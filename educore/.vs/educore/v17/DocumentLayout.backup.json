@@ -1,13 +1,25 @@
 {
   "Version": 1,
-  "WorkspaceRootPath": "D:\\educore\\educore\\",
+  "WorkspaceRootPath": "D:\\Github\\EduCoreLive\\educore\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\educore\\educore\\areas\\erp\\controllers\\admissioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\erp\\views\\admission\\studentlist.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\views\\admission\\studentlist.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\admin\\controllers\\schoolsettingscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\admin\\controllers\\schoolsettingscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\erp\\controllers\\admissioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\controllers\\admissioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{E57DC038-7CF6-4B3C-8F09-46F558681C0A}|..\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj|d:\\educore\\educoredataaccesslayer\\models\\admissionformmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\erp\\views\\admission\\dashboard.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\views\\admission\\dashboard.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|D:\\educore\\EduCoreDataAccessLayer\\Services\\Repository\\Admin\\AdmissionService.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -17,7 +29,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 5,
+          "SelectedChildIndex": 6,
           "Children": [
             {
               "$type": "Bookmark",
@@ -37,29 +49,64 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "AdmissionFormModel.cs",
-              "DocumentMoniker": "D:\\educore\\EduCoreDataAccessLayer\\Models\\AdmissionFormModel.cs",
-              "RelativeDocumentMoniker": "..\\EduCoreDataAccessLayer\\Models\\AdmissionFormModel.cs",
-              "ToolTip": "D:\\educore\\EduCoreDataAccessLayer\\Models\\AdmissionFormModel.cs",
-              "RelativeToolTip": "..\\EduCoreDataAccessLayer\\Models\\AdmissionFormModel.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAB0AAAAFAAAAAAAAAA==",
+              "DocumentIndex": 4,
+              "Title": "AdmissionService.cs",
+              "DocumentMoniker": "D:\\educore\\EduCoreDataAccessLayer\\Services\\Repository\\Admin\\AdmissionService.cs",
+              "RelativeDocumentMoniker": "..\\..\\..\\educore\\EduCoreDataAccessLayer\\Services\\Repository\\Admin\\AdmissionService.cs",
+              "ToolTip": "D:\\educore\\EduCoreDataAccessLayer\\Services\\Repository\\Admin\\AdmissionService.cs",
+              "RelativeToolTip": "..\\..\\..\\educore\\EduCoreDataAccessLayer\\Services\\Repository\\Admin\\AdmissionService.cs",
+              "ViewState": "AgIAAOwAAAAAAAAAAAAqwP8AAAAJAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-02T15:55:11.859Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-01T17:31:40.698Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "SchoolSettingsController.cs",
+              "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
+              "RelativeDocumentMoniker": "Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
+              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
+              "RelativeToolTip": "Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
+              "ViewState": "AgIAAIMBAAAAAAAAAAAhwDgBAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-01T16:19:12.647Z"
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "AdmissionController.cs",
-              "DocumentMoniker": "D:\\educore\\educore\\Areas\\ERP\\Controllers\\AdmissionController.cs",
-              "RelativeDocumentMoniker": "Areas\\ERP\\Controllers\\AdmissionController.cs",
-              "ToolTip": "D:\\educore\\educore\\Areas\\ERP\\Controllers\\AdmissionController.cs",
-              "RelativeToolTip": "Areas\\ERP\\Controllers\\AdmissionController.cs",
-              "ViewState": "AgIAADYBAAAAAAAAAAAgwDYBAAAyAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-02T15:28:42.69Z",
+              "Title": "StudentList.cshtml",
+              "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Views\\Admission\\StudentList.cshtml",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Views\\Admission\\StudentList.cshtml",
+              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Views\\Admission\\StudentList.cshtml",
+              "RelativeToolTip": "Areas\\ERP\\Views\\Admission\\StudentList.cshtml",
+              "ViewState": "AgIAAJIDAAAAAAAAAAAawKIDAAAbAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-01T16:23:09.114Z",
               "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "Dashboard.cshtml",
+              "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Views\\Admission\\Dashboard.cshtml",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Views\\Admission\\Dashboard.cshtml",
+              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Views\\Admission\\Dashboard.cshtml",
+              "RelativeToolTip": "Areas\\ERP\\Views\\Admission\\Dashboard.cshtml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-01T16:17:23.741Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "AdmissionController.cs",
+              "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Controllers\\AdmissionController.cs",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Controllers\\AdmissionController.cs",
+              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Controllers\\AdmissionController.cs",
+              "RelativeToolTip": "Areas\\ERP\\Controllers\\AdmissionController.cs",
+              "ViewState": "AgIAAPkAAAAAAAAAAAASwAQBAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-01T16:15:19.592Z"
             }
           ]
         }

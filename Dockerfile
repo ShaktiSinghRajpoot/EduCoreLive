@@ -11,4 +11,9 @@ RUN dotnet publish "educore/educore.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
+
+# 👇 This fixes the Railway PORT issue
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
 ENTRYPOINT ["dotnet", "educore.dll"]

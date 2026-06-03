@@ -3295,11 +3295,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\educore\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj",
+      "projectUniqueName": "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj",
       "projectName": "EduCoreDataAccessLayer",
-      "projectPath": "D:\\educore\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj",
+      "projectPath": "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj",
       "packagesPath": "C:\\Users\\shakt\\.nuget\\packages\\",
-      "outputPath": "D:\\educore\\EduCoreDataAccessLayer\\obj\\",
+      "outputPath": "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -3370,13 +3370,5 @@
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.313/PortableRuntimeIdentifierGraph.json"
       }
     }
-  },
-  "logs": [
-    {
-      "code": "NU1900",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "Error occurred while getting package vulnerability data: Unable to load the service index for source https://api.nuget.org/v3/index.json."
-    }
-  ]
+  }
 }

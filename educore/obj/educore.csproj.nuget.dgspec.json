@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "D:\\educore\\educore\\educore.csproj": {}
+    "D:\\Github\\EduCoreLive\\educore\\educore.csproj": {}
   },
   "projects": {
-    "D:\\educore\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj": {
+    "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\educore\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj",
+        "projectUniqueName": "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj",
         "projectName": "EduCoreDataAccessLayer",
-        "projectPath": "D:\\educore\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj",
+        "projectPath": "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj",
         "packagesPath": "C:\\Users\\shakt\\.nuget\\packages\\",
-        "outputPath": "D:\\educore\\EduCoreDataAccessLayer\\obj\\",
+        "outputPath": "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -83,14 +83,14 @@
         }
       }
     },
-    "D:\\educore\\educore\\educore.csproj": {
+    "D:\\Github\\EduCoreLive\\educore\\educore.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\educore\\educore\\educore.csproj",
+        "projectUniqueName": "D:\\Github\\EduCoreLive\\educore\\educore.csproj",
         "projectName": "educore",
-        "projectPath": "D:\\educore\\educore\\educore.csproj",
+        "projectPath": "D:\\Github\\EduCoreLive\\educore\\educore.csproj",
         "packagesPath": "C:\\Users\\shakt\\.nuget\\packages\\",
-        "outputPath": "D:\\educore\\educore\\obj\\",
+        "outputPath": "D:\\Github\\EduCoreLive\\educore\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -111,8 +111,8 @@
           "net9.0": {
             "targetAlias": "net9.0",
             "projectReferences": {
-              "D:\\educore\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj": {
-                "projectPath": "D:\\educore\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj"
+              "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj": {
+                "projectPath": "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj"
               }
             }
           }
