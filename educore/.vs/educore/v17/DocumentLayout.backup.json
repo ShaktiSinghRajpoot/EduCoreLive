@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "D:\\Github\\EduCoreLive\\educore\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\erp\\views\\admission\\studentlist.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
       "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\views\\admission\\studentlist.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
@@ -29,7 +33,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 6,
+          "SelectedChildIndex": 4,
           "Children": [
             {
               "$type": "Bookmark",
@@ -49,7 +53,20 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAAYAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-03T17:01:50.667Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
               "Title": "AdmissionService.cs",
               "DocumentMoniker": "D:\\educore\\EduCoreDataAccessLayer\\Services\\Repository\\Admin\\AdmissionService.cs",
               "RelativeDocumentMoniker": "..\\..\\..\\educore\\EduCoreDataAccessLayer\\Services\\Repository\\Admin\\AdmissionService.cs",
@@ -61,7 +78,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "SchoolSettingsController.cs",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
               "RelativeDocumentMoniker": "Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
@@ -73,7 +90,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "StudentList.cshtml",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Views\\Admission\\StudentList.cshtml",
               "RelativeDocumentMoniker": "Areas\\ERP\\Views\\Admission\\StudentList.cshtml",
@@ -86,7 +103,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "Dashboard.cshtml",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Views\\Admission\\Dashboard.cshtml",
               "RelativeDocumentMoniker": "Areas\\ERP\\Views\\Admission\\Dashboard.cshtml",
@@ -98,7 +115,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "AdmissionController.cs",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Controllers\\AdmissionController.cs",
               "RelativeDocumentMoniker": "Areas\\ERP\\Controllers\\AdmissionController.cs",
@@ -106,7 +123,8 @@
               "RelativeToolTip": "Areas\\ERP\\Controllers\\AdmissionController.cs",
               "ViewState": "AgIAAPkAAAAAAAAAAAASwAQBAAAIAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-01T16:15:19.592Z"
+              "WhenOpened": "2026-06-01T16:15:19.592Z",
+              "EditorCaption": ""
             }
           ]
         }
