@@ -1,0 +1,175 @@
+@using System.Security.Claims
+@using EduCoreDataAccessLayer.Helpers
+
+@{
+    var userName = User.FindFirst(Common.SK_UserName)?.Value
+                ?? User.Identity?.Name
+                ?? "User";
+    var email    = User.FindFirst(Common.SK_EmailId)?.Value ?? "";
+    var roleCode = User.FindFirst("role_code")?.Value
+                ?? User.FindFirst(ClaimTypes.Role)?.Value
+                ?? "";
+    var roleName = User.FindFirst("role_name")?.Value ?? "";
+
+    string roleLabel = roleCode switch {
+        AppRoles.SuperAdmin   => "Super Admin",
+        AppRoles.SchoolAdmin  => "School Admin",
+        AppRoles.Teacher      => "Teacher",
+        AppRoles.Accountant   => "Accountant",
+        AppRoles.Receptionist => "Receptionist",
+        _                     => string.IsNullOrWhiteSpace(roleName) ? roleCode : roleName
+    };
+
+    var parts    = userName.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    var initials = parts.Length >= 2
+        ? $"{parts[0][0]}{parts[^1][0]}".ToUpper()
+        : userName.Length > 0 ? userName[0].ToString().ToUpper() : "U";
+}
+
+@* ── Mobile sidebar toggle — flex-shrink-0 so it never gets squeezed ─ *@
+@if (ViewData["navbarHideToggle"] == null)
+{
+    <div class="layout-menu-toggle navbar-nav align-items-xl-center me-3 me-xl-0 d-xl-none flex-shrink-0">
+        <a class="nav-item nav-link px-0" href="javascript:void(0)">
+            <i class="icon-base bx bx-menu bx-md"></i>
+        </a>
+    </div>
+}
+
+@* ── Navbar body: fills all remaining horizontal space ────────────────
+   flex-grow-1  → expand to fill the navbar after the mobile toggle
+   flex-nowrap  → never let children wrap to a second row
+   overflow-hidden → clip anything that somehow still overflows          *@
+<div class="navbar-nav-right d-flex align-items-center flex-grow-1 flex-nowrap overflow-hidden"
+     id="navbar-collapse">
+
+    @* Search — me-auto pushes the right items to the far end
+       Input is hidden on mobile; icon always shows as a visual anchor   *@
+    <div class="navbar-nav align-items-center me-auto">
+        <div class="nav-item d-flex align-items-center gap-2">
+            <i class="icon-base bx bx-search icon-md text-muted flex-shrink-0"></i>
+            <input type="text"
+                   class="form-control border-0 shadow-none bg-transparent ps-0 d-none d-md-block"
+                   style="width:160px;"
+                   placeholder="Search…"
+                   aria-label="Search" />
+        </div>
+    </div>
+
+    @* Right items — flex-shrink-0 so bell + avatar are never compressed *@
+    <ul class="navbar-nav flex-row align-items-center gap-1 flex-shrink-0">
+
+        @* ── Notifications ──────────────────────────────────────────── *@
+        <li class="nav-item dropdown">
+            <a class="nav-link p-2 position-relative"
+               href="javascript:void(0);"
+               data-bs-toggle="dropdown"
+               aria-expanded="false">
+                <i class="icon-base bx bx-bell bx-sm"></i>
+                <span class="position-absolute bg-danger rounded-circle border border-white"
+                      style="width:8px;height:8px;top:6px;right:6px;"></span>
+            </a>
+
+            @* max-width: min(320px, 90vw) stops dropdown overflowing on narrow screens *@
+            <div class="dropdown-menu dropdown-menu-end shadow-sm p-0"
+                 style="width:320px;max-width:min(320px,90vw);">
+                <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
+                    <h6 class="mb-0 fw-semibold">Notifications</h6>
+                    <span class="badge bg-label-danger rounded-pill">3 new</span>
+                </div>
+                <ul class="list-unstyled mb-0" style="max-height:260px;overflow-y:auto;">
+                    <li class="border-bottom">
+                        <a href="javascript:void(0);"
+                           class="dropdown-item px-4 py-3 d-flex gap-3 align-items-start">
+                            <div class="avatar flex-shrink-0" style="width:34px;height:34px;">
+                                <span class="avatar-initial rounded-circle bg-label-warning">
+                                    <i class="bx bx-wallet" style="font-size:14px;"></i>
+                                </span>
+                            </div>
+                            <div class="overflow-hidden">
+                                <p class="mb-0 fw-medium small text-truncate">3 fee payments due today</p>
+                                <small class="text-muted">2 hours ago</small>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="border-bottom">
+                        <a href="javascript:void(0);"
+                           class="dropdown-item px-4 py-3 d-flex gap-3 align-items-start">
+                            <div class="avatar flex-shrink-0" style="width:34px;height:34px;">
+                                <span class="avatar-initial rounded-circle bg-label-info">
+                                    <i class="bx bx-user-plus" style="font-size:14px;"></i>
+                                </span>
+                            </div>
+                            <div class="overflow-hidden">
+                                <p class="mb-0 fw-medium small text-truncate">New admission enquiry received</p>
+                                <small class="text-muted">5 hours ago</small>
+                            </div>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="javascript:void(0);"
+                           class="dropdown-item px-4 py-3 d-flex gap-3 align-items-start">
+                            <div class="avatar flex-shrink-0" style="width:34px;height:34px;">
+                                <span class="avatar-initial rounded-circle bg-label-success">
+                                    <i class="bx bx-file" style="font-size:14px;"></i>
+                                </span>
+                            </div>
+                            <div class="overflow-hidden">
+                                <p class="mb-0 fw-medium small text-truncate">Exam results upload pending</p>
+                                <small class="text-muted">Yesterday</small>
+                            </div>
+                        </a>
+                    </li>
+                </ul>
+                <div class="text-center border-top py-2">
+                    <a href="javascript:void(0);" class="small fw-medium">View all</a>
+                </div>
+            </div>
+        </li>
+
+        @* ── User ───────────────────────────────────────────────────── *@
+        <li class="nav-item navbar-dropdown dropdown-user dropdown">
+            <a class="nav-link dropdown-toggle hide-arrow p-0 ms-1"
+               href="javascript:void(0);"
+               data-bs-toggle="dropdown"
+               aria-expanded="false">
+                <div class="avatar avatar-online">
+                    <span class="avatar-initial rounded-circle bg-primary">@initials</span>
+                </div>
+            </a>
+
+            <ul class="dropdown-menu dropdown-menu-end shadow mt-1 py-0"
+                style="min-width:220px;max-width:min(260px,90vw);">
+                <li>
+                    <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom">
+                        <div class="avatar flex-shrink-0" style="width:40px;height:40px;">
+                            <span class="avatar-initial rounded-circle bg-primary">@initials</span>
+                        </div>
+                        <div class="overflow-hidden">
+                            <h6 class="mb-0 text-truncate fw-semibold">@userName</h6>
+                            <small class="text-muted d-block text-truncate">@roleLabel</small>
+                            @if (!string.IsNullOrWhiteSpace(email))
+                            {
+                                <small class="text-muted text-truncate d-block"
+                                       style="font-size:0.68rem;">@email</small>
+                            }
+                        </div>
+                    </div>
+                </li>
+                <li>
+                    <form asp-area="" asp-controller="Account" asp-action="Logout" method="post"
+                          class="py-1">
+                        @Html.AntiForgeryToken()
+                        <button type="submit"
+                                class="dropdown-item d-flex align-items-center gap-2 py-2 text-danger w-100"
+                                style="background:none;border:none;cursor:pointer;text-align:left;">
+                            <i class="icon-base bx bx-power-off icon-md"></i>
+                            Sign Out
+                        </button>
+                    </form>
+                </li>
+            </ul>
+        </li>
+
+    </ul>
+</div>

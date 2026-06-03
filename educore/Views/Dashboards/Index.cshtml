@@ -1,0 +1,320 @@
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+@section VendorStyles {
+    <link rel="stylesheet" href="~/vendor/libs/apex-charts/apex-charts.css" />
+}
+
+@section VendorScripts {
+    <script src="~/vendor/libs/apex-charts/apexcharts.js"></script>
+}
+
+@section PageStyles {
+    <style>
+        .erp-dashboard {
+            --erp-radius: 1rem;
+            --erp-border: var(--ec-border, #ececf5);
+            --erp-muted:  var(--ec-text-muted, #8b8175);
+        }
+
+            .erp-dashboard .card {
+                border:        1px solid var(--ec-border, #ececf5);
+                border-radius: var(--erp-radius);
+                box-shadow:    0 .125rem .75rem rgba(67,89,113,.06);
+            }
+
+            .erp-dashboard .card-header {
+                border-bottom: 1px solid var(--ec-border, #ececf5);
+                padding:       1.25rem 1.25rem .5rem;
+            }
+
+            .erp-dashboard .card-body {
+                padding: 1.25rem;
+            }
+
+        .erp-alert {
+            border-radius: var(--erp-radius);
+            background: #fff;
+            border-left: .35rem solid #ea5455;
+            box-shadow: 0 .125rem .75rem rgba(67,89,113,.08);
+        }
+
+        .erp-alert-icon, .erp-stat-icon {
+            width: 2.75rem;
+            height: 2.75rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: .85rem;
+            flex: 0 0 auto;
+        }
+
+        .erp-stat-card {
+            min-height: 8.4rem;
+            transition: transform .2s ease, box-shadow .2s ease;
+        }
+
+            .erp-stat-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 .5rem 1.25rem rgba(67,89,113,.09);
+            }
+
+        .erp-label {
+            color: var(--erp-muted);
+            font-size: .78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+        }
+
+        .erp-value {
+            color:       var(--ec-text-dark, #2b1b12);
+            font-size:   1.45rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .erp-subtext {
+            color: var(--erp-muted);
+            font-size: .85rem;
+        }
+
+        .erp-progress {
+            height: .45rem;
+            border-radius: 999px;
+            background: #f0f2f4;
+            overflow: hidden;
+        }
+
+            .erp-progress span {
+                display: block;
+                height: 100%;
+                border-radius: inherit;
+            }
+
+        .erp-dark-card {
+            color: #fff;
+            background: linear-gradient(135deg,#1f2937,#111827);
+        }
+
+            .erp-dark-card .erp-label, .erp-dark-card .erp-subtext {
+                color: rgba(255,255,255,.68);
+            }
+
+        .erp-chart {
+            min-height: 315px;
+        }
+
+        .erp-mini-chart {
+            min-height: 230px;
+        }
+
+        .erp-table thead th {
+            color:          var(--erp-muted);
+            font-size:      .76rem;
+            font-weight:    700;
+            text-transform: uppercase;
+            letter-spacing: .035em;
+            background:     #faf9f7;
+            border-bottom:  1px solid var(--ec-border-warm, #f0eee9);
+            white-space:    nowrap;
+        }
+
+        .erp-table tbody td {
+            padding:        1rem .9rem;
+            vertical-align: middle;
+            border-bottom:  1px solid var(--ec-border, #ececf5);
+        }
+
+        .erp-table tbody tr:hover {
+            background: #fffaf5;
+        }
+
+        .erp-avatar {
+            width: 2.25rem;
+            height: 2.25rem;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .8rem;
+            font-weight: 700;
+        }
+
+        .erp-status {
+            display: inline-flex;
+            align-items: center;
+            padding: .35rem .75rem;
+            border-radius: 999px;
+            font-size: .74rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .erp-search {
+            max-width: 18rem;
+        }
+        @@media (max-width: 991.98px) {
+            .erp-search
+
+        {
+            max-width: 100%;
+        }
+
+        .erp-chart {
+            min-height: 280px;
+        }
+
+        }
+        @@media (max-width: 575.98px) {
+            .erp-dashboard .card-body
+
+        {
+            padding: 1rem;
+        }
+
+        .erp-value {
+            font-size: 1.25rem;
+        }
+
+        .erp-stat-card {
+            min-height: auto;
+        }
+
+        }</style>
+}
+
+@* ************** School ERP Dashboard ************** *@
+<div class="erp-dashboard">
+    <div class="row g-4">
+       
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Staff Attendance</div><div class="erp-value mb-2">0 <span class="fs-6 fw-normal text-muted">/ 11</span></div><span class="badge bg-label-danger">0%</span><span class="erp-subtext ms-2">Present Today</span></div><span class="erp-stat-icon bg-label-primary text-primary"><i class="icon-base bx bx-user-check icon-lg"></i></span></div></div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Student Attendance</div><div class="erp-value mb-2">0 <span class="fs-6 fw-normal text-muted">/ 13</span></div><span class="badge bg-label-danger">0%</span><span class="erp-subtext ms-2">Present Today</span></div><span class="erp-stat-icon bg-label-info text-info"><i class="icon-base bx bx-group icon-lg"></i></span></div></div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Total Collection</div><div class="erp-value mb-2">₹ 13,201</div><small class="text-success fw-medium"><i class="icon-base bx bx-trending-up"></i> +12.5%</small></div><span class="erp-stat-icon bg-label-success text-success"><i class="icon-base bx bx-wallet icon-lg"></i></span></div></div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Total Due</div><div class="erp-value mb-2">₹ 141,912</div><small class="text-danger fw-medium">Action Required</small></div><span class="erp-stat-icon bg-label-danger text-danger"><i class="icon-base bx bx-error-circle icon-lg"></i></span></div></div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Avg. Fee / Student</div><div class="erp-value mb-2">₹ 3,300</div><small class="erp-subtext">Per Transaction</small></div><span class="erp-stat-icon bg-label-primary text-primary"><i class="icon-base bx bx-credit-card icon-lg"></i></span></div></div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100 border border-success border-opacity-25"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3 text-success">Txns Count</div><div class="erp-value mb-2">4</div><small class="erp-subtext">Successful</small></div><span class="erp-stat-icon bg-label-success text-success"><i class="icon-base bx bx-transfer-alt icon-lg"></i></span></div></div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Students With Due</div><div class="erp-value mb-2">10</div><small class="text-warning fw-medium">77% of Total</small></div><span class="erp-stat-icon bg-label-warning text-warning"><i class="icon-base bx bx-user-x icon-lg"></i></span></div></div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Total Students</div><div class="erp-value mb-2">13</div><span class="badge bg-label-success">+1</span><span class="erp-subtext ms-2">New Admissions</span></div><span class="erp-stat-icon bg-label-secondary text-secondary"><i class="icon-base bx bx-user-plus icon-lg"></i></span></div></div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body"><div class="d-flex justify-content-between"><div><div class="erp-label mb-3">Collection Efficiency</div><div class="erp-value mb-2">8%</div></div><span class="erp-stat-icon bg-label-success text-success"><i class="icon-base bx bx-purchase-tag icon-lg"></i></span></div><div class="erp-progress mt-2"><span class="bg-success" style="width:8%"></span></div><small class="erp-subtext">Of yearly target</small></div></div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Revenue Growth</div><div class="erp-value mb-2">13101%</div><small class="text-success fw-medium"><i class="icon-base bx bx-up-arrow-alt"></i> vs Previous Period</small></div><span class="erp-stat-icon bg-label-warning text-warning"><i class="icon-base bx bx-line-chart icon-lg"></i></span></div></div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Defaulter Rate</div><div class="erp-value mb-2">77%</div><small class="text-danger fw-medium">High Risk</small></div><span class="erp-stat-icon bg-label-danger text-danger"><i class="icon-base bx bx-pulse icon-lg"></i></span></div></div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card erp-stat-card erp-dark-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Current Bill (Quarterly)</div><div class="erp-value text-white mb-2">₹0.00</div><small class="erp-subtext"><i class="icon-base bx bxs-circle text-warning me-1" style="font-size:.55rem"></i> Free Trial Plan</small></div><span class="erp-stat-icon bg-white bg-opacity-10 text-white"><i class="icon-base bx bx-receipt icon-lg"></i></span></div></div>
+        </div>
+
+        <div class="col-12 col-xl-8">
+            <div class="card h-100">
+                <div class="card-header d-flex flex-column flex-md-row justify-content-between gap-2">
+                    <div><h5 class="mb-1">Collection Trend</h5><small class="text-muted">Recent fee collection activity</small></div>
+                    <div class="d-flex gap-2"><button class="btn btn-sm btn-label-primary">Monthly</button><button class="btn btn-sm btn-outline-secondary">Export</button></div>
+                </div>
+                <div class="card-body"><div id="collectionTrendChart" class="erp-chart"></div></div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4">
+            <div class="row g-4 h-100">
+                <div class="col-12 col-md-6 col-xl-12">
+                    <div class="card h-100"><div class="card-header"><h5 class="mb-1">Payment Modes</h5><small class="text-muted">Collection by method</small></div><div class="card-body"><div id="paymentModesChart" class="erp-mini-chart"></div><div class="d-flex justify-content-between mt-2"><span class="erp-subtext">Cash</span><strong>100%</strong></div></div></div>
+                </div>
+                <div class="col-12 col-md-6 col-xl-12">
+                    <div class="card h-100"><div class="card-header"><h5 class="mb-1">Fee Status</h5><small class="text-muted">Collected vs expected</small></div><div class="card-body"><div class="d-flex justify-content-between mb-2"><span class="erp-subtext">Collection</span><strong>8.5%</strong></div><div class="erp-progress mb-3"><span class="bg-success" style="width:8.5%"></span></div><div id="feeStatusChart" class="erp-mini-chart"></div></div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+                    <div><h5 class="mb-1">Student Fee Matrix</h5><small class="text-muted">Showing top 10 results from 13 records</small></div>
+                    <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-lg-auto"><input type="search" class="form-control erp-search" placeholder="Search student or class..." /><button class="btn btn-primary"><i class="icon-base bx bx-download me-1"></i>Export</button></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table erp-table mb-0">
+                        <thead><tr><th>Student Name</th><th>Class</th><th>Total Fee</th><th>Paid</th><th>Due</th><th>Status</th><th>Last Payment</th></tr></thead>
+                        <tbody>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-primary text-primary">YK</span><div><h6 class="mb-0">Yash Kumar</h6><small class="text-muted">Student</small></div></div></td><td>12th</td><td>₹ 20,750</td><td class="text-success fw-semibold">₹ 0</td><td class="text-danger fw-semibold">₹ 20,750</td><td><span class="erp-status bg-label-danger text-danger">Pending</span></td><td>-</td></tr>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-info text-info">DS</span><div><h6 class="mb-0">Demo student</h6><small class="text-muted">Student</small></div></div></td><td>8th</td><td>₹ 20,500</td><td class="text-success fw-semibold">₹ 500</td><td class="text-danger fw-semibold">₹ 20,000</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>3/23/2026</td></tr>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-success text-success">DS</span><div><h6 class="mb-0">Deepak Sherma</h6><small class="text-muted">Student</small></div></div></td><td>11th</td><td>₹ 20,750</td><td class="text-success fw-semibold">₹ 1,100</td><td class="text-danger fw-semibold">₹ 19,650</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>3/21/2026</td></tr>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-primary text-primary">VJ</span><div><h6 class="mb-0">Vikash ji</h6><small class="text-muted">Student</small></div></div></td><td>4th</td><td>₹ 18,150</td><td class="text-success fw-semibold">₹ 950</td><td class="text-danger fw-semibold">₹ 17,200</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>3/14/2026</td></tr>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-danger text-danger">H</span><div><h6 class="mb-0">Hema</h6><small class="text-muted">Student</small></div></div></td><td>UKG</td><td>₹ 18,150</td><td class="text-success fw-semibold">₹ 1,251</td><td class="text-danger fw-semibold">₹ 16,899</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>4/22/2026</td></tr>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-secondary text-secondary">G</span><div><h6 class="mb-0">Govind</h6><small class="text-muted">Student</small></div></div></td><td>UKG</td><td>₹ 15,000</td><td class="text-success fw-semibold">₹ 2,001</td><td class="text-danger fw-semibold">₹ 12,999</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>5/3/2026</td></tr>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-danger text-danger">ML</span><div><h6 class="mb-0">Mohan Lal</h6><small class="text-muted">Student</small></div></div></td><td>8th</td><td>₹ 11,250</td><td class="text-success fw-semibold">₹ 0</td><td class="text-danger fw-semibold">₹ 11,250</td><td><span class="erp-status bg-label-danger text-danger">Pending</span></td><td>-</td></tr>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-info text-info">NS</span><div><h6 class="mb-0">New saloni</h6><small class="text-muted">Student</small></div></div></td><td>9th</td><td>₹ 11,250</td><td class="text-success fw-semibold">₹ 100</td><td class="text-danger fw-semibold">₹ 11,150</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>4/28/2026</td></tr>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-success text-success">A</span><div><h6 class="mb-0">Anmol</h6><small class="text-muted">Student</small></div></div></td><td>2nd</td><td>₹ 17,540</td><td class="text-success fw-semibold">₹ 10,000</td><td class="text-danger fw-semibold">₹ 7,540</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>5/3/2026</td></tr>
+                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-primary text-primary">AV</span><div><h6 class="mb-0">Akash Verma</h6><small class="text-muted">Student</small></div></div></td><td>9th</td><td>₹ 20,750</td><td class="text-success fw-semibold">₹ 16,276</td><td class="text-danger fw-semibold">₹ 4,474</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>5/6/2026</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section PageScripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          const primary = '#696cff', success = '#28c76f', warning = '#ff9f43', danger = '#ea5455';
+
+          if (document.querySelector('#collectionTrendChart')) {
+            new ApexCharts(document.querySelector('#collectionTrendChart'), {
+              chart: { type: 'area', height: 315, toolbar: { show: false }, parentHeightOffset: 0 },
+              series: [{ name: 'Collection', data: [2000, 5600, 10000, 7200, 13201] }],
+              xaxis: { categories: ['1 May', '2 May', '3 May', '4 May', '6 May'], labels: { style: { colors: '#a1acb8' } } },
+              yaxis: { labels: { formatter: value => '₹' + Math.round(value / 1000) + 'k', style: { colors: '#a1acb8' } } },
+              stroke: { curve: 'smooth', width: 3 },
+              colors: [primary],
+              dataLabels: { enabled: false },
+              grid: { borderColor: '#eceef1' },
+              fill: { type: 'gradient', gradient: { opacityFrom: .32, opacityTo: .04 } },
+              tooltip: { y: { formatter: value => '₹ ' + value.toLocaleString('en-IN') } }
+            }).render();
+          }
+
+          if (document.querySelector('#paymentModesChart')) {
+            new ApexCharts(document.querySelector('#paymentModesChart'), {
+              chart: { type: 'donut', height: 230 },
+              series: [100], labels: ['Cash'], colors: [success],
+              dataLabels: { enabled: false }, legend: { show: false },
+              stroke: { width: 0 }, plotOptions: { pie: { donut: { size: '68%' } } }
+            }).render();
+          }
+
+          if (document.querySelector('#feeStatusChart')) {
+            new ApexCharts(document.querySelector('#feeStatusChart'), {
+              chart: { type: 'bar', height: 210, toolbar: { show: false } },
+              series: [{ name: 'Students', data: [3, 10] }],
+              xaxis: { categories: ['Fully Paid', 'Due / Partial'] },
+              colors: [success, danger], dataLabels: { enabled: false },
+              plotOptions: { bar: { borderRadius: 6, distributed: true, columnWidth: '48%' } },
+              grid: { borderColor: '#eceef1' }, legend: { show: false }
+            }).render();
+          }
+        });
+    </script>
+}

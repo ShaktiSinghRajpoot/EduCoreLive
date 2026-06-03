@@ -1,0 +1,199 @@
+﻿@model UserViewModel
+@{
+    Layout = "_BlankLayout";
+    ViewData["Title"] = "Login";
+}
+
+@section PageStyles {
+    <style>
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #fff7ed 0%, #f8f7f5 50%, #fff4e6 100%);
+            padding: 1.5rem;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            background: #ffffff;
+            border: 1px solid #f0eee9;
+            border-radius: 22px;
+            padding: 2.5rem 2rem;
+            box-shadow: 0 8px 24px rgba(67, 89, 113, .14);
+        }
+
+        .brand-box { text-align: center; margin-bottom: .75rem; }
+
+        .brand-name {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #ff8a00;
+            letter-spacing: -.03em;
+            margin-bottom: 1rem;
+        }
+
+        .login-title {
+            text-align: center;
+            font-size: 1.6rem;
+            font-weight: 800;
+            color: #2b1b12;
+            margin-bottom: .25rem;
+        }
+
+        .login-subtitle {
+            text-align: center;
+            color: #8b8175;
+            font-size: .9rem;
+            margin-bottom: 1.75rem;
+        }
+
+        .login-input-wrap {
+            position: relative;
+            margin-bottom: 1.25rem;
+        }
+
+        .login-input-wrap .field-icon {
+            position: absolute;
+            left: .9rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #8b8175;
+            font-size: 1.1rem;
+            pointer-events: none;
+            z-index: 4;
+        }
+
+        .login-input-wrap .form-control {
+            padding-left: 2.6rem;
+            padding-right: 2.6rem;
+        }
+
+        .password-eye {
+            position: absolute;
+            right: .9rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #8b8175;
+            cursor: pointer;
+            z-index: 4;
+        }
+
+        .login-options { margin-bottom: 1.25rem; }
+
+        .login-btn {
+            font-weight: 700;
+            min-height: 48px;
+            border-radius: 12px;
+            margin-bottom: 1.25rem;
+        }
+
+        .login-links { text-align: center; font-size: .8rem; color: #8b8175; }
+        .login-links a { color: #ff8a00; text-decoration: none; }
+
+        @@media (max-width: 480px) {
+            .login-card { padding: 2rem 1.25rem; border-radius: 18px; }
+        }
+    </style>
+}
+
+<div class="login-page">
+    <div class="login-card">
+
+        <div class="brand-box">
+            <a href="/" class="app-brand-link text-decoration-none">
+                <span class="app-brand-logo demo">
+                    @await Html.PartialAsync("../_Partials/_Macros")
+                </span>
+            </a>
+        </div>
+
+        <div class="brand-name">@TempData.Peek("appName")</div>
+
+        <h1 class="login-title">Welcome Back</h1>
+        <p class="login-subtitle">Login to continue managing your school.</p>
+
+        @if (TempData["Message"] != null)
+        {
+            <div class="alert alert-danger">
+                @TempData["Message"]
+            </div>
+        }
+
+        <form asp-controller="Account"
+              asp-action="Login"
+              asp-route-returnurl="@Context.Request.Query["returnUrl"]"
+              method="post"
+              id="myform"
+              class="needs-validation"
+              novalidate
+              autocomplete="off">
+
+            @Html.AntiForgeryToken()
+
+            <div>
+                <label for="Email" class="form-label">Email</label>
+                <div class="login-input-wrap">
+                    <i class="icon-base bx bx-user field-icon"></i>
+                    <input type="text"
+                           asp-for="Email"
+                           class="form-control"
+                           placeholder="Enter email"
+                           autofocus />
+                </div>
+            </div>
+
+            <div>
+                <label for="Password" class="form-label">Password</label>
+                <div class="login-input-wrap">
+                    <i class="icon-base bx bx-lock-alt field-icon"></i>
+                    <input type="password"
+                           asp-for="Password"
+                           id="Password"
+                           class="form-control"
+                           placeholder="••••••••••" />
+                    <span class="password-eye" id="togglePassword">
+                        <i class="icon-base bx bx-hide"></i>
+                    </span>
+                </div>
+            </div>
+
+            <div class="login-options">
+                <div class="form-check mb-0">
+                    <input class="form-check-input" asp-for="RememberMe" type="checkbox" id="remember-me" />
+                    <label class="form-check-label" for="remember-me">Remember Me</label>
+                </div>
+            </div>
+
+            <button class="btn btn-primary d-grid w-100 login-btn" type="submit">
+                Login <span class="ms-1">→</span>
+            </button>
+        </form>
+
+        <div class="login-links">
+            <a href="#">Terms</a> • <a href="#">Privacy</a>
+        </div>
+    </div>
+</div>
+
+@section PageScripts {
+    <script type="text/javascript">
+        $(function () {
+            $('#togglePassword').on('click', function () {
+                const input = $('#Password');
+                const icon = $(this).find('i');
+
+                if (input.attr('type') === 'password') {
+                    input.attr('type', 'text');
+                    icon.removeClass('bx-hide').addClass('bx-show');
+                } else {
+                    input.attr('type', 'password');
+                    icon.removeClass('bx-show').addClass('bx-hide');
+                }
+            });
+        });
+    </script>
+}

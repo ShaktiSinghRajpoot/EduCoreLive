@@ -1,0 +1,640 @@
+@using EduCoreDataAccessLayer.Helpers
+@using System.Security.Claims
+
+@{
+    var currentPage = Context.Request.Path.Value ?? "";
+
+    var role = User.FindFirst("role_code")?.Value
+               ?? User.FindFirst(ClaimTypes.Role)?.Value
+               ?? Context.Session.GetString("RoleCode")
+               ?? "";
+
+    var roleName = User.FindFirst("role_name")?.Value
+                   ?? Context.Session.GetString("RoleName")
+                   ?? "";
+
+    var userName = User.FindFirst(Common.SK_UserName)?.Value
+                   ?? Context.Session.GetString("UserName")
+                   ?? "";
+
+    var appName = "EduCore";
+    var supportUrl = "#";
+
+    var menus = new Dictionary<string, string[]>
+    {
+        ["SUPER_ADMIN"] = new[] {
+            "Dashboard", "Schools", "Sign out"
+        },
+
+        ["SCHOOL_ADMIN"] = new[] {
+            "Dashboard",
+            "Admission & Students",
+            "Enquiry CRM",
+            "Student Attendance",
+            "Exams & Results",
+            "Fees Management",
+            "Payment Verification",
+            "Fee Due Reminders",
+            "Staff Management",
+            "Leave Management",
+            "Payroll Management",
+            "Staff Attendance",
+            "Inventory Management",
+            "Accounts & Expenses",
+            "Timetable Management",
+            "Notice Board",
+            "Smart Bell",
+            "Advanced Bus Tracking",
+            "ID Cards",
+            "Transfer Certificates",
+            "Certifications",
+            "Reports",
+            "Billing & Subscription",
+            "School Settings",
+            "Support",
+            "Install App",
+            "Sign out",
+            ////
+           "Fee",
+           "Admission"
+
+        },
+
+        ["TEACHER"] = new[] {
+            "Dashboard",
+            "Enquiry CRM",
+            "Student Attendance",
+            "Exams & Results",
+            "Leave Management",
+            "Payroll Management",
+            "Staff Attendance",
+            "Timetable Management",
+            "ID Cards",
+            "Support",
+            "Install App",
+            "Sign out"
+        },
+
+        ["ACCOUNTANT"] = new[] {
+            "Dashboard",
+            "Enquiry CRM",
+            "Fees Management",
+            "Payment Verification",
+            "Fee Due Reminders",
+            "Leave Management",
+            "Payroll Management",
+            "Staff Attendance",
+            "Inventory Management",
+            "Accounts & Expenses",
+            "Reports",
+            "Support",
+            "Install App",
+            "Sign out",
+            ////
+           "Fee"
+        },
+
+        ["RECEPTIONIST"] = new[] {
+            "Dashboard",
+            "Admission & Students",
+            "Enquiry CRM",
+            "Leave Management",
+            "Payroll Management",
+            "Staff Attendance",
+            "Inventory Management",
+            "ID Cards",
+            "Transfer Certificates",
+            "Support",
+            "Install App",
+            "Sign out"
+        }
+    };
+
+    string GetIcon(string name) => name switch
+    {
+        "Dashboard" => "bx-home-smile",
+        "Schools" => "bx-buildings",
+        "Admission & Students" => "bx-user-plus",
+        "Enquiry CRM" => "bx-message-square-detail",
+        "Student Attendance" => "bx-user-check",
+        "Exams & Results" => "bx-file",
+        "Fees Management" => "bx-wallet",
+        "Payment Verification" => "bx-check-shield",
+        "Fee Due Reminders" => "bx-bell",
+        "Staff Management" => "bx-group",
+        "Leave Management" => "bx-calendar-minus",
+        "Payroll Management" => "bx-money",
+        "Staff Attendance" => "bx-user-voice",
+        "Inventory Management" => "bx-package",
+        "Accounts & Expenses" => "bx-receipt",
+        "Timetable Management" => "bx-time-five",
+        "Notice Board" => "bx-news",
+        "Smart Bell" => "bx-bell-ring",
+        "Advanced Bus Tracking" => "bx-bus",
+        "ID Cards" => "bx-id-card",
+        "Transfer Certificates" => "bx-transfer",
+        "Certifications" => "bx-certification",
+        "Reports" => "bx-bar-chart-alt-2",
+        "Billing & Subscription" => "bx-credit-card",
+        "School Settings" => "bx-cog",
+        "Support" => "bx-support",
+        "Install App" => "bx-download",
+        "Sign out" => "bx-log-out",
+        //
+        "Fees" => "bx-wallet",
+        "Admission" => "bx-user-plus",
+        _ => "bx-circle"
+    };
+
+    string GetController(string name)
+    {
+        return name.Replace("&", "And")
+                   .Replace(" ", "")
+                   .Replace("-", "");
+    }
+
+    string GetArea(string item)
+    {
+        if (item == "Dashboard")
+            return role == "SUPER_ADMIN" ? "SuperAdmin" : "Admin";
+
+        if (role == "SUPER_ADMIN")
+            return "SuperAdmin";
+
+        return "Admin";
+    }
+
+    bool IsActive(string value)
+    {
+        return currentPage.Contains(value, StringComparison.OrdinalIgnoreCase);
+    }
+}
+<style>
+
+    /* =========================================
+       COLORFUL ICONS WITH DEFAULT SNEAT UI
+    ========================================= */
+
+    #layout-menu .menu-icon {
+        font-size: 20px;
+        margin-right: 14px;
+        transition: all .2s ease;
+    }
+    /* =========================================
+       PREMIUM SEARCH BOX
+    ========================================= */
+
+    .sidebar-search {
+        padding: 12px 16px 14px;
+    }
+
+        .sidebar-search input {
+            width: 100%;
+            height: 42px;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            background: #f8fafc;
+            padding: 0 14px 0 40px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #334155;
+            outline: none;
+            transition: all .22s ease;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-size: 16px;
+            background-position: 14px center;
+        }
+
+            .sidebar-search input::placeholder {
+                color: #94a3b8;
+            }
+
+            .sidebar-search input:hover {
+                border-color: #d7dbff;
+                background-color: #ffffff;
+            }
+
+            .sidebar-search input:focus {
+                border-color: #696cff;
+                background-color: #ffffff;
+                box-shadow: 0 0 0 4px rgba(105,108,255,.10);
+            }
+    /* Dashboard */
+    #layout-menu .bx-home-smile {
+        color: #696cff;
+    }
+
+    /* Schools */
+    #layout-menu .bx-buildings {
+        color: #03c3ec;
+    }
+
+    /* Admission */
+    #layout-menu .bx-user-plus {
+        color: #71dd37;
+    }
+
+    /* CRM */
+    #layout-menu .bx-message-square-detail {
+        color: #ffab00;
+    }
+
+    /* Attendance */
+    #layout-menu .bx-user-check {
+        color: #03c3ec;
+    }
+
+    /* Exams */
+    #layout-menu .bx-file {
+        color: #ff3e1d;
+    }
+
+    /* Fees */
+    #layout-menu .bx-wallet {
+        color: #71dd37;
+    }
+
+    /* Verification */
+    #layout-menu .bx-check-shield {
+        color: #696cff;
+    }
+
+    /* Reminder */
+    #layout-menu .bx-bell {
+        color: #ff9800;
+    }
+
+    /* Staff */
+    #layout-menu .bx-group {
+        color: #03c3ec;
+    }
+
+    /* Leave */
+    #layout-menu .bx-calendar-minus {
+        color: #e83e8c;
+    }
+
+    /* Payroll */
+    #layout-menu .bx-money {
+        color: #4caf50;
+    }
+
+    /* Voice */
+    #layout-menu .bx-user-voice {
+        color: #9c27b0;
+    }
+
+    /* Inventory */
+    #layout-menu .bx-package {
+        color: #ff5722;
+    }
+
+    /* Accounts */
+    #layout-menu .bx-receipt {
+        color: #009688;
+    }
+
+    /* Timetable */
+    #layout-menu .bx-time-five {
+        color: #2196f3;
+    }
+
+    /* Notice */
+    #layout-menu .bx-news {
+        color: #f44336;
+    }
+
+    /* Smart Bell */
+    #layout-menu .bx-bell-ring {
+        color: #ffc107;
+    }
+
+    /* Bus */
+    #layout-menu .bx-bus {
+        color: #00bcd4;
+    }
+
+    /* ID */
+    #layout-menu .bx-id-card {
+        color: #673ab7;
+    }
+
+    /* Transfer */
+    #layout-menu .bx-transfer {
+        color: #ff9800;
+    }
+
+    /* Certificate */
+    #layout-menu .bx-certification {
+        color: #4caf50;
+    }
+
+    /* Reports */
+    #layout-menu .bx-bar-chart-alt-2 {
+        color: #2196f3;
+    }
+
+    /* Billing */
+    #layout-menu .bx-credit-card {
+        color: #9c27b0;
+    }
+
+    /* Settings */
+    #layout-menu .bx-cog {
+        color: #8592a3;
+    }
+
+    /* Support */
+    #layout-menu .bx-support {
+        color: #03c3ec;
+    }
+
+    /* Download */
+    #layout-menu .bx-download {
+        color: #4caf50;
+    }
+
+    /* Logout */
+    #layout-menu .bx-log-out {
+        color: #f44336;
+    }
+
+    /* Hover effect */
+
+    #layout-menu .menu-link:hover .menu-icon {
+        transform: scale(1.12);
+    }
+
+    /* Active menu */
+
+    #layout-menu .menu-item.active > .menu-link .menu-icon {
+        color: #ffffff !important;
+    }
+
+    /* =========================================
+       SUBMENU ICONS
+    ========================================= */
+
+    #layout-menu .submenu-icon {
+        font-size: 16px;
+        margin-right: 10px;
+    }
+
+    /* Submenu Colors */
+
+    #layout-menu .submenu-profile {
+        color: #696cff;
+    }
+
+    #layout-menu .submenu-academic {
+        color: #03c3ec;
+    }
+
+    #layout-menu .submenu-feehead {
+        color: #71dd37;
+    }
+
+    #layout-menu .submenu-feestructure {
+        color: #ffab00;
+    }
+
+    #layout-menu .submenu-crm {
+        color: #e83e8c;
+    }
+</style>
+<aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
+
+    <div class='app-brand demo @((ViewData["navbarFull"] != null && Convert.ToBoolean(ViewData["navbarFull"])) ? "d-xl-none" : "")'>
+
+        @* <a asp-area=""
+           asp-controller="Dashboards"
+           asp-action="Index"
+           class="app-brand-link"> *@
+           <a asp-area="@(role == "SUPER_ADMIN" ? "SuperAdmin" : "Admin")"
+   asp-controller="Dashboard"
+   asp-action="Index"
+   class="app-brand-link">
+            <span class="app-brand-logo demo">
+                @await Html.PartialAsync("../_Partials/_Macros")
+            </span>
+
+            <span class="app-brand-text demo menu-text fw-bold ms-2">
+                @appName
+            </span>
+        </a>
+
+        <a href="javascript:void(0);"
+           class="layout-menu-toggle menu-link text-large ms-auto">
+            <i class="icon-base bx bx-chevron-left d-block d-xl-none align-middle"></i>
+        </a>
+    </div>
+
+    <div class="sidebar-search">
+        <input type="text" placeholder="Filter menu..." />
+    </div>
+    <div class="menu-inner-shadow"></div>
+
+    <ul class="menu-inner py-1">
+
+        <li class="menu-header small text-uppercase">
+            <span class="menu-header-text">
+                @(string.IsNullOrWhiteSpace(roleName) ? role : roleName) Menu
+            </span>
+        </li>
+
+        @if (!string.IsNullOrWhiteSpace(role) && menus.ContainsKey(role))
+        {
+            foreach (var item in menus[role])
+            {
+                var controller = GetController(item);
+                var isActive = IsActive(controller);
+
+                if (item == "Sign out")
+                {
+                    <li class="menu-item">
+                        <a asp-area=""
+                           asp-controller="Account"
+                           asp-action="Logout"
+                           class="menu-link">
+                            <i class="menu-icon icon-base bx @GetIcon(item)"></i>
+                            <div class="text-truncate">@item</div>
+                        </a>
+                    </li>
+                }
+                else if (item == "Support")
+                {
+                    <li class="menu-item">
+                        <a href="@supportUrl"
+                           target="_blank"
+                           class="menu-link">
+                            <i class="menu-icon icon-base bx @GetIcon(item)"></i>
+                            <div class="text-truncate">@item</div>
+                        </a>
+                    </li>
+                }
+                else if (item == "Install App")
+                {
+                    <li class="menu-item">
+                        <a href="javascript:void(0);"
+                           class="menu-link">
+                            <i class="menu-icon icon-base bx @GetIcon(item)"></i>
+                            <div class="text-truncate">@item</div>
+                        </a>
+                    </li>
+                }
+                else if (item == "School Settings")
+                {
+                    var schoolSettingsOpen = IsActive("SchoolSettings");
+
+                    <li class='menu-item @(schoolSettingsOpen ? "active open" : "")'>
+
+                        <a href="javascript:void(0);"
+                           class="menu-link menu-toggle">
+                            <i class="menu-icon icon-base bx bx-cog"></i>
+                            <div class="text-truncate">School Settings</div>
+                        </a>
+
+                        <ul class="menu-sub">
+
+                            <li class='menu-item @(IsActive("BasicProfile") ? "active" : "")'>
+                                <a asp-area="Admin"
+                                   asp-controller="SchoolSettings"
+                                   asp-action="BasicProfile"
+                                   class="menu-link">
+
+                                    <i class="bx bx-user submenu-icon submenu-profile"></i>
+
+                                    <div class="text-truncate">
+                                        Basic Profile
+                                    </div>
+
+                                </a>
+                            </li>
+
+                            <li class='menu-item @(IsActive("AcademicSetup") ? "active" : "")'>
+                                <a asp-area="Admin"
+                                   asp-controller="SchoolSettings"
+                                   asp-action="AcademicSetup"
+                                   class="menu-link">
+
+                                    <i class="bx bx-book-open submenu-icon submenu-academic"></i>
+
+                                    <div class="text-truncate">
+                                        Academic Setup
+                                    </div>
+
+                                </a>
+                            </li>
+
+                            <li class='menu-item @(IsActive("FeeHead") ? "active" : "")'>
+                                <a asp-area="Admin"
+                                   asp-controller="SchoolSettings"
+                                   asp-action="FeeHead"
+                                   class="menu-link">
+
+                                    <i class="bx bx-wallet submenu-icon submenu-feehead"></i>
+
+                                    <div class="text-truncate">
+                                        Fee Head
+                                    </div>
+
+                                </a>
+                            </li>
+                            <li class='menu-item @(IsActive("FeeStructure") ? "active" : "")'>
+                                <a asp-area="Admin"
+                                   asp-controller="SchoolSettings"
+                                   asp-action="FeeStructure"
+                                   class="menu-link">
+
+                                    <i class="bx bx-credit-card submenu-icon submenu-feestructure"></i>
+
+                                    <div class="text-truncate">
+                                        Fee Structure
+                                    </div>
+
+                                </a>
+                            </li>
+
+                            <li class='menu-item @(IsActive("EnquiryCRM") ? "active" : "")'>
+                                <a asp-area="Admin"
+                                   asp-controller="Enquiry"
+                                   asp-action="EnquiryCRM"
+                                   class="menu-link">
+
+                                    <i class="bx bx-message-square-detail submenu-icon submenu-crm"></i>
+
+                                    <div class="text-truncate">
+                                        Enquiry CRM
+                                    </div>
+
+                                </a>
+                            </li>
+
+                        </ul>
+                    </li>
+                }
+                else
+                {
+                    <li class='menu-item @(isActive ? "active" : "")'>
+                        <a asp-area="@GetArea(item)"
+                           asp-controller="@controller"
+                           asp-action="Index"
+                           class="menu-link">
+
+                            <i class="menu-icon icon-base bx @GetIcon(item)"></i>
+                            <div class="text-truncate">@item</div>
+                        </a>
+                    </li>
+                }
+            }
+        }
+        else
+        {
+            <li class="menu-item">
+                <a asp-area=""
+                   asp-controller="Account"
+                   asp-action="Login"
+                   class="menu-link">
+                    <i class="menu-icon icon-base bx bx-log-in"></i>
+                    <div class="text-truncate">Login</div>
+                </a>
+            </li>
+        }
+
+    </ul>
+</aside>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const searchInput = document.querySelector(".sidebar-search input");
+        const rootMenuItems = document.querySelectorAll("#layout-menu > ul.menu-inner > li.menu-item");
+
+        if (!searchInput) return;
+
+        searchInput.addEventListener("input", function () {
+            const value = this.value.toLowerCase().trim();
+
+            rootMenuItems.forEach(item => {
+                const text = item.innerText.toLowerCase();
+                const subMenu = item.querySelector(".menu-sub");
+
+                if (!value) {
+                    item.style.display = "";
+                    item.classList.remove("open");
+                    return;
+                }
+
+                if (text.includes(value)) {
+                    item.style.display = "";
+
+                    if (subMenu) {
+                        item.classList.add("open");
+                        subMenu.style.display = "block";
+                    }
+                } else {
+                    item.style.display = "none";
+                }
+            });
+        });
+    });
+</script>

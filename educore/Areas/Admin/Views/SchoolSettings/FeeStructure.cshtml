@@ -1,0 +1,1023 @@
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model EduCoreDataAccessLayer.Models.Admin.FeeStructureModel
+@{
+    ViewData["Title"] = "Fee Structure";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var classes           = Model.AvailableClasses;
+    var feeHeads          = Model.FeeHeads;
+    var existingStructures = Model.ExistingStructures;
+    var academicYear      = Model.AcademicYear;
+}
+
+@section PageStyles {
+    <style>
+        .class-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .75rem;
+        }
+
+        .class-chip-card {
+            border: 1px solid #ececf5;
+            border-radius: 999px;
+            background: #ffffff;
+            padding: .65rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .55rem;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+
+            .class-chip-card:hover,
+            .class-chip-card.active {
+                border-color: rgba(255,138,0,.45);
+                background: #fff4e6;
+                box-shadow: 0 10px 20px rgba(43,27,18,.06);
+            }
+
+            .class-chip-card.has-existing {
+                border-color: rgba(255,138,0,.55);
+                background: #fff7ed;
+            }
+
+            .class-chip-card span {
+                font-weight: 700;
+                color: #2b1b12;
+                font-size: .88rem;
+            }
+
+        .fee-head-row {
+            border: 1px solid #ececf5;
+            border-radius: 18px;
+            background: #ffffff;
+            padding: 1rem;
+            transition: all .2s ease;
+        }
+
+            .fee-head-row + .fee-head-row {
+                margin-top: .85rem;
+            }
+
+            .fee-head-row:hover {
+                border-color: rgba(255,138,0,.45);
+                box-shadow: 0 12px 28px rgba(43,27,18,.06);
+                transform: translateY(-1px);
+            }
+
+            .fee-head-row.disabled {
+                opacity: .55;
+            }
+
+        .fee-head-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
+            background: #fff4e6;
+            color: #ff8a00;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .fee-head-title {
+            font-weight: 800;
+            color: #2b1b12;
+            margin-bottom: .2rem;
+        }
+
+        .fee-group-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #2b1b12;
+        }
+
+        .fee-group-subtitle {
+            color: #8b8175;
+            font-size: .82rem;
+            font-weight: 600;
+        }
+
+        .fee-amount-input {
+            max-width: 170px;
+            text-align: right;
+            font-weight: 800;
+        }
+
+        .fee-summary-card {
+            position: sticky;
+            top: 90px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .summary-label {
+            color: #8b8175;
+            font-weight: 700;
+        }
+
+        .summary-value {
+            color: #2b1b12;
+            font-weight: 800;
+            text-align: right;
+        }
+
+        .summary-total-box {
+            border-radius: 20px;
+            border: 1px solid #ececf5;
+            background: linear-gradient(135deg, #fff7ed, #ffffff);
+            padding: 1rem;
+        }
+
+            .summary-total-box h3 {
+                margin: 0;
+                color: #ff8a00;
+                font-weight: 900;
+            }
+
+        .selected-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+        }
+
+        .summary-chip {
+            background: #fff4e6;
+            color: #2b1b12;
+            border-radius: 999px;
+            padding: .45rem .8rem;
+            font-size: .76rem;
+            font-weight: 700;
+        }
+
+        .warning-box {
+            border: 1px solid #ffe0a6;
+            background: #fff7ed;
+            color: #6b4b16;
+            border-radius: 18px;
+            padding: 1rem;
+        }
+
+        .success-box {
+            border: 1px solid #d8f3dc;
+            background: #f0fff4;
+            color: #276749;
+            border-radius: 18px;
+            padding: 1rem;
+        }
+
+        .fee-action-btn {
+            border-radius: 999px;
+            font-weight: 800;
+        }
+
+        .config-table th {
+            color: #9a938b;
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 800;
+            border-bottom: 1px solid #ececf5;
+        }
+
+        .config-table td {
+            vertical-align: middle;
+            font-weight: 700;
+            color: #2b2c40;
+        }
+
+        .saved-head-list {
+            max-width: 320px;
+            color: #8b8175;
+            font-size: .82rem;
+            font-weight: 600;
+            line-height: 1.45;
+        }
+
+        @@media (max-width: 991.98px) {
+            .fee-summary-card {
+                position: relative;
+                top: auto;
+            }
+
+            .fee-structure-page .ec-sticky-actions {
+                padding: 1rem;
+                margin: 1rem -1rem -1rem;
+            }
+        }
+
+        @@media (max-width: 575.98px) {
+            .fee-amount-input {
+                max-width: 100%;
+            }
+
+            .fee-head-row {
+                padding: .9rem;
+            }
+
+            .fee-head-icon {
+                width: 40px;
+                height: 40px;
+            }
+
+            .fee-action-btn,
+            .ec-sticky-actions .btn {
+                width: 100%;
+            }
+
+            .summary-row {
+                font-size: .92rem;
+            }
+        }
+    </style>
+}
+
+<div class="ec-page-shell fee-structure-page">
+    <div class="ec-page-content">
+
+        <div class="ec-page-header">
+            <div class="ec-page-header-inner d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                    <div class="ec-page-icon">
+                        <i class="bx bx-wallet"></i>
+                    </div>
+
+                    <div>
+                        <h3 class="ec-page-title mb-1">Fee Structure</h3>
+                        <p class="ec-page-subtitle mb-0">
+                            Configure same fee structure for selected classes using Fee Head Master.
+                        </p>
+                    </div>
+                </div>
+
+                <a asp-controller="Fee" asp-action="FeeHeadMaster" class="btn btn-outline-secondary fee-action-btn">
+                    <i class="bx bx-category me-1"></i>
+                    Fee Head Master
+                </a>
+            </div>
+        </div>
+
+        <form asp-area="Admin"
+              asp-controller="SchoolSettings"
+              asp-action="SaveFeeStructure"
+              method="post"
+              id="feeStructureForm">
+            @Html.AntiForgeryToken()
+
+            <input type="hidden" name="IsEditMode" id="IsEditMode" value="false" />
+            <input type="hidden" name="EditClassName" id="EditClassName" value="" />
+
+            <div class="row g-4">
+                <div class="col-12 col-xl-8">
+
+                    <div class="ec-card mb-4">
+                        <div class="ec-card-header">
+                            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                                <span class="ec-section-icon">
+                                    <i class="bx bx-cog"></i>
+                                </span>
+
+                                <div>
+                                    <h5 class="ec-section-title mb-1">Structure Setup</h5>
+                                    <p class="ec-section-subtitle mb-0">
+                                        Select academic year and classes. Existing classes will be updated.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ec-card-body">
+
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    Academic Year <span class="text-danger">*</span>
+                                </label>
+
+                                <select class="form-select" name="AcademicYear" id="AcademicYear">
+                                    <option value="">Select academic year</option>
+                                    @foreach (var yr in Model.AcademicYears)
+                                    {
+                                        <option value="@yr" selected="@(yr == academicYear)">@yr</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <div id="editModeBox" class="success-box mb-4 d-none">
+                                <strong>Edit Mode:</strong>
+                                You are editing fee structure for
+                                <span id="editModeClassText" class="fw-bold"></span>.
+                                Multi-class selection is disabled in edit mode.
+
+                                <button type="button" class="btn btn-sm btn-outline-secondary fee-action-btn ms-md-2 mt-2 mt-md-0" id="exitEditModeBtn">
+                                    Exit Edit Mode
+                                </button>
+                            </div>
+
+                            <div>
+                                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+                                    <div>
+                                        <div class="ec-detail-title">Select Classes</div>
+                                        <div class="text-muted small">
+                                            Same structure will be saved separately for each selected class.
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex flex-column flex-sm-row gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-primary fee-action-btn" id="selectAllClassesBtn">
+                                            Select All
+                                        </button>
+
+                                        <button type="button" class="btn btn-sm btn-outline-secondary fee-action-btn" id="clearAllClassesBtn">
+                                            Clear
+                                        </button>
+                                    </div>
+                                </div>
+
+                                @if (!classes.Any())
+                                {
+                                    <div class="warning-box">
+                                        <i class="bx bx-info-circle me-1"></i>
+                                        <strong>No classes found.</strong>
+                                        Please configure your classes in
+                                        <a asp-area="Admin" asp-controller="SchoolSettings" asp-action="AcademicSetup">Academic Setup</a>
+                                        before creating a fee structure.
+                                    </div>
+                                }
+
+                                <div class="class-grid">
+                                    @foreach (var cls in classes)
+                                    {
+                                        var hasExisting = existingStructures.Any(x => x.ClassName == cls && x.AcademicYear == academicYear);
+
+                                        <label class="class-chip-card @(hasExisting ? "has-existing" : "")"
+                                               data-class="@cls"
+                                               data-has-existing="@hasExisting.ToString().ToLower()">
+
+                                            <input type="checkbox"
+                                                   class="form-check-input class-checkbox"
+                                                   name="SelectedClasses"
+                                                   value="@cls" />
+
+                                            <span>@cls</span>
+
+                                            @if (hasExisting)
+                                            {
+                                                <i class="bx bx-info-circle text-warning" title="Structure already exists"></i>
+                                            }
+                                        </label>
+                                    }
+                                </div>
+                            </div>
+
+                            <div id="existingWarningBox" class="warning-box mt-4 d-none">
+                                <div class="fw-bold mb-1">
+                                    <i class="bx bx-info-circle me-1"></i>
+                                    Some selected classes already have a fee structure.
+                                </div>
+                                <div id="existingWarningText" class="small"></div>
+                            </div>
+
+                            <div class="ec-detail-box mt-4">
+                                <div class="ec-detail-item">
+                                    <span class="ec-detail-icon">
+                                        <i class="bx bx-git-branch"></i>
+                                    </span>
+                                    <div>
+                                        <div class="ec-detail-title">Save Behavior</div>
+                                        <div class="ec-detail-value fw-normal text-muted" id="saveBehaviorText">
+                                            Select classes and fee heads to see create/update summary.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="ec-card">
+                        <div class="ec-card-header">
+                            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                                <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                                    <span class="ec-section-icon">
+                                        <i class="bx bx-list-check"></i>
+                                    </span>
+
+                                    <div>
+                                        <h5 class="ec-section-title mb-1">Fee Heads</h5>
+                                        <p class="ec-section-subtitle mb-0">
+                                            Board Fee and Lab Fee are not automatic. Select them only when needed.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button type="button" class="btn btn-sm btn-outline-primary fee-action-btn" id="selectMandatoryBtn">
+                                    Select Mandatory
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="ec-card-body">
+
+                            @foreach (var group in new[]
+                                                        {
+                                                        new { Key="one-time", Title="One Time Charges", Sub="Charged once during admission." },
+                                                        new { Key="monthly", Title="Monthly Charges", Sub="Collected every month." },
+                                                        new { Key="yearly", Title="Yearly Charges", Sub="Collected once per year." }
+                                                        })
+                            {
+                                <div class="mb-4">
+                                    <div class="mb-3">
+                                        <div class="fee-group-title">@group.Title</div>
+                                        <div class="fee-group-subtitle">@group.Sub</div>
+                                    </div>
+
+                                    @for (int i = 0; i < feeHeads.Count; i++)
+                                    {
+                                        if (feeHeads[i].FeeGroup == group.Key)
+                                        {
+                                            var isMandatory = feeHeads[i].FeeType == "Mandatory";
+
+                                            <div class="fee-head-row"
+                                                 data-cycle="@feeHeads[i].Frequency"
+                                                 data-type="@feeHeads[i].FeeType"
+                                                 data-fee-head-name="@feeHeads[i].FeeHeadName">
+
+                                                <input type="hidden" name="FeeHeads[@i].FeeHeadId"   value="@feeHeads[i].FeeHeadId" />
+                                                <input type="hidden" name="FeeHeads[@i].FeeHeadName" value="@feeHeads[i].FeeHeadName" />
+                                                <input type="hidden" name="FeeHeads[@i].Frequency"   value="@feeHeads[i].Frequency" />
+                                                <input type="hidden" name="FeeHeads[@i].FeeType"     value="@feeHeads[i].FeeType" />
+                                                <input type="hidden" name="FeeHeads[@i].FeeGroup"    value="@feeHeads[i].FeeGroup" />
+
+                                                <div class="row align-items-center g-3">
+                                                    <div class="col-12 col-lg-6">
+                                                        <div class="d-flex align-items-start gap-3">
+                                                            <input class="form-check-input fee-head-checkbox mt-2"
+                                                                   type="checkbox"
+                                                                   name="FeeHeads[@i].IsSelected"
+                                                                   value="true"
+                                                                   @(isMandatory ? "checked" : "") />
+
+                                                            <input type="hidden" name="FeeHeads[@i].IsSelected" value="false" />
+
+                                                            <span class="fee-head-icon">
+                                                                <i class="bx bx-rupee"></i>
+                                                            </span>
+
+                                                            <div>
+                                                                <div class="fee-head-title">@feeHeads[i].FeeHeadName</div>
+                                                                <div class="ec-pill-wrap">
+                                                                    <span class="ec-pill">@feeHeads[i].Frequency</span>
+                                                                    <span class="ec-pill">@feeHeads[i].FeeType</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-12 col-sm-6 col-lg-3">
+                                                        <label class="form-label mb-1">Amount</label>
+                                                        <div class="input-group">
+                                                            <span class="input-group-text">₹</span>
+                                                            <input type="number"
+                                                                   class="form-control fee-amount fee-amount-input"
+                                                                   name="FeeHeads[@i].Amount"
+                                                                   value="@feeHeads[i].Amount"
+                                                                   min="0"
+                                                                   step="0.01" />
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="col-12 col-sm-6 col-lg-3 text-sm-end">
+                                                        <small class="text-muted d-block">Default amount</small>
+                                                        <strong>₹@feeHeads[i].Amount.ToString("N0")</strong>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    }
+                                </div>
+                            }
+
+                            <div class="ec-sticky-actions">
+                                <div class="d-flex flex-column flex-sm-row justify-content-end gap-2">
+                                    <button type="reset" class="btn btn-outline-secondary fee-action-btn">
+                                        Reset
+                                    </button>
+
+                                    <button type="submit" class="btn btn-primary fee-action-btn" id="saveButton"
+                                            @(!classes.Any() || !feeHeads.Any() ? "disabled" : "")>
+                                        <i class="bx bx-check me-1"></i>
+                                        Save Fee Structure
+                                    </button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="col-12 col-xl-4">
+                    <div class="ec-card fee-summary-card">
+                        <div class="ec-card-header">
+                            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                                <span class="ec-section-icon">
+                                    <i class="bx bx-calculator"></i>
+                                </span>
+
+                                <div>
+                                    <h5 class="ec-section-title mb-1">Structure Summary</h5>
+                                    <p class="ec-section-subtitle mb-0">
+                                        Sticky live summary before saving.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ec-card-body">
+                            <div class="summary-row">
+                                <span class="summary-label">Academic Year</span>
+                                <span class="summary-value" id="summaryYear">@Model.AcademicYear</span>
+                            </div>
+
+                            <div class="summary-row">
+                                <span class="summary-label">Selected Classes</span>
+                                <span class="summary-value" id="selectedClassCount">0</span>
+                            </div>
+
+                            <div class="summary-row">
+                                <span class="summary-label">Selected Fee Heads</span>
+                                <span class="summary-value" id="selectedFeeHeadCount">0</span>
+                            </div>
+
+                            <hr />
+
+                            <div class="summary-row">
+                                <span class="summary-label">One Time</span>
+                                <span class="summary-value" id="oneTimeTotal">₹0</span>
+                            </div>
+
+                            <div class="summary-row">
+                                <span class="summary-label">Monthly</span>
+                                <span class="summary-value" id="monthlyTotal">₹0 / month</span>
+                            </div>
+
+                            <div class="summary-row">
+                                <span class="summary-label">Yearly</span>
+                                <span class="summary-value" id="yearlyTotal">₹0 / year</span>
+                            </div>
+
+                            <div class="summary-total-box mt-3">
+                                <small class="text-muted d-block mb-1">Estimated Annual Fee</small>
+                                <h3 id="annualTotal">₹0</h3>
+                            </div>
+
+                            <small class="text-muted d-block mt-3">
+                                Formula: One Time + Monthly × 12 + Yearly
+                            </small>
+
+                            <hr />
+
+                            <div class="mb-3">
+                                <small class="text-muted d-block mb-2">Selected Classes</small>
+                                <div class="selected-list" id="selectedClassList"></div>
+                            </div>
+
+                            <div class="mb-3">
+                                <small class="text-muted d-block mb-2">Selected Fee Heads</small>
+                                <div class="selected-list" id="selectedFeeHeadList"></div>
+                            </div>
+
+                            <div class="warning-box d-none" id="summaryExistingBox">
+                                <strong>Update Warning</strong>
+                                <div class="small mt-1" id="summaryExistingText"></div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        <div class="ec-card mt-4">
+            <div class="ec-card-header">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                        <span class="ec-section-icon">
+                            <i class="bx bx-table"></i>
+                        </span>
+
+                        <div>
+                            <h5 class="ec-section-title mb-1">Saved Structures</h5>
+                            <p class="ec-section-subtitle mb-0">
+                                Existing class-wise fee structures with audit details.
+                            </p>
+                        </div>
+                    </div>
+
+                    <input type="search"
+                           class="form-control form-control-sm"
+                           id="structureSearch"
+                           style="max-width:260px;"
+                           placeholder="Search class..." />
+                </div>
+            </div>
+
+            <div class="ec-card-body p-0">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0 config-table">
+                        <thead>
+                            <tr>
+                                <th>Class</th>
+                                <th>Academic Year</th>
+                                <th>Fee Heads</th>
+                                <th>Monthly</th>
+                                <th>Annual Estimate</th>
+                                <th>Status</th>
+                                <th>Created By</th>
+                                <th>Updated By</th>
+                                <th>Updated Date</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach (var item in existingStructures)
+                            {
+                                <tr class="structure-row"
+                                    data-class="@item.ClassName"
+                                    data-year="@item.AcademicYear"
+                                    data-heads="@item.FeeHeadNames">
+
+                                    <td class="fw-bold">@item.ClassName</td>
+                                    <td>@item.AcademicYear</td>
+
+                                    <td>
+                                        <div class="saved-head-list">
+                                            @item.FeeHeadNames
+                                        </div>
+                                    </td>
+
+                                    <td>₹@item.MonthlyTotal.ToString("N0")</td>
+
+                                    <td class="fw-bold text-primary">
+                                        ₹@item.AnnualTotal.ToString("N0")
+                                    </td>
+
+                                    <td>
+                                        <span class="ec-pill">@(item.IsActive ? "Active" : "Inactive")</span>
+                                    </td>
+
+                                    <td>@item.CreatedBy</td>
+                                    <td>@item.UpdatedBy</td>
+                                    <td>@item.UpdatedAt?.ToString("dd MMM yyyy")</td>
+
+                                    <td class="text-end">
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary fee-action-btn edit-structure-btn"
+                                                data-class="@item.ClassName"
+                                                data-year="@item.AcademicYear">
+                                            <i class="bx bx-edit"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section PageScripts {
+    @{
+        var getByClassUrl = Url.Action("GetFeeStructureByClass", "SchoolSettings", new { area = "Admin" });
+    }
+    <script>
+        var GET_BY_CLASS_URL = '@getByClassUrl';
+
+        $(document).ready(function () {
+
+            const existingStructures = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                existingStructures.Select(x => new {
+                    className   = x.ClassName,
+                    academicYear = x.AcademicYear,
+                    feeHeads    = x.FeeHeadNames
+                })
+            ));
+
+            if (typeof toastr !== 'undefined') {
+                toastr.options = {
+                    closeButton: true,
+                    progressBar: true,
+                    positionClass: 'toast-top-right',
+                    timeOut: 3000
+                };
+            }
+
+            function showToast(type, message) {
+                if (typeof toastr !== 'undefined') {
+                    toastr[type](message);
+                } else {
+                    console.log(message);
+                }
+            }
+
+            function formatINR(amount) {
+                return '₹' + amount.toLocaleString('en-IN', {
+                    maximumFractionDigits: 0
+                });
+            }
+
+            function getExistingSelectedClasses() {
+                let year = $('#AcademicYear').val();
+                let existing = [];
+
+                $('.class-checkbox:checked').each(function () {
+                    let className = $(this).val();
+
+                    let found = existingStructures.some(function (x) {
+                        return x.className === className && x.academicYear === year;
+                    });
+
+                    if (found) {
+                        existing.push(className);
+                    }
+                });
+
+                return existing;
+            }
+
+            function updateSaveBehavior() {
+                let totalClasses = $('.class-checkbox:checked').length;
+                let existingClasses = getExistingSelectedClasses();
+                let updateCount = existingClasses.length;
+                let createCount = totalClasses - updateCount;
+
+                let message = '';
+
+                if (totalClasses === 0) {
+                    message = 'Select classes and fee heads to see create/update summary.';
+                } else {
+                    message = `This will create ${createCount} and update ${updateCount} class structure${totalClasses > 1 ? 's' : ''}.`;
+                }
+
+                $('#saveBehaviorText').text(message);
+
+                if (existingClasses.length > 0) {
+                    let text = `Existing structure found for: ${existingClasses.join(', ')}. Saving will update these classes.`;
+
+                    $('#existingWarningText').text(text);
+                    $('#existingWarningBox').removeClass('d-none');
+
+                    $('#summaryExistingText').text(text);
+                    $('#summaryExistingBox').removeClass('d-none');
+                } else {
+                    $('#existingWarningBox').addClass('d-none');
+                    $('#summaryExistingBox').addClass('d-none');
+                }
+            }
+
+            function updateSummary() {
+                let oneTime = 0;
+                let monthly = 0;
+                let yearly = 0;
+                let selectedFeeHeads = 0;
+
+                let selectedClassHtml = '';
+                let selectedFeeHeadHtml = '';
+
+                $('.class-checkbox:checked').each(function () {
+                    selectedClassHtml += `<span class="summary-chip">${$(this).val()}</span>`;
+                });
+
+                $('#selectedClassCount').text($('.class-checkbox:checked').length);
+
+                $('#selectedClassList').html(
+                    selectedClassHtml || '<small class="text-muted">No classes selected</small>'
+                );
+
+                $('.fee-head-row').each(function () {
+                    let isSelected = $(this).find('.fee-head-checkbox').is(':checked');
+
+                    $(this).toggleClass('disabled', !isSelected);
+
+                    if (!isSelected) return;
+
+                    selectedFeeHeads++;
+
+                    let cycle = ($(this).data('cycle') || '').toString().toLowerCase();
+                    let amount = parseFloat($(this).find('.fee-amount').val()) || 0;
+                    let feeHeadName = ($(this).data('fee-head-name') || '').toString();
+
+                    selectedFeeHeadHtml += `<span class="summary-chip">${feeHeadName}</span>`;
+
+                    if (cycle === 'one time') oneTime += amount;
+                    if (cycle === 'monthly') monthly += amount;
+                    if (cycle === 'yearly') yearly += amount;
+                });
+
+                let annualTotal = oneTime + (monthly * 12) + yearly;
+
+                $('#selectedFeeHeadCount').text(selectedFeeHeads);
+                $('#oneTimeTotal').text(formatINR(oneTime));
+                $('#monthlyTotal').text(formatINR(monthly) + ' / month');
+                $('#yearlyTotal').text(formatINR(yearly) + ' / year');
+                $('#annualTotal').text(formatINR(annualTotal));
+
+                $('#selectedFeeHeadList').html(
+                    selectedFeeHeadHtml || '<small class="text-muted">No fee heads selected</small>'
+                );
+
+                $('#summaryYear').text($('#AcademicYear').val() || '-');
+
+                updateSaveBehavior();
+            }
+
+            $('#selectAllClassesBtn').on('click', function () {
+                if ($('#IsEditMode').val() === 'true') {
+                    showToast('warning', 'Exit edit mode to select multiple classes.');
+                    return;
+                }
+
+                $('.class-checkbox').prop('checked', true);
+                $('.class-chip-card').addClass('active');
+
+                updateSummary();
+                showToast('success', 'All classes selected.');
+            });
+
+            $('#clearAllClassesBtn').on('click', function () {
+                if ($('#IsEditMode').val() === 'true') {
+                    showToast('warning', 'Exit edit mode to clear classes.');
+                    return;
+                }
+
+                $('.class-checkbox').prop('checked', false);
+                $('.class-chip-card').removeClass('active');
+
+                updateSummary();
+                showToast('info', 'Class selection cleared.');
+            });
+
+            $(document).on('change', '.class-checkbox', function () {
+                if ($('#IsEditMode').val() === 'true') {
+                    $('.class-checkbox').not(this).prop('checked', false).closest('.class-chip-card').removeClass('active');
+                }
+
+                $(this).closest('.class-chip-card').toggleClass('active', $(this).is(':checked'));
+
+                updateSummary();
+            });
+
+            $(document).on('change', '.fee-head-checkbox', updateSummary);
+            $(document).on('input', '.fee-amount', updateSummary);
+            $('#AcademicYear').on('change', updateSummary);
+
+            $('#selectMandatoryBtn').on('click', function () {
+                $('.fee-head-row').each(function () {
+                    let type = ($(this).data('type') || '').toString().toLowerCase();
+                    $(this).find('.fee-head-checkbox').prop('checked', type === 'mandatory');
+                });
+
+                updateSummary();
+                showToast('success', 'Mandatory fee heads selected.');
+            });
+
+            $('.edit-structure-btn').on('click', function () {
+                let className = $(this).data('class');
+                let year      = $(this).data('year');
+
+                $('#IsEditMode').val('true');
+                $('#EditClassName').val(className);
+                $('#AcademicYear').val(year);
+
+                // Select the matching class chip
+                $('.class-checkbox').prop('checked', false);
+                $('.class-chip-card').removeClass('active');
+                let selectedCheckbox = $('.class-checkbox[value="' + className + '"]');
+                selectedCheckbox.prop('checked', true);
+                selectedCheckbox.closest('.class-chip-card').addClass('active');
+
+                $('#editModeClassText').text(className);
+                $('#editModeBox').removeClass('d-none');
+                $('#saveButton').html('<i class="bx bx-save me-1"></i> Update Structure');
+
+                // Uncheck all fee heads first — the DB response will tell us which ones are saved
+                $('.fee-head-checkbox').prop('checked', false);
+
+                // Load the saved fee head amounts from the database
+                $.ajax({
+                    url: GET_BY_CLASS_URL,
+                    type: 'GET',
+                    data: { className: className, academicYear: year },
+                    success: function (response) {
+                        if (response.success && response.data && response.data.length > 0) {
+                            // Map returned fee head ids to their amounts
+                            let savedMap = {};
+                            response.data.forEach(function (item) {
+                                savedMap[item.feeHeadId] = item.amount;
+                            });
+
+                            // For each fee head row: check it if it was saved, set the saved amount
+                            $('.fee-head-row').each(function () {
+                                let feeHeadIdInput = $(this).find('input[name$=".FeeHeadId"]');
+                                let feeHeadId = parseInt(feeHeadIdInput.val());
+
+                                if (savedMap.hasOwnProperty(feeHeadId)) {
+                                    $(this).find('.fee-head-checkbox').prop('checked', true);
+                                    $(this).find('.fee-amount').val(savedMap[feeHeadId]);
+                                } else {
+                                    $(this).find('.fee-head-checkbox').prop('checked', false);
+                                }
+                            });
+
+                            showToast('info', 'Edit mode — ' + className + ' structure loaded from database.');
+                        } else {
+                            showToast('warning', 'Could not load saved structure. Using defaults.');
+                        }
+
+                        updateSummary();
+                    },
+                    error: function () {
+                        showToast('error', 'Failed to load structure. Please try again.');
+                        updateSummary();
+                    }
+                });
+
+                $('html, body').animate({
+                    scrollTop: $('#feeStructureForm').offset().top - 80
+                }, 300);
+            });
+
+            $('#exitEditModeBtn').on('click', function () {
+                $('#IsEditMode').val('false');
+                $('#EditClassName').val('');
+                $('#editModeBox').addClass('d-none');
+                $('#saveButton').html('<i class="bx bx-check me-1"></i> Save Fee Structure');
+
+                $('.class-checkbox').prop('checked', false);
+                $('.class-chip-card').removeClass('active');
+
+                updateSummary();
+                showToast('info', 'Edit mode closed.');
+            });
+
+            $('#feeStructureForm').on('submit', function (e) {
+                debugger;
+                let academicYear = $('#AcademicYear').val();
+                let selectedClasses = $('.class-checkbox:checked').length;
+                let selectedFeeHeads = $('.fee-head-checkbox:checked').length;
+
+                if (!academicYear) {
+                    e.preventDefault();
+                    showToast('error', 'Please select academic year.');
+                    $('#AcademicYear').focus();
+                    return false;
+                }
+
+                if (selectedClasses === 0) {
+                    e.preventDefault();
+                    showToast('error', 'Please select at least one class.');
+                    return false;
+                }
+
+                if (selectedFeeHeads === 0) {
+                    e.preventDefault();
+                    showToast('error', 'Please select at least one fee head.');
+                    return false;
+                }
+
+                let existingClasses = getExistingSelectedClasses();
+
+                if (existingClasses.length > 0) {
+                    showToast('warning', 'Existing class structures will be updated.');
+                }
+            });
+
+            $('#structureSearch').on('input', function () {
+                let searchText = $(this).val().toLowerCase().trim();
+
+                $('.structure-row').each(function () {
+                    let className = ($(this).data('class') || '').toLowerCase();
+                    let heads = ($(this).data('heads') || '').toLowerCase();
+
+                    $(this).toggle(
+                        className.includes(searchText) || heads.includes(searchText)
+                    );
+                });
+            });
+
+            updateSummary();
+        });
+    </script>
+}

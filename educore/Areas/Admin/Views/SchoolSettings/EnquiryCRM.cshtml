@@ -1,0 +1,1629 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model EduCoreDataAccessLayer.Models.Admin.EnquiryCrmPageModel
+@{
+    ViewData["Title"] = "Enquiry CRM";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var stats        = Model.Stats;
+    var sessions     = Model.AvailableSessions;
+    var classes      = Model.AvailableClasses;
+    var counsellors  = Model.AvailableCounsellors;
+}
+
+@section PageStyles {
+<style>
+    /* ── Top progress loader ── */
+    #crmTopLoader {
+        position: fixed; top: 0; left: 0; width: 0%; height: 3px;
+        background: var(--ec-primary); z-index: 99999;
+        opacity: 1; pointer-events: none; border-radius: 0 2px 2px 0;
+    }
+
+    /* ── KPI Cards ── */
+    .crm-kpi-card {
+        background: var(--ec-white); border: 1px solid var(--ec-border);
+        border-radius: 12px; padding: .9rem 1.1rem;
+        transition: box-shadow .18s; height: 100%;
+    }
+    .crm-kpi-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,.07); }
+    .crm-kpi-card .kpi-icon {
+        width: 42px; height: 42px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.2rem; flex-shrink: 0;
+    }
+    .crm-kpi-card .kpi-value  { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+    .crm-kpi-card .kpi-label  { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--ec-text-muted); }
+    .crm-kpi-card .kpi-sub    { font-size: .72rem; color: var(--ec-text-muted); margin-top: .15rem; }
+
+    /* ── Pipeline Tabs ── */
+    .crm-pipeline { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .2rem; }
+    .crm-pipeline::-webkit-scrollbar { height: 3px; }
+    .crm-pipeline::-webkit-scrollbar-thumb { background: var(--ec-border); border-radius: 3px; }
+    .pipeline-tab {
+        display: inline-flex; flex-direction: column; align-items: center;
+        padding: .38rem .8rem; border-radius: 9px;
+        border: 1.5px solid var(--ec-border); background: var(--ec-white);
+        cursor: pointer; white-space: nowrap; transition: all .14s;
+        text-decoration: none; min-width: 74px; user-select: none;
+    }
+    .pipeline-tab:hover, .pipeline-tab.active {
+        border-color: var(--ec-primary); background: var(--ec-primary-light);
+    }
+    .pipeline-tab .ptab-count { font-size: 1rem; font-weight: 700; color: var(--ec-text-dark); line-height: 1.15; }
+    .pipeline-tab .ptab-label { font-size: .65rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ec-text-muted); margin-top: .1rem; }
+    .pipeline-tab.active .ptab-count, .pipeline-tab.active .ptab-label { color: var(--ec-primary); }
+
+    /* ── Table helpers ── */
+    .lead-name { font-weight: 700; color: var(--ec-text-dark); font-size: .87rem; }
+    .lead-meta { font-size: .76rem; color: var(--ec-text-muted); }
+    .student-avatar {
+        width: 34px; height: 34px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: .74rem; flex-shrink: 0;
+    }
+    .fee-pill {
+        display: inline-flex; align-items: center;
+        border: 1.5px solid var(--ec-border); border-radius: 999px;
+        padding: .22rem .6rem; font-weight: 700; font-size: .76rem;
+        background: var(--ec-primary-light); color: var(--ec-primary);
+    }
+    .source-pill {
+        display: inline-flex; align-items: center; gap: .2rem;
+        font-size: .71rem; font-weight: 600; padding: .16rem .44rem;
+        border-radius: 6px; background: rgba(0,0,0,.04); color: var(--ec-text-muted);
+    }
+    .crm-action-btn { width: 31px; height: 31px; padding: 0; border-radius: 7px; }
+    .lead-row { cursor: pointer; }
+    .lead-row:hover { background-color: #fafbff !important; }
+    .overdue-row td:first-child { border-left: 3px solid #ef4444; }
+    .followup-overdue  { color: #ef4444; font-weight: 700; font-size: .78rem; }
+    .followup-today    { color: #f59e0b; font-weight: 700; font-size: .78rem; }
+    .followup-upcoming { color: var(--ec-text-dark); font-size: .8rem; font-weight: 600; }
+    .followup-done     { color: #22c55e; font-size: .8rem; font-weight: 600; }
+    .followup-count-badge {
+        display: inline-flex; align-items: center; gap: .2rem;
+        font-size: .7rem; color: var(--ec-text-muted);
+        background: rgba(0,0,0,.04); border-radius: 4px; padding: .1rem .35rem;
+    }
+
+    /* ── Status dropdown ── */
+    .status-badge-toggle { cursor: pointer; user-select: none; }
+    .status-badge-toggle:hover { opacity: .85; }
+    .dropdown-item.status-opt { display: flex; align-items: center; gap: .4rem; }
+    .dropdown-item.status-opt.active { background: var(--ec-primary-light) !important; color: var(--ec-primary) !important; }
+    .dropdown-item.status-opt.disabled-opt { opacity: .45; pointer-events: none; }
+    .status-opt .check-icon { margin-left: auto; color: var(--ec-primary); font-size: .85rem; }
+
+    /* ── Quick filter pills ── */
+    .qf-btn {
+        display: inline-flex; align-items: center; gap: .28rem;
+        padding: .28rem .7rem; border-radius: 999px;
+        border: 1.5px solid var(--ec-border); background: var(--ec-white);
+        font-size: .77rem; font-weight: 600; color: var(--ec-text-muted);
+        cursor: pointer; transition: all .14s; white-space: nowrap;
+    }
+    .qf-btn:hover { border-color: var(--ec-primary); color: var(--ec-primary); background: var(--ec-primary-light); }
+    .qf-btn.active-warning { border-color: #f59e0b; color: #92400e; background: #fffbeb; }
+    .qf-btn.active-danger  { border-color: #ef4444; color: #991b1b; background: #fef2f2; }
+
+    /* ── Pagination ── */
+    .crm-pg-bar {
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: .5rem; padding: .6rem 1rem;
+        border-top: 1px solid var(--ec-border);
+    }
+    .crm-pg-bar .pagination { margin-bottom: 0; }
+
+    /* ── Mobile card view ── */
+    .crm-card { background: var(--ec-white); border: 1px solid var(--ec-border); border-radius: 11px; padding: .9rem; margin-bottom: .6rem; }
+    .crm-card.overdue-card { border-left: 3px solid #ef4444; }
+
+    /* ── Follow-up timeline ── */
+    .followup-timeline { list-style: none; padding: 0; margin: 0; }
+    .followup-timeline li {
+        position: relative; padding: 0 0 1.2rem 2rem;
+        border-left: 2px solid var(--ec-border);
+    }
+    .followup-timeline li:last-child { border-left: 2px solid transparent; padding-bottom: 0; }
+    .followup-timeline li::before {
+        content: ''; position: absolute; left: -6px; top: 4px;
+        width: 10px; height: 10px; border-radius: 50%;
+        background: var(--ec-primary); border: 2px solid var(--ec-white);
+        box-shadow: 0 0 0 2px var(--ec-primary);
+    }
+    .tl-time  { font-size: .72rem; color: var(--ec-text-muted); margin-bottom: .25rem; }
+    .tl-title { font-weight: 700; font-size: .84rem; color: var(--ec-text-dark); }
+    .tl-note  { font-size: .79rem; color: var(--ec-text-muted); margin-top: .15rem; }
+
+    /* ── Modal scroll fix (form breaks flex chain) ── */
+    #addEnquiryModal .modal-content,
+    #addEnquiryModal .modal-content > form,
+    #logFollowupModal .modal-content {
+        max-height: calc(100dvh - 3.5rem);
+        display: flex; flex-direction: column;
+        overflow: hidden; flex: 1 1 auto; min-height: 0;
+    }
+    #addEnquiryModal .modal-header,  #addEnquiryModal .modal-footer,
+    #logFollowupModal .modal-header, #logFollowupModal .modal-footer { flex-shrink: 0; }
+    #addEnquiryModal .modal-body,
+    #logFollowupModal .modal-body {
+        flex: 1 1 auto; min-height: 0;
+        overflow-y: auto; overflow-x: hidden;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+    @@media (max-width: 575.98px) {
+        #addEnquiryModal .modal-content,
+        #addEnquiryModal .modal-content > form,
+        #logFollowupModal .modal-content { max-height: calc(100dvh - 1rem); }
+        #addEnquiryModal .modal-dialog,
+        #logFollowupModal .modal-dialog  { margin: .5rem; }
+    }
+
+    /* ── Responsive ── */
+    @@media (max-width: 767.98px) {
+        .crm-table-wrap { display: none !important; }
+        .crm-card-list  { display: block; }
+        .crm-pg-bar     { justify-content: center; }
+    }
+    @@media (min-width: 768px) {
+        .crm-card-list  { display: none !important; }
+        .crm-table-wrap { display: block; }
+    }
+</style>
+}
+
+<div id="crmTopLoader"></div>
+@* Standalone CSRF token for all AJAX POST calls on this page *@
+@Html.AntiForgeryToken()
+
+<div class="container-fluid flex-grow-1 container-p-y">
+
+    <!-- ── Page Header ─── -->
+    <div class="ec-card mb-4">
+        <div class="ec-card-header">
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div class="ec-section-title-wrap">
+                    <div class="ec-section-icon"><i class="bx bx-message-square-detail"></i></div>
+                    <div>
+                        <h5 class="mb-0">Enquiry CRM</h5>
+                        <small class="text-muted">Track admission enquiries, follow-ups &amp; conversion pipeline.</small>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-shrink-0">
+                    <button type="button" class="btn btn-outline-secondary btn-sm">
+                        <i class="bx bx-export me-1"></i> Export
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm"
+                            data-bs-toggle="modal" data-bs-target="#addEnquiryModal">
+                        <i class="bx bx-user-plus me-1"></i> Add Enquiry
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── KPI Cards ─── -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-sm-4 col-xl-2">
+            <div class="crm-kpi-card d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-label-primary"><i class="bx bx-group text-primary"></i></div>
+                <div><div class="kpi-value text-primary">@stats.TotalLeads</div><div class="kpi-label">Total Leads</div><div class="kpi-sub">This session</div></div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-xl-2">
+            <div class="crm-kpi-card d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-label-warning"><i class="bx bx-time text-warning"></i></div>
+                <div><div class="kpi-value text-warning">@stats.DueToday</div><div class="kpi-label">Due Today</div><div class="kpi-sub">Follow-ups</div></div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-xl-2">
+            <div class="crm-kpi-card d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-label-danger"><i class="bx bx-error-circle text-danger"></i></div>
+                <div><div class="kpi-value text-danger">@stats.OverdueCount</div><div class="kpi-label">Overdue</div><div class="kpi-sub">Need attention</div></div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-xl-2">
+            <div class="crm-kpi-card d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-label-info"><i class="bx bx-building text-info"></i></div>
+                <div><div class="kpi-value text-info">@stats.CampusVisits</div><div class="kpi-label">Campus Visits</div><div class="kpi-sub">Scheduled</div></div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-xl-2">
+            <div class="crm-kpi-card d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-label-success"><i class="bx bx-check-circle text-success"></i></div>
+                <div><div class="kpi-value text-success">@stats.Admitted</div><div class="kpi-label">Admitted</div><div class="kpi-sub">This session</div></div>
+            </div>
+        </div>
+        <div class="col-6 col-sm-4 col-xl-2">
+            <div class="crm-kpi-card d-flex align-items-center gap-3">
+                <div class="kpi-icon bg-label-secondary"><i class="bx bx-trending-up"></i></div>
+                <div><div class="kpi-value">@stats.ConversionRate%</div><div class="kpi-label">Conversion</div><div class="kpi-sub">Rate</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Pipeline Tabs ─── -->
+    <div class="ec-card mb-3">
+        <div class="ec-card-header">
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div class="ec-section-title-wrap">
+                    <div class="ec-section-icon"><i class="bx bx-git-branch"></i></div>
+                    <div><h6 class="mb-0">Admission Pipeline</h6><small class="text-muted">Click a stage to filter.</small></div>
+                </div>
+            </div>
+        </div>
+        <div class="ec-card-body py-3">
+            <div class="crm-pipeline" id="pipelineTabs">
+                <a class="pipeline-tab active" data-pipeline=""              href="#"><span class="ptab-count">@stats.TotalLeads</span><span class="ptab-label">All</span></a>
+                <a class="pipeline-tab"        data-pipeline="new"           href="#"><span class="ptab-count">@stats.CntNew</span><span class="ptab-label">New</span></a>
+                <a class="pipeline-tab"        data-pipeline="followup"      href="#"><span class="ptab-count">@stats.CntFollowup</span><span class="ptab-label">Follow-up</span></a>
+                <a class="pipeline-tab"        data-pipeline="interested"    href="#"><span class="ptab-count">@stats.CntInterested</span><span class="ptab-label">Interested</span></a>
+                <a class="pipeline-tab"        data-pipeline="campusvisit"   href="#"><span class="ptab-count">@stats.CntCampusVisit</span><span class="ptab-label">Campus Visit</span></a>
+                <a class="pipeline-tab"        data-pipeline="registered"    href="#"><span class="ptab-count">@stats.CntRegistered</span><span class="ptab-label">Registered</span></a>
+                <a class="pipeline-tab"        data-pipeline="admitted"      href="#"><span class="ptab-count">@stats.Admitted</span><span class="ptab-label">Admitted</span></a>
+                <a class="pipeline-tab"        data-pipeline="notinterested" href="#"><span class="ptab-count text-danger">@stats.CntNotInterested</span><span class="ptab-label">Not Interested</span></a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Filters ─── -->
+    <div class="ec-card mb-3">
+        <div class="ec-card-header">
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div class="ec-section-title-wrap">
+                    <div class="ec-section-icon"><i class="bx bx-filter-alt"></i></div>
+                    <div><h6 class="mb-0">Search &amp; Filter</h6></div>
+                </div>
+            </div>
+        </div>
+        <div class="ec-card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-lg-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-end-0 pe-1">
+                            <i class="bx bx-search text-muted"></i>
+                        </span>
+                        <input type="search" class="form-control border-start-0 ps-0"
+                               id="leadSearch" placeholder="Search student, parent or mobile..." />
+                    </div>
+                </div>
+                <div class="col-6 col-sm-3 col-lg-2">
+                    <select class="form-select" id="sessionFilter">
+                        <option value="">All Sessions</option>
+                        @foreach (var s in sessions){<option value="@s.Text">@s.Text</option>}
+                    </select>
+                </div>
+                <div class="col-6 col-sm-3 col-lg-2">
+                    <select class="form-select" id="classFilter">
+                        <option value="">All Classes</option>
+                        @foreach (var c in classes){<option value="@c.Text">@c.Text</option>}
+                    </select>
+                </div>
+                <div class="col-6 col-sm-3 col-lg-2">
+                    <select class="form-select" id="sourceFilter">
+                        <option value="">All Sources</option>
+                        <option value="Walk-in">Walk-in</option>
+                        <option value="QR Code">QR Code</option>
+                        <option value="Referral">Referral</option>
+                        <option value="Website">Website</option>
+                        <option value="Phone Call">Phone Call</option>
+                        <option value="Social Media">Social Media</option>
+                    </select>
+                </div>
+                @if (counsellors.Any())
+                {
+                    <div class="col-6 col-sm-3 col-lg-2">
+                        <select class="form-select" id="counsellorFilter">
+                            <option value="">All Counsellors</option>
+                            @foreach (var c in counsellors){<option value="@c.Value">@c.Text</option>}
+                        </select>
+                    </div>
+                }
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top">
+                <span class="text-muted" style="font-size:.76rem">Quick:</span>
+                <button type="button" class="qf-btn" id="btnTodayFollowups">
+                    <i class="bx bx-time"></i> Today's Follow-ups
+                </button>
+                <button type="button" class="qf-btn" id="btnOverdue">
+                    <i class="bx bx-error-circle"></i> Overdue Only
+                </button>
+                <button type="button" class="qf-btn ms-auto" id="btnClear">
+                    <i class="bx bx-x"></i> Clear All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Desktop Table ─── -->
+    <div class="ec-card crm-table-wrap">
+        <div class="ec-card-header">
+            <div class="d-flex justify-content-between align-items-center gap-3">
+                <div class="ec-section-title-wrap">
+                    <div class="ec-section-icon"><i class="bx bx-list-ul"></i></div>
+                    <div>
+                        <h6 class="mb-0">Enquiries</h6>
+                        <small class="text-muted" id="tableSubtitle">Loading...</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table ec-table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th style="min-width:185px">Student</th>
+                        <th style="min-width:165px">Parent &amp; Contact</th>
+                        <th style="min-width:110px">Class / Session</th>
+                        <th style="min-width:100px">Source</th>
+                        <th style="min-width:130px">Status</th>
+                        <th style="min-width:130px">Next Follow-up</th>
+                        <th style="min-width:80px">Age</th>
+                        <th class="text-end" style="min-width:185px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="leadTableBody">
+                    <tr id="loadingRow">
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                            Loading enquiries...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="text-center py-5 d-none" id="leadEmptyState">
+            <div class="avatar avatar-lg mx-auto mb-3">
+                <span class="avatar-initial rounded bg-label-secondary"><i class="bx bx-search"></i></span>
+            </div>
+            <h6 class="mb-1">No enquiries match your filters</h6>
+            <p class="text-muted mb-0">Try adjusting search, filters, or pipeline stage.</p>
+        </div>
+
+        <div class="crm-pg-bar" id="pgBar">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <label class="text-muted" style="font-size:.77rem">Per page:</label>
+                <select class="form-select form-select-sm" id="pageSizeSelect" style="width:auto">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                </select>
+                <span class="text-muted" id="pgInfo" style="font-size:.77rem"></span>
+            </div>
+            <nav><ul class="pagination pagination-sm mb-0" id="pgControls"></ul></nav>
+        </div>
+    </div>
+
+    <!-- ── Mobile Card List ─── -->
+    <div class="crm-card-list" id="mobileCardList">
+        <div class="text-center py-5 text-muted" id="mobileLoader">
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+            Loading...
+        </div>
+    </div>
+    <div class="ec-card d-md-none mt-2" id="mobilePgCard" style="display:none!important">
+        <div class="crm-pg-bar">
+            <div class="d-flex align-items-center gap-2">
+                <label class="text-muted" style="font-size:.77rem">Per page:</label>
+                <select class="form-select form-select-sm" id="mobilePgSize" style="width:auto">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
+            <nav><ul class="pagination pagination-sm mb-0" id="mobilePgControls"></ul></nav>
+        </div>
+    </div>
+
+</div><!-- container-fluid -->
+
+<!-- ════════════════════════════════════════════════════════
+     ADD ENQUIRY MODAL
+═════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="addEnquiryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <form asp-action="SaveEnquiry" asp-controller="Enquiry" asp-area="Admin" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="EnquiryId" value="0" />
+
+                <div class="modal-header">
+                    <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                        <div class="ec-section-title-wrap">
+                            <div class="ec-section-icon"><i class="bx bx-user-plus"></i></div>
+                            <div><h5 class="modal-title mb-0">Add Enquiry</h5><small class="text-muted">Capture student &amp; parent details.</small></div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+
+                <div class="modal-body">
+
+                    <!-- Student -->
+                    <div class="ec-section-title-wrap mb-3">
+                        <div class="ec-section-icon"><i class="bx bx-child"></i></div>
+                        <div><h6 class="mb-0">Student Information</h6></div>
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Student Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="StudentName" placeholder="e.g. Anmol Kumar" required />
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Gender</label>
+                            <select class="form-select" name="Gender">
+                                <option value="" disabled selected>Select</option>
+                                <option>Male</option><option>Female</option><option>Other</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">Date of Birth</label>
+                            <input type="date" class="form-control" name="Dob" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Class Interested In <span class="text-danger">*</span></label>
+                            <select class="form-select" name="ClassName" id="addClassName" required>
+                                <option value="" disabled selected>Select class</option>
+                                @foreach (var c in classes){<option value="@c.Text">@c.Text</option>}
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Academic Session <span class="text-danger">*</span></label>
+                            <select class="form-select" name="Session" required>
+                                <option value="" disabled selected>Select session</option>
+                                @foreach (var s in sessions){<option value="@s.Text">@s.Text</option>}
+                            </select>
+                        </div>
+                        <!-- Current school + class -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Current School</label>
+                            <input type="text" class="form-control" name="CurrentSchool"
+                                   placeholder="e.g. Delhi Public School" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Currently Studying in Class</label>
+                            <select class="form-select" name="CurrentClass">
+                                <option value="" selected>Select current class</option>
+                                <option>Nursery</option><option>LKG</option><option>UKG</option>
+                                <option>1st</option><option>2nd</option><option>3rd</option>
+                                <option>4th</option><option>5th</option><option>6th</option>
+                                <option>7th</option><option>8th</option><option>9th</option>
+                                <option>10th</option><option>11th</option><option>12th</option>
+                                <option>Not Currently Enrolled</option>
+                            </select>
+                        </div>
+                        <!-- Interested Stream — shown only for classes 11 and 12 -->
+                        <div class="col-12 col-md-6 d-none" id="streamRow">
+                            <label class="form-label">Interested Stream</label>
+                            <select class="form-select" name="InterestedStream">
+                                <option value="" selected>Select stream</option>
+                                <option>Science (PCM)</option>
+                                <option>Science (PCB)</option>
+                                <option>Commerce</option>
+                                <option>Arts / Humanities</option>
+                                <option>Vocational</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr class="mb-4">
+
+                    <!-- Parent / Guardian -->
+                    <div class="ec-section-title-wrap mb-3">
+                        <div class="ec-section-icon"><i class="bx bx-user"></i></div>
+                        <div><h6 class="mb-0">Parent / Guardian</h6></div>
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Father's Name</label>
+                            <input type="text" class="form-control" name="FatherName" placeholder="e.g. Rajaram Sharma" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Father's Mobile <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">+91</span>
+                                <input type="tel" class="form-control" name="FatherMobile" id="addFatherMobile"
+                                       placeholder="9876543210" />
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Mother's Name</label>
+                            <input type="text" class="form-control" name="MotherName" placeholder="e.g. Sunita Sharma" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Mother's Mobile</label>
+                            <div class="input-group">
+                                <span class="input-group-text">+91</span>
+                                <input type="tel" class="form-control" name="MotherMobile" placeholder="Optional" />
+                            </div>
+                        </div>
+                        <!-- Hidden primary mobile — auto-filled from father mobile -->
+                        <input type="hidden" name="Mobile" id="addPrimaryMobile" value="" />
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Parent Email</label>
+                            <input type="email" class="form-control" name="ParentEmail" id="addParentEmail"
+                                   placeholder="e.g. rajaram@gmail.com" />
+                            <small class="text-muted">For sending brochure &amp; fee structure.</small>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">WhatsApp Number</label>
+                            <div class="input-group">
+                                <span class="input-group-text">+91</span>
+                                <input type="tel" class="form-control" name="WhatsAppNumber" id="addWhatsApp"
+                                       placeholder="Same as father's mobile" />
+                            </div>
+                            <div class="form-check mt-1">
+                                <input class="form-check-input" type="checkbox"
+                                       id="whatsappSameAsMobile" checked />
+                                <label class="form-check-label text-muted" for="whatsappSameAsMobile"
+                                       style="font-size:.78rem">
+                                    Same as father's mobile
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">City</label>
+                            <input type="text" class="form-control" name="City" placeholder="e.g. Jaipur" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Area / Locality</label>
+                            <input type="text" class="form-control" name="AreaLocality" placeholder="e.g. Malviya Nagar" />
+                        </div>
+                    </div>
+
+                    <hr class="mb-4">
+
+                    <!-- Enquiry Details -->
+                    <div class="ec-section-title-wrap mb-3">
+                        <div class="ec-section-icon"><i class="bx bx-detail"></i></div>
+                        <div><h6 class="mb-0">Enquiry Details</h6></div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Lead Source <span class="text-danger">*</span></label>
+                            <select class="form-select" name="LeadSource" id="addLeadSource">
+                                <option selected>Walk-in</option>
+                                <option>QR Code</option>
+                                <option>Referral</option>
+                                <option>Website</option>
+                                <option>Phone Call</option>
+                                <option>Social Media</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Initial Status</label>
+                            <select class="form-select" name="Status">
+                                <option selected>New</option>
+                                <option>Follow-up Pending</option>
+                                <option>Interested</option>
+                            </select>
+                        </div>
+                        <!-- Referrer fields — shown only when Source = Referral -->
+                        <div class="col-12 col-md-6 d-none" id="referrerNameRow">
+                            <label class="form-label">Referred By (Name)</label>
+                            <input type="text" class="form-control" name="ReferrerName" placeholder="Who referred this family?" />
+                        </div>
+                        <div class="col-12 col-md-6 d-none" id="referrerMobileRow">
+                            <label class="form-label">Referrer Mobile</label>
+                            <div class="input-group">
+                                <span class="input-group-text">+91</span>
+                                <input type="tel" class="form-control" name="ReferrerMobile" placeholder="Optional" />
+                            </div>
+                        </div>
+                        @if (counsellors.Any())
+                        {
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Assign Counsellor</label>
+                                <select class="form-select" name="AssignedToId">
+                                    <option value="">Unassigned</option>
+                                    @foreach (var c in counsellors){<option value="@c.Value">@c.Text</option>}
+                                </select>
+                            </div>
+                        }
+                        <div class="col-12 col-md-6">
+                            <label class="form-label">Next Follow-up Date</label>
+                            <input type="date" class="form-control" name="NextFollowupDate" />
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label d-block">School Transport Required?</label>
+                            <div class="d-flex gap-3 mt-1">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio"
+                                           name="TransportRequired" id="transportNo" value="false" checked />
+                                    <label class="form-check-label" for="transportNo">No</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio"
+                                           name="TransportRequired" id="transportYes" value="true" />
+                                    <label class="form-check-label" for="transportYes">Yes — needs school bus</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Initial Notes</label>
+                            <textarea class="form-control" name="Notes" rows="3"
+                                      placeholder="Discussion notes, parent concerns, requirements..."></textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="saveEnquiryBtn">
+                        <i class="bx bx-save me-1"></i> Save Enquiry
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     LOG FOLLOW-UP MODAL
+═════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="logFollowupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="ec-section-title-wrap">
+                    <div class="ec-section-icon"><i class="bx bx-phone-call"></i></div>
+                    <div><h5 class="modal-title mb-0">Log Follow-up</h5><small class="text-muted" id="followupStudentName"></small></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="followupEnquiryId" value="" />
+
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label">Contact Type <span class="text-danger">*</span></label>
+                        <select class="form-select" id="followupType">
+                            <option value="Call" selected>📞 Phone Call</option>
+                            <option value="WhatsApp">💬 WhatsApp</option>
+                            <option value="In-Person">🤝 In-Person Visit</option>
+                            <option value="Email">✉️ Email</option>
+                            <option value="Visit">🏫 Campus Visit</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Outcome <span class="text-danger">*</span></label>
+                        <select class="form-select" id="followupOutcome">
+                            <option value="" disabled selected>Select outcome</option>
+                            <option value="Interested">✅ Interested</option>
+                            <option value="Call Back Later">🔁 Call Back Later</option>
+                            <option value="No Answer">📵 No Answer</option>
+                            <option value="Busy">⏳ Busy / Will Call Back</option>
+                            <option value="Left Message">💬 Left Message</option>
+                            <option value="Not Interested">❌ Not Interested</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Notes / Discussion Points</label>
+                        <textarea class="form-control" id="followupNotes" rows="3"
+                                  placeholder="What was discussed? Any specific concerns or requirements?"></textarea>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">Next Follow-up Date</label>
+                        <input type="date" class="form-control" id="followupNextDate" />
+                    </div>
+
+                    <!-- Update Status (optional) -->
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="updateStatusCheck" />
+                            <label class="form-check-label" for="updateStatusCheck">
+                                Also update enquiry status
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-12 d-none" id="newStatusRow">
+                        <label class="form-label">New Status</label>
+                        <select class="form-select" id="followupNewStatus">
+                            <option value="">Keep current</option>
+                            <option value="New">New</option>
+                            <option value="Follow-up Pending">Follow-up Pending</option>
+                            <option value="Interested">Interested</option>
+                            <option value="Campus Visit Scheduled">Campus Visit Scheduled</option>
+                            <option value="Registration Done">Registration Done</option>
+                            <option value="Admission Confirmed">Admission Confirmed</option>
+                            <option value="Not Interested">Not Interested</option>
+                        </select>
+                    </div>
+
+                    <!-- Lost reason — shown when status or outcome = Not Interested -->
+                    <div class="col-12 d-none" id="lostReasonRow">
+                        <label class="form-label">Reason for Not Interested <span class="text-danger">*</span></label>
+                        <select class="form-select" id="followupLostReason">
+                            <option value="" disabled selected>Select reason</option>
+                            <option>Fees Too High</option>
+                            <option>Admitted to Another School</option>
+                            <option>Distance / Transport Issue</option>
+                            <option>No Seats Available</option>
+                            <option>Changed Mind</option>
+                            <option>Not Responding</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Follow-up history -->
+                    <div class="col-12 mt-2" id="followupHistorySection">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <small class="fw-bold text-muted text-uppercase" style="letter-spacing:.05em">History</small>
+                            <div class="spinner-border spinner-border-sm text-primary d-none" id="historyLoader" role="status"></div>
+                        </div>
+                        <ul class="followup-timeline" id="followupTimeline">
+                            <li><div class="tl-time">Loading...</div></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveFollowupBtn">
+                    <i class="bx bx-save me-1"></i> Save Follow-up
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     LOST REASON MODAL (quick status change from dropdown)
+═════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="lostReasonModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header d-flex align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bx bx-x-circle text-danger fs-5 flex-shrink-0"></i>
+                    <h6 class="modal-title mb-0">Mark as Not Interested</h6>
+                </div>
+                <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="lostEnquiryId" />
+                <input type="hidden" id="lostTargetStatus" />
+                <label class="form-label">Why is the parent not interested? <span class="text-danger">*</span></label>
+                <select class="form-select" id="lostReasonSelect">
+                    <option value="" disabled selected>Select reason</option>
+                    <option>Fees Too High</option>
+                    <option>Admitted to Another School</option>
+                    <option>Distance / Transport Issue</option>
+                    <option>No Seats Available</option>
+                    <option>Changed Mind</option>
+                    <option>Not Responding</option>
+                    <option>Other</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger btn-sm" id="confirmLostBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     CONVERT TO ADMISSION MODAL
+═════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="convertAdmissionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="ec-section-title-wrap">
+                    <div class="ec-section-icon" style="background:rgba(34,197,94,.12)">
+                        <i class="bx bx-user-check text-success"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title mb-0">Convert to Admission</h5>
+                        <small class="text-muted">Review details before confirming.</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="convertEnquiryId" />
+
+                <!-- Summary card -->
+                <div class="ec-card mb-3" style="border:1.5px solid #d1fae5;background:#f0fff4;">
+                    <div class="ec-card-body py-3">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <small class="text-muted d-block" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Student</small>
+                                <div class="fw-bold" id="cvStudentName">—</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Parent</small>
+                                <div class="fw-bold" id="cvParentName">—</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Class</small>
+                                <div class="fw-bold" id="cvClassName">—</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Session</small>
+                                <div class="fw-bold" id="cvSession">—</div>
+                            </div>
+                            <div class="col-12">
+                                <small class="text-muted d-block" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Mobile</small>
+                                <div class="fw-bold" id="cvMobile">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning mb-0 py-2" style="font-size:.83rem">
+                    <i class="bx bx-info-circle me-1"></i>
+                    This will mark the enquiry as <strong>Admission Confirmed</strong>
+                    and lock further status changes. Make sure all documents and fees are verified.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmConvertBtn">
+                    <i class="bx bx-check me-1"></i> Confirm Admission
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     DELETE CONFIRMATION MODAL
+═════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="deleteEnquiryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header d-flex align-items-center justify-content-between gap-2 border-0 pb-0">
+                <div class="d-flex align-items-center gap-2">
+                    <div style="width:32px;height:32px;border-radius:8px;background:rgba(239,68,68,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                        <i class="bx bx-trash text-danger"></i>
+                    </div>
+                    <h6 class="modal-title mb-0">Delete Enquiry</h6>
+                </div>
+                <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-2">
+                <p class="mb-0">
+                    Are you sure you want to delete the enquiry for
+                    <strong id="deleteEnquiryName"></strong>?
+                    This action cannot be undone.
+                </p>
+                <input type="hidden" id="deleteEnquiryId" />
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteBtn">
+                    <i class="bx bx-trash me-1"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section PageScripts {
+<script>
+$(document).ready(function () {
+
+    /* ── Toastr ─────────────────────────────────────────── */
+    toastr.options = {
+        closeButton: true, progressBar: true, newestOnTop: true,
+        positionClass: 'toast-top-right', preventDuplicates: true, timeOut: 3500
+    };
+    @if (TempData["Message"] != null)
+    {
+        <text>
+        (function(){
+            var r = '@TempData["Result"]';
+            var m = '@Html.Raw((TempData["Message"] ?? "").ToString().Replace("'", "\\'").Replace("\r","").Replace("\n",""))';
+            if (r === '1') toastr.success(m); else toastr.error(m);
+        })();
+        </text>
+    }
+
+    /* ── CSRF token (uses standalone token outside any form) ── */
+    var csrf = $('input[name="__RequestVerificationToken"]').first().val();
+    if (!csrf) {
+        // Fallback: try to retrieve from any rendered antiforgery input
+        csrf = $('[name="__RequestVerificationToken"]').val() || '';
+    }
+
+    /* ── Loader ─────────────────────────────────────────── */
+    var $loader = $('#crmTopLoader');
+    function showLoader() { $loader.stop(true).css({ width:'0%', opacity:1 }).animate({ width:'72%' }, 300); }
+    function hideLoader() {
+        $loader.stop(true).animate({ width:'100%' }, 180, function() {
+            $(this).delay(150).animate({ opacity:0 }, 180, function(){ $(this).css({ width:'0%', opacity:1 }); });
+        });
+    }
+
+    /* ── Filter state ───────────────────────────────────── */
+    var F = { page:1, pageSize:10, search:'', session:'', className:'', source:'', pipeline:'', assignedTo:'', overdue:false, today:false };
+
+    /* ── HTML escape ────────────────────────────────────── */
+    function esc(s) {
+        return (s||'').toString()
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    /* ── Fetch data ─────────────────────────────────────── */
+    var fetchXhr;
+    function fetchData(resetPage) {
+        if (resetPage) F.page = 1;
+        if (fetchXhr) fetchXhr.abort();
+        showLoader();
+
+        fetchXhr = $.get('/Admin/Enquiry/GetEnquiriesData', {
+            page: F.page, pageSize: F.pageSize,
+            search: F.search, session: F.session, className: F.className,
+            source: F.source, pipeline: F.pipeline, assignedTo: F.assignedTo,
+            overdue: F.overdue, today: F.today
+        })
+        .done(function(d) {
+            if (!d.success) { hideLoader(); return; }
+            renderTable(d.rows);
+            renderMobileCards(d.rows);
+            updatePagination(d);
+            hideLoader();
+        })
+        .fail(function(x) {
+            if (x.statusText !== 'abort') { toastr.error('Failed to load data.'); hideLoader(); }
+        });
+    }
+
+    /* ── Status dropdown ────────────────────────────────── */
+    var STATUS_LIST = [
+        { key:'New',                    label:'New',                    icon:'bx-user',         cls:'' },
+        { key:'Follow-up Pending',      label:'Follow-up Pending',      icon:'bx-phone',        cls:'' },
+        { key:'Interested',             label:'Interested',             icon:'bx-heart',        cls:'' },
+        { key:'Campus Visit Scheduled', label:'Campus Visit Scheduled', icon:'bx-building',     cls:'' },
+        { key:'Registration Done',      label:'Registration Done',      icon:'bx-clipboard',    cls:'' },
+        { key:'Admission Confirmed',    label:'Admission Confirmed',    icon:'bx-check-circle', cls:'text-success fw-semibold' },
+        { key:'Not Interested',         label:'Not Interested',         icon:'bx-x-circle',     cls:'text-danger' }
+    ];
+
+    function buildStatusDropdown(r) {
+        if (r.isTerminal) {
+            return '<span class="badge bg-label-success" title="Admission Confirmed — final status">'
+                + '<i class="bx bx-check-circle me-1"></i>' + esc(r.status) + '</span>';
+        }
+        var items = STATUS_LIST.map(function (s) {
+            var isActive  = (s.key === r.status);
+            var needsLost = (s.key === 'Not Interested' || s.key === 'Dropped');
+            return '<li><a class="dropdown-item status-opt' + (isActive ? ' active' : '') + ' ' + s.cls + '"'
+                + ' href="#"'
+                + ' data-id="'     + r.enquiryId + '"'
+                + ' data-status="' + esc(s.key)  + '"'
+                + (needsLost ? ' data-needs-lost="1"' : '') + '>'
+                + '<i class="bx ' + s.icon + ' me-2"></i>' + esc(s.label)
+                + (isActive ? '<i class="bx bx-check check-icon ms-auto"></i>' : '')
+                + '</a></li>';
+        }).join('');
+
+        /* ── NO onclick="stopPropagation" here ───────────────────────
+           Bootstrap dropdown data-API + jQuery delegation both listen
+           on document. stopPropagation on a parent kills them both.
+           The row-click handler's own guard (.closest button/a/.dropdown)
+           already prevents row navigation when clicking inside a dropdown.
+        ──────────────────────────────────────────────────────────── */
+        return '<div class="dropdown">'
+            + '<span class="badge ' + esc(r.statusBadgeClass) + ' status-badge-toggle"'
+            + ' data-bs-toggle="dropdown" aria-expanded="false" style="cursor:pointer">'
+            + esc(r.status)
+            + ' <i class="bx bx-chevron-down" style="font-size:.65rem;opacity:.75;vertical-align:middle"></i>'
+            + '</span>'
+            + '<ul class="dropdown-menu dropdown-menu-end shadow py-1" style="min-width:215px;font-size:.82rem">'
+            + '<li><div class="px-3 pt-2 pb-1" style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ec-text-muted)">Change Status</div></li>'
+            + '<li><hr class="dropdown-divider my-1"></li>'
+            + items
+            + '</ul></div>';
+    }
+
+    /* ── Render table ───────────────────────────────────── */
+    function renderTable(rows) {
+        if (!rows || rows.length === 0) {
+            $('#leadTableBody').html('');
+            $('#leadEmptyState').removeClass('d-none');
+            return;
+        }
+        $('#leadEmptyState').addClass('d-none');
+        $('#leadTableBody').html(rows.map(buildTableRow).join(''));
+        // Re-initialise Bootstrap tooltips on dynamically injected rows
+        $('#leadTableBody [data-bs-toggle="tooltip"]').tooltip({ trigger: 'hover' });
+    }
+
+    function buildTableRow(r) {
+        var oClass = r.isOverdue ? 'overdue-row' : '';
+        var fwIcon = r.followupIcon ? '<i class="bx ' + esc(r.followupIcon) + ' me-1"></i>' : '';
+        var fwSub  = r.followupSubtext ? '<div class="lead-meta">' + esc(r.followupSubtext) + '</div>' : '';
+        var fwCnt  = r.followupCount > 0
+            ? ' <span class="followup-count-badge"><i class="bx bx-chat"></i>' + r.followupCount + '</span>' : '';
+
+        return '<tr class="lead-row ' + oClass + '" data-id="' + r.enquiryId + '">'
+            + '<td><div class="d-flex align-items-center gap-2">'
+            +   '<div class="student-avatar ' + esc(r.avatarColorClass) + '">' + esc(r.studentInitials) + '</div>'
+            +   '<div>'
+            +     '<div class="lead-name">' + esc(r.studentName) + '</div>'
+            +     '<div class="lead-meta">' + esc(r.className) + ' &middot; ' + esc(r.session) + '</div>'
+            +   '</div>'
+            + '</div></td>'
+            + '<td>'
+            +   '<div class="fw-semibold text-dark" style="font-size:.83rem">' + esc(r.parentName) + '</div>'
+            +   '<a href="' + esc(r.callUrl) + '" class="lead-meta text-decoration-none" onclick="event.stopPropagation()">'
+            +     '<i class="bx bx-phone me-1"></i>' + esc(r.mobile) + '</a>'
+            + '</td>'
+            + '<td>'
+            +   '<span class="badge bg-label-primary">' + esc(r.className) + '</span>'
+            +   '<div class="lead-meta mt-1">' + esc(r.session) + '</div>'
+            + '</td>'
+            + '<td><span class="source-pill"><i class="bx ' + esc(r.sourceIcon) + '"></i> ' + esc(r.leadSource) + '</span></td>'
+            + '<td>' + buildStatusDropdown(r) + '</td>'
+            + '<td>'
+            +   '<div class="' + esc(r.followupCssClass) + '">' + fwIcon + esc(r.followupDisplay) + fwCnt + '</div>'
+            +   fwSub
+            + '</td>'
+            + '<td><span class="lead-meta">' + esc(r.daysSinceLabel) + '</span></td>'
+            + '<td class="text-end"><div class="d-inline-flex gap-1 align-items-center flex-nowrap">'
+            /* Log Follow-up — NO stopPropagation; delegation on document handles it */
+            +   '<button type="button" class="btn btn-sm btn-icon btn-outline-secondary crm-action-btn btn-log-followup"'
+            +     ' title="Log Follow-up"'
+            +     ' data-id="' + r.enquiryId + '" data-name="' + esc(r.studentName) + '">'
+            +     '<i class="bx bx-calendar-plus"></i></button>'
+            /* WhatsApp */
+            +   '<a href="' + esc(r.whatsAppUrl) + '" target="_blank"'
+            +     ' class="btn btn-sm btn-icon btn-outline-success crm-action-btn" title="WhatsApp">'
+            +     '<i class="bx bxl-whatsapp"></i></a>'
+            /* Call */
+            +   '<a href="' + esc(r.callUrl) + '"'
+            +     ' class="btn btn-sm btn-icon btn-outline-info crm-action-btn" title="Call">'
+            +     '<i class="bx bx-phone-call"></i></a>'
+            /* Convert to Admission — only when not terminal */
+            + (!r.isTerminal
+                ? '<button type="button" class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"'
+                +   ' title="Convert to Admission"'
+                +   ' data-id="'      + r.enquiryId         + '"'
+                +   ' data-name="'    + esc(r.studentName)   + '"'
+                +   ' data-parent="'  + esc(r.parentName)    + '"'
+                +   ' data-mobile="'  + esc(r.mobile)        + '"'
+                +   ' data-class="'   + esc(r.className)     + '"'
+                +   ' data-session="' + esc(r.session)       + '">'
+                +   '<i class="bx bx-user-check"></i></button>'
+                : '')
+            /* Delete */
+            +   '<button type="button" class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"'
+            +     ' title="Delete"'
+            +     ' data-id="'   + r.enquiryId       + '"'
+            +     ' data-name="' + esc(r.studentName) + '">'
+            +     '<i class="bx bx-trash"></i></button>'
+            + '</div></td>'
+            + '</tr>';
+    }
+
+    /* ── Render mobile cards ────────────────────────────── */
+    function renderMobileCards(rows) {
+        $('#mobileLoader').hide();
+        if (!rows || rows.length === 0) {
+            $('#mobileCardList').html('<div class="text-center py-5 text-muted"><i class="bx bx-search fs-1 d-block mb-2 opacity-25"></i>No results.</div>');
+            return;
+        }
+        $('#mobileCardList').html(rows.map(buildMobileCard).join(''));
+    }
+
+    function buildMobileCard(r) {
+        var fwIcon = r.followupIcon ? '<i class="bx ' + esc(r.followupIcon) + ' me-1"></i>' : '';
+        return '<div class="crm-card lead-row ' + (r.isOverdue ? 'overdue-card' : '') + '" data-id="' + r.enquiryId + '">'
+            + '<div class="d-flex justify-content-between align-items-start mb-2">'
+            +   '<div class="d-flex align-items-center gap-2">'
+            +     '<div class="student-avatar ' + esc(r.avatarColorClass) + '">' + esc(r.studentInitials) + '</div>'
+            +     '<div><div class="lead-name">' + esc(r.studentName) + '</div><div class="lead-meta">' + esc(r.parentName) + '</div></div>'
+            +   '</div>'
+            +   buildStatusDropdown(r)
+            + '</div>'
+            + '<div class="d-flex flex-wrap gap-2 mb-2">'
+            +   '<span class="badge bg-label-primary">' + esc(r.className) + '</span>'
+            +   '<span class="source-pill"><i class="bx ' + esc(r.sourceIcon) + '"></i> ' + esc(r.leadSource) + '</span>'
+            + '</div>'
+            + '<div class="d-flex justify-content-between align-items-center">'
+            +   '<div class="' + esc(r.followupCssClass) + '" style="font-size:.76rem">' + fwIcon + esc(r.followupDisplay) + '</div>'
+            +   '<div class="d-flex gap-1 flex-wrap">'
+            +     '<button class="btn btn-sm btn-icon btn-outline-secondary crm-action-btn btn-log-followup"'
+            +       ' data-id="' + r.enquiryId + '" data-name="' + esc(r.studentName) + '">'
+            +       '<i class="bx bx-calendar-plus"></i></button>'
+            +     '<a href="' + esc(r.callUrl) + '" class="btn btn-sm btn-icon btn-outline-info crm-action-btn"><i class="bx bx-phone-call"></i></a>'
+            +     '<a href="' + esc(r.whatsAppUrl) + '" target="_blank" class="btn btn-sm btn-icon btn-outline-success crm-action-btn"><i class="bx bxl-whatsapp"></i></a>'
+            + (!r.isTerminal
+                ? '<button class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"'
+                +   ' data-id="'      + r.enquiryId       + '"'
+                +   ' data-name="'    + esc(r.studentName) + '"'
+                +   ' data-parent="'  + esc(r.parentName)  + '"'
+                +   ' data-mobile="'  + esc(r.mobile)      + '"'
+                +   ' data-class="'   + esc(r.className)   + '"'
+                +   ' data-session="' + esc(r.session)     + '">'
+                +   '<i class="bx bx-user-check"></i></button>'
+                : '')
+            +     '<button class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"'
+            +       ' data-id="' + r.enquiryId + '" data-name="' + esc(r.studentName) + '">'
+            +       '<i class="bx bx-trash"></i></button>'
+            +   '</div>'
+            + '</div></div>';
+    }
+
+    /* ── Pagination ─────────────────────────────────────── */
+    function updatePagination(d) {
+        var s = d.totalCount > 0 ? (d.page-1)*d.pageSize+1 : 0;
+        var e = Math.min(d.page*d.pageSize, d.totalCount);
+        $('#tableSubtitle').text(d.totalCount + ' record' + (d.totalCount!==1?'s':'') + ' · page ' + d.page + ' of ' + d.totalPages);
+        $('#pgInfo').text(d.totalCount > 0 ? 'Showing ' + s + '–' + e + ' of ' + d.totalCount : '0 results');
+        var html = buildPgHtml(d.page, d.totalPages);
+        $('#pgControls').html(html);
+        $('#mobilePgControls').html(html);
+        if (d.totalCount > 0) { $('#pgBar').show(); $('#mobilePgCard').css('display',''); }
+    }
+
+    function buildPgHtml(cur, total) {
+        if (total <= 1) return '';
+        var h = '<li class="page-item' + (cur<=1?' disabled':'') + '">'
+              + '<a class="page-link" href="#" data-pg="' + (cur-1) + '"><i class="bx bx-chevron-left"></i></a></li>';
+        pageRange(cur,total).forEach(function(p) {
+            if (p==='...') { h += '<li class="page-item disabled"><span class="page-link">…</span></li>'; }
+            else { h += '<li class="page-item' + (p===cur?' active':'') + '"><a class="page-link" href="#" data-pg="' + p + '">' + p + '</a></li>'; }
+        });
+        h += '<li class="page-item' + (cur>=total?' disabled':'') + '">'
+           + '<a class="page-link" href="#" data-pg="' + (cur+1) + '"><i class="bx bx-chevron-right"></i></a></li>';
+        return h;
+    }
+
+    function pageRange(cur, total) {
+        if (total<=7) return Array.from({length:total},function(_,i){return i+1;});
+        var r=[1]; if(cur>3) r.push('...');
+        for(var i=Math.max(2,cur-1);i<=Math.min(total-1,cur+1);i++) r.push(i);
+        if(cur<total-2) r.push('...'); r.push(total); return r;
+    }
+
+    $(document).on('click','#pgControls .page-link, #mobilePgControls .page-link',function(e){
+        e.preventDefault(); var p=parseInt($(this).data('pg'));
+        if(!isNaN(p)&&p>=1&&p!==F.page){F.page=p;fetchData(false);}
+    });
+    $('#pageSizeSelect').on('change',function(){ F.pageSize=parseInt($(this).val()); $('#mobilePgSize').val($(this).val()); fetchData(true); });
+    $('#mobilePgSize').on('change',function(){ F.pageSize=parseInt($(this).val()); $('#pageSizeSelect').val($(this).val()); fetchData(true); });
+
+    /* ── Pipeline tabs ──────────────────────────────────── */
+    $('#pipelineTabs .pipeline-tab').on('click',function(e){
+        e.preventDefault();
+        $('#pipelineTabs .pipeline-tab').removeClass('active');
+        $(this).addClass('active');
+        F.pipeline=$(this).data('pipeline')||''; F.overdue=false; F.today=false;
+        clearQF(); fetchData(true);
+    });
+
+    /* ── Quick filters ──────────────────────────────────── */
+    $('#btnTodayFollowups').on('click',function(){
+        F.today=!F.today; F.overdue=false; resetPipelineToAll();
+        $(this).toggleClass('active-warning',F.today); $('#btnOverdue').removeClass('active-danger'); fetchData(true);
+    });
+    $('#btnOverdue').on('click',function(){
+        F.overdue=!F.overdue; F.today=false; resetPipelineToAll();
+        $(this).toggleClass('active-danger',F.overdue); $('#btnTodayFollowups').removeClass('active-warning'); fetchData(true);
+    });
+    $('#btnClear').on('click',function(){
+        $('#leadSearch').val('');
+        $('#sessionFilter,#classFilter,#sourceFilter,#counsellorFilter').val('');
+        F={page:1,pageSize:F.pageSize,search:'',session:'',className:'',source:'',pipeline:'',assignedTo:'',overdue:false,today:false};
+        clearQF(); resetPipelineToAll(); fetchData(true);
+    });
+
+    function resetPipelineToAll(){
+        $('#pipelineTabs .pipeline-tab').removeClass('active');
+        $('#pipelineTabs .pipeline-tab[data-pipeline=""]').addClass('active');
+        F.pipeline='';
+    }
+    function clearQF(){
+        $('#btnTodayFollowups').removeClass('active-warning');
+        $('#btnOverdue').removeClass('active-danger');
+    }
+
+    /* ── Debounced search ───────────────────────────────── */
+    var searchTimer;
+    $('#leadSearch').on('input',function(){
+        clearTimeout(searchTimer); showLoader(); F.search=$(this).val().trim();
+        searchTimer=setTimeout(function(){fetchData(true);},350);
+    });
+    $('#sessionFilter').on('change',function(){ F.session=$(this).val(); fetchData(true); });
+    $('#classFilter').on('change',function(){ F.className=$(this).val(); fetchData(true); });
+    $('#sourceFilter').on('change',function(){ F.source=$(this).val(); fetchData(true); });
+    $('#counsellorFilter').on('change',function(){ F.assignedTo=$(this).val(); fetchData(true); });
+
+    /* ── Row click ──────────────────────────────────────── */
+    $(document).on('click','.lead-row',function(e){
+        if($(e.target).closest('button,a,.dropdown').length) return;
+        // TODO: open detail page when built
+        // window.location.href='/Admin/Enquiry/Detail/'+$(this).data('id');
+    });
+
+    /* ── Status dropdown click ──────────────────────────── */
+    $(document).on('click','.status-opt',function(e){
+        e.preventDefault(); e.stopPropagation();
+        var $item  = $(this);
+        var id     = $item.data('id');
+        var status = $item.data('status');
+        if ($item.hasClass('active')) return;
+
+        // Not Interested → requires lost reason
+        if ($item.data('needs-lost') === 1) {
+            $('#lostEnquiryId').val(id);
+            $('#lostTargetStatus').val(status);
+            $('#lostReasonSelect').val('');
+            new bootstrap.Modal(document.getElementById('lostReasonModal')).show();
+            return;
+        }
+
+        callUpdateStatus(id, status, null);
+    });
+
+    /* ── Lost reason confirm ────────────────────────────── */
+    $('#confirmLostBtn').on('click',function(){
+        var id     = $('#lostEnquiryId').val();
+        var status = $('#lostTargetStatus').val();
+        var reason = $('#lostReasonSelect').val();
+        if (!reason) { toastr.error('Please select a reason.'); return; }
+        bootstrap.Modal.getInstance(document.getElementById('lostReasonModal')).hide();
+        callUpdateStatus(id, status, reason);
+    });
+
+    function callUpdateStatus(id, status, lostReason) {
+        $.ajax({
+            url:         '/Admin/Enquiry/UpdateStatus',
+            type:        'POST',
+            contentType: 'application/json',
+            headers:     { 'RequestVerificationToken': csrf },
+            data: JSON.stringify({
+                enquiryId:  parseInt(id),
+                status:     status,
+                lostReason: lostReason || null
+            }),
+            success: function (res) {
+                if (res.success) {
+                    toastr.success('Status changed to "' + status + '".');
+                    fetchData(false);
+                } else {
+                    // SP may return a specific message (e.g. "Cannot change after Admission Confirmed")
+                    toastr.error(res.message || 'Unable to update status.');
+                }
+            },
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message)
+                            ? xhr.responseJSON.message : 'Something went wrong.';
+                toastr.error(msg);
+            }
+        });
+    }
+
+    /* ── Log Follow-up ──────────────────────────────────── */
+    $(document).on('click','.btn-log-followup',function(e){
+        e.stopPropagation();
+        var id   = $(this).data('id');
+        var name = $(this).data('name');
+
+        $('#followupEnquiryId').val(id);
+        $('#followupStudentName').text(name);
+        $('#followupType').val('Call');
+        $('#followupOutcome').val('');
+        $('#followupNotes').val('');
+        $('#followupNextDate').val('');
+        $('#updateStatusCheck').prop('checked',false);
+        $('#newStatusRow').addClass('d-none');
+        $('#lostReasonRow').addClass('d-none');
+        $('#followupLostReason').val('');
+        $('#followupTimeline').html('<li><div class="tl-time"><i class="bx bx-loader-circle bx-spin me-1"></i>Loading history...</div></li>');
+
+        new bootstrap.Modal(document.getElementById('logFollowupModal')).show();
+        loadFollowupHistory(id);
+    });
+
+    function loadFollowupHistory(id) {
+        $('#historyLoader').removeClass('d-none');
+        $('#followupTimeline').html('<li><div class="tl-time"><i class="bx bx-loader-circle bx-spin me-1"></i>Loading...</div></li>');
+
+        $.get('/Admin/Enquiry/GetFollowups', { enquiryId: id })
+        .done(function (d) {
+            $('#historyLoader').addClass('d-none');
+            if (!d.success) {
+                $('#followupTimeline').html('<li><div class="tl-time text-muted">No history yet.</div></li>');
+                return;
+            }
+
+            // Merge status history + follow-up logs into one chronological list
+            var entries = [];
+
+            if (d.history && d.history.length) {
+                d.history.forEach(function (h) {
+                    entries.push({
+                        type:       'status',
+                        sortKey:    h.changedAt,
+                        display:    h.changedAt,
+                        statusFrom: h.statusFrom,
+                        statusTo:   h.statusTo,
+                        badgeClass: h.statusToBadgeClass,
+                        note:       h.changeNote
+                    });
+                });
+            }
+
+            if (d.followups && d.followups.length) {
+                d.followups.forEach(function (f) {
+                    entries.push({
+                        type:       'followup',
+                        sortKey:    f.followupDate || f.timeAgo,
+                        display:    f.timeAgo,
+                        typeIcon:   f.typeIcon,
+                        followupType: f.followupType,
+                        outcome:    f.outcome,
+                        badgeClass: f.outcomeBadgeClass,
+                        note:       f.notes,
+                        statusBefore: f.statusBefore,
+                        statusAfter:  f.statusAfter
+                    });
+                });
+            }
+
+            // Sort newest first (both arrays come with string dates — sort descending)
+            entries.sort(function (a, b) {
+                return new Date(b.sortKey) - new Date(a.sortKey);
+            });
+
+            var html = '';
+            entries.forEach(function (e) {
+                if (e.type === 'status') {
+                    html += '<li>'
+                        + '<div class="tl-time"><i class="bx bx-transfer me-1 text-muted"></i>' + esc(e.display) + '</div>'
+                        + '<div class="tl-title">'
+                        + (e.statusFrom ? '<span class="text-muted">' + esc(e.statusFrom) + '</span> → ' : '<span class="text-muted">Created</span> → ')
+                        + '<span class="badge ' + esc(e.badgeClass) + '">' + esc(e.statusTo) + '</span>'
+                        + '</div>'
+                        + (e.note ? '<div class="tl-note">' + esc(e.note) + '</div>' : '')
+                        + '</li>';
+                } else {
+                    html += '<li>'
+                        + '<div class="tl-time"><i class="bx ' + esc(e.typeIcon) + ' me-1 text-primary"></i>' + esc(e.display) + '</div>'
+                        + '<div class="tl-title"><strong>' + esc(e.followupType) + '</strong>'
+                        + (e.outcome ? ' — <span class="badge ' + esc(e.badgeClass) + '">' + esc(e.outcome) + '</span>' : '')
+                        + (e.statusAfter && e.statusAfter !== e.statusBefore
+                            ? ' <i class="bx bx-right-arrow-alt text-muted"></i> <span class="text-muted small">' + esc(e.statusAfter) + '</span>'
+                            : '')
+                        + '</div>'
+                        + (e.note ? '<div class="tl-note">' + esc(e.note) + '</div>' : '')
+                        + '</li>';
+                }
+            });
+
+            $('#followupTimeline').html(html || '<li><div class="tl-time text-muted">No activity yet.</div></li>');
+        })
+        .fail(function () {
+            $('#historyLoader').addClass('d-none');
+            $('#followupTimeline').html('<li><div class="tl-time text-danger"><i class="bx bx-error me-1"></i>Failed to load history.</div></li>');
+        });
+    }
+
+    /* Show/hide status row when checkbox toggled */
+    $('#updateStatusCheck').on('change',function(){
+        if($(this).is(':checked')) $('#newStatusRow').removeClass('d-none');
+        else { $('#newStatusRow').addClass('d-none'); $('#followupNewStatus').val(''); $('#lostReasonRow').addClass('d-none'); }
+    });
+
+    /* Show/hide lost reason based on outcome or new status */
+    function checkLostVisibility() {
+        var outcome   = $('#followupOutcome').val();
+        var newStatus = $('#followupNewStatus').val();
+        var needsLost = (outcome==='Not Interested') || (newStatus==='Not Interested') || (newStatus==='Dropped');
+        if (needsLost) $('#lostReasonRow').removeClass('d-none');
+        else            $('#lostReasonRow').addClass('d-none');
+    }
+    $('#followupOutcome, #followupNewStatus').on('change', checkLostVisibility);
+
+    /* Save follow-up */
+    $('#saveFollowupBtn').on('click', function () {
+        var id         = parseInt($('#followupEnquiryId').val());
+        var type       = $('#followupType').val() || 'Call';
+        var outcome    = $('#followupOutcome').val();
+        var notes      = $.trim($('#followupNotes').val()) || null;
+        var nextDate   = $('#followupNextDate').val() || null;
+        var newStatus  = ($('#updateStatusCheck').is(':checked') && $('#followupNewStatus').val())
+                            ? $('#followupNewStatus').val() : null;
+        var lostReason = $.trim($('#followupLostReason').val()) || null;
+
+        // Validations
+        if (!outcome) { toastr.error('Please select an outcome.'); return; }
+        if ((outcome === 'Not Interested' || newStatus === 'Not Interested') && !lostReason) {
+            toastr.error('Please select a reason for Not Interested.'); return;
+        }
+        if (!id) { toastr.error('Invalid enquiry.'); return; }
+
+        var $btn = $(this).prop('disabled', true)
+                          .html('<i class="bx bx-loader-circle bx-spin me-1"></i> Saving...');
+
+        $.ajax({
+            url:         '/Admin/Enquiry/LogFollowup',
+            type:        'POST',
+            contentType: 'application/json',
+            headers:     { 'RequestVerificationToken': csrf },
+            data: JSON.stringify({
+                enquiryId:       id,
+                followupType:    type,
+                outcome:         outcome,
+                notes:           notes,
+                nextFollowupDate: nextDate,
+                newStatus:       newStatus,
+                lostReason:      lostReason
+            }),
+            success: function (res) {
+                $btn.prop('disabled', false).html('<i class="bx bx-save me-1"></i> Save Follow-up');
+                if (res.success) {
+                    toastr.success('Follow-up logged successfully.');
+                    bootstrap.Modal.getInstance(document.getElementById('logFollowupModal')).hide();
+                    fetchData(false);
+                } else {
+                    toastr.error(res.message || 'Unable to save follow-up.');
+                }
+            },
+            error: function (xhr) {
+                $btn.prop('disabled', false).html('<i class="bx bx-save me-1"></i> Save Follow-up');
+                var msg = (xhr.responseJSON && xhr.responseJSON.message)
+                            ? xhr.responseJSON.message : 'Something went wrong. Please try again.';
+                toastr.error(msg);
+            }
+        });
+    });
+
+    /* ── Convert to Admission ───────────────────────────── */
+    $(document).on('click', '.btn-convert-admission', function () {
+        var $btn    = $(this);
+        var id      = $btn.data('id');
+        var name    = $btn.data('name');
+        var parent  = $btn.data('parent');
+        var mobile  = $btn.data('mobile');
+        var cls     = $btn.data('class');
+        var session = $btn.data('session');
+
+        $('#convertEnquiryId').val(id);
+        $('#cvStudentName').text(name);
+        $('#cvParentName').text(parent  || '—');
+        $('#cvMobile').text(mobile      || '—');
+        $('#cvClassName').text(cls      || '—');
+        $('#cvSession').text(session    || '—');
+
+        new bootstrap.Modal(document.getElementById('convertAdmissionModal')).show();
+    });
+
+    $('#confirmConvertBtn').on('click', function () {
+        var id = parseInt($('#convertEnquiryId').val());
+        if (!id) { return; }
+
+        $(this).prop('disabled', true)
+               .html('<i class="bx bx-loader-circle bx-spin me-1"></i> Opening…');
+
+        // Hand off to the Admission module. Saving the admission there links
+        // this enquiry (sets admission_id) and moves it to "Admission Confirmed",
+        // so we do not pre-flip the status here.
+        window.location.href = '/ERP/Admission/Create?enquiryId=' + id;
+    });
+
+    /* ── Delete Enquiry ─────────────────────────────────── */
+    $(document).on('click', '.btn-delete-enquiry', function (e) {
+        e.stopPropagation();
+        var id   = $(this).data('id');
+        var name = $(this).data('name');
+        $('#deleteEnquiryId').val(id);
+        $('#deleteEnquiryName').text(name);
+        new bootstrap.Modal(document.getElementById('deleteEnquiryModal')).show();
+    });
+
+    $('#confirmDeleteBtn').on('click', function () {
+        var id  = $('#deleteEnquiryId').val();
+        var btn = $(this).prop('disabled', true)
+                         .html('<i class="bx bx-loader-circle bx-spin me-1"></i> Deleting...');
+
+        $.ajax({
+            url:         '/Admin/Enquiry/DeleteEnquiry',
+            type:        'POST',
+            contentType: 'application/json',
+            headers:     { 'RequestVerificationToken': csrf },
+            data:        JSON.stringify({ enquiryId: parseInt(id) }),
+            success: function (res) {
+                btn.prop('disabled', false).html('<i class="bx bx-trash me-1"></i> Delete');
+                bootstrap.Modal.getInstance(document.getElementById('deleteEnquiryModal')).hide();
+                if (res.success) {
+                    toastr.success('Enquiry deleted.');
+                    fetchData(false);
+                } else {
+                    toastr.error(res.message || 'Unable to delete enquiry.');
+                }
+            },
+            error: function () {
+                btn.prop('disabled', false).html('<i class="bx bx-trash me-1"></i> Delete');
+                toastr.error('Something went wrong. Please try again.');
+            }
+        });
+    });
+
+    /* ── Add Enquiry form: conditional fields ───────────── */
+    // Stream: show for 11th / 12th only
+    $('#addClassName').on('change',function(){
+        var cls = $(this).val() || '';
+        if(cls==='11th'||cls==='12th'||cls==='11'||cls==='12'||cls.startsWith('11')||cls.startsWith('12'))
+            $('#streamRow').removeClass('d-none');
+        else $('#streamRow').addClass('d-none');
+    });
+
+    // Referrer: show when source = Referral
+    $('#addLeadSource').on('change',function(){
+        if($(this).val()==='Referral'){
+            $('#referrerNameRow,#referrerMobileRow').removeClass('d-none');
+        } else {
+            $('#referrerNameRow,#referrerMobileRow').addClass('d-none');
+        }
+    });
+
+    // Sync hidden Mobile field from Father Mobile
+    $('#addFatherMobile').on('input', function () {
+        var mob = $(this).val().trim();
+        $('#addPrimaryMobile').val(mob);
+        // Also sync WhatsApp if "same as mobile" is checked
+        if ($('#whatsappSameAsMobile').is(':checked')) {
+            $('#addWhatsApp').val(mob);
+        }
+    });
+
+    // WhatsApp "Same as mobile" toggle
+    $('#whatsappSameAsMobile').on('change', function () {
+        if ($(this).is(':checked')) {
+            $('#addWhatsApp').val($('#addFatherMobile').val().trim()).prop('readonly', true);
+        } else {
+            $('#addWhatsApp').val('').prop('readonly', false).focus();
+        }
+    });
+    // Default state: WhatsApp field is readonly (syncs from father mobile)
+    $('#addWhatsApp').prop('readonly', true);
+
+    /* ── Add Enquiry form validation ────────────────────── */
+    $('#addEnquiryModal form').on('submit',function(e){
+        var ok = true;
+        function req(id, label){
+            var val = $.trim($(id,'#addEnquiryModal').val());
+            if(!val){ toastr.error(label+' is required.'); ok=false; }
+        }
+        req('[name="StudentName"]','Student Name');
+        req('[name="ClassName"]','Class');
+        req('[name="Session"]','Academic Session');
+
+        var fMob = $.trim($('#addFatherMobile').val());
+        if (!fMob) {
+            toastr.error("Father's mobile number is required."); ok = false;
+        } else if (!/^[6-9][0-9]{9}$/.test(fMob)) {
+            toastr.error('Enter a valid 10-digit mobile number.'); ok = false;
+        } else {
+            $('#addPrimaryMobile').val(fMob);
+        }
+
+        // Sync WhatsApp if same-as-mobile checkbox is checked
+        if ($('#whatsappSameAsMobile').is(':checked')) {
+            $('#addWhatsApp').val(fMob);
+        }
+
+        // Optional email format check
+        var email = $.trim($('#addParentEmail').val());
+        if (email && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(email)) {
+            toastr.error('Enter a valid email address.'); ok = false;
+        }
+
+        if (!ok) e.preventDefault();
+    });
+
+    /* ── Init ───────────────────────────────────────────── */
+    fetchData(true);
+});
+</script>
+}

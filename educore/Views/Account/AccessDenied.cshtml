@@ -1,0 +1,145 @@
+﻿@{
+    Layout = "_BlankLayout";
+    ViewData["Title"] = "Access Denied";
+}
+
+@section PageStyles {
+    <style>
+        :root {
+            --bg: #fff7ed;
+            --card: rgba(255,255,255,.92);
+            --border: rgba(67,89,113,.10);
+            --primary: #ff8a00;
+            --danger: #ef4444;
+            --text: #2b1b12;
+            --muted: #8b8175;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .denied-page {
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: radial-gradient(circle at top left, rgba(239,68,68,.12), transparent 35%), radial-gradient(circle at bottom right, rgba(255,138,0,.12), transparent 35%), linear-gradient(135deg, #fff7ed, #f8f7f5);
+        }
+
+        .denied-card {
+            width: 100%;
+            max-width: 420px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 34px 26px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(15,23,42,.12);
+            backdrop-filter: blur(14px);
+        }
+
+        .icon-box {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 18px;
+            border-radius: 50%;
+            background: rgba(239,68,68,.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .icon-box i {
+                font-size: 38px;
+                color: var(--danger);
+            }
+
+        .title {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            margin-bottom: 24px;
+            font-size: 15px;
+        }
+
+        .code {
+            font-size: 48px;
+            font-weight: 900;
+            color: var(--danger);
+            margin-bottom: 10px;
+        }
+
+        .btn-home {
+            height: 50px;
+            border-radius: 12px;
+            font-weight: 700;
+            border: none;
+            background: linear-gradient(135deg, #ff8a00, #ffb300);
+            color: #fff;
+            width: 100%;
+            box-shadow: 0 10px 24px rgba(255,138,0,.25);
+        }
+
+            .btn-home:hover {
+                transform: translateY(-1px);
+            }
+
+        .back-link {
+            display: block;
+            margin-top: 16px;
+            font-size: 14px;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        @@media (max-width: 420px) {
+            .denied-card {
+                padding: 26px 18px;
+            }
+
+            .title {
+                font-size: 22px;
+            }
+
+            .code {
+                font-size: 40px;
+            }
+        }
+    </style>
+}
+
+<div class="denied-page">
+    <div class="denied-card">
+
+        <div class="icon-box">
+            <i class="bx bx-lock-alt"></i>
+        </div>
+
+        <div class="code">403</div>
+
+        <div class="title">Access Denied</div>
+
+        <div class="subtitle">
+            You don’t have permission to access this page.
+        </div>
+
+        <a href="/" class="btn btn-home">
+            Go to Dashboard
+        </a>
+
+        <a href="javascript:history.back()" class="back-link">
+            ← Go Back
+        </a>
+
+    </div>
+</div>

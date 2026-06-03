@@ -1,0 +1,69 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\educore\\educore\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\educore\\educore\\areas\\erp\\controllers\\admissioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\controllers\\admissioncontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{E57DC038-7CF6-4B3C-8F09-46F558681C0A}|..\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj|d:\\educore\\educoredataaccesslayer\\models\\admissionformmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 5,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{e506b91c-c606-466a-90a9-123d1d1e12b3}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:129:0:{116d2292-e37d-41cd-a077-ebacac4c8cc4}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "AdmissionFormModel.cs",
+              "DocumentMoniker": "D:\\educore\\EduCoreDataAccessLayer\\Models\\AdmissionFormModel.cs",
+              "RelativeDocumentMoniker": "..\\EduCoreDataAccessLayer\\Models\\AdmissionFormModel.cs",
+              "ToolTip": "D:\\educore\\EduCoreDataAccessLayer\\Models\\AdmissionFormModel.cs",
+              "RelativeToolTip": "..\\EduCoreDataAccessLayer\\Models\\AdmissionFormModel.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAB0AAAAFAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-02T15:55:11.859Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "AdmissionController.cs",
+              "DocumentMoniker": "D:\\educore\\educore\\Areas\\ERP\\Controllers\\AdmissionController.cs",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Controllers\\AdmissionController.cs",
+              "ToolTip": "D:\\educore\\educore\\Areas\\ERP\\Controllers\\AdmissionController.cs",
+              "RelativeToolTip": "Areas\\ERP\\Controllers\\AdmissionController.cs",
+              "ViewState": "AgIAADYBAAAAAAAAAAAgwDYBAAAyAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-02T15:28:42.69Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

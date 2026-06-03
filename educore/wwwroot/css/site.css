@@ -1,0 +1,18 @@
+/* Allow flex children to shrink below their natural content width */
+.min-width-0 { min-width: 0; }
+
+/*
+ * navbar-detached width fix for layout-menu-fixed + layout-navbar-fixed combo.
+ *
+ * The vendor CSS sets inline-size: calc(100% - 1.625rem * 2) on .navbar-detached.
+ * When position:fixed, 100% = full viewport width. But inset-inline-start is already
+ * offset by --bs-menu-width (sidebar), so the navbar overflows the right edge by exactly
+ * --bs-menu-width pixels. Fix: subtract the sidebar width from the width calculation
+ * and add 1.625rem left gap so the navbar floats symmetrically inside the content area.
+ */
+@media (min-width: 1200px) {
+    .layout-menu-fixed.layout-navbar-fixed .layout-navbar.navbar-detached {
+        inset-inline-start: calc(var(--bs-menu-width) + 1.625rem) !important;
+        inline-size: calc(100% - var(--bs-menu-width) - 1.625rem * 2) !important;
+    }
+}

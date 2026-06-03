@@ -1,0 +1,916 @@
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model educore.Models.SchoolManageModel;
+
+@{
+    ViewData["Title"] = "Add School";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+@section PageStyles {
+<style>
+    .step-sidebar {
+        min-height: 720px;
+    }
+
+    .step-item {
+        display: flex;
+        gap: 1rem;
+        position: relative;
+        padding-bottom: 2rem;
+        cursor: pointer;
+    }
+
+        .step-item:not(:last-child)::after {
+            content: "";
+            position: absolute;
+            left: 20px;
+            top: 44px;
+            width: 2px;
+            height: calc(100% - 38px);
+            background: #d8d1c7;
+        }
+
+    .step-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        background: #fff;
+        border: 1px solid #eee;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+        color: #8b8175;
+        font-size: 20px;
+    }
+
+    .step-item.active .step-icon {
+        color: #ff8a00;
+        border-color: #ffe0b8;
+        box-shadow: 0 2px 8px rgba(255, 138, 0, 0.18);
+    }
+
+    .step-title {
+        font-weight: 700;
+        color: #8b8175;
+        margin-bottom: 2px;
+    }
+
+    .step-item.active .step-title {
+        color: #2b1b12;
+    }
+
+    .step-desc {
+        font-size: 0.82rem;
+        color: #9a938b;
+    }
+
+    .form-panel {
+        padding: 4rem 5rem;
+    }
+
+    .step-content {
+        max-width: 620px;
+        margin: auto;
+    }
+
+    .step-actions {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2rem;
+    }
+
+    @@media (max-width: 991px) {
+        .step-sidebar {
+            min-height: auto;
+            padding: 1rem;
+        }
+
+        .step-list {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .step-item {
+            min-width: 170px;
+            padding-bottom: 0;
+        }
+
+            .step-item::after {
+                display: none;
+            }
+
+        .form-panel {
+            padding: 2rem 1.25rem;
+        }
+    }
+
+    @@media (max-width: 576px) {
+        .step-title {
+            font-size: 0.85rem;
+        }
+
+        .step-desc {
+            display: none;
+        }
+
+        .form-panel {
+            padding: 1.5rem 1rem;
+        }
+
+        .step-actions {
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+            .step-actions .btn {
+                width: 100%;
+            }
+    }
+
+    .form-check-input {
+        cursor: pointer;
+    }
+</style>
+}
+<div class="container-fluid flex-grow-1 px-0">
+    <div class="ec-page-shell row g-0">
+        <div class="col-lg-4 ec-sidebar step-sidebar">
+            <div class="d-flex justify-content-between align-items-center mb-5">
+                <h4 class="fw-bold mb-0">Add School</h4>
+                <a href="/SuperAdmin/Schools/SchoolList" class="btn btn-sm btn-label-secondary">Back</a>
+            </div>
+        <!-- LEFT STEPPER -->
+        <div class="step-list">
+            <div class="step-item active" data-step="1">
+                <div class="step-icon"><i class="bx bx-buildings"></i></div>
+                <div>
+                    <div class="step-title">Organization</div>
+                    <div class="step-desc">Select or create tenant</div>
+                </div>
+            </div>
+
+            <div class="step-item" data-step="2">
+                <div class="step-icon"><i class="bx bx-building-house"></i></div>
+                <div>
+                    <div class="step-title">School Info</div>
+                    <div class="step-desc">Basic school details</div>
+                </div>
+            </div>
+
+            <div class="step-item" data-step="3">
+                <div class="step-icon"><i class="bx bx-map"></i></div>
+                <div>
+                    <div class="step-title">Address Details</div>
+                    <div class="step-desc">Primary location</div>
+                </div>
+            </div>
+
+            <div class="step-item" data-step="4">
+                <div class="step-icon"><i class="bx bx-user"></i></div>
+                <div>
+                    <div class="step-title">Primary Contact</div>
+                    <div class="step-desc">School contact person</div>
+                </div>
+            </div>
+
+            <div class="step-item" data-step="5">
+                <div class="step-icon"><i class="bx bx-cog"></i></div>
+                <div>
+                    <div class="step-title">Settings</div>
+                    <div class="step-desc">System preferences</div>
+                </div>
+            </div>
+
+            <div class="step-item" data-step="6">
+                <div class="step-icon"><i class="bx bx-lock-alt"></i></div>
+                <div>
+                    <div class="step-title">School Admin</div>
+                    <div class="step-desc">Create login account</div>
+                </div>
+            </div>
+
+            <div class="step-item" data-step="7">
+                <div class="step-icon"><i class="bx bx-check-circle"></i></div>
+                <div>
+                    <div class="step-title">Review & Save</div>
+                    <div class="step-desc">Confirm information</div>
+                </div>
+            </div>
+        </div>
+        </div>
+        <!-- RIGHT FORM -->
+        <div class="col-lg-8 form-panel">
+            <form asp-action="@(Model.SchoolId > 0 ? "Edit" : "Create")" method="post">
+                @Html.AntiForgeryToken()
+
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+
+                <input asp-for="Operation" type="hidden" value="I" />
+                <input asp-for="SchoolId" type="hidden" />
+
+                <!-- STEP 1: TENANT -->
+                <div class="step-content" data-step-content="1">
+                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-buildings"></i></div>
+                    <h4 class="fw-bold">Organization / Tenant</h4>
+                    <p class="text-muted mb-4">Select existing organization or create a new tenant.</p>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Tenant Option *</label>
+                            <select asp-for="TenantMode" class="form-select" id="TenantMode">
+                                <option value="existing">Select Existing Tenant</option>
+                                <option value="new">Create New Tenant</option>
+                            </select>
+                            <span asp-validation-for="TenantMode" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-12" id="existingTenantBox">
+                            <label class="form-label">Select Tenant *</label>
+                            <select asp-for="TenantId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.TenantList, "Value", "Text"))">
+                                <option value="">Select Tenant</option>
+                            </select>
+                            <span asp-validation-for="TenantId" class="text-danger small"></span>
+                        </div>
+
+                        <div id="newTenantBox" class="row g-3 d-none">
+                            <div class="col-md-6">
+                                <label class="form-label">Organization Name *</label>
+                                <input asp-for="TenantName" class="form-control" placeholder="DPS Group" />
+                                <span asp-validation-for="TenantName" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Tenant Code *</label>
+                                <input asp-for="TenantCode" class="form-control" placeholder="dps-group" />
+                                <span asp-validation-for="TenantCode" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Contact Email</label>
+                                <input asp-for="TenantEmail" class="form-control" placeholder="admin@school.com" />
+                                <span asp-validation-for="TenantEmail" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Contact Phone</label>
+                                <input asp-for="TenantPhone" class="form-control" placeholder="9876543210" />
+                                <span asp-validation-for="TenantPhone" class="text-danger small"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: SCHOOL INFO -->
+                <div class="step-content" data-step-content="2">
+                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-building-house"></i></div>
+                    <h4 class="fw-bold">School Information</h4>
+                    <p class="text-muted mb-4">Enter basic school and registration details.</p>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">School Name *</label>
+                            <input asp-for="SchoolName" class="form-control" placeholder="International Public School" />
+                            <span asp-validation-for="SchoolName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Display Name</label>
+                            <input asp-for="DisplayName" class="form-control" placeholder="IPS Academy" />
+                            <span asp-validation-for="DisplayName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Website</label>
+                            <input asp-for="Website" class="form-control" placeholder="www.school.com" />
+                            <span asp-validation-for="Website" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Status *</label>
+                            <select asp-for="StatusId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.StatusList, "Value", "Text"))">
+                                <option value="">Select Status</option>
+                            </select>
+                            <span asp-validation-for="StatusId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Board</label>
+                            <select asp-for="BoardId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.BoardList, "Value", "Text"))">
+                                <option value="">Select Board</option>
+                            </select>
+                            <span asp-validation-for="BoardId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">School Type</label>
+                            <select asp-for="SchoolTypeId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.SchoolTypeList, "Value", "Text"))">
+                                <option value="">Select School Type</option>
+                            </select>
+                            <span asp-validation-for="SchoolTypeId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Ownership Type</label>
+                            <select asp-for="OwnershipTypeId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.OwnershipTypeList, "Value", "Text"))">
+                                <option value="">Select Ownership</option>
+                            </select>
+                            <span asp-validation-for="OwnershipTypeId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Medium</label>
+                            <select asp-for="MediumId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.MediumList, "Value", "Text"))">
+                                <option value="">Select Medium</option>
+                            </select>
+                            <span asp-validation-for="MediumId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Established Year</label>
+                            <input asp-for="EstablishedYear" class="form-control" placeholder="2005" />
+                            <span asp-validation-for="EstablishedYear" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Registration No.</label>
+                            <input asp-for="RegistrationNumber" class="form-control" />
+                            <span asp-validation-for="RegistrationNumber" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Affiliation No.</label>
+                            <input asp-for="AffiliationNumber" class="form-control" autocomplete="off" />
+                            <span asp-validation-for="AffiliationNumber" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 3: ADDRESS -->
+                <div class="step-content d-none" data-step-content="3">
+                    <input asp-for="AddressTypeId" type="hidden" value="1" />
+
+                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-map"></i></div>
+                    <h4 class="fw-bold">Address Details</h4>
+                    <p class="text-muted mb-4">Enter the primary school address.</p>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Address Line 1 *</label>
+                            <input asp-for="AddressLine1" class="form-control" placeholder="Building / Street / Area" />
+                            <span asp-validation-for="AddressLine1" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">City *</label>
+                            <input asp-for="City" class="form-control" />
+                            <span asp-validation-for="City" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">District</label>
+                            <input asp-for="District" class="form-control" />
+                            <span asp-validation-for="District" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">State *</label>
+                            <input asp-for="State" class="form-control" />
+                            <span asp-validation-for="State" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Pincode *</label>
+                            <input asp-for="Pincode" class="form-control" />
+                            <span asp-validation-for="Pincode" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 4: CONTACT -->
+                <div class="step-content d-none" data-step-content="4">
+                    <input asp-for="ContactTypeId" type="hidden" value="1" />
+
+                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-user"></i></div>
+                    <h4 class="fw-bold">Primary Contact</h4>
+                    <p class="text-muted mb-4">Add the main school contact person.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Contact Name *</label>
+                            <input asp-for="ContactName" class="form-control" />
+                            <span asp-validation-for="ContactName" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Designation</label>
+                            <input asp-for="Designation" class="form-control" placeholder="Principal / Admin" />
+                            <span asp-validation-for="Designation" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Contact Email</label>
+                            <input asp-for="ContactEmail" class="form-control" />
+                            <span asp-validation-for="ContactEmail" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Phone *</label>
+                            <input asp-for="Phone" class="form-control" />
+                            <span asp-validation-for="Phone" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Alternate Phone</label>
+                            <input asp-for="AlternatePhone" class="form-control" />
+                            <span asp-validation-for="AlternatePhone" class="text-danger small"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 5: SETTINGS -->
+                <div class="step-content d-none" data-step-content="5">
+                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-cog"></i></div>
+                    <h4 class="fw-bold">System Settings</h4>
+                    <p class="text-muted mb-4">Configure default academic and communication settings.</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Academic Year</label>
+                            <select asp-for="AcademicYearId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.AcademicYearList, "Value", "Text"))">
+                                <option value="">Select Year</option>
+                            </select>
+                            <span asp-validation-for="AcademicYearId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Date Format</label>
+                            <select asp-for="DateFormatId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.DateFormatList, "Value", "Text"))">
+                                <option value="">Select Date Format</option>
+                            </select>
+                            <span asp-validation-for="DateFormatId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Time Format</label>
+                            <select asp-for="TimeFormatId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.TimeFormatList, "Value", "Text"))">
+                                <option value="">Select Time Format</option>
+                            </select>
+                            <span asp-validation-for="TimeFormatId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-12">
+                            <div class="p-3 bg-light rounded">
+                                <div class="form-check form-switch mb-2">
+                                    <input asp-for="EnableSms" class="form-check-input" type="checkbox" />
+                                    <label class="form-check-label">SMS Alerts</label>
+                                </div>
+
+                                <div class="form-check form-switch mb-2">
+                                    <input asp-for="EnableEmail" class="form-check-input" type="checkbox" />
+                                    <label class="form-check-label">Email Alerts</label>
+                                </div>
+
+                                <div class="form-check form-switch">
+                                    <input asp-for="EnableWhatsapp" class="form-check-input" type="checkbox" />
+                                    <label class="form-check-label">WhatsApp Alerts</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 6: ADMIN -->
+                <div class="step-content d-none" data-step-content="6">
+                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-lock-alt"></i></div>
+                    <h4 class="fw-bold">School Admin Account</h4>
+                    <p class="text-muted mb-4">Create login credentials for the school administrator.</p>
+
+                    <div class="form-check form-switch mb-4">
+                        <input asp-for="CreateSchoolAdmin" class="form-check-input" type="checkbox" id="CreateSchoolAdmin" checked />
+                        <label class="form-check-label">Create School Admin now</label>
+                    </div>
+
+                    <div id="adminFields">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Admin Full Name *</label>
+                                <input asp-for="AdminFullName" class="form-control" />
+                                <span asp-validation-for="AdminFullName" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Admin Email *</label>
+                                <input asp-for="AdminEmail" class="form-control" />
+                                <span asp-validation-for="AdminEmail" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Admin Phone</label>
+                                <input asp-for="AdminPhone" class="form-control" />
+                                <span asp-validation-for="AdminPhone" class="text-danger small"></span>
+                            </div>
+
+                            <div class="col-md-6 d-flex align-items-end">
+                                <div class="form-check form-switch">
+                                    <input asp-for="AutoGeneratePassword" class="form-check-input" type="checkbox" id="AutoGeneratePassword" checked />
+                                    <label class="form-check-label">Auto-generate password</label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6" id="passwordBox">
+                                <label class="form-label">Password</label>
+                                <input asp-for="Password" type="password" class="form-control" />
+                                <span asp-validation-for="Password" class="text-danger small"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 7: REVIEW -->
+                <div class="step-content d-none" data-step-content="7">
+                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-check-circle"></i></div>
+                    <h4 class="fw-bold">Review & Save</h4>
+                    <p class="text-muted mb-4">Review the information before creating the school.</p>
+
+                    <div class="alert alert-info">
+                        School code will be generated automatically after saving.
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <small class="text-muted">Organization</small>
+                                <div class="fw-bold" id="reviewTenant">-</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <small class="text-muted">School Name</small>
+                                <div class="fw-bold" id="reviewSchoolName">-</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <small class="text-muted">Location</small>
+                                <div class="fw-bold" id="reviewLocation">-</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <small class="text-muted">Contact</small>
+                                <div class="fw-bold" id="reviewContact">-</div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="border rounded p-3">
+                                <small class="text-muted">Admin Email</small>
+                                <div class="fw-bold" id="reviewAdminEmail">-</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ACTIONS -->
+                <div class="step-actions">
+                    <button type="button" class="btn btn-label-secondary" id="prevBtn">
+                        <i class="bx bx-chevron-left me-1"></i> Previous
+                    </button>
+
+                    <div>
+                        <button type="button" class="btn btn-primary" id="nextBtn">
+                            Next <i class="bx bx-chevron-right ms-1"></i>
+                        </button>
+
+                        <button type="submit" class="btn btn-success d-none" id="saveBtn">
+                            <i class="bx bx-save me-1"></i>
+                            @(Model.SchoolId > 0 ? "Update School" : "Save School")
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@section PageScripts {
+    @* <partial name="_ValidationScriptsPartial" /> *@
+    <script>
+        let currentStep = 1;
+        const totalSteps = 7;
+
+        function showStep(step) {
+            $(".step-content").addClass("d-none");
+            $('[data-step-content="' + step + '"]').removeClass("d-none");
+
+            $(".step-item").removeClass("active");
+            $('.step-item[data-step="' + step + '"]').addClass("active");
+
+            $("#prevBtn").toggleClass("d-none", step === 1);
+            $("#nextBtn").toggleClass("d-none", step === totalSteps);
+            $("#saveBtn").toggleClass("d-none", step !== totalSteps);
+
+            if (step === totalSteps) {
+                fillReview();
+            }
+        }
+
+        function validateCurrentStep() {
+            let isValid = true;
+            let currentContent = $('[data-step-content="' + currentStep + '"]');
+
+            currentContent.find("input, select, textarea").each(function () {
+                let input = $(this);
+                let value = $.trim(input.val());
+                let name = input.attr("name");
+
+                removeError(input);
+
+                if (input.prop("disabled") || input.attr("type") === "hidden") {
+                    return true;
+                }
+
+                let tenantMode = $("#TenantMode").val();
+
+                if (name === "TenantId" && tenantMode === "existing" && value === "") {
+                    showError(input, "Tenant is required.");
+                    isValid = false;
+                }
+
+                if (tenantMode === "new") {
+                    if (name === "TenantName" && value === "") {
+                        showError(input, "Organization name is required.");
+                        isValid = false;
+                    }
+
+                    if (name === "TenantCode" && value === "") {
+                        showError(input, "Tenant code is required.");
+                        isValid = false;
+                    }
+
+                    if (name === "TenantEmail" && value !== "" && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
+                        showError(input, "Enter valid tenant email.");
+                        isValid = false;
+                    }
+
+                    if (name === "TenantPhone" && value !== "" && !/^[6-9][0-9]{9}$/.test(value)) {
+                        showError(input, "Enter valid tenant phone number.");
+                        isValid = false;
+                    }
+                }
+
+                if (name === "SchoolName" && value === "") {
+                    showError(input, "School name is required.");
+                    isValid = false;
+                }
+
+                if (name === "StatusId" && (value === "" || value === "0")) {
+                    showError(input, "Status is required.");
+                    isValid = false;
+                }
+
+                if (name === "BoardId" && (value === "" || value === "0")) {
+                    showError(input, "Board is required.");
+                    isValid = false;
+                }
+
+                if (name === "SchoolTypeId" && (value === "" || value === "0")) {
+                    showError(input, "School Type is required.");
+                    isValid = false;
+                }
+
+                if (name === "AddressLine1" && value === "") {
+                    showError(input, "Address is required.");
+                    isValid = false;
+                }
+
+                if (name === "City" && value === "") {
+                    showError(input, "City is required.");
+                    isValid = false;
+                }
+
+                if (name === "State" && value === "") {
+                    showError(input, "State is required.");
+                    isValid = false;
+                }
+
+                if (name === "Pincode") {
+                    if (value === "") {
+                        showError(input, "Pincode is required.");
+                        isValid = false;
+                    } else if (!/^[1-9][0-9]{5}$/.test(value)) {
+                        showError(input, "Enter valid 6 digit pincode.");
+                        isValid = false;
+                    }
+                }
+
+                if (name === "ContactName" && value === "") {
+                    showError(input, "Contact name is required.");
+                    isValid = false;
+                }
+
+                if (name === "Phone") {
+                    if (value === "") {
+                        showError(input, "Phone number is required.");
+                        isValid = false;
+                    } else if (!/^[6-9][0-9]{9}$/.test(value)) {
+                        showError(input, "Enter valid 10 digit Indian mobile number.");
+                        isValid = false;
+                    }
+                }
+
+                if (name === "Website" && value !== "" && !/^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/.*)?$/.test(value)) {
+                    showError(input, "Enter valid website.");
+                    isValid = false;
+                }
+
+                if (name === "ContactEmail" && value !== "" && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
+                    showError(input, "Enter valid contact email.");
+                    isValid = false;
+                }
+
+                if (name === "AlternatePhone" && value !== "" && !/^[6-9][0-9]{9}$/.test(value)) {
+                    showError(input, "Enter valid alternate phone number.");
+                    isValid = false;
+                }
+
+                if (name === "EstablishedYear" && value !== "") {
+                    let year = parseInt(value);
+                    let currentYear = new Date().getFullYear();
+
+                    if (isNaN(year) || year < 1800 || year > currentYear) {
+                        showError(input, "Enter valid established year.");
+                        isValid = false;
+                    }
+                }
+
+                if ($("#CreateSchoolAdmin").is(":checked")) {
+                    if (name === "AdminFullName" && value === "") {
+                        showError(input, "Admin full name is required.");
+                        isValid = false;
+                    }
+
+                    if (name === "AdminEmail") {
+                        if (value === "") {
+                            showError(input, "Admin email is required.");
+                            isValid = false;
+                        } else if (!/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
+                            showError(input, "Enter valid admin email.");
+                            isValid = false;
+                        }
+                    }
+
+                    if (name === "AdminPhone" && value !== "" && !/^[6-9][0-9]{9}$/.test(value)) {
+                        showError(input, "Enter valid admin phone number.");
+                        isValid = false;
+                    }
+
+                    if (!$("#AutoGeneratePassword").is(":checked")) {
+                        if (name === "Password" && value === "") {
+                            showError(input, "Password is required.");
+                            isValid = false;
+                        } else if (name === "Password" && value.length < 6) {
+                            showError(input, "Password must be at least 6 characters.");
+                            isValid = false;
+                        }
+                    }
+                }
+            });
+
+            if (!isValid) {
+                currentContent.find(".is-invalid:first").focus();
+            }
+
+            return isValid;
+        }
+
+        function showError(input, message) {
+            input.addClass("is-invalid");
+
+            if (input.next(".field-validation-error").length === 0) {
+                input.after('<span class="field-validation-error text-danger small">' + message + '</span>');
+            } else {
+                input.next(".field-validation-error").text(message);
+            }
+        }
+
+        function removeError(input) {
+            input.removeClass("is-invalid");
+            input.next(".field-validation-error").remove();
+        }
+
+        function fillReview() {
+            let tenantMode = $("#TenantMode").val();
+
+            if (tenantMode === "new") {
+                $("#reviewTenant").text($('[name="TenantName"]').val() || "-");
+            } else {
+                let selectedTenant = $('[name="TenantId"] option:selected').text();
+                $("#reviewTenant").text(selectedTenant && selectedTenant !== "Select Tenant" ? selectedTenant : "-");
+            }
+
+            $("#reviewSchoolName").text($('[name="SchoolName"]').val() || "-");
+
+            let city = $('[name="City"]').val() || "";
+            let state = $('[name="State"]').val() || "";
+            $("#reviewLocation").text((city + ", " + state).replace(/^, |, $/g, "") || "-");
+
+            let contact = $('[name="ContactName"]').val() || "";
+            let phone = $('[name="Phone"]').val() || "";
+            $("#reviewContact").text((contact + " - " + phone).replace(/^ - | - $/g, "") || "-");
+
+            $("#reviewAdminEmail").text($('[name="AdminEmail"]').val() || "-");
+        }
+
+        function toggleTenantMode() {
+            let tenantMode = $("#TenantMode").val();
+            let isNew = tenantMode === "new";
+
+            $("#existingTenantBox").toggleClass("d-none", isNew);
+            $("#newTenantBox").toggleClass("d-none", !isNew);
+
+            if (isNew) {
+                $('[name="TenantId"]').val("");
+            } else {
+                $('[name="TenantName"]').val("");
+                $('[name="TenantCode"]').val("");
+                $('[name="TenantEmail"]').val("");
+                $('[name="TenantPhone"]').val("");
+            }
+        }
+
+        $("#nextBtn").on("click", function () {
+            if (validateCurrentStep()) {
+                if (currentStep < totalSteps) {
+                    currentStep++;
+                    showStep(currentStep);
+                }
+            }
+        });
+
+        $("#prevBtn").on("click", function () {
+            if (currentStep > 1) {
+                currentStep--;
+                showStep(currentStep);
+            }
+        });
+
+        $(".step-item").on("click", function () {
+            let targetStep = parseInt($(this).data("step"));
+
+            if (targetStep > currentStep) {
+                if (!validateCurrentStep()) {
+                    return;
+                }
+            }
+
+            currentStep = targetStep;
+            showStep(currentStep);
+        });
+
+        $("input, select, textarea").on("input change blur", function () {
+            removeError($(this));
+        });
+
+        $("#TenantMode").on("change", function () {
+            toggleTenantMode();
+        });
+
+        $("#CreateSchoolAdmin").on("change", function () {
+            $("#adminFields").toggle(this.checked);
+        });
+
+        $("#AutoGeneratePassword").on("change", function () {
+            $("#passwordBox").toggle(!this.checked);
+        });
+
+        $(document).ready(function () {
+            showStep(1);
+            toggleTenantMode();
+            $("#adminFields").toggle($("#CreateSchoolAdmin").is(":checked"));
+            $("#passwordBox").toggle(!$("#AutoGeneratePassword").is(":checked"));
+        });
+    </script>
+}

@@ -1,0 +1,73 @@
+@inject IHttpContextAccessor httpContextAccessor
+
+<!DOCTYPE html>
+<html lang="en" dir="ltr" data-bs-theme="light"
+      class="layout-menu-fixed layout-navbar-fixed"
+      data-template="vertical-menu-template-free"
+      data-skin="default"
+      data-assets-path='@((httpContextAccessor.HttpContext?.Request.PathBase ?? "") + "/")'>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+
+    @{
+        string title   = ViewData["title"] as string ?? "";
+        string appName = TempData.Peek("appName") as string ?? "EduCore";
+    }
+    <title>@title | @appName</title>
+    <meta name="description" content="@(TempData.Peek("description") as string ?? "")" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="~/img/favicon/favicon.ico" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="~/manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="@appName" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+    <!-- Core Styles -->
+    @await Html.PartialAsync("Sections/_Styles")
+
+    <!-- Vendor Styles -->
+    @RenderSection("VendorStyles", required: false)
+
+    <!-- Page Styles -->
+    @RenderSection("PageStyles", required: false)
+
+    <!-- Config / Helper Scripts -->
+    @await Html.PartialAsync("Sections/_ScriptsIncludes")
+</head>
+
+<body>
+
+    @RenderBody()
+
+    <!-- Core Scripts -->
+    @await Html.PartialAsync("Sections/_Scripts")
+
+    <!-- Vendor Scripts -->
+    @RenderSection("VendorScripts", required: false)
+
+    <!-- Main JS -->
+    <script src="~/js/main.js"></script>
+
+    <!-- Page Scripts -->
+    @RenderSection("PageScripts", required: false)
+
+    <!-- PWA Service Worker -->
+    <script>
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", function () {
+                navigator.serviceWorker.register("/service-worker.js")
+                    .then(function () { console.log("EduCore PWA registered"); })
+                    .catch(function (err) { console.log("EduCore PWA failed:", err); });
+            });
+        }
+    </script>
+
+</body>
+</html>

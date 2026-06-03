@@ -1,0 +1,45 @@
+
+	
+
+
+
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="9.0.0" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="9.0.12" />
+    <PackageReference Include="Npgsql" Version="10.0.2" />
+    <PackageReference Include="Portable.BouncyCastle" Version="1.9.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Areas\Admin\Data\" />
+    <Folder Include="Areas\Admin\Models\" />
+    <Folder Include="Areas\ERP\Data\" />
+    <Folder Include="Areas\ERP\Models\" />
+    <Folder Include="Areas\LMS\Controllers\" />
+    <Folder Include="Areas\LMS\Data\" />
+    <Folder Include="Areas\LMS\Models\" />
+    <Folder Include="Areas\LMS\Views\" />
+    <Folder Include="wwwroot\css\Admin\" />
+    <Folder Include="wwwroot\css\ERP\" />
+    <Folder Include="wwwroot\css\LMS\" />
+    <Folder Include="wwwroot\css\SuperAdmin\" />
+    <Folder Include="wwwroot\js\Admin\" />
+    <Folder Include="wwwroot\js\ERP\" />
+    <Folder Include="wwwroot\js\LMS\" />
+    <Folder Include="wwwroot\js\SuperAdmin\" />
+    <Folder Include="wwwroot\vendor\libs\toastr\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EduCoreDataAccessLayer\EduCoreDataAccessLayer.csproj" />
+  </ItemGroup>
+</Project>

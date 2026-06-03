@@ -1,0 +1,667 @@
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model EduCoreDataAccessLayer.Models.Admin.AcademicSetupModel
+@{
+    ViewData["Title"] = "Academic Setup";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+    <style>
+        .academic-setup-page .ec-page-shell {
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(255, 138, 0, .13), transparent 34rem),
+                radial-gradient(circle at bottom right, rgba(255, 173, 66, .10), transparent 32rem),
+                linear-gradient(135deg, #fff8ef 0%, #f8f7f5 48%, #ffffff 100%);
+        }
+        .academic-setup-page .ec-card,
+        .academic-class-card {
+            border: 1px solid rgba(236, 236, 245, .95);
+            border-radius: 1.35rem;
+            background: rgba(255, 255, 255, .92);
+            box-shadow: 0 14px 34px rgba(43, 44, 64, .07);
+            transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+
+        .academic-setup-page .ec-card:hover,
+        .academic-class-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 18px 42px rgba(43, 44, 64, .10);
+            border-color: rgba(255, 138, 0, .20);
+        }
+
+        .academic-setup-page .ec-card-header,
+        .academic-setup-page .ec-card-body {
+            padding: 1.25rem;
+        }
+
+        .academic-setup-page .form-control,
+        .academic-setup-page .form-select {
+            min-height: 46px;
+            border-radius: .95rem;
+            border-color: #ececf5;
+            color: #2b2c40;
+            font-weight: 700;
+            background-color: #ffffff;
+        }
+
+        .academic-setup-page .form-control:focus,
+        .academic-setup-page .form-select:focus {
+            border-color: rgba(255, 138, 0, .65);
+            box-shadow: 0 0 0 .25rem rgba(255, 138, 0, .12);
+        }
+
+        .academic-setup-page .form-label {
+            color: #9a938b;
+            font-size: .76rem;
+            font-weight: 900;
+            letter-spacing: .03em;
+            text-transform: uppercase;
+        }
+
+        .academic-setup-page .btn {
+            border-radius: .95rem;
+            font-weight: 900;
+            min-height: 44px;
+            transition: all .2s ease;
+        }
+
+        .academic-setup-page .btn-primary {
+            background: linear-gradient(135deg, #ff8a00, #ffad42);
+            border-color: #ff8a00;
+            box-shadow: 0 10px 22px rgba(255, 138, 0, .22);
+        }
+
+        .academic-setup-page .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 28px rgba(255, 138, 0, .28);
+        }
+
+        .academic-setup-page .btn-outline-secondary {
+            border-color: #ececf5;
+            color: #2b2c40;
+            background: #ffffff;
+        }
+
+        .academic-setup-page .btn-outline-secondary:hover {
+            background: #fff4e6;
+            border-color: rgba(255, 138, 0, .25);
+            color: #2b1b12;
+        }
+
+        .academic-toolbar {
+            gap: .75rem;
+        }
+
+        .class-create-panel {
+            border-radius: 1.25rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #fff7ed, #ffffff);
+            border: 1px solid rgba(255, 138, 0, .14);
+        }
+
+        .academic-class-card {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .class-card-top {
+            padding: 1.15rem;
+            background: linear-gradient(135deg, #fff7ed, #ffffff);
+            border-bottom: 1px solid #f0edf8;
+        }
+
+        .class-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            background: linear-gradient(135deg, #ff8a00, #ffbd66);
+            box-shadow: 0 10px 20px rgba(255, 138, 0, .22);
+            font-size: 1.25rem;
+        }
+
+        .class-title {
+            color: #2b1b12;
+            font-weight: 900;
+            font-size: 1.05rem;
+            line-height: 1.2;
+        }
+
+        .class-meta {
+            color: #9a938b;
+            font-size: .82rem;
+            font-weight: 700;
+        }
+
+        .class-card-body {
+            padding: 1.15rem;
+        }
+
+        .section-input-wrap {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: .55rem;
+            margin-bottom: 1rem;
+        }
+
+        .section-pill-wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .55rem;
+            min-height: 38px;
+        }
+
+        .section-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .45rem;
+            padding: .45rem .55rem .45rem .78rem;
+            border-radius: 999px;
+            background: #fff7ed;
+            border: 1px solid rgba(255, 138, 0, .18);
+            color: #2b1b12;
+            font-weight: 900;
+            font-size: .85rem;
+        }
+
+        .remove-chip,
+        .remove-class-btn {
+            border: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s ease;
+        }
+
+        .remove-chip {
+            width: 1.45rem;
+            height: 1.45rem;
+            border-radius: 999px;
+            background: rgba(255, 138, 0, .12);
+            color: #ff8a00;
+        }
+
+        .remove-chip:hover,
+        .remove-class-btn:hover {
+            background: #ff8a00;
+            color: #ffffff;
+        }
+
+        .remove-class-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: .9rem;
+            color: #9a938b;
+            background: #ffffff;
+            border: 1px solid #ececf5;
+        }
+
+        .empty-section-note {
+            border: 1px dashed #ececf5;
+            border-radius: 1rem;
+            padding: .85rem;
+            color: #9a938b;
+            background: #ffffff;
+            font-weight: 700;
+            font-size: .88rem;
+        }
+
+        .academic-empty-state {
+            border: 1px dashed #ececf5;
+            border-radius: 1.25rem;
+            background: linear-gradient(135deg, #ffffff, #fff7ed);
+        }
+
+        /* Floating-pill variant of sticky actions for this page only */
+        .academic-setup-page .ec-sticky-actions {
+            bottom:        1rem;
+            padding:       .85rem;
+            border-radius: 1.2rem;
+            border:        1px solid rgba(236, 236, 245, .95);
+            background:    rgba(255, 255, 255, .88);
+            backdrop-filter: blur(12px);
+            box-shadow:    0 14px 34px rgba(43, 44, 64, .10);
+        }
+
+        @@media (max-width: 991.98px) {
+            .academic-setup-page .ec-page-content {
+                padding-inline: clamp(1rem, 3vw, 1.5rem);
+            }
+
+            .academic-toolbar,
+            .academic-toolbar .class-create-panel {
+                width: 100%;
+            }
+
+            .academic-toolbar .form-control,
+            .academic-toolbar .btn {
+                width: 100%;
+            }
+        }
+
+        @@media (max-width: 575.98px) {
+            .setup-hero {
+                padding: 1.15rem;
+            }
+
+            .academic-setup-page .ec-card-header,
+            .academic-setup-page .ec-card-body,
+            .class-card-top,
+            .class-card-body {
+                padding: 1rem;
+            }
+
+            .section-input-wrap {
+                grid-template-columns: 1fr;
+            }
+
+            .ec-sticky-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .ec-sticky-actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
+}
+
+<div class="academic-setup-page">
+    <div class="ec-page-shell">
+        <div class="ec-page-content">
+            <form asp-action="SaveAcademicSetup" asp-controller="SchoolSettings" method="post" id="academicSetupForm">
+                <input type="hidden" asp-for="AcademicYearId" />
+
+                <div class="ec-card mb-4">
+                    <div class="ec-card-header">
+                        <div class="ec-section-title-wrap">
+                            <div class="ec-section-icon">
+                                <i class="bx bx-calendar"></i>
+                            </div>
+                            <div>
+                                <h5 class="ec-section-title">Academic Session</h5>
+                                <p class="ec-section-subtitle">Set the active academic year and session duration.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ec-card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Academic Year</label>
+                                <select class="form-control fix-height w-100" asp-for="AcademicYearId" required asp-items="@(new SelectList(Model.AcademicYears, "Value", "Text"))">
+                                    <option value="">Select</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Start Date</label>
+                                <input type="date"
+                                       class="form-control"
+                                       name="StartDate"
+                                       value="@(Model.StartDate?.ToString("yyyy-MM-dd"))" />
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">End Date</label>
+                                <input type="date"
+                                       class="form-control"
+                                       name="EndDate"
+                                       value="@(Model.EndDate?.ToString("yyyy-MM-dd"))" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-card mb-4">
+                    <div class="ec-card-header">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center academic-toolbar">
+                            <div class="ec-section-title-wrap">
+                                <div class="ec-section-icon">
+                                    <i class="bx bx-buildings"></i>
+                                </div>
+                                <div>
+                                    <h5 class="ec-section-title">Classes & Sections</h5>
+                                    <p class="ec-section-subtitle">
+                                        Add classes first, then add sections or streams inside each class.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="class-create-panel d-flex flex-column flex-sm-row gap-2">
+                                <input type="text"
+                                       class="form-control"
+                                       id="classInput"
+                                       placeholder="Add class e.g. Class 1, Class 11" />
+
+                                <button type="button" class="btn btn-primary" id="addClassBtn">
+                                    <i class="bx bx-plus me-1"></i> Add Class
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ec-card-body">
+                        <div class="row g-3" id="classContainer">
+                            @foreach (var cls in Model.Classes)
+                            {
+                                var sectionCount = Model.ClassSections.ContainsKey(cls)
+                                    ? Model.ClassSections[cls].Count
+                                    : 0;
+
+                                <div class="col-12 col-md-6 col-xl-4 class-item" data-class="@cls.ToLower()">
+                                    <div class="academic-class-card">
+                                        <div class="class-card-top">
+                                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                                <div class="d-flex align-items-center gap-3">
+                                                    <span class="class-avatar">
+                                                        <i class="bx bx-book-open"></i>
+                                                    </span>
+
+                                                    <div>
+                                                        <div class="class-title">@cls</div>
+                                                        <div class="class-meta">
+                                                            <span class="section-count">@sectionCount</span> sections / streams
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <button type="button"
+                                                        class="remove-class-btn remove-class"
+                                                        title="Remove class">
+                                                    <i class="bx bx-x"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="class-card-body">
+                                            <div class="section-input-wrap">
+                                                <input type="text"
+                                                       class="form-control section-input"
+                                                       placeholder="Add section/stream e.g. A, Science" />
+
+                                                <button type="button" class="btn btn-primary add-section-btn">
+                                                    <i class="bx bx-plus me-1"></i> Add
+                                                </button>
+                                            </div>
+
+                                            <div class="section-pill-wrap">
+                                                @if (Model.ClassSections.ContainsKey(cls))
+                                                {
+                                                    foreach (var section in Model.ClassSections[cls])
+                                                    {
+                                                        <span class="section-pill section-item"
+                                                              data-section="@(section).ToLower()">
+
+                                                            <span>@(section)</span>
+
+                                                            <button type="button"
+                                                                    class="remove-chip remove-section"
+                                                                    title="Remove section">
+                                                                <i class="bx bx-x"></i>
+                                                            </button>
+
+                                                            <input type="hidden"
+                                                                   name="ClassSections[@cls]"
+                                                                   value="@(section)" />
+                                                        </span>
+                                                    }
+                                                }
+                                            </div>
+
+                                            <div class="empty-section-note @(sectionCount > 0 ? "d-none" : "")">
+                                                No section added yet. Add A, B, C or Science, Commerce, Arts.
+                                            </div>
+
+                                            <input type="hidden" name="Classes" value="@cls" />
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="academic-empty-state text-center py-5" id="classEmptyState">
+                            <div class="ec-page-icon mx-auto mb-3">
+                                <i class="bx bx-buildings"></i>
+                            </div>
+                            <h6 class="ec-detail-title mb-1">No classes added</h6>
+                            <p class="ec-section-subtitle mb-0">Add your first class to continue setup.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-sticky-actions d-flex flex-column flex-sm-row justify-content-end gap-2">
+                    <button type="reset" class="btn btn-outline-secondary">
+                        Cancel
+                    </button>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bx bx-save me-1"></i> Save Configuration
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section PageScripts {
+    <script>
+        $(document).ready(function () {
+
+            function showToast(type, message) {
+                if (typeof toastr !== 'undefined') {
+                    toastr[type](message);
+                }
+            }
+
+            function sanitizeValue(value) {
+                return $('<div>').text(value).html();
+            }
+
+            function makeKey(value) {
+                return $.trim(value).toLowerCase();
+            }
+
+            function updateClassStats($classItem) {
+                let count = $classItem.find('.section-item').length;
+                $classItem.find('.section-count').text(count);
+                $classItem.find('.empty-section-note').toggleClass('d-none', count > 0);
+            }
+
+            function updateEmptyStates() {
+                $('#classEmptyState').toggleClass('d-none', $('.class-item').length > 0);
+
+                $('.class-item').each(function () {
+                    updateClassStats($(this));
+                });
+            }
+
+            function buildClassCard(className) {
+                let safeClassName = sanitizeValue(className);
+                let key = makeKey(className);
+
+                return `
+                    <div class="col-12 col-md-6 col-xl-4 class-item" data-class="${key}">
+                        <div class="academic-class-card">
+                            <div class="class-card-top">
+                                <div class="d-flex justify-content-between align-items-start gap-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="class-avatar">
+                                            <i class="bx bx-book-open"></i>
+                                        </span>
+                                        <div>
+                                            <div class="class-title">${safeClassName}</div>
+                                            <div class="class-meta"><span class="section-count">0</span> sections / streams</div>
+                                        </div>
+                                    </div>
+
+                                    <button type="button" class="remove-class-btn remove-class" title="Remove class">
+                                        <i class="bx bx-x"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="class-card-body">
+                                <div class="section-input-wrap">
+                                    <input type="text" class="form-control section-input" placeholder="Add section/stream e.g. A, Science" />
+                                    <button type="button" class="btn btn-primary add-section-btn">
+                                        <i class="bx bx-plus me-1"></i> Add
+                                    </button>
+                                </div>
+
+                                <div class="section-pill-wrap"></div>
+
+                                <div class="empty-section-note">
+                                    No section added yet. Add A, B, C or Science, Commerce, Arts.
+                                </div>
+
+                                <input type="hidden" name="Classes" value="${safeClassName}" />
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            function buildSectionPill(className, sectionName) {
+                let safeSectionName = sanitizeValue(sectionName);
+                let safeClassName = sanitizeValue(className);
+                let sectionKey = makeKey(sectionName);
+
+                return `
+                    <span class="section-pill section-item" data-section="${sectionKey}">
+                        <span>${safeSectionName}</span>
+
+                        <button type="button" class="remove-chip remove-section" title="Remove section">
+                            <i class="bx bx-x"></i>
+                        </button>
+
+                        <input type="hidden" name="ClassSections[${safeClassName}]" value="${safeSectionName}" />
+                    </span>
+                `;
+            }
+
+            $('#addClassBtn').on('click', function () {
+                let value = $.trim($('#classInput').val());
+
+                if (value === '') {
+                    showToast('error', 'Please enter a class name.');
+                    return;
+                }
+
+                let key = makeKey(value);
+                let exists = false;
+
+                $('.class-item').each(function () {
+                    if ($(this).data('class') === key) {
+                        exists = true;
+                    }
+                });
+
+                if (exists) {
+                    $('#classInput').val('');
+                    showToast('warning', 'This class already exists.');
+                    return;
+                }
+
+                $('#classContainer').append(buildClassCard(value));
+                $('#classInput').val('');
+                updateEmptyStates();
+                showToast('success', 'Class added successfully.');
+            });
+
+            $(document).on('click', '.remove-class', function () {
+                $(this).closest('.class-item').remove();
+                updateEmptyStates();
+                showToast('info', 'Class removed.');
+            });
+
+            $(document).on('click', '.add-section-btn', function () {
+                let $classItem = $(this).closest('.class-item');
+                let className = $classItem.find('input[name="Classes"]').val();
+                let $sectionInput = $classItem.find('.section-input');
+                let value = $.trim($sectionInput.val());
+
+                if (value === '') {
+                    showToast('error', 'Please enter a section or stream name.');
+                    return;
+                }
+
+                let key = makeKey(value);
+                let exists = false;
+
+                $classItem.find('.section-item').each(function () {
+                    if ($(this).data('section') === key) {
+                        exists = true;
+                    }
+                });
+
+                if (exists) {
+                    $sectionInput.val('');
+                    showToast('warning', 'This section already exists in this class.');
+                    return;
+                }
+
+                $classItem.find('.section-pill-wrap').append(buildSectionPill(className, value));
+                $sectionInput.val('');
+                updateClassStats($classItem);
+                showToast('success', 'Section added successfully.');
+            });
+
+            $(document).on('click', '.remove-section', function () {
+                let $classItem = $(this).closest('.class-item');
+                $(this).closest('.section-item').remove();
+                updateClassStats($classItem);
+                showToast('info', 'Section removed.');
+            });
+
+            $('#classInput').on('keypress', function (e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    $('#addClassBtn').click();
+                }
+            });
+
+            $(document).on('keypress', '.section-input', function (e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    $(this).closest('.class-item').find('.add-section-btn').click();
+                }
+            });
+
+            $('#academicSetupForm').on('submit', function () {
+                if ($.trim($('#AcademicYearId').val()) === '') {
+                    showToast('error', 'Please enter academic year.');
+                    return false;
+                }
+
+                if ($('.class-item').length === 0) {
+                    showToast('error', 'Please add at least one class.');
+                    return false;
+                }
+
+                let classWithoutSection = null;
+
+                $('.class-item').each(function () {
+                    if ($(this).find('.section-item').length === 0) {
+                        classWithoutSection = $(this).find('.class-title').text();
+                        return false;
+                    }
+                });
+
+                if (classWithoutSection !== null) {
+                    showToast('error', 'Please add at least one section/stream for ' + classWithoutSection + '.');
+                    return false;
+                }
+
+                return true;
+            });
+
+            updateEmptyStates();
+        });
+    </script>
+}

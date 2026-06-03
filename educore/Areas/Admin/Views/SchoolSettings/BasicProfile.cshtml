@@ -1,0 +1,446 @@
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model educore.Models.SchoolManageModel
+
+@{
+    ViewData["Title"] = "Basic Profile";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var logoImage = string.IsNullOrWhiteSpace(Model.LogoUrl)
+        ? Url.Content("~/assets/img/school-logo.png")
+        : Url.Content(Model.LogoUrl);
+}
+
+<div class="container-fluid flex-grow-1 container-p-y">
+    <form asp-area="Admin"
+          asp-controller="SchoolSettings"
+          asp-action="BasicProfile"
+          method="post"
+          enctype="multipart/form-data">
+
+        @Html.AntiForgeryToken()
+
+        <input type="hidden" asp-for="TenantId" />
+        <input type="hidden" asp-for="SchoolId" />
+        <input type="hidden" asp-for="StatusId" />
+        <input type="hidden" asp-for="Operation" />
+        <input type="hidden" asp-for="LogoUrl" />
+        <input type="hidden" asp-for="HeaderImageUrl" />
+
+        <div class="ec-page-shell row g-0">
+
+            <!-- LEFT PANEL -->
+            <div class="col-12 col-lg-4 col-xl-3 ec-sidebar">
+                <div class="ec-avatar-wrap">
+                    <label class="ec-school-logo">
+                        <img id="logoPreview" src="@logoImage" class="ec-school-logo-img" />
+                        <span class="ec-school-logo-edit"><i class="bx bx-camera"></i></span>
+                        <input type="file" id="LogoImageFile" name="LogoImageFile" class="d-none" accept="image/*" />
+                    </label>
+
+                    <h5 class="ec-profile-name">@(string.IsNullOrWhiteSpace(Model.SchoolName) ? "School Name" : Model.SchoolName)</h5>
+                    <p class="ec-profile-subtitle">@(string.IsNullOrWhiteSpace(Model.TenantName) ? "Tenant not available" : Model.TenantName)</p>
+
+                    <div class="ec-pill-wrap">
+                        <span class="ec-pill">@(string.IsNullOrWhiteSpace(Model.BoardName)   ? "Board -"  : Model.BoardName)</span>
+                        <span class="ec-pill">@(string.IsNullOrWhiteSpace(Model.StatusName) ? "Status -" : Model.StatusName)</span>
+                    </div>
+                </div>
+
+                <div class="ec-detail-box">
+                    <div class="ec-detail-title">School Details</div>
+
+                    <div class="ec-detail-item">
+                        <div class="ec-detail-icon"><i class="bx bx-id-card"></i></div>
+                        <div>
+                            <div class="ec-detail-label">School Code</div>
+                            <div class="ec-detail-value">@(string.IsNullOrWhiteSpace(Model.SchoolCode) ? "-" : Model.SchoolCode)</div>
+                        </div>
+                    </div>
+
+                    <div class="ec-detail-item">
+                        <div class="ec-detail-icon"><i class="bx bx-category"></i></div>
+                        <div>
+                            <div class="ec-detail-label">School Type</div>
+                            <div class="ec-detail-value">@(string.IsNullOrWhiteSpace(Model.SchoolTypeName) ? "-" : Model.SchoolTypeName)</div>
+                        </div>
+                    </div>
+
+                    <div class="ec-detail-item">
+                        <div class="ec-detail-icon"><i class="bx bx-certification"></i></div>
+                        <div>
+                            <div class="ec-detail-label">Board</div>
+                            <div class="ec-detail-value">@(string.IsNullOrWhiteSpace(Model.BoardName) ? "-" : Model.BoardName)</div>
+                        </div>
+                    </div>
+
+                    <div class="ec-detail-item">
+                        <div class="ec-detail-icon"><i class="bx bx-calendar"></i></div>
+                        <div>
+                            <div class="ec-detail-label">Established</div>
+                            <div class="ec-detail-value">@(Model.EstablishedYear == null ? "-" : Model.EstablishedYear.ToString())</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-detail-box">
+                    <div class="ec-detail-title">Contact & Location</div>
+
+                    <div class="ec-detail-item">
+                        <div class="ec-detail-icon"><i class="bx bx-envelope"></i></div>
+                        <div>
+                            <div class="ec-detail-label">Email</div>
+                            <div class="ec-detail-value">@(string.IsNullOrWhiteSpace(Model.ContactEmail) ? "-" : Model.ContactEmail)</div>
+                        </div>
+                    </div>
+
+                    <div class="ec-detail-item">
+                        <div class="ec-detail-icon"><i class="bx bx-phone"></i></div>
+                        <div>
+                            <div class="ec-detail-label">Phone</div>
+                            <div class="ec-detail-value">@(string.IsNullOrWhiteSpace(Model.Phone) ? "-" : Model.Phone)</div>
+                        </div>
+                    </div>
+
+                    <div class="ec-detail-item">
+                        <div class="ec-detail-icon"><i class="bx bx-globe"></i></div>
+                        <div>
+                            <div class="ec-detail-label">Website</div>
+                            <div class="ec-detail-value">@(string.IsNullOrWhiteSpace(Model.Website) ? "-" : Model.Website)</div>
+                        </div>
+                    </div>
+
+                    <div class="ec-detail-item">
+                        <div class="ec-detail-icon"><i class="bx bx-map"></i></div>
+                        <div>
+                            <div class="ec-detail-label">Location</div>
+                            <div class="ec-detail-value">
+                                @(string.IsNullOrWhiteSpace(Model.City) ? "-" : Model.City)@(string.IsNullOrWhiteSpace(Model.State) ? "" : ", " + Model.State)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT FORM PANEL -->
+            <div class="col-12 col-lg-8 col-xl-9 ec-content">
+
+                <div class="ec-card">
+                    <div class="ec-card-header">
+                        <div class="ec-section-title-wrap">
+                            <div class="ec-section-icon"><i class="bx bx-shield-quarter"></i></div>
+                            <div>
+                                <h5 class="mb-0">School Identity</h5>
+                                <small class="text-muted">These details are managed by Super Admin.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ec-card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">School Code</label>
+                                <input asp-for="SchoolCode" class="form-control ec-readonly" readonly />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">School Name</label>
+                                <input asp-for="SchoolName" class="form-control ec-readonly" readonly />
+                                <span asp-validation-for="SchoolName" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Board</label>
+                                <input asp-for="BoardName" class="form-control ec-readonly" readonly />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">School Type</label>
+                                <input asp-for="SchoolTypeName" class="form-control ec-readonly" readonly />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-card">
+                    <div class="ec-card-header">
+                        <div class="ec-section-title-wrap">
+                            <div class="ec-section-icon"><i class="bx bx-edit-alt"></i></div>
+                            <div>
+                                <h5 class="mb-0">Basic Information</h5>
+                                <small class="text-muted">Update public display and registration information.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ec-card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Display Name</label>
+                                <input asp-for="DisplayName" class="form-control" placeholder="Enter display name" />
+                                <span asp-validation-for="DisplayName" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Website</label>
+                                <input asp-for="Website" class="form-control" placeholder="https://school.com" />
+                                <span asp-validation-for="Website" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Registration Number</label>
+                                <input asp-for="RegistrationNumber" class="form-control" placeholder="Enter registration number" />
+                                <span asp-validation-for="RegistrationNumber" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Affiliation Number</label>
+                                <input asp-for="AffiliationNumber" class="form-control" placeholder="Enter affiliation number" />
+                                <span asp-validation-for="AffiliationNumber" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Established Year</label>
+                                <input asp-for="EstablishedYear" class="form-control" placeholder="Enter established year" />
+                                <span asp-validation-for="EstablishedYear" class="text-danger small"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-card">
+                    <div class="ec-card-header">
+                        <div class="ec-section-title-wrap">
+                            <div class="ec-section-icon"><i class="bx bx-map"></i></div>
+                            <div>
+                                <h5 class="mb-0">Address Details</h5>
+                                <small class="text-muted">Primary address and location details.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ec-card-body">
+                        <input type="hidden" asp-for="AddressTypeId" />
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">Address Line 1 <span class="text-danger">*</span></label>
+                                <textarea asp-for="AddressLine1" class="form-control" rows="3" placeholder="Enter address line 1"></textarea>
+                                <span asp-validation-for="AddressLine1" class="text-danger small"></span>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Address Line 2</label>
+                                <textarea asp-for="AddressLine2" class="form-control" rows="2" placeholder="Enter address line 2"></textarea>
+                                <span asp-validation-for="AddressLine2" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">City</label>
+                                <input asp-for="City" class="form-control" placeholder="City" />
+                                <span asp-validation-for="City" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">State</label>
+                                <input asp-for="State" class="form-control" placeholder="State" />
+                                <span asp-validation-for="State" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Pincode</label>
+                                <input asp-for="Pincode" class="form-control" placeholder="Pincode" />
+                                <span asp-validation-for="Pincode" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">District</label>
+                                <input asp-for="District" class="form-control" placeholder="District" />
+                                <span asp-validation-for="District" class="text-danger small"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-card">
+                    <div class="ec-card-header">
+                        <div class="ec-section-title-wrap">
+                            <div class="ec-section-icon"><i class="bx bx-user"></i></div>
+                            <div>
+                                <h5 class="mb-0">Contact Details</h5>
+                                <small class="text-muted">Main contact person and official communication details.</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ec-card-body">
+                        <input type="hidden" asp-for="ContactTypeId" />
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Contact Name <span class="text-danger">*</span></label>
+                                <input asp-for="ContactName" class="form-control" placeholder="Contact person name" />
+                                <span asp-validation-for="ContactName" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Designation</label>
+                                <input asp-for="Designation" class="form-control" placeholder="Designation" />
+                                <span asp-validation-for="Designation" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Official Phone <span class="text-danger">*</span></label>
+                                <input asp-for="Phone" class="form-control" placeholder="Official phone" />
+                                <span asp-validation-for="Phone" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Alternate Phone</label>
+                                <input asp-for="AlternatePhone" class="form-control" placeholder="Alternate phone" />
+                                <span asp-validation-for="AlternatePhone" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Official Email</label>
+                                <input asp-for="ContactEmail" class="form-control" placeholder="school@example.com" />
+                                <span asp-validation-for="ContactEmail" class="text-danger small"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-sticky-actions">
+                    <div class="d-flex justify-content-end gap-2">
+                        <a asp-area="Admin" asp-controller="SchoolSettings" asp-action="BasicProfile"
+                           class="btn btn-outline-secondary">Reset</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bx bx-save me-1"></i> Save Changes
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </form>
+</div>
+@section PageScripts {
+
+    <script>
+        $(document).ready(function () {
+
+            toastr.options = {
+                closeButton: true,
+                progressBar: true,
+                newestOnTop: true,
+                positionClass: "toast-top-right",
+                preventDuplicates: true,
+                timeOut: 3500
+            };
+
+            @if (TempData["Message"] != null)
+            {
+                    <text>
+                        var result = '@TempData["Result"]';
+                        var message = '@TempData["Message"]';
+
+                        if (result === "1") {
+                            toastr.success(message);
+                        } else {
+                            toastr.error(message);
+                        }
+                    </text>
+            }
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                    foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                            <text>
+                                toastr.error('@error.ErrorMessage');
+                            </text>
+                    }
+            }
+
+            const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+            const maxImageSizeMb = 2;
+
+            function showToastError(input, message) {
+                const field = $(input);
+                field.addClass("is-invalid");
+
+                if (!field.data("toast-shown")) {
+                    toastr.error(message);
+                    field.data("toast-shown", true);
+                }
+            }
+
+            function clearFieldError(input) {
+                $(input)
+                    .removeClass("is-invalid")
+                    .removeData("toast-shown");
+            }
+
+            $("#LogoImageFile").on("change", function () {
+                const file = this.files[0];
+
+                clearFieldError(this);
+
+                if (!file) return;
+
+                if (!allowedImageTypes.includes(file.type)) {
+                    this.value = "";
+                    showToastError(this, "Only JPG, PNG or WEBP image is allowed.");
+                    return;
+                }
+
+                if (file.size > maxImageSizeMb * 1024 * 1024) {
+                    this.value = "";
+                    showToastError(this, "Logo image must be less than 2 MB.");
+                    return;
+                }
+
+                $("#logoPreview").attr("src", URL.createObjectURL(file));
+               toastr.info("Logo selected.");
+            });
+
+            $("form").on("submit", function (e) {
+
+                let isValid = true;
+                const currentYear = new Date().getFullYear();
+
+                $(".is-invalid").removeClass("is-invalid").removeData("toast-shown");
+
+                function required(name, message) {
+                    const input = $('[name="' + name + '"]');
+
+                    if (!$.trim(input.val())) {
+                        showToastError(input, message);
+                        isValid = false;
+                    }
+                }
+
+                function validatePattern(name, regex, message) {
+                    const input = $('[name="' + name + '"]');
+                    const value = $.trim(input.val());
+
+                    if (value && !regex.test(value)) {
+                        showToastError(input, message);
+                        isValid = false;
+                    }
+                }
+
+                required("AddressLine1", "Address Line 1 is required.");
+                required("ContactName", "Contact Name is required.");
+                required("Phone", "Official Phone is required.");
+
+                validatePattern("Phone", /^[6-9][0-9]{9}$/, "Enter valid 10 digit Indian mobile number.");
+                validatePattern("AlternatePhone", /^[6-9][0-9]{9}$/, "Enter valid alternate phone number.");
+                validatePattern("ContactEmail", /^[^@@ ]+@@[^@@ ]+[.][^@@ ]+$/, "Enter valid official email.");
+                validatePattern("Website", /^(https?:\/\/)?([A-Za-z0-9-]+[.])+[A-Za-z]{2,}(\/.*)?$/, "Enter valid website.");
+                validatePattern("Pincode", /^[1-9][0-9]{5}$/, "Enter valid 6 digit pincode.");
+
+                const establishedYearInput = $('[name="EstablishedYear"]');
+                const establishedYear = $.trim(establishedYearInput.val());
+
+                if (establishedYear) {
+                    const year = parseInt(establishedYear);
+
+                    if (isNaN(year) || year < 1800 || year > currentYear) {
+                        showToastError(establishedYearInput, "Enter valid established year.");
+                        isValid = false;
+                    }
+                }
+
+                        if (!isValid) {
+            e.preventDefault();
+            toastr.warning("Please fix the highlighted fields.");
+            $(".is-invalid:first").focus();
+            return false;
+                        }
+            });
+
+            $("input, textarea").on("input change blur", function () {
+                clearFieldError(this);
+            });
+
+        });
+    </script>
+}

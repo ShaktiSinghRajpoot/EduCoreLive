@@ -1,0 +1,655 @@
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model EduCoreDataAccessLayer.Models.Admin.FeeHead
+@{
+    ViewData["Title"] = "Fee Head Master";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var feeHeads = ViewBag.FeeHeads as List<EduCoreDataAccessLayer.Models.Admin.FeeHead>
+                    ?? new List<EduCoreDataAccessLayer.Models.Admin.FeeHead>();
+}
+
+@section PageStyles {
+    <style>
+        .fee-head-type-card,
+        .fee-head-row {
+            border: 1px solid #ececf5;
+            border-radius: 18px;
+            background: #ffffff;
+            transition: all .2s ease;
+        }
+
+        .fee-head-type-card {
+            padding: 1rem;
+            cursor: pointer;
+        }
+
+            .fee-head-type-card:hover,
+            .fee-head-row:hover {
+                border-color: rgba(255, 138, 0, .45);
+                box-shadow: 0 12px 28px rgba(43, 27, 18, .07);
+                transform: translateY(-1px);
+            }
+
+            .fee-head-type-card input:checked + .fee-choice-content {
+                color: #ff8a00;
+            }
+
+        .fee-choice-title {
+            font-weight: 800;
+            color: #2b1b12;
+        }
+
+        .fee-head-row {
+            padding: 1rem;
+        }
+
+            .fee-head-row + .fee-head-row {
+                margin-top: .85rem;
+            }
+
+        .fee-head-name {
+            font-weight: 800;
+            color: #2b1b12;
+            margin-bottom: .2rem;
+        }
+
+        .fee-head-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff4e6;
+            color: #ff8a00;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .fee-action-btn {
+            border-radius: 999px;
+            font-weight: 800;
+            transition: all .2s ease;
+        }
+
+            .fee-action-btn:hover {
+                transform: translateY(-1px);
+            }
+
+        .fee-filter-bar {
+            max-width: 520px;
+        }
+
+        @@media (max-width: 991.98px) {
+            .fee-filter-bar {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .fee-head-page .ec-sticky-actions {
+                padding: 1rem;
+                margin: 1rem -1rem -1rem;
+            }
+        }
+
+        @@media (max-width: 575.98px) {
+            .ec-page-title {
+                font-size: clamp(1.35rem, 6vw, 1.75rem);
+            }
+
+            .fee-head-row {
+                padding: .9rem;
+            }
+
+            .fee-head-icon {
+                width: 40px;
+                height: 40px;
+            }
+
+            .fee-action-btn,
+            .ec-sticky-actions .btn {
+                width: 100%;
+            }
+
+            .fee-row-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: .5rem;
+                width: 100%;
+            }
+        }
+    </style>
+}
+
+<div class="ec-page-shell fee-head-page">
+    <div class="ec-page-content">
+
+        <div class="ec-page-header">
+            <div class="ec-page-header-inner d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                    <div class="ec-page-icon">
+                        <i class="bx bx-rupee"></i>
+                    </div>
+
+                    <div>
+                        <h3 class="ec-page-title mb-1">Fee Head Master</h3>
+                        <p class="ec-page-subtitle mb-0">
+                            Create reusable billing heads used later in class-wise Fee Structure.
+                        </p>
+                    </div>
+                </div>
+
+                <a asp-controller="SchoolSettings" asp-action="FeeStructure" class="btn btn-outline-secondary fee-action-btn">
+                    <i class="bx bx-wallet me-1"></i>
+                    Fee Structure
+                </a>
+            </div>
+        </div>
+
+        <div class="ec-card mb-4">
+            <div class="ec-card-body">
+                <div class="row g-3">
+
+                    <div class="col-12 col-md-4">
+                        <div class="ec-detail-box h-100">
+                            <div class="ec-detail-item">
+                                <span class="ec-detail-icon">
+                                    <i class="bx bx-category"></i>
+                                </span>
+
+                                <div>
+                                    <div class="ec-detail-label">Total Fee Heads</div>
+                                    <div class="ec-detail-value">@feeHeads.Count</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <div class="ec-detail-box h-100">
+                            <div class="ec-detail-item">
+                                <span class="ec-detail-icon">
+                                    <i class="bx bx-check-shield"></i>
+                                </span>
+
+                                <div>
+                                    <div class="ec-detail-label">Mandatory Heads</div>
+                                    <div class="ec-detail-value">@feeHeads.Count(x => x.FeeType == "Mandatory")</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <div class="ec-detail-box h-100">
+                            <div class="ec-detail-item">
+                                <span class="ec-detail-icon">
+                                    <i class="bx bx-slider"></i>
+                                </span>
+
+                                <div>
+                                    <div class="ec-detail-label">Optional Heads</div>
+                                    <div class="ec-detail-value">@feeHeads.Count(x => x.FeeType == "Optional")</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="ec-detail-box mt-3">
+                    <div class="ec-detail-item">
+                        <span class="ec-detail-icon">
+                            <i class="bx bx-info-circle"></i>
+                        </span>
+
+                        <div>
+                            <div class="ec-detail-title">Simple Fee Head Setup</div>
+                            <div class="ec-detail-value fw-normal text-muted">
+                                Keep this page only for reusable fee heads. Class-wise selection is managed manually in Fee Structure.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="row g-4">
+
+            <div class="col-12 col-xl-4">
+                <div class="ec-card h-100">
+                    <div class="ec-card-header">
+                        <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                            <span class="ec-section-icon">
+                                <i class="bx bx-plus-circle"></i>
+                            </span>
+
+                            <div>
+                                <h5 class="ec-section-title mb-1" id="feeHeadFormTitle">Create Fee Head</h5>
+                                <p class="ec-section-subtitle mb-0">
+                                    Add a reusable charge for billing.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ec-card-body">
+                        <form asp-action="SaveFeeHead"
+                              asp-controller="SchoolSettings"
+                              method="post"
+                              id="feeHeadForm">
+
+                            @Html.AntiForgeryToken()
+
+                            <input type="hidden" asp-for="FeeHeadId" id="FeeHeadId" />
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Fee Head Name <span class="text-danger">*</span>
+                                </label>
+
+                                <input asp-for="FeeHeadName"
+                                       class="form-control"
+                                       id="FeeHeadName"
+                                       maxlength="80"
+                                       placeholder="Example: Tuition Fee" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Billing Cycle <span class="text-danger">*</span>
+                                </label>
+
+                                <select asp-for="Frequency" class="form-select" id="Frequency">
+                                    <option value="">Select cycle</option>
+                                    <option value="One Time">One Time</option>
+                                    <option value="Monthly">Monthly</option>
+                                    <option value="Quarterly">Quarterly</option>
+                                    <option value="Yearly">Yearly</option>
+                                </select>
+
+                                <small class="text-muted">
+                                    Example: Tuition = Monthly, Admission = One Time.
+                                </small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Default Amount</label>
+
+                                <div class="input-group">
+                                    <span class="input-group-text">₹</span>
+
+                                    <input asp-for="DefaultAmount"
+                                           type="number"
+                                           class="form-control"
+                                           id="DefaultAmount"
+                                           min="0"
+                                           step="0.01"
+                                           placeholder="0" />
+                                </div>
+
+                                <small class="text-muted">
+                                    This amount can be changed later in Fee Structure.
+                                </small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Fee Type <span class="text-danger">*</span>
+                                </label>
+
+                                <div class="row g-2">
+                                    <div class="col-12">
+                                        <label class="fee-head-type-card d-flex align-items-start gap-3">
+                                            <input asp-for="FeeType"
+                                                   class="form-check-input mt-1"
+                                                   type="radio"
+                                                   value="Mandatory" />
+
+                                            <div class="fee-choice-content">
+                                                <span class="fee-choice-title d-block">
+                                                    Mandatory
+                                                </span>
+
+                                                <small class="text-muted">
+                                                    Usually selected by default in Fee Structure.
+                                                </small>
+                                            </div>
+                                        </label>
+                                    </div>
+
+                                    <div class="col-12">
+                                        <label class="fee-head-type-card d-flex align-items-start gap-3">
+                                            <input asp-for="FeeType"
+                                                   class="form-check-input mt-1"
+                                                   type="radio"
+                                                   value="Optional" />
+
+                                            <div class="fee-choice-content">
+                                                <span class="fee-choice-title d-block">
+                                                    Optional
+                                                </span>
+
+                                                <small class="text-muted">
+                                                    Can be selected manually in Fee Structure.
+                                                </small>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Fee Group</label>
+
+                                <select asp-for="FeeGroup" class="form-select" id="FeeGroup">
+                                    <option value="Academic">Academic</option>
+                                    <option value="Transport">Transport</option>
+                                    <option value="Hostel">Hostel</option>
+                                    <option value="Optional Services">Optional Services</option>
+                                    <option value="Fine / Penalty">Fine / Penalty</option>
+                                </select>
+
+                                <small class="text-muted">
+                                    Used for reporting and filtering only.
+                                </small>
+                            </div>
+
+                            <div class="ec-sticky-actions">
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-primary fee-action-btn">
+                                        <i class="bx bx-save me-1"></i>
+                                        Save Fee Head
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn btn-outline-secondary fee-action-btn d-none"
+                                            id="cancelEditButton">
+                                        Cancel Edit
+                                    </button>
+                                </div>
+                            </div>
+
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-8">
+                <div class="ec-card">
+                    <div class="ec-card-header">
+                        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+                            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                                <span class="ec-section-icon">
+                                    <i class="bx bx-list-ul"></i>
+                                </span>
+
+                                <div>
+                                    <h5 class="ec-section-title mb-1">Existing Fee Heads</h5>
+                                    <p class="ec-section-subtitle mb-0">
+                                        Manage reusable billing heads.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="fee-filter-bar d-flex flex-column flex-sm-row gap-2">
+                                <input type="search"
+                                       class="form-control form-control-sm"
+                                       id="feeHeadSearch"
+                                       placeholder="Search fee head..." />
+
+                                <select class="form-select form-select-sm" id="feeHeadFrequencyFilter">
+                                    <option value="all" selected>All Cycles</option>
+                                    <option value="one time">One Time</option>
+                                    <option value="monthly">Monthly</option>
+                                    <option value="quarterly">Quarterly</option>
+                                    <option value="yearly">Yearly</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ec-card-body">
+
+                        <div class="text-center py-5 @(feeHeads.Count > 0 ? "d-none" : "")" id="feeHeadEmptyState">
+                            <div class="ec-avatar mx-auto mb-3">
+                                <i class="bx bx-search"></i>
+                            </div>
+
+                            <h6 class="ec-profile-title mb-1">
+                                No fee heads found
+                            </h6>
+
+                            <p class="ec-profile-subtitle mb-0">
+                                Try changing search or filter.
+                            </p>
+                        </div>
+
+                        @foreach (var item in feeHeads)
+                        {
+                            <div class="fee-head-row"
+                                 data-name="@item.FeeHeadName.ToLower()"
+                                 data-frequency="@item.Frequency.ToLower()">
+
+                                <div class="row align-items-center g-3">
+                                    <div class="col-12 col-md-4">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <span class="fee-head-icon">
+                                                <i class="bx bx-rupee"></i>
+                                            </span>
+
+                                            <div>
+                                                <div class="fee-head-name">
+                                                    @item.FeeHeadName
+                                                </div>
+
+                                                <small class="text-muted">
+                                                    @item.FeeGroup
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-6 col-md-2">
+                                        <span class="ec-detail-label">Cycle</span>
+                                        <span class="ec-detail-value">@item.Frequency</span>
+                                    </div>
+
+                                    <div class="col-6 col-md-2">
+                                        <span class="ec-detail-label">Amount</span>
+                                        <span class="ec-detail-value">₹@item.DefaultAmount.ToString("N2")</span>
+                                    </div>
+
+                                    <div class="col-6 col-md-2">
+                                        <span class="ec-detail-label">Type</span>
+
+                                        <div class="ec-pill-wrap">
+                                            <span class="ec-pill">@item.FeeType</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-6 col-md-2 text-md-end">
+                                        <div class="fee-row-actions">
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-primary fee-action-btn edit-fee-head"
+                                                    data-id="@item.FeeHeadId">
+                                                <i class="bx bx-edit"></i>
+                                            </button>
+
+                                            <form asp-action="DeleteFeeHead"
+                                                  asp-controller="SchoolSettings"
+                                                  method="post"
+                                                  class="d-inline">
+
+                                                @Html.AntiForgeryToken()
+
+                                                <input type="hidden" name="id" value="@item.FeeHeadId" />
+
+                                                <button type="submit"
+                                                        class="btn btn-sm btn-outline-danger fee-action-btn"
+                                                        onclick="return confirm('Are you sure you want to delete this fee head?')">
+                                                    <i class="bx bx-trash"></i>
+                                                </button>
+
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                    </div>
+
+                    <div class="ec-card-header border-top">
+                        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
+                            <small class="text-muted" id="feeHeadCountText">
+                                Showing @feeHeads.Count fee heads
+                            </small>
+
+                            <small class="text-muted">
+                                Class-wise use is managed in Fee Structure.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+@section PageScripts {
+    <script>
+        $(document).ready(function () {
+
+            if (typeof toastr !== 'undefined') {
+                toastr.options = {
+                    closeButton: true,
+                    progressBar: true,
+                    positionClass: 'toast-top-right',
+                    timeOut: 3000
+                };
+            }
+
+            function showToast(type, message) {
+                if (typeof toastr !== 'undefined') {
+                    toastr[type](message);
+                } else {
+                    console.log(message);
+                }
+            }
+
+            function filterFeeHeads() {
+                let searchText = $('#feeHeadSearch').val().toLowerCase().trim();
+                let selectedFrequency = $('#feeHeadFrequencyFilter').val();
+                let visibleRows = 0;
+
+                $('.fee-head-row').each(function () {
+                    let name = ($(this).data('name') || '').toLowerCase();
+                    let frequency = ($(this).data('frequency') || '').toLowerCase();
+
+                    let matchesSearch = name.includes(searchText);
+                    let matchesFrequency = selectedFrequency === 'all' || frequency === selectedFrequency;
+
+                    if (matchesSearch && matchesFrequency) {
+                        $(this).show();
+                        visibleRows++;
+                    } else {
+                        $(this).hide();
+                    }
+                });
+
+                $('#feeHeadCountText').text('Showing ' + visibleRows + ' fee heads');
+                $('#feeHeadEmptyState').toggleClass('d-none', visibleRows !== 0);
+            }
+
+            function resetFeeHeadForm() {
+                $('#FeeHeadId').val('0');
+                $('#FeeHeadName').val('');
+                $('#Frequency').val('');
+                $('#DefaultAmount').val('');
+                $('#FeeGroup').val('Academic');
+                $('input[name="FeeType"]').prop('checked', false);
+                $('#feeHeadFormTitle').text('Create Fee Head');
+                $('#cancelEditButton').addClass('d-none');
+            }
+
+            $('#feeHeadSearch').on('input', filterFeeHeads);
+            $('#feeHeadFrequencyFilter').on('change', filterFeeHeads);
+
+            $('#feeHeadForm').on('submit', function (e) {
+                let feeHeadName = $('#FeeHeadName').val().trim();
+                let frequency = $('#Frequency').val();
+                let feeType = $('input[name="FeeType"]:checked').val();
+
+                if (!feeHeadName) {
+                    e.preventDefault();
+                    showToast('error', 'Please enter fee head name.');
+                    $('#FeeHeadName').focus();
+                    return false;
+                }
+
+                if (!frequency) {
+                    e.preventDefault();
+                    showToast('error', 'Please select billing cycle.');
+                    $('#Frequency').focus();
+                    return false;
+                }
+
+                if (!feeType) {
+                    e.preventDefault();
+                    showToast('error', 'Please select fee type.');
+                    return false;
+                }
+            });
+
+            $(document).on('click', '.edit-fee-head', function () {
+                let id = $(this).data('id');
+
+                $.get('/Admin/SchoolSettings/GetFeeHeadById?id=' + id, function (response) {
+                    if (response.success) {
+                        $('#FeeHeadId').val(response.data.feeHeadId);
+                        $('#FeeHeadName').val(response.data.feeHeadName);
+                        $('#Frequency').val(response.data.frequency);
+                        $('#DefaultAmount').val(response.data.defaultAmount);
+                        $('#FeeGroup').val(response.data.feeGroup);
+
+                        $('input[name="FeeType"][value="' + response.data.feeType + '"]').prop('checked', true);
+
+                        $('#feeHeadFormTitle').text('Edit Fee Head');
+                        $('#cancelEditButton').removeClass('d-none');
+
+                        window.scrollTo({
+                            top: 0,
+                            behavior: 'smooth'
+                        });
+                    } else {
+                        showToast('error', response.message);
+                    }
+                });
+            });
+
+            $('#cancelEditButton').on('click', function () {
+                resetFeeHeadForm();
+            });
+
+            filterFeeHeads();
+
+            @if (TempData["SuccessMessage"] != null)
+            {
+                    <text>
+                        showToast('success', '@TempData["SuccessMessage"]');
+                    </text>
+            }
+
+            @if (TempData["ErrorMessage"] != null)
+            {
+                    <text>
+                        showToast('error', '@TempData["ErrorMessage"]');
+                    </text>
+            }
+        });
+    </script>
+}

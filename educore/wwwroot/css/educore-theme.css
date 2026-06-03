@@ -1,0 +1,552 @@
+/* ============================================================
+   EduCore Design System — single source of truth
+   Every page uses these ec-* classes. No page should redefine
+   colours, shadows, border-radii, or card patterns inline.
+   ============================================================ */
+
+/* ── Design tokens ─────────────────────────────────────────── */
+:root {
+    --ec-primary:        #ff8a00;
+    --ec-primary-light:  #fff4e6;
+    --ec-primary-soft:   #fff7ed;
+    --ec-bg-soft:        #f8f7f5;
+    --ec-white:          #ffffff;
+    --ec-border:         #ececf5;   /* inner cards */
+    --ec-border-warm:    #f0eee9;   /* outer shell  */
+    --ec-border-soft:    #f0e8df;   /* sidebar      */
+    --ec-text-dark:      #2b1b12;
+    --ec-text:           #2b2c40;
+    --ec-text-muted:     #8b8175;
+    --ec-text-light:     #9a938b;
+    --ec-shadow-sm:      0 2px 8px  rgba(67, 89, 113, 0.06);
+    --ec-shadow:         0 4px 20px rgba(67, 89, 113, 0.08);
+    --ec-shadow-lg:      0 8px 24px rgba(67, 89, 113, 0.14);
+    --ec-transition:     all 0.25s ease;
+}
+
+/* ── Override Bootstrap's cold text defaults ────────────────── *
+ * Bootstrap ships with cold blue-greys:                          *
+ *   --bs-body-color      #646e78   (cold)                        *
+ *   --bs-secondary-color #a7acb2   (cold — used by .text-muted)  *
+ * Override them here so every page inherits warm EduCore text.   */
+:root {
+    --bs-body-color:              var(--ec-text);       /* #2b2c40 */
+    --bs-body-color-rgb:          43, 44, 64;
+    --bs-secondary-color:         var(--ec-text-muted); /* #8b8175 */
+    --bs-secondary-color-rgb:     139, 129, 117;
+    --bs-heading-color:           var(--ec-text-dark);  /* #2b1b12 */
+}
+
+/* ── Body ───────────────────────────────────────────────────── */
+body {
+    background: #f5f5f9;
+    color: var(--ec-text);
+}
+
+/* Bootstrap's .text-muted uses var(--bs-secondary-color) which we just
+   overrode, but some vendor/page CSS may hard-code the cold value.
+   !important ensures the warm colour wins site-wide.              */
+.text-muted { color: var(--ec-text-muted) !important; }
+
+/* Headings: warm dark across all pages, not Bootstrap's cold default */
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+    color: var(--ec-text-dark);
+}
+
+/* small tags (used for sub-labels everywhere) */
+small, .small { color: var(--ec-text-muted); }
+
+/* ── Outer page shell ───────────────────────────────────────── *
+ * Wraps the entire page content. Acts as the main white card.   */
+.ec-page-shell {
+    background:    var(--ec-white);
+    border-radius: 18px;
+    border:        1px solid var(--ec-border-warm);
+    box-shadow:    var(--ec-shadow);
+    overflow:      hidden;
+}
+
+/* ── Single-column padded content area (no sidebar) ─────────── *
+ * Use inside ec-page-shell when there is no left sidebar.        */
+.ec-page-content {
+    padding: 2rem;
+}
+
+@media (max-width: 991.98px) {
+    .ec-page-content { padding: 1.5rem; }
+}
+
+@media (max-width: 575.98px) {
+    .ec-page-content { padding: 1rem; }
+}
+
+/* ── Sidebar (left column inside ec-page-shell) ─────────────── */
+.ec-sidebar {
+    background:   linear-gradient(180deg, var(--ec-bg-soft) 0%, var(--ec-primary-soft) 100%);
+    border-right: 1px solid var(--ec-border-soft);
+    padding:      2rem;
+    min-height:   100%;
+}
+
+@media (max-width: 991.98px) {
+    .ec-sidebar {
+        border-right:  none;
+        border-bottom: 1px solid var(--ec-border-soft);
+        min-height:    auto;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .ec-sidebar { padding: 1rem; }
+}
+
+/* ── Main content area (right column inside ec-page-shell) ──── */
+.ec-content {
+    padding: 2rem 2.25rem;
+}
+
+@media (max-width: 991.98px) {
+    .ec-content { padding: 1.5rem; }
+}
+
+@media (max-width: 575.98px) {
+    .ec-content { padding: 1rem; }
+}
+
+/* ── Avatar / logo block (top of sidebar) ───────────────────── */
+.ec-avatar-wrap {
+    text-align:    center;
+    background:    rgba(255, 255, 255, .7);
+    border:        1px solid var(--ec-border-soft);
+    border-radius: 18px;
+    padding:       1.5rem 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.ec-school-logo {
+    width:         128px;
+    height:        128px;
+    border-radius: 24px;
+    background:    var(--ec-white);
+    padding:       8px;
+    display:       inline-block;
+    position:      relative;
+    box-shadow:    var(--ec-shadow-lg);
+    cursor:        pointer;
+    border:        1px solid #f3e3cf;
+}
+
+@media (max-width: 575.98px) {
+    .ec-school-logo { width: 104px; height: 104px; border-radius: 20px; }
+}
+
+.ec-school-logo-img {
+    width:         100%;
+    height:        100%;
+    border-radius: 18px;
+    object-fit:    contain;
+    background:    #f8f9fa;
+}
+
+.ec-school-logo-edit {
+    position:      absolute;
+    right:         -6px;
+    bottom:        -6px;
+    width:         38px;
+    height:        38px;
+    border-radius: 50%;
+    background:    var(--ec-primary);
+    color:         var(--ec-white);
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    box-shadow:    0 6px 16px rgba(255, 138, 0, .35);
+    border:        3px solid var(--ec-white);
+    font-size:     16px;
+}
+
+.ec-profile-name {
+    color:         var(--ec-text-dark);
+    font-weight:   800;
+    margin-top:    1.25rem;
+    margin-bottom: .35rem;
+}
+
+.ec-profile-subtitle {
+    color:         var(--ec-text-muted);
+    font-size:     .875rem;
+    margin-bottom: 0;
+}
+
+/* ── Large avatar / icon block (empty states, profile images) ── */
+.ec-avatar {
+    width:         120px;
+    height:        120px;
+    border-radius: 24px;
+    object-fit:    cover;
+    background:    var(--ec-primary-light);
+    color:         var(--ec-primary);
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    font-size:     2.5rem;
+    border:        1px solid #f3e3cf;
+}
+
+.ec-profile-title {
+    font-size:     1.1rem;
+    font-weight:   800;
+    color:         var(--ec-text-dark);
+    margin-bottom: .35rem;
+}
+
+/* ── Pills ──────────────────────────────────────────────────── */
+.ec-pill-wrap {
+    display:         flex;
+    flex-wrap:       wrap;
+    justify-content: center;
+    gap:             .5rem;
+    margin-top:      1rem;
+}
+
+.ec-pill {
+    background:    var(--ec-primary-light);
+    color:         var(--ec-primary);
+    border-radius: 999px;
+    padding:       .35rem .75rem;
+    font-size:     .75rem;
+    font-weight:   700;
+}
+
+/* ── Detail box (info list in sidebar) ──────────────────────── */
+.ec-detail-box {
+    background:    var(--ec-white);
+    border:        1px solid var(--ec-border-warm);
+    border-radius: 16px;
+    padding:       1rem;
+    margin-bottom: 1rem;
+}
+
+.ec-detail-title {
+    font-size:      .72rem;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    font-weight:    800;
+    color:          var(--ec-text-light);
+    margin-bottom:  .75rem;
+}
+
+.ec-detail-item {
+    display:       flex;
+    align-items:   flex-start;
+    gap:           .8rem;
+    padding:       .65rem 0;
+    border-bottom: 1px dashed #eee3d8;
+}
+
+.ec-detail-item:last-child {
+    border-bottom:  none;
+    padding-bottom: 0;
+}
+
+.ec-detail-icon {
+    width:         36px;
+    height:        36px;
+    min-width:     36px;
+    border-radius: 10px;
+    background:    var(--ec-primary-light);
+    color:         var(--ec-primary);
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    font-size:     18px;
+    flex-shrink:   0;
+}
+
+.ec-detail-label {
+    color:         var(--ec-text-light);
+    font-size:     .73rem;
+    font-weight:   700;
+    margin-bottom: 1px;
+}
+
+.ec-detail-value {
+    color:       var(--ec-text);
+    font-weight: 700;
+    font-size:   .88rem;
+    word-break:  break-word;
+}
+
+/* ── Page header banner (gradient strip at top of content) ──── */
+.ec-page-header {
+    background:    linear-gradient(135deg, var(--ec-primary-soft) 0%, var(--ec-white) 60%);
+    border:        1px solid #f4e3cf;
+    border-radius: 18px;
+    padding:       1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 575.98px) {
+    .ec-page-header { padding: 1rem; }
+}
+
+.ec-page-header-inner {
+    display:         flex;
+    align-items:     center;
+    justify-content: space-between;
+    gap:             1rem;
+    flex-wrap:       wrap;
+}
+
+/* Compact page header — used in list/table pages */
+.ec-page-header-compact {
+    background:    var(--ec-white);
+    border-bottom: 1px solid var(--ec-border-warm);
+    padding:       .85rem 1.25rem;
+}
+
+.ec-page-icon {
+    width:         48px;
+    height:        48px;
+    border-radius: 14px;
+    background:    var(--ec-primary-light);
+    color:         var(--ec-primary);
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    font-size:     24px;
+    flex-shrink:   0;
+}
+
+/* Smaller icon variant — used in compact headers */
+.ec-page-icon-sm {
+    width:         36px;
+    height:        36px;
+    border-radius: 8px;
+    background:    var(--ec-primary-light);
+    color:         var(--ec-primary);
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    font-size:     18px;
+    flex-shrink:   0;
+}
+
+.ec-page-title {
+    font-size:     1.4rem;
+    font-weight:   800;
+    color:         var(--ec-text-dark);
+    margin-bottom: 4px;
+}
+
+.ec-page-subtitle {
+    color:         var(--ec-text-muted);
+    margin-bottom: 0;
+}
+
+/* ── Section cards ──────────────────────────────────────────── */
+.ec-card {
+    border:        1px solid var(--ec-border);
+    border-radius: 16px;
+    overflow:      hidden;
+    background:    var(--ec-white);
+    box-shadow:    none;
+    margin-bottom: 1.5rem;
+    transition:    var(--ec-transition);
+}
+
+.ec-card-header {
+    background:    var(--ec-white);
+    border-bottom: 1px solid var(--ec-border);
+    padding:       1.15rem 1.35rem;
+}
+
+.ec-card-body {
+    padding: 1.35rem;
+}
+
+/* ── Section title (icon + heading inside ec-card-header) ───── */
+.ec-section-title-wrap {
+    display:     flex;
+    align-items: center;
+    gap:         .75rem;
+}
+
+.ec-section-icon {
+    width:         38px;
+    height:        38px;
+    border-radius: 11px;
+    background:    var(--ec-primary-light);
+    color:         var(--ec-primary);
+    display:       flex;
+    align-items:   center;
+    justify-content: center;
+    font-size:     19px;
+    flex-shrink:   0;
+}
+
+.ec-section-title {
+    font-size:   1rem;
+    font-weight: 700;
+    color:       var(--ec-text-dark);
+    margin:      0;
+}
+
+.ec-section-subtitle {
+    color:     var(--ec-text-muted);
+    font-size: .82rem;
+}
+
+/* ── Sticky action bar ──────────────────────────────────────── */
+.ec-sticky-actions {
+    position:       sticky;
+    bottom:         0;
+    z-index:        5;
+    background:     rgba(255, 255, 255, .92);
+    backdrop-filter: blur(8px);
+    border-top:     1px solid var(--ec-border);
+    padding-top:    1rem;
+    margin-top:     .5rem;
+}
+
+/* ── Form controls ──────────────────────────────────────────── */
+.form-label,
+.col-form-label {
+    font-size:   .78rem;
+    font-weight: 800;
+    color:       #3d2c24;
+}
+
+.form-control,
+.form-select {
+    min-height:    44px;
+    border-radius: 9px;
+    border:        1px solid #d9dee3;
+    font-size:     .9rem;
+    transition:    var(--ec-transition);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #ffb866;
+    box-shadow:   0 0 0 .18rem rgba(255, 138, 0, .12);
+}
+
+textarea.form-control {
+    min-height: auto;
+}
+
+.form-control.is-invalid,
+.form-select.is-invalid {
+    border-color: #dc3545;
+    box-shadow:   none;
+}
+
+.ec-readonly {
+    background: #f8f9fa !important;
+    cursor:     not-allowed;
+    color:      #697a8d;
+}
+
+/* ── Tables ─────────────────────────────────────────────────── */
+.ec-table {
+    vertical-align: middle;
+}
+
+.ec-table thead th {
+    background:     #faf9f7;
+    color:          #a19489;
+    font-size:      .68rem;
+    text-transform: uppercase;
+    font-weight:    800;
+    letter-spacing: .8px;
+    border-bottom:  1px solid var(--ec-border-warm);
+}
+
+.ec-table tbody tr {
+    transition: var(--ec-transition);
+}
+
+.ec-table tbody tr:hover {
+    background-color: #fffaf5 !important;
+}
+
+/* ── Status badges ──────────────────────────────────────────── */
+.ec-badge {
+    padding:       6px 12px;
+    border-radius: 50px;
+    font-size:     .7rem;
+    font-weight:   700;
+}
+
+.ec-badge-active   { background: #e8fadf; color: #71dd37; }
+.ec-badge-inactive { background: #fff2d6; color: #ffab00; }
+.ec-badge-default  { background: #ebeef1; color: #8592a3; }
+
+/* ── Buttons ────────────────────────────────────────────────── */
+.btn {
+    border-radius: 10px;
+    font-weight:   600;
+    transition:    var(--ec-transition);
+}
+
+.btn-primary {
+    background:   var(--ec-primary);
+    border-color: var(--ec-primary);
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background:   #eb7d00;
+    border-color: #eb7d00;
+}
+
+.btn-outline-secondary {
+    border-color: #d9dee3;
+}
+
+/* Soft ghost button — primary colour, no hard background */
+.ec-btn-soft {
+    background-color: var(--ec-primary-light);
+    color:            var(--ec-primary);
+    border:           none;
+    font-weight:      600;
+}
+
+.ec-btn-soft:hover {
+    background-color: var(--ec-primary);
+    color:            var(--ec-white);
+}
+
+/* Gradient CTA button — for the main action in list headers */
+.ec-btn-cta {
+    background:  linear-gradient(45deg, #ff8a00, #ffb300);
+    border:      none;
+    box-shadow:  0 4px 10px rgba(255, 138, 0, .2);
+    color:       var(--ec-white);
+    font-weight: 600;
+}
+
+.ec-btn-cta:hover {
+    background: linear-gradient(45deg, #eb7d00, #e6a200);
+    color:      var(--ec-white);
+}
+
+/* ── Toastr ─────────────────────────────────────────────────── */
+.toast-success { background-color: #51a351 !important; }
+.toast-error   { background-color: #bd362f !important; }
+.toast-warning { background-color: #f89406 !important; }
+.toast-info    { background-color: #2f96b4 !important; }
+
+#toast-container > div {
+    border-radius: 12px;
+    box-shadow:    var(--ec-shadow-lg);
+    opacity:       1;
+}
+
+/* ── Responsive helpers ─────────────────────────────────────── */
+@media (max-width: 575.98px) {
+    .ec-page-header-inner { flex-direction: column; align-items: flex-start; }
+    .btn { width: 100%; }
+}
