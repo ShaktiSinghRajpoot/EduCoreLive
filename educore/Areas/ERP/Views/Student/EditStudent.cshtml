@@ -1,0 +1,928 @@
+@{
+    ViewData["Title"] = "Edit Student";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    int studentId = ViewBag.StudentId ?? 0;
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+@@media (max-width:575.98px){
+    .es-sticky .btn{ width:100% !important; }
+    .es-sticky{ flex-direction:column; align-items:stretch !important; }
+}
+.dropdown-toggle::after{ display:none; }
+
+/* ── Page wrapper ───────────────────────────── */
+.es-page{
+    font-family:"Public Sans",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--ec-text);
+}
+
+.es-breadcrumb{
+    display:flex; align-items:center; gap:.4rem;
+    font-size:.76rem; font-weight:700; color:var(--ec-text-muted);
+    margin-bottom:.35rem;
+}
+.es-breadcrumb a{ color:var(--ec-text-muted); text-decoration:none; }
+.es-breadcrumb a:hover{ color:var(--ec-primary); }
+.es-breadcrumb span{ color:var(--ec-text-dark); }
+
+/* ── Section card ───────────────────────────── */
+.es-card{
+    border:1px solid var(--ec-border);
+    border-radius:var(--ec-radius);
+    background:#fff;
+    margin-bottom:1.25rem;
+    transition:var(--ec-transition);
+}
+.es-card:hover{
+    border-color:rgba(255,138,0,.2);
+    box-shadow:0 8px 24px rgba(43,27,18,.06);
+}
+.es-card-hdr{
+    display:flex; align-items:center; gap:.85rem;
+    padding:1rem 1.25rem .75rem;
+    border-bottom:1px solid var(--ec-border);
+}
+.es-sec-ic{
+    width:38px; height:38px; flex:0 0 38px;
+    border-radius:11px;
+    background:var(--ec-primary-light);
+    color:var(--ec-primary);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1rem;
+}
+.es-sec-title{
+    font-size:.9rem; font-weight:900; color:var(--ec-text-dark);
+}
+.es-sec-sub{
+    font-size:.74rem; font-weight:650; color:var(--ec-text-muted); margin-top:.08rem;
+}
+.es-card-body{ padding:1.1rem 1.25rem; }
+
+/* ── Form fields ────────────────────────────── */
+.es-label{
+    font-size:.72rem; font-weight:800;
+    text-transform:uppercase; letter-spacing:.04em;
+    color:var(--ec-text-muted); margin-bottom:.38rem; display:block;
+}
+.es-label.required::after{ content:" *"; color:#ea5455; }
+.es-page .form-control,
+.es-page .form-select{
+    border:1px solid var(--ec-border);
+    border-radius:12px;
+    min-height:46px;
+    font-size:.88rem; font-weight:650;
+    color:var(--ec-text);
+    background:#fff;
+    transition:border-color .2s,box-shadow .2s;
+}
+.es-page .form-control:focus,
+.es-page .form-select:focus{
+    border-color:rgba(255,138,0,.6);
+    box-shadow:0 0 0 4px rgba(255,138,0,.11);
+}
+.es-page .form-control::placeholder{ color:var(--ec-text-muted); opacity:1; }
+.es-page textarea.form-control{ min-height:90px; resize:vertical; }
+.es-readonly{
+    background:#f9f8f6 !important;
+    color:var(--ec-text-muted) !important;
+    cursor:not-allowed;
+}
+.es-readonly-wrap{
+    position:relative;
+}
+.es-lock-ic{
+    position:absolute; right:.75rem; top:50%; transform:translateY(-50%);
+    color:var(--ec-text-muted); font-size:.9rem; pointer-events:none;
+}
+
+/* ── Info pill ──────────────────────────────── */
+.es-locked-note{
+    display:inline-flex; align-items:center; gap:.35rem;
+    font-size:.72rem; font-weight:700; color:var(--ec-text-muted);
+    background:#f5f4f2; border:1px solid var(--ec-border);
+    border-radius:8px; padding:.3rem .65rem; margin-bottom:.5rem;
+}
+
+/* ── Right panel ────────────────────────────── */
+.es-panel{
+    border:1px solid var(--ec-border);
+    border-radius:var(--ec-radius);
+    background:#fff;
+    position:sticky; top:80px;
+    overflow:hidden;
+}
+.es-panel-hdr{
+    background:linear-gradient(135deg,var(--ec-primary-soft) 0%,#fff 70%);
+    padding:1.25rem;
+    border-bottom:1px solid var(--ec-border);
+    text-align:center;
+}
+.es-avatar-wrap{ position:relative; display:inline-block; margin-bottom:.75rem; }
+.es-avatar{
+    width:84px; height:84px;
+    border-radius:50%;
+    border:3px solid rgba(255,138,0,.25);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.5rem; font-weight:900;
+    overflow:hidden;
+    background:var(--ec-primary-light);
+    color:var(--ec-primary);
+}
+.es-avatar img{ width:100%; height:100%; object-fit:cover; }
+.es-avatar-edit{
+    position:absolute; bottom:2px; right:2px;
+    width:26px; height:26px; border-radius:50%;
+    background:var(--ec-primary); color:#fff;
+    border:2px solid #fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:.75rem; cursor:pointer;
+    transition:var(--ec-transition);
+}
+.es-avatar-edit:hover{ background:#e07600; }
+.es-panel-name{
+    font-size:1rem; font-weight:900; color:var(--ec-text-dark); line-height:1.2;
+}
+.es-panel-meta{
+    font-size:.78rem; font-weight:650; color:var(--ec-text-muted); margin-top:.2rem;
+}
+.es-panel-body{ padding:1rem 1.25rem; }
+.es-info-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:.55rem 0;
+    border-bottom:1px solid #f5f0ea;
+    font-size:.82rem;
+}
+.es-info-row:last-child{ border-bottom:0; }
+.es-info-lbl{ font-weight:800; color:var(--ec-text-muted); font-size:.73rem; text-transform:uppercase; letter-spacing:.03em; }
+.es-info-val{ font-weight:700; color:var(--ec-text-dark); text-align:right; }
+
+/* ── Status selector ────────────────────────── */
+.es-status-grid{
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:.5rem; margin-top:.5rem;
+}
+.es-status-opt{
+    border:1.5px solid var(--ec-border);
+    border-radius:12px;
+    padding:.65rem .75rem;
+    cursor:pointer; display:flex; align-items:center; gap:.55rem;
+    transition:var(--ec-transition);
+    user-select:none;
+}
+.es-status-opt:hover{ border-color:rgba(255,138,0,.3); background:var(--ec-primary-light); }
+.es-status-opt.selected-active{ border-color:#28a745; background:#d4edda; }
+.es-status-opt.selected-inactive{ border-color:#6c757d; background:#e2e3e5; }
+.es-status-opt.selected-transfer{ border-color:#0d6efd; background:#cfe2ff; }
+.es-status-dot{
+    width:10px; height:10px; border-radius:50%; flex-shrink:0;
+}
+.dot-active{ background:#28a745; }
+.dot-inactive{ background:#6c757d; }
+.dot-transfer{ background:#0d6efd; }
+.dot-left{ background:#dc3545; }
+.es-status-lbl{ font-size:.8rem; font-weight:800; }
+
+/* ── Sticky footer ──────────────────────────── */
+.es-sticky{
+    position:sticky; bottom:0; z-index:10;
+    background:rgba(255,255,255,.95);
+    backdrop-filter:blur(14px);
+    border-top:1px solid var(--ec-border);
+    padding:1rem 1.5rem;
+    display:flex; justify-content:space-between; align-items:center;
+    gap:1rem;
+    margin:0 -1.5rem -1.5rem;
+}
+.es-footer-hint{
+    font-size:.78rem; font-weight:650; color:var(--ec-text-muted);
+    display:flex; align-items:center; gap:.4rem;
+}
+.es-btn-save{
+    background:linear-gradient(135deg,#ff8a00,#ff9f2f);
+    border:0; color:#fff;
+    border-radius:999px;
+    font-weight:800; font-size:.88rem;
+    padding:.65rem 1.75rem;
+    box-shadow:0 8px 20px rgba(255,138,0,.22);
+    transition:transform .2s,box-shadow .2s;
+    cursor:pointer;
+}
+.es-btn-save:hover{
+    color:#fff; transform:translateY(-1px);
+    box-shadow:0 12px 28px rgba(255,138,0,.3);
+}
+.es-btn-cancel{
+    border:1px solid rgba(43,27,18,.15);
+    color:var(--ec-text); background:#fff;
+    border-radius:999px;
+    font-weight:800; font-size:.88rem;
+    padding:.65rem 1.5rem;
+    transition:var(--ec-transition);
+    cursor:pointer; text-decoration:none;
+    display:inline-flex; align-items:center; gap:.4rem;
+}
+.es-btn-cancel:hover{
+    background:var(--ec-primary-light);
+    border-color:rgba(255,138,0,.35);
+    color:var(--ec-text-dark);
+}
+
+/* ── Success toast ──────────────────────────── */
+.es-toast{
+    position:fixed; top:1.25rem; right:1.25rem; z-index:9999;
+    background:#fff; border:1px solid #d1e7dd;
+    border-left:4px solid #28a745;
+    border-radius:14px;
+    padding:.9rem 1.25rem;
+    box-shadow:0 8px 28px rgba(0,0,0,.1);
+    display:flex; align-items:center; gap:.75rem;
+    font-size:.86rem; font-weight:700; color:#0a5a35;
+    transform:translateX(110%);
+    transition:transform .35s cubic-bezier(.34,1.56,.64,1);
+    max-width:340px;
+}
+.es-toast.show{ transform:translateX(0); }
+
+@@media (max-width:991.98px){
+    .es-panel{ position:static; margin-top:1.25rem; }
+}
+@@media (max-width:575.98px){
+    .es-card-body{ padding:.9rem 1rem; }
+    .es-page-header{ flex-direction:column; align-items:flex-start; }
+}
+</style>
+}
+
+<div class="ec-page-shell es-page">
+  <div class="ec-page-content">
+
+    <!-- Breadcrumb -->
+    <div class="es-breadcrumb">
+        <a asp-area="ERP" asp-controller="Student" asp-action="StudentList">
+            <i class="bx bx-group"></i> All Students
+        </a>
+        <i class="bx bx-chevron-right" style="font-size:.85rem;"></i>
+        <a asp-area="ERP" asp-controller="Student" asp-action="Dashboard" asp-route-id="@studentId">
+            <span id="bc-name">Student Profile</span>
+        </a>
+        <i class="bx bx-chevron-right" style="font-size:.85rem;"></i>
+        <span>Edit</span>
+    </div>
+
+    <!-- Page header -->
+    <div class="ec-page-header">
+        <div class="ec-page-header-inner">
+            <div class="ec-page-title-wrap">
+                <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+                    <i class="bx bx-edit-alt fs-4"></i>
+                </div>
+                <div>
+                    <h4 class="ec-page-title mb-1">Edit Student Profile</h4>
+                    <div class="ec-page-subtitle">Update student details, contact information and academic placement</div>
+                </div>
+            </div>
+            <a asp-area="ERP" asp-controller="Student" asp-action="Dashboard"
+               asp-route-id="@studentId"
+               class="btn btn-outline-secondary d-flex align-items-center gap-1">
+                <i class="bx bx-arrow-back"></i><span class="d-none d-sm-inline">Back to Profile</span>
+            </a>
+        </div>
+    </div>
+
+    <form id="editStudentForm" method="post"
+          asp-area="ERP" asp-controller="Student" asp-action="EditStudent"
+          asp-route-id="@studentId"
+          enctype="multipart/form-data"
+          novalidate>
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="StudentId" id="hStudentId" value="@studentId" />
+        <input type="hidden" name="StudentStatus" id="hStatus" value="Active" />
+
+        <div class="row g-4">
+
+            <!-- ── Left: Form sections ──────────── -->
+            <div class="col-12 col-lg-8">
+
+                <!-- ① Basic Info -->
+                <div class="es-card">
+                    <div class="es-card-hdr">
+                        <div class="es-sec-ic"><i class="bx bx-user"></i></div>
+                        <div>
+                            <div class="es-sec-title">Student Details</div>
+                            <div class="es-sec-sub">Academic placement and personal identity</div>
+                        </div>
+                    </div>
+                    <div class="es-card-body">
+                        <div class="es-locked-note">
+                            <i class="bx bx-lock-alt"></i>
+                            Admission No, Admission Date and Academic Year cannot be changed after admission.
+                        </div>
+                        <div class="row g-3 mt-1">
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Admission No</label>
+                                <div class="es-readonly-wrap">
+                                    <input type="text" class="form-control es-readonly" id="fAdmNo" readonly
+                                           value="ADM-2026-004">
+                                    <i class="bx bx-lock-alt es-lock-ic"></i>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Roll No</label>
+                                <input type="text" name="RollNo" id="fRollNo" class="form-control"
+                                       placeholder="e.g. 24">
+                            </div>
+                            <div class="col-12">
+                                <label class="es-label required">Full Name</label>
+                                <input type="text" name="StudentName" id="fName" class="form-control"
+                                       placeholder="Enter student full name" required>
+                                <div class="invalid-feedback">Student name is required.</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="es-label">Academic Year</label>
+                                <div class="es-readonly-wrap">
+                                    <input type="text" class="form-control es-readonly" id="fAcYear" readonly
+                                           value="2025-26">
+                                    <i class="bx bx-lock-alt es-lock-ic"></i>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="es-label required">Class</label>
+                                <select name="ClassName" id="fClass" class="form-select" required>
+                                    <option value="">Select Class</option>
+                                    <option>1st</option><option>2nd</option><option>3rd</option>
+                                    <option>4th</option><option>5th</option><option>6th</option>
+                                    <option>7th</option><option>8th</option><option>9th</option>
+                                    <option>10th</option><option>11th Science</option>
+                                    <option>11th Commerce</option><option>12th Science</option>
+                                    <option>12th Commerce</option>
+                                </select>
+                                <div class="invalid-feedback">Please select a class.</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="es-label required">Section</label>
+                                <select name="Section" id="fSection" class="form-select" required>
+                                    <option value="">Select</option>
+                                    <option>A</option><option>B</option><option>C</option>
+                                    <option>D</option><option>E</option>
+                                </select>
+                                <div class="invalid-feedback">Please select a section.</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="es-label required">Gender</label>
+                                <select name="Gender" id="fGender" class="form-select" required>
+                                    <option value="">Select</option>
+                                    <option>Male</option>
+                                    <option>Female</option>
+                                    <option>Other</option>
+                                </select>
+                                <div class="invalid-feedback">Please select gender.</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="es-label required">Date of Birth</label>
+                                <input type="date" name="DateOfBirth" id="fDob" class="form-control" required>
+                                <div class="invalid-feedback">Date of birth is required.</div>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="es-label">Admission Date</label>
+                                <div class="es-readonly-wrap">
+                                    <input type="text" class="form-control es-readonly" id="fAdmDate" readonly>
+                                    <i class="bx bx-lock-alt es-lock-ic"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ② Parent & Contact -->
+                <div class="es-card">
+                    <div class="es-card-hdr">
+                        <div class="es-sec-ic" style="background:#e8f5e9;color:#2e7d32;">
+                            <i class="bx bx-phone"></i>
+                        </div>
+                        <div>
+                            <div class="es-sec-title">Parent &amp; Contact</div>
+                            <div class="es-sec-sub">Guardian details and communication information</div>
+                        </div>
+                    </div>
+                    <div class="es-card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="es-label required">Father / Guardian Name</label>
+                                <input type="text" name="GuardianName" id="fGuardian" class="form-control"
+                                       placeholder="Enter guardian name" required>
+                                <div class="invalid-feedback">Guardian name is required.</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Mother Name</label>
+                                <input type="text" name="MotherName" id="fMother" class="form-control"
+                                       placeholder="Optional">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label required">Mobile Number</label>
+                                <input type="tel" name="MobileNumber" id="fMobile" class="form-control"
+                                       maxlength="10" pattern="[0-9]{10}"
+                                       placeholder="10-digit mobile" required>
+                                <div class="invalid-feedback">Enter a valid 10-digit mobile number.</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Alternate Mobile</label>
+                                <input type="tel" name="AlternateMobile" id="fAltMobile" class="form-control"
+                                       maxlength="10" pattern="[0-9]{10}"
+                                       placeholder="Optional">
+                                <div class="invalid-feedback">Enter a valid 10-digit number.</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Email Address</label>
+                                <input type="email" name="Email" id="fEmail" class="form-control"
+                                       placeholder="parent@email.com">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">WhatsApp Number</label>
+                                <input type="tel" name="WhatsappNo" id="fWhatsapp" class="form-control"
+                                       maxlength="10" pattern="[0-9]{10}"
+                                       placeholder="If different from mobile">
+                            </div>
+                            <div class="col-12">
+                                <label class="es-label required">Address</label>
+                                <textarea name="Address" id="fAddress" class="form-control"
+                                          placeholder="Complete residential address" required></textarea>
+                                <div class="invalid-feedback">Address is required.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ③ Additional Details -->
+                <div class="es-card">
+                    <div class="es-card-hdr">
+                        <div class="es-sec-ic" style="background:#e3f2fd;color:#1565c0;">
+                            <i class="bx bx-detail"></i>
+                        </div>
+                        <div>
+                            <div class="es-sec-title">Additional Details</div>
+                            <div class="es-sec-sub">Optional fields for records and government reporting</div>
+                        </div>
+                    </div>
+                    <div class="es-card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <label class="es-label">Blood Group</label>
+                                <select name="BloodGroup" id="fBlood" class="form-select">
+                                    <option value="">Not Known</option>
+                                    <option>A+</option><option>A-</option>
+                                    <option>B+</option><option>B-</option>
+                                    <option>AB+</option><option>AB-</option>
+                                    <option>O+</option><option>O-</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="es-label">Religion</label>
+                                <select name="Religion" id="fReligion" class="form-select">
+                                    <option value="">Select</option>
+                                    <option>Hindu</option><option>Muslim</option>
+                                    <option>Christian</option><option>Sikh</option>
+                                    <option>Jain</option><option>Buddhist</option>
+                                    <option>Other</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="es-label">Category</label>
+                                <select name="Category" id="fCategory" class="form-select">
+                                    <option value="">Select</option>
+                                    <option>General</option><option>OBC</option>
+                                    <option>SC</option><option>ST</option>
+                                    <option>EWS</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Nationality</label>
+                                <input type="text" name="Nationality" id="fNationality" class="form-control"
+                                       value="Indian" placeholder="e.g. Indian">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Caste</label>
+                                <input type="text" name="Caste" id="fCaste" class="form-control"
+                                       placeholder="Optional">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Aadhar Number</label>
+                                <input type="text" name="AadharNo" id="fAadhar" class="form-control"
+                                       maxlength="12" pattern="[0-9]{12}"
+                                       placeholder="12-digit Aadhar number">
+                                <div class="invalid-feedback">Aadhar must be 12 digits.</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Previous School</label>
+                                <input type="text" name="PreviousSchool" id="fPrevSchool" class="form-control"
+                                       placeholder="Name of last school attended">
+                            </div>
+                            <div class="col-12">
+                                <label class="es-label">Remarks / Notes</label>
+                                <textarea name="Remarks" id="fRemarks" class="form-control" rows="2"
+                                          placeholder="Any special notes or medical conditions..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ④ Status -->
+                <div class="es-card">
+                    <div class="es-card-hdr">
+                        <div class="es-sec-ic" style="background:#fff3e0;color:#e65100;">
+                            <i class="bx bx-shield-quarter"></i>
+                        </div>
+                        <div>
+                            <div class="es-sec-title">Student Status</div>
+                            <div class="es-sec-sub">Changing status affects fee dues, attendance and reports</div>
+                        </div>
+                    </div>
+                    <div class="es-card-body">
+                        <div class="es-status-grid" id="statusGrid">
+                            <div class="es-status-opt selected-active" data-status="Active" onclick="selectStatus(this,'selected-active')">
+                                <div class="es-status-dot dot-active"></div>
+                                <div>
+                                    <div class="es-status-lbl" style="color:#155724;">Active</div>
+                                    <div style="font-size:.71rem;font-weight:650;color:#28a745;margin-top:.05rem;">Currently enrolled</div>
+                                </div>
+                            </div>
+                            <div class="es-status-opt" data-status="Inactive" onclick="selectStatus(this,'selected-inactive')">
+                                <div class="es-status-dot dot-inactive"></div>
+                                <div>
+                                    <div class="es-status-lbl" style="color:#495057;">Inactive</div>
+                                    <div style="font-size:.71rem;font-weight:650;color:#6c757d;margin-top:.05rem;">Temporarily not attending</div>
+                                </div>
+                            </div>
+                            <div class="es-status-opt" data-status="Transfer" onclick="selectStatus(this,'selected-transfer')">
+                                <div class="es-status-dot dot-transfer"></div>
+                                <div>
+                                    <div class="es-status-lbl" style="color:#084298;">Transfer</div>
+                                    <div style="font-size:.71rem;font-weight:650;color:#0d6efd;margin-top:.05rem;">Issued Transfer Certificate</div>
+                                </div>
+                            </div>
+                            <div class="es-status-opt" data-status="Left" onclick="selectStatus(this,'')">
+                                <div class="es-status-dot dot-left"></div>
+                                <div>
+                                    <div class="es-status-lbl" style="color:#842029;">Left</div>
+                                    <div style="font-size:.71rem;font-weight:650;color:#dc3545;margin-top:.05rem;">Dropped / Left school</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3" id="statusReasonWrap" style="display:none;">
+                            <label class="es-label required">Reason for Status Change</label>
+                            <textarea name="StatusReason" id="fStatusReason" class="form-control" rows="2"
+                                      placeholder="Required: explain reason for this status change"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ── Right: Info panel ────────────── -->
+            <div class="col-12 col-lg-4">
+                <div class="es-panel">
+
+                    <!-- Photo section -->
+                    <div class="es-panel-hdr">
+                        <div class="es-avatar-wrap" id="avatarWrap">
+                            <div class="es-avatar mx-auto" id="avatarEl">
+                                <span id="avatarInitials">--</span>
+                            </div>
+                            <label class="es-avatar-edit" for="photoInput" title="Change photo">
+                                <i class="bx bx-camera"></i>
+                            </label>
+                        </div>
+                        <div class="es-panel-name" id="panelName">Loading…</div>
+                        <div class="es-panel-meta" id="panelMeta">—</div>
+                        <input type="file" id="photoInput" name="PhotoFile"
+                               class="d-none" accept="image/png,image/jpeg,image/webp">
+                        <div class="mt-2" style="font-size:.72rem;font-weight:650;color:var(--ec-text-muted);">
+                            <i class="bx bx-info-circle me-1"></i>JPG or PNG · Max 2 MB
+                        </div>
+                    </div>
+
+                    <!-- Locked fields display -->
+                    <div class="es-panel-body">
+                        <div style="font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ec-text-muted);margin-bottom:.6rem;">
+                            <i class="bx bx-lock-alt me-1"></i>Read-only Record
+                        </div>
+                        <div class="es-info-row">
+                            <span class="es-info-lbl">Admission No</span>
+                            <span class="es-info-val" id="pi-admno">—</span>
+                        </div>
+                        <div class="es-info-row">
+                            <span class="es-info-lbl">Admission Date</span>
+                            <span class="es-info-val" id="pi-admdate">—</span>
+                        </div>
+                        <div class="es-info-row">
+                            <span class="es-info-lbl">Academic Year</span>
+                            <span class="es-info-val" id="pi-acyear">—</span>
+                        </div>
+                        <div class="es-info-row">
+                            <span class="es-info-lbl">Current Class</span>
+                            <span class="es-info-val" id="pi-class">—</span>
+                        </div>
+                        <div class="es-info-row">
+                            <span class="es-info-lbl">Student ID</span>
+                            <span class="es-info-val">#<span id="pi-id">@studentId</span></span>
+                        </div>
+
+                        <!-- Change summary -->
+                        <div id="changeSummary" class="d-none mt-3 p-3"
+                             style="background:#fff4e6;border:1px solid rgba(255,138,0,.2);border-radius:12px;">
+                            <div style="font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ec-primary);margin-bottom:.5rem;">
+                                <i class="bx bx-edit me-1"></i>Unsaved Changes
+                            </div>
+                            <div id="changeList" style="font-size:.78rem;font-weight:700;color:var(--ec-text-dark);"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ── Sticky footer ─────────────────────── -->
+        <div class="es-sticky">
+            <div class="es-footer-hint">
+                <i class="bx bx-info-circle" style="color:var(--ec-primary);"></i>
+                Fee ledger and payment history are not affected by profile edits.
+            </div>
+            <div class="d-flex gap-2">
+                <a asp-area="ERP" asp-controller="Student" asp-action="Dashboard"
+                   asp-route-id="@studentId"
+                   class="es-btn-cancel">
+                    Cancel
+                </a>
+                <button type="submit" class="es-btn-save">
+                    <i class="bx bx-save me-1"></i>Save Changes
+                </button>
+            </div>
+        </div>
+
+    </form>
+  </div>
+</div>
+
+<!-- Success toast -->
+<div class="es-toast" id="esSuccessToast">
+    <i class="bx bx-check-circle" style="font-size:1.3rem;color:#28a745;flex-shrink:0;"></i>
+    <span>Student profile updated successfully.</span>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+
+    // ── Mock student data — replace with API/ViewBag call ───────────────
+    const student = {
+        id:          @studentId,
+        admNo:       "ADM-2026-004",
+        name:        "Akash Verma",
+        admDate:     "12 Apr 2026",
+        acYear:      "2025-26",
+        className:   "9th",
+        section:     "A",
+        gender:      "Male",
+        dob:         "2012-08-15",
+        guardian:    "Bhukal Verma",
+        mother:      "",
+        mobile:      "7571870995",
+        altMobile:   "",
+        email:       "",
+        whatsapp:    "",
+        address:     "123 Main Road, Delhi",
+        bloodGroup:  "B+",
+        religion:    "Hindu",
+        category:    "General",
+        nationality: "Indian",
+        caste:       "",
+        aadhar:      "",
+        prevSchool:  "",
+        remarks:     "",
+        rollNo:      "24",
+        status:      "Active",
+        photo:       ""
+    };
+
+    // ── Populate form ────────────────────────────────────────────────────
+    function populate() {
+        // Header
+        setAvatarInitials(student.name);
+        document.getElementById("panelName").textContent  = student.name;
+        document.getElementById("panelMeta").textContent  = student.className + " – " + student.section + " · " + student.gender;
+        document.getElementById("bc-name").textContent    = student.name;
+
+        // Locked panel
+        document.getElementById("pi-admno").textContent   = student.admNo;
+        document.getElementById("pi-admdate").textContent = student.admDate;
+        document.getElementById("pi-acyear").textContent  = student.acYear;
+        document.getElementById("pi-class").textContent   = student.className + " – " + student.section;
+
+        // Readonly fields in form
+        document.getElementById("fAdmNo").value   = student.admNo;
+        document.getElementById("fAdmDate").value = student.admDate;
+        document.getElementById("fAcYear").value  = student.acYear;
+
+        // Editable fields
+        setVal("fRollNo",     student.rollNo);
+        setVal("fName",       student.name);
+        setVal("fClass",      student.className);
+        setVal("fSection",    student.section);
+        setVal("fGender",     student.gender);
+        setVal("fDob",        student.dob);
+        setVal("fGuardian",   student.guardian);
+        setVal("fMother",     student.mother);
+        setVal("fMobile",     student.mobile);
+        setVal("fAltMobile",  student.altMobile);
+        setVal("fEmail",      student.email);
+        setVal("fWhatsapp",   student.whatsapp);
+        setVal("fAddress",    student.address);
+        setVal("fBlood",      student.bloodGroup);
+        setVal("fReligion",   student.religion);
+        setVal("fCategory",   student.category);
+        setVal("fNationality",student.nationality);
+        setVal("fCaste",      student.caste);
+        setVal("fAadhar",     student.aadhar);
+        setVal("fPrevSchool", student.prevSchool);
+        setVal("fRemarks",    student.remarks);
+
+        // Photo
+        if (student.photo) {
+            const img = document.createElement("img");
+            img.src = student.photo;
+            const av = document.getElementById("avatarEl");
+            av.innerHTML = "";
+            av.appendChild(img);
+        }
+
+        // Status
+        if (student.status !== "Active") {
+            document.querySelectorAll(".es-status-opt").forEach(o => o.classList.remove("selected-active"));
+            const match = document.querySelector("[data-status='" + student.status + "']");
+            if (match) match.classList.add("selected-" + student.status.toLowerCase());
+            document.getElementById("hStatus").value = student.status;
+        }
+
+        // Snapshot for change detection
+        snapshotOriginal();
+    }
+
+    function setVal(id, val) {
+        const el = document.getElementById(id);
+        if (!el || val == null) return;
+        el.value = val;
+    }
+
+    // ── Avatar initials ──────────────────────────────────────────────────
+    function setAvatarInitials(name) {
+        const parts  = (name || "").split(" ").filter(Boolean);
+        const init   = parts.length >= 2
+            ? parts[0][0] + parts[parts.length - 1][0]
+            : (parts[0] || "?")[0];
+        document.getElementById("avatarInitials").textContent = init.toUpperCase();
+    }
+
+    // ── Photo preview ────────────────────────────────────────────────────
+    document.getElementById("photoInput").addEventListener("change", function () {
+        const file = this.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            alert("Photo must be under 2 MB.");
+            this.value = "";
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            const av = document.getElementById("avatarEl");
+            av.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;">';
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // ── Status selection ─────────────────────────────────────────────────
+    window.selectStatus = function (el, cls) {
+        document.querySelectorAll(".es-status-opt").forEach(o => {
+            o.classList.remove("selected-active", "selected-inactive", "selected-transfer");
+        });
+        if (cls) el.classList.add(cls);
+        const status = el.dataset.status;
+        document.getElementById("hStatus").value = status;
+
+        const reasonWrap = document.getElementById("statusReasonWrap");
+        const reasonField = document.getElementById("fStatusReason");
+        if (status !== "Active") {
+            reasonWrap.style.display = "block";
+            reasonField.setAttribute("required", "required");
+        } else {
+            reasonWrap.style.display = "none";
+            reasonField.removeAttribute("required");
+            reasonField.value = "";
+        }
+        markChanged("Status", status);
+    };
+
+    // ── Change detection ─────────────────────────────────────────────────
+    let originalValues = {};
+
+    function snapshotOriginal() {
+        document.querySelectorAll("#editStudentForm input:not([readonly]):not([type=file]):not([type=hidden]), #editStudentForm select, #editStudentForm textarea")
+            .forEach(el => { if (el.id) originalValues[el.id] = el.value; });
+    }
+
+    const changedFields = new Set();
+
+    function markChanged(label, val) {
+        changedFields.add(label);
+        updateChangeSummary();
+    }
+
+    function updateChangeSummary() {
+        const wrap = document.getElementById("changeSummary");
+        const list = document.getElementById("changeList");
+        if (changedFields.size === 0) {
+            wrap.classList.add("d-none");
+            return;
+        }
+        wrap.classList.remove("d-none");
+        list.textContent = changedFields.size + " field" + (changedFields.size > 1 ? "s" : "") + " modified";
+    }
+
+    document.getElementById("editStudentForm").addEventListener("input", function (e) {
+        const el = e.target;
+        if (!el.id || el.readOnly || el.type === "file" || el.type === "hidden") return;
+        const orig = originalValues[el.id];
+        if (orig !== undefined && el.value !== orig) {
+            changedFields.add(el.id);
+        } else {
+            changedFields.delete(el.id);
+        }
+        updateChangeSummary();
+
+        // Live panel sync
+        if (el.id === "fName") {
+            document.getElementById("panelName").textContent = el.value || "—";
+            setAvatarInitials(el.value);
+        }
+        if (el.id === "fClass" || el.id === "fSection") {
+            const cls = document.getElementById("fClass").value;
+            const sec = document.getElementById("fSection").value;
+            document.getElementById("panelMeta").textContent = [cls, sec].filter(Boolean).join(" – ") + " · " + (document.getElementById("fGender").value || "");
+            document.getElementById("pi-class").textContent  = [cls, sec].filter(Boolean).join(" – ") || "—";
+        }
+    });
+
+    // ── Form validation + submit ──────────────────────────────────────────
+    document.getElementById("editStudentForm").addEventListener("submit", function (e) {
+        if (!this.checkValidity()) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.classList.add("was-validated");
+
+            // Scroll to first invalid field
+            const first = this.querySelector(":invalid");
+            if (first) first.scrollIntoView({ behavior: "smooth", block: "center" });
+            return;
+        }
+        this.classList.add("was-validated");
+    });
+
+    // ── Mobile number input: digits only ─────────────────────────────────
+    ["fMobile", "fAltMobile", "fWhatsapp", "fAadhar"].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener("input", function () {
+            this.value = this.value.replace(/\D/g, "");
+        });
+    });
+
+    // ── Show success toast if redirected after save ───────────────────────
+    @if (TempData["SuccessMessage"] != null) {
+        <text>
+        (function () {
+            const t = document.getElementById("esSuccessToast");
+            t.classList.add("show");
+            setTimeout(() => t.classList.remove("show"), 4000);
+        })();
+        </text>
+    }
+
+    // ── Unsaved changes warning ───────────────────────────────────────────
+    let formDirty = false;
+    document.getElementById("editStudentForm").addEventListener("input", () => { formDirty = true; });
+    window.addEventListener("beforeunload", function (e) {
+        if (formDirty) {
+            e.preventDefault();
+            e.returnValue = "";
+        }
+    });
+    document.getElementById("editStudentForm").addEventListener("submit", () => { formDirty = false; });
+    document.querySelectorAll(".es-btn-cancel").forEach(b => b.addEventListener("click", () => { formDirty = false; }));
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    populate();
+
+})();
+</script>
+}

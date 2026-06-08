@@ -24,17 +24,11 @@
     <Folder Include="Areas\Admin\Models\" />
     <Folder Include="Areas\ERP\Data\" />
     <Folder Include="Areas\ERP\Models\" />
-    <Folder Include="Areas\LMS\Controllers\" />
-    <Folder Include="Areas\LMS\Data\" />
-    <Folder Include="Areas\LMS\Models\" />
-    <Folder Include="Areas\LMS\Views\" />
     <Folder Include="wwwroot\css\Admin\" />
     <Folder Include="wwwroot\css\ERP\" />
-    <Folder Include="wwwroot\css\LMS\" />
     <Folder Include="wwwroot\css\SuperAdmin\" />
     <Folder Include="wwwroot\js\Admin\" />
     <Folder Include="wwwroot\js\ERP\" />
-    <Folder Include="wwwroot\js\LMS\" />
     <Folder Include="wwwroot\js\SuperAdmin\" />
     <Folder Include="wwwroot\vendor\libs\toastr\" />
   </ItemGroup>

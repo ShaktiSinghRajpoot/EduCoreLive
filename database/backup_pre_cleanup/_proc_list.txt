@@ -1,0 +1,15 @@
+academic.sp_school_admin_academic_setup_manage
+config.sp_dropdown_common
+config.sp_role_permission_management
+config.sp_school_dropdowns
+core.sp_admission_manage
+core.sp_enquiry_crm_manage
+core.sp_enquiry_followup_manage
+core.sp_get_user_permissions
+core.sp_login_management
+core.sp_school_admin_basic_profile_manage
+core.sp_school_admin_dashboard
+core.sp_school_admin_fee_head_manage
+core.sp_school_admin_fee_structure_manage
+core.sp_school_manage
+core.sp_school_user_management

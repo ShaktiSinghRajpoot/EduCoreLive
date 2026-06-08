@@ -53,11 +53,7 @@
             "School Settings",
             "Support",
             "Install App",
-            "Sign out",
-            ////
-           "Fee",
-           "Admission"
-
+            "Sign out"
         },
 
         ["TEACHER"] = new[] {
@@ -89,9 +85,7 @@
             "Reports",
             "Support",
             "Install App",
-            "Sign out",
-            ////
-           "Fee"
+            "Sign out"
         },
 
         ["RECEPTIONIST"] = new[] {
@@ -108,6 +102,19 @@
             "Install App",
             "Sign out"
         }
+    };
+
+    // Explicit routes for ERP pages that already exist (area, controller, action).
+    // Menu labels listed here navigate to the real page instead of the
+    // default {Admin/SuperAdmin}/{controller}/Index convention.
+    var routeMap = new Dictionary<string, (string area, string controller, string action)>
+    {
+        ["Admission & Students"] = ("ERP", "Admission", "StudentList"),
+        ["Student Attendance"]   = ("ERP", "Student",   "StudentAttendance"),
+        ["Exams & Results"]      = ("ERP", "Exam",      "MarkEntry"),
+        ["Fees Management"]      = ("ERP", "Fee",       "ManageFee"),
+        ["Enquiry CRM"]          = ("Admin", "Enquiry", "EnquiryCRM"),
+        ["Schools"]              = ("SuperAdmin", "Schools", "SchoolList"),
     };
 
     string GetIcon(string name) => name switch
@@ -172,236 +179,265 @@
 <style>
 
     /* =========================================
-       COLORFUL ICONS WITH DEFAULT SNEAT UI
+       EDUCORE PREMIUM SIDEBAR
+       (matches the warm card aesthetic used
+        across the ERP pages / dashboard)
     ========================================= */
 
-    #layout-menu .menu-icon {
-        font-size: 20px;
-        margin-right: 14px;
-        transition: all .2s ease;
+    /* ---- Sidebar shell ---- */
+    #layout-menu {
+        background: #fff;
+        border-right: 1px solid #f0eee9;
+        box-shadow: 0 0 1.75rem rgba(67,89,113,.045);
     }
-    /* =========================================
-       PREMIUM SEARCH BOX
-    ========================================= */
 
+    /* ---- Brand ---- */
+    #layout-menu .app-brand {
+        padding: 1.15rem 1.35rem .55rem;
+    }
+
+    #layout-menu .app-brand-text {
+        font-size: 1.4rem;
+        font-weight: 800;
+        letter-spacing: -.02em;
+        color: #2b2c40;
+    }
+
+    /* ---- Search ---- */
     .sidebar-search {
-        padding: 12px 16px 14px;
+        padding: .25rem 1rem 1rem;
     }
 
         .sidebar-search input {
             width: 100%;
-            height: 42px;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            background: #f8fafc;
-            padding: 0 14px 0 40px;
-            font-size: 14px;
+            height: 38px;
+            border: 1px solid #ece8e1;
+            border-radius: 9px;
+            background: #f7f5f1;
+            padding: 0 14px 0 36px;
+            font-size: 13px;
             font-weight: 500;
-            color: #334155;
+            color: #2b1b12;
             outline: none;
-            transition: all .22s ease;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z'/%3E%3C/svg%3E");
+            transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238b8175' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-size: 16px;
-            background-position: 14px center;
+            background-size: 15px;
+            background-position: 12px center;
         }
 
             .sidebar-search input::placeholder {
-                color: #94a3b8;
-            }
-
-            .sidebar-search input:hover {
-                border-color: #d7dbff;
-                background-color: #ffffff;
+                color: #b6ab9c;
             }
 
             .sidebar-search input:focus {
                 border-color: #696cff;
                 background-color: #ffffff;
-                box-shadow: 0 0 0 4px rgba(105,108,255,.10);
+                box-shadow: 0 0 0 3px rgba(105,108,255,.12);
             }
-    /* Dashboard */
-    #layout-menu .bx-home-smile {
-        color: #696cff;
+
+    /* ---- Section header ("… Menu") ---- */
+    #layout-menu .menu-header {
+        padding-top: 1.1rem;
+        padding-bottom: .35rem;
     }
 
-    /* Schools */
-    #layout-menu .bx-buildings {
-        color: #03c3ec;
+    #layout-menu .menu-header-text {
+        color: #b6ab9c;
+        font-size: .7rem;
+        font-weight: 700;
+        letter-spacing: .09em;
     }
 
-    /* Admission */
-    #layout-menu .bx-user-plus {
-        color: #71dd37;
+    /* ---- Menu items ---- */
+    #layout-menu .menu-inner > .menu-item {
+        margin: .12rem .7rem;
     }
 
-    /* CRM */
-    #layout-menu .bx-message-square-detail {
-        color: #ffab00;
+    #layout-menu .menu-link {
+        position: relative;
+        padding: .5rem .65rem;
+        border-radius: .6rem;
+        font-size: .9rem;
+        font-weight: 500;
+        color: #655d52;
+        transition: background .18s ease, color .18s ease;
     }
 
-    /* Attendance */
-    #layout-menu .bx-user-check {
-        color: #03c3ec;
+    /* Soft tinted chip behind each icon — identical construction to the
+       dashboard's bg-label icon tiles. The tint colour comes from --mi
+       (set on the link via :has() below) so each chip matches its icon. */
+    #layout-menu .menu-inner > .menu-item > .menu-link::before {
+        content: "";
+        position: absolute;
+        left: .6rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 2rem;
+        height: 2rem;
+        border-radius: .5rem;
+        background: color-mix(in srgb, var(--mi, #696cff) 13%, transparent);
+        transition: background .18s ease;
     }
 
-    /* Exams */
-    #layout-menu .bx-file {
-        color: #ff3e1d;
+    /* The masked icon itself (Iconify paints background-color through the
+       icon's mask). Sits above the chip via z-index. */
+    #layout-menu .menu-icon {
+        position: relative;
+        z-index: 1;
+        width: 2rem;
+        height: 2rem;
+        margin-right: .7rem !important;
+        font-size: 1.1rem;
+        background: var(--mi, #696cff);
+        transition: transform .18s ease;
     }
 
-    /* Fees */
-    #layout-menu .bx-wallet {
-        color: #71dd37;
+    /* Per-icon colour — restricted to the SAME 6 semantic colours used by
+       the dashboard tiles (primary/info/success/warning/secondary/danger)
+       so the sidebar reads as one design system, not a 28-colour rainbow. */
+    #layout-menu .menu-link:has(.bx-home-smile)            { --mi: #696cff; }
+    #layout-menu .menu-link:has(.bx-buildings)             { --mi: #03c3ec; }
+    #layout-menu .menu-link:has(.bx-user-plus)             { --mi: #696cff; }
+    #layout-menu .menu-link:has(.bx-message-square-detail) { --mi: #03c3ec; }
+    #layout-menu .menu-link:has(.bx-user-check)            { --mi: #71dd37; }
+    #layout-menu .menu-link:has(.bx-file)                  { --mi: #ffab00; }
+    #layout-menu .menu-link:has(.bx-wallet)                { --mi: #71dd37; }
+    #layout-menu .menu-link:has(.bx-check-shield)          { --mi: #696cff; }
+    #layout-menu .menu-link:has(.bx-bell)                  { --mi: #ffab00; }
+    #layout-menu .menu-link:has(.bx-group)                 { --mi: #03c3ec; }
+    #layout-menu .menu-link:has(.bx-calendar-minus)        { --mi: #ffab00; }
+    #layout-menu .menu-link:has(.bx-money)                 { --mi: #71dd37; }
+    #layout-menu .menu-link:has(.bx-user-voice)            { --mi: #71dd37; }
+    #layout-menu .menu-link:has(.bx-package)               { --mi: #8592a3; }
+    #layout-menu .menu-link:has(.bx-receipt)               { --mi: #71dd37; }
+    #layout-menu .menu-link:has(.bx-time-five)             { --mi: #03c3ec; }
+    #layout-menu .menu-link:has(.bx-news)                  { --mi: #ffab00; }
+    #layout-menu .menu-link:has(.bx-bell-ring)             { --mi: #ffab00; }
+    #layout-menu .menu-link:has(.bx-bus)                   { --mi: #03c3ec; }
+    #layout-menu .menu-link:has(.bx-id-card)               { --mi: #696cff; }
+    #layout-menu .menu-link:has(.bx-transfer)              { --mi: #8592a3; }
+    #layout-menu .menu-link:has(.bx-certification)         { --mi: #71dd37; }
+    #layout-menu .menu-link:has(.bx-bar-chart-alt-2)       { --mi: #03c3ec; }
+    #layout-menu .menu-link:has(.bx-credit-card)           { --mi: #696cff; }
+    #layout-menu .menu-link:has(.bx-cog)                   { --mi: #8592a3; }
+    #layout-menu .menu-link:has(.bx-support)               { --mi: #03c3ec; }
+    #layout-menu .menu-link:has(.bx-download)              { --mi: #71dd37; }
+    #layout-menu .menu-link:has(.bx-log-out)               { --mi: #ff3e1d; }
+
+    /* ---- Hover ---- */
+    #layout-menu .menu-link:hover {
+        background: #faf8f5;
+        color: #2b1b12;
     }
 
-    /* Verification */
-    #layout-menu .bx-check-shield {
-        color: #696cff;
+        #layout-menu .menu-link:hover .menu-icon {
+            transform: scale(1.06);
+        }
+
+    /* ---- Active item (clean solid pill) ---- */
+    #layout-menu .menu-inner > .menu-item.active > .menu-link:not(.menu-toggle) {
+        background: #696cff;
+        color: #fff;
+        box-shadow: 0 2px 6px -1px rgba(105,108,255,.4);
     }
 
-    /* Reminder */
-    #layout-menu .bx-bell {
-        color: #ff9800;
-    }
+        #layout-menu .menu-inner > .menu-item.active > .menu-link:not(.menu-toggle):hover {
+            background: #5f61f0;
+            color: #fff;
+        }
 
-    /* Staff */
-    #layout-menu .bx-group {
-        color: #03c3ec;
-    }
+        /* chip + icon turn white on the active pill */
+        #layout-menu .menu-inner > .menu-item.active > .menu-link:not(.menu-toggle)::before {
+            background: rgba(255,255,255,.22);
+        }
 
-    /* Leave */
-    #layout-menu .bx-calendar-minus {
-        color: #e83e8c;
-    }
+        #layout-menu .menu-inner > .menu-item.active > .menu-link:not(.menu-toggle) .menu-icon {
+            background: #fff;
+        }
 
-    /* Payroll */
-    #layout-menu .bx-money {
-        color: #4caf50;
-    }
-
-    /* Voice */
-    #layout-menu .bx-user-voice {
-        color: #9c27b0;
-    }
-
-    /* Inventory */
-    #layout-menu .bx-package {
-        color: #ff5722;
-    }
-
-    /* Accounts */
-    #layout-menu .bx-receipt {
-        color: #009688;
-    }
-
-    /* Timetable */
-    #layout-menu .bx-time-five {
-        color: #2196f3;
-    }
-
-    /* Notice */
-    #layout-menu .bx-news {
-        color: #f44336;
-    }
-
-    /* Smart Bell */
-    #layout-menu .bx-bell-ring {
-        color: #ffc107;
-    }
-
-    /* Bus */
-    #layout-menu .bx-bus {
-        color: #00bcd4;
-    }
-
-    /* ID */
-    #layout-menu .bx-id-card {
-        color: #673ab7;
-    }
-
-    /* Transfer */
-    #layout-menu .bx-transfer {
-        color: #ff9800;
-    }
-
-    /* Certificate */
-    #layout-menu .bx-certification {
-        color: #4caf50;
-    }
-
-    /* Reports */
-    #layout-menu .bx-bar-chart-alt-2 {
-        color: #2196f3;
-    }
-
-    /* Billing */
-    #layout-menu .bx-credit-card {
-        color: #9c27b0;
-    }
-
-    /* Settings */
-    #layout-menu .bx-cog {
-        color: #8592a3;
-    }
-
-    /* Support */
-    #layout-menu .bx-support {
-        color: #03c3ec;
-    }
-
-    /* Download */
-    #layout-menu .bx-download {
-        color: #4caf50;
-    }
-
-    /* Logout */
-    #layout-menu .bx-log-out {
-        color: #f44336;
-    }
-
-    /* Hover effect */
-
-    #layout-menu .menu-link:hover .menu-icon {
-        transform: scale(1.12);
-    }
-
-    /* Active menu */
-
-    #layout-menu .menu-item.active > .menu-link .menu-icon {
-        color: #ffffff !important;
+    /* Open parent (e.g. School Settings) */
+    #layout-menu .menu-item.open > .menu-link.menu-toggle {
+        background: #faf8f5;
+        color: #2b1b12;
     }
 
     /* =========================================
-       SUBMENU ICONS
+       SUBMENU — deliberately smaller than the
+       top-level menu (icons, text, padding) with
+       a connecting rail + indent.
     ========================================= */
 
+    #layout-menu .menu-sub {
+        margin: .1rem 0 .35rem;
+        position: relative;
+    }
+
+        /* vertical connecting rail */
+        #layout-menu .menu-sub::before {
+            content: "";
+            position: absolute;
+            left: 1.55rem;
+            top: .1rem;
+            bottom: .1rem;
+            width: 1px;
+            background: #ece8e1;
+        }
+
+        #layout-menu .menu-sub .menu-link {
+            padding: .32rem .6rem .32rem 1rem;
+            font-size: .8rem;
+            font-weight: 500;
+            color: #7a7064;
+        }
+
+        /* smaller tinted chip for the submenu icon */
+        #layout-menu .menu-sub .menu-link::before {
+            content: "";
+            display: block;
+            position: absolute;
+            left: .95rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 1.4rem;
+            height: 1.4rem;
+            border-radius: .4rem;
+            background: color-mix(in srgb, var(--mi, #696cff) 13%, transparent);
+        }
+
     #layout-menu .submenu-icon {
-        font-size: 16px;
-        margin-right: 10px;
+        position: relative;
+        z-index: 1;
+        width: 1.4rem;
+        height: 1.4rem;
+        margin-right: .6rem;
+        font-size: .8rem;
+        background: var(--mi, #696cff);
+        transition: transform .18s ease;
     }
 
-    /* Submenu Colors */
+    #layout-menu .menu-sub .menu-link:hover {
+        color: #2b1b12;
+    }
 
-    #layout-menu .submenu-profile {
+        #layout-menu .menu-sub .menu-link:hover .submenu-icon {
+            transform: scale(1.06);
+        }
+
+    /* Active submenu item — soft tinted */
+    #layout-menu .menu-sub .menu-item.active > .menu-link {
+        background: rgba(105,108,255,.10);
         color: #696cff;
+        font-weight: 600;
     }
 
-    #layout-menu .submenu-academic {
-        color: #03c3ec;
-    }
-
-    #layout-menu .submenu-feehead {
-        color: #71dd37;
-    }
-
-    #layout-menu .submenu-feestructure {
-        color: #ffab00;
-    }
-
-    #layout-menu .submenu-crm {
-        color: #e83e8c;
-    }
+    /* Submenu icon colours (set on link so the chip reads --mi) */
+    #layout-menu .menu-link:has(.submenu-profile)      { --mi: #696cff; }
+    #layout-menu .menu-link:has(.submenu-academic)     { --mi: #03c3ec; }
+    #layout-menu .menu-link:has(.submenu-subject)      { --mi: #ffab00; }
+    #layout-menu .menu-link:has(.submenu-feehead)      { --mi: #71dd37; }
+    #layout-menu .menu-link:has(.submenu-feestructure) { --mi: #696cff; }
+    #layout-menu .menu-link:has(.submenu-crm)          { --mi: #03c3ec; }
 </style>
 <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
 
@@ -448,7 +484,8 @@
             foreach (var item in menus[role])
             {
                 var controller = GetController(item);
-                var isActive = IsActive(controller);
+                var hasRoute = routeMap.TryGetValue(item, out var route);
+                var isActive = hasRoute ? IsActive(route.action) : IsActive(controller);
 
                 if (item == "Sign out")
                 {
@@ -527,6 +564,21 @@
                                 </a>
                             </li>
 
+                            <li class='menu-item @(IsActive("SubjectManagement") ? "active" : "")'>
+                                <a asp-area="Admin"
+                                   asp-controller="SchoolSettings"
+                                   asp-action="SubjectManagement"
+                                   class="menu-link">
+
+                                    <i class="bx bx-book-content submenu-icon submenu-subject"></i>
+
+                                    <div class="text-truncate">
+                                        Subject Management
+                                    </div>
+
+                                </a>
+                            </li>
+
                             <li class='menu-item @(IsActive("FeeHead") ? "active" : "")'>
                                 <a asp-area="Admin"
                                    asp-controller="SchoolSettings"
@@ -576,10 +628,14 @@
                 }
                 else
                 {
+                    var area   = hasRoute ? route.area       : GetArea(item);
+                    var ctrl   = hasRoute ? route.controller  : controller;
+                    var action = hasRoute ? route.action      : "Index";
+
                     <li class='menu-item @(isActive ? "active" : "")'>
-                        <a asp-area="@GetArea(item)"
-                           asp-controller="@controller"
-                           asp-action="Index"
+                        <a asp-area="@area"
+                           asp-controller="@ctrl"
+                           asp-action="@action"
                            class="menu-link">
 
                             <i class="menu-icon icon-base bx @GetIcon(item)"></i>

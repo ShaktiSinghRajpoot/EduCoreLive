@@ -48,6 +48,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcQWRtaW5cVmlld3NcU2Nob29sU2V0dGluZ3NcRmVlU3RydWN0dXJlLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/Github/EduCoreLive/educore/Areas/Admin/Views/SchoolSettings/SubjectManagement.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcQWRtaW5cVmlld3NcU2Nob29sU2V0dGluZ3NcU3ViamVjdE1hbmFnZW1lbnQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/Github/EduCoreLive/educore/Areas/ERP/Views/Admission/Dashboard.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEFkbWlzc2lvblxEYXNoYm9hcmQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
@@ -56,12 +60,32 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEFkbWlzc2lvblxTdHVkZW50TGlzdC5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Exam/CreateExam.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEV4YW1cQ3JlYXRlRXhhbS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Exam/MarkEntry.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEV4YW1cTWFya0VudHJ5LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/Github/EduCoreLive/educore/Areas/ERP/Views/Fee/ManageFee.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEZlZVxNYW5hZ2VGZWUuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Student/Dashboard.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFN0dWRlbnRcRGFzaGJvYXJkLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Student/EditStudent.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFN0dWRlbnRcRWRpdFN0dWRlbnQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/Github/EduCoreLive/educore/Areas/ERP/Views/Student/StudentAttendance.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFN0dWRlbnRcU3R1ZGVudEF0dGVuZGFuY2UuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Student/StudentList.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFN0dWRlbnRcU3R1ZGVudExpc3QuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/Github/EduCoreLive/educore/Areas/SuperAdmin/Views/Schools/Create.cshtml]
@@ -90,66 +114,6 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/Github/EduCoreLive/educore/Views/Dashboards/Index.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRGFzaGJvYXJkc1xJbmRleC5jc2h0bWw=
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/ExtendedUi/PerfectScrollbar.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRXh0ZW5kZWRVaVxQZXJmZWN0U2Nyb2xsYmFyLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/ExtendedUi/TextDivider.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRXh0ZW5kZWRVaVxUZXh0RGl2aWRlci5jc2h0bWw=
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/FormLayouts/Horizontal.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRm9ybUxheW91dHNcSG9yaXpvbnRhbC5jc2h0bWw=
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/FormLayouts/Vertical.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRm9ybUxheW91dHNcVmVydGljYWwuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Forms/BasicInputs.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRm9ybXNcQmFzaWNJbnB1dHMuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Forms/InputGroups.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcRm9ybXNcSW5wdXRHcm91cHMuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Icons/Boxicons.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcSWNvbnNcQm94aWNvbnMuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/LayoutExamples/Blank.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTGF5b3V0RXhhbXBsZXNcQmxhbmsuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/LayoutExamples/Container.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTGF5b3V0RXhhbXBsZXNcQ29udGFpbmVyLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/LayoutExamples/Fluid.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTGF5b3V0RXhhbXBsZXNcRmx1aWQuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/LayoutExamples/WithoutMenu.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTGF5b3V0RXhhbXBsZXNcV2l0aG91dE1lbnUuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/LayoutExamples/WithoutNavbar.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcTGF5b3V0RXhhbXBsZXNcV2l0aG91dE5hdmJhci5jc2h0bWw=
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Pages/AccountSettings.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUGFnZXNcQWNjb3VudFNldHRpbmdzLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Pages/AccountSettingsConnections.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUGFnZXNcQWNjb3VudFNldHRpbmdzQ29ubmVjdGlvbnMuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Pages/AccountSettingsNotifications.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcUGFnZXNcQWNjb3VudFNldHRpbmdzTm90aWZpY2F0aW9ucy5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/Github/EduCoreLive/educore/Views/Shared/Sections/Footer/_Footer.cshtml]
@@ -198,86 +162,6 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/Github/EduCoreLive/educore/Views/Shared/_ValidationScriptsPartial.cshtml]
 build_metadata.AdditionalFiles.TargetPath = Vmlld3NcU2hhcmVkXF9WYWxpZGF0aW9uU2NyaXB0c1BhcnRpYWwuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Tables/Basic.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVGFibGVzXEJhc2ljLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Accordion.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcQWNjb3JkaW9uLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Alerts.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcQWxlcnRzLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Badges.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcQmFkZ2VzLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Buttons.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcQnV0dG9ucy5jc2h0bWw=
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Carousel.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcQ2Fyb3VzZWwuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Collapse.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcQ29sbGFwc2UuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Dropdowns.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcRHJvcGRvd25zLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Footer.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcRm9vdGVyLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/ListGroups.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcTGlzdEdyb3Vwcy5jc2h0bWw=
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Modals.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcTW9kYWxzLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Navbar.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcTmF2YmFyLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Offcanvas.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcT2ZmY2FudmFzLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/PaginationBreadcrumbs.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcUGFnaW5hdGlvbkJyZWFkY3J1bWJzLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Progress.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcUHJvZ3Jlc3MuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Spinners.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcU3Bpbm5lcnMuY3NodG1s
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/TabsPills.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcVGFic1BpbGxzLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Toasts.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcVG9hc3RzLmNzaHRtbA==
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/TooltipsPopovers.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcVG9vbHRpcHNQb3BvdmVycy5jc2h0bWw=
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLive/educore/Views/Ui/Typography.cshtml]
-build_metadata.AdditionalFiles.TargetPath = Vmlld3NcVWlcVHlwb2dyYXBoeS5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/Github/EduCoreLive/educore/Views/_Partials/_Macros.cshtml]

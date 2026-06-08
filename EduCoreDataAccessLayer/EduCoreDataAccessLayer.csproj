@@ -7,14 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="Models\Admin\AcademicSetupModel.cs~RF2946125e.TMP" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Folder Include="Services\Contract\ERP\" />
-    <Folder Include="Services\Contract\LMS\" />
     <Folder Include="Services\Repository\ERP\" />
-    <Folder Include="Services\Repository\LMS\" />
   </ItemGroup>
 
   <ItemGroup>
