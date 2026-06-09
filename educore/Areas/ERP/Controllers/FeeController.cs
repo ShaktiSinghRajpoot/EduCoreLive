@@ -8,6 +8,6 @@ namespace educore.Areas.ERP.Controllers
         public IActionResult ManageFee()
         {
             return View();
-        }
+        } 
     }
 }

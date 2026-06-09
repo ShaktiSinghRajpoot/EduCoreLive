@@ -1,0 +1,720 @@
+﻿@{
+    ViewData["Title"] = "Purchase Entry";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+    <style>
+        .purchase-page .purchase-summary-value {
+            font-size: clamp(1.2rem, 2vw, 1.6rem);
+            font-weight: 900;
+            color: #2b1b12;
+        }
+         
+        .purchase-page .purchase-grid-wrap {
+            overflow-x: auto;
+        }
+
+        .purchase-page .purchase-grid {
+            min-width: 1100px;
+            margin-bottom: 0;
+        }
+
+            .purchase-page .purchase-grid th {
+                font-size: .76rem;
+                font-weight: 900;
+                color: #8b8175;
+                white-space: nowrap;
+                border-bottom: 1px solid #ececf5;
+            }
+
+            .purchase-page .purchase-grid td {
+                vertical-align: middle;
+                border-bottom: 1px solid #f2f2f7;
+            }
+
+            .purchase-page .purchase-grid tbody tr:hover {
+                background: #fffaf5;
+            }
+
+        .purchase-page .form-control,
+        .purchase-page .form-select {
+            min-height: 46px;
+            border-radius: 14px;
+            border-color: #ececf5;
+            font-weight: 650;
+        }
+
+            .purchase-page .form-control:focus,
+            .purchase-page .form-select:focus {
+                border-color: #ff8a00;
+                box-shadow: 0 0 0 4px rgba(255, 138, 0, .12);
+            }
+
+        .purchase-page .btn-ec-primary {
+            background: #ff8a00;
+            color: #fff;
+            border: 0;
+            border-radius: 14px;
+            font-weight: 900;
+            box-shadow: 0 12px 24px rgba(255, 138, 0, .2);
+        }
+
+            .purchase-page .btn-ec-primary:hover {
+                background: #eb7e00;
+                color: #fff;
+            }
+
+        .purchase-page .btn-ec-outline {
+            border: 1px solid rgba(255, 138, 0, .35);
+            color: #ff8a00;
+            background: #fff;
+            border-radius: 14px;
+            font-weight: 900;
+        }
+
+            .purchase-page .btn-ec-outline:hover {
+                background: #fff4e6;
+            }
+
+        .purchase-page .purchase-total-box {
+            border-radius: 20px;
+            border: 1px solid #ececf5;
+            background: linear-gradient(180deg, #fff, #fffaf5);
+        }
+
+        .purchase-page .purchase-total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            padding: .65rem 0;
+            border-bottom: 1px solid #f1f1f5;
+            font-weight: 800;
+        }
+
+            .purchase-page .purchase-total-row:last-child {
+                border-bottom: 0;
+            }
+
+            .purchase-page .purchase-total-row span {
+                color: #8b8175;
+            }
+
+            .purchase-page .purchase-total-row strong {
+                color: #2b1b12;
+            }
+
+        .purchase-page .purchase-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            border-radius: 999px;
+            padding: .3rem .7rem;
+            background: #fff4e6;
+            color: #ff8a00;
+            font-size: .7rem;
+            font-weight: 900;
+        }
+
+        .purchase-page .grid-remove-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            border: 1px solid #ececf5;
+            background: #fff;
+            color: #dc2626;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+            .purchase-page .grid-remove-btn:hover {
+                background: #fff1f2;
+            }
+
+        .purchase-page .purchase-item-thumb {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            background: #fff4e6;
+            color: #ff8a00;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .purchase-page .purchase-sticky-footer {
+            position: sticky;
+            bottom: 0;
+            z-index: 15;
+            background: rgba(255,255,255,.95);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid #ececf5;
+        }
+
+        @@media (max-width: 991.98px) {
+            .purchase-page .purchase-footer-actions .btn {
+                width: 100%;
+            }
+        }
+
+        @@media (max-width: 575.98px) {
+            .purchase-page .ec-page-header-inner {
+                align-items: stretch !important;
+            }
+
+            .purchase-page .header-actions {
+                width: 100%;
+                display: grid !important;
+                grid-template-columns: 1fr;
+            }
+
+                .purchase-page .header-actions .btn {
+                    width: 100%;
+                }
+        }
+    </style>
+}
+
+<div class="ec-page-shell purchase-page">
+    <div class="ec-page-content">
+
+        <div class="ec-page-header">
+            <div class="ec-page-header-inner d-flex justify-content-between gap-3 flex-wrap">
+
+                <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                    <div class="ec-page-icon">
+                        <i class="bx bx-cart-download"></i>
+                    </div>
+
+                    <div>
+                        <h4 class="ec-page-title mb-1">Purchase Entry</h4>
+                        <div class="ec-page-subtitle">
+                            Record supplier purchases and automatically increase inventory stock.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-actions d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-ec-outline px-3 py-2">
+                        <i class="bx bx-history me-1"></i>
+                        Purchase History
+                    </button>
+
+                    <button type="button" class="btn btn-ec-primary px-3 py-2">
+                        <i class="bx bx-printer me-1"></i>
+                        Print Preview
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="row g-3 g-xl-4 mb-3 mb-xl-4">
+
+            <div class="col-12 col-md-6 col-xl-3">
+                <div class="ec-card h-100">
+                    <div class="ec-card-body">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <div class="ec-section-subtitle">Today's Purchases</div>
+                                <div class="purchase-summary-value">₹42,500</div>
+                            </div>
+
+                            <div class="ec-section-icon">
+                                <i class="bx bx-rupee"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-xl-3">
+                <div class="ec-card h-100">
+                    <div class="ec-card-body">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <div class="ec-section-subtitle">Purchase Bills</div>
+                                <div class="purchase-summary-value">18</div>
+                            </div>
+
+                            <div class="ec-section-icon">
+                                <i class="bx bx-receipt"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-xl-3">
+                <div class="ec-card h-100">
+                    <div class="ec-card-body">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <div class="ec-section-subtitle">Items Purchased</div>
+                                <div class="purchase-summary-value">560</div>
+                            </div>
+
+                            <div class="ec-section-icon">
+                                <i class="bx bx-package"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-xl-3">
+                <div class="ec-card h-100">
+                    <div class="ec-card-body">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <div class="ec-section-subtitle">Suppliers</div>
+                                <div class="purchase-summary-value">12</div>
+                            </div>
+
+                            <div class="ec-section-icon">
+                                <i class="bx bx-store"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="ec-card mb-3 mb-xl-4">
+            <div class="ec-card-header">
+                <div class="ec-section-title-wrap d-flex align-items-center gap-2">
+                    <div class="ec-section-icon">
+                        <i class="bx bx-file"></i>
+                    </div>
+
+                    <div>
+                        <div class="ec-section-title">Purchase Information</div>
+                        <div class="ec-section-subtitle">
+                            Supplier invoice and purchase details.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ec-card-body">
+
+                <div class="row g-3">
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label class="form-label">Supplier</label>
+
+                        <select class="form-select" id="supplierId">
+                            <option value="">Select Supplier</option>
+                            <option>ABC Uniform House</option>
+                            <option>NCERT Distributor</option>
+                            <option>Sports World</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label class="form-label">Purchase Date</label>
+
+                        <input type="date" class="form-control" id="purchaseDate">
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label class="form-label">Invoice Number</label>
+
+                        <input type="text" class="form-control" id="invoiceNumber" placeholder="INV-2026-001">
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label class="form-label">Payment Mode</label>
+
+                        <select class="form-select" id="paymentMode">
+                            <option>Cash</option>
+                            <option>Bank Transfer</option>
+                            <option>UPI</option>
+                            <option>Cheque</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Remarks</label>
+
+                        <textarea class="form-control" id="purchaseRemarks" rows="2" placeholder="Purchase remarks"></textarea>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+        <div class="ec-card">
+
+            <div class="ec-card-header">
+
+                <div class="d-flex justify-content-between gap-3 flex-wrap align-items-center">
+
+                    <div class="ec-section-title-wrap d-flex align-items-center gap-2">
+
+                        <div class="ec-section-icon">
+                            <i class="bx bx-grid-alt"></i>
+                        </div>
+
+                        <div>
+                            <div class="ec-section-title">Purchase Items</div>
+                            <div class="ec-section-subtitle">
+                                Add inventory items for stock purchase.
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <button type="button" class="btn btn-ec-primary px-3 py-2" id="addPurchaseRowBtn">
+                        <i class="bx bx-plus me-1"></i>
+                        Add Item
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div class="ec-card-body p-0">
+
+                <div class="purchase-grid-wrap">
+
+                    <table class="table purchase-grid">
+
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th width="150">Quantity</th>
+                                <th width="160">Unit Price</th>
+                                <th width="140">Tax %</th>
+                                <th width="180">Total</th>
+                                <th width="80"></th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="purchaseGridBody"></tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="row g-3 mt-1">
+
+            <div class="col-12 col-lg-7">
+                <div class="ec-card h-100">
+                    <div class="ec-card-body">
+
+                        <div class="ec-section-title-wrap d-flex align-items-center gap-2 mb-3">
+                            <div class="ec-section-icon">
+                                <i class="bx bx-info-circle"></i>
+                            </div>
+
+                            <div>
+                                <div class="ec-section-title">Purchase Notes</div>
+                                <div class="ec-section-subtitle">
+                                    Inventory stock will increase after purchase save.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ec-detail-box">
+                            <ul class="mb-0 ps-3 small fw-semibold">
+                                <li>Every purchase creates inventory transaction history.</li>
+                                <li>Stock is automatically updated after save.</li>
+                                <li>Invoice number should be unique per supplier.</li>
+                                <li>Purchase can later be linked with accounts module.</li>
+                            </ul>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-5">
+
+                <div class="purchase-total-box p-3 h-100">
+
+                    <div class="purchase-total-row">
+                        <span>Sub Total</span>
+                        <strong id="subTotalAmount">₹0</strong>
+                    </div>
+
+                    <div class="purchase-total-row">
+                        <span>Total Tax</span>
+                        <strong id="taxAmount">₹0</strong>
+                    </div>
+
+                    <div class="purchase-total-row">
+                        <span>Grand Total</span>
+                        <strong class="fs-5" id="grandTotalAmount">₹0</strong>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="purchase-sticky-footer mt-3 p-3 rounded-4">
+
+            <div class="d-flex justify-content-end gap-2 flex-wrap purchase-footer-actions">
+
+                <button type="button" class="btn btn-ec-outline px-4 py-2">
+                    Cancel
+                </button>
+
+                <button type="button" class="btn btn-ec-primary px-4 py-2" id="savePurchaseBtn">
+                    <i class="bx bx-save me-1"></i>
+                    Save Purchase
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+@section PageScripts {
+    <script>
+
+        $(document).ready(function () {
+
+            let purchaseRows = [];
+
+            const itemOptions = [
+                "School Tie",
+                "School Belt",
+                "Physics Book",
+                "Notebook",
+                "Football",
+                "Chemistry Lab Kit"
+            ];
+
+            function money(value) {
+                return "₹" + Number(value || 0).toLocaleString("en-IN");
+            }
+
+            function toastSuccess(message) {
+                if (typeof toastr !== "undefined") toastr.success(message);
+                else console.log(message);
+            }
+
+            function toastError(message) {
+                if (typeof toastr !== "undefined") toastr.error(message);
+                else console.error(message);
+            }
+
+            function addRow() {
+
+                purchaseRows.push({
+                    id: Date.now() + Math.random(),
+                    item: "",
+                    qty: 1,
+                    rate: 0,
+                    tax: 0
+                });
+
+                renderRows();
+            }
+
+            function renderRows() {
+
+                let html = "";
+
+                purchaseRows.forEach(row => {
+
+                    const amount = Number(row.qty) * Number(row.rate);
+                    const taxAmount = amount * (Number(row.tax) / 100);
+                    const total = amount + taxAmount;
+
+                    html += `
+                        <tr data-id="${row.id}">
+
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+
+                                    <div class="purchase-item-thumb">
+                                        <i class="bx bx-package"></i>
+                                    </div>
+
+                                    <div class="flex-grow-1">
+
+                                        <select class="form-select item-select">
+                                            <option value="">Select Item</option>
+                                            ${itemOptions.map(x =>
+                                                `<option value="${x}" ${x === row.item ? 'selected' : ''}>${x}</option>`
+                                            ).join('')}
+                                        </select>
+
+                                    </div>
+
+                                </div>
+                            </td>
+
+                            <td>
+                                <input type="number" class="form-control qty-input"
+                                       min="1"
+                                       value="${row.qty}">
+                            </td>
+
+                            <td>
+                                <input type="number" class="form-control rate-input"
+                                       min="0"
+                                       value="${row.rate}">
+                            </td>
+
+                            <td>
+                                <input type="number" class="form-control tax-input"
+                                       min="0"
+                                       value="${row.tax}">
+                            </td>
+
+                            <td>
+                                <div class="fw-bold">${money(total)}</div>
+
+                                <small class="text-muted">
+                                    Tax: ${money(taxAmount)}
+                                </small>
+                            </td>
+
+                            <td class="text-center">
+                                <button type="button"
+                                        class="grid-remove-btn remove-row-btn">
+                                    <i class="bx bx-trash"></i>
+                                </button>
+                            </td>
+
+                        </tr>
+                    `;
+                });
+
+                if (!html) {
+
+                    html = `
+                        <tr>
+                            <td colspan="6" class="text-center py-5">
+
+                                <div class="text-muted fw-bold mb-2">
+                                    No items added yet
+                                </div>
+
+                                <button type="button"
+                                        class="btn btn-ec-primary"
+                                        id="emptyAddRowBtn">
+
+                                    <i class="bx bx-plus me-1"></i>
+                                    Add Purchase Item
+
+                                </button>
+
+                            </td>
+                        </tr>
+                    `;
+                }
+
+                $("#purchaseGridBody").html(html);
+
+                calculateTotals();
+            }
+
+            function calculateTotals() {
+
+                let subTotal = 0;
+                let taxTotal = 0;
+
+                purchaseRows.forEach(row => {
+
+                    const amount = Number(row.qty) * Number(row.rate);
+                    const tax = amount * (Number(row.tax) / 100);
+
+                    subTotal += amount;
+                    taxTotal += tax;
+                });
+
+                const grandTotal = subTotal + taxTotal;
+
+                $("#subTotalAmount").text(money(subTotal));
+                $("#taxAmount").text(money(taxTotal));
+                $("#grandTotalAmount").text(money(grandTotal));
+            }
+
+            $(document).on("click", "#addPurchaseRowBtn, #emptyAddRowBtn", function () {
+                addRow();
+            });
+
+            $(document).on("click", ".remove-row-btn", function () {
+
+                const rowId = Number($(this).closest("tr").data("id"));
+
+                purchaseRows = purchaseRows.filter(x => x.id !== rowId);
+
+                renderRows();
+            });
+
+            $(document).on("change input", ".item-select, .qty-input, .rate-input, .tax-input", function () {
+
+                const tr = $(this).closest("tr");
+                const rowId = Number(tr.data("id"));
+
+                const row = purchaseRows.find(x => x.id === rowId);
+
+                if (!row) return;
+
+                row.item = tr.find(".item-select").val();
+                row.qty = Number(tr.find(".qty-input").val() || 0);
+                row.rate = Number(tr.find(".rate-input").val() || 0);
+                row.tax = Number(tr.find(".tax-input").val() || 0);
+
+                renderRows();
+            });
+
+            $("#savePurchaseBtn").on("click", function () {
+
+                if (!$("#supplierId").val()) {
+                    toastError("Please select supplier.");
+                    return;
+                }
+
+                if (!$("#purchaseDate").val()) {
+                    toastError("Please select purchase date.");
+                    return;
+                }
+
+                if (!purchaseRows.length) {
+                    toastError("Please add at least one item.");
+                    return;
+                }
+
+                const invalid = purchaseRows.some(x =>
+                    !x.item || x.qty <= 0 || x.rate <= 0
+                );
+
+                if (invalid) {
+                    toastError("Please complete all purchase item rows.");
+                    return;
+                }
+
+                toastSuccess("Purchase entry saved successfully.");
+
+                console.log({
+                    supplier: $("#supplierId").val(),
+                    purchaseDate: $("#purchaseDate").val(),
+                    invoiceNumber: $("#invoiceNumber").val(),
+                    paymentMode: $("#paymentMode").val(),
+                    remarks: $("#purchaseRemarks").val(),
+                    items: purchaseRows
+                });
+            });
+            addRow();
+        });
+    </script>
+}

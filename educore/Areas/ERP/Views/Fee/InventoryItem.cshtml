@@ -1,0 +1,860 @@
+﻿@{
+    ViewData["Title"] = "Inventory Item Master";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+    <style>
+        .inventory-item-page .inventory-stat-value {
+            font-size: clamp(1.25rem, 2vw, 1.7rem);
+            font-weight: 900;
+            color: #2b1b12;
+        }
+
+        .inventory-item-page .inventory-table-wrap { 
+            overflow-x: auto;
+        }
+
+        .inventory-item-page .inventory-table {
+            margin-bottom: 0;
+            width: 100%;
+        }
+
+        .inventory-item-page .inventory-table th {
+            color: #8b8175;
+            font-size: .76rem;
+            font-weight: 900;
+            border-bottom: 1px solid #ececf5;
+            white-space: nowrap;
+            padding: 1rem 0.75rem;
+            background-color: #f8f7f5;
+        }
+
+        .inventory-item-page .inventory-table td {
+            color: #2b2c40;
+            font-size: .84rem;
+            font-weight: 650;
+            vertical-align: middle;
+            border-bottom: 1px solid #f1f1f6;
+            padding: 1rem 0.75rem;
+        }
+
+        .inventory-item-page .inventory-table tbody tr:hover {
+            background: #fff7ed;
+        }
+
+        /* Responsive table improvements */
+        @@media (max-width: 991.98px) {
+            .inventory-item-page .inventory-table,
+            .inventory-item-page .inventory-table thead,
+            .inventory-item-page .inventory-table tbody,
+            .inventory-item-page .inventory-table th,
+            .inventory-item-table .inventory-table td,
+            .inventory-item-page .inventory-table tr {
+                display: block;
+            }
+
+            .inventory-item-page .inventory-table thead {
+                /* Hide table headers on small screens */
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+
+            .inventory-item-page .inventory-table tr {
+                border: 1px solid #ececf5;
+                margin-bottom: 1rem;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            }
+
+            .inventory-item-page .inventory-table td {
+                /* Behave like a "row" */
+                border: none;
+                border-bottom: 1px solid #eee;
+                position: relative;
+                padding-left: 50%;
+                text-align: left;
+                white-space: normal;
+            }
+
+            .inventory-item-page .inventory-table td::before {
+                /* Now like a table header */
+                position: absolute;
+                /* Top/left values mimic padding */
+                top: 0;
+                left: 0.75rem;
+                width: 45%;
+                padding-right: 0.75rem;
+                white-space: nowrap;
+                content: attr(data-label);
+                font-weight: 650;
+                color: #8b8175;
+                font-size: .76rem;
+            }
+
+            .inventory-item-page .inventory-table td:last-child {
+                border-bottom: 0;
+            }
+        }
+
+        .inventory-item-page .inventory-table tbody tr:hover {
+            background: #fff7ed;
+        }
+
+        .inventory-item-page .inventory-thumb {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+            background: #fff4e6;
+            color: #ff8a00;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+        }
+
+        .inventory-item-page .inventory-action-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            border: 1px solid #ececf5;
+            background: #fff;
+            color: #ff8a00;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .inventory-item-page .inventory-action-btn:hover {
+            background: #fff4e6;
+        }
+
+        .inventory-item-page .ec-pill {
+            border-radius: 999px;
+            padding: .32rem .65rem;
+            font-size: .7rem;
+            font-weight: 900;
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+        }
+
+        .inventory-item-page .pill-orange {
+            background: #fff4e6;
+            color: #ff8a00;
+        }
+
+        .inventory-item-page .pill-success {
+            background: #ecfdf3;
+            color: #16a34a;
+        }
+
+        .inventory-item-page .pill-danger {
+            background: #fff1f2;
+            color: #dc2626;
+        }
+
+        .inventory-item-page .pill-warning {
+            background: #fff7ed;
+            color: #d97706;
+        }
+
+        .inventory-item-page .btn-ec-primary {
+            background: #ff8a00;
+            color: #fff;
+            border: 0;
+            border-radius: 14px;
+            font-weight: 900;
+            box-shadow: 0 12px 24px rgba(255, 138, 0, .2);
+        }
+
+        .inventory-item-page .btn-ec-outline {
+            border: 1px solid rgba(255, 138, 0, .35);
+            background: #fff;
+            color: #ff8a00;
+            border-radius: 14px;
+            font-weight: 900;
+        }
+
+        .inventory-item-page .form-control,
+        .inventory-item-page .form-select {
+            border-radius: 14px;
+            min-height: 45px;
+            border-color: #ececf5;
+            font-weight: 650;
+        }
+
+        .inventory-item-page .form-control:focus,
+        .inventory-item-page .form-select:focus {
+            border-color: #ff8a00;
+            box-shadow: 0 0 0 4px rgba(255, 138, 0, .12);
+        }
+
+        @@media (max-width: 991.98px) {
+            .inventory-item-page .filter-actions {
+                width: 100%;
+            }
+
+            .inventory-item-page .filter-actions .btn {
+                width: 100%;
+            }
+        }
+
+        @@media (max-width: 575.98px) {
+            .inventory-item-page .ec-page-header-inner {
+                align-items: stretch !important;
+            }
+
+            .inventory-item-page .ec-page-header-inner .header-actions {
+                width: 100%;
+                display: grid !important;
+                grid-template-columns: 1fr;
+            }
+
+            .inventory-item-page .ec-page-header-inner .header-actions .btn {
+                width: 100%;
+            }
+        }
+    </style>
+}
+
+<div class="ec-page-shell inventory-item-page">
+    <div class="ec-page-content">
+
+        <div class="ec-page-header">
+            <div class="ec-page-header-inner d-flex justify-content-between gap-3 flex-wrap">
+                <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                    <div class="ec-page-icon">
+                        <i class="bx bx-package"></i>
+                    </div>
+                    <div>
+                        <h4 class="ec-page-title mb-1">Inventory Item Master</h4>
+                        <div class="ec-page-subtitle">
+                            Manage school items like uniforms, books, notebooks, stationery, sports items, furniture and lab items.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="header-actions d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-ec-outline px-3 py-2" id="exportItemsBtn">
+                        <i class="bx bx-export me-1"></i> Export
+                    </button>
+                    <button type="button" class="btn btn-ec-primary px-3 py-2" data-bs-toggle="modal" data-bs-target="#itemModal">
+                        <i class="bx bx-plus me-1"></i> Add Item
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 g-xl-4 mb-3 mb-xl-4">
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="ec-card h-100">
+                    <div class="ec-card-body">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <div class="ec-section-subtitle">Total Items</div>
+                                <div class="inventory-stat-value" id="totalItems">0</div>
+                            </div>
+                            <div class="ec-section-icon">
+                                <i class="bx bx-package"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="ec-card h-100">
+                    <div class="ec-card-body">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <div class="ec-section-subtitle">Low Stock</div>
+                                <div class="inventory-stat-value text-warning" id="lowStockItems">0</div>
+                            </div>
+                            <div class="ec-section-icon">
+                                <i class="bx bx-error-circle"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="ec-card h-100">
+                    <div class="ec-card-body">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <div class="ec-section-subtitle">Out of Stock</div>
+                                <div class="inventory-stat-value text-danger" id="outStockItems">0</div>
+                            </div>
+                            <div class="ec-section-icon">
+                                <i class="bx bx-block"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="ec-card h-100">
+                    <div class="ec-card-body">
+                        <div class="d-flex justify-content-between gap-3">
+                            <div>
+                                <div class="ec-section-subtitle">Stock Value</div>
+                                <div class="inventory-stat-value text-success" id="stockValue">₹0</div>
+                            </div>
+                            <div class="ec-section-icon">
+                                <i class="bx bx-rupee"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ec-card mb-3 mb-xl-4">
+            <div class="ec-card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label class="form-label">Search Item</label>
+                        <input type="text" class="form-control" id="searchItem" placeholder="Name, SKU, brand...">
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-2">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" id="filterCategory">
+                            <option value="">All Categories</option>
+                            <option>Uniform</option>
+                            <option>Books</option>
+                            <option>Stationery</option>
+                            <option>Sports</option>
+                            <option>Furniture</option>
+                            <option>Electronics</option>
+                            <option>Lab Items</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-2">
+                        <label class="form-label">Item Type</label>
+                        <select class="form-select" id="filterType">
+                            <option value="">All Types</option>
+                            <option>Consumable</option>
+                            <option>Reusable</option>
+                            <option>Saleable</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-md-6 col-lg-2">
+                        <label class="form-label">Stock Status</label>
+                        <select class="form-select" id="filterStock">
+                            <option value="">All Stock</option>
+                            <option value="low">Low Stock</option>
+                            <option value="out">Out of Stock</option>
+                            <option value="available">Available</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12 col-lg-3">
+                        <div class="d-flex gap-2 filter-actions">
+                            <button type="button" class="btn btn-ec-primary flex-fill" id="applyFilterBtn">
+                                <i class="bx bx-filter-alt me-1"></i> Filter
+                            </button>
+                            <button type="button" class="btn btn-ec-outline flex-fill" id="resetFilterBtn">
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ec-card">
+            <div class="ec-card-header">
+                <div class="d-flex justify-content-between gap-3 flex-wrap align-items-center">
+                    <div class="ec-section-title-wrap d-flex align-items-center gap-2">
+                        <div class="ec-section-icon">
+                            <i class="bx bx-list-ul"></i>
+                        </div>
+                        <div>
+                            <div class="ec-section-title">Item List</div>
+                            <div class="ec-section-subtitle">View, search, edit and manage all inventory items.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ec-card-body p-0">
+                <div class="inventory-table-wrap">
+                    <table class="table inventory-table">
+                        <thead>
+                            <tr>
+                                <th>Item</th>
+                                <th>SKU</th>
+                                <th>Category</th>
+                                <th>Type</th>
+                                <th>Unit</th>
+                                <th>Current Stock</th>
+                                <th>Minimum</th>
+                                <th>Value</th>
+                                <th>Status</th>
+                                <th class="text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="modal fade" id="itemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content rounded-4 border-0">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold" id="itemModalTitle">Add Inventory Item</h5>
+                    <small class="text-muted">Create item master for purchase, issue, return and stock tracking.</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <input type="hidden" id="itemId">
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <div class="ec-detail-box">
+                            <div class="ec-section-title-wrap d-flex align-items-center gap-2 mb-3">
+                                <div class="ec-section-icon">
+                                    <i class="bx bx-info-circle"></i>
+                                </div>
+                                <div>
+                                    <div class="ec-section-title">Basic Information</div>
+                                    <div class="ec-section-subtitle">Name, code, category and classification.</div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label">Item Name</label>
+                                    <input type="text" class="form-control" id="itemName" placeholder="School Tie">
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label">Item Code / SKU</label>
+                                    <input type="text" class="form-control" id="itemCode" placeholder="UNI-TIE-001">
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label">Category</label>
+                                    <select class="form-select" id="itemCategory">
+                                        <option value="">Select Category</option>
+                                        <option>Uniform</option>
+                                        <option>Books</option>
+                                        <option>Stationery</option>
+                                        <option>Sports</option>
+                                        <option>Furniture</option>
+                                        <option>Electronics</option>
+                                        <option>Lab Items</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label">Sub Category</label>
+                                    <input type="text" class="form-control" id="itemSubCategory" placeholder="Tie / Belt / Notebook">
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label">Item Type</label>
+                                    <select class="form-select" id="itemType">
+                                        <option>Consumable</option>
+                                        <option>Reusable</option>
+                                        <option>Saleable</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label">Unit Type</label>
+                                    <select class="form-select" id="unitType">
+                                        <option>Piece</option>
+                                        <option>Box</option>
+                                        <option>Set</option>
+                                        <option>Kg</option>
+                                        <option>Liter</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="ec-detail-box">
+                            <div class="ec-section-title-wrap d-flex align-items-center gap-2 mb-3">
+                                <div class="ec-section-icon">
+                                    <i class="bx bx-store"></i>
+                                </div>
+                                <div>
+                                    <div class="ec-section-title">Stock & Pricing</div>
+                                    <div class="ec-section-subtitle">Opening stock, alert quantity and valuation.</div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6 col-lg-3">
+                                    <label class="form-label">Opening Stock</label>
+                                    <input type="number" class="form-control" id="openingStock" min="0" placeholder="0">
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-3">
+                                    <label class="form-label">Minimum Stock Alert</label>
+                                    <input type="number" class="form-control" id="minimumStock" min="0" placeholder="10">
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-3">
+                                    <label class="form-label">Cost Price</label>
+                                    <input type="number" class="form-control" id="costPrice" min="0" placeholder="0">
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-3">
+                                    <label class="form-label">Selling Price</label>
+                                    <input type="number" class="form-control" id="sellingPrice" min="0" placeholder="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="ec-detail-box">
+                            <div class="ec-section-title-wrap d-flex align-items-center gap-2 mb-3">
+                                <div class="ec-section-icon">
+                                    <i class="bx bx-detail"></i>
+                                </div>
+                                <div>
+                                    <div class="ec-section-title">Additional Details</div>
+                                    <div class="ec-section-subtitle">Brand, model, description and status.</div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3">
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label">Brand</label>
+                                    <input type="text" class="form-control" id="brand" placeholder="Brand name">
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label">Model</label>
+                                    <input type="text" class="form-control" id="model" placeholder="Model">
+                                </div>
+
+                                <div class="col-12 col-md-6 col-lg-4">
+                                    <label class="form-label">Status</label>
+                                    <select class="form-select" id="itemStatus">
+                                        <option>Active</option>
+                                        <option>Inactive</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">Description</label>
+                                    <textarea class="form-control" id="description" rows="3" placeholder="Item details"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer flex-column flex-sm-row">
+                <button type="button" class="btn btn-ec-outline w-100 w-sm-auto" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-ec-primary w-100 w-sm-auto" id="saveItemBtn">
+                    <i class="bx bx-save me-1"></i> Save Item
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section PageScripts {
+    <script>
+        $(document).ready(function () {
+            const items = [
+                {
+                    id: 1,
+                    name: "School Tie",
+                    code: "UNI-TIE-001",
+                    category: "Uniform",
+                    subCategory: "Tie",
+                    type: "Saleable",
+                    unit: "Piece",
+                    brand: "EduCore",
+                    model: "Standard",
+                    stock: 120,
+                    minimum: 25,
+                    cost: 45,
+                    selling: 80,
+                    status: "Active"
+                },
+                {
+                    id: 2,
+                    name: "Class 10 Physics Book",
+                    code: "BOOK-PHY-10",
+                    category: "Books",
+                    subCategory: "Academic Book",
+                    type: "Saleable",
+                    unit: "Piece",
+                    brand: "NCERT",
+                    model: "2026",
+                    stock: 18,
+                    minimum: 20,
+                    cost: 140,
+                    selling: 180,
+                    status: "Active"
+                },
+                {
+                    id: 3,
+                    name: "Chemistry Lab Beaker",
+                    code: "LAB-BEAKER-250",
+                    category: "Lab Items",
+                    subCategory: "Glassware",
+                    type: "Reusable",
+                    unit: "Piece",
+                    brand: "Borosil",
+                    model: "250ml",
+                    stock: 0,
+                    minimum: 10,
+                    cost: 95,
+                    selling: 0,
+                    status: "Active"
+                }
+            ];
+
+            function money(value) {
+                return "₹" + Number(value || 0).toLocaleString("en-IN");
+            }
+
+            function toastSuccess(message) {
+                if (typeof toastr !== "undefined") toastr.success(message);
+                else console.log(message);
+            }
+
+            function toastError(message) {
+                if (typeof toastr !== "undefined") toastr.error(message);
+                else console.error(message);
+            }
+
+            function getStockPill(item) {
+                if (item.stock <= 0) return `<span class="ec-pill pill-danger">Out of Stock</span>`;
+                if (item.stock <= item.minimum) return `<span class="ec-pill pill-warning">Low Stock</span>`;
+                return `<span class="ec-pill pill-success">Available</span>`;
+            }
+
+            function renderItems() {
+                const search = ($("#searchItem").val() || "").toLowerCase();
+                const category = $("#filterCategory").val();
+                const type = $("#filterType").val();
+                const stockFilter = $("#filterStock").val();
+
+                let filtered = items.filter(item => {
+                    const searchMatch =
+                        item.name.toLowerCase().includes(search) ||
+                        item.code.toLowerCase().includes(search) ||
+                        item.brand.toLowerCase().includes(search);
+
+                    const categoryMatch = !category || item.category === category;
+                    const typeMatch = !type || item.type === type;
+
+                    let stockMatch = true;
+                    if (stockFilter === "low") stockMatch = item.stock > 0 && item.stock <= item.minimum;
+                    if (stockFilter === "out") stockMatch = item.stock <= 0;
+                    if (stockFilter === "available") stockMatch = item.stock > item.minimum;
+
+                    return searchMatch && categoryMatch && typeMatch && stockMatch;
+                });
+
+                let html = "";
+
+                filtered.forEach(item => {
+                    html += `
+                        <tr>
+                            <td data-label="Item">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="inventory-thumb"><i class="bx bx-package"></i></div>
+                                    <div>
+                                        <div class="fw-bold text-dark">${item.name}</div>
+                                        <small class="text-muted">${item.subCategory || "-"}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="SKU"><span class="ec-pill pill-orange">${item.code}</span></td>
+                            <td data-label="Category">${item.category}</td>
+                            <td data-label="Type">${item.type}</td>
+                            <td data-label="Unit">${item.unit}</td>
+                            <td data-label="Current Stock" class="fw-bold">${item.stock}</td>
+                            <td data-label="Minimum">${item.minimum}</td>
+                            <td data-label="Value" class="fw-bold">${money(item.stock * item.cost)}</td>
+                            <td data-label="Status">${getStockPill(item)}</td>
+                            <td data-label="Action" class="text-end">
+                                <button type="button" class="inventory-action-btn edit-item" data-id="${item.id}">
+                                    <i class="bx bx-edit"></i>
+                                </button>
+                                <button type="button" class="inventory-action-btn delete-item" data-id="${item.id}">
+                                    <i class="bx bx-trash"></i>
+                                </button>
+                            </td>
+                        </tr>`;
+                });
+
+                if (!html) {
+                    html = `
+                        <tr>
+                            <td colspan="10" class="text-center py-5">
+                                <div class="text-muted fw-bold">No inventory items found.</div>
+                            </td>
+                        </tr>`;
+                }
+
+                $("#itemTableBody").html(html);
+                updateStats();
+            }
+
+            function updateStats() {
+                $("#totalItems").text(items.length);
+                $("#lowStockItems").text(items.filter(x => x.stock > 0 && x.stock <= x.minimum).length);
+                $("#outStockItems").text(items.filter(x => x.stock <= 0).length);
+
+                const value = items.reduce((sum, item) => sum + (Number(item.stock) * Number(item.cost)), 0);
+                $("#stockValue").text(money(value));
+            }
+
+            function resetForm() {
+                $("#itemId").val("");
+                $("#itemModalTitle").text("Add Inventory Item");
+                $("#itemName, #itemCode, #itemSubCategory, #brand, #model, #description").val("");
+                $("#openingStock, #minimumStock, #costPrice, #sellingPrice").val("");
+                $("#itemCategory").val("");
+                $("#itemType").val("Consumable");
+                $("#unitType").val("Piece");
+                $("#itemStatus").val("Active");
+            }
+
+            function validateItem() {
+                const id = Number($("#itemId").val() || 0);
+                const code = ($("#itemCode").val() || "").trim().toLowerCase();
+
+                if (!($("#itemName").val() || "").trim()) {
+                    toastError("Item name is required.");
+                    return false;
+                }
+
+                if (!code) {
+                    toastError("Item code / SKU is required.");
+                    return false;
+                }
+
+                if (!$("#itemCategory").val()) {
+                    toastError("Category is required.");
+                    return false;
+                }
+
+                const duplicate = items.some(x => x.code.toLowerCase() === code && x.id !== id);
+                if (duplicate) {
+                    toastError("Duplicate item code / SKU is not allowed.");
+                    return false;
+                }
+
+                return true;
+            }
+
+            $("#saveItemBtn").on("click", function () {
+                if (!validateItem()) return;
+
+                const id = Number($("#itemId").val() || 0);
+
+                const itemData = {
+                    id: id || Date.now(),
+                    name: $("#itemName").val().trim(),
+                    code: $("#itemCode").val().trim(),
+                    category: $("#itemCategory").val(),
+                    subCategory: $("#itemSubCategory").val().trim(),
+                    type: $("#itemType").val(),
+                    unit: $("#unitType").val(),
+                    brand: $("#brand").val().trim(),
+                    model: $("#model").val().trim(),
+                    stock: Number($("#openingStock").val() || 0),
+                    minimum: Number($("#minimumStock").val() || 0),
+                    cost: Number($("#costPrice").val() || 0),
+                    selling: Number($("#sellingPrice").val() || 0),
+                    status: $("#itemStatus").val()
+                };
+
+                if (id) {
+                    const index = items.findIndex(x => x.id === id);
+                    items[index] = itemData;
+                    toastSuccess("Item updated successfully.");
+                } else {
+                    items.push(itemData);
+                    toastSuccess("Item saved successfully.");
+                }
+
+                $("#itemModal").modal("hide");
+                resetForm();
+                renderItems();
+            });
+
+            $(document).on("click", ".edit-item", function () {
+                const id = Number($(this).data("id"));
+                const item = items.find(x => x.id === id);
+                if (!item) return;
+
+                $("#itemId").val(item.id);
+                $("#itemModalTitle").text("Edit Inventory Item");
+                $("#itemName").val(item.name);
+                $("#itemCode").val(item.code);
+                $("#itemCategory").val(item.category);
+                $("#itemSubCategory").val(item.subCategory);
+                $("#itemType").val(item.type);
+                $("#unitType").val(item.unit);
+                $("#brand").val(item.brand);
+                $("#model").val(item.model);
+                $("#openingStock").val(item.stock);
+                $("#minimumStock").val(item.minimum);
+                $("#costPrice").val(item.cost);
+                $("#sellingPrice").val(item.selling);
+                $("#itemStatus").val(item.status);
+                $("#description").val(item.description || "");
+
+                $("#itemModal").modal("show");
+            });
+
+            $(document).on("click", ".delete-item", function () {
+                const id = Number($(this).data("id"));
+                const index = items.findIndex(x => x.id === id);
+
+                if (index >= 0) {
+                    items.splice(index, 1);
+                    toastSuccess("Item deleted successfully.");
+                    renderItems();
+                }
+            });
+
+            $("#applyFilterBtn").on("click", renderItems);
+            $("#searchItem, #filterCategory, #filterType, #filterStock").on("input change", renderItems);
+
+            $("#resetFilterBtn").on("click", function () {
+                $("#searchItem").val("");
+                $("#filterCategory").val("");
+                $("#filterType").val("");
+                $("#filterStock").val("");
+                renderItems();
+            });
+
+            $("#itemModal").on("hidden.bs.modal", resetForm);
+
+            renderItems();
+        });
+    </script>
+}

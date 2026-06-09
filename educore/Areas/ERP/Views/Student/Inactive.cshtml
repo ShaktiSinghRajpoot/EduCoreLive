@@ -1,0 +1,517 @@
+@{
+    ViewData["Title"] = "Inactive / Left Students";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+/* ===== Inactive / Left Students (in-*) ===== */
+
+/* summary cards */
+.in-card{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
+    background:#fff; padding:1rem 1.1rem;
+    display:flex; align-items:center; gap:.85rem; height:100%;
+    transition:var(--ec-transition); 
+}
+.in-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); }
+.in-card-ic{ width:44px; height:44px; flex:0 0 44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; }
+.in-card-val{ font-size:1.45rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.in-card-lbl{ font-size:.7rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+/* filter bar */
+.in-fbar{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.in-srch-wrap{ position:relative; flex:1 1 200px; max-width:280px; }
+.in-srch-ic{ position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:var(--ec-text-muted); font-size:1rem; pointer-events:none; }
+.in-srch-inp{
+    width:100%; height:34px; padding:0 .75rem 0 2rem;
+    border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.82rem; font-weight:600; color:var(--ec-text,#2b2c40); outline:none;
+    transition:var(--ec-transition);
+}
+.in-srch-inp:focus{ border-color:rgba(255,138,0,.55); background:#fff; box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+.in-chip{
+    height:34px; padding:0 .65rem; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.78rem; font-weight:700; color:var(--ec-text-muted);
+    cursor:pointer; outline:none; transition:var(--ec-transition); white-space:nowrap; appearance:auto;
+}
+.in-chip:hover{ border-color:rgba(255,138,0,.4); background:#fff; color:var(--ec-text,#2b2c40); }
+.in-chip.active-filter{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.45); color:var(--ec-primary); }
+.in-clear-btn{
+    height:34px; padding:0 .75rem; border-radius:8px; border:1px solid #f5c2c7;
+    background:#fff0f0; color:#dc3545; font-size:.76rem; font-weight:700; cursor:pointer; outline:none;
+    display:inline-flex; align-items:center; gap:.3rem; transition:var(--ec-transition);
+}
+.in-clear-btn:hover{ background:#fde8e8; border-color:#dc3545; }
+.in-export-btn{
+    height:34px; width:34px; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; color:var(--ec-text-muted); font-size:1rem; cursor:pointer; outline:none;
+    display:inline-flex; align-items:center; justify-content:center; transition:var(--ec-transition);
+}
+.in-export-btn:hover{ background:#fff; color:#198754; border-color:#198754; }
+
+/* table */
+.in-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.in-tbl{ min-width:940px; width:100%; }
+.in-tbl thead th{
+    background:linear-gradient(180deg,#fffaf3,#fff6ea);
+    color:var(--ec-text-light,#9a938b); font-size:.7rem;
+    text-transform:uppercase; letter-spacing:.06em; font-weight:800;
+    padding:.75rem .9rem; border-bottom:1px solid var(--ec-border); white-space:nowrap;
+}
+.in-tbl tbody td{
+    padding:.72rem .9rem; vertical-align:middle; border-bottom:1px solid #f4f0eb;
+    font-size:.84rem; font-weight:600; color:var(--ec-text,#2b2c40);
+}
+.in-tbl tbody tr:hover td{ background:#fffaf3; }
+
+.in-av{ width:34px; height:34px; flex:0 0 34px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:800; }
+.in-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.85rem; line-height:1.2; }
+.in-rl{ font-size:.72rem; color:var(--ec-text-muted); }
+
+/* reason badge */
+.in-bdg{ display:inline-flex; align-items:center; gap:.28rem; padding:.26rem .6rem; border-radius:999px; font-size:.69rem; font-weight:800; white-space:nowrap; }
+.in-bdg::before{ content:''; width:5px; height:5px; border-radius:50%; }
+.r-left    { background:#e2e3e5; color:#495057; } .r-left::before    { background:#6c757d; }
+.r-transfer{ background:#cfe2ff; color:#084298; } .r-transfer::before{ background:#0d6efd; }
+.r-passout { background:#d4edda; color:#155724; } .r-passout::before { background:#28a745; }
+.r-struck  { background:#fde8e8; color:#842029; } .r-struck::before  { background:#dc3545; }
+.r-suspend { background:#fff3cd; color:#664d03; } .r-suspend::before { background:#ffc107; }
+
+/* dues */
+.in-due{ font-weight:800; font-size:.82rem; }
+.in-due.has{ color:#b02a37; } .in-due.clear{ color:#157347; }
+
+/* tc status */
+.in-tc{ display:inline-flex; align-items:center; gap:.3rem; font-size:.78rem; font-weight:700; }
+.in-tc.issued{ color:#157347; } .in-tc.no{ color:var(--ec-text-muted); }
+
+/* action buttons */
+.in-act-btn{
+    display:inline-flex; align-items:center; gap:.28rem; padding:.26rem .6rem;
+    border-radius:8px; font-size:.75rem; font-weight:700; cursor:pointer; white-space:nowrap;
+    border:1px solid rgba(255,138,0,.2); background:var(--ec-primary-light); color:var(--ec-primary);
+    transition:var(--ec-transition);
+}
+.in-act-btn:hover{ background:#ffe0b2; color:#e65c00; }
+.in-act-btn.tc{ border-color:rgba(13,110,253,.2); background:#eaf1ff; color:#0d6efd; }
+.in-act-btn.tc:hover{ background:#d8e6ff; }
+
+/* empty + pagination */
+.in-empty{ padding:3rem 1rem; text-align:center; }
+.in-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }
+.in-pg-wrap{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.65rem; padding-top:1rem; border-top:1px solid var(--ec-border); }
+.in-pg-info{ font-size:.81rem; color:var(--ec-text-muted); font-weight:650; }
+.in-pg-btn{
+    width:32px; height:32px; border-radius:7px; border:1px solid var(--ec-border);
+    background:#fff; color:var(--ec-text,#2b2c40); font-size:.8rem; font-weight:700;
+    display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:var(--ec-transition); padding:0;
+}
+.in-pg-btn:hover:not(:disabled){ background:var(--ec-primary-light); border-color:var(--ec-primary); color:var(--ec-primary); }
+.in-pg-btn.active{ background:var(--ec-primary); border-color:var(--ec-primary); color:#fff; }
+.in-pg-btn:disabled{ opacity:.35; cursor:not-allowed; }
+
+/* mobile cards */
+.in-mob{ display:none; }
+.in-mob-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; padding:.9rem; margin-bottom:.7rem; }
+.in-mob-top{ display:flex; align-items:center; gap:.65rem; margin-bottom:.7rem; }
+.in-mob-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.45rem .7rem; margin-bottom:.7rem; }
+.in-mob-grid label{ font-size:.66rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--ec-text-light,#9a938b); display:block; }
+.in-mob-grid span{ font-size:.82rem; font-weight:700; color:var(--ec-text,#2b2c40); }
+
+@@media (max-width:991.98px){ .in-srch-wrap{ max-width:100%; } }
+@@media (max-width:767.98px){
+    .in-tbl-wrap{ display:none; }
+    .in-mob{ display:block; }
+    .in-pg-wrap{ justify-content:center; }
+    .in-pg-info{ width:100%; text-align:center; }
+}
+@@media (max-width:575.98px){
+    .in-card{ padding:.8rem .9rem; }
+    .in-card-val{ font-size:1.25rem; }
+    .in-srch-wrap{ flex:1 1 100%; }
+    .in-mob-grid{ grid-template-columns:1fr; }
+}
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <!-- Header -->
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-user-x fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Inactive / Left Students</h4>
+            <div class="ec-page-subtitle">Archived records — re-admit, issue certificates or follow up on dues</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="in-card">
+          <div class="in-card-ic bg-label-secondary" style="color:#6c757d;"><i class="bx bx-archive"></i></div>
+          <div><div class="in-card-val" id="cTotal">—</div><div class="in-card-lbl">Total Archived</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="in-card">
+          <div class="in-card-ic bg-label-info text-info"><i class="bx bx-transfer"></i></div>
+          <div><div class="in-card-val" id="cTransfer">—</div><div class="in-card-lbl">Transferred</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="in-card">
+          <div class="in-card-ic bg-label-success text-success"><i class="bx bx-graduation"></i></div>
+          <div><div class="in-card-val" id="cPassout">—</div><div class="in-card-lbl">Passed Out</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="in-card">
+          <div class="in-card-ic bg-label-danger text-danger"><i class="bx bx-wallet"></i></div>
+          <div><div class="in-card-val" id="cDues">—</div><div class="in-card-lbl">With Pending Dues</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Roster -->
+    <div class="ec-card mb-0">
+      <div class="ec-card-header">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-archive-in"></i></span>
+            <div>
+              <div class="ec-section-title">Archived Records</div>
+              <div class="ec-section-subtitle" id="resultText">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="in-fbar">
+          <div class="in-srch-wrap">
+            <i class="bx bx-search in-srch-ic"></i>
+            <input type="search" class="in-srch-inp" id="inSearch" placeholder="Search name, roll no, class…">
+          </div>
+
+          <select class="in-chip" id="fReason">
+            <option value="">All Reasons</option>
+            <option value="Left">Left / Withdrawn</option>
+            <option value="Transfer">Transferred (TC)</option>
+            <option value="Passout">Passed Out</option>
+            <option value="Struck">Struck Off</option>
+            <option value="Suspend">Suspended</option>
+          </select>
+
+          <select class="in-chip" id="fYear">
+            <option value="">All Years</option>
+            <option value="2025-26">2025–26</option>
+            <option value="2024-25">2024–25</option>
+            <option value="2023-24">2023–24</option>
+          </select>
+
+          <select class="in-chip" id="fDues">
+            <option value="">Dues: Any</option>
+            <option value="has">With Dues</option>
+            <option value="clear">Cleared</option>
+          </select>
+
+          <button class="in-clear-btn d-none" id="clearBtn"><i class="bx bx-x"></i>Clear</button>
+
+          <div class="ms-auto">
+            <button class="in-export-btn" id="btnExcel" title="Export list"><i class="bx bx-spreadsheet"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ec-card-body pt-2">
+
+        <!-- Desktop -->
+        <div class="in-tbl-wrap">
+          <table class="table in-tbl align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Last Class</th>
+                <th>Reason</th>
+                <th>Date Left</th>
+                <th>Pending Dues</th>
+                <th>TC Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Mobile -->
+        <div class="in-mob" id="mobList"></div>
+
+        <!-- Empty -->
+        <div class="in-empty d-none" id="emptyState">
+          <div class="in-empty-ic"><i class="bx bx-search-alt"></i></div>
+          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No records found</h6>
+          <p class="text-muted small mb-0">Try adjusting your search or filters.</p>
+        </div>
+
+        <!-- Pagination -->
+        <div class="in-pg-wrap" id="pgWrap">
+          <div class="in-pg-info" id="pgInfo">—</div>
+          <div class="d-flex gap-1 flex-wrap justify-content-end" id="pgBtns"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Reactivate confirm modal -->
+<div class="modal fade" id="reactModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:0;border-radius:20px;overflow:hidden;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-user-check"></i></span>
+          <div>
+            <div class="ec-section-title">Re-admit Student</div>
+            <div class="ec-section-subtitle">Restore this student to the active roster</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4">
+        <p class="mb-2" style="font-size:.9rem;">You are about to re-activate <strong id="reactName">—</strong>.</p>
+        <div class="row g-3">
+          <div class="col-12 col-sm-6">
+            <label class="form-label" style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--ec-text-muted);">Admit into Class</label>
+            <select class="form-select" id="reactClass"></select>
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label" style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--ec-text-muted);">Section</label>
+            <select class="form-select" id="reactSection"><option>A</option><option>B</option><option>C</option></select>
+          </div>
+        </div>
+        <div class="alert alert-info d-flex align-items-start gap-2 mt-3 mb-0" style="border-radius:12px;font-size:.82rem;">
+          <i class="bx bx-info-circle fs-5"></i>
+          <span>The student's full history (fees, attendance, exams) is preserved and re-linked.</span>
+        </div>
+      </div>
+      <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" id="reactConfirm"><i class="bx bx-check me-1"></i>Re-admit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+(function(){
+'use strict';
+
+var LADDER=['Grade UKG','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
+var PAGE=1, PER=10, filtered=[], reactId=null;
+
+/* Mock archived students (would come from SP) */
+var DATA=[
+  {id:101,name:'Sourav Das',    roll:'R-201',cls:'Grade 9', reason:'Left',    date:'2025-08-12',dues:6500, tc:false,year:'2025-26',color:'secondary'},
+  {id:102,name:'Meena Kumari',  roll:'R-202',cls:'Grade 10',reason:'Transfer',date:'2025-07-03',dues:0,    tc:true, year:'2025-26',color:'info'},
+  {id:103,name:'Arjun Nair',    roll:'R-203',cls:'Grade 12',reason:'Passout', date:'2025-03-31',dues:0,    tc:true, year:'2024-25',color:'success'},
+  {id:104,name:'Farah Khan',    roll:'R-204',cls:'Grade 12',reason:'Passout', date:'2025-03-31',dues:1200, tc:false,year:'2024-25',color:'primary'},
+  {id:105,name:'Rohit Sinha',   roll:'R-205',cls:'Grade 7', reason:'Struck',  date:'2025-09-20',dues:14200,tc:false,year:'2025-26',color:'danger'},
+  {id:106,name:'Aisha Begum',   roll:'R-206',cls:'Grade 6', reason:'Transfer',date:'2025-06-15',dues:0,    tc:true, year:'2025-26',color:'warning'},
+  {id:107,name:'Naveen Reddy',  roll:'R-207',cls:'Grade 11',reason:'Suspend', date:'2025-10-01',dues:3800, tc:false,year:'2025-26',color:'info'},
+  {id:108,name:'Komal Joshi',   roll:'R-208',cls:'Grade 8', reason:'Left',    date:'2024-12-10',dues:0,    tc:false,year:'2024-25',color:'primary'},
+  {id:109,name:'Imran Sheikh',  roll:'R-209',cls:'Grade 12',reason:'Passout', date:'2024-03-31',dues:0,    tc:true, year:'2023-24',color:'success'},
+  {id:110,name:'Sneha Pillai',  roll:'R-210',cls:'Grade 5', reason:'Transfer',date:'2025-05-22',dues:2400, tc:true, year:'2025-26',color:'danger'},
+  {id:111,name:'Karan Malhotra',roll:'R-211',cls:'Grade 9', reason:'Left',    date:'2024-11-05',dues:9100, tc:false,year:'2024-25',color:'warning'},
+  {id:112,name:'Pooja Iyer',    roll:'R-212',cls:'Grade 10',reason:'Struck',  date:'2025-09-28',dues:16750,tc:false,year:'2025-26',color:'secondary'}
+];
+
+var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDate(d){ var x=new Date(d); return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]+' '+x.getFullYear(); }
+function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
+function inr(n){ return n>0?'₹'+n.toLocaleString('en-IN'):'₹0'; }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
+
+var REASON={
+  Left:    {cls:'r-left',    txt:'Left'},
+  Transfer:{cls:'r-transfer',txt:'Transferred'},
+  Passout: {cls:'r-passout', txt:'Passed Out'},
+  Struck:  {cls:'r-struck',  txt:'Struck Off'},
+  Suspend: {cls:'r-suspend', txt:'Suspended'}
+};
+function reasonBdg(r){ var m=REASON[r]||REASON.Left; return '<span class="in-bdg '+m.cls+'">'+m.txt+'</span>'; }
+function tcHtml(t){ return t ? '<span class="in-tc issued"><i class="bx bx-check-circle"></i>Issued</span>' : '<span class="in-tc no"><i class="bx bx-minus-circle"></i>Not issued</span>'; }
+
+/* Populate reactivate class dropdown */
+(function(){ var s=document.getElementById('reactClass'); LADDER.forEach(function(c){ var o=document.createElement('option'); o.value=c; o.textContent=c; s.appendChild(o); }); })();
+
+/* Cards reflect full dataset */
+function updateCards(){
+  document.getElementById('cTotal').textContent=DATA.length;
+  document.getElementById('cTransfer').textContent=DATA.filter(function(s){return s.reason==='Transfer';}).length;
+  document.getElementById('cPassout').textContent=DATA.filter(function(s){return s.reason==='Passout';}).length;
+  document.getElementById('cDues').textContent=DATA.filter(function(s){return s.dues>0;}).length;
+}
+
+/* Filters */
+function applyFilters(){
+  var q=document.getElementById('inSearch').value.toLowerCase().trim(),
+      reason=document.getElementById('fReason').value,
+      year=document.getElementById('fYear').value,
+      dues=document.getElementById('fDues').value;
+
+  filtered=DATA.filter(function(s){
+    var dueOk = !dues || (dues==='has'? s.dues>0 : s.dues===0);
+    return (!q || s.name.toLowerCase().includes(q) || s.roll.toLowerCase().includes(q) || s.cls.toLowerCase().includes(q))
+      && (!reason || s.reason===reason) && (!year || s.year===year) && dueOk;
+  });
+
+  ['fReason','fYear','fDues'].forEach(function(id){ var el=document.getElementById(id); el.classList.toggle('active-filter', el.value!==''); });
+  var has=q||reason||year||dues;
+  document.getElementById('clearBtn').classList.toggle('d-none',!has);
+
+  PAGE=1; render();
+}
+
+/* Render */
+function render(){
+  var total=filtered.length;
+  PER=10;
+  var pages=Math.ceil(total/PER)||1;
+  if(PAGE>pages)PAGE=pages;
+  var start=(PAGE-1)*PER, end=Math.min(start+PER,total), slice=filtered.slice(start,end);
+
+  var tb=document.getElementById('tblBody'), mob=document.getElementById('mobList'), empty=document.getElementById('emptyState');
+
+  if(!total){
+    tb.innerHTML=''; mob.innerHTML=''; empty.classList.remove('d-none');
+    document.getElementById('pgWrap').classList.add('d-none');
+    document.getElementById('resultText').textContent='No records found';
+    return;
+  }
+  empty.classList.add('d-none'); document.getElementById('pgWrap').classList.remove('d-none');
+
+  tb.innerHTML=slice.map(function(s){
+    return '<tr>'
+      +'<td><div class="d-flex align-items-center gap-2">'
+      +   '<span class="in-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
+      +   '<div><div class="in-nm">'+esc(s.name)+'</div><div class="in-rl">'+esc(s.roll)+'</div></div>'
+      +'</div></td>'
+      +'<td>'+esc(s.cls)+'</td>'
+      +'<td>'+reasonBdg(s.reason)+'</td>'
+      +'<td>'+fmtDate(s.date)+'</td>'
+      +'<td><span class="in-due '+(s.dues>0?'has':'clear')+'">'+inr(s.dues)+'</span></td>'
+      +'<td>'+tcHtml(s.tc)+'</td>'
+      +'<td><div class="d-flex gap-1">'
+      +   '<button class="in-act-btn js-react" data-id="'+s.id+'"><i class="bx bx-user-check"></i>Re-admit</button>'
+      +   '<button class="in-act-btn tc js-tc" data-id="'+s.id+'"><i class="bx bx-file"></i>TC</button>'
+      +'</div></td>'
+      +'</tr>';
+  }).join('');
+
+  mob.innerHTML=slice.map(function(s){
+    return '<div class="in-mob-card">'
+      +'<div class="in-mob-top">'
+      +   '<span class="in-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
+      +   '<div class="flex-grow-1"><div class="in-nm">'+esc(s.name)+'</div><div class="in-rl">'+esc(s.roll)+' · '+esc(s.cls)+'</div></div>'
+      +   reasonBdg(s.reason)
+      +'</div>'
+      +'<div class="in-mob-grid">'
+      +   '<div><label>Date Left</label><span>'+fmtDate(s.date)+'</span></div>'
+      +   '<div><label>Pending Dues</label><span class="in-due '+(s.dues>0?'has':'clear')+'">'+inr(s.dues)+'</span></div>'
+      +   '<div><label>TC Status</label><span>'+tcHtml(s.tc)+'</span></div>'
+      +   '<div><label>Year</label><span>'+esc(s.year)+'</span></div>'
+      +'</div>'
+      +'<div class="d-flex gap-1">'
+      +   '<button class="in-act-btn js-react flex-grow-1 justify-content-center" data-id="'+s.id+'"><i class="bx bx-user-check"></i>Re-admit</button>'
+      +   '<button class="in-act-btn tc js-tc flex-grow-1 justify-content-center" data-id="'+s.id+'"><i class="bx bx-file"></i>Issue TC</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+
+  bindRowActions();
+  renderPag(pages,total,start,end);
+  document.getElementById('resultText').textContent='Showing '+(start+1)+'–'+end+' of '+total+' archived students';
+}
+
+function renderPag(pages,total,start,end){
+  document.getElementById('pgInfo').textContent='Showing '+(start+1)+'–'+end+' of '+total;
+  var box=document.getElementById('pgBtns'); box.innerHTML='';
+  function btn(lbl,pg,dis,act){
+    var b=document.createElement('button');
+    b.className='in-pg-btn'+(act?' active':''); b.innerHTML=lbl; b.disabled=dis;
+    b.addEventListener('click',function(){ PAGE=pg; render(); });
+    box.appendChild(b);
+  }
+  btn('<i class="bx bx-chevron-left"></i>',PAGE-1,PAGE===1,false);
+  for(var i=1;i<=pages;i++) btn(i,i,false,i===PAGE);
+  btn('<i class="bx bx-chevron-right"></i>',PAGE+1,PAGE===pages,false);
+}
+
+/* Row actions */
+function bindRowActions(){
+  document.querySelectorAll('.js-react').forEach(function(b){
+    b.addEventListener('click',function(){
+      reactId=parseInt(this.dataset.id,10);
+      var s=DATA.find(function(x){return x.id===reactId;});
+      document.getElementById('reactName').textContent=s.name+' ('+s.roll+')';
+      document.getElementById('reactClass').value=s.cls;
+      new bootstrap.Modal(document.getElementById('reactModal')).show();
+    });
+  });
+  document.querySelectorAll('.js-tc').forEach(function(b){
+    b.addEventListener('click',function(){
+      var s=DATA.find(function(x){return x.id===parseInt(b.dataset.id,10);});
+      toast('info','Opening certificate generator for '+s.name+'… (Transfer Certificates module)');
+    });
+  });
+}
+
+/* Confirm reactivate */
+document.getElementById('reactConfirm').addEventListener('click',function(){
+  var s=DATA.find(function(x){return x.id===reactId;});
+  if(!s) return;
+  var cls=document.getElementById('reactClass').value, sec=document.getElementById('reactSection').value;
+  // Wire to: @Url.Action("Reactivate","Student",new{area="ERP"})  (POST id, cls, sec)
+  var i=DATA.indexOf(s); DATA.splice(i,1);
+  bootstrap.Modal.getInstance(document.getElementById('reactModal')).hide();
+  updateCards(); applyFilters();
+  toast('success',s.name+' re-admitted into '+cls+' – '+sec+'.');
+});
+
+/* Export stub */
+document.getElementById('btnExcel').addEventListener('click',function(){ toast('info','Exporting '+filtered.length+' records…'); });
+
+/* Clear */
+document.getElementById('clearBtn').addEventListener('click',function(){
+  document.getElementById('inSearch').value='';
+  document.getElementById('fReason').value='';
+  document.getElementById('fYear').value='';
+  document.getElementById('fDues').value='';
+  applyFilters();
+});
+
+/* Listeners */
+['inSearch','fReason','fYear','fDues'].forEach(function(id){
+  document.getElementById(id).addEventListener('input',applyFilters);
+  document.getElementById(id).addEventListener('change',applyFilters);
+});
+
+/* Init */
+updateCards();
+applyFilters();
+
+})();
+</script>
+}

@@ -1,0 +1,444 @@
+@{
+    ViewData["Title"] = "Period Structure";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+/* ===== Period Structure (ps-*) ===== */
+
+/* summary cards */
+.ps-card{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
+    background:#fff; padding:1rem 1.1rem;
+    display:flex; align-items:center; gap:.85rem; height:100%; 
+    transition:var(--ec-transition);
+}
+.ps-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); }
+.ps-card-ic{ width:44px; height:44px; flex:0 0 44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; }
+.ps-card-val{ font-size:1.3rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.ps-card-lbl{ font-size:.68rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+/* toolbar */
+.ps-shift{
+    height:38px; min-width:180px; padding:0 .7rem; border-radius:9px; border:1px solid var(--ec-border);
+    background:#fff; font-size:.83rem; font-weight:700; color:var(--ec-text,#2b2c40); outline:none; transition:var(--ec-transition);
+}
+.ps-shift:focus{ border-color:rgba(255,138,0,.55); box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+
+/* day-at-a-glance bar */
+.ps-glance{ display:flex; gap:3px; border-radius:11px; overflow:hidden; height:40px; }
+.ps-g-seg{ display:flex; align-items:center; justify-content:center; font-size:.6rem; font-weight:800; color:#fff; white-space:nowrap; overflow:hidden; min-width:6px; transition:var(--ec-transition); }
+.ps-g-class{ background:linear-gradient(135deg,#ff8a00,#ffad42); }
+.ps-g-break{ background:repeating-linear-gradient(45deg,#b9b3aa,#b9b3aa 6px,#a9a399 6px,#a9a399 12px); }
+.ps-g-lunch{ background:linear-gradient(135deg,#3b82f6,#60a5fa); }
+.ps-legend{ display:flex; gap:1rem; flex-wrap:wrap; align-items:center; font-size:.72rem; font-weight:700; color:var(--ec-text-muted); }
+.ps-legend span{ display:inline-flex; align-items:center; gap:.35rem; }
+.ps-l-dot{ width:12px; height:12px; border-radius:4px; }
+
+/* ---- vertical timeline ---- */
+.ps-tl{ position:relative; }
+.ps-item{ display:grid; grid-template-columns:58px 26px 1fr; align-items:stretch; }
+.ps-time{
+    text-align:right; padding-top:.85rem; padding-right:.1rem;
+    font-size:.8rem; font-weight:800; color:var(--ec-text-dark); white-space:nowrap; line-height:1.1;
+}
+.ps-time small{ display:block; font-size:.62rem; font-weight:700; color:var(--ec-text-muted); margin-top:1px; }
+
+.ps-line{ position:relative; }
+.ps-line::before{ content:''; position:absolute; left:50%; top:0; bottom:0; width:2px; background:var(--ec-border); transform:translateX(-50%); }
+.ps-item:first-child .ps-line::before{ top:18px; }
+.ps-item:last-child .ps-line::before{ bottom:auto; height:18px; }
+.ps-dot{ position:absolute; left:50%; top:18px; transform:translate(-50%,-50%); width:15px; height:15px; border-radius:50%; background:#fff; border:3px solid var(--ec-border); z-index:1; }
+
+.ps-block{
+    border:1px solid var(--ec-border); border-left-width:4px; border-radius:13px; background:#fff;
+    margin:.3rem 0 .55rem .35rem; padding:.7rem .85rem;
+    display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;
+    transition:var(--ec-transition);
+}
+.ps-block:hover{ box-shadow:var(--ec-shadow); transform:translateX(2px); }
+.ps-blk-ic{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; }
+.ps-blk-info{ flex:1 1 130px; min-width:0; }
+.ps-blk-name{ font-weight:800; color:var(--ec-text-dark); font-size:.92rem; line-height:1.2; }
+.ps-blk-meta{ font-size:.72rem; color:var(--ec-text-muted); font-weight:650; }
+.ps-dur{ font-size:.74rem; font-weight:800; color:var(--ec-text-muted); padding:.2rem .5rem; border-radius:7px; background:#faf9f7; white-space:nowrap; }
+
+.ps-type{ display:inline-flex; align-items:center; gap:.3rem; padding:.26rem .6rem; border-radius:999px; font-size:.68rem; font-weight:800; white-space:nowrap; }
+.ps-type.class{ background:#fff4e6; color:#c2410c; }
+.ps-type.break{ background:#e9e6e1; color:#6b6258; }
+.ps-type.lunch{ background:#dbeafe; color:#1e40af; }
+
+/* type accents */
+.ps-t-class .ps-block{ border-left-color:#ff8a00; }
+.ps-t-class .ps-blk-ic{ background:#fff4e6; color:#ff8a00; }
+.ps-t-class .ps-dot{ border-color:#ff8a00; }
+.ps-t-break .ps-block{ border-left-color:#b9b3aa; }
+.ps-t-break .ps-blk-ic{ background:#efece7; color:#8b8175; }
+.ps-t-break .ps-dot{ border-color:#b9b3aa; }
+.ps-t-lunch .ps-block{ border-left-color:#3b82f6; }
+.ps-t-lunch .ps-blk-ic{ background:#dbeafe; color:#3b82f6; }
+.ps-t-lunch .ps-dot{ border-color:#3b82f6; }
+
+/* actions */
+.ps-acts{ display:inline-flex; gap:.3rem; align-items:center; }
+.ps-ord{ display:inline-flex; flex-direction:column; }
+.ps-ord-btn{ width:22px; height:16px; border:0; background:transparent; color:var(--ec-text-muted); cursor:pointer; padding:0; line-height:1; border-radius:4px; transition:var(--ec-transition); }
+.ps-ord-btn:hover:not(:disabled){ color:var(--ec-primary); background:var(--ec-primary-light); }
+.ps-ord-btn:disabled{ opacity:.25; cursor:not-allowed; }
+.ps-icon-btn{
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fff; color:var(--ec-text-muted); font-size:1rem; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; transition:var(--ec-transition); padding:0;
+}
+.ps-icon-btn:hover{ background:var(--ec-primary-light); border-color:var(--ec-primary); color:var(--ec-primary); }
+.ps-icon-btn.danger:hover{ background:#fff0f0; border-color:#dc3545; color:#dc3545; }
+
+/* warning */
+.ps-warn{ display:flex; align-items:center; gap:.4rem; font-size:.78rem; font-weight:700; color:#b02a37; background:#fff0f0; border:1px solid #f5c2c7; border-radius:11px; padding:.6rem .8rem; }
+
+.ps-note{ font-size:.78rem; color:var(--ec-text-muted); font-weight:650; }
+.ps-modal-lbl{ font-size:.72rem; font-weight:800; text-transform:uppercase; color:var(--ec-text-muted); }
+
+/* ---- responsive ---- */
+@@media (max-width:767.98px){
+    .ps-blk-info{ flex:1 1 100%; order:1; }
+    .ps-blk-ic{ order:0; }
+    .ps-type{ order:2; }
+    .ps-dur{ order:2; }
+    .ps-acts{ order:3; margin-left:auto; }
+}
+@@media (max-width:575.98px){
+    .ps-card{ padding:.8rem .9rem; }
+    .ps-card-val{ font-size:1.15rem; }
+    .ps-item{ grid-template-columns:46px 20px 1fr; }
+    .ps-time{ font-size:.72rem; }
+    .ps-block{ padding:.6rem .65rem; gap:.5rem; }
+    .ps-blk-ic{ width:34px; height:34px; flex:0 0 34px; }
+}
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <!-- Header -->
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-time fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Period Structure</h4>
+            <div class="ec-page-subtitle">Define the daily bell schedule — the timetable grid is built from this</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="ps-card">
+          <div class="ps-card-ic bg-label-primary" style="color:var(--ec-primary);"><i class="bx bx-list-ol"></i></div>
+          <div><div class="ps-card-val" id="cTeaching">—</div><div class="ps-card-lbl">Teaching Periods</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="ps-card">
+          <div class="ps-card-ic bg-label-secondary" style="color:#6c757d;"><i class="bx bx-coffee"></i></div>
+          <div><div class="ps-card-val" id="cBreaks">—</div><div class="ps-card-lbl">Breaks</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="ps-card">
+          <div class="ps-card-ic bg-label-success text-success"><i class="bx bx-sun"></i></div>
+          <div><div class="ps-card-val" id="cStart">—</div><div class="ps-card-lbl">Day Starts</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="ps-card">
+          <div class="ps-card-ic bg-label-info text-info"><i class="bx bx-moon"></i></div>
+          <div><div class="ps-card-val" id="cEnd">—</div><div class="ps-card-lbl">Day Ends</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="ec-card mb-0">
+      <div class="ec-card-header">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-time"></i></span>
+            <div>
+              <div class="ec-section-title">Daily Schedule</div>
+              <div class="ec-section-subtitle" id="resultText">Loading…</div>
+            </div>
+          </div>
+          <div class="d-flex flex-column flex-sm-row gap-2">
+            <select class="ps-shift" id="shiftSel" title="Schedules can differ per shift / wing">
+              <option value="senior">Senior Wing (default)</option>
+              <option value="primary">Primary Wing</option>
+            </select>
+            <button class="btn btn-primary" id="btnAdd"><i class="bx bx-plus me-1"></i>Add Period</button>
+          </div>
+        </div>
+
+        <!-- day at a glance -->
+        <div class="ps-glance mb-2" id="glance"></div>
+        <div class="ps-legend">
+          <span><span class="ps-l-dot ps-g-class"></span>Class</span>
+          <span><span class="ps-l-dot ps-g-break"></span>Break</span>
+          <span><span class="ps-l-dot ps-g-lunch"></span>Lunch</span>
+          <span class="ms-auto" id="totalDur"></span>
+        </div>
+      </div>
+
+      <div class="ec-card-body pt-2">
+        <div class="ps-warn d-none mb-3" id="warnBox"><i class="bx bx-error-circle"></i><span id="warnTxt"></span></div>
+
+        <div class="ps-tl" id="tlList"></div>
+
+        <p class="ps-note mt-3 mb-0">
+          <i class="bx bx-info-circle"></i> This schedule feeds the <strong>Timetable</strong> grid. Breaks &amp; lunch show as non-teaching bars there.
+        </p>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end mt-3">
+      <button class="btn btn-primary px-4" id="btnSave"><i class="bx bx-save me-1"></i>Save Schedule</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Period modal -->
+<div class="modal fade" id="periodModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:0;border-radius:20px;overflow:hidden;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-time"></i></span>
+          <div>
+            <div class="ec-section-title" id="pmTitle">Add Period</div>
+            <div class="ec-section-subtitle">Part of the daily bell schedule</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4">
+        <div class="row g-3">
+          <div class="col-12 col-sm-6">
+            <label class="form-label ps-modal-lbl">Type</label>
+            <select class="form-select" id="mType">
+              <option value="class">Class (teaching)</option>
+              <option value="break">Break</option>
+              <option value="lunch">Lunch</option>
+            </select>
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label ps-modal-lbl">Label</label>
+            <input type="text" class="form-control" id="mName" placeholder="e.g. P1 / Break">
+          </div>
+          <div class="col-6">
+            <label class="form-label ps-modal-lbl">Start Time</label>
+            <input type="time" class="form-control" id="mStart">
+          </div>
+          <div class="col-6">
+            <label class="form-label ps-modal-lbl">End Time</label>
+            <input type="time" class="form-control" id="mEnd">
+          </div>
+        </div>
+        <div class="ps-warn mt-3 d-none" id="mWarn"><i class="bx bx-error"></i><span id="mWarnTxt"></span></div>
+      </div>
+      <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" id="pmSave"><i class="bx bx-check me-1"></i>Save Period</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+(function(){
+'use strict';
+
+var nextId=100, editId=null;
+
+/* Mock schedules per shift (would come from SP). type: class|break|lunch */
+var SCHEDULES={
+  senior:[
+    {id:1,name:'P1',start:'08:00',end:'08:40',type:'class'},
+    {id:2,name:'P2',start:'08:40',end:'09:20',type:'class'},
+    {id:3,name:'P3',start:'09:20',end:'10:00',type:'class'},
+    {id:4,name:'Break',start:'10:00',end:'10:15',type:'break'},
+    {id:5,name:'P4',start:'10:15',end:'10:55',type:'class'},
+    {id:6,name:'P5',start:'10:55',end:'11:35',type:'class'},
+    {id:7,name:'Lunch',start:'11:35',end:'12:10',type:'lunch'},
+    {id:8,name:'P6',start:'12:10',end:'12:50',type:'class'},
+    {id:9,name:'P7',start:'12:50',end:'13:30',type:'class'},
+    {id:10,name:'P8',start:'13:30',end:'14:10',type:'class'}
+  ],
+  primary:[
+    {id:1,name:'P1',start:'08:30',end:'09:05',type:'class'},
+    {id:2,name:'P2',start:'09:05',end:'09:40',type:'class'},
+    {id:3,name:'Break',start:'09:40',end:'09:55',type:'break'},
+    {id:4,name:'P3',start:'09:55',end:'10:30',type:'class'},
+    {id:5,name:'P4',start:'10:30',end:'11:05',type:'class'},
+    {id:6,name:'Lunch',start:'11:05',end:'11:40',type:'lunch'},
+    {id:7,name:'P5',start:'11:40',end:'12:15',type:'class'},
+    {id:8,name:'P6',start:'12:15',end:'12:50',type:'class'}
+  ]
+};
+var shift='senior';
+function rows(){ return SCHEDULES[shift]; }
+
+function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function toMin(t){ if(!t) return 0; var p=t.split(':'); return parseInt(p[0],10)*60+parseInt(p[1],10); }
+function dur(r){ return toMin(r.end)-toMin(r.start); }
+function fmt12(t){ if(!t) return '—'; var p=t.split(':'),h=parseInt(p[0],10),m=p[1]; var ap=h>=12?'PM':'AM'; var hh=h%12||12; return hh+':'+m+' '+ap; }
+function typeLabel(t){ return {class:'Class',break:'Break',lunch:'Lunch'}[t]||'Class'; }
+function typeIcon(t){ return {class:'bx-book',break:'bx-coffee',lunch:'bx-restaurant'}[t]||'bx-book'; }
+
+/* validate ordering: detect overlaps / negative durations */
+function findIssue(){
+  var list=rows();
+  for(var i=0;i<list.length;i++){
+    if(dur(list[i])<=0) return list[i].name+' has an invalid time (end before start).';
+    if(i>0 && toMin(list[i].start)<toMin(list[i-1].end)) return list[i].name+' overlaps '+list[i-1].name+'.';
+  }
+  return null;
+}
+
+function updateCards(){
+  var list=rows();
+  document.getElementById('cTeaching').textContent=list.filter(function(r){return r.type==='class';}).length;
+  document.getElementById('cBreaks').textContent=list.filter(function(r){return r.type!=='class';}).length;
+  document.getElementById('cStart').textContent=list.length?fmt12(list[0].start):'—';
+  document.getElementById('cEnd').textContent=list.length?fmt12(list[list.length-1].end):'—';
+}
+
+function renderGlance(){
+  var list=rows(), g=document.getElementById('glance');
+  var total=list.reduce(function(a,r){return a+Math.max(dur(r),0);},0)||1;
+  g.innerHTML=list.map(function(r){
+    var w=Math.max(dur(r),0)/total*100;
+    var cls=r.type==='class'?'ps-g-class':(r.type==='lunch'?'ps-g-lunch':'ps-g-break');
+    return '<div class="ps-g-seg '+cls+'" style="flex:'+w+' 1 0;" title="'+esc(r.name)+' · '+r.start+'–'+r.end+'">'+(w>5?esc(r.name):'')+'</div>';
+  }).join('');
+  var hrs=Math.floor(total/60), mins=total%60;
+  document.getElementById('totalDur').textContent='Total day: '+(hrs?hrs+'h ':'')+(mins?mins+'m':'');
+}
+
+function render(){
+  var list=rows(), box=document.getElementById('tlList');
+  box.innerHTML=list.map(function(r,i){
+    var d=dur(r);
+    return '<div class="ps-item ps-t-'+r.type+'">'
+      +'<div class="ps-time">'+r.start+'<small>'+r.end+'</small></div>'
+      +'<div class="ps-line"><span class="ps-dot"></span></div>'
+      +'<div class="ps-block">'
+      +  '<div class="ps-blk-ic"><i class="bx '+typeIcon(r.type)+'"></i></div>'
+      +  '<div class="ps-blk-info"><div class="ps-blk-name">'+esc(r.name)+'</div>'
+      +     '<div class="ps-blk-meta">'+fmt12(r.start)+' – '+fmt12(r.end)+'</div></div>'
+      +  '<span class="ps-dur">'+(d>0?d+' min':'—')+'</span>'
+      +  '<span class="ps-type '+r.type+'">'+typeLabel(r.type)+'</span>'
+      +  '<div class="ps-acts">'
+      +     '<div class="ps-ord">'
+      +        '<button class="ps-ord-btn js-up" data-i="'+i+'"'+(i===0?' disabled':'')+'><i class="bx bx-chevron-up"></i></button>'
+      +        '<button class="ps-ord-btn js-down" data-i="'+i+'"'+(i===list.length-1?' disabled':'')+'><i class="bx bx-chevron-down"></i></button>'
+      +     '</div>'
+      +     '<button class="ps-icon-btn js-edit" data-id="'+r.id+'"><i class="bx bx-edit-alt"></i></button>'
+      +     '<button class="ps-icon-btn danger js-del" data-id="'+r.id+'"><i class="bx bx-trash"></i></button>'
+      +  '</div>'
+      +'</div>'
+      +'</div>';
+  }).join('');
+
+  var issue=findIssue(), wb=document.getElementById('warnBox');
+  if(issue){ document.getElementById('warnTxt').textContent=issue; wb.classList.remove('d-none'); }
+  else wb.classList.add('d-none');
+
+  document.getElementById('resultText').textContent=list.length+' periods · '+list.filter(function(r){return r.type==='class';}).length+' teaching';
+
+  updateCards(); renderGlance(); bindRows();
+}
+
+function bindRows(){
+  document.querySelectorAll('.js-up').forEach(function(b){ b.addEventListener('click',function(){ move(parseInt(this.dataset.i,10),-1); }); });
+  document.querySelectorAll('.js-down').forEach(function(b){ b.addEventListener('click',function(){ move(parseInt(this.dataset.i,10),1); }); });
+  document.querySelectorAll('.js-edit').forEach(function(b){ b.addEventListener('click',function(){ openModal(parseInt(this.dataset.id,10)); }); });
+  document.querySelectorAll('.js-del').forEach(function(b){ b.addEventListener('click',function(){ del(parseInt(this.dataset.id,10)); }); });
+}
+
+function move(i,dir){
+  var list=rows(), j=i+dir;
+  if(j<0||j>=list.length) return;
+  var t=list[i]; list[i]=list[j]; list[j]=t;
+  render();
+}
+function del(id){
+  var list=rows(), r=list.find(function(x){return x.id===id;});
+  if(!r) return;
+  if(!confirm('Remove "'+r.name+'" from the schedule?')) return;
+  SCHEDULES[shift]=list.filter(function(x){return x.id!==id;});
+  render(); toast('info','Period removed.');
+}
+
+/* ---- modal ---- */
+function openModal(id){
+  editId=id;
+  var r=id?rows().find(function(x){return x.id===id;}):null;
+  document.getElementById('pmTitle').textContent=r?'Edit Period':'Add Period';
+  document.getElementById('mType').value=r?r.type:'class';
+  document.getElementById('mName').value=r?r.name:'';
+  document.getElementById('mStart').value=r?r.start:'';
+  document.getElementById('mEnd').value=r?r.end:'';
+  document.getElementById('mWarn').classList.add('d-none');
+  new bootstrap.Modal(document.getElementById('periodModal')).show();
+}
+document.getElementById('btnAdd').addEventListener('click',function(){ openModal(null); });
+
+document.getElementById('pmSave').addEventListener('click',function(){
+  var name=document.getElementById('mName').value.trim();
+  var start=document.getElementById('mStart').value, end=document.getElementById('mEnd').value;
+  var type=document.getElementById('mType').value;
+  if(!name){ toast('error','Enter a label.'); return; }
+  if(!start||!end){ toast('error','Enter start and end time.'); return; }
+  if(toMin(end)<=toMin(start)){
+    document.getElementById('mWarnTxt').textContent='End time must be after start time.';
+    document.getElementById('mWarn').classList.remove('d-none'); return;
+  }
+  if(editId){
+    var r=rows().find(function(x){return x.id===editId;});
+    r.name=name; r.start=start; r.end=end; r.type=type;
+    toast('success','Period updated.');
+  } else {
+    rows().push({id:++nextId,name:name,start:start,end:end,type:type});
+    toast('success','Period added.');
+  }
+  /* keep chronological order */
+  rows().sort(function(a,b){return toMin(a.start)-toMin(b.start);});
+  // Wire to SP: save period (shift, id, name, start, end, type, sequence)
+  bootstrap.Modal.getInstance(document.getElementById('periodModal')).hide();
+  render();
+});
+
+/* ---- toolbar ---- */
+document.getElementById('shiftSel').addEventListener('change',function(){ shift=this.value; render(); });
+document.getElementById('btnSave').addEventListener('click',function(){
+  if(findIssue()){ toast('error','Fix the highlighted timing issue before saving.'); return; }
+  // Wire to SP: save full schedule for shift
+  toast('success','Schedule saved for '+document.getElementById('shiftSel').selectedOptions[0].text+'.');
+});
+
+/* init */
+render();
+
+})();
+</script>
+}

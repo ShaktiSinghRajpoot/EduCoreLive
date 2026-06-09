@@ -1,0 +1,626 @@
+@{
+    ViewData["Title"] = "Promote Students";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+/* ===== Promote Students (pr-*) ===== */
+
+/* Source → Target flow bar */
+.pr-flow{
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    gap:1rem; align-items:stretch; 
+}
+.pr-flow-box{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
+    background:#fff; padding:1rem 1.1rem;
+}
+.pr-flow-box.is-target{ background:linear-gradient(180deg,#fff,var(--ec-primary-soft)); border-color:rgba(255,138,0,.22); }
+.pr-flow-lbl{
+    font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--ec-text-muted); margin-bottom:.7rem; display:flex; align-items:center; gap:.4rem;
+}
+.pr-flow-lbl .bx{ font-size:1rem; }
+.pr-flow-lbl.t{ color:var(--ec-primary); }
+.pr-arrow{
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ec-primary); font-size:1.7rem;
+}
+.pr-field{ margin-bottom:.6rem; }
+.pr-field:last-child{ margin-bottom:0; }
+.pr-field label{
+    font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--ec-text-light,#9a938b); display:block; margin-bottom:.25rem;
+}
+.pr-sel{
+    width:100%; height:38px; padding:0 .7rem;
+    border-radius:10px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.85rem; font-weight:700; color:var(--ec-text,#2b2c40);
+    outline:none; transition:var(--ec-transition); appearance:auto;
+}
+.pr-sel:focus{ border-color:rgba(255,138,0,.55); background:#fff; box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+.pr-sel:disabled{ background:#f3f1ee; color:var(--ec-text-muted); cursor:not-allowed; }
+
+/* summary cards */
+.pr-card{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
+    background:#fff; padding:1rem 1.1rem;
+    display:flex; align-items:center; gap:.85rem; height:100%;
+    transition:var(--ec-transition);
+}
+.pr-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); }
+.pr-card-ic{ width:44px; height:44px; flex:0 0 44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; }
+.pr-card-val{ font-size:1.45rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.pr-card-lbl{ font-size:.7rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+/* bulk toolbar */
+.pr-bulk{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.pr-bulk-btn{
+    height:32px; padding:0 .7rem; border-radius:8px;
+    border:1px solid var(--ec-border); background:#fafaf8;
+    font-size:.76rem; font-weight:700; color:var(--ec-text-muted);
+    cursor:pointer; transition:var(--ec-transition);
+    display:inline-flex; align-items:center; gap:.3rem;
+}
+.pr-bulk-btn:hover{ background:#fff; color:var(--ec-primary); border-color:rgba(255,138,0,.4); }
+
+/* outcome segmented control */
+.pr-seg{ display:inline-flex; border:1px solid var(--ec-border); border-radius:8px; overflow:hidden; background:#fff; }
+.pr-seg input{ display:none; }
+.pr-seg label{
+    padding:.28rem .6rem; font-size:.73rem; font-weight:800; cursor:pointer; margin:0;
+    color:var(--ec-text-muted); transition:var(--ec-transition); user-select:none;
+    border-right:1px solid var(--ec-border); white-space:nowrap;
+}
+.pr-seg label:last-of-type{ border-right:0; }
+.pr-seg label:hover{ background:#faf8f5; }
+.pr-seg input.o-promote:checked + label{ background:#d4edda; color:#155724; }
+.pr-seg input.o-retain:checked  + label{ background:#fff3cd; color:#664d03; }
+.pr-seg input.o-passout:checked + label{ background:#cfe2ff; color:#084298; }
+
+/* table */
+.pr-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.pr-tbl{ min-width:760px; width:100%; }
+.pr-tbl thead th{
+    background:linear-gradient(180deg,#fffaf3,#fff6ea);
+    color:var(--ec-text-light,#9a938b); font-size:.7rem;
+    text-transform:uppercase; letter-spacing:.06em; font-weight:800;
+    padding:.75rem .9rem; border-bottom:1px solid var(--ec-border); white-space:nowrap;
+}
+.pr-tbl tbody td{
+    padding:.7rem .9rem; vertical-align:middle; border-bottom:1px solid #f4f0eb;
+    font-size:.84rem; font-weight:600; color:var(--ec-text,#2b2c40);
+}
+.pr-tbl tbody tr:hover td{ background:#fffaf3; }
+.pr-tbl tbody tr.row-retain  td{ background:#fffdf5; }
+.pr-tbl tbody tr.row-passout td{ background:#f6f9ff; }
+
+.pr-av{ width:34px; height:34px; flex:0 0 34px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:800; }
+.pr-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.85rem; line-height:1.2; }
+.pr-rl{ font-size:.72rem; color:var(--ec-text-muted); }
+
+/* result pill */
+.pr-res{ display:inline-flex; align-items:center; gap:.3rem; font-weight:800; font-size:.82rem; }
+.pr-res.pass{ color:#157347; } .pr-res.fail{ color:#b02a37; }
+
+/* fee due */
+.pr-due{ font-weight:800; font-size:.82rem; }
+.pr-due.has{ color:#b02a37; } .pr-due.clear{ color:#157347; }
+
+/* empty state */
+.pr-empty{ padding:3rem 1rem; text-align:center; }
+.pr-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }
+
+/* options row */
+.pr-opt{ display:flex; align-items:center; gap:.55rem; font-size:.82rem; font-weight:700; color:var(--ec-text,#2b2c40); }
+
+/* sticky action footer */
+.pr-actions{
+    display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;
+    padding-top:1rem; margin-top:1rem; border-top:1px solid var(--ec-border);
+}
+.pr-actions .hint{ font-size:.8rem; color:var(--ec-text-muted); font-weight:650; }
+
+/* mobile cards */
+.pr-mob{ display:none; }
+.pr-mob-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; padding:.9rem; margin-bottom:.7rem; }
+.pr-mob-card.row-retain{ border-color:#ffe08a; background:#fffdf5; }
+.pr-mob-card.row-passout{ border-color:#b6d4fe; background:#f6f9ff; }
+.pr-mob-top{ display:flex; align-items:center; gap:.65rem; margin-bottom:.65rem; }
+.pr-mob-meta{ display:flex; justify-content:space-between; gap:.6rem; margin-bottom:.7rem; font-size:.8rem; }
+
+/* confirm modal summary */
+.pr-sum-line{ display:flex; align-items:center; justify-content:space-between; padding:.6rem .2rem; border-bottom:1px dashed var(--ec-border); font-size:.88rem; }
+.pr-sum-line:last-child{ border-bottom:0; }
+.pr-sum-line .v{ font-weight:900; }
+.pr-chip{ display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .55rem; border-radius:999px; font-size:.72rem; font-weight:800; }
+.pr-chip.promote{ background:#d4edda; color:#155724; }
+.pr-chip.retain{ background:#fff3cd; color:#664d03; }
+.pr-chip.passout{ background:#cfe2ff; color:#084298; }
+
+/* responsive */
+@@media (max-width:991.98px){
+    .pr-flow{ grid-template-columns:1fr; }
+    .pr-arrow{ transform:rotate(90deg); font-size:1.4rem; }
+}
+@@media (max-width:767.98px){
+    .pr-tbl-wrap{ display:none; }
+    .pr-mob{ display:block; }
+}
+@@media (max-width:575.98px){
+    .pr-card{ padding:.8rem .9rem; }
+    .pr-card-val{ font-size:1.25rem; }
+    .pr-actions{ flex-direction:column; align-items:stretch; }
+    .pr-actions .btn{ width:100%; }
+    .pr-mob-meta{ flex-direction:column; gap:.2rem; }
+}
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <!-- Header -->
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-up-arrow-circle fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Promote Students</h4>
+            <div class="ec-page-subtitle">Move a class to the next academic session in one bulk operation</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Source → Target flow -->
+    <div class="ec-card mb-4">
+      <div class="ec-card-body">
+        <div class="pr-flow">
+
+          <div class="pr-flow-box">
+            <div class="pr-flow-lbl"><i class="bx bx-log-out-circle"></i>From (Current)</div>
+            <div class="pr-field">
+              <label>Academic Year</label>
+              <select class="pr-sel" id="srcYear">
+                <option value="2025-26">2025–26</option>
+                <option value="2024-25">2024–25</option>
+              </select>
+            </div>
+            <div class="pr-field">
+              <label>Class</label>
+              <select class="pr-sel" id="srcClass">
+                <option value="">Select class</option>
+              </select>
+            </div>
+            <div class="pr-field">
+              <label>Section</label>
+              <select class="pr-sel" id="srcSection">
+                <option value="">All sections</option>
+                <option>A</option><option>B</option><option>C</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pr-arrow"><i class="bx bx-right-arrow-alt"></i></div>
+
+          <div class="pr-flow-box is-target">
+            <div class="pr-flow-lbl t"><i class="bx bx-log-in-circle"></i>To (Promote into)</div>
+            <div class="pr-field">
+              <label>Academic Year</label>
+              <select class="pr-sel" id="tgtYear">
+                <option value="2026-27">2026–27</option>
+                <option value="2027-28">2027–28</option>
+              </select>
+            </div>
+            <div class="pr-field">
+              <label>Class</label>
+              <select class="pr-sel" id="tgtClass" disabled>
+                <option value="">Auto (next class)</option>
+              </select>
+            </div>
+            <div class="pr-field">
+              <label>Section</label>
+              <select class="pr-sel" id="tgtSection">
+                <option value="keep">Keep same section</option>
+                <option>A</option><option>B</option><option>C</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mt-3">
+          <label class="pr-opt mb-0">
+            <input type="checkbox" class="form-check-input mt-0" id="carryDues" checked>
+            Carry forward pending fee dues to the new session
+          </label>
+          <button class="btn btn-primary d-flex align-items-center justify-content-center gap-1" id="loadBtn">
+            <i class="bx bx-list-ul"></i><span>Load Students</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="row g-3 mb-4" id="sumSection" style="display:none;">
+      <div class="col-6 col-lg-3">
+        <div class="pr-card">
+          <div class="pr-card-ic bg-label-primary text-primary"><i class="bx bx-group"></i></div>
+          <div><div class="pr-card-val" id="cTotal">0</div><div class="pr-card-lbl">In Class</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="pr-card">
+          <div class="pr-card-ic bg-label-success text-success"><i class="bx bx-up-arrow-circle"></i></div>
+          <div><div class="pr-card-val" id="cPromote">0</div><div class="pr-card-lbl">To Promote</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="pr-card">
+          <div class="pr-card-ic bg-label-warning text-warning"><i class="bx bx-revision"></i></div>
+          <div><div class="pr-card-val" id="cRetain">0</div><div class="pr-card-lbl">To Retain</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="pr-card">
+          <div class="pr-card-ic bg-label-info text-info"><i class="bx bx-graduation"></i></div>
+          <div><div class="pr-card-val" id="cPassout">0</div><div class="pr-card-lbl">To Pass Out</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Roster -->
+    <div class="ec-card mb-0" id="rosterCard" style="display:none;">
+      <div class="ec-card-header">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-list-check"></i></span>
+            <div>
+              <div class="ec-section-title">Student Roster</div>
+              <div class="ec-section-subtitle" id="rosterSub">—</div>
+            </div>
+          </div>
+          <div class="pr-bulk">
+            <span class="text-muted small fw-bold me-1">Mark all:</span>
+            <button class="pr-bulk-btn" data-all="promote"><i class="bx bx-check-circle"></i>Promote</button>
+            <button class="pr-bulk-btn" data-all="retain"><i class="bx bx-revision"></i>Retain</button>
+            <button class="pr-bulk-btn" data-all="passout"><i class="bx bx-graduation"></i>Pass Out</button>
+            <button class="pr-bulk-btn" id="promoteFailed" title="Retain students below 33%"><i class="bx bx-filter-alt"></i>Auto by result</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ec-card-body pt-2">
+
+        <!-- Desktop table -->
+        <div class="pr-tbl-wrap">
+          <table class="table pr-tbl align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:38px;"><input type="checkbox" class="form-check-input" id="selAll" checked></th>
+                <th>Student</th>
+                <th>Roll No</th>
+                <th>Result</th>
+                <th>Pending Dues</th>
+                <th>Next Class</th>
+                <th style="width:260px;">Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Mobile cards -->
+        <div class="pr-mob" id="mobList"></div>
+
+        <!-- Empty -->
+        <div class="pr-empty d-none" id="emptyState">
+          <div class="pr-empty-ic"><i class="bx bx-user-x"></i></div>
+          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No students in this class</h6>
+          <p class="text-muted small mb-0">Pick a different class/section and load again.</p>
+        </div>
+
+        <!-- Actions -->
+        <div class="pr-actions">
+          <div class="hint"><i class="bx bx-info-circle me-1"></i>Review outcomes, then preview before committing. This action updates student records.</div>
+          <div class="d-flex flex-column flex-sm-row gap-2">
+            <button class="btn btn-outline-secondary px-4" id="resetBtn"><i class="bx bx-reset me-1"></i>Reset</button>
+            <button class="btn btn-primary px-4" id="reviewBtn" data-bs-toggle="modal" data-bs-target="#confirmModal">
+              <i class="bx bx-up-arrow-circle me-1"></i>Review &amp; Promote
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:0;border-radius:20px;overflow:hidden;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-shield-quarter"></i></span>
+          <div>
+            <div class="ec-section-title">Confirm Promotion</div>
+            <div class="ec-section-subtitle" id="confirmFlow">—</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4">
+        <div class="pr-sum-line"><span class="pr-chip promote"><i class="bx bx-up-arrow-circle"></i>Promote</span><span class="v" id="mPromote">0</span></div>
+        <div class="pr-sum-line"><span class="pr-chip retain"><i class="bx bx-revision"></i>Retain in class</span><span class="v" id="mRetain">0</span></div>
+        <div class="pr-sum-line"><span class="pr-chip passout"><i class="bx bx-graduation"></i>Pass out / Graduate</span><span class="v" id="mPassout">0</span></div>
+        <div class="pr-sum-line"><span><i class="bx bx-wallet me-1"></i>Carry forward dues</span><span class="v" id="mDues">—</span></div>
+        <div class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0" style="border-radius:12px;font-size:.82rem;">
+          <i class="bx bx-error-circle fs-5"></i>
+          <span>This will move the selected students into the new academic session. Make sure exam results are finalised first.</span>
+        </div>
+      </div>
+      <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" id="commitBtn"><i class="bx bx-check me-1"></i>Confirm &amp; Promote</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+(function(){
+'use strict';
+
+/* ── Class ladder (source → next) ─────────────── */
+var LADDER=['Grade UKG','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
+function nextClass(c){ var i=LADDER.indexOf(c); return (i<0||i===LADDER.length-1)?null:LADDER[i+1]; }
+
+/* ── Mock roster (would come from SP by class+section) ─ */
+var ALL=[
+  {id:1, name:'Akash Verma',  roll:'R-001',cls:'Grade 10',sec:'A',pct:74,due:8500, color:'primary'},
+  {id:2, name:'Priya Sharma', roll:'R-002',cls:'Grade 10',sec:'A',pct:91,due:0,    color:'info'},
+  {id:3, name:'Rahul Singh',  roll:'R-003',cls:'Grade 10',sec:'A',pct:28,due:18500,color:'success'},
+  {id:4, name:'Anjali Patel', roll:'R-004',cls:'Grade 10',sec:'B',pct:88,due:0,    color:'warning'},
+  {id:5, name:'Mohan Lal',    roll:'R-005',cls:'Grade 10',sec:'B',pct:31,due:20750,color:'danger'},
+  {id:6, name:'Deepak Sharma',roll:'R-006',cls:'Grade 10',sec:'A',pct:67,due:5200, color:'secondary'},
+  {id:7, name:'Saloni Verma', roll:'R-007',cls:'Grade 12',sec:'A',pct:90,due:0,    color:'primary'},
+  {id:8, name:'Yash Kumar',   roll:'R-008',cls:'Grade 12',sec:'B',pct:55,due:20750,color:'danger'},
+  {id:9, name:'Neha Singh',   roll:'R-009',cls:'Grade 9', sec:'A',pct:85,due:0,    color:'info'},
+  {id:10,name:'Vikash Jha',   roll:'R-010',cls:'Grade 9', sec:'A',pct:93,due:1200, color:'success'},
+  {id:11,name:'Pooja Mishra', roll:'R-011',cls:'Grade 9', sec:'B',pct:30,due:4500, color:'warning'},
+  {id:12,name:'Ravi Tiwari',  roll:'R-012',cls:'Grade 8', sec:'A',pct:72,due:0,    color:'primary'}
+];
+
+var PASS=33;            // pass mark %
+var roster=[];          // currently loaded students
+var outcome={};         // id -> 'promote' | 'retain' | 'passout'
+var carry=true;
+
+/* ── Helpers ─────────────────────────────────── */
+function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
+function inr(n){ return n>0 ? '₹'+n.toLocaleString('en-IN') : '₹0'; }
+function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+/* ── Populate source class dropdown ──────────── */
+(function initClasses(){
+  var sel=document.getElementById('srcClass');
+  LADDER.forEach(function(c){
+    var has=ALL.some(function(s){return s.cls===c;});
+    if(!has) return;
+    var o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o);
+  });
+})();
+
+/* ── Default outcome per student (by result) ─── */
+function defaultOutcome(s){
+  if(nextClass(s.cls)===null) return 'passout';   // final class → graduate
+  return s.pct>=PASS ? 'promote' : 'retain';       // failed → retain
+}
+
+/* ── Load button ─────────────────────────────── */
+document.getElementById('loadBtn').addEventListener('click', function(){
+  var cls=document.getElementById('srcClass').value,
+      sec=document.getElementById('srcSection').value;
+  if(!cls){ toast('warning','Please select a class first.'); return; }
+
+  roster=ALL.filter(function(s){ return s.cls===cls && (!sec||s.sec===sec); });
+  outcome={};
+  roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
+
+  document.getElementById('sumSection').style.display='';
+  document.getElementById('rosterCard').style.display='';
+  document.getElementById('selAll').checked=true;
+
+  var nc=nextClass(cls);
+  document.getElementById('rosterSub').textContent=
+    roster.length+' student'+(roster.length!==1?'s':'')+' in '+cls+(sec?' – '+sec:'')+
+    (nc?(' → promoting to '+nc):' (final class)');
+
+  render();
+  if(roster.length) document.getElementById('rosterCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+});
+
+/* ── Outcome segmented control markup ────────── */
+function seg(id, val){
+  function r(o,lbl){
+    var checked = val===o ? 'checked' : '';
+    return '<input type="radio" class="o-'+o+'" name="oc'+id+'" id="oc'+id+'_'+o+'" value="'+o+'" '+checked+'>'+
+           '<label for="oc'+id+'_'+o+'">'+lbl+'</label>';
+  }
+  return '<div class="pr-seg" data-id="'+id+'">'+r('promote','Promote')+r('retain','Retain')+r('passout','Pass Out')+'</div>';
+}
+
+/* ── Render desktop + mobile ─────────────────── */
+function render(){
+  carry=document.getElementById('carryDues').checked;
+  var tb=document.getElementById('tblBody'),
+      mob=document.getElementById('mobList'),
+      empty=document.getElementById('emptyState');
+
+  if(!roster.length){
+    tb.innerHTML=''; mob.innerHTML=''; empty.classList.remove('d-none');
+    updateCounts(); return;
+  }
+  empty.classList.add('d-none');
+
+  tb.innerHTML=roster.map(function(s){
+    var nc=nextClass(s.cls), oc=outcome[s.id];
+    var ncTxt = oc==='passout' ? '<span class="text-info fw-bold">Graduate</span>'
+              : oc==='retain'  ? '<span class="text-muted">Stays in '+esc(s.cls)+'</span>'
+              : (nc? '<span class="fw-bold">'+esc(nc)+'</span>' : '<span class="text-muted">—</span>');
+    var pass=s.pct>=PASS;
+    return '<tr class="'+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
+      +'<td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input pr-pick" data-id="'+s.id+'" checked></td>'
+      +'<td><div class="d-flex align-items-center gap-2">'
+      +   '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
+      +   '<div><div class="pr-nm">'+esc(s.name)+'</div><div class="pr-rl">'+esc(s.cls)+' – '+esc(s.sec)+'</div></div>'
+      +'</div></td>'
+      +'<td>'+esc(s.roll)+'</td>'
+      +'<td><span class="pr-res '+(pass?'pass':'fail')+'"><i class="bx '+(pass?'bx-check-circle':'bx-x-circle')+'"></i>'+s.pct+'%</span></td>'
+      +'<td><span class="pr-due '+(s.due>0?'has':'clear')+'">'+inr(s.due)+'</span></td>'
+      +'<td>'+ncTxt+'</td>'
+      +'<td>'+seg(s.id, oc)+'</td>'
+      +'</tr>';
+  }).join('');
+
+  mob.innerHTML=roster.map(function(s){
+    var nc=nextClass(s.cls), oc=outcome[s.id], pass=s.pct>=PASS;
+    var ncTxt = oc==='passout'?'Graduate':oc==='retain'?'Stays in '+esc(s.cls):(nc?esc(nc):'—');
+    return '<div class="pr-mob-card '+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
+      +'<div class="pr-mob-top">'
+      +  '<input type="checkbox" class="form-check-input pr-pick mt-0" data-id="'+s.id+'" checked>'
+      +  '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
+      +  '<div><div class="pr-nm">'+esc(s.name)+'</div><div class="pr-rl">'+esc(s.roll)+' · '+esc(s.cls)+' – '+esc(s.sec)+'</div></div>'
+      +'</div>'
+      +'<div class="pr-mob-meta">'
+      +  '<span class="pr-res '+(pass?'pass':'fail')+'"><i class="bx '+(pass?'bx-check-circle':'bx-x-circle')+'"></i> Result '+s.pct+'%</span>'
+      +  '<span class="pr-due '+(s.due>0?'has':'clear')+'">Dues '+inr(s.due)+'</span>'
+      +'</div>'
+      +'<div class="text-muted small fw-bold mb-2"><i class="bx bx-right-arrow-alt"></i> '+ncTxt+'</div>'
+      +seg(s.id, oc)
+      +'</div>';
+  }).join('');
+
+  bindSegs();
+  updateCounts();
+}
+
+/* ── Outcome change ──────────────────────────── */
+function bindSegs(){
+  document.querySelectorAll('.pr-seg input[type=radio]').forEach(function(r){
+    r.addEventListener('change', function(){
+      var id=parseInt(this.closest('.pr-seg').dataset.id,10);
+      outcome[id]=this.value;
+      render();
+    });
+  });
+  document.querySelectorAll('.pr-pick').forEach(function(c){
+    c.addEventListener('change', updateCounts);
+  });
+}
+
+/* ── Counts ──────────────────────────────────── */
+function picked(){
+  var set={};
+  document.querySelectorAll('.pr-pick').forEach(function(c){ if(c.checked) set[c.dataset.id]=true; });
+  return roster.filter(function(s){ return set[s.id]; });
+}
+function updateCounts(){
+  var sel=picked();
+  var p=0,r=0,g=0;
+  sel.forEach(function(s){ var o=outcome[s.id]; if(o==='promote')p++; else if(o==='retain')r++; else g++; });
+  document.getElementById('cTotal').textContent=roster.length;
+  document.getElementById('cPromote').textContent=p;
+  document.getElementById('cRetain').textContent=r;
+  document.getElementById('cPassout').textContent=g;
+  document.getElementById('mPromote').textContent=p;
+  document.getElementById('mRetain').textContent=r;
+  document.getElementById('mPassout').textContent=g;
+}
+
+/* ── Bulk buttons ────────────────────────────── */
+document.querySelectorAll('.pr-bulk-btn[data-all]').forEach(function(b){
+  b.addEventListener('click', function(){
+    var v=this.dataset.all;
+    roster.forEach(function(s){
+      // never auto-promote a final-class student
+      outcome[s.id] = (v==='promote' && nextClass(s.cls)===null) ? 'passout' : v;
+    });
+    render();
+  });
+});
+document.getElementById('promoteFailed').addEventListener('click', function(){
+  roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
+  render();
+  toast('info','Outcomes set by result — students below '+PASS+'% retained.');
+});
+
+/* ── Select all ──────────────────────────────── */
+document.getElementById('selAll').addEventListener('change', function(){
+  var on=this.checked;
+  document.querySelectorAll('.pr-pick').forEach(function(c){ c.checked=on; });
+  updateCounts();
+});
+
+/* ── Carry dues toggle ───────────────────────── */
+document.getElementById('carryDues').addEventListener('change', function(){
+  document.getElementById('mDues').textContent = this.checked ? 'Yes' : 'No';
+});
+
+/* ── Reset ───────────────────────────────────── */
+document.getElementById('resetBtn').addEventListener('click', function(){
+  roster=[]; outcome={};
+  document.getElementById('sumSection').style.display='none';
+  document.getElementById('rosterCard').style.display='none';
+  document.getElementById('srcClass').value='';
+  document.getElementById('srcSection').value='';
+  toast('info','Cleared. Select a class to start again.');
+});
+
+/* ── Review modal fill ───────────────────────── */
+document.getElementById('reviewBtn').addEventListener('click', function(){
+  updateCounts();
+  var srcY=document.getElementById('srcYear').value,
+      tgtY=document.getElementById('tgtYear').value,
+      cls=document.getElementById('srcClass').value;
+  document.getElementById('confirmFlow').textContent=cls+' · '+srcY+'  →  '+tgtY;
+  document.getElementById('mDues').textContent=document.getElementById('carryDues').checked?'Yes':'No';
+});
+
+/* ── Commit (would POST to controller) ───────── */
+document.getElementById('commitBtn').addEventListener('click', function(){
+  var sel=picked();
+  if(!sel.length){ toast('warning','No students selected.'); return; }
+
+  // Build payload — wire to: @Url.Action("Promotion","Student",new{area="ERP"})
+  var payload={
+    srcYear:document.getElementById('srcYear').value,
+    tgtYear:document.getElementById('tgtYear').value,
+    srcClass:document.getElementById('srcClass').value,
+    srcSection:document.getElementById('srcSection').value,
+    tgtSection:document.getElementById('tgtSection').value,
+    carryDues:document.getElementById('carryDues').checked,
+    students:sel.map(function(s){ return {id:s.id, outcome:outcome[s.id]}; })
+  };
+  console.log('Promotion payload →', payload);
+
+  var modalEl=document.getElementById('confirmModal');
+  var inst=bootstrap.Modal.getInstance(modalEl); if(inst) inst.hide();
+
+  toast('success', sel.length+' student'+(sel.length!==1?'s':'')+' promoted successfully.');
+  document.getElementById('resetBtn').click();
+});
+
+})();
+</script>
+}
