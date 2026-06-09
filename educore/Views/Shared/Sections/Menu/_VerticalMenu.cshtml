@@ -3,690 +3,555 @@
 
 @{
     var currentPage = Context.Request.Path.Value ?? "";
-
-    var role = User.FindFirst("role_code")?.Value
-               ?? User.FindFirst(ClaimTypes.Role)?.Value
-               ?? Context.Session.GetString("RoleCode")
-               ?? "";
-
-    var roleName = User.FindFirst("role_name")?.Value
-                   ?? Context.Session.GetString("RoleName")
-                   ?? "";
-
-    var userName = User.FindFirst(Common.SK_UserName)?.Value
-                   ?? Context.Session.GetString("UserName")
-                   ?? "";
-
     var appName = "EduCore";
     var supportUrl = "#";
 
-    var menus = new Dictionary<string, string[]>
-    {
-        ["SUPER_ADMIN"] = new[] {
-            "Dashboard", "Schools", "Sign out"
-        },
+    bool IsActive(string value) =>
+        currentPage.Contains(value, StringComparison.OrdinalIgnoreCase);
 
-        ["SCHOOL_ADMIN"] = new[] {
-            "Dashboard",
-            "Admission & Students",
-            "Enquiry CRM",
-            "Student Attendance",
-            "Exams & Results",
-            "Fees Management",
-            "Payment Verification",
-            "Fee Due Reminders",
-            "Staff Management",
-            "Leave Management",
-            "Payroll Management",
-            "Staff Attendance",
-            "Inventory Management",
-            "Accounts & Expenses",
-            "Timetable Management",
-            "Notice Board",
-            "Smart Bell",
-            "Advanced Bus Tracking",
-            "ID Cards",
-            "Transfer Certificates",
-            "Certifications",
-            "Reports",
-            "Billing & Subscription",
-            "School Settings",
-            "Support",
-            "Install App",
-            "Sign out"
-        },
+    string Open(params string[] keys) =>
+        keys.Any(IsActive) ? "active open" : "";
 
-        ["TEACHER"] = new[] {
-            "Dashboard",
-            "Enquiry CRM",
-            "Student Attendance",
-            "Exams & Results",
-            "Leave Management",
-            "Payroll Management",
-            "Staff Attendance",
-            "Timetable Management",
-            "ID Cards",
-            "Support",
-            "Install App",
-            "Sign out"
-        },
-
-        ["ACCOUNTANT"] = new[] {
-            "Dashboard",
-            "Enquiry CRM",
-            "Fees Management",
-            "Payment Verification",
-            "Fee Due Reminders",
-            "Leave Management",
-            "Payroll Management",
-            "Staff Attendance",
-            "Inventory Management",
-            "Accounts & Expenses",
-            "Reports",
-            "Support",
-            "Install App",
-            "Sign out"
-        },
-
-        ["RECEPTIONIST"] = new[] {
-            "Dashboard",
-            "Admission & Students",
-            "Enquiry CRM",
-            "Leave Management",
-            "Payroll Management",
-            "Staff Attendance",
-            "Inventory Management",
-            "ID Cards",
-            "Transfer Certificates",
-            "Support",
-            "Install App",
-            "Sign out"
-        }
-    };
-
-    // Explicit routes for ERP pages that already exist (area, controller, action).
-    // Menu labels listed here navigate to the real page instead of the
-    // default {Admin/SuperAdmin}/{controller}/Index convention.
-    var routeMap = new Dictionary<string, (string area, string controller, string action)>
-    {
-        ["Admission & Students"] = ("ERP", "Admission", "StudentList"),
-        ["Student Attendance"]   = ("ERP", "Student",   "StudentAttendance"),
-        ["Exams & Results"]      = ("ERP", "Exam",      "MarkEntry"),
-        ["Fees Management"]      = ("ERP", "Fee",       "ManageFee"),
-        ["Enquiry CRM"]          = ("Admin", "Enquiry", "EnquiryCRM"),
-        ["Schools"]              = ("SuperAdmin", "Schools", "SchoolList"),
-    };
-
-    string GetIcon(string name) => name switch
-    {
-        "Dashboard" => "bx-home-smile",
-        "Schools" => "bx-buildings",
-        "Admission & Students" => "bx-user-plus",
-        "Enquiry CRM" => "bx-message-square-detail",
-        "Student Attendance" => "bx-user-check",
-        "Exams & Results" => "bx-file",
-        "Fees Management" => "bx-wallet",
-        "Payment Verification" => "bx-check-shield",
-        "Fee Due Reminders" => "bx-bell",
-        "Staff Management" => "bx-group",
-        "Leave Management" => "bx-calendar-minus",
-        "Payroll Management" => "bx-money",
-        "Staff Attendance" => "bx-user-voice",
-        "Inventory Management" => "bx-package",
-        "Accounts & Expenses" => "bx-receipt",
-        "Timetable Management" => "bx-time-five",
-        "Notice Board" => "bx-news",
-        "Smart Bell" => "bx-bell-ring",
-        "Advanced Bus Tracking" => "bx-bus",
-        "ID Cards" => "bx-id-card",
-        "Transfer Certificates" => "bx-transfer",
-        "Certifications" => "bx-certification",
-        "Reports" => "bx-bar-chart-alt-2",
-        "Billing & Subscription" => "bx-credit-card",
-        "School Settings" => "bx-cog",
-        "Support" => "bx-support",
-        "Install App" => "bx-download",
-        "Sign out" => "bx-log-out",
-        //
-        "Fees" => "bx-wallet",
-        "Admission" => "bx-user-plus",
-        _ => "bx-circle"
-    };
-
-    string GetController(string name)
-    {
-        return name.Replace("&", "And")
-                   .Replace(" ", "")
-                   .Replace("-", "");
-    }
-
-    string GetArea(string item)
-    {
-        if (item == "Dashboard")
-            return role == "SUPER_ADMIN" ? "SuperAdmin" : "Admin";
-
-        if (role == "SUPER_ADMIN")
-            return "SuperAdmin";
-
-        return "Admin";
-    }
-
-    bool IsActive(string value)
-    {
-        return currentPage.Contains(value, StringComparison.OrdinalIgnoreCase);
-    }
+    string On(string key) => IsActive(key) ? "active" : "";
 }
+
 <style>
+    /* =========================================================
+       EDUCORE — PREMIUM SCHOOL ERP SIDEBAR
+       Sneat base + custom polish
+    ========================================================= */
 
-    /* =========================================
-       EDUCORE PREMIUM SIDEBAR
-       (matches the warm card aesthetic used
-        across the ERP pages / dashboard)
-    ========================================= */
-
-    /* ---- Sidebar shell ---- */
+    /* Clean white surface — orange is spent only on accents below.
+       We also re-point Sneat's OWN menu colour variables to orange, so the
+       framework's native active pill + edge-marker render in our brand colour.
+       This is what makes the active state reliably work (no specificity war). */
     #layout-menu {
-        background: #fff;
-        border-right: 1px solid #f0eee9;
-        box-shadow: 0 0 1.75rem rgba(67,89,113,.045);
+        border-right: 1px solid #eef0f6;
+        background: #ffffff !important;
+        --bs-primary: #ff8a00;
+        --bs-primary-rgb: 255, 138, 0;
+        --bs-menu-active-bg: #ff8a00;
+        --bs-menu-active-color: #ffffff;
+        --bs-menu-sub-active-bg: #fff3e6;
+        --bs-menu-sub-active-color: #d97400;
     }
 
-    /* ---- Brand ---- */
-    #layout-menu .app-brand {
-        padding: 1.15rem 1.35rem .55rem;
-    }
-
+    /* ---------- Brand ---------- */
     #layout-menu .app-brand-text {
-        font-size: 1.4rem;
-        font-weight: 800;
-        letter-spacing: -.02em;
-        color: #2b2c40;
+        background: linear-gradient(90deg, #ff8a00 0%, #ffb866 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        letter-spacing: .3px;
     }
 
-    /* ---- Search ---- */
+    /* ---------- Search ----------
+       position:relative + z-index keeps the box ABOVE .menu-inner-shadow, so
+       scrolling the menu no longer "whitens"/recolours it. The opaque sidebar-
+       matching background stops any menu content bleeding through. */
     .sidebar-search {
-        padding: .25rem 1rem 1rem;
-    }
-
-        .sidebar-search input {
-            width: 100%;
-            height: 38px;
-            border: 1px solid #ece8e1;
-            border-radius: 9px;
-            background: #f7f5f1;
-            padding: 0 14px 0 36px;
-            font-size: 13px;
-            font-weight: 500;
-            color: #2b1b12;
-            outline: none;
-            transition: border-color .2s ease, box-shadow .2s ease, background-color .2s ease;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%238b8175' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-size: 15px;
-            background-position: 12px center;
-        }
-
-            .sidebar-search input::placeholder {
-                color: #b6ab9c;
-            }
-
-            .sidebar-search input:focus {
-                border-color: #696cff;
-                background-color: #ffffff;
-                box-shadow: 0 0 0 3px rgba(105,108,255,.12);
-            }
-
-    /* ---- Section header ("… Menu") ---- */
-    #layout-menu .menu-header {
-        padding-top: 1.1rem;
-        padding-bottom: .35rem;
-    }
-
-    #layout-menu .menu-header-text {
-        color: #b6ab9c;
-        font-size: .7rem;
-        font-weight: 700;
-        letter-spacing: .09em;
-    }
-
-    /* ---- Menu items ---- */
-    #layout-menu .menu-inner > .menu-item {
-        margin: .12rem .7rem;
-    }
-
-    #layout-menu .menu-link {
+        padding: 10px 16px 12px;
         position: relative;
-        padding: .5rem .65rem;
-        border-radius: .6rem;
-        font-size: .9rem;
+        z-index: 3;
+        background: #ffffff;
+    }
+    .sidebar-search input {
+        width: 100%;
+        height: 42px;
+        border: 1px solid #e7e9f3;
+        border-radius: 12px;
+        background: #f5f6fa;
+        padding: 0 14px 0 40px;
+        font-size: 14px;
         font-weight: 500;
-        color: #655d52;
-        transition: background .18s ease, color .18s ease;
+        color: #3a3f55;
+        outline: none;
+        transition: all .22s ease;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m21 21-4.35-4.35m1.85-5.15a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-size: 16px;
+        background-position: 14px center;
+    }
+    .sidebar-search input::placeholder { color: #9aa1b9; }
+    /* The one orange touch on the search: an accent focus ring. */
+    .sidebar-search input:focus {
+        border-color: #ff8a00;
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(255,138,0,.12);
     }
 
-    /* Soft tinted chip behind each icon — identical construction to the
-       dashboard's bg-label icon tiles. The tint colour comes from --mi
-       (set on the link via :has() below) so each chip matches its icon. */
-    #layout-menu .menu-inner > .menu-item > .menu-link::before {
+    /* Keep the scroll shadow white (matches the surface) and BEHIND the
+       search box, so scrolling never recolours the search field. */
+    #layout-menu .menu-inner-shadow {
+        background: linear-gradient(#ffffff 41%, rgba(255,255,255,.11) 95%, rgba(255,255,255,0)) !important;
+    }
+
+    /* ---------- Section headers ---------- */
+    #layout-menu .menu-header {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .9px;
+        color: #9aa1b9 !important;
+        padding-top: 18px;
+        padding-bottom: 6px;
+        text-transform: uppercase;
+    }
+    #layout-menu .menu-header::before {
         content: "";
-        position: absolute;
-        left: .6rem;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 2rem;
-        height: 2rem;
-        border-radius: .5rem;
-        background: color-mix(in srgb, var(--mi, #696cff) 13%, transparent);
-        transition: background .18s ease;
+        display: inline-block;
+        width: 14px; height: 2px;
+        border-radius: 2px;
+        background: #dfe2ec;
+        margin-right: 8px;
+        vertical-align: middle;
     }
 
-    /* The masked icon itself (Iconify paints background-color through the
-       icon's mask). Sits above the chip via z-index. */
+    /* ---------- Links ---------- */
+    #layout-menu .menu-link {
+        border-radius: 10px;
+        margin: 2px 12px;
+        padding-block: 9px;
+        font-weight: 500;
+        color: #51566b;
+        transition: background .18s ease, color .18s ease, transform .18s ease;
+    }
+    #layout-menu .menu-link:hover { background: #f4f5f9; }
+
+    /* ---------- Icons ---------- */
     #layout-menu .menu-icon {
-        position: relative;
-        z-index: 1;
-        width: 2rem;
-        height: 2rem;
-        margin-right: .7rem !important;
-        font-size: 1.1rem;
-        background: var(--mi, #696cff);
+        font-size: 20px;
+        width: 26px;
+        margin-right: 12px;
         transition: transform .18s ease;
     }
 
-    /* Per-icon colour — restricted to the SAME 6 semantic colours used by
-       the dashboard tiles (primary/info/success/warning/secondary/danger)
-       so the sidebar reads as one design system, not a 28-colour rainbow. */
-    #layout-menu .menu-link:has(.bx-home-smile)            { --mi: #696cff; }
-    #layout-menu .menu-link:has(.bx-buildings)             { --mi: #03c3ec; }
-    #layout-menu .menu-link:has(.bx-user-plus)             { --mi: #696cff; }
-    #layout-menu .menu-link:has(.bx-message-square-detail) { --mi: #03c3ec; }
-    #layout-menu .menu-link:has(.bx-user-check)            { --mi: #71dd37; }
-    #layout-menu .menu-link:has(.bx-file)                  { --mi: #ffab00; }
-    #layout-menu .menu-link:has(.bx-wallet)                { --mi: #71dd37; }
-    #layout-menu .menu-link:has(.bx-check-shield)          { --mi: #696cff; }
-    #layout-menu .menu-link:has(.bx-bell)                  { --mi: #ffab00; }
-    #layout-menu .menu-link:has(.bx-group)                 { --mi: #03c3ec; }
-    #layout-menu .menu-link:has(.bx-calendar-minus)        { --mi: #ffab00; }
-    #layout-menu .menu-link:has(.bx-money)                 { --mi: #71dd37; }
-    #layout-menu .menu-link:has(.bx-user-voice)            { --mi: #71dd37; }
-    #layout-menu .menu-link:has(.bx-package)               { --mi: #8592a3; }
-    #layout-menu .menu-link:has(.bx-receipt)               { --mi: #71dd37; }
-    #layout-menu .menu-link:has(.bx-time-five)             { --mi: #03c3ec; }
-    #layout-menu .menu-link:has(.bx-news)                  { --mi: #ffab00; }
-    #layout-menu .menu-link:has(.bx-bell-ring)             { --mi: #ffab00; }
-    #layout-menu .menu-link:has(.bx-bus)                   { --mi: #03c3ec; }
-    #layout-menu .menu-link:has(.bx-id-card)               { --mi: #696cff; }
-    #layout-menu .menu-link:has(.bx-transfer)              { --mi: #8592a3; }
-    #layout-menu .menu-link:has(.bx-certification)         { --mi: #71dd37; }
-    #layout-menu .menu-link:has(.bx-bar-chart-alt-2)       { --mi: #03c3ec; }
-    #layout-menu .menu-link:has(.bx-credit-card)           { --mi: #696cff; }
-    #layout-menu .menu-link:has(.bx-cog)                   { --mi: #8592a3; }
-    #layout-menu .menu-link:has(.bx-support)               { --mi: #03c3ec; }
-    #layout-menu .menu-link:has(.bx-download)              { --mi: #71dd37; }
-    #layout-menu .menu-link:has(.bx-log-out)               { --mi: #ff3e1d; }
-
-    /* ---- Hover ---- */
-    #layout-menu .menu-link:hover {
-        background: #faf8f5;
-        color: #2b1b12;
+    /* Motion effects ONLY on real pointers (mouse). Touch devices skip
+       these so the menu doesn't "shake"/jitter while scrolling by finger. */
+    @@media (hover: hover) and (pointer: fine) {
+        #layout-menu .menu-link:hover { transform: translateX(3px); }
+        #layout-menu .menu-link:hover .menu-icon { transform: scale(1.12); }
     }
 
-        #layout-menu .menu-link:hover .menu-icon {
-            transform: scale(1.06);
-        }
+    /* Icon palette — calmed to ONE neutral tone so the icons read as a tidy
+       column instead of a rainbow. The ic-*/c-* classes are kept on the markup
+       but no longer carry their own colours; orange appears only on hover and
+       white on the active item. */
+    #layout-menu .menu-icon,
+    #layout-menu .submenu-icon { color: #8b93a7; }
 
-    /* ---- Active item (clean solid pill) ---- */
-    #layout-menu .menu-inner > .menu-item.active > .menu-link:not(.menu-toggle) {
-        background: #696cff;
-        color: #fff;
-        box-shadow: 0 2px 6px -1px rgba(105,108,255,.4);
+    #layout-menu .menu-link:hover .menu-icon,
+    #layout-menu .menu-link:hover .submenu-icon { color: #ff8a00; }
+
+    /* ---------- Active state (gradient pill) ---------- */
+    #layout-menu .menu-item.active > .menu-link:not(.menu-toggle) {
+        background: linear-gradient(90deg, #ff8a00 0%, #ffa733 100%) !important;
+        color: #fff !important;
+        box-shadow: 0 6px 16px -4px rgba(255,138,0,.5);
+    }
+    #layout-menu .menu-item.active > .menu-link:not(.menu-toggle) .menu-icon,
+    #layout-menu .menu-item.active > .menu-link:not(.menu-toggle) [class^="ic-"],
+    #layout-menu .menu-item.active > .menu-link:not(.menu-toggle) [class^="c-"] {
+        color: #fff !important;
+    }
+    #layout-menu .menu-item.active > .menu-toggle { background:#fff0e0; color:#ff8a00; }
+
+    /* Reuse Sneat's NATIVE active edge-bar, but move it to the LEFT edge and
+       paint it orange (it's already wired to whichever item is active). */
+    #layout-menu .menu-inner > .menu-item.active::before {
+        inset-inline-start: 0;
+        inset-inline-end: auto;
+        inline-size: 0.1875rem;
+        block-size: 1.75rem;
+        border-radius: 0 3px 3px 0;
+        background-color: #ff8a00;
     }
 
-        #layout-menu .menu-inner > .menu-item.active > .menu-link:not(.menu-toggle):hover {
-            background: #5f61f0;
-            color: #fff;
-        }
-
-        /* chip + icon turn white on the active pill */
-        #layout-menu .menu-inner > .menu-item.active > .menu-link:not(.menu-toggle)::before {
-            background: rgba(255,255,255,.22);
-        }
-
-        #layout-menu .menu-inner > .menu-item.active > .menu-link:not(.menu-toggle) .menu-icon {
-            background: #fff;
-        }
-
-    /* Open parent (e.g. School Settings) */
-    #layout-menu .menu-item.open > .menu-link.menu-toggle {
-        background: #faf8f5;
-        color: #2b1b12;
-    }
-
-    /* =========================================
-       SUBMENU — deliberately smaller than the
-       top-level menu (icons, text, padding) with
-       a connecting rail + indent.
-    ========================================= */
-
-    #layout-menu .menu-sub {
-        margin: .1rem 0 .35rem;
-        position: relative;
-    }
-
-        /* vertical connecting rail */
-        #layout-menu .menu-sub::before {
-            content: "";
-            position: absolute;
-            left: 1.55rem;
-            top: .1rem;
-            bottom: .1rem;
-            width: 1px;
-            background: #ece8e1;
-        }
-
-        #layout-menu .menu-sub .menu-link {
-            padding: .32rem .6rem .32rem 1rem;
-            font-size: .8rem;
-            font-weight: 500;
-            color: #7a7064;
-        }
-
-        /* smaller tinted chip for the submenu icon */
-        #layout-menu .menu-sub .menu-link::before {
-            content: "";
-            display: block;
-            position: absolute;
-            left: .95rem;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 1.4rem;
-            height: 1.4rem;
-            border-radius: .4rem;
-            background: color-mix(in srgb, var(--mi, #696cff) 13%, transparent);
-        }
-
-    #layout-menu .submenu-icon {
-        position: relative;
-        z-index: 1;
-        width: 1.4rem;
-        height: 1.4rem;
-        margin-right: .6rem;
-        font-size: .8rem;
-        background: var(--mi, #696cff);
-        transition: transform .18s ease;
-    }
-
-    #layout-menu .menu-sub .menu-link:hover {
-        color: #2b1b12;
-    }
-
-        #layout-menu .menu-sub .menu-link:hover .submenu-icon {
-            transform: scale(1.06);
-        }
-
-    /* Active submenu item — soft tinted */
+    /* ---------- Submenu ---------- */
+    #layout-menu .menu-sub .menu-link { font-size: 13.5px; padding-block: 7px; }
+    #layout-menu .submenu-icon { font-size: 15px; width: 22px; margin-right: 10px; }
     #layout-menu .menu-sub .menu-item.active > .menu-link {
-        background: rgba(105,108,255,.10);
-        color: #696cff;
-        font-weight: 600;
+        background: linear-gradient(90deg, #ff8a00 0%, #ffa733 100%) !important;
+        color: #fff !important;
+        box-shadow: 0 6px 16px -4px rgba(255,138,0,.5);
     }
+    #layout-menu .menu-sub .menu-item.active > .menu-link .submenu-icon { color:#fff !important; }
 
-    /* Submenu icon colours (set on link so the chip reads --mi) */
-    #layout-menu .menu-link:has(.submenu-profile)      { --mi: #696cff; }
-    #layout-menu .menu-link:has(.submenu-academic)     { --mi: #03c3ec; }
-    #layout-menu .menu-link:has(.submenu-subject)      { --mi: #ffab00; }
-    #layout-menu .menu-link:has(.submenu-feehead)      { --mi: #71dd37; }
-    #layout-menu .menu-link:has(.submenu-feestructure) { --mi: #696cff; }
-    #layout-menu .menu-link:has(.submenu-crm)          { --mi: #03c3ec; }
+    /* ---------- Badges ---------- */
+    #layout-menu .ec-badge {
+        font-size: 10px; font-weight: 700;
+        padding: 2px 7px; border-radius: 20px; margin-left: auto;
+    }
+    #layout-menu .ec-badge-new { background:#e7fbe9; color:#16a34a; }
+    #layout-menu .ec-badge-hot { background:#fff0e0; color:#ff8a00; }
+    #layout-menu .ec-badge-soon { background:#eef0f6; color:#9aa1b9; font-weight:600; }
+
+    /* ---------- "Coming soon" placeholder (page not built yet) ---------- */
+    #layout-menu .menu-soon { opacity:.5; cursor:default; }
+    #layout-menu .menu-soon:hover { opacity:.7; background:transparent; transform:none; }
+    #layout-menu .menu-soon:hover .menu-icon { transform:none; }
+
+    /* ---------- Scrollbar ---------- */
+    #layout-menu .menu-inner::-webkit-scrollbar { width: 6px; }
+    #layout-menu .menu-inner::-webkit-scrollbar-thumb { background:#d7dbe3; border-radius:6px; }
+    #layout-menu .menu-inner::-webkit-scrollbar-thumb:hover { background:#c2c7d6; }
 </style>
+
 <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
 
     <div class='app-brand demo @((ViewData["navbarFull"] != null && Convert.ToBoolean(ViewData["navbarFull"])) ? "d-xl-none" : "")'>
-
-        @* <a asp-area=""
-           asp-controller="Dashboards"
-           asp-action="Index"
-           class="app-brand-link"> *@
-           <a asp-area="@(role == "SUPER_ADMIN" ? "SuperAdmin" : "Admin")"
-   asp-controller="Dashboard"
-   asp-action="Index"
-   class="app-brand-link">
-            <span class="app-brand-logo demo">
-                @await Html.PartialAsync("../_Partials/_Macros")
-            </span>
-
-            <span class="app-brand-text demo menu-text fw-bold ms-2">
-                @appName
-            </span>
+        <a asp-area="" asp-controller="Dashboards" asp-action="Index" class="app-brand-link">
+            <span class="app-brand-logo demo">@await Html.PartialAsync("../_Partials/_Macros")</span>
+            <span class="app-brand-text demo menu-text fw-bold ms-2">@appName</span>
         </a>
-
-        <a href="javascript:void(0);"
-           class="layout-menu-toggle menu-link text-large ms-auto">
+        <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto">
             <i class="icon-base bx bx-chevron-left d-block d-xl-none align-middle"></i>
         </a>
     </div>
 
-    <div class="sidebar-search">
-        <input type="text" placeholder="Filter menu..." />
-    </div>
+    <div class="sidebar-search"><input type="text" placeholder="Search menu..." /></div>
     <div class="menu-inner-shadow"></div>
 
     <ul class="menu-inner py-1">
 
-        <li class="menu-header small text-uppercase">
-            <span class="menu-header-text">
-                @(string.IsNullOrWhiteSpace(roleName) ? role : roleName) Menu
-            </span>
+        @*
+           ============================================================
+           LINK STATUS LEGEND
+             ✅ real  = points to an existing controller/action
+             🚧 soon  = page not built yet → dimmed, non-clicking placeholder
+           Convert a "soon" item to real later: swap href="javascript:void(0);"
+           + class "menu-link menu-soon" for asp-area/asp-controller/asp-action
+           + class "menu-link", and delete its <span class="ec-badge ec-badge-soon">.
+           ============================================================
+        *@
+
+        @* ===================== MAIN ===================== *@
+        <li class='menu-item @On("Dashboards")'>
+            <a asp-area="" asp-controller="Dashboards" asp-action="Index" class="menu-link">
+                <i class="menu-icon icon-base bx bx-home-smile ic-dash"></i>
+                <div class="text-truncate">Dashboard</div>
+            </a>
         </li>
 
-        @if (!string.IsNullOrWhiteSpace(role) && menus.ContainsKey(role))
-        {
-            foreach (var item in menus[role])
-            {
-                var controller = GetController(item);
-                var hasRoute = routeMap.TryGetValue(item, out var route);
-                var isActive = hasRoute ? IsActive(route.action) : IsActive(controller);
+        @* ===================== ACADEMIC ZONE ===================== *@
+        <li class="menu-header"><span class="menu-header-text">Academic</span></li>
 
-                if (item == "Sign out")
-                {
-                    <li class="menu-item">
-                        <a asp-area=""
-                           asp-controller="Account"
-                           asp-action="Logout"
-                           class="menu-link">
-                            <i class="menu-icon icon-base bx @GetIcon(item)"></i>
-                            <div class="text-truncate">@item</div>
-                        </a>
-                    </li>
-                }
-                else if (item == "Support")
-                {
-                    <li class="menu-item">
-                        <a href="@supportUrl"
-                           target="_blank"
-                           class="menu-link">
-                            <i class="menu-icon icon-base bx @GetIcon(item)"></i>
-                            <div class="text-truncate">@item</div>
-                        </a>
-                    </li>
-                }
-                else if (item == "Install App")
-                {
-                    <li class="menu-item">
-                        <a href="javascript:void(0);"
-                           class="menu-link">
-                            <i class="menu-icon icon-base bx @GetIcon(item)"></i>
-                            <div class="text-truncate">@item</div>
-                        </a>
-                    </li>
-                }
-                else if (item == "School Settings")
-                {
-                    var schoolSettingsOpen = IsActive("SchoolSettings");
+        @* ---- Front Office ---- *@
+        <li class='menu-item @Open("EnquiryCRM","Visitor","CallLog","Postal","Complaint")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-buildings ic-front"></i>
+                <div class="text-truncate">Front Office</div>
+            </a> 
+            <ul class="menu-sub">
+                <li class='menu-item @On("EnquiryCRM")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="EnquiryCRM" class="menu-link"><i class="bx bx-message-square-detail submenu-icon c-pink"></i><div class="text-truncate">Admission Enquiry</div><span class="ec-badge ec-badge-hot">CRM</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-blue"></i><div class="text-truncate">Visitor Book</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-phone-call submenu-icon c-green"></i><div class="text-truncate">Phone Call Log</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-envelope submenu-icon c-orange"></i><div class="text-truncate">Postal Dispatch/Receive</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-comment-error submenu-icon c-red"></i><div class="text-truncate">Complaints</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                    <li class='menu-item @(schoolSettingsOpen ? "active open" : "")'>
+        @* ---- Students ---- *@
+        <li class='menu-item @Open("StudentList","ManageAdmission","EditStudent")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-user-plus ic-students"></i>
+                <div class="text-truncate">Students</div>
+            </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("StudentList")'><a asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Student Directory</div></a></li>
+                <li class='menu-item @On("ManageAdmission")'><a asp-area="ERP" asp-controller="Admission" asp-action="ManageAdmission" class="menu-link"><i class="bx bx-user-plus submenu-icon c-green"></i><div class="text-truncate">New Admission</div></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-category submenu-icon c-purple"></i><div class="text-truncate">Student Categories</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("Promotion")'><a asp-area="ERP" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
+                <li class='menu-item @On("Inactive")'><a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
+            </ul>
+        </li>
 
-                        <a href="javascript:void(0);"
-                           class="menu-link menu-toggle">
-                            <i class="menu-icon icon-base bx bx-cog"></i>
-                            <div class="text-truncate">School Settings</div>
-                        </a>
+        @* ---- Academics ---- *@
+        <li class='menu-item @Open("SubjectManagement")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-book ic-academic"></i>
+                <div class="text-truncate">Academics</div>
+            </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("ClassSection")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="ClassSection" class="menu-link"><i class="bx bx-grid-alt submenu-icon c-blue"></i><div class="text-truncate">Classes &amp; Sections</div></a></li>
+                <li class='menu-item @On("SubjectManagement")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="SubjectManagement" class="menu-link"><i class="bx bx-book-alt submenu-icon c-purple"></i><div class="text-truncate">Subjects</div></a></li>
+                <li class='menu-item @On("AssignClassTeacher")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="AssignClassTeacher" class="menu-link"><i class="bx bx-user-voice submenu-icon c-green"></i><div class="text-truncate">Assign Class Teacher</div></a></li>
+                <li class='menu-item @On("Timetable")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="Timetable" class="menu-link"><i class="bx bx-time-five submenu-icon c-indigo"></i><div class="text-truncate">Timetable</div></a></li>
+                <li class='menu-item @On("PeriodStructure")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="PeriodStructure" class="menu-link"><i class="bx bx-time submenu-icon c-teal"></i><div class="text-truncate">Period Structure</div></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-book-content submenu-icon c-teal"></i><div class="text-truncate">Syllabus &amp; Lesson Plan</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-task submenu-icon c-orange"></i><div class="text-truncate">Assignments / Homework</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-folder-open submenu-icon c-pink"></i><div class="text-truncate">Study Materials</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                        <ul class="menu-sub">
+        @* ---- Attendance ---- *@
+        <li class='menu-item @Open("StudentAttendance")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-user-check ic-att"></i>
+                <div class="text-truncate">Attendance</div>
+            </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("StudentAttendance")'><a asp-area="ERP" asp-controller="Attendance" asp-action="StudentAttendance" class="menu-link"><i class="bx bx-user-check submenu-icon c-green"></i><div class="text-truncate">Student Attendance</div></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-user-voice submenu-icon c-blue"></i><div class="text-truncate">Staff Attendance</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("AttendanceReport")'><a asp-area="ERP" asp-controller="Attendance" asp-action="AttendanceReport" class="menu-link"><i class="bx bx-bar-chart submenu-icon c-purple"></i><div class="text-truncate">Attendance Reports</div></a></li>
+            </ul>
+        </li>
 
-                            <li class='menu-item @(IsActive("BasicProfile") ? "active" : "")'>
-                                <a asp-area="Admin"
-                                   asp-controller="SchoolSettings"
-                                   asp-action="BasicProfile"
-                                   class="menu-link">
+        @* ---- Examinations ---- *@
+        <li class='menu-item @Open("CreateExam","MarkEntry")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-file ic-exam"></i>
+                <div class="text-truncate">Examinations</div>
+            </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("CreateExam")'><a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-red"></i><div class="text-truncate">Exam Schedule</div></a></li>
+                <li class='menu-item @On("MarkEntry")'><a asp-area="ERP" asp-controller="Exam" asp-action="MarkEntry" class="menu-link"><i class="bx bx-edit submenu-icon c-purple"></i><div class="text-truncate">Marks Entry</div></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-indigo"></i><div class="text-truncate">Admit Cards</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-medal submenu-icon c-orange"></i><div class="text-truncate">Grading System</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-spreadsheet submenu-icon c-blue"></i><div class="text-truncate">Report Cards</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-line-chart submenu-icon c-teal"></i><div class="text-truncate">Result Analysis</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                                    <i class="bx bx-user submenu-icon submenu-profile"></i>
+        @* ===================== FINANCE ZONE ===================== *@
+        <li class="menu-header"><span class="menu-header-text">Finance</span></li>
 
-                                    <div class="text-truncate">
-                                        Basic Profile
-                                    </div>
+        @* ---- Fees ---- *@
+        <li class='menu-item @Open("FeeStructure","FeeHead","ManageFee")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-wallet ic-fees"></i>
+                <div class="text-truncate">Fees &amp; Collection</div>
+            </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("FeeStructure")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="FeeStructure" class="menu-link"><i class="bx bx-credit-card submenu-icon c-green"></i><div class="text-truncate">Fee Structure</div></a></li>
+                <li class='menu-item @On("FeeHead")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="FeeHead" class="menu-link"><i class="bx bx-list-ul submenu-icon c-teal"></i><div class="text-truncate">Fee Heads</div></a></li>
+                <li class='menu-item @On("ManageFee")'><a asp-area="ERP" asp-controller="Fee" asp-action="ManageFee" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Collect Fees</div></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-check-shield submenu-icon c-indigo"></i><div class="text-truncate">Payment Verification</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Due Reminders</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-bar-chart-alt-2 submenu-icon c-blue"></i><div class="text-truncate">Fee Reports</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                                </a>
-                            </li>
+        @* ---- Accounting ---- *@
+        <li class='menu-item'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-receipt ic-account"></i>
+                <div class="text-truncate">Accounting</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-trending-up submenu-icon c-green"></i><div class="text-truncate">Income</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-trending-down submenu-icon c-red"></i><div class="text-truncate">Expenses</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-book-bookmark submenu-icon c-teal"></i><div class="text-truncate">Account Ledger</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                            <li class='menu-item @(IsActive("AcademicSetup") ? "active" : "")'>
-                                <a asp-area="Admin"
-                                   asp-controller="SchoolSettings"
-                                   asp-action="AcademicSetup"
-                                   class="menu-link">
+        @* ===================== PEOPLE & FACILITIES ===================== *@
+        <li class="menu-header"><span class="menu-header-text">People &amp; Facilities</span></li>
 
-                                    <i class="bx bx-book-open submenu-icon submenu-academic"></i>
+        @* ---- HR ---- *@
+        <li class='menu-item'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-group ic-hr"></i>
+                <div class="text-truncate">Human Resources</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Staff Directory</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-sitemap submenu-icon c-purple"></i><div class="text-truncate">Departments &amp; Designations</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-calendar-minus submenu-icon c-pink"></i><div class="text-truncate">Leave Management</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Payroll &amp; Salary</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                                    <div class="text-truncate">
-                                        Academic Setup
-                                    </div>
+        @* ---- Library ---- *@
+        <li class='menu-item'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-book-reader ic-library"></i>
+                <div class="text-truncate">Library</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-book-alt submenu-icon c-orange"></i><div class="text-truncate">Book Catalog</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-transfer-alt submenu-icon c-blue"></i><div class="text-truncate">Issue &amp; Return</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-green"></i><div class="text-truncate">Members</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                                </a>
-                            </li>
+        @* ---- Transport ---- *@
+        <li class='menu-item'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-bus ic-bus"></i>
+                <div class="text-truncate">Transport</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-map submenu-icon c-blue"></i><div class="text-truncate">Routes</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-car submenu-icon c-purple"></i><div class="text-truncate">Vehicles &amp; Drivers</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-current-location submenu-icon c-red"></i><div class="text-truncate">Live Bus Tracking</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-link submenu-icon c-green"></i><div class="text-truncate">Assign Transport</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                            <li class='menu-item @(IsActive("SubjectManagement") ? "active" : "")'>
-                                <a asp-area="Admin"
-                                   asp-controller="SchoolSettings"
-                                   asp-action="SubjectManagement"
-                                   class="menu-link">
+        @* ---- Hostel ---- *@
+        <li class='menu-item'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-building-house ic-hostel"></i>
+                <div class="text-truncate">Hostel</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-buildings submenu-icon c-pink"></i><div class="text-truncate">Hostels</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-door-open submenu-icon c-blue"></i><div class="text-truncate">Rooms &amp; Types</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-key submenu-icon c-green"></i><div class="text-truncate">Room Allocation</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                                    <i class="bx bx-book-content submenu-icon submenu-subject"></i>
+        @* ---- Inventory ---- *@
+        <li class='menu-item @Open("InventoryItem","PurchaseEntry")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-package ic-inv"></i>
+                <div class="text-truncate">Inventory / Store</div>
+            </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("InventoryItem")'><a asp-area="ERP" asp-controller="Fee" asp-action="InventoryItem" class="menu-link"><i class="bx bx-box submenu-icon c-orange"></i><div class="text-truncate">Items &amp; Stock</div></a></li>
+                <li class='menu-item @On("PurchaseEntry")'><a asp-area="ERP" asp-controller="Fee" asp-action="PurchaseEntry" class="menu-link"><i class="bx bx-cart submenu-icon c-green"></i><div class="text-truncate">Purchase Entry</div></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-store submenu-icon c-blue"></i><div class="text-truncate">Suppliers</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-log-out-circle submenu-icon c-purple"></i><div class="text-truncate">Issue Items</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                                    <div class="text-truncate">
-                                        Subject Management
-                                    </div>
+        @* ===================== ENGAGEMENT ===================== *@
+        <li class="menu-header"><span class="menu-header-text">Engagement</span></li>
 
-                                </a>
-                            </li>
+        @* ---- Communication ---- *@
+        <li class='menu-item'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-broadcast ic-comm"></i>
+                <div class="text-truncate">Communication</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-news submenu-icon c-red"></i><div class="text-truncate">Notice Board</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-message-rounded-dots submenu-icon c-blue"></i><div class="text-truncate">Send SMS / Email</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-calendar-star submenu-icon c-orange"></i><div class="text-truncate">Events &amp; Calendar</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-bell-ring submenu-icon c-amber"></i><div class="text-truncate">Smart Bell</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                            <li class='menu-item @(IsActive("FeeHead") ? "active" : "")'>
-                                <a asp-area="Admin"
-                                   asp-controller="SchoolSettings"
-                                   asp-action="FeeHead"
-                                   class="menu-link">
+        @* ---- Certificates ---- *@
+        <li class='menu-item'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-certification ic-cert"></i>
+                <div class="text-truncate">Certificates &amp; ID</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-indigo"></i><div class="text-truncate">ID Cards</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-transfer submenu-icon c-orange"></i><div class="text-truncate">Transfer Certificate</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-file submenu-icon c-green"></i><div class="text-truncate">Bonafide / Character</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-award submenu-icon c-purple"></i><div class="text-truncate">Custom Certificates</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                                    <i class="bx bx-wallet submenu-icon submenu-feehead"></i>
+        @* ---- Reports ---- *@
+        <li class="menu-item">
+            <a href="javascript:void(0);" class="menu-link menu-soon">
+                <i class="menu-icon icon-base bx bx-bar-chart-alt-2 ic-reports"></i>
+                <div class="text-truncate">Reports &amp; Analytics</div>
+                <span class="ec-badge ec-badge-soon">soon</span>
+            </a>
+        </li>
 
-                                    <div class="text-truncate">
-                                        Fee Head
-                                    </div>
+        @* ===================== ADMINISTRATION ===================== *@
+        <li class="menu-header"><span class="menu-header-text">Administration</span></li>
 
-                                </a>
-                            </li>
-                            <li class='menu-item @(IsActive("FeeStructure") ? "active" : "")'>
-                                <a asp-area="Admin"
-                                   asp-controller="SchoolSettings"
-                                   asp-action="FeeStructure"
-                                   class="menu-link">
+        @* ---- Settings ---- *@
+        <li class='menu-item @Open("BasicProfile","AcademicSetup")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-cog ic-settings"></i>
+                <div class="text-truncate">Settings</div>
+            </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("BasicProfile")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="BasicProfile" class="menu-link"><i class="bx bx-buildings submenu-icon c-blue"></i><div class="text-truncate">School Profile</div></a></li>
+                <li class='menu-item @On("AcademicSetup")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="AcademicSetup" class="menu-link"><i class="bx bx-book-open submenu-icon c-purple"></i><div class="text-truncate">Academic Setup</div></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Academic Year / Session</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-user-circle submenu-icon c-indigo"></i><div class="text-truncate">Users &amp; Roles</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-plug submenu-icon c-green"></i><div class="text-truncate">SMS / Payment Gateway</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-data submenu-icon c-teal"></i><div class="text-truncate">Backup &amp; Restore</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
 
-                                    <i class="bx bx-credit-card submenu-icon submenu-feestructure"></i>
+        @* ---- Billing ---- *@
+        <li class="menu-item">
+            <a href="javascript:void(0);" class="menu-link menu-soon">
+                <i class="menu-icon icon-base bx bx-credit-card ic-billing"></i>
+                <div class="text-truncate">Billing &amp; Subscription</div>
+                <span class="ec-badge ec-badge-soon">soon</span>
+            </a>
+        </li>
 
-                                    <div class="text-truncate">
-                                        Fee Structure
-                                    </div>
+        @* ===================== MORE ===================== *@
+        <li class="menu-header"><span class="menu-header-text">More</span></li>
 
-                                </a>
-                            </li>
-
-                            <li class='menu-item @(IsActive("EnquiryCRM") ? "active" : "")'>
-                                <a asp-area="Admin"
-                                   asp-controller="Enquiry"
-                                   asp-action="EnquiryCRM"
-                                   class="menu-link">
-
-                                    <i class="bx bx-message-square-detail submenu-icon submenu-crm"></i>
-
-                                    <div class="text-truncate">
-                                        Enquiry CRM
-                                    </div>
-
-                                </a>
-                            </li>
-
-                        </ul>
-                    </li>
-                }
-                else
-                {
-                    var area   = hasRoute ? route.area       : GetArea(item);
-                    var ctrl   = hasRoute ? route.controller  : controller;
-                    var action = hasRoute ? route.action      : "Index";
-
-                    <li class='menu-item @(isActive ? "active" : "")'>
-                        <a asp-area="@area"
-                           asp-controller="@ctrl"
-                           asp-action="@action"
-                           class="menu-link">
-
-                            <i class="menu-icon icon-base bx @GetIcon(item)"></i>
-                            <div class="text-truncate">@item</div>
-                        </a>
-                    </li>
-                }
-            }
-        }
-        else
-        {
-            <li class="menu-item">
-                <a asp-area=""
-                   asp-controller="Account"
-                   asp-action="Login"
-                   class="menu-link">
-                    <i class="menu-icon icon-base bx bx-log-in"></i>
-                    <div class="text-truncate">Login</div>
-                </a>
-            </li>
-        }
+        <li class="menu-item">
+            <a href="@supportUrl" target="_blank" class="menu-link">
+                <i class="menu-icon icon-base bx bx-support ic-support"></i>
+                <div class="text-truncate">Support &amp; Help</div>
+            </a>
+        </li>
+        <li class="menu-item">
+            <a href="javascript:void(0);" class="menu-link">
+                <i class="menu-icon icon-base bx bx-download ic-install"></i>
+                <div class="text-truncate">Install App</div>
+            </a>
+        </li>
+        <li class="menu-item">
+            <a asp-area="" asp-controller="Account" asp-action="Logout" class="menu-link">
+                <i class="menu-icon icon-base bx bx-log-out ic-logout"></i>
+                <div class="text-truncate">Sign out</div>
+            </a>
+        </li>
 
     </ul>
 </aside>
+
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        const searchInput = document.querySelector(".sidebar-search input");
-        const rootMenuItems = document.querySelectorAll("#layout-menu > ul.menu-inner > li.menu-item");
+        const layoutMenu = document.getElementById("layout-menu");
 
+        // --- Desktop submenu click-to-toggle ---------------------------------
+        // Sneat's menu.js binds the submenu click-toggle for TOUCH devices only
+        // (`if (window.Helpers.isMobileDevice) ...`). On desktop the submenu was
+        // only opening on hover and collapsing when the pointer left. Bind an
+        // explicit click-to-toggle (with accordion) for non-touch devices. The
+        // submenu is pure CSS (.menu-item.open > .menu-sub { display:flex }), so
+        // toggling the `open` class is all that's needed.
+        const isTouch = window.Helpers && Helpers.isMobileDevice && Helpers.isMobileDevice();
+        if (layoutMenu && !isTouch) {
+            layoutMenu.addEventListener("click", function (e) {
+                const toggle = e.target.closest(".menu-toggle");
+                if (!toggle || !layoutMenu.contains(toggle)) return;
+                e.preventDefault();
+                const item = toggle.parentElement;                  // li.menu-item
+                const opening = !item.classList.contains("open");
+                Array.from(item.parentElement.children).forEach(sib => {
+                    if (sib !== item) sib.classList.remove("open");  // accordion
+                });
+                item.classList.toggle("open", opening);
+            });
+        }
+
+        // --- Menu filter ------------------------------------------------------
+        const searchInput = document.querySelector(".sidebar-search input");
         if (!searchInput) return;
+
+        const rootItems = document.querySelectorAll("#layout-menu > ul.menu-inner > li.menu-item");
+        const headers   = document.querySelectorAll("#layout-menu > ul.menu-inner > li.menu-header");
 
         searchInput.addEventListener("input", function () {
             const value = this.value.toLowerCase().trim();
+            headers.forEach(h => h.style.display = value ? "none" : "");
 
-            rootMenuItems.forEach(item => {
+            rootItems.forEach(item => {
                 const text = item.innerText.toLowerCase();
-                const subMenu = item.querySelector(".menu-sub");
-
-                if (!value) {
-                    item.style.display = "";
-                    item.classList.remove("open");
-                    return;
-                }
-
+                const sub  = item.querySelector(".menu-sub");
+                if (!value) { item.style.display = ""; item.classList.remove("open"); return; }
                 if (text.includes(value)) {
                     item.style.display = "";
-
-                    if (subMenu) {
-                        item.classList.add("open");
-                        subMenu.style.display = "block";
-                    }
+                    if (sub) item.classList.add("open");   // CSS reveals the sub
                 } else {
                     item.style.display = "none";
                 }
