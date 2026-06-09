@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using System.Threading.Tasks;
 
 namespace educore.Areas.Admin.Controllers
-{
+{ 
     [Area("Admin")]
     //[Authorize(Roles = AppRoles.SchoolAdmin)]
     public class SchoolSettingsController : Controller

@@ -10,7 +10,7 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        public IActionResult AttendanceReport()
+        public IActionResult AttendanceReport() 
         {
             return View();
         }

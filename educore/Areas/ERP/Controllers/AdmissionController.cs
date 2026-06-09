@@ -10,7 +10,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
-    public class AdmissionController : Controller
+    public class AdmissionController : Controller 
     {
         private readonly IAdmissionService _admissionService;
         private readonly IEnquiryService _enquiryService;

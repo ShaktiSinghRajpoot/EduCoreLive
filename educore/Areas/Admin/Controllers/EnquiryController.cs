@@ -9,7 +9,7 @@ namespace educore.Areas.Admin.Controllers
 {
     [Area("Admin")]
     public class EnquiryController : Controller
-    {
+    { 
         private readonly IEnquiryService _enquiryService;
         private readonly ISchoolSettingsService _schoolSettingsService;
         private readonly IBaseService _baseService;

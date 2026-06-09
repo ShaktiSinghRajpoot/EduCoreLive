@@ -9,7 +9,7 @@ namespace educore.Areas.ERP.Controllers
         {
             return View();
         }
-
+         
         public IActionResult MarkEntry(int examId = 0, string className = " ", string section = "", string subject = "")
         {
             ViewBag.ExamId    = examId;
