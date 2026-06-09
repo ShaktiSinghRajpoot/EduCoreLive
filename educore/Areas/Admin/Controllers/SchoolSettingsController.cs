@@ -442,7 +442,10 @@ namespace educore.Areas.Admin.Controllers
         }
 
         #endregion
-
+        public IActionResult EnquiryCRM()
+        {
+            return View();
+        }
         public IActionResult SubjectManagement()
         {
             ViewBag.Classes = new List<string>
