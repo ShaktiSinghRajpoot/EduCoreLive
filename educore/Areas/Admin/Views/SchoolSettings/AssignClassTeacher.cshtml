@@ -1,0 +1,397 @@
+@{
+    ViewData["Title"] = "Assign Class Teacher";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+/* ===== Assign Class Teacher (act-*) ===== */
+
+/* summary cards */
+.act-card{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
+    background:#fff; padding:1rem 1.1rem;
+    display:flex; align-items:center; gap:.85rem; height:100%;
+    transition:var(--ec-transition);
+}
+.act-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); }
+.act-card-ic{ width:44px; height:44px; flex:0 0 44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; }
+.act-card-val{ font-size:1.45rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.act-card-lbl{ font-size:.7rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+.act-card.alert-card{ border-color:rgba(234,84,85,.3); background:#fff6f6; }
+
+/* toolbar */
+.act-fbar{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.act-srch-wrap{ position:relative; flex:1 1 200px; max-width:280px; }
+.act-srch-ic{ position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:var(--ec-text-muted); font-size:1rem; pointer-events:none; }
+.act-srch-inp{
+    width:100%; height:36px; padding:0 .75rem 0 2rem;
+    border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.82rem; font-weight:600; color:var(--ec-text,#2b2c40); outline:none;
+    transition:var(--ec-transition);
+}
+.act-srch-inp:focus{ border-color:rgba(255,138,0,.55); background:#fff; box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+.act-chip{
+    height:36px; padding:0 .65rem; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.78rem; font-weight:700; color:var(--ec-text-muted);
+    cursor:pointer; outline:none; transition:var(--ec-transition); white-space:nowrap; appearance:auto;
+}
+.act-chip:hover{ border-color:rgba(255,138,0,.4); background:#fff; color:var(--ec-text,#2b2c40); }
+.act-chip.active-filter{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.45); color:var(--ec-primary); }
+.act-toggle{
+    height:36px; padding:0 .8rem; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.78rem; font-weight:700; color:var(--ec-text-muted);
+    cursor:pointer; outline:none; transition:var(--ec-transition); display:inline-flex; align-items:center; gap:.35rem; white-space:nowrap;
+}
+.act-toggle:hover{ background:#fff; color:var(--ec-text,#2b2c40); }
+.act-toggle.on{ background:#fff0f0; border-color:#f5c2c7; color:#dc3545; }
+
+/* class group */
+.act-grp{ margin-bottom:1.25rem; }
+.act-grp-head{ display:flex; align-items:center; gap:.6rem; margin-bottom:.55rem; }
+.act-grp-rank{ width:30px; height:30px; border-radius:9px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:.8rem; }
+.act-grp-name{ font-weight:800; color:var(--ec-text-dark); font-size:.95rem; }
+.act-grp-meta{ font-size:.72rem; color:var(--ec-text-muted); font-weight:650; }
+
+/* section row */
+.act-row{
+    display:grid; grid-template-columns:150px 1fr 150px 130px; align-items:center; gap:.9rem;
+    border:1px solid var(--ec-border); border-radius:13px; background:#fff;
+    padding:.7rem .9rem; margin-bottom:.55rem; transition:var(--ec-transition);
+}
+.act-row:hover{ border-color:rgba(255,138,0,.3); background:#fffaf3; }
+.act-row.unassigned{ border-color:rgba(234,84,85,.4); background:#fff6f6; }
+.act-row.unassigned:hover{ background:#fff0f0; }
+
+.act-sec-name{ display:flex; align-items:center; gap:.55rem; }
+.act-sec-badge{ width:32px; height:32px; border-radius:9px; background:var(--ec-primary-light); color:var(--ec-primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.85rem; }
+.act-sec-title{ font-weight:800; color:var(--ec-text-dark); font-size:.86rem; line-height:1.2; }
+.act-sec-sub{ font-size:.71rem; color:var(--ec-text-muted); }
+
+.act-select{
+    width:100%; height:38px; padding:0 .65rem; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fff; font-size:.83rem; font-weight:700; color:var(--ec-text,#2b2c40); outline:none; transition:var(--ec-transition);
+}
+.act-select:focus{ border-color:rgba(255,138,0,.55); box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+.act-select.empty{ color:var(--ec-text-muted); }
+
+/* workload pill */
+.act-load{ display:inline-flex; align-items:center; gap:.3rem; font-size:.73rem; font-weight:800; }
+.act-load.ok{ color:#157347; } .act-load.busy{ color:#d97706; } .act-load.over{ color:#b02a37; }
+.act-load.none{ color:var(--ec-text-muted); font-weight:650; }
+
+/* status badge */
+.act-stat{ display:inline-flex; align-items:center; gap:.3rem; padding:.26rem .6rem; border-radius:999px; font-size:.7rem; font-weight:800; white-space:nowrap; }
+.act-stat.assigned{ background:#d4edda; color:#155724; }
+.act-stat.empty{ background:#fde8e8; color:#842029; }
+
+/* conflict note */
+.act-warn{ grid-column:1 / -1; font-size:.74rem; font-weight:700; color:#b02a37; display:flex; align-items:center; gap:.35rem; margin-top:.2rem; }
+
+/* empty */
+.act-empty{ padding:3rem 1rem; text-align:center; }
+.act-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }
+
+/* responsive */
+@@media (max-width:991.98px){
+    .act-row{ grid-template-columns:1fr 1fr; }
+    .act-row .act-sec-name{ grid-column:1 / -1; }
+    .act-row .act-select{ grid-column:1 / -1; }
+}
+@@media (max-width:575.98px){
+    .act-card{ padding:.8rem .9rem; }
+    .act-card-val{ font-size:1.25rem; }
+    .act-srch-wrap{ flex:1 1 100%; max-width:100%; }
+    .act-row{ grid-template-columns:1fr; }
+}
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <!-- Header -->
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-user-voice fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Assign Class Teacher</h4>
+            <div class="ec-page-subtitle">Map a class teacher to every section — spot gaps and balance workload</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="act-card">
+          <div class="act-card-ic bg-label-primary" style="color:var(--ec-primary);"><i class="bx bx-grid"></i></div>
+          <div><div class="act-card-val" id="cSecs">—</div><div class="act-card-lbl">Sections</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="act-card">
+          <div class="act-card-ic bg-label-success text-success"><i class="bx bx-user-check"></i></div>
+          <div><div class="act-card-val" id="cAssigned">—</div><div class="act-card-lbl">Assigned</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="act-card alert-card" id="unassignedCard" style="cursor:pointer;">
+          <div class="act-card-ic bg-label-danger text-danger"><i class="bx bx-user-x"></i></div>
+          <div><div class="act-card-val" id="cUnassigned">—</div><div class="act-card-lbl">Unassigned</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="act-card">
+          <div class="act-card-ic bg-label-warning text-warning"><i class="bx bx-error-circle"></i></div>
+          <div><div class="act-card-val" id="cConflict">—</div><div class="act-card-lbl">Conflicts</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="ec-card mb-0">
+      <div class="ec-card-header">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-user-voice"></i></span>
+            <div>
+              <div class="ec-section-title">Section Assignments</div>
+              <div class="ec-section-subtitle" id="resultText">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="act-fbar">
+          <div class="act-srch-wrap">
+            <i class="bx bx-search act-srch-ic"></i>
+            <input type="search" class="act-srch-inp" id="actSearch" placeholder="Search class, section or teacher…">
+          </div>
+          <select class="act-chip" id="fClass"><option value="">All Classes</option></select>
+          <button class="act-toggle" id="btnUnassigned"><i class="bx bx-user-x"></i>Unassigned only</button>
+          <button class="act-chip ms-auto" id="btnAuto" title="Fill empty sections with least-loaded teachers"><i class="bx bx-magic-wand"></i> Auto-balance</button>
+        </div>
+      </div>
+
+      <div class="ec-card-body pt-2">
+        <div id="grpList"></div>
+
+        <div class="act-empty d-none" id="emptyState">
+          <div class="act-empty-ic"><i class="bx bx-search-alt"></i></div>
+          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">Nothing to show</h6>
+          <p class="text-muted small mb-0">Try a different search or filter.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+(function(){
+'use strict';
+
+/* Mock teacher pool (would come from Staff module) */
+var TEACHERS=[
+  {id:1,name:'Mrs. Rao'},      {id:2,name:'Ms. Dsouza'},   {id:3,name:'Mr. Khanna'},
+  {id:4,name:'Mrs. Iyer'},     {id:5,name:'Mrs. Sharma'},  {id:6,name:'Mr. Banerjee'},
+  {id:7,name:'Ms. Fernandes'}, {id:8,name:'Mr. Mehta'},    {id:9,name:'Mrs. Pillai'},
+  {id:10,name:'Dr. Nair'},     {id:11,name:'Mr. Gupta'},   {id:12,name:'Ms. Verma'},
+  {id:13,name:'Mr. Saxena'}
+];
+
+/* Mock class/section structure (would come from Classes & Sections SP).
+   teacherId = currently assigned class teacher (0 = none). */
+var DATA=[
+  {cls:'Class 1', rank:1,  sections:[
+    {id:11,name:'A',room:'101',teacherId:1},
+    {id:12,name:'B',room:'102',teacherId:2}
+  ]},
+  {cls:'Class 2', rank:2,  sections:[
+    {id:21,name:'A',room:'103',teacherId:3},
+    {id:22,name:'B',room:'104',teacherId:0}
+  ]},
+  {cls:'Class 5', rank:5,  sections:[
+    {id:31,name:'A',room:'201',teacherId:5},
+    {id:32,name:'B',room:'202',teacherId:6},
+    {id:33,name:'C',room:'203',teacherId:0}
+  ]},
+  {cls:'Class 10',rank:10, sections:[
+    {id:41,name:'A',room:'301',teacherId:8},
+    {id:42,name:'B',room:'302',teacherId:1}   /* Mrs. Rao deliberately double-booked → conflict demo */
+  ]},
+  {cls:'Class 11',rank:11, sections:[
+    {id:51,name:'A',room:'401',teacherId:0}
+  ]},
+  {cls:'Class 12',rank:12, sections:[
+    {id:61,name:'A',room:'402',teacherId:11}
+  ]}
+];
+
+var showUnassignedOnly=false;
+
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
+function teacherName(id){ var t=TEACHERS.find(function(x){return x.id===id;}); return t?t.name:''; }
+
+/* All sections flattened */
+function allSecs(){
+  var out=[];
+  DATA.forEach(function(c){ c.sections.forEach(function(s){ out.push({cls:c.cls,rank:c.rank,sec:s}); }); });
+  return out;
+}
+/* How many sections each teacher owns */
+function loadMap(){
+  var m={};
+  allSecs().forEach(function(r){ if(r.sec.teacherId){ m[r.sec.teacherId]=(m[r.sec.teacherId]||0)+1; } });
+  return m;
+}
+function loadCls(n){ return n>=3?'over':(n===2?'busy':'ok'); }
+
+/* Populate class filter */
+(function(){
+  var f=document.getElementById('fClass');
+  DATA.slice().sort(function(a,b){return a.rank-b.rank;}).forEach(function(c){
+    var o=document.createElement('option'); o.value=c.cls; o.textContent=c.cls; f.appendChild(o);
+  });
+})();
+
+/* Summary */
+function updateCards(){
+  var secs=allSecs(), assigned=secs.filter(function(r){return r.sec.teacherId;}).length;
+  var lm=loadMap(), conflicts=Object.keys(lm).filter(function(k){return lm[k]>1;}).length;
+  document.getElementById('cSecs').textContent=secs.length;
+  document.getElementById('cAssigned').textContent=assigned;
+  document.getElementById('cUnassigned').textContent=secs.length-assigned;
+  document.getElementById('cConflict').textContent=conflicts;
+}
+
+/* Build a teacher <select> for a section */
+function selectHtml(sec){
+  var lm=loadMap();
+  var opts='<option value="0">— Unassigned —</option>';
+  TEACHERS.forEach(function(t){
+    var load=lm[t.id]||0;
+    var extra = (load>0 && t.id!==sec.teacherId) ? ' ('+load+' sec)' : (t.id===sec.teacherId && load>1 ? ' ('+load+' sec)' : '');
+    opts+='<option value="'+t.id+'"'+(t.id===sec.teacherId?' selected':'')+'>'+esc(t.name)+extra+'</option>';
+  });
+  return '<select class="act-select js-assign'+(sec.teacherId?'':' empty')+'" data-sec="'+sec.id+'">'+opts+'</select>';
+}
+
+/* Render */
+function render(){
+  var q=document.getElementById('actSearch').value.toLowerCase().trim();
+  var fc=document.getElementById('fClass').value;
+  var lm=loadMap();
+  var box=document.getElementById('grpList'), empty=document.getElementById('emptyState');
+  var html='', shown=0;
+
+  DATA.slice().sort(function(a,b){return a.rank-b.rank;}).forEach(function(c){
+    if(fc && c.cls!==fc) return;
+
+    var rows=c.sections.filter(function(s){
+      if(showUnassignedOnly && s.teacherId) return false;
+      if(q){
+        var hay=(c.cls+' section '+s.name+' '+teacherName(s.teacherId)).toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+    if(!rows.length) return;
+
+    var assignedHere=c.sections.filter(function(s){return s.teacherId;}).length;
+    var rowsHtml=rows.map(function(s){
+      var load=s.teacherId?(lm[s.teacherId]||0):0;
+      var conflict=s.teacherId && load>1;
+      var loadHtml = s.teacherId
+        ? '<span class="act-load '+loadCls(load)+'"><i class="bx bx-briefcase"></i>'+load+' section'+(load>1?'s':'')+'</span>'
+        : '<span class="act-load none"><i class="bx bx-minus"></i>—</span>';
+      var statHtml = s.teacherId
+        ? '<span class="act-stat assigned"><i class="bx bx-check"></i>Assigned</span>'
+        : '<span class="act-stat empty"><i class="bx bx-error-circle"></i>Unassigned</span>';
+
+      return '<div class="act-row'+(s.teacherId?'':' unassigned')+'">'
+        +'<div class="act-sec-name"><span class="act-sec-badge">'+esc(s.name)+'</span>'
+        +  '<div><div class="act-sec-title">Section '+esc(s.name)+'</div><div class="act-sec-sub">Room '+esc(s.room||'—')+'</div></div></div>'
+        +'<div>'+selectHtml(s)+'</div>'
+        +'<div>'+loadHtml+'</div>'
+        +'<div class="text-lg-end">'+statHtml+'</div>'
+        +(conflict?'<div class="act-warn"><i class="bx bx-error"></i>'+esc(teacherName(s.teacherId))+' is class teacher of '+load+' sections.</div>':'')
+        +'</div>';
+    }).join('');
+
+    html+='<div class="act-grp">'
+      +'<div class="act-grp-head"><span class="act-grp-rank">'+(c.rank||'–')+'</span>'
+      +  '<span class="act-grp-name">'+esc(c.cls)+'</span>'
+      +  '<span class="act-grp-meta">'+assignedHere+'/'+c.sections.length+' assigned</span></div>'
+      +rowsHtml+'</div>';
+    shown+=rows.length;
+  });
+
+  if(!shown){ box.innerHTML=''; empty.classList.remove('d-none'); }
+  else { box.innerHTML=html; empty.classList.add('d-none'); }
+
+  var total=allSecs().length, assigned=allSecs().filter(function(r){return r.sec.teacherId;}).length;
+  document.getElementById('resultText').textContent=assigned+' of '+total+' sections have a class teacher';
+
+  bindRows();
+}
+
+function bindRows(){
+  document.querySelectorAll('.js-assign').forEach(function(sel){
+    sel.addEventListener('change',function(){
+      var secId=parseInt(this.dataset.sec,10), tid=parseInt(this.value,10);
+      var sec=allSecs().find(function(r){return r.sec.id===secId;});
+      if(!sec) return;
+      sec.sec.teacherId=tid;
+      // Wire to SP: save assignment (sectionId, teacherId, effectiveFrom)
+      var msg = tid ? (teacherName(tid)+' assigned to '+sec.cls+' – '+sec.sec.name) : ('Class teacher cleared for '+sec.cls+' – '+sec.sec.name);
+      toast(tid?'success':'info', msg);
+      updateCards(); render();
+    });
+  });
+}
+
+/* Toolbar */
+document.getElementById('btnUnassigned').addEventListener('click',function(){
+  showUnassignedOnly=!showUnassignedOnly;
+  this.classList.toggle('on',showUnassignedOnly);
+  render();
+});
+document.getElementById('unassignedCard').addEventListener('click',function(){
+  showUnassignedOnly=true;
+  document.getElementById('btnUnassigned').classList.add('on');
+  render();
+});
+document.getElementById('btnAuto').addEventListener('click',function(){
+  var empties=allSecs().filter(function(r){return !r.sec.teacherId;});
+  if(!empties.length){ toast('info','Every section already has a class teacher.'); return; }
+  empties.forEach(function(r){
+    var lm=loadMap();
+    /* pick teacher with the fewest sections */
+    var best=TEACHERS.slice().sort(function(a,b){return (lm[a.id]||0)-(lm[b.id]||0);})[0];
+    r.sec.teacherId=best.id;
+  });
+  // Wire to SP: bulk-save auto assignments
+  toast('success','Auto-balanced '+empties.length+' unassigned section'+(empties.length>1?'s':'')+'.');
+  updateCards(); render();
+});
+document.getElementById('fClass').addEventListener('change',function(){
+  this.classList.toggle('active-filter', this.value!=='');
+  render();
+});
+document.getElementById('actSearch').addEventListener('input',render);
+
+/* Init */
+updateCards();
+render();
+
+})();
+</script>
+}

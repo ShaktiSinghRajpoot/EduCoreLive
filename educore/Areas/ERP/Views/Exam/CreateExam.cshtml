@@ -1,0 +1,612 @@
+@{
+    ViewData["Title"] = "Create Exam";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<style>
+    :root {
+        --ec-orange: #ff8a00;
+        --ec-orange-soft: #fff4e6;
+        --ec-soft-bg: #f8f7f5;
+        --ec-white: #ffffff;
+        --ec-border: #ececf5;
+        --ec-heading: #2b1b12;
+        --ec-text: #2b2c40;
+        --ec-muted: #8b8175;
+        --ec-success: #16a34a;
+        --ec-success-soft: #ecfdf3;
+        --ec-danger: #dc2626;
+        --ec-danger-soft: #fff1f2;
+        --ec-indigo: #4f46e5;
+        --ec-indigo-soft: #eef2ff;
+    }
+
+    .exam-page { padding-bottom: 1rem; }
+    .exam-page *, .exam-page *::before, .exam-page *::after { box-sizing: border-box; }
+
+    .exam-page .form-control,
+    .exam-page .form-select {
+        min-height: 46px; border-radius: 12px; border-color: var(--ec-border);
+        font-weight: 700; font-size: .9rem; color: var(--ec-text);
+    }
+    .exam-page .form-control:focus,
+    .exam-page .form-select:focus { border-color: var(--ec-orange); box-shadow: 0 0 0 4px rgba(255,138,0,.12); }
+    .exam-field-label { font-size: .7rem; font-weight: 800; color: var(--ec-muted); margin-bottom: .35rem; letter-spacing: .02em; }
+
+    /* ── Section header ── */
+    .exam-section-head {
+        display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem;
+    }
+    .exam-section-num {
+        width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+        background: var(--ec-orange-soft); color: var(--ec-orange);
+        font-size: .78rem; font-weight: 900;
+        display: flex; align-items: center; justify-content: center;
+    }
+    .exam-section-title { font-size: 1rem; font-weight: 900; color: var(--ec-heading); }
+    .exam-section-sub { font-size: .78rem; font-weight: 700; color: var(--ec-muted); margin-top: .05rem; }
+
+    /* ── Exam type cards ── */
+    .exam-type-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 10px;
+    }
+    .exam-type-card {
+        border: 1.5px solid var(--ec-border); border-radius: 14px; background: #fff;
+        padding: .9rem .7rem; text-align: center; cursor: pointer;
+        transition: border-color .16s, background .16s, transform .16s;
+        user-select: none;
+    }
+    .exam-type-card:hover { border-color: var(--ec-orange); transform: translateY(-2px); }
+    .exam-type-card.selected { border-color: var(--ec-orange); background: var(--ec-orange-soft); }
+    .exam-type-icon {
+        width: 44px; height: 44px; border-radius: 13px; margin: 0 auto .6rem;
+        display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
+        background: #f1f5f9; color: var(--ec-muted); transition: .16s;
+    }
+    .exam-type-card.selected .exam-type-icon { background: var(--ec-orange-soft); color: var(--ec-orange); }
+    .exam-type-label { font-size: .8rem; font-weight: 900; color: var(--ec-heading); line-height: 1.25; }
+    .exam-type-desc { font-size: .68rem; font-weight: 700; color: var(--ec-muted); margin-top: .2rem; }
+
+    /* has-error for selects */
+    .has-error .form-select { border-color: var(--ec-danger) !important; }
+
+    /* ── Subject schedule table ── */
+    .subj-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; }
+    .subj-table thead th {
+        font-size: .7rem; font-weight: 800; color: var(--ec-muted); letter-spacing: .04em;
+        padding: 0 .6rem .4rem; text-align: left;
+    }
+    .subj-row { background: #fff; }
+    .subj-row td {
+        padding: .5rem .6rem; border-top: 1px solid var(--ec-border); border-bottom: 1px solid var(--ec-border);
+        vertical-align: middle;
+    }
+    .subj-row td:first-child { border-left: 1px solid var(--ec-border); border-radius: 12px 0 0 12px; padding-left: .9rem; }
+    .subj-row td:last-child  { border-right: 1px solid var(--ec-border); border-radius: 0 12px 12px 0; padding-right: .9rem; }
+    .subj-row .form-control { min-height: 40px; font-size: .85rem; padding: .35rem .65rem; }
+    .subj-name { font-weight: 800; font-size: .9rem; color: var(--ec-heading); white-space: nowrap; }
+    .subj-ico {
+        width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+        display: inline-flex; align-items: center; justify-content: center; font-size: 1rem;
+        background: var(--ec-indigo-soft); color: var(--ec-indigo);
+    }
+
+    /* Mobile: table → cards */
+    .subj-cards { display: none; }
+    .subj-card {
+        border: 1px solid var(--ec-border); border-radius: 14px; background: #fff;
+        padding: .85rem; margin-bottom: 10px;
+    }
+    .subj-card-head { display: flex; align-items: center; gap: .6rem; margin-bottom: .75rem; }
+    .subj-card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+
+    @@media (max-width: 767.98px) {
+        .subj-table-wrap { display: none; }
+        .subj-cards { display: block; }
+        .exam-type-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    /* ── Empty state (no class selected) ── */
+    .subj-empty {
+        text-align: center; padding: 2rem 1rem;
+        border: 1.5px dashed var(--ec-border); border-radius: 16px;
+    }
+    .subj-empty-ico {
+        width: 52px; height: 52px; border-radius: 18px; margin: 0 auto .75rem;
+        display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+        background: var(--ec-orange-soft); color: var(--ec-orange);
+    }
+    .subj-empty h6 { font-weight: 900; color: var(--ec-heading); margin-bottom: .25rem; }
+    .subj-empty p { font-size: .8rem; font-weight: 700; color: var(--ec-muted); margin: 0; }
+
+    /* ── Sticky action bar ── */
+    .exam-bar {
+        position: sticky; bottom: 1rem; z-index: 20; margin-top: 1.25rem;
+        background: rgba(255,255,255,.97); backdrop-filter: blur(12px);
+        border: 1px solid var(--ec-border); border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(43,27,18,.1); padding: .75rem 1rem;
+    }
+    .exam-bar-inner { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+    .exam-bar-summary { font-size: .82rem; font-weight: 800; color: var(--ec-muted); }
+    .exam-bar-summary span { color: var(--ec-heading); }
+
+    .btn-ex-primary { background: var(--ec-orange); border: 0; color: #fff; border-radius: 12px; font-weight: 900; min-height: 46px; padding: 0 1.75rem; box-shadow: 0 8px 20px rgba(255,138,0,.22); transition: .16s; }
+    .btn-ex-primary:hover { background: #e07a00; color: #fff; transform: translateY(-1px); }
+    .btn-ex-primary:disabled { background: #e2e8f0; color: var(--ec-muted); box-shadow: none; transform: none; cursor: not-allowed; }
+    .btn-ex-ghost { border: 1.5px solid var(--ec-border); background: #fff; color: var(--ec-text); border-radius: 12px; font-weight: 800; min-height: 46px; padding: 0 1.25rem; transition: .16s; }
+    .btn-ex-ghost:hover { border-color: var(--ec-danger); color: var(--ec-danger); }
+
+    /* ── Validation feedback ── */
+    .field-error { font-size: .73rem; font-weight: 700; color: var(--ec-danger); margin-top: .25rem; display: none; }
+    .has-error .form-control,
+    .has-error .form-select { border-color: var(--ec-danger) !important; }
+    .has-error .field-error { display: block; }
+</style>
+}
+
+<div class="ec-page-shell exam-page">
+    <div class="ec-page-content">
+
+        <!-- ── Page Header ── -->
+        <div class="ec-page-header">
+            <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                <div class="ec-page-icon"><i class="bx bx-spreadsheet"></i></div>
+                <div>
+                    <h4 class="ec-page-title mb-1">Create Exam</h4>
+                    <div class="ec-page-subtitle">Define exam details, select a class and configure the subject schedule.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ════ SECTION 1 — Exam Details ════ -->
+        <div class="ec-card mb-3">
+            <div class="ec-card-body">
+                <div class="exam-section-head">
+                    <div class="exam-section-num">1</div>
+                    <div>
+                        <div class="exam-section-title">Exam Details</div>
+                        <div class="exam-section-sub">Name, type and schedule of the exam</div>
+                    </div>
+                </div>
+
+                <!-- Exam Name -->
+                <div class="mb-3" id="examNameWrap">
+                    <div class="exam-field-label">EXAM NAME <span style="color:var(--ec-danger)">*</span></div>
+                    <input type="text" class="form-control" id="examName" maxlength="80"
+                           placeholder="e.g. Unit Test 1 — April 2026">
+                    <div class="field-error" id="examNameErr">Please enter an exam name.</div>
+                </div>
+
+                <!-- Exam Type -->
+                <div class="mb-3" id="examTypeWrap">
+                    <div class="exam-field-label">EXAM TYPE <span style="color:var(--ec-muted);font-weight:600;">(optional)</span></div>
+                    <div class="exam-type-grid" id="examTypeGrid">
+                        <div class="exam-type-card" data-type="Unit Test">
+                            <div class="exam-type-icon"><i class="bx bx-pencil"></i></div>
+                            <div class="exam-type-label">Unit Test</div>
+                            <div class="exam-type-desc">Periodic / chapter test</div>
+                        </div>
+                        <div class="exam-type-card" data-type="Mid Term">
+                            <div class="exam-type-icon"><i class="bx bx-notepad"></i></div>
+                            <div class="exam-type-label">Mid Term</div>
+                            <div class="exam-type-desc">Half-term evaluation</div>
+                        </div>
+                        <div class="exam-type-card" data-type="Half Yearly">
+                            <div class="exam-type-icon"><i class="bx bx-book-open"></i></div>
+                            <div class="exam-type-label">Half Yearly</div>
+                            <div class="exam-type-desc">First half of year</div>
+                        </div>
+                        <div class="exam-type-card" data-type="Annual">
+                            <div class="exam-type-icon"><i class="bx bx-award"></i></div>
+                            <div class="exam-type-label">Annual</div>
+                            <div class="exam-type-desc">Final year exam</div>
+                        </div>
+                        <div class="exam-type-card" data-type="Pre Board">
+                            <div class="exam-type-icon"><i class="bx bx-certification"></i></div>
+                            <div class="exam-type-label">Pre Board</div>
+                            <div class="exam-type-desc">10th / 12th prep</div>
+                        </div>
+                    </div>
+                    <div class="field-error" id="examTypeErr">Please select an exam type.</div>
+                </div>
+
+                <!-- Dates -->
+                <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                        <div class="exam-field-label">ACADEMIC YEAR</div>
+                        <input type="text" class="form-control" value="2025 – 2026" readonly
+                               style="background:#f8f7f5;cursor:default;">
+                    </div>
+                    <div class="col-6 col-md-4" id="startDateWrap">
+                        <div class="exam-field-label">START DATE <span style="color:var(--ec-danger)">*</span></div>
+                        <input type="date" class="form-control" id="startDate">
+                        <div class="field-error" id="startDateErr">Required.</div>
+                    </div>
+                    <div class="col-6 col-md-4" id="endDateWrap">
+                        <div class="exam-field-label">END DATE <span style="color:var(--ec-danger)">*</span></div>
+                        <input type="date" class="form-control" id="endDate">
+                        <div class="field-error" id="endDateErr">Must be on or after start date.</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ════ SECTION 2 — Class & Section ════ -->
+        <div class="ec-card mb-3">
+            <div class="ec-card-body">
+                <div class="exam-section-head">
+                    <div class="exam-section-num">2</div>
+                    <div>
+                        <div class="exam-section-title">Class &amp; Section</div>
+                        <div class="exam-section-sub">Select the class and section this exam is for</div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-6" id="examClassWrap">
+                        <div class="exam-field-label">CLASS <span style="color:var(--ec-danger)">*</span></div>
+                        <select class="form-select" id="examClass">
+                            <option value="">Select Class</option>
+                        </select>
+                        <div class="field-error" id="classErr">Please select a class.</div>
+                    </div>
+                    <div class="col-12 col-md-6" id="examSectionWrap">
+                        <div class="exam-field-label">SECTION <span style="color:var(--ec-danger)">*</span></div>
+                        <select class="form-select" id="examSection">
+                            <option value="">Select Section</option>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                            <option value="D">D</option>
+                            <option value="E">E</option>
+                            <option value="All Sections">All Sections</option>
+                        </select>
+                        <div class="field-error" id="sectionErr">Please select a section.</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ════ SECTION 3 — Subject Schedule ════ -->
+        <div class="ec-card mb-3">
+            <div class="ec-card-body">
+                <div class="exam-section-head">
+                    <div class="exam-section-num">3</div>
+                    <div>
+                        <div class="exam-section-title">Subject Schedule</div>
+                        <div class="exam-section-sub">Set exam date, max marks and passing marks per subject</div>
+                    </div>
+                </div>
+
+                <!-- Empty state -->
+                <div id="subjEmpty" class="subj-empty">
+                    <div class="subj-empty-ico"><i class="bx bx-layer"></i></div>
+                    <h6>No class selected</h6>
+                    <p>Select a class in Step 2 to load its subject schedule.</p>
+                </div>
+
+                <!-- Desktop table -->
+                <div class="subj-table-wrap" id="subjTableWrap" style="display:none;">
+                    <table class="subj-table">
+                        <thead>
+                            <tr>
+                                <th style="width:34%">SUBJECT</th>
+                                <th style="width:26%">EXAM DATE</th>
+                                <th style="width:20%">MAX MARKS</th>
+                                <th style="width:20%">PASS MARKS</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subjTableBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile cards -->
+                <div class="subj-cards" id="subjCards"></div>
+
+            </div>
+        </div>
+
+        <!-- ════ Sticky Action Bar ════ -->
+        <div class="exam-bar">
+            <div class="exam-bar-inner">
+                <div class="exam-bar-summary">
+                    <span id="barSummary">Fill in the details above to create an exam.</span>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-ex-ghost" id="cancelBtn">Cancel</button>
+                    <button class="btn btn-ex-primary" id="saveExamBtn" disabled>
+                        <i class="bx bx-save me-1"></i>Save Exam
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section PageScripts {
+<script>
+$(document).ready(function () {
+
+    if (typeof toastr !== 'undefined') toastr.options = { closeButton: true, progressBar: true, timeOut: '3500', positionClass: 'toast-top-right' };
+    function toast(t, m) { if (typeof toastr !== 'undefined') toastr[t](m); }
+
+    // ── Fallback subject map (used when Subject Management has no data) ───────
+    const fallbackMap = {
+        primary:   ['English', 'Hindi', 'Mathematics', 'Environmental Studies', 'General Knowledge'],
+        middle:    ['English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Sanskrit'],
+        secondary: ['English', 'Hindi', 'Mathematics', 'Science', 'Social Science', 'Sanskrit'],
+        senior:    ['English', 'Hindi', 'Mathematics', 'Physics', 'Chemistry', 'Biology / CS / Commerce']
+    };
+
+    function fallbackGroup(cls) {
+        const n = parseInt(cls);
+        if (n <= 5) return 'primary';
+        if (n <= 8) return 'middle';
+        if (n <= 10) return 'secondary';
+        return 'senior';
+    }
+
+    // ── Read subjects from Subject Management (localStorage) ─────────────────
+    const LS_KEY = 'educore_subjects';
+
+    function getSubjectsFromStorage(className) {
+        const stored = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+        // Direct key match — dropdown value = Subject Management class name
+        if (stored[className] && stored[className].length) return stored[className];
+        return null;
+    }
+
+    const subjectIcons = {
+        'English': 'bx-book',
+        'Hindi': 'bx-font',
+        'Mathematics': 'bx-calculator',
+        'Environmental Studies': 'bx-leaf',
+        'Environmental Science': 'bx-leaf',
+        'EVS': 'bx-leaf',
+        'General Knowledge': 'bx-world',
+        'Science': 'bx-atom',
+        'Social Science': 'bx-globe',
+        'Sanskrit': 'bx-text',
+        'Physics': 'bx-radio-circle',
+        'Chemistry': 'bx-test-tube',
+        'Biology': 'bx-dna',
+        'Biology / CS / Commerce': 'bx-dna',
+        'Computer Science': 'bx-chip',
+        'Computer': 'bx-chip',
+        'IT / Computer': 'bx-chip',
+        'Informatics Practices': 'bx-chip',
+        'Accountancy': 'bx-money',
+        'Business Studies': 'bx-briefcase',
+        'Economics': 'bx-trending-up',
+        'History': 'bx-time-five',
+        'Geography': 'bx-map',
+        'Political Science': 'bx-flag',
+        'Psychology': 'bx-brain',
+        'Physical Education': 'bx-run',
+        'Drawing': 'bx-pencil',
+        'Rhymes': 'bx-music',
+        'Maths': 'bx-calculator'
+    };
+
+    // State
+    let selectedType    = '';
+    let selectedClass   = '';
+    let selectedSection = '';
+
+    // ── Populate class dropdown from Subject Management (localStorage) ────────
+    function populateClassDropdown() {
+        const stored = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+        const $sel   = $('#examClass');
+        $sel.find('option:not(:first)').remove();
+
+        const classes = Object.keys(stored).filter(function(k) { return stored[k] && stored[k].length; });
+
+        // Fall back to standard list if Subject Management not configured yet
+        const list = classes.length ? classes : [
+            'Nursery','LKG','UKG',
+            'Class 1','Class 2','Class 3','Class 4','Class 5',
+            'Class 6','Class 7','Class 8',
+            'Class 9','Class 10',
+            'Class 11 Science','Class 11 Commerce',
+            'Class 12 Science','Class 12 Commerce'
+        ];
+
+        list.forEach(function(cls) {
+            $sel.append('<option value="' + cls + '">' + cls + '</option>');
+        });
+    }
+
+    // ── Exam type selection ───────────────────────────────────────────────────
+    $(document).on('click', '.exam-type-card', function () {
+        $('.exam-type-card').removeClass('selected');
+        $(this).addClass('selected');
+        selectedType = $(this).data('type');
+        $('#examTypeWrap').removeClass('has-error');
+        updateBar();
+    });
+
+    // ── Class + Section change ────────────────────────────────────────────────
+    $('#examClass').on('change', function () {
+        selectedClass = this.value;
+        $('#examClassWrap').removeClass('has-error');
+        renderSubjects();
+        updateBar();
+    });
+
+    $('#examSection').on('change', function () {
+        selectedSection = this.value;
+        $('#examSectionWrap').removeClass('has-error');
+        updateBar();
+    });
+
+    // ── Subjects for one class ────────────────────────────────────────────────
+    function getSubjectsForClass(className) {
+        const fromStorage = getSubjectsFromStorage(className);
+        if (fromStorage && fromStorage.length) return fromStorage;
+        // Fallback: derive group from class number
+        const n = parseInt(className);
+        const group = isNaN(n) ? 'primary' : fallbackGroup(n + 'th');
+        return fallbackMap[group] || fallbackMap.primary;
+    }
+
+    function renderSubjects() {
+        if (!selectedClass) {
+            $('#subjEmpty').show();
+            $('#subjTableWrap').hide();
+            $('#subjCards').hide().empty();
+            return;
+        }
+
+        $('#subjEmpty').hide();
+        const subjects = getSubjectsForClass(selectedClass);
+        const startVal = $('#startDate').val();
+
+        // Desktop table
+        const tRows = subjects.map(function (subj, i) {
+            const ico = subjectIcons[subj] || 'bx-book-bookmark';
+            return '<tr class="subj-row">' +
+                '<td><div class="d-flex align-items-center gap-2">' +
+                    '<span class="subj-ico"><i class="bx ' + ico + '"></i></span>' +
+                    '<span class="subj-name">' + subj + '</span>' +
+                '</div></td>' +
+                '<td><input type="date" class="form-control subj-date" data-subj="' + i + '" value="' + startVal + '"></td>' +
+                '<td><input type="number" class="form-control subj-max" data-subj="' + i + '" value="100" min="1" max="999" placeholder="100"></td>' +
+                '<td><input type="number" class="form-control subj-pass" data-subj="' + i + '" value="35" min="0" max="999" placeholder="35"></td>' +
+                '</tr>';
+        }).join('');
+
+        $('#subjTableBody').html(tRows);
+        $('#subjTableWrap').show();
+
+        // Mobile cards
+        const cards = subjects.map(function (subj, i) {
+            const ico = subjectIcons[subj] || 'bx-book-bookmark';
+            return '<div class="subj-card">' +
+                '<div class="subj-card-head">' +
+                    '<span class="subj-ico"><i class="bx ' + ico + '"></i></span>' +
+                    '<span class="subj-name">' + subj + '</span>' +
+                '</div>' +
+                '<div class="mb-2"><div class="exam-field-label">EXAM DATE</div>' +
+                    '<input type="date" class="form-control subj-date" data-subj="' + i + '" value="' + startVal + '"></div>' +
+                '<div class="subj-card-row">' +
+                    '<div><div class="exam-field-label">MAX MARKS</div>' +
+                        '<input type="number" class="form-control subj-max" data-subj="' + i + '" value="100" min="1" max="999"></div>' +
+                    '<div><div class="exam-field-label">PASS MARKS</div>' +
+                        '<input type="number" class="form-control subj-pass" data-subj="' + i + '" value="35" min="0" max="999"></div>' +
+                '</div></div>';
+        }).join('');
+
+        $('#subjCards').html(cards).show();
+        updateBar();
+    }
+
+    // ── Sync subject dates when start date changes ────────────────────────────
+    $('#startDate').on('change', function () {
+        const v = $(this).val();
+        $('.subj-date').val(v);
+        if ($('#endDate').val() && $('#endDate').val() < v) {
+            $('#endDate').val(v);
+        }
+        $('#startDateWrap').removeClass('has-error');
+        updateBar();
+    });
+
+    $('#endDate').on('change', function () {
+        $('#endDateWrap').removeClass('has-error');
+        updateBar();
+    });
+
+    $('#examName').on('input', function () {
+        $('#examNameWrap').removeClass('has-error');
+        updateBar();
+    });
+
+    // ── Action bar summary ────────────────────────────────────────────────────
+    function updateBar() {
+        const name     = $('#examName').val().trim();
+        const type     = selectedType;
+        const cls      = selectedClass;
+        const section  = selectedSection;
+        const subjects = cls ? getSubjectsForClass(cls).length : 0;
+
+        const ready = name && cls && section && $('#startDate').val() && $('#endDate').val();
+        // type is optional — not part of ready check
+        $('#saveExamBtn').prop('disabled', !ready);
+
+        if (!name && !cls) {
+            $('#barSummary').text('Fill in the details above to create an exam.');
+            return;
+        }
+
+        let parts = [];
+        if (name)    parts.push('<span>' + name + '</span>');
+        if (type)    parts.push(type);
+        if (cls)     parts.push(cls + (section ? ' – ' + section : ''));
+        if (subjects) parts.push(subjects + ' subject' + (subjects > 1 ? 's' : ''));
+        $('#barSummary').html(parts.join(' &middot; '));
+    }
+
+    // ── Validate & Save ───────────────────────────────────────────────────────
+    $('#saveExamBtn').on('click', function () {
+        let valid = true;
+
+        if (!$('#examName').val().trim()) {
+            $('#examNameWrap').addClass('has-error'); valid = false;
+        }
+        if (!$('#startDate').val()) {
+            $('#startDateWrap').addClass('has-error'); valid = false;
+        }
+        if (!$('#endDate').val() || $('#endDate').val() < $('#startDate').val()) {
+            $('#endDateWrap').addClass('has-error'); valid = false;
+        }
+        if (!selectedClass) {
+            $('#examClassWrap').addClass('has-error'); valid = false;
+        }
+        if (!selectedSection) {
+            $('#examSectionWrap').addClass('has-error'); valid = false;
+        }
+
+        if (!valid) { toast('error', 'Please complete all required fields.'); return; }
+
+        // Build payload (TODO: POST to ExamController)
+        const subjects = getSubjectsForClass(selectedClass);
+        const schedule = subjects.map(function (subj, i) {
+            return {
+                subject: subj,
+                date: $('.subj-date[data-subj=' + i + ']').first().val(),
+                maxMarks:  parseInt($('.subj-max[data-subj='  + i + ']').first().val()) || 100,
+                passMarks: parseInt($('.subj-pass[data-subj=' + i + ']').first().val()) || 35
+            };
+        });
+
+        const payload = {
+            name:         $('#examName').val().trim(),
+            type:         selectedType,
+            academicYear: '2025-2026',
+            startDate:    $('#startDate').val(),
+            endDate:      $('#endDate').val(),
+            class:        selectedClass,
+            section:      selectedSection,
+            schedule:     schedule
+        };
+
+        console.log('Exam payload:', payload);
+        toast('success', 'Exam "' + payload.name + '" created for ' + selectedClass + ' – ' + selectedSection + '.');
+    });
+
+    $('#cancelBtn').on('click', function () {
+        window.history.back();
+    });
+
+    // ── Init ──────────────────────────────────────────────────────────────────
+    populateClassDropdown();
+    updateBar();
+});
+</script>
+}

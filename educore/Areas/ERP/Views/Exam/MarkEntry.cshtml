@@ -1,0 +1,1199 @@
+@{
+    ViewData["Title"] = "Exam Mark Entry";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+@@media (max-width:575.98px){
+    .me-bar-inner{ flex-direction:column; align-items:stretch !important; gap:.75rem; }
+    .me-bar-inner .d-flex{ flex-direction:column; }
+    .me-bar-inner .btn{ width:100% !important; }
+}
+.dropdown-toggle::after{ display:none; }
+
+/* ── Page scope ─────────────────────────────── */
+.me-page{
+    font-family:"Public Sans",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--ec-text);
+}
+
+/* ── Selector bar ───────────────────────────── */
+.me-selector{
+    border:1px solid var(--ec-border);
+    border-radius:var(--ec-radius);
+    background:#fff;
+    padding:1rem 1.25rem;
+    margin-bottom:1.25rem;
+}
+.me-sel-label{
+    font-size:.7rem; font-weight:800;
+    text-transform:uppercase; letter-spacing:.05em;
+    color:var(--ec-text-muted); margin-bottom:.35rem; display:block;
+}
+.me-page .form-select{
+    border:1px solid var(--ec-border);
+    border-radius:10px; min-height:42px;
+    font-size:.86rem; font-weight:700; color:var(--ec-text);
+}
+.me-page .form-select:focus{
+    border-color:var(--ec-primary);
+    box-shadow:0 0 0 3px rgba(255,138,0,.12);
+}
+.me-load-btn{
+    height:42px; padding:0 1.25rem;
+    background:linear-gradient(135deg,#ff8a00,#ff9f2f);
+    border:0; border-radius:10px;
+    color:#fff; font-size:.86rem; font-weight:800;
+    display:inline-flex; align-items:center; gap:.4rem;
+    cursor:pointer; transition:var(--ec-transition);
+    white-space:nowrap;
+}
+.me-load-btn:hover{ transform:translateY(-1px); box-shadow:0 6px 16px rgba(255,138,0,.28); }
+.me-load-btn:disabled{ opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
+
+/* ── Context banner ─────────────────────────── */
+.me-context{
+    border:1px solid var(--ec-border);
+    border-radius:var(--ec-radius);
+    background:linear-gradient(135deg,var(--ec-primary-soft) 0%,#fff 60%);
+    padding:1.1rem 1.25rem;
+    margin-bottom:1.25rem;
+    display:none;
+}
+.me-ctx-exam{ font-size:1.05rem; font-weight:900; color:var(--ec-text-dark); }
+.me-ctx-sub{
+    font-size:.8rem; font-weight:700; color:var(--ec-text-muted); margin-top:.2rem;
+}
+.me-type-badge{
+    display:inline-flex; align-items:center; gap:.3rem;
+    background:var(--ec-primary-light);
+    color:var(--ec-primary);
+    border-radius:999px; padding:.25rem .7rem;
+    font-size:.72rem; font-weight:800;
+}
+.me-meta-pill{
+    display:inline-flex; align-items:center; gap:.3rem;
+    background:#f5f4f2; border:1px solid var(--ec-border);
+    border-radius:8px; padding:.28rem .65rem;
+    font-size:.78rem; font-weight:700; color:var(--ec-text);
+    white-space:nowrap;
+}
+.me-meta-pill i{ color:var(--ec-primary); font-size:.9rem; }
+.me-progress-wrap{
+    height:7px; background:#ede8e3;
+    border-radius:999px; overflow:hidden; margin-top:.65rem;
+}
+.me-progress-fill{
+    height:100%; border-radius:inherit;
+    background:linear-gradient(90deg,#ff8a00,#ffb347);
+    transition:width .5s ease;
+}
+.me-prog-label{
+    font-size:.75rem; font-weight:800; color:var(--ec-text-muted); margin-top:.35rem;
+}
+.me-status-badge{
+    display:inline-flex; align-items:center; gap:.35rem;
+    border-radius:999px; padding:.3rem .8rem;
+    font-size:.73rem; font-weight:900; white-space:nowrap;
+}
+.ms-pending   { background:#fff3cd; color:#856404; }
+.ms-progress  { background:#cfe2ff; color:#084298; }
+.ms-completed { background:#d1f0e0; color:#0a5a35; }
+.ms-finalized { background:#d4edda; color:#155724; }
+
+/* ── Summary strip ──────────────────────────── */
+.me-summary{
+    display:flex; align-items:center; gap:.5rem .85rem;
+    flex-wrap:wrap;
+    border:1px solid var(--ec-border);
+    border-radius:var(--ec-radius);
+    background:#fff;
+    padding:.85rem 1.25rem;
+    margin-bottom:1.25rem;
+    display:none;
+}
+.me-sum-item{
+    display:flex; align-items:center; gap:.4rem;
+    font-size:.82rem;
+}
+.me-sum-dot{
+    width:9px; height:9px; border-radius:50%; flex-shrink:0;
+}
+.me-sum-val{ font-weight:900; color:var(--ec-text-dark); }
+.me-sum-lbl{ font-weight:700; color:var(--ec-text-muted); font-size:.76rem; }
+.me-sum-div{
+    width:1px; height:18px; background:var(--ec-border);
+    flex-shrink:0;
+}
+
+/* ── Entry grid card ────────────────────────── */
+.me-grid-card{
+    border:1px solid var(--ec-border);
+    border-radius:var(--ec-radius);
+    background:#fff;
+    overflow:hidden;
+    margin-bottom:5rem;
+    display:none;
+}
+.me-grid-hdr{
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:.5rem;
+    padding:.9rem 1.25rem;
+    border-bottom:1px solid var(--ec-border);
+    background:#fafaf8;
+}
+.me-grid-title{ font-size:.88rem; font-weight:900; color:var(--ec-text-dark); }
+.me-grid-actions{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.me-bulk-btn{
+    height:32px; padding:0 .85rem;
+    border-radius:8px; border:1px solid var(--ec-border);
+    background:#fff; color:var(--ec-text-muted);
+    font-size:.76rem; font-weight:800;
+    cursor:pointer; display:inline-flex; align-items:center; gap:.3rem;
+    transition:var(--ec-transition);
+}
+.me-bulk-btn:hover{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.3); color:var(--ec-primary); }
+.me-finalized-notice{
+    display:none;
+    padding:.65rem 1.25rem;
+    background:#d4edda; color:#0a5a35;
+    font-size:.8rem; font-weight:800;
+    border-bottom:1px solid #b7dfca;
+    align-items:center; gap:.5rem;
+}
+
+/* ── Table ──────────────────────────────────── */
+.me-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.me-tbl{
+    min-width:780px; width:100%;
+    border-collapse:collapse;
+}
+.me-tbl thead th{
+    background:linear-gradient(180deg,#fffaf3,#fff6ea);
+    color:var(--ec-text-muted);
+    font-size:.68rem; text-transform:uppercase;
+    letter-spacing:.06em; font-weight:800;
+    padding:.75rem 1rem;
+    border-bottom:1px solid var(--ec-border);
+    white-space:nowrap; user-select:none;
+}
+.me-tbl tbody td{
+    padding:.6rem 1rem; vertical-align:middle;
+    border-bottom:1px solid #f4f0eb;
+    font-size:.84rem; font-weight:600;
+}
+.me-tbl tbody tr:hover td{ background:#fffaf3; }
+.me-tbl tbody tr.me-row-pass td{ background:#f0fdf4; }
+.me-tbl tbody tr.me-row-fail td{ background:#fff5f5; }
+.me-tbl tbody tr.me-row-abs  td{ background:#f8f9fa; }
+
+/* student cell */
+.me-av{
+    width:34px; height:34px; flex:0 0 34px;
+    border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:.69rem; font-weight:800;
+}
+.me-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.85rem; }
+.me-rl{ font-size:.72rem; color:var(--ec-text-muted); }
+
+/* absent toggle */
+.me-abs-toggle{
+    position:relative; display:inline-block;
+    width:40px; height:22px;
+}
+.me-abs-toggle input{ opacity:0; width:0; height:0; }
+.me-abs-slider{
+    position:absolute; inset:0;
+    background:#e2e3e5; border-radius:999px;
+    cursor:pointer; transition:.2s;
+}
+.me-abs-slider::before{
+    content:""; position:absolute;
+    width:16px; height:16px; border-radius:50%;
+    left:3px; top:3px;
+    background:#fff; transition:.2s;
+}
+.me-abs-toggle input:checked + .me-abs-slider{ background:#ea5455; }
+.me-abs-toggle input:checked + .me-abs-slider::before{ transform:translateX(18px); }
+
+/* marks input */
+.me-marks-inp{
+    width:80px; height:36px;
+    border:1.5px solid var(--ec-border);
+    border-radius:9px;
+    text-align:center;
+    font-size:.88rem; font-weight:900; color:var(--ec-text-dark);
+    outline:none; background:#fff;
+    transition:border-color .15s,box-shadow .15s;
+    -moz-appearance:textfield;
+}
+.me-marks-inp::-webkit-outer-spin-button,
+.me-marks-inp::-webkit-inner-spin-button{ -webkit-appearance:none; }
+.me-marks-inp:focus{
+    border-color:var(--ec-primary);
+    box-shadow:0 0 0 3px rgba(255,138,0,.13);
+}
+.me-marks-inp.inp-error{ border-color:#ea5455; background:#fff5f5; }
+.me-marks-inp[readonly]{ background:#f5f4f2; color:var(--ec-text-muted); cursor:not-allowed; border-color:var(--ec-border); box-shadow:none; }
+
+/* grade & result badges */
+.me-grade{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:34px; height:34px; border-radius:50%;
+    font-size:.78rem; font-weight:900;
+}
+.g-aplus { background:#bbf7d0; color:#14532d; }
+.g-a     { background:#d1fae5; color:#065f46; }
+.g-bplus { background:#bfdbfe; color:#1e40af; }
+.g-b     { background:#dbeafe; color:#1e40af; }
+.g-c     { background:#fef9c3; color:#713f12; }
+.g-d     { background:#fed7aa; color:#7c2d12; }
+.g-e     { background:#e0e7ff; color:#3730a3; }
+.g-f     { background:#fee2e2; color:#991b1b; }
+.g-ab    { background:#f1f5f9; color:#475569; }
+
+.me-result{
+    display:inline-flex; align-items:center; gap:.25rem;
+    border-radius:999px; padding:.22rem .65rem;
+    font-size:.68rem; font-weight:900; white-space:nowrap;
+}
+.r-pass{ background:#d1f0e0; color:#0a5a35; }
+.r-fail{ background:#fde8e8; color:#842029; }
+.r-abs { background:#e2e3e5; color:#495057; }
+
+/* ── Mobile card view ───────────────────────── */
+.me-mob-list{ display:none; padding:1rem; }
+.me-mob-card{
+    border:1px solid var(--ec-border);
+    border-radius:var(--ec-radius);
+    background:#fff; padding:.9rem;
+    margin-bottom:.65rem;
+    transition:var(--ec-transition);
+}
+.me-mob-card.mob-pass{ border-color:#d1f0e0; background:#f0fdf4; }
+.me-mob-card.mob-fail{ border-color:#fde8e8; background:#fff5f5; }
+.me-mob-card.mob-abs { border-color:var(--ec-border); background:#f8f9fa; }
+.me-mob-top{ display:flex; align-items:center; gap:.75rem; margin-bottom:.75rem; }
+.me-mob-inp-row{ display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+.me-mob-inp-lbl{ font-size:.68rem; font-weight:800; text-transform:uppercase; color:var(--ec-text-muted); letter-spacing:.04em; display:block; margin-bottom:.25rem; }
+
+/* ── Empty state ────────────────────────────── */
+.me-empty{
+    padding:3.5rem 1rem; text-align:center;
+    display:flex; flex-direction:column; align-items:center;
+}
+.me-empty-ic{
+    width:64px; height:64px; border-radius:18px;
+    background:var(--ec-primary-light); color:var(--ec-primary);
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.8rem; margin-bottom:.9rem;
+}
+.me-empty-title{ font-size:1rem; font-weight:900; color:var(--ec-text-dark); margin-bottom:.4rem; }
+.me-empty-sub{ font-size:.82rem; font-weight:650; color:var(--ec-text-muted); max-width:320px; }
+
+/* ── Sticky action bar ──────────────────────── */
+.me-bar{
+    position:fixed; bottom:0; left:0; right:0; z-index:40;
+    background:rgba(255,255,255,.96);
+    backdrop-filter:blur(14px);
+    border-top:1px solid var(--ec-border);
+    box-shadow:0 -4px 20px rgba(43,27,18,.07);
+    display:none;
+}
+.me-bar-inner{
+    max-width:1400px; margin:0 auto;
+    padding:.85rem 1.5rem;
+    display:flex; align-items:center; justify-content:space-between; gap:1rem;
+}
+.me-bar-info{
+    font-size:.8rem; font-weight:700; color:var(--ec-text-muted);
+    display:flex; align-items:center; gap:.4rem;
+    min-width:0; flex:1 1 auto;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.me-bar-info strong{ color:var(--ec-text-dark); }
+.btn-me-draft{
+    height:42px; padding:0 1.25rem;
+    border-radius:999px;
+    border:1.5px solid var(--ec-border);
+    background:#fff; color:var(--ec-text);
+    font-size:.84rem; font-weight:800;
+    display:inline-flex; align-items:center; gap:.4rem;
+    cursor:pointer; transition:var(--ec-transition); white-space:nowrap;
+}
+.btn-me-draft:hover{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.4); color:var(--ec-primary); }
+.btn-me-finalize{
+    height:42px; padding:0 1.35rem;
+    border-radius:999px; border:0;
+    background:linear-gradient(135deg,#ff8a00,#ff9f2f);
+    color:#fff; font-size:.84rem; font-weight:800;
+    display:inline-flex; align-items:center; gap:.4rem;
+    cursor:pointer; transition:var(--ec-transition); white-space:nowrap;
+    box-shadow:0 6px 18px rgba(255,138,0,.22);
+}
+.btn-me-finalize:hover{ transform:translateY(-1px); box-shadow:0 10px 24px rgba(255,138,0,.3); }
+.btn-me-finalize:disabled,
+.btn-me-draft:disabled{ opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
+
+/* ── Confirm modal ──────────────────────────── */
+.me-modal .modal-content{
+    border:0; border-radius:22px;
+    box-shadow:0 24px 60px rgba(43,27,18,.18);
+    overflow:hidden;
+}
+.me-modal .modal-header{
+    background:linear-gradient(135deg,var(--ec-primary-soft),#fff 70%);
+    border-bottom:1px solid var(--ec-border);
+    padding:1.25rem 1.5rem;
+}
+.me-modal .modal-title{ font-weight:900; color:var(--ec-text-dark); }
+
+/* ── Toast ──────────────────────────────────── */
+.me-toast{
+    position:fixed; top:1.25rem; right:1.25rem; z-index:9999;
+    background:#fff; border:1px solid #d1e7dd;
+    border-left:4px solid #28a745;
+    border-radius:14px; padding:.9rem 1.25rem;
+    box-shadow:0 8px 28px rgba(0,0,0,.1);
+    display:flex; align-items:center; gap:.75rem;
+    font-size:.86rem; font-weight:700; color:#0a5a35;
+    transform:translateX(110%);
+    transition:transform .35s cubic-bezier(.34,1.56,.64,1);
+    max-width:340px;
+}
+.me-toast.show{ transform:translateX(0); }
+
+@@media (max-width:767.98px){
+    .me-tbl-wrap{ display:none; }
+    .me-mob-list{ display:block; }
+    .me-bar-info{ display:none; }
+}
+@@media (max-width:575.98px){
+    .me-selector .row{ gap:.5rem 0; }
+    .me-context{ padding:.9rem 1rem; }
+}
+</style>
+}
+
+<div class="ec-page-shell me-page">
+  <div class="ec-page-content">
+
+    <!-- ── Page header ───────────────────────── -->
+    <div class="ec-page-header">
+        <div class="ec-page-header-inner">
+            <div class="ec-page-title-wrap">
+                <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+                    <i class="bx bx-pencil fs-4"></i>
+                </div>
+                <div>
+                    <h4 class="ec-page-title mb-1">Exam Mark Entry</h4>
+                    <div class="ec-page-subtitle">Select an exam, class and subject to enter student marks</div>
+                </div>
+            </div>
+            <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam"
+               class="btn btn-outline-secondary d-flex align-items-center gap-1">
+                <i class="bx bx-plus"></i><span class="d-none d-sm-inline">Create Exam</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- ── ① Selector bar ───────────────────── -->
+    <div class="me-selector">
+        <div class="row g-3 align-items-end">
+            <div class="col-12 col-sm-6 col-lg-3">
+                <span class="me-sel-label">Exam</span>
+                <select class="form-select" id="selExam">
+                    <option value="">Select Exam</option>
+                    <option value="1">Annual Exam 2025–26</option>
+                    <option value="2">Mid-Term Exam 2025</option>
+                    <option value="3">Unit Test 1 — April 2026</option>
+                    <option value="4">Half Yearly 2025</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <span class="me-sel-label">Class</span>
+                <select class="form-select" id="selClass" disabled>
+                    <option value="">Class</option>
+                    <option>1st</option><option>2nd</option><option>3rd</option>
+                    <option>4th</option><option>5th</option><option>6th</option>
+                    <option>7th</option><option>8th</option>
+                    <option value="9th" selected>9th</option>
+                    <option>10th</option><option>11th</option><option>12th</option>
+                </select>
+            </div>
+            <div class="col-6 col-sm-3 col-lg-2">
+                <span class="me-sel-label">Section</span>
+                <select class="form-select" id="selSection" disabled>
+                    <option value="">Sec</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-3">
+                <span class="me-sel-label">Subject</span>
+                <select class="form-select" id="selSubject" disabled>
+                    <option value="">Select Subject</option>
+                </select>
+            </div>
+            <div class="col-12 col-sm-6 col-lg-2">
+                <button class="me-load-btn w-100" id="loadBtn" disabled>
+                    <i class="bx bx-spreadsheet"></i> Load Students
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── ② Context banner ──────────────────── -->
+    <div class="me-context" id="meContext">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+            <div>
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <span class="me-ctx-exam" id="ctxExamName">—</span>
+                    <span class="me-type-badge" id="ctxTypeBadge"><i class="bx bx-award"></i> Annual</span>
+                </div>
+                <div class="me-ctx-sub" id="ctxSub">—</div>
+            </div>
+            <span class="me-status-badge ms-pending" id="ctxStatus">Pending</span>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <span class="me-meta-pill"><i class="bx bx-calendar"></i> <span id="ctxDate">—</span></span>
+            <span class="me-meta-pill"><i class="bx bx-trophy"></i> Max: <strong id="ctxMax">—</strong></span>
+            <span class="me-meta-pill"><i class="bx bx-check-circle"></i> Pass: <strong id="ctxPass">—</strong></span>
+        </div>
+        <div class="me-progress-wrap">
+            <div class="me-progress-fill" id="ctxProgressBar" style="width:0%"></div>
+        </div>
+        <div class="me-prog-label" id="ctxProgressLabel">0 / 0 students marked</div>
+    </div>
+
+    <!-- ── ③ Summary strip ───────────────────── -->
+    <div class="me-summary" id="meSummary">
+        <div class="me-sum-item">
+            <div class="me-sum-dot" style="background:#28a745;"></div>
+            <span class="me-sum-val" id="sumPresent">0</span>
+            <span class="me-sum-lbl">Present</span>
+        </div>
+        <div class="me-sum-div"></div>
+        <div class="me-sum-item">
+            <div class="me-sum-dot" style="background:#ea5455;"></div>
+            <span class="me-sum-val" id="sumAbsent">0</span>
+            <span class="me-sum-lbl">Absent</span>
+        </div>
+        <div class="me-sum-div"></div>
+        <div class="me-sum-item">
+            <div class="me-sum-dot" style="background:#ffab00;"></div>
+            <span class="me-sum-val" id="sumPending">0</span>
+            <span class="me-sum-lbl">Pending</span>
+        </div>
+        <div class="me-sum-div"></div>
+        <div class="me-sum-item">
+            <span class="me-sum-val" id="sumAvg">—</span>
+            <span class="me-sum-lbl">Avg %</span>
+        </div>
+        <div class="me-sum-div"></div>
+        <div class="me-sum-item">
+            <span class="me-sum-val" id="sumHigh" style="color:#16a34a;">—</span>
+            <span class="me-sum-lbl">Highest</span>
+        </div>
+        <div class="me-sum-div"></div>
+        <div class="me-sum-item">
+            <span class="me-sum-val" id="sumLow" style="color:#ea5455;">—</span>
+            <span class="me-sum-lbl">Lowest</span>
+        </div>
+        <div class="me-sum-div"></div>
+        <div class="me-sum-item">
+            <div class="me-sum-dot" style="background:#16a34a;"></div>
+            <span class="me-sum-val" id="sumPass">0</span>
+            <span class="me-sum-lbl">Pass</span>
+        </div>
+        <div class="me-sum-div"></div>
+        <div class="me-sum-item">
+            <div class="me-sum-dot" style="background:#dc3545;"></div>
+            <span class="me-sum-val" id="sumFail">0</span>
+            <span class="me-sum-lbl">Fail</span>
+        </div>
+    </div>
+
+    <!-- ── ④ Mark entry grid ──────────────────── -->
+    <div class="me-grid-card" id="meGridCard">
+
+        <div class="me-grid-hdr">
+            <div class="me-grid-title" id="gridTitle">Student Roster</div>
+            <div class="me-grid-actions">
+                <button class="me-bulk-btn" id="btnMarkAllPresent">
+                    <i class="bx bx-user-check"></i> All Present
+                </button>
+                <button class="me-bulk-btn" id="btnClearAll">
+                    <i class="bx bx-reset"></i> Clear Marks
+                </button>
+            </div>
+        </div>
+
+        <!-- Finalized notice -->
+        <div class="me-finalized-notice" id="finalizedNotice">
+            <i class="bx bx-lock-alt"></i>
+            These marks are finalized. Contact School Admin to make changes.
+        </div>
+
+        <!-- Desktop table -->
+        <div class="me-tbl-wrap">
+            <table class="me-tbl">
+                <thead>
+                    <tr>
+                        <th style="width:52px;">#</th>
+                        <th>Student</th>
+                        <th style="width:80px; text-align:center;">Absent</th>
+                        <th style="width:110px; text-align:center;">Marks <span id="thMax" style="font-weight:600;opacity:.7;"></span></th>
+                        <th style="width:70px; text-align:center;">%</th>
+                        <th style="width:64px; text-align:center;">Grade</th>
+                        <th style="width:90px; text-align:center;">Result</th>
+                    </tr>
+                </thead>
+                <tbody id="markTableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- Mobile cards -->
+        <div class="me-mob-list" id="mobList"></div>
+
+        <!-- Empty state (shown before load) -->
+        <div class="me-empty" id="meEmpty">
+            <div class="me-empty-ic"><i class="bx bx-spreadsheet"></i></div>
+            <div class="me-empty-title">No students loaded</div>
+            <div class="me-empty-sub">Select an exam, class, section and subject above, then click Load Students.</div>
+        </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- ── ⑤ Sticky action bar ──────────────────── -->
+<div class="me-bar" id="meBar">
+    <div class="me-bar-inner">
+        <div class="me-bar-info">
+            <i class="bx bx-info-circle" style="color:var(--ec-primary);flex-shrink:0;"></i>
+            <span id="barInfoText">—</span>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn-me-draft" id="btnDraft">
+                <i class="bx bx-save"></i> Save Draft
+            </button>
+            <button class="btn-me-finalize" id="btnFinalize">
+                <i class="bx bx-lock-alt"></i> Finalize &amp; Lock
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Finalize confirm modal ─────────────────── -->
+<div class="modal fade me-modal" id="finalizeModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h6 class="modal-title">
+                    <i class="bx bx-lock-alt me-2" style="color:var(--ec-primary);"></i>
+                    Finalize &amp; Lock Marks
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding:1.25rem 1.5rem;">
+                <p style="font-size:.88rem;font-weight:650;color:var(--ec-text);margin-bottom:1rem;">
+                    You are about to finalize marks for:
+                </p>
+                <div style="background:var(--ec-primary-light);border-radius:12px;padding:.85rem 1rem;margin-bottom:1rem;">
+                    <div style="font-weight:900;color:var(--ec-text-dark);" id="modalExamDesc">—</div>
+                    <div style="font-size:.78rem;color:var(--ec-text-muted);margin-top:.2rem;" id="modalSubDesc">—</div>
+                </div>
+                <p style="font-size:.83rem;font-weight:650;color:#842029;background:#fde8e8;border-radius:10px;padding:.75rem 1rem;margin:0;">
+                    <i class="bx bx-error-circle me-1"></i>
+                    Once finalized, marks cannot be edited without School Admin approval.
+                </p>
+                <div id="modalPendingWarn" class="d-none mt-3"
+                     style="font-size:.82rem;font-weight:700;color:#856404;background:#fff3cd;border-radius:10px;padding:.75rem 1rem;">
+                    <i class="bx bx-error me-1"></i>
+                    <span id="modalPendingCount">0</span> student(s) have no marks entered. They will be recorded as Absent.
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top:1px solid var(--ec-border);padding:1rem 1.5rem;gap:.5rem;">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmFinalizeBtn">
+                    <i class="bx bx-lock-alt me-1"></i> Yes, Finalize
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success toast -->
+<div class="me-toast" id="meToast">
+    <i class="bx bx-check-circle" style="font-size:1.3rem;color:#28a745;flex-shrink:0;"></i>
+    <span id="meToastMsg">Marks saved successfully.</span>
+</div>
+
+@section PageScripts {
+<script>
+$(document).ready(function () {
+'use strict';
+
+// ── Config ────────────────────────────────────────────────────────────────
+const GRADE_SCALE = [
+    { min: 91, grade: 'A+', cls: 'g-aplus' },
+    { min: 81, grade: 'A',  cls: 'g-a'     },
+    { min: 71, grade: 'B+', cls: 'g-bplus' },
+    { min: 61, grade: 'B',  cls: 'g-b'     },
+    { min: 51, grade: 'C',  cls: 'g-c'     },
+    { min: 41, grade: 'D',  cls: 'g-d'     },
+    { min: 33, grade: 'E',  cls: 'g-e'     },
+    { min: 0,  grade: 'F',  cls: 'g-f'     }
+];
+
+const AVATAR_COLORS = [
+    'bg-label-primary text-primary',
+    'bg-label-success text-success',
+    'bg-label-info text-info',
+    'bg-label-warning text-warning',
+    'bg-label-danger text-danger'
+];
+
+// ── Mock exam data ────────────────────────────────────────────────────────
+const EXAMS = {
+    '1': { name: 'Annual Exam 2025–26',      type: 'Annual',    subjects: ['Mathematics','English','Hindi','Science','Social Science'] },
+    '2': { name: 'Mid-Term Exam 2025',        type: 'Mid Term',  subjects: ['Mathematics','English','Hindi','Science'] },
+    '3': { name: 'Unit Test 1 — April 2026', type: 'Unit Test', subjects: ['Mathematics','English','Science'] },
+    '4': { name: 'Half Yearly 2025',          type: 'Half Yearly', subjects: ['Mathematics','English','Hindi','Science','Social Science'] }
+};
+
+const SUBJECT_SCHEDULE = {
+    'Mathematics':    { date: '14 Jun 2026', max: 100, pass: 33 },
+    'English':        { date: '15 Jun 2026', max: 100, pass: 33 },
+    'Hindi':          { date: '16 Jun 2026', max: 100, pass: 33 },
+    'Science':        { date: '17 Jun 2026', max: 100, pass: 33 },
+    'Social Science': { date: '18 Jun 2026', max: 100, pass: 33 }
+};
+
+// Returns schedule for any subject — defaults to 100/33 for unknown ones
+function getSubjectSchedule(subject) {
+    return SUBJECT_SCHEDULE[subject] || { date: '', max: 100, pass: 33 };
+}
+
+// ── Read subjects from Subject Management (localStorage) ──────────────────
+const LS_KEY = 'educore_subjects';
+
+function getSubjectsForClass(classValue) {
+    const stored = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+    if (!Object.keys(stored).length) return null;
+
+    const num = parseInt(classValue);
+    if (!isNaN(num)) {
+        const key = 'Class ' + num;
+        if (stored[key] && stored[key].length) return stored[key];
+
+        // For Class 11/12 merge all streams (Science + Commerce + Arts)
+        if (num >= 11) {
+            const merged = new Set();
+            Object.keys(stored).forEach(function(k) {
+                if (k.toLowerCase().startsWith('class ' + num)) {
+                    stored[k].forEach(function(s) { merged.add(s); });
+                }
+            });
+            if (merged.size) return [...merged];
+        }
+    }
+    return null; // not in localStorage — caller uses fallback
+}
+
+// ── Mock student roster ───────────────────────────────────────────────────
+const STUDENTS = [
+    { id:1,  roll:'01', name:'Akash Verma',    gender:'M' },
+    { id:2,  roll:'02', name:'Priya Sharma',   gender:'F' },
+    { id:3,  roll:'03', name:'Rahul Kumar',    gender:'M' },
+    { id:4,  roll:'04', name:'Sneha Patel',    gender:'F' },
+    { id:5,  roll:'05', name:'Arjun Singh',    gender:'M' },
+    { id:6,  roll:'06', name:'Kavya Nair',     gender:'F' },
+    { id:7,  roll:'07', name:'Rohan Gupta',    gender:'M' },
+    { id:8,  roll:'08', name:'Anjali Mishra',  gender:'F' },
+    { id:9,  roll:'09', name:'Vikram Joshi',   gender:'M' },
+    { id:10, roll:'10', name:'Divya Rao',      gender:'F' },
+    { id:11, roll:'11', name:'Aditya Shah',    gender:'M' },
+    { id:12, roll:'12', name:'Meera Kapoor',   gender:'F' }
+];
+
+// ── State ─────────────────────────────────────────────────────────────────
+let state = {
+    examId: '', className: '', section: '', subject: '',
+    maxMarks: 100, passMarks: 33,
+    rows: [],         // { studentId, marks: null|number, absent: false, finalized: false }
+    finalized: false
+};
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const selExam    = document.getElementById('selExam');
+const selClass   = document.getElementById('selClass');
+const selSection = document.getElementById('selSection');
+const selSubject = document.getElementById('selSubject');
+const loadBtn    = document.getElementById('loadBtn');
+
+// ── Selector cascade ──────────────────────────────────────────────────────
+selExam.addEventListener('change', function () {
+    const examId = this.value;
+    state.examId = examId;
+    selClass.disabled   = !examId;
+    selSection.disabled = !examId;
+
+    // Reset class + subject when exam changes
+    selClass.value   = '';
+    selSubject.innerHTML = '<option value="">Select Subject</option>';
+    selSubject.disabled  = true;
+    updateLoadBtn();
+});
+
+// Subject dropdown is driven by CLASS (from Subject Management), not exam
+selClass.addEventListener('change', function () {
+    const classVal = this.value;
+    selSubject.innerHTML = '<option value="">Select Subject</option>';
+
+    if (classVal) {
+        // Try localStorage (Subject Management) first
+        const fromStorage = getSubjectsForClass(classVal);
+        // Fall back to exam's hardcoded subject list
+        const examId  = selExam.value;
+        const fallback = (examId && EXAMS[examId]) ? EXAMS[examId].subjects : [];
+        const subjects = fromStorage || fallback;
+
+        subjects.forEach(function(s) {
+            selSubject.innerHTML += `<option value="${s}">${s}</option>`;
+        });
+        selSubject.disabled = subjects.length === 0;
+    } else {
+        selSubject.disabled = true;
+    }
+    updateLoadBtn();
+});
+
+[selSection, selSubject].forEach(el => {
+    el.addEventListener('change', updateLoadBtn);
+});
+
+function updateLoadBtn() {
+    const ready = selExam.value && selClass.value && selSection.value && selSubject.value;
+    loadBtn.disabled = !ready;
+}
+
+// ── Load students ─────────────────────────────────────────────────────────
+loadBtn.addEventListener('click', function () {
+    state.examId    = selExam.value;
+    state.className = selClass.value;
+    state.section   = selSection.value;
+    state.subject   = selSubject.value;
+    state.finalized = false;
+
+    const sched = getSubjectSchedule(state.subject);
+    state.maxMarks  = sched.max;
+    state.passMarks = sched.pass;
+
+    // Build rows from mock student list
+    state.rows = STUDENTS.map(s => ({
+        studentId: s.id, roll: s.roll, name: s.name, gender: s.gender,
+        marks: null, absent: false, finalized: false
+    }));
+
+    renderContext();
+    renderSummary();
+    renderGrid();
+    showUI();
+});
+
+// ── Render context banner ─────────────────────────────────────────────────
+function renderContext() {
+    const exam  = EXAMS[state.examId];
+    const sched = SUBJECT_SCHEDULE[state.subject] || {};
+
+    document.getElementById('ctxExamName').textContent = exam ? exam.name : '—';
+    document.getElementById('ctxTypeBadge').innerHTML  =
+        `<i class="bx bx-award"></i> ${exam ? exam.type : '—'}`;
+    document.getElementById('ctxSub').textContent =
+        `${state.subject} · Class ${state.className} – ${state.section}`;
+    document.getElementById('ctxDate').textContent = sched.date || '—';
+    document.getElementById('ctxMax').textContent  = state.maxMarks;
+    document.getElementById('ctxPass').textContent = state.passMarks;
+    document.getElementById('thMax').textContent   = `/ ${state.maxMarks}`;
+
+    updateProgress();
+
+    // Modal preview
+    document.getElementById('modalExamDesc').textContent =
+        exam ? exam.name : '—';
+    document.getElementById('modalSubDesc').textContent  =
+        `${state.subject} · Class ${state.className} – ${state.section}`;
+}
+
+function updateProgress() {
+    const total   = state.rows.length;
+    const marked  = state.rows.filter(r => r.absent || r.marks !== null).length;
+    const pct     = total ? Math.round(marked / total * 100) : 0;
+
+    document.getElementById('ctxProgressBar').style.width  = pct + '%';
+    document.getElementById('ctxProgressLabel').textContent =
+        `${marked} / ${total} students marked`;
+
+    const statusEl = document.getElementById('ctxStatus');
+    let cls = 'ms-pending', label = 'Pending';
+    if (state.finalized) { cls = 'ms-finalized'; label = 'Finalized'; }
+    else if (marked === total && total > 0) { cls = 'ms-completed'; label = 'Completed'; }
+    else if (marked > 0) { cls = 'ms-progress'; label = 'In Progress'; }
+    statusEl.className = `me-status-badge ${cls}`;
+    statusEl.textContent = label;
+}
+
+// ── Render summary strip ──────────────────────────────────────────────────
+function renderSummary() {
+    const rows    = state.rows;
+    const absent  = rows.filter(r => r.absent).length;
+    const present = rows.filter(r => !r.absent).length;
+    const withMarks = rows.filter(r => !r.absent && r.marks !== null);
+    const pending   = rows.filter(r => !r.absent && r.marks === null).length;
+    const scores  = withMarks.map(r => r.marks);
+    const pass    = withMarks.filter(r => r.marks >= state.passMarks).length;
+    const fail    = withMarks.filter(r => r.marks < state.passMarks).length;
+
+    document.getElementById('sumPresent').textContent = present;
+    document.getElementById('sumAbsent').textContent  = absent;
+    document.getElementById('sumPending').textContent = pending;
+    document.getElementById('sumPass').textContent    = pass;
+    document.getElementById('sumFail').textContent    = fail;
+
+    if (scores.length) {
+        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        document.getElementById('sumAvg').textContent  = avg.toFixed(1) + '%';
+        document.getElementById('sumHigh').textContent = Math.max(...scores);
+        document.getElementById('sumLow').textContent  = Math.min(...scores);
+    } else {
+        document.getElementById('sumAvg').textContent  = '—';
+        document.getElementById('sumHigh').textContent = '—';
+        document.getElementById('sumLow').textContent  = '—';
+    }
+}
+
+// ── Compute grade ─────────────────────────────────────────────────────────
+function getGradeInfo(marks, max, pass) {
+    if (marks === null) return { pct: null, grade: '—', cls: 'g-ab', result: 'pending' };
+    const pct = Math.round(marks / max * 100);
+    if (marks < pass) return { pct, grade: 'F', cls: 'g-f', result: 'fail' };
+    const found = GRADE_SCALE.find(g => pct >= g.min);
+    return { pct, grade: found ? found.grade : 'F', cls: found ? found.cls : 'g-f', result: 'pass' };
+}
+
+// ── Render desktop table row ──────────────────────────────────────────────
+function buildTableRow(row, idx) {
+    const gi   = row.absent ? { pct: null, grade: 'AB', cls: 'g-ab', result: 'abs' } : getGradeInfo(row.marks, state.maxMarks, state.passMarks);
+    const pct  = row.absent ? '—' : (gi.pct !== null ? gi.pct + '%' : '—');
+    const avCol = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+    const initials = row.name.split(' ').map(p => p[0]).slice(0,2).join('').toUpperCase();
+
+    const rowCls = row.absent ? 'me-row-abs' : (gi.result === 'pass' ? 'me-row-pass' : gi.result === 'fail' ? 'me-row-fail' : '');
+    const marksVal = row.absent ? 'AB' : (row.marks !== null ? row.marks : '');
+    const readonly = state.finalized ? 'readonly' : '';
+    const disabledAbs = state.finalized ? 'disabled' : '';
+
+    const resultHtml = row.absent
+        ? `<span class="me-result r-abs">ABS</span>`
+        : gi.result === 'pass'
+        ? `<span class="me-result r-pass"><i class="bx bx-check"></i> PASS</span>`
+        : gi.result === 'fail'
+        ? `<span class="me-result r-fail"><i class="bx bx-x"></i> FAIL</span>`
+        : `<span style="color:var(--ec-text-muted);font-size:.78rem;font-weight:700;">—</span>`;
+
+    return `<tr class="${rowCls}" data-idx="${idx}" data-id="${row.studentId}">
+        <td><span style="font-weight:800;color:var(--ec-text-muted);">${row.roll}</span></td>
+        <td>
+            <div class="d-flex align-items-center gap-2">
+                <div class="me-av ${avCol}">${initials}</div>
+                <div>
+                    <div class="me-nm">${row.name}</div>
+                    <div class="me-rl">${row.gender === 'M' ? 'Male' : 'Female'}</div>
+                </div>
+            </div>
+        </td>
+        <td style="text-align:center;">
+            <label class="me-abs-toggle">
+                <input type="checkbox" class="abs-chk" data-idx="${idx}" ${row.absent?'checked':''} ${disabledAbs}>
+                <span class="me-abs-slider"></span>
+            </label>
+        </td>
+        <td style="text-align:center;">
+            <input type="number" class="me-marks-inp marks-inp"
+                   data-idx="${idx}" min="0" max="${state.maxMarks}"
+                   value="${row.absent ? '' : (row.marks !== null ? row.marks : '')}"
+                   placeholder="—"
+                   ${row.absent ? 'readonly' : readonly}
+                   tabindex="${row.absent ? -1 : 0}">
+        </td>
+        <td style="text-align:center;font-weight:800;color:var(--ec-text-muted);font-size:.84rem;">${pct}</td>
+        <td style="text-align:center;"><span class="me-grade ${gi.cls}">${row.absent ? 'AB' : gi.grade}</span></td>
+        <td style="text-align:center;">${resultHtml}</td>
+    </tr>`;
+}
+
+// ── Render mobile card ────────────────────────────────────────────────────
+function buildMobCard(row, idx) {
+    const gi   = row.absent ? { pct: null, grade: 'AB', cls: 'g-ab', result: 'abs' } : getGradeInfo(row.marks, state.maxMarks, state.passMarks);
+    const avCol = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+    const initials = row.name.split(' ').map(p => p[0]).slice(0,2).join('').toUpperCase();
+    const mobCls = row.absent ? 'mob-abs' : (gi.result === 'pass' ? 'mob-pass' : gi.result === 'fail' ? 'mob-fail' : '');
+    const readonly = state.finalized ? 'readonly' : '';
+    const disabledAbs = state.finalized ? 'disabled' : '';
+
+    return `<div class="me-mob-card ${mobCls}" data-idx="${idx}">
+        <div class="me-mob-top">
+            <div class="me-av ${avCol}">${initials}</div>
+            <div class="flex-grow-1">
+                <div class="me-nm">${row.name}</div>
+                <div class="me-rl">Roll: ${row.roll} · ${row.gender === 'M' ? 'Male' : 'Female'}</div>
+            </div>
+            <span class="me-grade ${gi.cls}" style="flex-shrink:0;">${row.absent ? 'AB' : gi.grade}</span>
+        </div>
+        <div class="me-mob-inp-row">
+            <div>
+                <span class="me-mob-inp-lbl">Absent</span>
+                <label class="me-abs-toggle">
+                    <input type="checkbox" class="abs-chk" data-idx="${idx}" ${row.absent?'checked':''} ${disabledAbs}>
+                    <span class="me-abs-slider"></span>
+                </label>
+            </div>
+            <div>
+                <span class="me-mob-inp-lbl">Marks / ${state.maxMarks}</span>
+                <input type="number" class="me-marks-inp marks-inp"
+                       data-idx="${idx}" min="0" max="${state.maxMarks}"
+                       value="${row.absent ? '' : (row.marks !== null ? row.marks : '')}"
+                       placeholder="—"
+                       style="width:90px;"
+                       ${row.absent ? 'readonly' : readonly}>
+            </div>
+            ${!row.absent && gi.pct !== null ? `<div>
+                <span class="me-mob-inp-lbl">%</span>
+                <span style="font-size:.95rem;font-weight:900;color:var(--ec-text-dark);">${gi.pct}%</span>
+            </div>` : ''}
+        </div>
+    </div>`;
+}
+
+// ── Render full grid ──────────────────────────────────────────────────────
+function renderGrid() {
+    const tbody   = document.getElementById('markTableBody');
+    const mobList = document.getElementById('mobList');
+    const empty   = document.getElementById('meEmpty');
+    const fin     = document.getElementById('finalizedNotice');
+    const title   = document.getElementById('gridTitle');
+
+    title.textContent = `${state.className} – ${state.section} · ${state.subject} (${state.rows.length} students)`;
+
+    if (state.rows.length === 0) {
+        tbody.innerHTML = '';
+        mobList.innerHTML = '';
+        empty.style.display = 'flex';
+        return;
+    }
+    empty.style.display = 'none';
+
+    tbody.innerHTML   = state.rows.map((r, i) => buildTableRow(r, i)).join('');
+    mobList.innerHTML = state.rows.map((r, i) => buildMobCard(r, i)).join('');
+
+    fin.style.display = state.finalized ? 'flex' : 'none';
+
+    attachRowEvents();
+    updateProgress();
+    updateBarInfo();
+}
+
+// ── Attach events to rows ─────────────────────────────────────────────────
+function attachRowEvents() {
+    // Absent toggles
+    document.querySelectorAll('.abs-chk').forEach(chk => {
+        chk.addEventListener('change', function () {
+            const idx = parseInt(this.dataset.idx);
+            state.rows[idx].absent = this.checked;
+            if (this.checked) state.rows[idx].marks = null;
+            renderGrid();
+            renderSummary();
+        });
+    });
+
+    // Marks inputs
+    document.querySelectorAll('.marks-inp').forEach(inp => {
+        inp.addEventListener('input', function () {
+            const idx = parseInt(this.dataset.idx);
+            const raw = this.value.trim();
+            const val = raw === '' ? null : Math.min(parseInt(raw) || 0, state.maxMarks);
+
+            // Clamp visually
+            if (val !== null && val < 0)              this.value = 0;
+            if (val !== null && val > state.maxMarks) this.value = state.maxMarks;
+
+            state.rows[idx].marks = val;
+            this.classList.toggle('inp-error', val !== null && val < 0);
+
+            // Update just this row without full re-render
+            refreshRow(idx);
+            renderSummary();
+            updateProgress();
+            updateBarInfo();
+        });
+
+        // Tab / Enter moves to next input
+        inp.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                const all  = Array.from(document.querySelectorAll('.marks-inp:not([readonly])'));
+                const cur  = all.indexOf(this);
+                const next = all[cur + 1];
+                if (next) next.focus();
+            }
+        });
+    });
+}
+
+// ── Refresh a single row (no full re-render) ──────────────────────────────
+function refreshRow(idx) {
+    const row = state.rows[idx];
+    const gi  = row.absent ? { pct: null, grade: 'AB', cls: 'g-ab', result: 'abs' } : getGradeInfo(row.marks, state.maxMarks, state.passMarks);
+
+    // Desktop
+    const tr = document.querySelector(`#markTableBody tr[data-idx="${idx}"]`);
+    if (tr) {
+        tr.className = row.absent ? 'me-row-abs' : (gi.result === 'pass' ? 'me-row-pass' : gi.result === 'fail' ? 'me-row-fail' : '');
+        const cells = tr.querySelectorAll('td');
+        const pct = row.absent ? '—' : (gi.pct !== null ? gi.pct + '%' : '—');
+        cells[4].textContent = pct;
+        cells[5].innerHTML = `<span class="me-grade ${gi.cls}">${row.absent ? 'AB' : gi.grade}</span>`;
+        cells[6].innerHTML = row.absent
+            ? `<span class="me-result r-abs">ABS</span>`
+            : gi.result === 'pass'
+            ? `<span class="me-result r-pass"><i class="bx bx-check"></i> PASS</span>`
+            : gi.result === 'fail'
+            ? `<span class="me-result r-fail"><i class="bx bx-x"></i> FAIL</span>`
+            : `<span style="color:var(--ec-text-muted);font-size:.78rem;font-weight:700;">—</span>`;
+    }
+
+    // Mobile
+    const mc = document.querySelector(`#mobList .me-mob-card[data-idx="${idx}"]`);
+    if (mc) {
+        mc.className = `me-mob-card ${row.absent ? 'mob-abs' : gi.result === 'pass' ? 'mob-pass' : gi.result === 'fail' ? 'mob-fail' : ''}`;
+        const gradeEl = mc.querySelector('.me-grade');
+        if (gradeEl) { gradeEl.className = `me-grade ${gi.cls}`; gradeEl.textContent = row.absent ? 'AB' : gi.grade; }
+    }
+}
+
+// ── Bulk actions ──────────────────────────────────────────────────────────
+document.getElementById('btnMarkAllPresent').addEventListener('click', function () {
+    state.rows.forEach(r => { r.absent = false; });
+    renderGrid();
+    renderSummary();
+});
+
+document.getElementById('btnClearAll').addEventListener('click', function () {
+    if (!confirm('Clear all entered marks? This cannot be undone.')) return;
+    state.rows.forEach(r => { r.marks = null; r.absent = false; });
+    renderGrid();
+    renderSummary();
+    updateProgress();
+});
+
+// ── Show UI panels ────────────────────────────────────────────────────────
+function showUI() {
+    document.getElementById('meContext').style.display  = 'block';
+    document.getElementById('meSummary').style.display  = 'flex';
+    document.getElementById('meGridCard').style.display = 'block';
+    document.getElementById('meBar').style.display      = 'block';
+    document.getElementById('meEmpty').style.display    = 'none';
+}
+
+// ── Bar info text ─────────────────────────────────────────────────────────
+function updateBarInfo() {
+    const exam = EXAMS[state.examId];
+    const total = state.rows.length;
+    const marked = state.rows.filter(r => r.absent || r.marks !== null).length;
+    document.getElementById('barInfoText').innerHTML =
+        `<strong>${exam ? exam.name : ''}</strong> · ${state.subject} · ${state.className} – ${state.section} · ${marked}/${total} marked`;
+}
+
+// ── Save draft ────────────────────────────────────────────────────────────
+document.getElementById('btnDraft').addEventListener('click', function () {
+    // In production: POST to SaveMarks with action=draft
+    showToast('Marks saved as draft.');
+});
+
+// ── Finalize ──────────────────────────────────────────────────────────────
+document.getElementById('btnFinalize').addEventListener('click', function () {
+    const pending = state.rows.filter(r => !r.absent && r.marks === null).length;
+    const warn    = document.getElementById('modalPendingWarn');
+    const cnt     = document.getElementById('modalPendingCount');
+    if (pending > 0) {
+        warn.classList.remove('d-none');
+        cnt.textContent = pending;
+    } else {
+        warn.classList.add('d-none');
+    }
+    const modal = new bootstrap.Modal(document.getElementById('finalizeModal'));
+    modal.show();
+});
+
+document.getElementById('confirmFinalizeBtn').addEventListener('click', function () {
+    // Mark absent any student with null marks
+    state.rows.forEach(r => { if (!r.absent && r.marks === null) r.absent = true; });
+    state.finalized = true;
+
+    bootstrap.Modal.getInstance(document.getElementById('finalizeModal')).hide();
+
+    renderGrid();
+    renderSummary();
+    updateProgress();
+
+    // Disable action buttons
+    document.getElementById('btnDraft').disabled    = true;
+    document.getElementById('btnFinalize').disabled = true;
+    document.getElementById('btnMarkAllPresent').disabled = true;
+    document.getElementById('btnClearAll').disabled = true;
+
+    showToast('Marks finalized and locked successfully.');
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+    const t = document.getElementById('meToast');
+    document.getElementById('meToastMsg').textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ── TempData toast (post-redirect) ────────────────────────────────────────
+@if (TempData["SuccessMessage"] != null) {
+    <text>showToast("@TempData["SuccessMessage"]");</text>
+}
+
+// ── Auto-load defaults so mock data shows immediately ─────────────────────
+(function autoLoad() {
+    selExam.value = '1';
+    selExam.dispatchEvent(new Event('change'));
+
+    selClass.value = '9th';
+    selClass.dispatchEvent(new Event('change')); // populates subjects from localStorage
+
+    selSection.value = 'A';
+
+    // Pick Mathematics if available, otherwise first subject in list
+    setTimeout(function () {
+        const opts = Array.from(selSubject.options).map(function(o) { return o.value; }).filter(Boolean);
+        selSubject.value = opts.includes('Mathematics') ? 'Mathematics' : (opts[0] || '');
+        updateLoadBtn();
+        if (selSubject.value) loadBtn.click();
+    }, 0);
+})();
+
+}); // end $(document).ready
+</script>
+}

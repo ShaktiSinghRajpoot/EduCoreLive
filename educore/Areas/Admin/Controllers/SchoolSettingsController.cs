@@ -442,5 +442,42 @@ namespace educore.Areas.Admin.Controllers
         }
 
         #endregion
+
+        public IActionResult SubjectManagement()
+        {
+            ViewBag.Classes = new List<string>
+            {
+                "Nursery","LKG","UKG",
+                "Class 1","Class 2","Class 3","Class 4","Class 5",
+                "Class 6","Class 7","Class 8",
+                "Class 9","Class 10",
+                "Class 11 Science","Class 11 Commerce",
+                "Class 12 Science","Class 12 Commerce"
+            };
+
+            return View();
+        }
+
+
+        public IActionResult ClassSection()
+        {
+            return View();
+        }
+
+        public IActionResult AssignClassTeacher()
+        {
+            return View();
+        }
+
+        public IActionResult Timetable()
+        {
+            return View();
+        }
+
+        public IActionResult PeriodStructure()
+        {
+            return View();
+        }
+
     }
 }

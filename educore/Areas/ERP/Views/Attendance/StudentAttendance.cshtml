@@ -1,0 +1,462 @@
+@{
+    ViewData["Title"] = "Student Attendance";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<style>
+    :root {
+        --ec-orange: #ff8a00;
+        --ec-orange-soft: #fff4e6;
+        --ec-white: #ffffff;
+        --ec-border: #ececf5;
+        --ec-heading: #2b1b12;
+        --ec-text: #2b2c40;
+        --ec-muted: #8b8175;
+        --ec-success: #16a34a;
+        --ec-success-soft: #ecfdf3;
+        --ec-danger: #dc2626;
+        --ec-warning: #d97706;
+        --ec-warning-soft: #fffbeb;
+    }
+
+    /* ════════ MOBILE-FIRST BASE ════════ */
+    .att-page { padding-bottom: 1rem; }
+    .att-page *, .att-page *::before, .att-page *::after { box-sizing: border-box; }
+
+    .att-page .form-select,
+    .att-page .form-control {
+        min-height: 46px; border-radius: 12px; border-color: var(--ec-border);
+        font-weight: 700; font-size: .9rem; color: var(--ec-text);
+    }
+    .att-page .form-select:focus,
+    .att-page .form-control:focus { border-color: var(--ec-orange); box-shadow: 0 0 0 4px rgba(255,138,0,.12); }
+    .att-field-label { font-size: .7rem; font-weight: 800; color: var(--ec-muted); margin-bottom: .3rem; letter-spacing: .02em; }
+
+    /* selector bar */
+    .att-selector { border: 1px solid var(--ec-border); border-radius: 18px; background: #fff; padding: 1rem; }
+
+    /* card header: flat date label + status (no gradient, no icon box) */
+    .att-head { display: flex; align-items: center; justify-content: space-between; gap: .85rem 1.25rem; flex-wrap: wrap; }
+    .att-head-left { display: flex; align-items: center; gap: .65rem; flex-wrap: wrap; }
+    .ahd-title { font-size: 1.02rem; font-weight: 900; color: var(--ec-heading); }
+    .ahd-title #dbDate { color: var(--ec-text); }
+    .db-status {
+        flex: 0 0 auto; display: inline-flex; align-items: center; gap: .4rem;
+        border-radius: 999px; padding: .42rem .8rem; font-size: .76rem; font-weight: 900; white-space: nowrap;
+    }
+    .db-status.today { background: var(--ec-success-soft); color: var(--ec-success); }
+    .db-status.past { background: var(--ec-warning-soft); color: var(--ec-warning); }
+    .db-dot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+    .db-status.today .db-dot { animation: dbpulse 1.6s infinite; }
+    @@keyframes dbpulse {
+        0%   { box-shadow: 0 0 0 0 rgba(22,163,74,.5); }
+        70%  { box-shadow: 0 0 0 6px rgba(22,163,74,0); }
+        100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); }
+    }
+
+    /* slim summary */
+    .att-summary { display: flex; align-items: center; gap: .65rem .95rem; flex-wrap: wrap; }
+    .att-sum-item {
+        display: flex; align-items: center; gap: .4rem;
+        background: #f8f7f5; border-radius: 999px; padding: .3rem .7rem;
+    }
+    .att-sum-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .att-sum-dot.green { background: var(--ec-success); }
+    .att-sum-dot.red { background: var(--ec-danger); }
+    .att-sum-dot.grey { background: #cbd5e1; }
+    .att-sum-num { font-weight: 900; font-size: .95rem; color: var(--ec-heading); }
+    .att-sum-txt { font-size: .78rem; font-weight: 700; color: var(--ec-muted); }
+    .att-sum-rate { font-weight: 900; font-size: 1rem; color: var(--ec-success); padding-left: .15rem; }
+
+    .att-list { display: flex; flex-direction: column; gap: 10px; }
+
+    /* ── Row: STACKS on mobile ── */
+    .att-row {
+        display: flex; flex-wrap: wrap; align-items: center; gap: .65rem .75rem;
+        padding: .8rem; border: 1px solid var(--ec-border);
+        border-radius: 15px; background: #fff;
+        transition: border-color .16s, background .16s;
+    }
+    .att-row.absent { border-color: rgba(220,38,38,.3); background: #fffafa; }
+
+    .att-av {
+        width: 46px; height: 46px; border-radius: 13px; flex: 0 0 auto;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 900; font-size: .82rem;
+        background: var(--ec-orange-soft); color: var(--ec-orange); transition: .16s;
+    }
+    .att-row.absent .att-av { background: #fee2e2; color: var(--ec-danger); }
+
+    /* name takes the rest of line 1 next to avatar, wraps on word boundaries only */
+    .att-info { flex: 1 1 0; min-width: 0; }
+    .att-name {
+        font-size: .98rem; font-weight: 800; color: var(--ec-heading); line-height: 1.3;
+        word-break: keep-all; overflow-wrap: break-word;
+    }
+    .att-roll { font-size: .77rem; font-weight: 700; color: var(--ec-muted); margin-top: .12rem; }
+
+    /* toggle: stays inline with name on mobile (icon-only, compact) */
+    .att-toggle { display: flex; flex: 0 0 auto; border: 1px solid var(--ec-border); border-radius: 12px; overflow: hidden; }
+    .att-toggle button {
+        flex: 0 0 44px; border: 0; background: #fff; cursor: pointer; height: 46px;
+        font-size: 0; /* hide label text on mobile */
+        display: inline-flex; align-items: center; justify-content: center; transition: .14s;
+    }
+    .att-toggle button i { font-size: 1.2rem; }
+    .att-toggle .seg-p { border-right: 1px solid var(--ec-border); }
+    .att-toggle .seg-p.on { background: var(--ec-success); color: #fff; }
+    .att-toggle .seg-a.on { background: var(--ec-danger); color: #fff; }
+
+    /* notify: full-width row, comes after toggle in DOM so it wraps below row 1 */
+    .att-notify { display: flex; flex: 1 1 100%; align-items: center; gap: .5rem; }
+    .notify-chip {
+        display: inline-flex; align-items: center; gap: .28rem; white-space: nowrap;
+        border-radius: 999px; padding: .35rem .6rem; font-size: .72rem; font-weight: 900; flex: 1 1 auto; justify-content: center;
+    }
+    .notify-chip.pending { background: var(--ec-warning-soft); color: var(--ec-warning); }
+    .notify-chip.sent { background: var(--ec-success-soft); color: var(--ec-success); }
+    .btn-wa {
+        width: 46px; height: 46px; border-radius: 12px; flex: 0 0 auto; cursor: pointer;
+        border: 1px solid #bbf7d0; background: #f0fdf4; color: var(--ec-success);
+        display: inline-flex; align-items: center; justify-content: center; font-size: 1.25rem; transition: .16s;
+    }
+    .btn-wa:hover { background: #25d366; border-color: #25d366; color: #fff; }
+
+    /* sticky bar — lives inside the content column, aligns with the page */
+    .att-bar {
+        position: sticky; bottom: 1rem; z-index: 20; margin-top: 1rem;
+        background: rgba(255,255,255,.97); backdrop-filter: blur(12px);
+        border: 1px solid var(--ec-border); border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(43,27,18,.1); padding: .7rem .9rem;
+    }
+    .att-bar-inner { display: flex; align-items: center; gap: .6rem; }
+    .att-bar-actions { display: flex; gap: .6rem; flex: 1 1 auto; }
+    .att-bar .btn {
+        flex: 1 1 0; white-space: nowrap; border-radius: 12px; font-weight: 900;
+        min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
+        padding: 0 .75rem; font-size: .88rem;
+    }
+    #barLabel { display: none; } /* hidden on mobile */
+    #barLabel i { font-size: 1.1rem; color: var(--ec-orange); flex-shrink: 0; }
+    #barLabelText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .count-badge { background: rgba(255,255,255,.28); border-radius: 999px; padding: .05rem .5rem; font-size: .8rem; font-weight: 900; line-height: 1.4; }
+    .count-badge-dark { background: var(--ec-heading); color: #fff; border-radius: 999px; padding: .05rem .5rem; font-size: .78rem; font-weight: 900; line-height: 1.4; }
+
+    .btn-att-primary { background: var(--ec-orange); border: 0; color: #fff; box-shadow: 0 8px 20px rgba(255,138,0,.22); transition: .16s; }
+    .btn-att-primary:hover { background: #e07a00; color: #fff; }
+    .btn-att-primary.unconfirmed { background: #e2e8f0; color: var(--ec-muted); box-shadow: none; }
+    .btn-att-primary.unconfirmed:hover { background: #cbd5e1; color: var(--ec-text); transform: none; }
+    .save-hint { font-size: .68rem; font-weight: 700; opacity: .75; margin-left: .3rem; }
+    .btn-att-wa { background: #25d366; border: 0; color: #fff; transition: .16s; }
+    .btn-att-wa:hover { background: #1eb858; color: #fff; }
+    .btn-att-ghost { border: 1px solid var(--ec-border); background: #fff; color: var(--ec-text); border-radius: 12px; font-weight: 800; }
+    .btn-att-ghost:hover { border-color: var(--ec-orange); color: var(--ec-orange); }
+
+    .att-modal .modal-content { border: 0; border-radius: 22px; box-shadow: 0 24px 70px rgba(43,27,18,.18); overflow: hidden; }
+    .att-modal .modal-title { color: var(--ec-heading); font-weight: 900; }
+    .modal-row { display: flex; align-items: center; gap: .7rem; padding: .6rem .7rem; border: 1px solid var(--ec-border); border-radius: 12px; margin-bottom: .45rem; }
+
+    /* ════════ TABLET / DESKTOP (≥ 768px) ════════ */
+    @@media (min-width: 768px) {
+        .att-row { flex-wrap: nowrap; gap: .9rem; padding: .7rem .9rem; }
+        .att-info { flex: 1 1 auto; }
+        .att-notify { flex: 0 0 auto; }
+        .att-toggle { flex: 0 0 auto; }
+        .att-toggle button { flex: 0 0 auto; min-width: 96px; font-size: .85rem; font-weight: 800; color: var(--ec-muted); gap: .3rem; white-space: nowrap; }
+        .att-toggle button i { font-size: 1rem; }
+        .notify-chip { flex: 0 0 auto; }
+        .btn-wa { width: 42px; height: 42px; }
+        #barLabel { display: inline-flex; align-items: center; gap: .45rem; flex: 1 1 auto; min-width: 0; font-size: .85rem; color: var(--ec-text); font-weight: 800; }
+        .att-bar-inner { justify-content: space-between; }
+        .att-bar-actions { flex: 0 0 auto; }
+        .att-bar .btn { flex: 0 0 auto; padding: 0 1.5rem; min-height: 46px; }
+    }
+</style>
+}
+
+<div class="ec-page-shell att-page">
+    <div class="ec-page-content">
+
+        <!-- Title -->
+        <div class="ec-page-header">
+            <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                <div class="ec-page-icon"><i class="bx bx-calendar-check"></i></div>
+                <div>
+                    <h4 class="ec-page-title mb-1">Student Attendance</h4>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selector bar -->
+        <div class="att-selector mb-3 mb-xl-4">
+            <div class="row g-3 align-items-end">
+                <div class="col-6 col-md-3">
+                    <div class="att-field-label">CLASS</div>
+                    <select class="form-select" id="filterClass">
+                        <option>1st</option><option>2nd</option><option>3rd</option><option>4th</option>
+                        <option>5th</option><option>6th</option><option>7th</option><option>8th</option>
+                        <option selected>9th</option><option>10th</option><option>11th</option><option>12th</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="att-field-label">SECTION</div>
+                    <select class="form-select" id="filterSection">
+                        <option selected>A</option><option>B</option><option>C</option>
+                    </select>
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="att-field-label">DATE</div>
+                    <input type="date" class="form-control" id="attendanceDate">
+                </div>
+            </div>
+        </div>
+
+        <!-- Roster -->
+        <div class="ec-card">
+            <div class="ec-card-body">
+                <div class="att-head mb-3">
+                    <div class="att-head-left">
+                        <div class="ahd-title"><span id="dbDay">Day</span>, <span id="dbDate">Date</span></div>
+                        <span class="db-status today" id="dbStatus"><span class="db-dot"></span>Today</span>
+                    </div>
+                    <div class="att-summary">
+                        <div class="att-sum-item"><span class="att-sum-dot green"></span><span class="att-sum-num" id="sumPresent">0</span><span class="att-sum-txt">Present</span></div>
+                        <div class="att-sum-item"><span class="att-sum-dot red"></span><span class="att-sum-num" id="sumAbsent">0</span><span class="att-sum-txt">Absent</span></div>
+                        <div class="att-sum-item"><span class="att-sum-dot grey"></span><span class="att-sum-num" id="sumTotal">0</span><span class="att-sum-txt">Total</span></div>
+                        <div class="att-sum-rate" id="sumRate">100%</div>
+                    </div>
+                </div>
+
+                <div class="att-list" id="list"></div>
+            </div>
+        </div>
+
+        <!-- Sticky action bar (inside content → matches page width, never under the sidebar) -->
+        <div class="att-bar">
+            <div class="att-bar-inner">
+                <div id="barLabel"><i class="bx bx-chalkboard"></i><span id="barLabelText"></span></div>
+                <div class="att-bar-actions">
+                    <button class="btn btn-att-outline" id="notifyBtn" style="display:none;">
+                        <i class="bx bx-user-x"></i><span>Absent Students</span><span class="count-badge-dark" id="notifyCount">0</span>
+                    </button>
+                    <button class="btn btn-att-primary" id="saveBtn"><i class="bx bx-save"></i><span>Save<span class="d-none d-md-inline"> Attendance</span></span></button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Absent Students modal -->
+<div class="modal fade att-modal" id="notifyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1 d-flex align-items-center gap-2">
+                        <i class="bx bx-user-x" style="color:var(--ec-danger);"></i>
+                        Absent Students
+                        <span id="modalAbsentCount" class="badge rounded-pill" style="background:var(--ec-danger);font-size:.7rem;">0</span>
+                    </h5>
+                    <small class="text-muted fw-semibold">Review absences and send WhatsApp notifications to parents.</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+
+                <!-- Section 1: Student list (leads the modal) -->
+                <div class="p-3" style="border-bottom:1px solid var(--ec-border);">
+                    <div class="att-field-label mb-2">ABSENT STUDENTS</div>
+                    <div id="modalList" style="max-height:260px;overflow-y:auto;"></div>
+                </div>
+
+                <!-- Section 2: Message template (secondary) -->
+                <div class="p-3">
+                    <div class="att-field-label mb-2">
+                        MESSAGE TEMPLATE
+                        <span class="fw-normal text-lowercase ms-1">— {parent} {student} {class} {date}</span>
+                    </div>
+                    <textarea class="form-control" id="msgTemplate" rows="3" style="font-weight:600;resize:vertical;"></textarea>
+                    <div class="mt-2" style="font-size:.74rem;font-weight:700;color:var(--ec-muted);">
+                        <i class="bx bx-info-circle me-1"></i>Each parent receives a personalised message. Opens one WhatsApp chat per parent.
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-att-ghost px-4 py-2" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section PageScripts {
+<script>
+$(document).ready(function () {
+
+    if (typeof toastr !== 'undefined') toastr.options = { closeButton: true, progressBar: true, timeOut: '3000', positionClass: 'toast-top-right' };
+    function toast(t, m) { if (typeof toastr !== 'undefined') toastr[t](m); }
+
+    const students = [
+        { id:1,  name:'Akash Verma',     roll:'01', parent:'Bhukal Verma',    phone:'9876543210', av:'AV' },
+        { id:2,  name:'Priya Singh',     roll:'02', parent:'Rakesh Singh',    phone:'9876543211', av:'PS' },
+        { id:3,  name:'Ravi Kumar',      roll:'03', parent:'Suresh Kumar',    phone:'9876543212', av:'RK' },
+        { id:4,  name:'Neha Gupta',      roll:'04', parent:'Mahesh Gupta',    phone:'9876543213', av:'NG' },
+        { id:5,  name:'Arjun Patel',     roll:'05', parent:'Vijay Patel',     phone:'9876543214', av:'AP' },
+        { id:6,  name:'Sunita Yadav',    roll:'06', parent:'Ramesh Yadav',    phone:'9876543215', av:'SY' },
+        { id:7,  name:'Mohit Sharma',    roll:'07', parent:'Dinesh Sharma',   phone:'9876543216', av:'MS' },
+        { id:8,  name:'Kavita Joshi',    roll:'08', parent:'Naresh Joshi',    phone:'9876543217', av:'KJ' },
+        { id:9,  name:'Rahul Tiwari',    roll:'09', parent:'Anil Tiwari',     phone:'9876543218', av:'RT' },
+        { id:10, name:'Pooja Mishra',    roll:'10', parent:'Sanjay Mishra',   phone:'9876543219', av:'PM' },
+        { id:11, name:'Amit Rajput',     roll:'11', parent:'Govind Rajput',   phone:'9876543220', av:'AR' },
+        { id:12, name:'Anjali Dubey',    roll:'12', parent:'Rakesh Dubey',    phone:'9876543221', av:'AD' }
+    ];
+
+    const status = {}, notified = {};
+    students.forEach(s => { status[s.id] = 'present'; notified[s.id] = false; });
+
+    let touched = false; // true once teacher interacts with any toggle
+
+    function updateSaveBtn() {
+        if (touched) {
+            $('#saveBtn').removeClass('unconfirmed').find('.save-hint').remove();
+        } else {
+            if (!$('#saveBtn').hasClass('unconfirmed')) {
+                $('#saveBtn').addClass('unconfirmed').append('<span class="save-hint">Not confirmed</span>');
+            }
+        }
+    }
+
+    function resetSession() {
+        touched = false;
+        students.forEach(s => { status[s.id] = 'present'; notified[s.id] = false; });
+        updateSaveBtn();
+        render();
+    };
+
+    const today = new Date(), iso = today.toISOString().slice(0,10);
+    $('#attendanceDate').val(iso).attr('max', iso);
+
+    function dateStr() {
+        const d = $('#attendanceDate').val() ? new Date($('#attendanceDate').val()) : today;
+        const s = d.toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
+        return d.toISOString().slice(0,10) === iso ? s + ' (Today)' : s;
+    }
+
+    // ── Attractive live date banner ──
+    function updateDateBanner() {
+        const v = $('#attendanceDate').val();
+        const d = v ? new Date(v) : today;
+        $('#dbDay').text(d.toLocaleDateString('en-IN', { weekday: 'long' }));
+        $('#dbDate').text(d.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }));
+        const isToday = d.toISOString().slice(0,10) === iso;
+        $('#dbStatus')
+            .attr('class', 'db-status ' + (isToday ? 'today' : 'past'))
+            .html('<span class="db-dot"></span>' + (isToday ? 'Today' : 'Back-dated'));
+    }
+    $('#attendanceDate').on('change', function () { updateDateBanner(); renderStats(); });
+    updateDateBanner();
+    function classStr() { return $('#filterClass').val() + '-' + $('#filterSection').val(); }
+
+    function renderList() {
+        $('#list').html(students.map(function (s) {
+            const ab = status[s.id] === 'absent';
+            const notify = ab
+                ? '<div class="att-notify">' +
+                    '<span class="notify-chip ' + (notified[s.id]?'sent':'pending') + '">' +
+                      '<i class="bx ' + (notified[s.id]?'bx-check-circle':'bx-time-five') + '"></i>' + (notified[s.id]?'Notified':'Not notified') + '</span>' +
+                    '<button class="btn-wa wa-one" data-id="' + s.id + '" title="WhatsApp"><i class="bx bxl-whatsapp"></i></button>' +
+                  '</div>'
+                : '';
+            return (
+                '<div class="att-row ' + (ab?'absent':'') + '">' +
+                    '<div class="att-av">' + s.av + '</div>' +
+                    '<div class="att-info"><div class="att-name">' + s.name + '</div><div class="att-roll">Roll No. ' + s.roll + '</div></div>' +
+                    '<div class="att-toggle">' +
+                        '<button class="seg-p ' + (ab?'':'on') + '" data-id="' + s.id + '" data-set="present"><i class="bx bx-check"></i>Present</button>' +
+                        '<button class="seg-a ' + (ab?'on':'') + '" data-id="' + s.id + '" data-set="absent"><i class="bx bx-x"></i>Absent</button>' +
+                    '</div>' +
+                    notify +
+                '</div>'
+            );
+        }).join(''));
+    }
+
+    function renderStats() {
+        const total = students.length;
+        const present = students.filter(s => status[s.id]==='present').length;
+        const absent = total - present;
+        const rate = total ? Math.round(present/total*100) : 0;
+        $('#sumPresent').text(present); $('#sumAbsent').text(absent); $('#sumTotal').text(total); $('#sumRate').text(rate + '%');
+        $('#barLabelText').text('Class ' + $('#filterClass').val() + ' - ' + $('#filterSection').val() + ' · ' + dateStr());
+        $('#notifyCount').text(absent);
+        absent > 0 ? $('#notifyBtn').show() : $('#notifyBtn').hide();
+    }
+
+    function render() { renderList(); renderStats(); }
+
+    $(document).on('click', '.att-toggle button', function () {
+        const id = Number($(this).data('id')), set = $(this).data('set');
+        if (status[id] === set) return;
+        status[id] = set;
+        if (set === 'present') notified[id] = false;
+        if (!touched) { touched = true; updateSaveBtn(); }
+        render();
+    });
+
+    // Reset session when class/section/date changes — it's a new attendance sheet
+    $('#filterClass, #filterSection, #attendanceDate').on('change', function () {
+        resetSession();
+        renderStats();
+    });
+
+    $('#saveBtn').on('click', function () {
+        if (!touched) {
+            toast('warning', 'Please review the roster first. Tap at least one student to confirm attendance before saving.');
+            $('#list').find('.att-row:first').css('box-shadow','0 0 0 3px rgba(255,138,0,.4)');
+            setTimeout(function () { $('#list').find('.att-row:first').css('box-shadow',''); }, 1800);
+            return;
+        }
+        const present = students.filter(s => status[s.id]==='present').length;
+        const absent  = students.length - present;
+        // TODO: POST { class, section, date, records:[{id,status}] } to AttendanceController
+        toast('success', 'Attendance saved — Present: ' + present + ', Absent: ' + absent + '.');
+    });
+
+    function template() { return 'Dear {parent}, your ward {student} (Class {class}) was marked absent on {date}. Kindly inform the school if this is unexpected.'; }
+    function buildMsg(s) {
+        return ($('#msgTemplate').val() || template())
+            .replace(/{parent}/g, s.parent).replace(/{student}/g, s.name)
+            .replace(/{class}/g, classStr()).replace(/{date}/g, dateStr());
+    }
+    function sendWA(id) {
+        const s = students.find(x => x.id === id); if (!s) return;
+        window.open('https://wa.me/91' + s.phone.replace(/\D/g,'') + '?text=' + encodeURIComponent(buildMsg(s)), '_blank');
+        notified[id] = true; render(); refreshModal();
+    }
+    $(document).on('click', '.wa-one', function () { sendWA(Number($(this).data('id'))); });
+    $(document).on('click', '.wa-modal', function () { sendWA(Number($(this).data('id'))); });
+
+    function refreshModal() {
+        const absent = students.filter(s => status[s.id]==='absent');
+        $('#modalAbsentCount').text(absent.length);
+        if (!absent.length) { $('#modalList').html('<p class="text-muted text-center small py-3 mb-0">No absent students.</p>'); return; }
+        $('#modalList').html(absent.map(function (s) {
+            return '<div class="modal-row">' +
+                '<div class="att-av" style="width:36px;height:36px;border-radius:10px;font-size:.7rem;background:#fee2e2;color:var(--ec-danger);">' + s.av + '</div>' +
+                '<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:.83rem;color:var(--ec-heading);">' + s.name + '</div>' +
+                '<div style="font-size:.71rem;font-weight:700;color:var(--ec-muted);">' + s.parent + ' · +91 ' + s.phone + '</div></div>' +
+                '<span class="notify-chip ' + (notified[s.id]?'sent':'pending') + '" style="flex:0 0 auto;"><i class="bx ' + (notified[s.id]?'bx-check-circle':'bx-time-five') + '"></i>' + (notified[s.id]?'Sent':'Pending') + '</span>' +
+                '<button class="btn-wa wa-modal" data-id="' + s.id + '"><i class="bx bxl-whatsapp"></i></button></div>';
+        }).join(''));
+    }
+
+    $('#notifyBtn').on('click', function () { $('#msgTemplate').val(template()); refreshModal(); $('#notifyModal').modal('show'); });
+
+    render();
+    updateSaveBtn();
+});
+</script>
+}

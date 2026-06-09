@@ -11,10 +11,6 @@ using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
-// ADD THIS LINE 👇
-builder.WebHost.UseUrls($"http://0.0.0.0:{Environment.GetEnvironmentVariable("PORT") ?? "8080"}");
-
 var mvcBuilder = builder.Services
     .AddControllersWithViews()
     .AddSessionStateTempDataProvider();
