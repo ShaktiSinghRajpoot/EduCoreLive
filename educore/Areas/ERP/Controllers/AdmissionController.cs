@@ -199,7 +199,10 @@ namespace educore.Areas.ERP.Controllers
                 })
             });
         }
-
+        public IActionResult ManageAdmission()
+        {
+            return View();
+        }
         private static string GroupForFrequency(string? freq) => freq switch
         {
             "One Time" => "One Time Payable Now",
