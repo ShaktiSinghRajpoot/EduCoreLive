@@ -563,11 +563,17 @@ textarea.form-control {
    fixed navbar + footer layout breaks.
    ============================================================ */
 
-/* Solid, full-width bar with a hairline divider for definition. */
+/* Solid, full-width bar with a hairline divider — flat, no shadow. */
 .layout-content-navbar #layout-navbar.layout-navbar {
-    min-height:    64px;
+    min-height:    60px;
     border-bottom: 1px solid var(--ec-border-warm);
-    box-shadow:    var(--ec-shadow-sm);
+}
+
+/* Pull page content up snug under the fixed bar. Sneat pads the content by
+   1.75rem in fixed mode on top of the navbar-height offset, which reads as a
+   big empty band between the bar and the first card — tighten it. */
+.layout-content-navbar .container-p-y:not([class^="pt-"]):not([class*=" pt-"]) {
+    padding-block-start: 1rem !important;
 }
 
 /* Top-bar buttons must keep their natural width even on mobile, where the

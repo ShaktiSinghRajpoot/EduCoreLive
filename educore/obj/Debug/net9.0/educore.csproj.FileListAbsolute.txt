@@ -1144,5 +1144,5 @@ D:\Github\EduCoreLive\educore\bin\verify\zh-Hant\Microsoft.CodeAnalysis.Workspac
 D:\Github\EduCoreLive\educore\bin\verify\runtimes\win\lib\net8.0\System.Windows.Extensions.dll
 D:\Github\EduCoreLive\educore\bin\verify\EduCoreDataAccessLayer.dll
 D:\Github\EduCoreLive\educore\bin\verify\EduCoreDataAccessLayer.pdb
-D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\im8ckc47wf-bgr81gu0e6.gz
 D:\Github\EduCoreLive\educore\obj\Debug\net9.0\staticwebassets.upToDateCheck.txt
+D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\im8ckc47wf-czbysjaqx6.gz
