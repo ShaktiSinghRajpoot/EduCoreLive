@@ -13,8 +13,8 @@
   @* ViewData["customizerHidden"] = (ViewData["customizerHidden"] ??= "customizer-hide"); *@
 
 
-  @*HTML Classes *@
-  ViewData["navbarDetached"] = (ViewData["navbarDetached"] ?? "navbar-detached");
+  @*HTML Classes — null = full-width, attached (solid) navbar for the app shell *@
+  ViewData["navbarDetached"] = ViewData["navbarDetached"];
 
   @*Content classes *@
   ViewData["container"] = (ViewData["container"] ?? "container-xxl");

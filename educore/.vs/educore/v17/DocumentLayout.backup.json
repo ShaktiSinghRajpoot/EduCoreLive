@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "D:\\Github\\EduCoreLive\\educore\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\admin\\controllers\\schoolsettingscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\admin\\controllers\\schoolsettingscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -47,19 +51,32 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Program.cs",
+              "RelativeDocumentMoniker": "Program.cs",
+              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-10T16:46:00.605Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
               "Title": "SchoolSettingsController.cs",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
               "RelativeDocumentMoniker": "Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
               "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
               "RelativeToolTip": "Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
-              "ViewState": "AgIAAMABAAAAAAAAAAAuwNoBAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAdAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-06-10T02:27:06.242Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "EnquiryCRM.cshtml",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Views\\SchoolSettings\\EnquiryCRM.cshtml",
               "RelativeDocumentMoniker": "Areas\\Admin\\Views\\SchoolSettings\\EnquiryCRM.cshtml",
@@ -67,12 +84,11 @@
               "RelativeToolTip": "Areas\\Admin\\Views\\SchoolSettings\\EnquiryCRM.cshtml",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAEAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-06-09T19:36:17.801Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-09T19:36:17.801Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "EnquiryController.cs",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Controllers\\EnquiryController.cs",
               "RelativeDocumentMoniker": "Areas\\Admin\\Controllers\\EnquiryController.cs",
@@ -80,12 +96,11 @@
               "RelativeToolTip": "Areas\\Admin\\Controllers\\EnquiryController.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAACYAAABxAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-09T19:30:58.04Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-09T19:30:58.04Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "AdmissionController.cs",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Controllers\\AdmissionController.cs",
               "RelativeDocumentMoniker": "Areas\\ERP\\Controllers\\AdmissionController.cs",
@@ -93,8 +108,7 @@
               "RelativeToolTip": "Areas\\ERP\\Controllers\\AdmissionController.cs",
               "ViewState": "AgIAAA8AAAAAAAAAAAAAwBEAAAAzAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-09T19:26:32.712Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-06-09T19:26:32.712Z"
             }
           ]
         }

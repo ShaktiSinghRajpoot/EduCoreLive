@@ -1,0 +1,43 @@
+@model educore.Models.SchoolManageModel
+@{
+    var schoolName = string.IsNullOrWhiteSpace(Model?.SchoolName) ? "Your School" : Model!.SchoolName.Trim();
+
+    // Compose a short address line from whatever parts are available.
+    var addressParts = new[] { Model?.AddressLine1, Model?.City, Model?.State }
+        .Where(p => !string.IsNullOrWhiteSpace(p))
+        .Select(p => p!.Trim());
+    var address = string.Join(", ", addressParts);
+
+    // Initials fallback when no logo is set (first letters of up to two words).
+    var words = schoolName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    var initials = words.Length >= 2
+        ? $"{words[0][0]}{words[1][0]}".ToUpper()
+        : schoolName.Length > 0 ? schoolName[0].ToString().ToUpper() : "S";
+
+    var hasLogo = !string.IsNullOrWhiteSpace(Model?.LogoUrl);
+}
+
+<div class="ec-school-identity d-flex align-items-center gap-2 overflow-hidden">
+    @if (hasLogo)
+    {
+        <img src="@Url.Content(Model!.LogoUrl!)" alt="@schoolName logo"
+             class="ec-school-identity-logo flex-shrink-0" />
+    }
+    else
+    {
+        <span class="avatar flex-shrink-0">
+            <span class="avatar-initial rounded bg-primary">@initials</span>
+        </span>
+    }
+
+    <div class="overflow-hidden lh-sm">
+        <div class="ec-school-identity-name fw-semibold text-truncate">@schoolName</div>
+        @if (!string.IsNullOrWhiteSpace(address))
+        {
+            <div class="ec-school-identity-addr d-flex align-items-center gap-1 text-muted text-truncate">
+                <i class="icon-base bx bx-map-pin flex-shrink-0" aria-hidden="true"></i>
+                <span class="text-truncate">@address</span>
+            </div>
+        }
+    </div>
+</div>

@@ -97,6 +97,7 @@ wwwroot\js\ui-toasts.js
 wwwroot\manifest.json
 wwwroot\service-worker.js
 wwwroot\uploads\schools\2\1\logo_20260509212707834.jpg
+wwwroot\uploads\schools\2\1\logo_20260610221750291.png
 wwwroot\vendor\css\core.css
 wwwroot\vendor\css\pages\page-auth.css
 wwwroot\vendor\css\pages\page-icons.css

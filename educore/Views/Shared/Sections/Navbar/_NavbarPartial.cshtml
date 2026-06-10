@@ -30,8 +30,8 @@
 @if (ViewData["navbarHideToggle"] == null)
 {
     <div class="layout-menu-toggle navbar-nav align-items-xl-center me-3 me-xl-0 d-xl-none flex-shrink-0">
-        <a class="nav-item nav-link px-0" href="javascript:void(0)">
-            <i class="icon-base bx bx-menu bx-md"></i>
+        <a class="nav-item nav-link px-0" href="javascript:void(0)" aria-label="Toggle navigation menu">
+            <i class="icon-base bx bx-menu bx-md" aria-hidden="true"></i>
         </a>
     </div>
 }
@@ -39,35 +39,33 @@
 @* ── Navbar body: fills all remaining horizontal space ────────────────
    flex-grow-1  → expand to fill the navbar after the mobile toggle
    flex-nowrap  → never let children wrap to a second row
-   overflow-hidden → clip anything that somehow still overflows          *@
-<div class="navbar-nav-right d-flex align-items-center flex-grow-1 flex-nowrap overflow-hidden"
+   NOTE: no overflow-hidden here — it would clip the open dropdowns. The
+   school-identity wrapper below clips/truncates its own text instead.     *@
+<div class="navbar-nav-right d-flex align-items-center flex-grow-1 flex-nowrap"
      id="navbar-collapse">
 
-    @* Search — me-auto pushes the right items to the far end
-       Input is hidden on mobile; icon always shows as a visual anchor   *@
-    <div class="navbar-nav align-items-center me-auto">
-        <div class="nav-item d-flex align-items-center gap-2">
-            <i class="icon-base bx bx-search icon-md text-muted flex-shrink-0"></i>
-            <input type="text"
-                   class="form-control border-0 shadow-none bg-transparent ps-0 d-none d-md-block"
-                   style="width:160px;"
-                   placeholder="Search…"
-                   aria-label="Search" />
-        </div>
+    @* School identity — me-auto pushes the right items to the far end.
+       Self-fetching view component (logo/initials + name + address).
+       overflow-hidden lets the name/address truncate when space is tight. *@
+    <div class="me-auto overflow-hidden">
+        @await Component.InvokeAsync("SchoolIdentity")
     </div>
 
     @* Right items — flex-shrink-0 so bell + avatar are never compressed *@
-    <ul class="navbar-nav flex-row align-items-center gap-1 flex-shrink-0">
+    <ul class="navbar-nav flex-row align-items-center gap-2 flex-shrink-0">
 
         @* ── Notifications ──────────────────────────────────────────── *@
         <li class="nav-item dropdown">
             <a class="nav-link p-2 position-relative"
                href="javascript:void(0);"
                data-bs-toggle="dropdown"
-               aria-expanded="false">
-                <i class="icon-base bx bx-bell bx-sm"></i>
-                <span class="position-absolute bg-danger rounded-circle border border-white"
-                      style="width:8px;height:8px;top:6px;right:6px;"></span>
+               aria-expanded="false"
+               aria-label="Notifications, 3 unread">
+                <i class="icon-base bx bx-bell bx-sm" aria-hidden="true"></i>
+                <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle"
+                      style="font-size:.65rem;padding:.2em .4em;">
+                    3<span class="visually-hidden"> unread notifications</span>
+                </span>
             </a>
 
             @* max-width: min(320px, 90vw) stops dropdown overflowing on narrow screens *@
@@ -139,23 +137,27 @@
             </a>
 
             <ul class="dropdown-menu dropdown-menu-end shadow mt-1 py-0"
-                style="min-width:220px;max-width:min(260px,90vw);">
+                style="min-width:240px;max-width:min(280px,90vw);">
                 <li>
                     <div class="d-flex align-items-center gap-3 px-4 py-3 border-bottom">
-                        <div class="avatar flex-shrink-0" style="width:40px;height:40px;">
+                        <div class="avatar avatar-online flex-shrink-0" style="width:42px;height:42px;">
                             <span class="avatar-initial rounded-circle bg-primary">@initials</span>
                         </div>
                         <div class="overflow-hidden">
-                            <h6 class="mb-0 text-truncate fw-semibold">@userName</h6>
-                            <small class="text-muted d-block text-truncate">@roleLabel</small>
-                            @if (!string.IsNullOrWhiteSpace(email))
-                            {
-                                <small class="text-muted text-truncate d-block"
-                                       style="font-size:0.68rem;">@email</small>
-                            }
+                            <h6 class="mb-1 text-truncate fw-semibold">@userName</h6>
+                            <span class="badge bg-label-primary rounded-pill" style="font-size:.65rem;">@roleLabel</span>
                         </div>
                     </div>
                 </li>
+                @if (!string.IsNullOrWhiteSpace(email))
+                {
+                    <li>
+                        <div class="px-4 py-2 border-bottom">
+                            <small class="text-muted d-block" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;">Signed in as</small>
+                            <small class="text-truncate d-block fw-medium">@email</small>
+                        </div>
+                    </li>
+                }
                 <li>
                     <form asp-area="" asp-controller="Account" asp-action="Logout" method="post"
                           class="py-1">

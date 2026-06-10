@@ -550,3 +550,52 @@ textarea.form-control {
     .ec-page-header-inner { flex-direction: column; align-items: flex-start; }
     .btn { width: 100%; }
 }
+
+/* ============================================================
+   APP SHELL — TOP BAR
+   The fixed full-height sidebar (logo pinned) and the fixed,
+   solid top bar are already provided by Sneat's layout-menu-fixed
+   / layout-navbar-fixed classes on <html>: the navbar is
+   position:fixed with a solid background, the menu is fixed, and
+   the content is padded beneath the bar so long pages scroll
+   UNDER it. We only add cosmetic polish here — do NOT override
+   .layout-page / .content-wrapper heights or overflow, or the
+   fixed navbar + footer layout breaks.
+   ============================================================ */
+
+/* Solid, full-width bar with a hairline divider for definition. */
+.layout-content-navbar #layout-navbar.layout-navbar {
+    min-height:    64px;
+    border-bottom: 1px solid var(--ec-border-warm);
+    box-shadow:    var(--ec-shadow-sm);
+}
+
+/* Top-bar buttons must keep their natural width even on mobile, where the
+   global rule above stretches .btn to 100%. */
+.layout-navbar .btn { width: auto; }
+
+/* ── Top-bar school identity ─────────────────────────────────── */
+.ec-school-identity-logo {
+    width:  38px;
+    height: 38px;
+    border-radius: 8px;
+    object-fit: contain;
+    background: var(--ec-white);
+    border: 1px solid var(--ec-border-warm);
+}
+.ec-school-identity .avatar,
+.ec-school-identity .avatar .avatar-initial {
+    width:  38px;
+    height: 38px;
+    font-size: .85rem;
+}
+.ec-school-identity-name {
+    font-size: .95rem;
+    color: var(--ec-text-dark);
+    line-height: 1.2;
+}
+.ec-school-identity-addr {
+    font-size: .75rem;
+    line-height: 1.2;
+}
+.ec-school-identity-addr i { font-size: .9rem; }
