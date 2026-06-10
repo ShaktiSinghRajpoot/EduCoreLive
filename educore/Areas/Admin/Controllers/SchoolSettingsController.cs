@@ -442,9 +442,11 @@ namespace educore.Areas.Admin.Controllers
         }
 
         #endregion
+        // Enquiry CRM is owned by EnquiryController (which loads the page model).
+        // Kept here so the old SchoolSettings/EnquiryCRM URL keeps working.
         public IActionResult EnquiryCRM()
         {
-            return View();
+            return RedirectToAction("EnquiryCRM", "Enquiry");
         }
         public IActionResult SubjectManagement()
         {
@@ -458,6 +460,26 @@ namespace educore.Areas.Admin.Controllers
                 "Class 12 Science","Class 12 Commerce"
             };
 
+            return View();
+        }
+
+        public IActionResult ClassSection()
+        {
+            return View();
+        }
+
+        public IActionResult AssignClassTeacher()
+        {
+            return View();
+        }
+
+        public IActionResult Timetable()
+        {
+            return View();
+        }
+
+        public IActionResult PeriodStructure()
+        {
             return View();
         }
     }

@@ -265,5 +265,5 @@ namespace educore.Areas.Admin.Controllers
         private int UserId() => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
         private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
-    }   
+    }
 }
