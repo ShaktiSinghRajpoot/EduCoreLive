@@ -1,6 +1,7 @@
 D:\Github\EduCoreLive\educore\wwwroot\vendor\css\pages\page-auth.css
 D:\Github\EduCoreLive\educore\wwwroot\vendor\fonts\iconify-icons.css
 D:\Github\EduCoreLive\educore\wwwroot\js\ui-popover.js
+D:\Github\EduCoreLive\educore\wwwroot\js\inventory-catalog.js
 D:\Github\EduCoreLive\educore\wwwroot\vendor\libs\jquery\jquery.js
 D:\Github\EduCoreLive\educore\wwwroot\vendor\css\core.css
 D:\Github\EduCoreLive\educore\wwwroot\vendor\libs\masonry\masonry.js
@@ -88,6 +89,7 @@ wwwroot\js\config.js
 wwwroot\js\dashboards-analytics.js
 wwwroot\js\extended-ui-perfect-scrollbar.js
 wwwroot\js\form-basic-inputs.js
+wwwroot\js\inventory-catalog.js
 wwwroot\js\main.js
 wwwroot\js\pages-account-settings-account.js
 wwwroot\js\site.js

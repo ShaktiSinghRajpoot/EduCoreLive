@@ -1,414 +1,322 @@
-﻿@{
+@{
     ViewData["Title"] = "Inventory Item Master";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 }
 
 @section PageStyles {
-    <style>
-        .inventory-item-page .inventory-stat-value {
-            font-size: clamp(1.25rem, 2vw, 1.7rem);
-            font-weight: 900;
-            color: #2b1b12;
-        }
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+/* override global mobile btn-width only for this page's specific controls */
+@@media (max-width:575.98px){
+    .iv-pg-btn,.iv-view-btn,.iv-fbar .btn,.dropdown-item{ width:auto !important; }
+}
 
-        .inventory-item-page .inventory-table-wrap { 
-            overflow-x: auto;
-        }
+/* ── summary cards (mirrors StudentList) ───────────────────── */
+.iv-card{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius,14px);
+    background:#fff; padding:1.1rem 1.2rem;
+    display:flex; align-items:center; gap:.9rem;
+    transition:var(--ec-transition); height:100%;
+}
+.iv-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); border-color:rgba(255,138,0,.22); }
+.iv-card-ic{ width:46px; height:46px; flex:0 0 46px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; }
+.iv-card-val{ font-size:1.5rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.iv-card-lbl{ font-size:.71rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
 
-        .inventory-item-page .inventory-table {
-            margin-bottom: 0;
-            width: 100%;
-        }
+/* ── Filter bar ────────────────────────────────────────────── */
+.iv-fbar{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 
-        .inventory-item-page .inventory-table th {
-            color: #8b8175;
-            font-size: .76rem;
-            font-weight: 900;
-            border-bottom: 1px solid #ececf5;
-            white-space: nowrap;
-            padding: 1rem 0.75rem;
-            background-color: #f8f7f5;
-        }
+.iv-srch-wrap{ position:relative; flex:1 1 180px; max-width:260px; }
+.iv-srch-ic{ position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:var(--ec-text-muted); font-size:1rem; pointer-events:none; line-height:1; }
+.iv-srch-inp{
+    width:100%; height:34px; padding:0 .75rem 0 2rem;
+    border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.82rem; font-weight:600;
+    color:var(--ec-text); outline:none; transition:var(--ec-transition);
+}
+.iv-srch-inp::placeholder{ color:var(--ec-text-muted); }
+.iv-srch-inp:focus{ border-color:rgba(255,138,0,.55); background:#fff; box-shadow:0 0 0 3px rgba(255,138,0,.1); }
 
-        .inventory-item-page .inventory-table td {
-            color: #2b2c40;
-            font-size: .84rem;
-            font-weight: 650;
-            vertical-align: middle;
-            border-bottom: 1px solid #f1f1f6;
-            padding: 1rem 0.75rem;
-        }
+.iv-fbar-div{ width:1px; height:22px; background:var(--ec-border); flex-shrink:0; }
 
-        .inventory-item-page .inventory-table tbody tr:hover {
-            background: #fff7ed;
-        }
+.iv-chip{
+    height:34px; padding:0 .65rem;
+    border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.78rem; font-weight:700;
+    color:var(--ec-text-muted); cursor:pointer; outline:none;
+    transition:var(--ec-transition); white-space:nowrap; flex-shrink:0;
+    appearance:auto; -webkit-appearance:auto;
+}
+.iv-chip:hover{ border-color:rgba(255,138,0,.4); background:#fff; color:var(--ec-text); }
+.iv-chip:focus{ border-color:var(--ec-primary); box-shadow:0 0 0 3px rgba(255,138,0,.1); background:#fff; }
+.iv-chip.active-filter{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.45); color:var(--ec-primary); }
 
-        /* Responsive table improvements */
-        @@media (max-width: 991.98px) {
-            .inventory-item-page .inventory-table,
-            .inventory-item-page .inventory-table thead,
-            .inventory-item-page .inventory-table tbody,
-            .inventory-item-page .inventory-table th,
-            .inventory-item-table .inventory-table td,
-            .inventory-item-page .inventory-table tr {
-                display: block;
-            }
+.iv-clear-btn{
+    height:34px; padding:0 .75rem;
+    border-radius:8px; border:1px solid #f5c2c7;
+    background:#fff0f0; color:#dc3545;
+    font-size:.76rem; font-weight:700; cursor:pointer; outline:none;
+    display:inline-flex; align-items:center; gap:.3rem;
+    transition:var(--ec-transition); flex-shrink:0;
+}
+.iv-clear-btn:hover{ background:#fde8e8; border-color:#dc3545; }
 
-            .inventory-item-page .inventory-table thead {
-                /* Hide table headers on small screens */
-                position: absolute;
-                top: -9999px;
-                left: -9999px;
-            }
+.iv-export-btn{
+    height:34px; width:34px;
+    border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; color:var(--ec-text-muted);
+    font-size:1rem; cursor:pointer; outline:none;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:var(--ec-transition); flex-shrink:0;
+}
+.iv-export-btn:hover{ background:#fff; color:var(--ec-primary); border-color:rgba(255,138,0,.4); }
+.iv-export-btn.xl:hover{ color:#198754; border-color:#198754; }
+.iv-export-btn.pdf:hover{ color:#dc3545; border-color:#dc3545; }
 
-            .inventory-item-page .inventory-table tr {
-                border: 1px solid #ececf5;
-                margin-bottom: 1rem;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            }
+@@media (max-width:991.98px){ .iv-srch-wrap{ max-width:100%; } .iv-fbar-div{ display:none; } }
+@@media (max-width:575.98px){
+    .iv-fbar{ gap:.4rem; }
+    .iv-srch-wrap{ flex:1 1 100%; max-width:100%; }
+    .iv-chip{ font-size:.75rem; height:32px; }
+    .iv-clear-btn{ height:32px; }
+    .iv-export-btn{ height:32px; width:32px; }
+}
 
-            .inventory-item-page .inventory-table td {
-                /* Behave like a "row" */
-                border: none;
-                border-bottom: 1px solid #eee;
-                position: relative;
-                padding-left: 50%;
-                text-align: left;
-                white-space: normal;
-            }
+/* ── table ─────────────────────────────────────────────────── */
+.iv-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.iv-tbl{ min-width:920px; width:100%; }
+.iv-tbl thead th{
+    background:linear-gradient(180deg,#fffaf3,#fff6ea);
+    color:var(--ec-text-light); font-size:.7rem;
+    text-transform:uppercase; letter-spacing:.06em; font-weight:800;
+    padding:.8rem .9rem; border-bottom:1px solid var(--ec-border);
+    white-space:nowrap; user-select:none;
+}
+.iv-sortable{ cursor:pointer; }
+.iv-sortable:hover{ background:#fff0e0; color:var(--ec-primary); }
+.iv-si{ font-size:.85rem; opacity:.35; vertical-align:middle; margin-left:3px; }
+.iv-si-on{ opacity:1; color:var(--ec-primary); }
+.iv-tbl tbody td{
+    padding:.6rem .9rem; vertical-align:middle;
+    border-bottom:1px solid #f4f0eb;
+    font-size:.83rem; font-weight:600; color:var(--ec-text);
+}
+.iv-tbl tbody tr:hover td{ background:#fffaf3; }
 
-            .inventory-item-page .inventory-table td::before {
-                /* Now like a table header */
-                position: absolute;
-                /* Top/left values mimic padding */
-                top: 0;
-                left: 0.75rem;
-                width: 45%;
-                padding-right: 0.75rem;
-                white-space: nowrap;
-                content: attr(data-label);
-                font-weight: 650;
-                color: #8b8175;
-                font-size: .76rem;
-            }
+.iv-thumb{
+    width:34px; height:34px; flex:0 0 34px; border-radius:10px;
+    background:#fff4e6; color:#ff8a00;
+    display:inline-flex; align-items:center; justify-content:center; font-size:1.05rem;
+}
+.iv-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.86rem; line-height:1.2; }
+.iv-sub{ font-size:.72rem; color:var(--ec-text-muted); }
+.iv-sku{ background:#fff4e6; color:#ff8a00; border-radius:6px; padding:.2rem .5rem; font-size:.72rem; font-weight:800; white-space:nowrap; }
 
-            .inventory-item-page .inventory-table td:last-child {
-                border-bottom: 0;
-            }
-        }
+/* badges */
+.iv-bdg{ display:inline-flex; align-items:center; gap:.28rem; padding:.26rem .65rem; border-radius:999px; font-size:.69rem; font-weight:800; white-space:nowrap; }
+.iv-bdg::before{ content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.b-avail   { background:#d1f0e0; color:#0a5a35; } .b-avail::before  { background:#198754; }
+.b-low     { background:#fff3cd; color:#664d03; } .b-low::before    { background:#ffc107; }
+.b-out     { background:#fde8e8; color:#842029; } .b-out::before    { background:#dc3545; }
 
-        .inventory-item-page .inventory-table tbody tr:hover {
-            background: #fff7ed;
-        }
+/* action buttons */
+.iv-act{
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fff; color:var(--ec-text-muted); font-size:.95rem;
+    display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:var(--ec-transition);
+}
+.iv-act:hover{ background:var(--ec-primary-light); color:var(--ec-primary); border-color:rgba(255,138,0,.4); }
+.iv-act.del:hover{ background:#fff0f0; color:#dc3545; border-color:#f5c2c7; }
 
-        .inventory-item-page .inventory-thumb {
-            width: 42px;
-            height: 42px;
-            border-radius: 14px;
-            background: #fff4e6;
-            color: #ff8a00;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.15rem;
-        }
+/* pagination (mirrors StudentList) */
+.iv-pg-wrap{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.65rem; padding-top:1rem; border-top:1px solid var(--ec-border); }
+.iv-pg-info{ font-size:.81rem; color:var(--ec-text-muted); font-weight:650; }
+.iv-pg-btn{
+    width:32px !important; height:32px; border-radius:7px; border:1px solid var(--ec-border);
+    background:#fff; color:var(--ec-text); font-size:.8rem; font-weight:700;
+    display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:var(--ec-transition); padding:0;
+}
+.iv-pg-btn:hover:not(:disabled){ background:var(--ec-primary-light); border-color:var(--ec-primary); color:var(--ec-primary); }
+.iv-pg-btn.active{ background:var(--ec-primary); border-color:var(--ec-primary); color:#fff; }
+.iv-pg-btn:disabled{ opacity:.35; cursor:not-allowed; }
 
-        .inventory-item-page .inventory-action-btn {
-            width: 34px;
-            height: 34px;
-            border-radius: 12px;
-            border: 1px solid #ececf5;
-            background: #fff;
-            color: #ff8a00;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
+/* empty state */
+.iv-empty{ padding:3rem 1rem; text-align:center; }
+.iv-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }
 
-        .inventory-item-page .inventory-action-btn:hover {
-            background: #fff4e6;
-        }
+/* mobile cards */
+.iv-mob-list{ display:none; }
+.iv-mob-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius,14px); background:#fff; padding:.95rem; margin-bottom:.7rem; }
+.iv-mob-top{ display:flex; align-items:center; gap:.7rem; margin-bottom:.7rem; }
+.iv-mob-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.45rem .7rem; }
+.iv-mob-field label{ font-size:.67rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--ec-text-light); display:block; }
+.iv-mob-field span{ font-size:.82rem; font-weight:700; color:var(--ec-text); }
 
-        .inventory-item-page .ec-pill {
-            border-radius: 999px;
-            padding: .32rem .65rem;
-            font-size: .7rem;
-            font-weight: 900;
-            display: inline-flex;
-            align-items: center;
-            gap: .25rem;
-        }
+@@media (max-width:767.98px){
+    .iv-tbl-wrap{ display:none; }
+    .iv-mob-list{ display:block; }
+    .iv-pg-wrap{ justify-content:center; }
+    .iv-pg-info{ width:100%; text-align:center; }
+}
+@@media (max-width:575.98px){
+    .iv-card{ padding:.85rem 1rem; }
+    .iv-card-val{ font-size:1.3rem; }
+    .iv-mob-grid{ grid-template-columns:1fr; }
+}
 
-        .inventory-item-page .pill-orange {
-            background: #fff4e6;
-            color: #ff8a00;
-        }
-
-        .inventory-item-page .pill-success {
-            background: #ecfdf3;
-            color: #16a34a;
-        }
-
-        .inventory-item-page .pill-danger {
-            background: #fff1f2;
-            color: #dc2626;
-        }
-
-        .inventory-item-page .pill-warning {
-            background: #fff7ed;
-            color: #d97706;
-        }
-
-        .inventory-item-page .btn-ec-primary {
-            background: #ff8a00;
-            color: #fff;
-            border: 0;
-            border-radius: 14px;
-            font-weight: 900;
-            box-shadow: 0 12px 24px rgba(255, 138, 0, .2);
-        }
-
-        .inventory-item-page .btn-ec-outline {
-            border: 1px solid rgba(255, 138, 0, .35);
-            background: #fff;
-            color: #ff8a00;
-            border-radius: 14px;
-            font-weight: 900;
-        }
-
-        .inventory-item-page .form-control,
-        .inventory-item-page .form-select {
-            border-radius: 14px;
-            min-height: 45px;
-            border-color: #ececf5;
-            font-weight: 650;
-        }
-
-        .inventory-item-page .form-control:focus,
-        .inventory-item-page .form-select:focus {
-            border-color: #ff8a00;
-            box-shadow: 0 0 0 4px rgba(255, 138, 0, .12);
-        }
-
-        @@media (max-width: 991.98px) {
-            .inventory-item-page .filter-actions {
-                width: 100%;
-            }
-
-            .inventory-item-page .filter-actions .btn {
-                width: 100%;
-            }
-        }
-
-        @@media (max-width: 575.98px) {
-            .inventory-item-page .ec-page-header-inner {
-                align-items: stretch !important;
-            }
-
-            .inventory-item-page .ec-page-header-inner .header-actions {
-                width: 100%;
-                display: grid !important;
-                grid-template-columns: 1fr;
-            }
-
-            .inventory-item-page .ec-page-header-inner .header-actions .btn {
-                width: 100%;
-            }
-        }
-    </style>
+/* modal form controls compact */
+.inventory-item-page .form-control,
+.inventory-item-page .form-select{ border-radius:10px; min-height:40px; font-size:.85rem; font-weight:650; }
+</style>
 }
 
 <div class="ec-page-shell inventory-item-page">
-    <div class="ec-page-content">
+  <div class="ec-page-content">
 
-        <div class="ec-page-header">
-            <div class="ec-page-header-inner d-flex justify-content-between gap-3 flex-wrap">
-                <div class="ec-page-title-wrap d-flex align-items-start gap-3">
-                    <div class="ec-page-icon">
-                        <i class="bx bx-package"></i>
-                    </div>
-                    <div>
-                        <h4 class="ec-page-title mb-1">Inventory Item Master</h4>
-                        <div class="ec-page-subtitle">
-                            Manage school items like uniforms, books, notebooks, stationery, sports items, furniture and lab items.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="header-actions d-flex gap-2 flex-wrap">
-                    <button type="button" class="btn btn-ec-outline px-3 py-2" id="exportItemsBtn">
-                        <i class="bx bx-export me-1"></i> Export
-                    </button>
-                    <button type="button" class="btn btn-ec-primary px-3 py-2" data-bs-toggle="modal" data-bs-target="#itemModal">
-                        <i class="bx bx-plus me-1"></i> Add Item
-                    </button>
-                </div>
-            </div>
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap d-flex align-items-center gap-3">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-package fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Inventory Item Master</h4>
+            <div class="ec-page-subtitle">Manage uniforms, books, stationery, sports, furniture and lab items.</div>
+          </div>
         </div>
-
-        <div class="row g-3 g-xl-4 mb-3 mb-xl-4">
-            <div class="col-12 col-md-6 col-lg-3">
-                <div class="ec-card h-100">
-                    <div class="ec-card-body">
-                        <div class="d-flex justify-content-between gap-3">
-                            <div>
-                                <div class="ec-section-subtitle">Total Items</div>
-                                <div class="inventory-stat-value" id="totalItems">0</div>
-                            </div>
-                            <div class="ec-section-icon">
-                                <i class="bx bx-package"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-md-6 col-lg-3">
-                <div class="ec-card h-100">
-                    <div class="ec-card-body">
-                        <div class="d-flex justify-content-between gap-3">
-                            <div>
-                                <div class="ec-section-subtitle">Low Stock</div>
-                                <div class="inventory-stat-value text-warning" id="lowStockItems">0</div>
-                            </div>
-                            <div class="ec-section-icon">
-                                <i class="bx bx-error-circle"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-md-6 col-lg-3">
-                <div class="ec-card h-100">
-                    <div class="ec-card-body">
-                        <div class="d-flex justify-content-between gap-3">
-                            <div>
-                                <div class="ec-section-subtitle">Out of Stock</div>
-                                <div class="inventory-stat-value text-danger" id="outStockItems">0</div>
-                            </div>
-                            <div class="ec-section-icon">
-                                <i class="bx bx-block"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-md-6 col-lg-3">
-                <div class="ec-card h-100">
-                    <div class="ec-card-body">
-                        <div class="d-flex justify-content-between gap-3">
-                            <div>
-                                <div class="ec-section-subtitle">Stock Value</div>
-                                <div class="inventory-stat-value text-success" id="stockValue">₹0</div>
-                            </div>
-                            <div class="ec-section-icon">
-                                <i class="bx bx-rupee"></i>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="ec-card mb-3 mb-xl-4">
-            <div class="ec-card-body">
-                <div class="row g-3 align-items-end">
-                    <div class="col-12 col-md-6 col-lg-3">
-                        <label class="form-label">Search Item</label>
-                        <input type="text" class="form-control" id="searchItem" placeholder="Name, SKU, brand...">
-                    </div>
-
-                    <div class="col-12 col-md-6 col-lg-2">
-                        <label class="form-label">Category</label>
-                        <select class="form-select" id="filterCategory">
-                            <option value="">All Categories</option>
-                            <option>Uniform</option>
-                            <option>Books</option>
-                            <option>Stationery</option>
-                            <option>Sports</option>
-                            <option>Furniture</option>
-                            <option>Electronics</option>
-                            <option>Lab Items</option>
-                        </select>
-                    </div>
-
-                    <div class="col-12 col-md-6 col-lg-2">
-                        <label class="form-label">Item Type</label>
-                        <select class="form-select" id="filterType">
-                            <option value="">All Types</option>
-                            <option>Consumable</option>
-                            <option>Reusable</option>
-                            <option>Saleable</option>
-                        </select>
-                    </div>
-
-                    <div class="col-12 col-md-6 col-lg-2">
-                        <label class="form-label">Stock Status</label>
-                        <select class="form-select" id="filterStock">
-                            <option value="">All Stock</option>
-                            <option value="low">Low Stock</option>
-                            <option value="out">Out of Stock</option>
-                            <option value="available">Available</option>
-                        </select>
-                    </div>
-
-                    <div class="col-12 col-lg-3">
-                        <div class="d-flex gap-2 filter-actions">
-                            <button type="button" class="btn btn-ec-primary flex-fill" id="applyFilterBtn">
-                                <i class="bx bx-filter-alt me-1"></i> Filter
-                            </button>
-                            <button type="button" class="btn btn-ec-outline flex-fill" id="resetFilterBtn">
-                                Reset
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="ec-card">
-            <div class="ec-card-header">
-                <div class="d-flex justify-content-between gap-3 flex-wrap align-items-center">
-                    <div class="ec-section-title-wrap d-flex align-items-center gap-2">
-                        <div class="ec-section-icon">
-                            <i class="bx bx-list-ul"></i>
-                        </div>
-                        <div>
-                            <div class="ec-section-title">Item List</div>
-                            <div class="ec-section-subtitle">View, search, edit and manage all inventory items.</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="ec-card-body p-0">
-                <div class="inventory-table-wrap">
-                    <table class="table inventory-table">
-                        <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th>SKU</th>
-                                <th>Category</th>
-                                <th>Type</th>
-                                <th>Unit</th>
-                                <th>Current Stock</th>
-                                <th>Minimum</th>
-                                <th>Value</th>
-                                <th>Status</th>
-                                <th class="text-end">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="itemTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
+        <button class="btn btn-primary d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#itemModal">
+          <i class="bx bx-plus"></i><span>Add Item</span>
+        </button>
+      </div>
     </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="iv-card">
+          <div class="iv-card-ic bg-label-primary text-primary"><i class="bx bx-package"></i></div>
+          <div><div class="iv-card-val" id="sumTotal">—</div><div class="iv-card-lbl">Total Items</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="iv-card">
+          <div class="iv-card-ic bg-label-warning text-warning"><i class="bx bx-error-circle"></i></div>
+          <div><div class="iv-card-val" id="sumLow">—</div><div class="iv-card-lbl">Low Stock</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="iv-card">
+          <div class="iv-card-ic bg-label-danger text-danger"><i class="bx bx-block"></i></div>
+          <div><div class="iv-card-val" id="sumOut">—</div><div class="iv-card-lbl">Out of Stock</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="iv-card">
+          <div class="iv-card-ic bg-label-success text-success"><i class="bx bx-rupee"></i></div>
+          <div><div class="iv-card-val" id="sumValue">—</div><div class="iv-card-lbl">Stock Value</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ec-card mb-0">
+
+      <div class="ec-card-header">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
+            <div>
+              <div class="ec-section-title">Item List</div>
+              <div class="ec-section-subtitle" id="resultText">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="iv-fbar">
+          <div class="iv-srch-wrap">
+            <i class="bx bx-search iv-srch-ic"></i>
+            <input type="search" class="iv-srch-inp" id="ivSearch" placeholder="Search name, SKU, brand…">
+          </div>
+
+          <div class="iv-fbar-div"></div>
+
+          <select class="iv-chip" id="fCategory">
+            <option value="">Category</option>
+            <option>Uniform</option><option>Books</option><option>Stationery</option>
+            <option>Sports</option><option>Furniture</option><option>Electronics</option><option>Lab Items</option>
+          </select>
+
+          <select class="iv-chip" id="fType">
+            <option value="">Type</option>
+            <option>Consumable</option><option>Reusable</option><option>Saleable</option>
+          </select>
+
+          <select class="iv-chip" id="fStock">
+            <option value="">Stock</option>
+            <option value="available">Available</option>
+            <option value="low">Low Stock</option>
+            <option value="out">Out of Stock</option>
+          </select>
+
+          <select class="iv-chip" id="perPage" title="Rows per page">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+          </select>
+
+          <button class="iv-clear-btn d-none" id="clearBtn" title="Clear all filters">
+            <i class="bx bx-x"></i>Clear
+          </button>
+
+          <div class="ms-auto d-flex gap-1 align-items-center">
+            <button class="iv-export-btn xl" id="btnExcel" title="Export to Excel"><i class="bx bx-spreadsheet"></i></button>
+            <button class="iv-export-btn pdf" id="btnPdf" title="Export to PDF"><i class="bxs-file-pdf bx"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ec-card-body pt-2">
+
+        <div class="iv-tbl-wrap">
+          <table class="table iv-tbl align-middle mb-0">
+            <thead>
+              <tr>
+                <th class="iv-sortable" data-col="name">Item <i class="bx bx-sort iv-si" id="si-name"></i></th>
+                <th>SKU</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Unit</th>
+                <th class="iv-sortable" data-col="stock">Current Stock <i class="bx bx-sort iv-si" id="si-stock"></i></th>
+                <th>Minimum</th>
+                <th class="iv-sortable" data-col="value">Value <i class="bx bx-sort iv-si" id="si-value"></i></th>
+                <th>Status</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody id="itemTableBody"></tbody>
+          </table>
+          <div class="iv-empty d-none" id="emptyDesk">
+            <div class="iv-empty-ic"><i class="bx bx-search-alt"></i></div>
+            <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No items found</h6>
+            <p class="text-muted small mb-0">Try adjusting your search or filters.</p>
+          </div>
+        </div>
+
+        <div class="iv-mob-list" id="mobList"></div>
+        <div class="iv-empty d-none" id="emptyMob">
+          <div class="iv-empty-ic"><i class="bx bx-search-alt"></i></div>
+          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No items found</h6>
+          <p class="text-muted small mb-0">Try adjusting filters.</p>
+        </div>
+
+        <div class="iv-pg-wrap" id="pgWrap">
+          <div class="iv-pg-info" id="pgInfo">—</div>
+          <div class="d-flex gap-1 flex-wrap justify-content-end" id="pgBtns"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <div class="modal fade" id="itemModal" tabindex="-1" aria-hidden="true">
@@ -429,9 +337,7 @@
                     <div class="col-12">
                         <div class="ec-detail-box">
                             <div class="ec-section-title-wrap d-flex align-items-center gap-2 mb-3">
-                                <div class="ec-section-icon">
-                                    <i class="bx bx-info-circle"></i>
-                                </div>
+                                <div class="ec-section-icon"><i class="bx bx-info-circle"></i></div>
                                 <div>
                                     <div class="ec-section-title">Basic Information</div>
                                     <div class="ec-section-subtitle">Name, code, category and classification.</div>
@@ -443,48 +349,32 @@
                                     <label class="form-label">Item Name</label>
                                     <input type="text" class="form-control" id="itemName" placeholder="School Tie">
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-4">
                                     <label class="form-label">Item Code / SKU</label>
                                     <input type="text" class="form-control" id="itemCode" placeholder="UNI-TIE-001">
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-4">
                                     <label class="form-label">Category</label>
                                     <select class="form-select" id="itemCategory">
                                         <option value="">Select Category</option>
-                                        <option>Uniform</option>
-                                        <option>Books</option>
-                                        <option>Stationery</option>
-                                        <option>Sports</option>
-                                        <option>Furniture</option>
-                                        <option>Electronics</option>
-                                        <option>Lab Items</option>
+                                        <option>Uniform</option><option>Books</option><option>Stationery</option>
+                                        <option>Sports</option><option>Furniture</option><option>Electronics</option><option>Lab Items</option>
                                     </select>
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-4">
                                     <label class="form-label">Sub Category</label>
                                     <input type="text" class="form-control" id="itemSubCategory" placeholder="Tie / Belt / Notebook">
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-4">
                                     <label class="form-label">Item Type</label>
                                     <select class="form-select" id="itemType">
-                                        <option>Consumable</option>
-                                        <option>Reusable</option>
-                                        <option>Saleable</option>
+                                        <option>Consumable</option><option>Reusable</option><option>Saleable</option>
                                     </select>
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-4">
                                     <label class="form-label">Unit Type</label>
                                     <select class="form-select" id="unitType">
-                                        <option>Piece</option>
-                                        <option>Box</option>
-                                        <option>Set</option>
-                                        <option>Kg</option>
-                                        <option>Liter</option>
+                                        <option>Piece</option><option>Box</option><option>Set</option><option>Kg</option><option>Liter</option>
                                     </select>
                                 </div>
                             </div>
@@ -494,11 +384,9 @@
                     <div class="col-12">
                         <div class="ec-detail-box">
                             <div class="ec-section-title-wrap d-flex align-items-center gap-2 mb-3">
-                                <div class="ec-section-icon">
-                                    <i class="bx bx-store"></i>
-                                </div>
+                                <div class="ec-section-icon"><i class="bx bx-store"></i></div>
                                 <div>
-                                    <div class="ec-section-title">Stock & Pricing</div>
+                                    <div class="ec-section-title">Stock &amp; Pricing</div>
                                     <div class="ec-section-subtitle">Opening stock, alert quantity and valuation.</div>
                                 </div>
                             </div>
@@ -508,17 +396,14 @@
                                     <label class="form-label">Opening Stock</label>
                                     <input type="number" class="form-control" id="openingStock" min="0" placeholder="0">
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label">Minimum Stock Alert</label>
                                     <input type="number" class="form-control" id="minimumStock" min="0" placeholder="10">
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label">Cost Price</label>
                                     <input type="number" class="form-control" id="costPrice" min="0" placeholder="0">
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label">Selling Price</label>
                                     <input type="number" class="form-control" id="sellingPrice" min="0" placeholder="0">
@@ -530,9 +415,7 @@
                     <div class="col-12">
                         <div class="ec-detail-box">
                             <div class="ec-section-title-wrap d-flex align-items-center gap-2 mb-3">
-                                <div class="ec-section-icon">
-                                    <i class="bx bx-detail"></i>
-                                </div>
+                                <div class="ec-section-icon"><i class="bx bx-detail"></i></div>
                                 <div>
                                     <div class="ec-section-title">Additional Details</div>
                                     <div class="ec-section-subtitle">Brand, model, description and status.</div>
@@ -544,20 +427,16 @@
                                     <label class="form-label">Brand</label>
                                     <input type="text" class="form-control" id="brand" placeholder="Brand name">
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-4">
                                     <label class="form-label">Model</label>
                                     <input type="text" class="form-control" id="model" placeholder="Model">
                                 </div>
-
                                 <div class="col-12 col-md-6 col-lg-4">
                                     <label class="form-label">Status</label>
                                     <select class="form-select" id="itemStatus">
-                                        <option>Active</option>
-                                        <option>Inactive</option>
+                                        <option>Active</option><option>Inactive</option>
                                     </select>
                                 </div>
-
                                 <div class="col-12">
                                     <label class="form-label">Description</label>
                                     <textarea class="form-control" id="description" rows="3" placeholder="Item details"></textarea>
@@ -569,8 +448,8 @@
             </div>
 
             <div class="modal-footer flex-column flex-sm-row">
-                <button type="button" class="btn btn-ec-outline w-100 w-sm-auto" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-ec-primary w-100 w-sm-auto" id="saveItemBtn">
+                <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary w-100 w-sm-auto" id="saveItemBtn">
                     <i class="bx bx-save me-1"></i> Save Item
                 </button>
             </div>
@@ -579,282 +458,252 @@
 </div>
 
 @section PageScripts {
-    <script>
-        $(document).ready(function () {
-            const items = [
-                {
-                    id: 1,
-                    name: "School Tie",
-                    code: "UNI-TIE-001",
-                    category: "Uniform",
-                    subCategory: "Tie",
-                    type: "Saleable",
-                    unit: "Piece",
-                    brand: "EduCore",
-                    model: "Standard",
-                    stock: 120,
-                    minimum: 25,
-                    cost: 45,
-                    selling: 80,
-                    status: "Active"
-                },
-                {
-                    id: 2,
-                    name: "Class 10 Physics Book",
-                    code: "BOOK-PHY-10",
-                    category: "Books",
-                    subCategory: "Academic Book",
-                    type: "Saleable",
-                    unit: "Piece",
-                    brand: "NCERT",
-                    model: "2026",
-                    stock: 18,
-                    minimum: 20,
-                    cost: 140,
-                    selling: 180,
-                    status: "Active"
-                },
-                {
-                    id: 3,
-                    name: "Chemistry Lab Beaker",
-                    code: "LAB-BEAKER-250",
-                    category: "Lab Items",
-                    subCategory: "Glassware",
-                    type: "Reusable",
-                    unit: "Piece",
-                    brand: "Borosil",
-                    model: "250ml",
-                    stock: 0,
-                    minimum: 10,
-                    cost: 95,
-                    selling: 0,
-                    status: "Active"
-                }
-            ];
+<script src="~/js/inventory-catalog.js" asp-append-version="true"></script>
+<script>
+(function(){
+'use strict';
 
-            function money(value) {
-                return "₹" + Number(value || 0).toLocaleString("en-IN");
-            }
+/* ── State ─────────────────────────────────────── */
+var PAGE=1, PER=10, sortCol=null, sortDir='asc', filtered=[];
 
-            function toastSuccess(message) {
-                if (typeof toastr !== "undefined") toastr.success(message);
-                else console.log(message);
-            }
+/* ── Data — seeded from the shared inventory catalog ── */
+var items=(window.EduInventory ? window.EduInventory.all() : []);
 
-            function toastError(message) {
-                if (typeof toastr !== "undefined") toastr.error(message);
-                else console.error(message);
-            }
+/* ── Helpers ───────────────────────────────────── */
+function money(n){ return "₹"+Number(n||0).toLocaleString("en-IN"); }
+function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
+function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); else console.log(m); }
+function value(it){ return Number(it.stock)*Number(it.cost); }
+function stockState(it){ if(it.stock<=0) return 'out'; if(it.stock<=it.minimum) return 'low'; return 'available'; }
+function stockBadge(it){
+  var s=stockState(it),m={available:['b-avail','Available'],low:['b-low','Low Stock'],out:['b-out','Out of Stock']},c=m[s];
+  return '<span class="iv-bdg '+c[0]+'">'+c[1]+'</span>';
+}
 
-            function getStockPill(item) {
-                if (item.stock <= 0) return `<span class="ec-pill pill-danger">Out of Stock</span>`;
-                if (item.stock <= item.minimum) return `<span class="ec-pill pill-warning">Low Stock</span>`;
-                return `<span class="ec-pill pill-success">Available</span>`;
-            }
+/* ── Sort ──────────────────────────────────────── */
+function doSort(list){
+  if(!sortCol) return list;
+  return list.slice().sort(function(a,b){
+    var va,vb;
+    if(sortCol==='name'){ va=a.name.toLowerCase(); vb=b.name.toLowerCase(); }
+    else if(sortCol==='stock'){ va=Number(a.stock); vb=Number(b.stock); }
+    else if(sortCol==='value'){ va=value(a); vb=value(b); }
+    return sortDir==='asc'?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0);
+  });
+}
+function updateSortIcons(){
+  ['name','stock','value'].forEach(function(c){
+    var el=document.getElementById('si-'+c);
+    if(!el) return;
+    el.className='bx bx-sort iv-si';
+    if(c===sortCol) el.className='bx '+(sortDir==='asc'?'bx-sort-up':'bx-sort-down')+' iv-si iv-si-on';
+  });
+}
 
-            function renderItems() {
-                const search = ($("#searchItem").val() || "").toLowerCase();
-                const category = $("#filterCategory").val();
-                const type = $("#filterType").val();
-                const stockFilter = $("#filterStock").val();
+/* ── Filter ────────────────────────────────────── */
+function applyFilters(){
+  var q=document.getElementById('ivSearch').value.toLowerCase().trim(),
+      cat=document.getElementById('fCategory').value,
+      typ=document.getElementById('fType').value,
+      stk=document.getElementById('fStock').value;
 
-                let filtered = items.filter(item => {
-                    const searchMatch =
-                        item.name.toLowerCase().includes(search) ||
-                        item.code.toLowerCase().includes(search) ||
-                        item.brand.toLowerCase().includes(search);
+  filtered=items.filter(function(it){
+    var s=stockState(it);
+    return (!q || it.name.toLowerCase().includes(q) || it.code.toLowerCase().includes(q) || (it.brand||'').toLowerCase().includes(q))
+      && (!cat || it.category===cat)
+      && (!typ || it.type===typ)
+      && (!stk || s===stk);
+  });
 
-                    const categoryMatch = !category || item.category === category;
-                    const typeMatch = !type || item.type === type;
+  ['fCategory','fType','fStock'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.classList.toggle('active-filter', el.value!=='');
+  });
 
-                    let stockMatch = true;
-                    if (stockFilter === "low") stockMatch = item.stock > 0 && item.stock <= item.minimum;
-                    if (stockFilter === "out") stockMatch = item.stock <= 0;
-                    if (stockFilter === "available") stockMatch = item.stock > item.minimum;
+  var hasFilter=cat||typ||stk||q;
+  document.getElementById('clearBtn').classList.toggle('d-none',!hasFilter);
 
-                    return searchMatch && categoryMatch && typeMatch && stockMatch;
-                });
+  updateCards(); PAGE=1; render();
+}
+function updateCards(){
+  document.getElementById('sumTotal').textContent=items.length;
+  document.getElementById('sumLow').textContent=items.filter(function(it){return stockState(it)==='low';}).length;
+  document.getElementById('sumOut').textContent=items.filter(function(it){return stockState(it)==='out';}).length;
+  document.getElementById('sumValue').textContent=money(items.reduce(function(s,it){return s+value(it);},0));
+}
 
-                let html = "";
+/* ── Render ────────────────────────────────────── */
+function render(){
+  var sorted=doSort(filtered),total=sorted.length;
+  PER=parseInt(document.getElementById('perPage').value);
+  var pages=Math.ceil(total/PER)||1;
+  if(PAGE>pages) PAGE=pages;
+  var start=(PAGE-1)*PER,end=Math.min(start+PER,total),slice=sorted.slice(start,end);
+  renderDesk(slice); renderMob(slice); renderPag(pages,total,start,end);
+  document.getElementById('resultText').textContent=total?'Showing '+(start+1)+'–'+end+' of '+total+' items':'No items found';
+}
 
-                filtered.forEach(item => {
-                    html += `
-                        <tr>
-                            <td data-label="Item">
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="inventory-thumb"><i class="bx bx-package"></i></div>
-                                    <div>
-                                        <div class="fw-bold text-dark">${item.name}</div>
-                                        <small class="text-muted">${item.subCategory || "-"}</small>
-                                    </div>
-                                </div>
-                            </td>
-                            <td data-label="SKU"><span class="ec-pill pill-orange">${item.code}</span></td>
-                            <td data-label="Category">${item.category}</td>
-                            <td data-label="Type">${item.type}</td>
-                            <td data-label="Unit">${item.unit}</td>
-                            <td data-label="Current Stock" class="fw-bold">${item.stock}</td>
-                            <td data-label="Minimum">${item.minimum}</td>
-                            <td data-label="Value" class="fw-bold">${money(item.stock * item.cost)}</td>
-                            <td data-label="Status">${getStockPill(item)}</td>
-                            <td data-label="Action" class="text-end">
-                                <button type="button" class="inventory-action-btn edit-item" data-id="${item.id}">
-                                    <i class="bx bx-edit"></i>
-                                </button>
-                                <button type="button" class="inventory-action-btn delete-item" data-id="${item.id}">
-                                    <i class="bx bx-trash"></i>
-                                </button>
-                            </td>
-                        </tr>`;
-                });
+function renderDesk(slice){
+  var tb=document.getElementById('itemTableBody'),em=document.getElementById('emptyDesk');
+  if(!slice.length){ tb.innerHTML=''; em.classList.remove('d-none'); document.getElementById('pgWrap').classList.add('d-none'); return; }
+  em.classList.add('d-none'); document.getElementById('pgWrap').classList.remove('d-none');
+  tb.innerHTML=slice.map(function(it){
+    return '<tr>'
+      +'<td><div class="d-flex align-items-center gap-2"><span class="iv-thumb"><i class="bx bx-package"></i></span>'
+      +  '<div><div class="iv-nm">'+it.name+'</div><div class="iv-sub">'+(it.subCategory||'-')+'</div></div></div></td>'
+      +'<td><span class="iv-sku">'+it.code+'</span></td>'
+      +'<td>'+it.category+'</td>'
+      +'<td>'+it.type+'</td>'
+      +'<td>'+it.unit+'</td>'
+      +'<td class="fw-bold">'+it.stock+'</td>'
+      +'<td>'+it.minimum+'</td>'
+      +'<td class="fw-bold">'+money(value(it))+'</td>'
+      +'<td>'+stockBadge(it)+'</td>'
+      +'<td class="text-end"><button class="iv-act edit-item" data-id="'+it.id+'" title="Edit"><i class="bx bx-edit"></i></button> '
+      +  '<button class="iv-act del delete-item" data-id="'+it.id+'" title="Delete"><i class="bx bx-trash"></i></button></td>'
+      +'</tr>';
+  }).join('');
+}
 
-                if (!html) {
-                    html = `
-                        <tr>
-                            <td colspan="10" class="text-center py-5">
-                                <div class="text-muted fw-bold">No inventory items found.</div>
-                            </td>
-                        </tr>`;
-                }
+function renderMob(slice){
+  var list=document.getElementById('mobList'),em=document.getElementById('emptyMob');
+  if(!slice.length){ list.innerHTML=''; em.classList.remove('d-none'); return; }
+  em.classList.add('d-none');
+  list.innerHTML=slice.map(function(it){
+    return '<div class="iv-mob-card">'
+      +'<div class="iv-mob-top"><span class="iv-thumb"><i class="bx bx-package"></i></span>'
+      +  '<div class="flex-grow-1"><div class="iv-nm">'+it.name+'</div><div class="iv-sub">'+it.code+' · '+it.category+'</div></div>'
+      +  stockBadge(it)+'</div>'
+      +'<div class="iv-mob-grid">'
+      +  '<div class="iv-mob-field"><label>Type</label><span>'+it.type+'</span></div>'
+      +  '<div class="iv-mob-field"><label>Unit</label><span>'+it.unit+'</span></div>'
+      +  '<div class="iv-mob-field"><label>Stock</label><span>'+it.stock+'</span></div>'
+      +  '<div class="iv-mob-field"><label>Minimum</label><span>'+it.minimum+'</span></div>'
+      +  '<div class="iv-mob-field"><label>Value</label><span>'+money(value(it))+'</span></div>'
+      +  '<div class="iv-mob-field"><label>Brand</label><span>'+(it.brand||'-')+'</span></div>'
+      +'</div>'
+      +'<div class="d-flex gap-2 mt-2">'
+      +  '<button class="btn btn-sm btn-outline-secondary flex-fill edit-item" data-id="'+it.id+'"><i class="bx bx-edit me-1"></i>Edit</button>'
+      +  '<button class="btn btn-sm btn-outline-danger flex-fill delete-item" data-id="'+it.id+'"><i class="bx bx-trash me-1"></i>Delete</button>'
+      +'</div></div>';
+  }).join('');
+}
 
-                $("#itemTableBody").html(html);
-                updateStats();
-            }
+function renderPag(pages,total,start,end){
+  var info=document.getElementById('pgInfo'),btns=document.getElementById('pgBtns');
+  info.textContent='Showing '+(total?start+1:0)+'–'+end+' of '+total+' items';
+  if(pages<=1){ btns.innerHTML=''; return; }
+  var h='<button class="iv-pg-btn" id="pPrev" '+(PAGE===1?'disabled':'')+'><i class="bx bx-chevron-left"></i></button>';
+  var fr=Math.max(1,PAGE-2),to=Math.min(pages,fr+4); fr=Math.max(1,to-4);
+  if(fr>1) h+='<button class="iv-pg-btn" data-p="1">1</button>'+(fr>2?'<span class="iv-pg-info px-1">…</span>':'');
+  for(var i=fr;i<=to;i++) h+='<button class="iv-pg-btn'+(i===PAGE?' active':'')+'" data-p="'+i+'">'+i+'</button>';
+  if(to<pages) h+=(to<pages-1?'<span class="iv-pg-info px-1">…</span>':'')+'<button class="iv-pg-btn" data-p="'+pages+'">'+pages+'</button>';
+  h+='<button class="iv-pg-btn" id="pNext" '+(PAGE===pages?'disabled':'')+'><i class="bx bx-chevron-right"></i></button>';
+  btns.innerHTML=h;
+  btns.querySelectorAll('[data-p]').forEach(function(b){ b.addEventListener('click',function(){ PAGE=parseInt(this.dataset.p); render(); }); });
+  var pv=btns.querySelector('#pPrev'),nx=btns.querySelector('#pNext');
+  if(pv) pv.addEventListener('click',function(){ if(PAGE>1){PAGE--;render();} });
+  if(nx) nx.addEventListener('click',function(){ if(PAGE<pages){PAGE++;render();} });
+}
 
-            function updateStats() {
-                $("#totalItems").text(items.length);
-                $("#lowStockItems").text(items.filter(x => x.stock > 0 && x.stock <= x.minimum).length);
-                $("#outStockItems").text(items.filter(x => x.stock <= 0).length);
+/* ── Export ────────────────────────────────────── */
+document.getElementById('btnExcel').addEventListener('click',function(){
+  if(!filtered.length){ toast('error','No items to export.'); return; }
+  var hdr=['Name','SKU','Category','Sub Category','Type','Unit','Brand','Stock','Minimum','Cost','Selling','Value','Status'];
+  var rows=filtered.map(function(it){return [it.name,it.code,it.category,it.subCategory,it.type,it.unit,it.brand,it.stock,it.minimum,it.cost,it.selling,value(it),it.status];});
+  var csv='﻿'+[hdr].concat(rows).map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='inventory_items_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('success',filtered.length+' items exported.');
+});
+document.getElementById('btnPdf').addEventListener('click',function(){ window.print(); });
 
-                const value = items.reduce((sum, item) => sum + (Number(item.stock) * Number(item.cost)), 0);
-                $("#stockValue").text(money(value));
-            }
+/* ── Wire filters & sort ───────────────────────── */
+['ivSearch','fCategory','fType','fStock','perPage'].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el) el.addEventListener(id==='ivSearch'?'input':'change', applyFilters);
+});
+document.getElementById('clearBtn').addEventListener('click',function(){
+  document.getElementById('ivSearch').value='';
+  ['fCategory','fType','fStock'].forEach(function(id){ var el=document.getElementById(id); if(el){el.value='';el.classList.remove('active-filter');} });
+  applyFilters();
+});
+document.querySelectorAll('.iv-sortable').forEach(function(th){
+  th.addEventListener('click',function(){
+    var c=this.dataset.col;
+    if(sortCol===c) sortDir=sortDir==='asc'?'desc':'asc';
+    else { sortCol=c; sortDir='asc'; }
+    updateSortIcons(); render();
+  });
+});
 
-            function resetForm() {
-                $("#itemId").val("");
-                $("#itemModalTitle").text("Add Inventory Item");
-                $("#itemName, #itemCode, #itemSubCategory, #brand, #model, #description").val("");
-                $("#openingStock, #minimumStock, #costPrice, #sellingPrice").val("");
-                $("#itemCategory").val("");
-                $("#itemType").val("Consumable");
-                $("#unitType").val("Piece");
-                $("#itemStatus").val("Active");
-            }
+/* ── CRUD (jQuery, modal) ──────────────────────── */
+function resetForm(){
+  $("#itemId").val("");
+  $("#itemModalTitle").text("Add Inventory Item");
+  $("#itemName, #itemCode, #itemSubCategory, #brand, #model, #description").val("");
+  $("#openingStock, #minimumStock, #costPrice, #sellingPrice").val("");
+  $("#itemCategory").val("");
+  $("#itemType").val("Consumable");
+  $("#unitType").val("Piece");
+  $("#itemStatus").val("Active");
+}
+function validateItem(){
+  var id=Number($("#itemId").val()||0), code=($("#itemCode").val()||"").trim().toLowerCase();
+  if(!($("#itemName").val()||"").trim()){ toast('error',"Item name is required."); return false; }
+  if(!code){ toast('error',"Item code / SKU is required."); return false; }
+  if(!$("#itemCategory").val()){ toast('error',"Category is required."); return false; }
+  if(items.some(function(x){return x.code.toLowerCase()===code && x.id!==id;})){ toast('error',"Duplicate item code / SKU is not allowed."); return false; }
+  return true;
+}
+$("#saveItemBtn").on("click",function(){
+  if(!validateItem()) return;
+  var id=Number($("#itemId").val()||0);
+  var data={
+    id:id||Date.now(),
+    name:$("#itemName").val().trim(), code:$("#itemCode").val().trim(),
+    category:$("#itemCategory").val(), subCategory:$("#itemSubCategory").val().trim(),
+    type:$("#itemType").val(), unit:$("#unitType").val(),
+    brand:$("#brand").val().trim(), model:$("#model").val().trim(),
+    stock:Number($("#openingStock").val()||0), minimum:Number($("#minimumStock").val()||0),
+    cost:Number($("#costPrice").val()||0), selling:Number($("#sellingPrice").val()||0),
+    status:$("#itemStatus").val(), description:$("#description").val().trim()
+  };
+  if(id){ items[items.findIndex(function(x){return x.id===id;})]=data; toast('success',"Item updated successfully."); }
+  else  { items.unshift(data); toast('success',"Item saved successfully."); }
+  $("#itemModal").modal("hide"); resetForm(); applyFilters();
+});
+$(document).on("click",".edit-item",function(){
+  var eid=Number($(this).data("id"));
+  var it=items.find(function(x){return x.id===eid;});
+  if(!it) return;
+  $("#itemId").val(it.id);
+  $("#itemModalTitle").text("Edit Inventory Item");
+  $("#itemName").val(it.name); $("#itemCode").val(it.code); $("#itemCategory").val(it.category);
+  $("#itemSubCategory").val(it.subCategory); $("#itemType").val(it.type); $("#unitType").val(it.unit);
+  $("#brand").val(it.brand); $("#model").val(it.model);
+  $("#openingStock").val(it.stock); $("#minimumStock").val(it.minimum);
+  $("#costPrice").val(it.cost); $("#sellingPrice").val(it.selling);
+  $("#itemStatus").val(it.status); $("#description").val(it.description||"");
+  $("#itemModal").modal("show");
+});
+$(document).on("click",".delete-item",function(){
+  var id=Number($(this).data("id"));
+  var it=items.find(function(x){return x.id===id;});
+  if(!it) return;
+  if(!confirm('Delete "'+it.name+'"? This cannot be undone.')) return;
+  items.splice(items.findIndex(function(x){return x.id===id;}),1);
+  toast('success',"Item deleted successfully.");
+  applyFilters();
+});
+$("#itemModal").on("hidden.bs.modal",resetForm);
 
-            function validateItem() {
-                const id = Number($("#itemId").val() || 0);
-                const code = ($("#itemCode").val() || "").trim().toLowerCase();
+/* ── toastr ────────────────────────────────────── */
+if(typeof toastr!=='undefined') toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
 
-                if (!($("#itemName").val() || "").trim()) {
-                    toastError("Item name is required.");
-                    return false;
-                }
-
-                if (!code) {
-                    toastError("Item code / SKU is required.");
-                    return false;
-                }
-
-                if (!$("#itemCategory").val()) {
-                    toastError("Category is required.");
-                    return false;
-                }
-
-                const duplicate = items.some(x => x.code.toLowerCase() === code && x.id !== id);
-                if (duplicate) {
-                    toastError("Duplicate item code / SKU is not allowed.");
-                    return false;
-                }
-
-                return true;
-            }
-
-            $("#saveItemBtn").on("click", function () {
-                if (!validateItem()) return;
-
-                const id = Number($("#itemId").val() || 0);
-
-                const itemData = {
-                    id: id || Date.now(),
-                    name: $("#itemName").val().trim(),
-                    code: $("#itemCode").val().trim(),
-                    category: $("#itemCategory").val(),
-                    subCategory: $("#itemSubCategory").val().trim(),
-                    type: $("#itemType").val(),
-                    unit: $("#unitType").val(),
-                    brand: $("#brand").val().trim(),
-                    model: $("#model").val().trim(),
-                    stock: Number($("#openingStock").val() || 0),
-                    minimum: Number($("#minimumStock").val() || 0),
-                    cost: Number($("#costPrice").val() || 0),
-                    selling: Number($("#sellingPrice").val() || 0),
-                    status: $("#itemStatus").val()
-                };
-
-                if (id) {
-                    const index = items.findIndex(x => x.id === id);
-                    items[index] = itemData;
-                    toastSuccess("Item updated successfully.");
-                } else {
-                    items.push(itemData);
-                    toastSuccess("Item saved successfully.");
-                }
-
-                $("#itemModal").modal("hide");
-                resetForm();
-                renderItems();
-            });
-
-            $(document).on("click", ".edit-item", function () {
-                const id = Number($(this).data("id"));
-                const item = items.find(x => x.id === id);
-                if (!item) return;
-
-                $("#itemId").val(item.id);
-                $("#itemModalTitle").text("Edit Inventory Item");
-                $("#itemName").val(item.name);
-                $("#itemCode").val(item.code);
-                $("#itemCategory").val(item.category);
-                $("#itemSubCategory").val(item.subCategory);
-                $("#itemType").val(item.type);
-                $("#unitType").val(item.unit);
-                $("#brand").val(item.brand);
-                $("#model").val(item.model);
-                $("#openingStock").val(item.stock);
-                $("#minimumStock").val(item.minimum);
-                $("#costPrice").val(item.cost);
-                $("#sellingPrice").val(item.selling);
-                $("#itemStatus").val(item.status);
-                $("#description").val(item.description || "");
-
-                $("#itemModal").modal("show");
-            });
-
-            $(document).on("click", ".delete-item", function () {
-                const id = Number($(this).data("id"));
-                const index = items.findIndex(x => x.id === id);
-
-                if (index >= 0) {
-                    items.splice(index, 1);
-                    toastSuccess("Item deleted successfully.");
-                    renderItems();
-                }
-            });
-
-            $("#applyFilterBtn").on("click", renderItems);
-            $("#searchItem, #filterCategory, #filterType, #filterStock").on("input change", renderItems);
-
-            $("#resetFilterBtn").on("click", function () {
-                $("#searchItem").val("");
-                $("#filterCategory").val("");
-                $("#filterType").val("");
-                $("#filterStock").val("");
-                renderItems();
-            });
-
-            $("#itemModal").on("hidden.bs.modal", resetForm);
-
-            renderItems();
-        });
-    </script>
+applyFilters();
+})();
+</script>
 }

@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 
 // ADD THIS LINE 👇
-builder.WebHost.UseUrls($"http://0.0.0.0:{Environment.GetEnvironmentVariable("PORT") ?? "8080"}");
+//builder.WebHost.UseUrls($"http://0.0.0.0:{Environment.GetEnvironmentVariable("PORT") ?? "8080"}");
 
 var mvcBuilder = builder.Services
     .AddControllersWithViews()
@@ -147,10 +147,13 @@ app.Use(async (context, next) =>
             context.Response.Redirect("/Account/Login");
             return;
         }
-    }
+    }   
 
     await next();
 });
+
+
+
 
 app.UseAuthorization();
 

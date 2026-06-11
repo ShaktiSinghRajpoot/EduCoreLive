@@ -621,31 +621,8 @@
                                     </div>
                                 </div>
                                 <div class="ec-card-body p-3 p-lg-4 pt-0">
-                                    <div class="row g-3">
-                                        <div class="col-12 col-md-6">
-                                            <label class="admission-kit-card">
-                                                <input type="checkbox" class="form-check-input kit-checkbox mt-1" data-amount="650" name="SelectedKitItems" value="Uniform Set">
-                                                <div class="w-100"><div class="d-flex justify-content-between gap-2"><div class="kit-title">Uniform Set</div><div class="kit-price">₹650</div></div><div class="kit-meta">Inventory / Student Store item</div></div>
-                                            </label>
-                                        </div>
-                                        <div class="col-12 col-md-6">
-                                            <label class="admission-kit-card">
-                                                <input type="checkbox" class="form-check-input kit-checkbox mt-1" data-amount="120" name="SelectedKitItems" value="Tie &amp; Belt">
-                                                <div class="w-100"><div class="d-flex justify-content-between gap-2"><div class="kit-title">Tie &amp; Belt</div><div class="kit-price">₹120</div></div><div class="kit-meta">Uniform accessory</div></div>
-                                            </label>
-                                        </div>
-                                        <div class="col-12 col-md-6">
-                                            <label class="admission-kit-card">
-                                                <input type="checkbox" class="form-check-input kit-checkbox mt-1" data-amount="80" name="SelectedKitItems" value="Diary">
-                                                <div class="w-100"><div class="d-flex justify-content-between gap-2"><div class="kit-title">School Diary</div><div class="kit-price">₹80</div></div><div class="kit-meta">Optional student item</div></div>
-                                            </label>
-                                        </div>
-                                        <div class="col-12 col-md-6">
-                                            <label class="admission-kit-card">
-                                                <input type="checkbox" class="form-check-input kit-checkbox mt-1" data-amount="60" name="SelectedKitItems" value="ID Card">
-                                                <div class="w-100"><div class="d-flex justify-content-between gap-2"><div class="kit-title">ID Card</div><div class="kit-price">₹60</div></div><div class="kit-meta">Identity card charge</div></div>
-                                            </label>
-                                        </div>
+                                    <div class="row g-3" id="admissionKitGrid">
+                                        <!-- kit items rendered from the shared inventory catalog -->
                                     </div>
                                 </div>
                             </div>
@@ -726,6 +703,7 @@
 </div>
 
 @section PageScripts {
+<script src="~/js/inventory-catalog.js" asp-append-version="true"></script>
 <script>
 (function(){
 'use strict';
@@ -1006,6 +984,23 @@ applyFilters();
         discountReason=document.getElementById("discountReason"),
         ledgerJson=document.getElementById("ledgerJson"),
         admissionForm=document.getElementById("admissionForm");
+
+    /* ── Render the Admission Kit from the shared inventory catalog ──
+       Prices now come from one source (Inventory master), not hard-coded
+       here, so a price change in Inventory flows through to admission. */
+    (function renderKit(){
+        var grid=document.getElementById("admissionKitGrid");
+        if(!grid||!window.EduInventory) return;
+        var kit=window.EduInventory.admissionKit();
+        grid.innerHTML=kit.map(function(it){
+            var meta=(it.subCategory||it.category)+" · "+(it.stock>0?"In stock":"Out of stock");
+            return '<div class="col-12 col-md-6"><label class="admission-kit-card">'
+                + '<input type="checkbox" class="form-check-input kit-checkbox mt-1" data-amount="'+it.selling+'" name="SelectedKitItems" value="'+it.name+'"'+(it.mandatory?' checked':'')+'>'
+                + '<div class="w-100"><div class="d-flex justify-content-between gap-2"><div class="kit-title">'+it.name+'</div>'
+                + '<div class="kit-price">₹'+Number(it.selling).toLocaleString("en-IN")+'</div></div>'
+                + '<div class="kit-meta">'+meta+'</div></div></label></div>';
+        }).join('');
+    })();
 
     var currentFees=[];
 
