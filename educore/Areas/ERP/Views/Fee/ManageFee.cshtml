@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Fee Collection";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 }
@@ -14,7 +14,7 @@
             --edu-muted:         #8b8175;
             --edu-bg:            #f8f7f5;
             --edu-card:          #ffffff;
-            --edu-border:        #ececf5; 
+            --edu-border:        #ececf5;
             --edu-success:       #28c76f;
             --edu-success-soft:  #e9f9f0;
             --edu-danger:        #ea5455;
@@ -23,98 +23,145 @@
             --edu-warning-soft:  #fff7e6;
             --edu-info:          #00bad1;
             --edu-info-soft:     #e9fbfd;
-            --edu-dark:          #2b1b12;
         }
 
+        /* ───────────────────────── Buttons ───────────────────────── */
         .btn-premium {
-            border-radius: 13px;
+            border-radius: 12px;
             font-size: .84rem;
             font-weight: 800;
-            padding: .72rem 1.05rem;
+            padding: .7rem 1.05rem;
         }
 
         .btn-primary {
-            background: var(--edu-primary);
-            border-color: var(--edu-primary);
-            box-shadow: 0 10px 20px rgba(255, 138, 0, .2);
+            background: linear-gradient(135deg, #ff9d2e, var(--edu-primary));
+            border: 0;
+            box-shadow: 0 10px 22px rgba(255, 138, 0, .28);
         }
 
-            .btn-primary:hover {
-                background: var(--edu-primary-dark);
-                border-color: var(--edu-primary-dark);
+            .btn-primary:hover,
+            .btn-primary:focus {
+                background: linear-gradient(135deg, var(--edu-primary), var(--edu-primary-dark));
+                box-shadow: 0 8px 18px rgba(255, 138, 0, .32);
             }
 
-        .metric-card {
+        .btn-collect {
+            font-size: .98rem;
+            padding: .9rem 1.1rem;
+            border-radius: 14px;
+            letter-spacing: .01em;
+        }
+
+        /* ───────────────────────── Compact header ────────────────── */
+        .fee-header-compact {
+            padding: .7rem 1.1rem;
+            border-radius: 15px;
+        }
+
+            .fee-header-compact .ec-page-icon {
+                width: 38px;
+                height: 38px;
+                border-radius: 11px;
+                font-size: 1.15rem;
+            }
+
+            .fee-header-compact .ec-page-title {
+                font-size: 1.1rem;
+            }
+
+            .fee-header-compact .ec-page-subtitle {
+                font-size: .76rem;
+            }
+
+        /* ───────────────────────── KPI cards ─────────────────────── */
+        .kpi-card {
+            position: relative;
             background: var(--edu-card);
             border: 1px solid var(--edu-border);
-            border-radius: 20px;
-            padding: 1.15rem;
+            border-radius: 15px;
+            padding: .8rem .9rem;
             height: 100%;
-            box-shadow: 0 8px 24px rgba(67, 89, 113, .055);
-            position: relative;
             overflow: hidden;
+            box-shadow: 0 8px 24px rgba(67, 89, 113, .055);
+            transition: transform .18s ease, box-shadow .18s ease;
         }
 
-        .metric-label {
-            color:         var(--edu-muted);
-            font-size:     .72rem;
-            font-weight:   800;
-            text-transform: uppercase;
-            letter-spacing: .04em;
-            margin-bottom: .65rem;
-        }
+            .kpi-card:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 14px 30px rgba(67, 89, 113, .10);
+            }
 
-        .metric-value {
-            color:       var(--edu-heading);
-            font-size:   1.6rem;
-            font-weight: 800;
-            line-height: 1;
-        }
+            .kpi-card::after {
+                content: "";
+                position: absolute;
+                right: -42px;
+                top: -42px;
+                width: 130px;
+                height: 130px;
+                border-radius: 50%;
+                background: radial-gradient(circle, var(--kpi-glow, rgba(255,138,0,.10)), transparent 70%);
+                pointer-events: none;
+            }
 
-        .metric-note {
-            color:       var(--edu-muted);
-            font-size:   .76rem;
-            font-weight: 600;
-            margin-top:  .55rem;
-        }
-
-        .metric-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-        }
-
-        .metric-top {
+        .kpi-top {
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
             gap: .75rem;
         }
 
-        .icon-primary {
-            background: var(--edu-primary-soft);
-            color: var(--edu-primary);
+        .kpi-label {
+            color: var(--edu-muted);
+            font-size: .67rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            margin-bottom: .3rem;
         }
 
-        .icon-success {
-            background: var(--edu-success-soft);
-            color: var(--edu-success);
+        .kpi-value {
+            color: var(--edu-heading);
+            font-size: 1.25rem;
+            font-weight: 800;
+            line-height: 1.1;
         }
 
-        .icon-danger {
-            background: var(--edu-danger-soft);
-            color: var(--edu-danger);
+        .kpi-note {
+            color: var(--edu-muted);
+            font-size: .68rem;
+            font-weight: 600;
+            margin-top: .3rem;
         }
 
+        .kpi-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+            color: #fff;
+        }
+
+        .kpi-primary { --kpi-glow: rgba(255,138,0,.12); }
+        .kpi-success { --kpi-glow: rgba(40,199,111,.12); }
+        .kpi-danger  { --kpi-glow: rgba(234,84,85,.12); }
+        .kpi-info    { --kpi-glow: rgba(0,186,209,.12); }
+
+        .kpi-primary .kpi-icon { background: linear-gradient(135deg, #ffb45c, var(--edu-primary)); box-shadow: 0 8px 16px rgba(255,138,0,.30); }
+        .kpi-success .kpi-icon { background: linear-gradient(135deg, #5be49b, var(--edu-success)); box-shadow: 0 8px 16px rgba(40,199,111,.30); }
+        .kpi-danger  .kpi-icon { background: linear-gradient(135deg, #f58e8f, var(--edu-danger));  box-shadow: 0 8px 16px rgba(234,84,85,.30); }
+        .kpi-info    .kpi-icon { background: linear-gradient(135deg, #54dceb, var(--edu-info));    box-shadow: 0 8px 16px rgba(0,186,209,.30); }
+
+        /* ───────────────────────── Workspace grid ────────────────── */
         .main-grid {
             display: grid;
             grid-template-columns: 330px minmax(0, 1fr) 330px;
             gap: 1.25rem;
             align-items: stretch;
-            margin-top: 1.25rem;
+            margin-top: 1rem;
         }
 
         .erp-panel {
@@ -123,44 +170,65 @@
             border-radius: 22px;
             box-shadow: 0 10px 28px rgba(67, 89, 113, .06);
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
             min-height: 700px;
         }
 
         .panel-header {
-            padding: 1.05rem 1.15rem;
+            padding: 1rem 1.15rem;
             border-bottom: 1px solid var(--edu-border);
-            background: #fff;
+            background: linear-gradient(180deg, #fffdf9, #ffffff);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .75rem;
         }
 
         .panel-title {
-            color:         var(--edu-heading);
-            font-size:     1rem;
-            font-weight:   700;
-            margin-bottom: .2rem;
+            color: var(--edu-heading);
+            font-size: .98rem;
+            font-weight: 800;
+            margin-bottom: .15rem;
         }
 
         .panel-subtitle {
-            color:       var(--edu-muted);
-            font-size:   .76rem;
+            color: var(--edu-muted);
+            font-size: .74rem;
             font-weight: 600;
+        }
+
+        .panel-count {
+            background: var(--edu-primary-soft);
+            color: var(--edu-primary);
+            border-radius: 999px;
+            padding: .3rem .7rem;
+            font-size: .72rem;
+            font-weight: 800;
+            white-space: nowrap;
         }
 
         .panel-body {
             padding: 1.05rem;
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
 
+        /* ───────────────────────── Filters & search ──────────────── */
         .student-filter-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: .65rem;
-            margin-bottom: .75rem;
+            gap: .6rem;
+            margin-bottom: .7rem;
         }
 
         .quick-filter-row {
             display: flex;
-            gap: .45rem;
+            gap: .4rem;
             flex-wrap: wrap;
-            margin-bottom: .85rem;
+            margin-bottom: .8rem;
         }
 
         .quick-filter {
@@ -168,23 +236,29 @@
             background: #fff;
             color: var(--edu-muted);
             border-radius: 999px;
-            padding: .35rem .7rem;
-            font-size: .72rem;
+            padding: .34rem .68rem;
+            font-size: .71rem;
             font-weight: 800;
-            letter-spacing: .01em;
+            transition: .15s ease;
         }
+
+            .quick-filter:hover {
+                border-color: rgba(255, 138, 0, .45);
+                color: var(--edu-primary);
+            }
 
             .quick-filter.active {
                 border-color: var(--edu-primary);
-                background: var(--edu-primary-soft);
-                color: var(--edu-primary);
+                background: linear-gradient(135deg, #ff9d2e, var(--edu-primary));
+                color: #fff;
+                box-shadow: 0 6px 14px rgba(255, 138, 0, .25);
             }
 
         .form-label {
             color: #3d2c24;
             font-size: .78rem;
             font-weight: 800;
-            margin-bottom: .42rem;
+            margin-bottom: .4rem;
         }
 
         .required::after {
@@ -194,29 +268,29 @@
 
         .form-control,
         .form-select {
-            border:           1px solid #d9dee3;
-            border-radius:    9px;
-            min-height:       44px;
-            color:            var(--edu-text);
-            font-size:        .9rem;
-            font-weight:      500;
+            border: 1px solid #d9dee3;
+            border-radius: 10px;
+            min-height: 44px;
+            color: var(--edu-text);
+            font-size: .9rem;
+            font-weight: 500;
             background-color: #fff;
         }
 
             .form-control::placeholder {
-                color:   var(--edu-muted);
+                color: var(--edu-muted);
                 opacity: 1;
             }
 
             .form-control:focus,
             .form-select:focus {
                 border-color: #ffb866;
-                box-shadow:   0 0 0 .18rem rgba(255, 138, 0, .12);
+                box-shadow: 0 0 0 .18rem rgba(255, 138, 0, .12);
             }
 
         .search-wrap {
             position: relative;
-            margin-bottom: .85rem;
+            margin-bottom: .8rem;
         }
 
             .search-wrap i {
@@ -230,8 +304,24 @@
 
             .search-wrap .form-control {
                 padding-left: 40px;
+                padding-right: 44px;
             }
 
+        .search-kbd {
+            position: absolute;
+            right: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 1px solid var(--edu-border);
+            border-radius: 7px;
+            background: #faf9f7;
+            color: var(--edu-muted);
+            font-size: .68rem;
+            font-weight: 800;
+            padding: .14rem .45rem;
+        }
+
+        /* ───────────────────────── Scroll areas ──────────────────── */
         .student-list,
         .history-list,
         .due-list {
@@ -239,18 +329,9 @@
             padding-right: .25rem;
         }
 
-        .student-list {
-            max-height: 510px;
-        }
-
-        .history-list {
-            max-height: 590px;
-        }
-
-        .due-list {
-            max-height: 255px;
-            margin-bottom: 1rem;
-        }
+        .student-list { max-height: 470px; }
+        .history-list { max-height: 560px; }
+        .due-list     { max-height: 260px; margin-bottom: 1rem; }
 
             .student-list::-webkit-scrollbar,
             .history-list::-webkit-scrollbar,
@@ -265,133 +346,205 @@
                 border-radius: 30px;
             }
 
+        /* ───────────────────────── Student cards ─────────────────── */
         .student-item {
+            display: flex;
+            gap: .75rem;
             border: 1px solid var(--edu-border);
             border-radius: 16px;
-            padding: .85rem;
-            margin-bottom: .7rem;
+            padding: .8rem;
+            margin-bottom: .65rem;
             cursor: pointer;
             background: #fff;
             transition: .18s ease;
         }
 
             .student-item:hover {
-                border-color: rgba(255, 138, 0, .40);
+                border-color: rgba(255, 138, 0, .45);
                 background: #fffaf5;
                 transform: translateY(-1px);
+                box-shadow: 0 8px 18px rgba(255, 138, 0, .08);
             }
 
             .student-item.active {
                 border-color: var(--edu-primary);
-                background: var(--edu-primary-soft);
-                box-shadow: 0 8px 18px rgba(255, 138, 0, .10);
+                background: linear-gradient(135deg, #fff4e6, #fffdf9);
+                box-shadow: 0 10px 22px rgba(255, 138, 0, .14);
             }
 
-        .student-name {
-            color: var(--edu-heading);
-            font-size: .9rem;
-            font-weight: 800;
-            margin-bottom: .2rem;
-        }
-
-        .student-meta,
-        .student-extra {
-            color: var(--edu-muted);
-            font-size: .74rem;
-            font-weight: 600;
-        }
-
-        .student-extra {
-            margin-top: .2rem;
-        }
-
-        .student-due {
-            color: var(--edu-danger);
-            font-size: .78rem;
-            font-weight: 800;
-            margin-top: .45rem;
-        }
-
-        .collection-hero {
-            padding: 1.15rem;
-            border-bottom: 1px solid var(--edu-border);
-            background: linear-gradient(180deg, #fff7ed, #ffffff);
-        }
-
-        .selected-student {
-            display: flex;
-            gap: .9rem;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .student-avatar {
-            width: 56px;
-            height: 56px;
-            border-radius: 18px;
-            background: var(--edu-primary);
+        .student-mini-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 13px;
             color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
             font-weight: 800;
-            font-size: 1rem;
-            box-shadow: 0 10px 20px rgba(255, 138, 0, .22);
+            font-size: .82rem;
+            flex-shrink: 0;
+        }
+
+        .student-name {
+            color: var(--edu-heading);
+            font-size: .88rem;
+            font-weight: 800;
+            margin-bottom: .15rem;
+        }
+
+        .student-meta {
+            color: var(--edu-muted);
+            font-size: .72rem;
+            font-weight: 600;
+        }
+
+        .student-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .5rem;
+            margin-top: .5rem;
+        }
+
+        .student-due {
+            font-size: .78rem;
+            font-weight: 800;
+            color: var(--edu-danger);
+        }
+
+            .student-due.clear {
+                color: var(--edu-success);
+            }
+
+        .student-progress {
+            height: 5px;
+            border-radius: 99px;
+            background: #f1efe9;
+            overflow: hidden;
+            margin-top: .55rem;
+        }
+
+            .student-progress span {
+                display: block;
+                height: 100%;
+                border-radius: 99px;
+                background: linear-gradient(90deg, #5be49b, var(--edu-success));
+            }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .25rem;
+            padding: .22rem .55rem;
+            border-radius: 999px;
+            font-size: .64rem;
+            font-weight: 800;
+            letter-spacing: .02em;
+            white-space: nowrap;
+        }
+
+        .pill-overdue  { background: var(--edu-danger-soft);  color: var(--edu-danger); }
+        .pill-pending  { background: var(--edu-warning-soft); color: #b86f00; }
+        .pill-partial  { background: var(--edu-info-soft);    color: #0796a8; }
+        .pill-paid     { background: var(--edu-success-soft); color: var(--edu-success); }
+        .pill-cycle    { background: var(--edu-primary-soft); color: var(--edu-primary); }
+        .pill-neutral  { background: #f2f3f5;                 color: var(--edu-muted); }
+        .pill-extra    { background: var(--edu-warning-soft); color: #b86f00; }
+        .pill-advance  { background: var(--edu-success-soft); color: var(--edu-success); }
+        .pill-void     { background: #f2f3f5;                 color: var(--edu-danger); }
+
+        /* ───────────────────────── Counter hero ──────────────────── */
+        .collection-hero {
+            padding: 1.2rem;
+            border-bottom: 1px solid var(--edu-border);
+            background: linear-gradient(135deg, #fff3e2 0%, #fffaf2 55%, #ffffff 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+            .collection-hero::before {
+                content: "";
+                position: absolute;
+                right: -70px;
+                top: -70px;
+                width: 220px;
+                height: 220px;
+                border-radius: 50%;
+                background: radial-gradient(circle, rgba(255,138,0,.10), transparent 70%);
+                pointer-events: none;
+            }
+
+        .selected-student {
+            display: flex;
+            gap: .95rem;
+            align-items: center;
+            margin-bottom: 1.05rem;
+            position: relative;
+        }
+
+        .student-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 19px;
+            background: linear-gradient(135deg, #ffb45c, var(--edu-primary));
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.05rem;
+            box-shadow: 0 12px 24px rgba(255, 138, 0, .30);
+            border: 3px solid #fff;
             flex-shrink: 0;
         }
 
         .selected-name {
             color: var(--edu-heading);
-            font-size: 1.08rem;
+            font-size: 1.1rem;
             font-weight: 800;
             margin-bottom: .15rem;
         }
 
         .selected-info {
             color: var(--edu-muted);
-            font-size: .8rem;
+            font-size: .79rem;
             font-weight: 600;
         }
 
         .ledger-summary {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            border: 1px solid var(--edu-border);
-            border-radius: 18px;
-            background: #fff;
-            overflow: hidden;
+            gap: .65rem;
+            position: relative;
         }
 
         .ledger-box {
-            padding: .9rem;
-            border-right: 1px solid var(--edu-border);
+            background: rgba(255, 255, 255, .82);
+            backdrop-filter: blur(3px);
+            border: 1px solid rgba(255, 138, 0, .14);
+            border-radius: 15px;
+            padding: .8rem .85rem;
         }
-
-            .ledger-box:last-child {
-                border-right: 0;
-            }
 
         .ledger-label {
             color: var(--edu-muted);
-            font-size: .72rem;
+            font-size: .68rem;
             font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
             margin-bottom: .3rem;
         }
 
         .ledger-value {
             color: var(--edu-heading);
-            font-size: 1.08rem;
+            font-size: 1.05rem;
             font-weight: 800;
         }
 
-            .ledger-value.success {
-                color: var(--edu-success);
-            }
+            .ledger-value.success { color: var(--edu-success); }
+            .ledger-value.danger  { color: var(--edu-danger); }
 
-            .ledger-value.danger {
-                color: var(--edu-danger);
-            }
-
+        /* ───────────────────────── Dues ──────────────────────────── */
         .collection-body {
             padding: 1.15rem;
         }
@@ -410,20 +563,68 @@
 
         .section-note {
             color: var(--edu-muted);
-            font-size: .74rem;
+            font-size: .73rem;
             font-weight: 600;
         }
 
+        .due-toolbar {
+            display: flex;
+            gap: .4rem;
+            flex-wrap: wrap;
+        }
+
+        .chip-btn {
+            border: 1px solid var(--edu-border);
+            background: #fff;
+            color: var(--edu-muted);
+            border-radius: 999px;
+            padding: .32rem .7rem;
+            font-size: .71rem;
+            font-weight: 800;
+            transition: .15s ease;
+        }
+
+            .chip-btn:hover {
+                border-color: rgba(255, 138, 0, .5);
+                color: var(--edu-primary);
+                background: #fffaf5;
+            }
+
         .due-item {
             display: grid;
-            grid-template-columns: 28px minmax(0, 1fr) auto;
+            grid-template-columns: 26px minmax(0, 1fr) auto;
             gap: .75rem;
             align-items: center;
-            padding: .8rem;
+            padding: .8rem .85rem .8rem 1rem;
             border: 1px solid var(--edu-border);
-            border-radius: 16px;
-            margin-bottom: .65rem;
+            border-left: 4px solid var(--due-accent, var(--edu-border));
+            border-radius: 14px;
+            margin-bottom: .6rem;
             background: #fff;
+            cursor: pointer;
+            transition: .15s ease;
+        }
+
+            .due-item:hover {
+                border-color: rgba(255, 138, 0, .4);
+                border-left-color: var(--due-accent, var(--edu-primary));
+                box-shadow: 0 8px 18px rgba(67, 89, 113, .07);
+            }
+
+            .due-item.checked {
+                background: #fffaf3;
+                border-color: rgba(255, 138, 0, .45);
+                border-left-color: var(--edu-primary);
+            }
+
+            .due-item.acc-overdue { --due-accent: var(--edu-danger); }
+            .due-item.acc-pending { --due-accent: var(--edu-warning); }
+            .due-item.acc-partial { --due-accent: var(--edu-info); }
+
+        .due-check {
+            width: 19px;
+            height: 19px;
+            margin: 0;
             cursor: pointer;
         }
 
@@ -431,18 +632,25 @@
             color: var(--edu-heading);
             font-size: .86rem;
             font-weight: 800;
-            margin-bottom: .15rem;
+            margin-bottom: .12rem;
         }
 
         .due-sub {
             color: var(--edu-muted);
-            font-size: .72rem;
+            font-size: .71rem;
             font-weight: 600;
+        }
+
+        .due-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .3rem;
+            margin-top: .4rem;
         }
 
         .due-amount {
             color: var(--edu-heading);
-            font-size: .92rem;
+            font-size: .95rem;
             font-weight: 800;
             text-align: right;
         }
@@ -450,69 +658,79 @@
         .due-small {
             color: var(--edu-muted);
             display: block;
-            font-size: .69rem;
+            font-size: .67rem;
             font-weight: 600;
-            margin-top: .12rem;
+            margin-top: .1rem;
         }
 
-        .due-badges {
-            display: flex;
-            flex-wrap: wrap;
-            gap: .32rem;
-            margin-top: .35rem;
-        }
-
-        .due-status,
-        .due-badge {
-            display: inline-flex;
-            padding: .25rem .55rem;
-            border-radius: 999px;
-            font-size: .66rem;
-            font-weight: 800;
-            letter-spacing: .01em;
-        }
-
-        .status-overdue {
-            background: var(--edu-danger-soft);
-            color: var(--edu-danger);
-        }
-
-        .status-pending {
-            background: var(--edu-warning-soft);
-            color: var(--edu-warning);
-        }
-
-        .status-partial {
-            background: var(--edu-info-soft);
-            color: var(--edu-info);
-        }
-
-        .status-paid {
-            background: var(--edu-success-soft);
-            color: var(--edu-success);
-        }
-
-        .badge-cycle {
-            background: var(--edu-primary-soft);
-            color: var(--edu-primary);
-        }
-
-        .badge-optional {
-            background: #f2f3f5;
-            color: var(--edu-muted);
-        }
-
-        .badge-extra {
-            background: var(--edu-warning-soft);
-            color: #b86f00;
-        }
-
+        /* ───────────────────────── Payment card ──────────────────── */
         .payment-card {
             background: #fff;
             border: 1px solid var(--edu-border);
             border-radius: 18px;
-            padding: 1rem;
+            padding: 1.05rem;
+            box-shadow: 0 6px 18px rgba(67, 89, 113, .05);
         }
+
+        .collection-mode-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            border-radius: 999px;
+            padding: .3rem .65rem;
+            font-size: .67rem;
+            font-weight: 800;
+            background: var(--edu-primary-soft);
+            color: var(--edu-primary);
+        }
+
+            .collection-mode-pill.advance {
+                background: var(--edu-success-soft);
+                color: var(--edu-success);
+            }
+
+            .collection-mode-pill.partial {
+                background: var(--edu-info-soft);
+                color: var(--edu-info);
+            }
+
+        .mode-pills {
+            display: flex;
+            gap: .45rem;
+            flex-wrap: wrap;
+        }
+
+        .mode-pill {
+            flex: 1 1 auto;
+            min-width: 76px;
+            border: 1px solid #d9dee3;
+            background: #fff;
+            color: var(--edu-muted);
+            border-radius: 12px;
+            padding: .55rem .4rem;
+            font-size: .73rem;
+            font-weight: 800;
+            text-align: center;
+            transition: .15s ease;
+        }
+
+            .mode-pill i {
+                display: block;
+                font-size: 1.15rem;
+                margin-bottom: .15rem;
+            }
+
+            .mode-pill:hover {
+                border-color: rgba(255, 138, 0, .5);
+                color: var(--edu-primary);
+            }
+
+            .mode-pill.active {
+                border-color: var(--edu-primary);
+                background: var(--edu-primary-soft);
+                color: var(--edu-primary);
+                box-shadow: 0 6px 14px rgba(255, 138, 0, .14);
+            }
 
         .amount-input-group {
             position: relative;
@@ -531,222 +749,54 @@
 
         .amount-input {
             padding-left: 38px;
-            font-size: 1rem;
+            font-size: 1.05rem;
             font-weight: 800;
             color: var(--edu-heading);
         }
 
-        .selected-dues-box,
-        .balance-box {
-            border-radius: 16px;
-            padding: .85rem;
-            margin-top: .8rem;
-        }
-
-        .selected-dues-box {
-            background: var(--edu-primary-soft);
-            border: 1px solid rgba(255, 138, 0, .14);
-        }
-
-            .selected-dues-box ul {
-                margin: .45rem 0 0;
-                padding-left: 1.1rem;
-                color: var(--edu-text);
-                font-size: .78rem;
-                font-weight: 600;
-            }
-
-        .balance-box {
-            background: #fff7ed;
-            border: 1px solid rgba(255, 138, 0, .16);
-        }
-
-        .balance-row {
-            display: flex;
-            justify-content: space-between;
-            gap: .75rem;
-            margin-bottom: .5rem;
-            font-size: .78rem;
-            font-weight: 800;
-        }
-
-            .balance-row:last-child {
-                margin-bottom: 0;
-            }
-
-            .balance-row span {
-                color: var(--edu-muted);
-                font-weight: 800;
-            }
-
-            .balance-row strong {
-                color: var(--edu-heading);
-            }
-
-            .balance-row.primary strong {
-                color: var(--edu-primary);
-                font-size: 1rem;
-            }
-
-            .balance-row.danger strong {
-                color: var(--edu-danger);
-            }
-
-            .balance-row.success strong {
-                color: var(--edu-success);
-            }
-
-        .history-item {
-            border: 1px solid var(--edu-border);
-            border-radius: 17px;
-            padding: .9rem;
-            background: #fff;
-            margin-bottom: .75rem;
-            transition: .18s ease;
-        }
-
-            .history-item:hover {
-                border-color: rgba(255, 138, 0, .30);
-                box-shadow: 0 8px 18px rgba(67, 89, 113, .055);
-            }
-
-        .history-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            gap: .75rem;
-            margin-bottom: .55rem;
-        }
-
-        .receipt-no {
-            color: var(--edu-primary);
-            font-size: .72rem;
-            font-weight: 800;
-            margin-bottom: .2rem;
-        }
-
-        .history-amount {
-            color: var(--edu-heading);
-            font-size: 1rem;
-            font-weight: 800;
-        }
-
-        .history-date,
-        .history-mode {
-            color: var(--edu-muted);
-            font-size: .72rem;
-            font-weight: 800;
-        }
-
-        .history-mode {
-            text-transform: uppercase;
-        }
-
-        .history-desc {
-            color: var(--edu-text);
-            font-size: .78rem;
-            font-weight: 600;
-        }
-
-        .history-actions {
-            display: flex;
-            gap: .45rem;
-            margin-top: .75rem;
-        }
-
-        .icon-btn {
-            width: 34px;
-            height: 34px;
-            border-radius: 11px;
-            border: 1px solid var(--edu-border);
-            background: #fff;
-            color: var(--edu-primary);
-            display: inline-flex;
+        .advance-toggle {
+            display: none;
             align-items: center;
-            justify-content: center;
-        }
-
-        .history-chip {
-            border-radius: 999px;
-            padding: .25rem .55rem;
-            font-size: .66rem;
-            font-weight: 800;
+            justify-content: space-between;
+            gap: .75rem;
+            border: 1px dashed rgba(40, 199, 111, .5);
             background: var(--edu-success-soft);
-            color: var(--edu-success);
+            border-radius: 14px;
+            padding: .7rem .85rem;
+            margin-top: .85rem;
         }
 
-        .empty-state {
-            text-align: center;
-            padding: 2rem 1rem;
-            color: var(--edu-muted);
-            font-weight: 700;
-        }
-
-            .empty-state i {
-                font-size: 2.5rem;
-                color: var(--edu-primary);
-                margin-bottom: .6rem;
+            .advance-toggle.show {
+                display: flex;
             }
 
-            .empty-state h6 {
-                color: var(--edu-heading);
-                font-weight: 800;
-                margin-bottom: .25rem;
-            }
-
-            .empty-state p {
-                font-size: .82rem;
-                margin: 0;
-                font-weight: 700;
-            }
-
-        .modal-content {
-            border: 0;
-            border-radius: 22px;
-            overflow: hidden;
-            box-shadow: 0 22px 60px rgba(23, 33, 60, .22);
-        }
-
-        .modal-header {
-            border-bottom: 1px solid var(--edu-border);
-            padding: 1.1rem 1.25rem;
-        }
-
-        .modal-title {
-            color: var(--edu-heading);
+        .advance-toggle-label {
+            font-size: .78rem;
             font-weight: 800;
+            color: #1f8f55;
         }
 
-        .modal-footer {
-            border-top: 1px solid var(--edu-border);
-            padding: 1rem 1.25rem;
+        .advance-toggle-sub {
+            font-size: .7rem;
+            font-weight: 600;
+            color: #1f8f55;
+            opacity: .8;
         }
 
-        .collection-mode-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .35rem;
-            border-radius: 999px;
-            padding: .3rem .65rem;
-            font-size: .68rem;
-            font-weight: 800;
-            background: var(--edu-primary-soft);
-            color: var(--edu-primary);
+        .form-switch .form-check-input {
+            width: 2.6em;
+            height: 1.35em;
+            cursor: pointer;
         }
 
-            .collection-mode-pill.advance {
-                background: var(--edu-success-soft);
-                color: var(--edu-success);
-            }
-
-            .collection-mode-pill.partial {
-                background: var(--edu-info-soft);
-                color: var(--edu-info);
+            .form-switch .form-check-input:checked {
+                background-color: var(--edu-success);
+                border-color: var(--edu-success);
             }
 
         .soft-info-box {
-            border-radius: 14px;
-            padding: .75rem .85rem;
+            border-radius: 13px;
+            padding: .72rem .85rem;
             font-size: .76rem;
             font-weight: 600;
             margin-top: .8rem;
@@ -774,6 +824,218 @@
             background: var(--edu-info-soft);
             color: #168090;
             border: 1px solid #cceff4;
+        }
+
+        .selected-dues-box {
+            background: var(--edu-primary-soft);
+            border: 1px solid rgba(255, 138, 0, .14);
+            border-radius: 15px;
+            padding: .85rem;
+            margin-top: .85rem;
+        }
+
+            .selected-dues-box ul {
+                margin: .45rem 0 0;
+                padding-left: 1.1rem;
+                color: var(--edu-text);
+                font-size: .77rem;
+                font-weight: 600;
+            }
+
+        .balance-box {
+            background: linear-gradient(135deg, #fff7ed, #fffdfa);
+            border: 1px solid rgba(255, 138, 0, .16);
+            border-radius: 15px;
+            padding: .9rem;
+            margin-top: .8rem;
+        }
+
+        .balance-row {
+            display: flex;
+            justify-content: space-between;
+            gap: .75rem;
+            margin-bottom: .5rem;
+            font-size: .78rem;
+            font-weight: 800;
+        }
+
+            .balance-row:last-child {
+                margin-bottom: 0;
+            }
+
+            .balance-row span {
+                color: var(--edu-muted);
+                font-weight: 800;
+            }
+
+            .balance-row strong {
+                color: var(--edu-heading);
+            }
+
+            .balance-row.primary strong {
+                color: var(--edu-primary);
+                font-size: 1.02rem;
+            }
+
+            .balance-row.danger strong  { color: var(--edu-danger); }
+            .balance-row.success strong { color: var(--edu-success); }
+
+        .balance-divider {
+            border-top: 1px dashed rgba(255, 138, 0, .3);
+            margin: .55rem 0;
+        }
+
+        /* ───────────────────────── History ───────────────────────── */
+        .history-item {
+            border: 1px solid var(--edu-border);
+            border-radius: 16px;
+            padding: .9rem;
+            background: #fff;
+            margin-bottom: .7rem;
+            transition: .18s ease;
+        }
+
+            .history-item:hover {
+                border-color: rgba(255, 138, 0, .32);
+                box-shadow: 0 8px 18px rgba(67, 89, 113, .06);
+            }
+
+            .history-item.voided {
+                opacity: .62;
+                background: #fbfbfb;
+            }
+
+                .history-item.voided .history-amount {
+                    text-decoration: line-through;
+                }
+
+        .history-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: .75rem;
+            margin-bottom: .5rem;
+        }
+
+        .history-mode-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background: var(--edu-primary-soft);
+            color: var(--edu-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .receipt-no {
+            color: var(--edu-primary);
+            font-size: .71rem;
+            font-weight: 800;
+            margin-bottom: .15rem;
+        }
+
+        .history-amount {
+            color: var(--edu-heading);
+            font-size: 1rem;
+            font-weight: 800;
+        }
+
+        .history-date {
+            color: var(--edu-muted);
+            font-size: .71rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .history-desc {
+            color: var(--edu-text);
+            font-size: .77rem;
+            font-weight: 600;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: .45rem;
+            margin-top: .7rem;
+        }
+
+        .icon-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 11px;
+            border: 1px solid var(--edu-border);
+            background: #fff;
+            color: var(--edu-primary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: .15s ease;
+        }
+
+            .icon-btn:hover {
+                background: var(--edu-primary-soft);
+                border-color: rgba(255, 138, 0, .4);
+            }
+
+            .icon-btn.danger {
+                color: var(--edu-danger);
+            }
+
+                .icon-btn.danger:hover {
+                    background: var(--edu-danger-soft);
+                    border-color: rgba(234, 84, 85, .4);
+                }
+
+        /* ───────────────────────── Empty state ───────────────────── */
+        .empty-state {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--edu-muted);
+            font-weight: 700;
+        }
+
+            .empty-state i {
+                font-size: 2.5rem;
+                color: var(--edu-primary);
+                margin-bottom: .6rem;
+            }
+
+            .empty-state h6 {
+                color: var(--edu-heading);
+                font-weight: 800;
+                margin-bottom: .25rem;
+            }
+
+            .empty-state p {
+                font-size: .8rem;
+                margin: 0;
+                font-weight: 600;
+            }
+
+        /* ───────────────────────── Modals ────────────────────────── */
+        .modal-content {
+            border: 0;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow: 0 22px 60px rgba(23, 33, 60, .22);
+        }
+
+        .modal-header {
+            border-bottom: 1px solid var(--edu-border);
+            padding: 1.1rem 1.25rem;
+        }
+
+        .modal-title {
+            color: var(--edu-heading);
+            font-weight: 800;
+        }
+
+        .modal-footer {
+            border-top: 1px solid var(--edu-border);
+            padding: 1rem 1.25rem;
         }
 
         .confirm-summary {
@@ -806,13 +1068,9 @@
                 color: var(--edu-heading);
             }
 
-            .confirm-row.success strong {
-                color: var(--edu-success);
-            }
-
-            .confirm-row.primary strong {
-                color: var(--edu-primary);
-            }
+            .confirm-row.success strong { color: var(--edu-success); }
+            .confirm-row.primary strong { color: var(--edu-primary); }
+            .confirm-row.danger strong  { color: var(--edu-danger); }
 
         .confirm-note,
         .concession-help {
@@ -827,9 +1085,251 @@
             line-height: 1.45;
         }
 
-        @@media(max-width: 1199px) {
+        /* ───────────────────────── Receipt preview ───────────────── */
+        .receipt-paper {
+            border: 1px solid var(--edu-border);
+            border-radius: 16px;
+            background: #fff;
+            padding: 1.25rem;
+            font-size: .82rem;
+            color: var(--edu-text);
+        }
+
+        .receipt-school {
+            text-align: center;
+            border-bottom: 2px dashed var(--edu-border);
+            padding-bottom: .8rem;
+            margin-bottom: .8rem;
+        }
+
+            .receipt-school h5 {
+                color: var(--edu-heading);
+                font-weight: 800;
+                margin-bottom: .15rem;
+            }
+
+            .receipt-school small {
+                color: var(--edu-muted);
+                font-weight: 600;
+            }
+
+        .receipt-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: .75rem;
+            flex-wrap: wrap;
+            font-weight: 700;
+            margin-bottom: .8rem;
+        }
+
+        .receipt-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: .8rem;
+        }
+
+            .receipt-table th,
+            .receipt-table td {
+                border: 1px solid var(--edu-border);
+                padding: .45rem .6rem;
+                font-size: .78rem;
+            }
+
+            .receipt-table th {
+                background: #faf9f7;
+                color: var(--edu-heading);
+                font-weight: 800;
+            }
+
+        .receipt-totals {
+            display: flex;
+            flex-direction: column;
+            gap: .3rem;
+            align-items: flex-end;
+            font-weight: 800;
+        }
+
+        .receipt-foot {
+            border-top: 2px dashed var(--edu-border);
+            margin-top: .9rem;
+            padding-top: .7rem;
+            display: flex;
+            justify-content: space-between;
+            color: var(--edu-muted);
+            font-size: .72rem;
+            font-weight: 600;
+        }
+
+        /* ───────────────────────── Per-due amount entry ──────────── */
+        .due-pay-field {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: .3rem;
+            margin-top: .5rem;
+        }
+
+        .due-pay-label {
+            color: var(--edu-muted);
+            font-size: .68rem;
+            font-weight: 800;
+        }
+
+        .due-pay-input {
+            width: 88px;
+            border: 1px solid #d9dee3;
+            border-radius: 9px;
+            padding: .3rem .5rem;
+            font-size: .82rem;
+            font-weight: 800;
+            color: var(--edu-heading);
+            text-align: right;
+        }
+
+            .due-pay-input:focus {
+                outline: 0;
+                border-color: #ffb866;
+                box-shadow: 0 0 0 .15rem rgba(255, 138, 0, .12);
+            }
+
+        /* ───────────────────────── Sticky collect bar ────────────── */
+        .sticky-collect-bar {
+            position: sticky;
+            bottom: 0;
+            z-index: 20;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin: 1rem -1.15rem -1.15rem;
+            padding: .85rem 1.15rem;
+            background: rgba(255, 255, 255, .92);
+            backdrop-filter: blur(8px);
+            border-top: 1px solid var(--edu-border);
+            box-shadow: 0 -8px 22px rgba(67, 89, 113, .08);
+        }
+
+            .sticky-collect-bar.show {
+                display: flex;
+            }
+
+        .sticky-amount-label {
+            color: var(--edu-muted);
+            font-size: .7rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .sticky-amount-value {
+            color: var(--edu-heading);
+            font-size: 1.25rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .sticky-collect-bar .btn-collect {
+            margin: 0;
+            width: auto;
+            min-width: 200px;
+        }
+
+        /* ───────────────────────── Day-end summary ───────────────── */
+        .daysum-total {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: .65rem;
+            margin-bottom: 1rem;
+        }
+
+        .daysum-box {
+            border: 1px solid var(--edu-border);
+            border-radius: 15px;
+            padding: .85rem;
+            text-align: center;
+        }
+
+            .daysum-box.primary { background: var(--edu-primary-soft); border-color: rgba(255, 138, 0, .18); }
+            .daysum-box.success { background: var(--edu-success-soft); border-color: rgba(40, 199, 111, .18); }
+
+        .daysum-box .label {
+            color: var(--edu-muted);
+            font-size: .68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .daysum-box .value {
+            color: var(--edu-heading);
+            font-size: 1.25rem;
+            font-weight: 800;
+            margin-top: .25rem;
+        }
+
+        .daysum-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+            .daysum-table th,
+            .daysum-table td {
+                padding: .55rem .7rem;
+                font-size: .82rem;
+                border-bottom: 1px solid var(--edu-border);
+                text-align: left;
+            }
+
+            .daysum-table th {
+                color: var(--edu-muted);
+                font-weight: 800;
+                text-transform: uppercase;
+                font-size: .68rem;
+                letter-spacing: .04em;
+            }
+
+            .daysum-table td.num,
+            .daysum-table th.num {
+                text-align: right;
+            }
+
+            .daysum-table tfoot td {
+                font-weight: 800;
+                color: var(--edu-heading);
+                border-top: 2px solid var(--edu-border);
+                border-bottom: 0;
+            }
+
+        .daysum-mode {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            font-weight: 700;
+            color: var(--edu-heading);
+        }
+
+            .daysum-mode i {
+                color: var(--edu-primary);
+            }
+
+        /* ───────────────────────── Duplicate receipt copies ──────── */
+        .copy-tag {
+            display: inline-block;
+            background: var(--edu-primary-soft);
+            color: var(--edu-primary);
+            border: 1px solid rgba(255, 138, 0, .25);
+            border-radius: 999px;
+            padding: .15rem .65rem;
+            font-size: .66rem;
+            font-weight: 800;
+            letter-spacing: .04em;
+            margin-bottom: .6rem;
+        }
+
+        /* ───────────────────────── Responsive ────────────────────── */
+        @@media(max-width: 1399px) {
             .main-grid {
-                grid-template-columns: 310px minmax(0, 1fr);
+                grid-template-columns: 300px minmax(0, 1fr);
             }
 
             .history-panel {
@@ -838,7 +1338,7 @@
             }
 
             .history-list {
-                max-height: 360px;
+                max-height: 380px;
             }
         }
 
@@ -859,42 +1359,23 @@
             .due-list {
                 max-height: none;
             }
+
+            .ledger-summary {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @@media(max-width: 575px) {
-            .page-header {
-                align-items: stretch;
-            }
-
-                .page-header .btn,
-                .page-header > div:last-child {
-                    width: 100%;
-                }
-
-                .page-header > div:last-child {
-                    display: grid !important;
-                    grid-template-columns: 1fr;
-                }
-
             .ledger-summary {
                 grid-template-columns: 1fr;
             }
-
-            .ledger-box {
-                border-right: 0;
-                border-bottom: 1px solid var(--edu-border);
-            }
-
-                .ledger-box:last-child {
-                    border-bottom: 0;
-                }
 
             .student-filter-row {
                 grid-template-columns: 1fr;
             }
 
             .due-item {
-                grid-template-columns: 28px minmax(0, 1fr);
+                grid-template-columns: 26px minmax(0, 1fr);
             }
 
             .due-amount {
@@ -905,6 +1386,10 @@
             .selected-student {
                 align-items: flex-start;
             }
+
+            .mode-pill {
+                min-width: 30%;
+            }
         }
     </style>
 }
@@ -913,280 +1398,321 @@
 <div class="ec-page-shell">
 <div class="ec-page-content fee-page">
 
-    <div class="ec-page-header mb-4">
+    <div class="ec-page-header fee-header-compact mb-3">
         <div class="ec-page-header-inner">
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2">
                 <div class="ec-page-icon">
                     <i class="bx bx-wallet"></i>
                 </div>
                 <div>
-                    <h4 class="ec-page-title mb-1">Fee Collection</h4>
-                    <p class="ec-page-subtitle mb-0">Operational fee counter — collect dues, apply concession, record advance payments and print receipts.</p>
+                    <h4 class="ec-page-title mb-0">Fee Collection</h4>
+                    <p class="ec-page-subtitle mb-0 d-none d-md-block">Operational fee counter — collect, concession, advance & receipts.</p>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button type="button" class="btn btn-primary btn-premium btn-sm" id="dayEndBtn">
+                    <i class="bx bx-bar-chart-alt-2 me-1"></i>
+                    Day Summary
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-card kpi-primary">
+                <div class="kpi-top">
+                    <div>
+                        <div class="kpi-label">Collected Today</div>
+                        <div class="kpi-value" id="collectedToday">₹0</div>
+                        <div class="kpi-note"><span id="receiptsToday">0</span> receipts today</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bx bx-rupee"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-card kpi-success">
+                <div class="kpi-top">
+                    <div>
+                        <div class="kpi-label">Total Collected</div>
+                        <div class="kpi-value" id="totalCollected">₹0</div>
+                        <div class="kpi-note">All receipts, all students</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bx bx-credit-card"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-card kpi-danger">
+                <div class="kpi-top">
+                    <div>
+                        <div class="kpi-label">Total Pending Due</div>
+                        <div class="kpi-value" id="totalPendingDue">₹0</div>
+                        <div class="kpi-note"><span id="overdueStudents">0</span> students overdue</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bx bx-calendar-exclamation"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-card kpi-info">
+                <div class="kpi-top">
+                    <div>
+                        <div class="kpi-label">Advance Held</div>
+                        <div class="kpi-value" id="totalAdvanceHeld">₹0</div>
+                        <div class="kpi-note">Adjustable against future dues</div>
+                    </div>
+                    <div class="kpi-icon"><i class="bx bx-wallet-alt"></i></div>
                 </div>
             </div>
         </div>
     </div>
 
-        <div class="row g-4">
-            <div class="col-lg-4 col-md-6">
-                <div class="metric-card">
-                    <div class="metric-top">
-                        <div>
-                            <div class="metric-label">Collected Today</div>
-                            <div class="metric-value" id="collectedToday">₹0</div>
-                            <div class="metric-note">Server timestamp will decide collection date</div>
-                        </div>
-                        <div class="metric-icon icon-primary">
-                            <i class="bx bx-rupee"></i>
-                        </div>
+    <div class="main-grid">
+
+        <!-- ════════════ LEFT: STUDENTS ════════════ -->
+        <div class="erp-panel">
+            <div class="panel-header">
+                <div>
+                    <div class="panel-title">Students</div>
+                    <div class="panel-subtitle">Search and select student ledger</div>
+                </div>
+                <span class="panel-count" id="studentCount">0</span>
+            </div>
+
+            <div class="panel-body">
+                <div class="student-filter-row">
+                    <select class="form-select" id="filterClass">
+                        <option>All Classes</option>
+                    </select>
+
+                    <select class="form-select" id="filterSection">
+                        <option>All Sections</option>
+                    </select>
+                </div>
+
+                <div class="quick-filter-row" id="quickFilterRow">
+                    <button type="button" class="quick-filter active" data-filter="All">All</button>
+                    <button type="button" class="quick-filter" data-filter="Pending">Pending</button>
+                    <button type="button" class="quick-filter" data-filter="Overdue">Overdue</button>
+                    <button type="button" class="quick-filter" data-filter="Paid">Paid</button>
+                </div>
+
+                <div class="search-wrap">
+                    <i class="bx bx-search"></i>
+                    <input class="form-control" id="studentSearch" placeholder="Search name, admission no, parent...">
+                    <span class="search-kbd">/</span>
+                </div>
+
+                <div class="student-list" id="studentList"></div>
+            </div>
+        </div>
+
+        <!-- ════════════ CENTER: COLLECTION COUNTER ════════════ -->
+        <div class="erp-panel">
+            <div class="collection-hero">
+                <div class="selected-student">
+                    <div class="student-avatar" id="selectedAvatar">--</div>
+
+                    <div class="flex-grow-1">
+                        <div class="selected-name" id="selectedName">Select Student</div>
+                        <div class="selected-info" id="selectedInfo">Student details will appear here</div>
+                    </div>
+
+                    <span class="pill pill-paid" id="selectedStatusPill">Active</span>
+                </div>
+
+                <div class="ledger-summary">
+                    <div class="ledger-box">
+                        <div class="ledger-label">Total Charges</div>
+                        <div class="ledger-value" id="totalLedgerCharges">₹0</div>
+                    </div>
+
+                    <div class="ledger-box">
+                        <div class="ledger-label">Paid So Far</div>
+                        <div class="ledger-value success" id="paidSoFar">₹0</div>
+                    </div>
+
+                    <div class="ledger-box">
+                        <div class="ledger-label">Pending Due</div>
+                        <div class="ledger-value danger" id="pendingDue">₹0</div>
+                    </div>
+
+                    <div class="ledger-box">
+                        <div class="ledger-label">Advance Balance</div>
+                        <div class="ledger-value success" id="advanceBalance">₹0</div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-lg-4 col-md-6">
-                <div class="metric-card">
-                    <div class="metric-top">
-                        <div>
-                            <div class="metric-label">Collected This Month</div>
-                            <div class="metric-value text-success" id="collectedMonth">₹0</div>
-                            <div class="metric-note">Across all payment modes</div>
-                        </div>
-                        <div class="metric-icon icon-success">
-                            <i class="bx bx-credit-card"></i>
-                        </div>
+            <div class="collection-body">
+                <div class="section-heading">
+                    <span>Pending Ledger Dues</span>
+
+                    <div class="due-toolbar">
+                        <button type="button" class="chip-btn" id="selectAllDuesBtn"><i class="bx bx-check-double"></i> Select All</button>
+                        <button type="button" class="chip-btn" id="clearDuesBtn"><i class="bx bx-x"></i> Clear</button>
+                        <button type="button" class="chip-btn" id="openGlobalConcessionBtn"><i class="bx bx-purchase-tag-alt"></i> Concession</button>
+                        <button type="button" class="chip-btn" data-bs-toggle="modal" data-bs-target="#extraChargeModal"><i class="bx bx-plus"></i> Extra Charge</button>
                     </div>
                 </div>
-            </div>
 
-            <div class="col-lg-4 col-md-12">
-                <div class="metric-card">
-                    <div class="metric-top">
+                <div class="due-list" id="dueList"></div>
+
+                <div class="payment-card">
+                    <div class="section-heading mb-3">
+                        <span>
+                            <span id="paymentSectionTitle">Collect Payment</span>
+                            <span class="collection-mode-pill ms-2" id="collectionModePill">
+                                <i class="bx bx-list-check"></i>
+                                Selected Dues
+                            </span>
+                        </span>
+
+                        <span class="section-note">Payment date will use server timestamp</span>
+                    </div>
+
+                    <div class="soft-info-box no-due-info-box" id="noDueInfoBox">
+                        <i class="bx bx-info-circle me-1"></i>
+                        No dues selected. Payment will be treated as advance payment.
+                    </div>
+
+                    <div class="soft-info-box partial-info-box" id="partialInfoBox">
+                        <i class="bx bx-info-circle me-1"></i>
+                        Entered amount is less than selected dues. This will be recorded as a partial payment (oldest due adjusted first).
+                    </div>
+
+                    <div class="soft-info-box advance-info-box" id="advanceInfoBox">
+                        <i class="bx bx-check-circle me-1"></i>
+                        Extra amount will be stored as student advance balance and can be adjusted in future dues.
+                    </div>
+
+                    <div class="advance-toggle" id="advanceToggleBox">
                         <div>
-                            <div class="metric-label">Total Pending Due</div>
-                            <div class="metric-value text-danger" id="totalPendingDue">₹0</div>
-                            <div class="metric-note">Pending balance from student ledger</div>
+                            <div class="advance-toggle-label"><i class="bx bx-wallet"></i> Use advance balance (<span id="advanceAvailableLabel">₹0</span>)</div>
+                            <div class="advance-toggle-sub">Advance will be adjusted against selected dues before cash.</div>
                         </div>
-                        <div class="metric-icon icon-danger">
-                            <i class="bx bx-calendar-exclamation"></i>
+                        <div class="form-check form-switch m-0">
+                            <input class="form-check-input" type="checkbox" id="useAdvanceSwitch">
                         </div>
                     </div>
+
+                    <div class="row g-3 mt-0">
+                        <div class="col-12">
+                            <label class="form-label required">Payment Mode</label>
+                            <div class="mode-pills" id="modePills">
+                                <button type="button" class="mode-pill active" data-mode="Cash"><i class="bx bx-money"></i>Cash</button>
+                                <button type="button" class="mode-pill" data-mode="UPI"><i class="bx bx-qr-scan"></i>UPI</button>
+                                <button type="button" class="mode-pill" data-mode="Card"><i class="bx bx-credit-card-front"></i>Card</button>
+                                <button type="button" class="mode-pill" data-mode="Bank Transfer"><i class="bx bx-buildings"></i>Bank</button>
+                                <button type="button" class="mode-pill" data-mode="Cheque"><i class="bx bx-notepad"></i>Cheque</button>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label required">Amount Collecting Now</label>
+                            <div class="amount-input-group">
+                                <span class="amount-prefix">₹</span>
+                                <input type="number" class="form-control amount-input" id="paymentAmount" min="0">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6" id="referenceNoCol">
+                            <label class="form-label" id="referenceNoLabel">Reference No</label>
+                            <input class="form-control" id="paymentReferenceNo" placeholder="UPI / cheque / bank ref">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Remarks</label>
+                            <input class="form-control" id="paymentRemarks" placeholder="Optional note for receipt">
+                        </div>
+                    </div>
+
+                    <div class="selected-dues-box">
+                        <div class="d-flex justify-content-between gap-2">
+                            <span class="section-note fw-bold">Collecting Against</span>
+                            <span class="section-note" id="selectedDueCount">0 dues</span>
+                        </div>
+                        <ul id="selectedDuesSummary">
+                            <li>No dues selected</li>
+                        </ul>
+                    </div>
+
+                    <div class="balance-box">
+                        <div class="balance-row primary">
+                            <span>Selected Dues</span>
+                            <strong id="selectedPayableAmount">₹0</strong>
+                        </div>
+
+                        <div class="balance-row">
+                            <span>Concession Applied</span>
+                            <strong id="concessionAppliedAmount">₹0</strong>
+                        </div>
+
+                        <div class="balance-row success" id="advanceUsedRow">
+                            <span>Advance Adjusted</span>
+                            <strong id="advanceUsedAmount">₹0</strong>
+                        </div>
+
+                        <div class="balance-row">
+                            <span>Paying Now (Cash / Bank)</span>
+                            <strong id="payingNowAmount">₹0</strong>
+                        </div>
+
+                        <div class="balance-divider"></div>
+
+                        <div class="balance-row danger" id="remainingBalanceRow">
+                            <span>Remaining Balance</span>
+                            <strong id="remainingBalanceAmount">₹0</strong>
+                        </div>
+
+                        <div class="balance-row success" id="advanceAddedRow">
+                            <span>Advance Added</span>
+                            <strong id="advanceAddedAmount">₹0</strong>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary btn-premium btn-collect w-100 mt-3" id="confirmPaymentBtn">
+                        <i class="bx bx-check-circle me-1"></i>
+                        Confirm &amp; Collect
+                    </button>
+                </div>
+
+                <div class="sticky-collect-bar" id="stickyCollectBar">
+                    <div>
+                        <div class="sticky-amount-label">Paying Now</div>
+                        <div class="sticky-amount-value" id="stickyPayingAmount">₹0</div>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-premium btn-collect" id="stickyCollectBtn">
+                        <i class="bx bx-check-circle me-1"></i>
+                        Confirm &amp; Collect
+                    </button>
                 </div>
             </div>
         </div>
 
-        <div class="main-grid">
-            <div class="erp-panel">
-                <div class="panel-header">
-                    <div class="panel-title">Students</div>
-                    <div class="panel-subtitle">Search and select student ledger</div>
-                </div>
-
-                <div class="panel-body">
-                    <div class="student-filter-row">
-                        <select class="form-select" id="filterClass">
-                            <option>All Classes</option>
-                            <option>1st</option>
-                            <option>4th</option>
-                            <option>9th</option>
-                            <option>10th</option>
-                            <option>11th</option>
-                            <option>12th</option>
-                        </select>
-
-                        <select class="form-select" id="filterSection">
-                            <option>All Sections</option>
-                            <option>A</option>
-                            <option>B</option>
-                            <option>C</option>
-                        </select>
-                    </div>
-
-                    <div class="quick-filter-row">
-                        <button type="button" class="quick-filter active" data-filter="All">All</button>
-                        <button type="button" class="quick-filter" data-filter="Pending">Pending</button>
-                        <button type="button" class="quick-filter" data-filter="Overdue">Overdue</button>
-                        <button type="button" class="quick-filter" data-filter="Paid">Paid</button>
-                    </div>
-
-                    <div class="search-wrap">
-                        <i class="bx bx-search"></i>
-                        <input class="form-control" id="studentSearch" placeholder="Search name, admission no...">
-                    </div>
-
-                    <div class="student-list" id="studentList"></div>
-                </div>
-            </div>
-
-            <div class="erp-panel">
-                <div class="collection-hero">
-                    <div class="selected-student">
-                        <div class="student-avatar" id="selectedAvatar">--</div>
-
-                        <div class="flex-grow-1">
-                            <div class="selected-name" id="selectedName">Select Student</div>
-                            <div class="selected-info" id="selectedInfo">Student details will appear here</div>
-                        </div>
-
-                        <span class="history-chip">Active</span>
-                    </div>
-
-                    <div class="ledger-summary">
-                        <div class="ledger-box">
-                            <div class="ledger-label">Total Ledger Charges</div>
-                            <div class="ledger-value" id="totalLedgerCharges">₹0</div>
-                        </div>
-
-                        <div class="ledger-box">
-                            <div class="ledger-label">Paid So Far</div>
-                            <div class="ledger-value success" id="paidSoFar">₹0</div>
-                        </div>
-
-                        <div class="ledger-box">
-                            <div class="ledger-label">Pending Due</div>
-                            <div class="ledger-value danger" id="pendingDue">₹0</div>
-                        </div>
-
-                        <div class="ledger-box">
-                            <div class="ledger-label">Advance Balance</div>
-                            <div class="ledger-value success" id="advanceBalance">₹0</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="collection-body">
-                    <div class="section-heading">
-                        <span>Pending Ledger Dues</span>
-
-                        <div class="d-flex gap-2 flex-wrap">
-                            <button type="button" class="btn btn-sm btn-outline-secondary btn-premium" id="openGlobalConcessionBtn">
-                                <i class="bx bx-purchase-tag-alt me-1"></i>
-                                Apply Concession
-                            </button>
-
-                            <button type="button" class="btn btn-sm btn-outline-primary btn-premium" data-bs-toggle="modal" data-bs-target="#extraChargeModal">
-                                <i class="bx bx-plus me-1"></i>
-                                Add Extra Charge
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="due-list" id="dueList"></div>
-
-                    <div class="payment-card">
-                        <div class="section-heading mb-3">
-                            <span>
-                                <span id="paymentSectionTitle">Collect Payment</span>
-                                <span class="collection-mode-pill ms-2" id="collectionModePill">
-                                    <i class="bx bx-list-check"></i>
-                                    Selected Dues
-                                </span>
-                            </span>
-
-                            <span class="section-note">Payment date will use server timestamp</span>
-                        </div>
-
-                        <input type="hidden" id="collectionType" value="Fee Collection">
-
-                        <div class="soft-info-box no-due-info-box" id="noDueInfoBox">
-                            <i class="bx bx-info-circle me-1"></i>
-                            No dues selected. Payment will be treated as advance payment.
-                        </div>
-
-                        <div class="soft-info-box partial-info-box" id="partialInfoBox">
-                            <i class="bx bx-info-circle me-1"></i>
-                            Entered amount is less than selected dues. This will be recorded as a partial payment.
-                        </div>
-
-                        <div class="soft-info-box advance-info-box" id="advanceInfoBox">
-                            <i class="bx bx-check-circle me-1"></i>
-                            Extra amount will be stored as student advance balance and can be adjusted in future dues.
-                        </div>
-
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label required">Amount</label>
-                                <div class="amount-input-group">
-                                    <span class="amount-prefix">₹</span>
-                                    <input type="number" class="form-control amount-input" id="paymentAmount" min="0">
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label required">Payment Mode</label>
-                                <select class="form-select" id="paymentMode">
-                                    <option>Cash</option>
-                                    <option>UPI</option>
-                                    <option>Card</option>
-                                    <option>Bank Transfer</option>
-                                    <option>Cheque</option>
-                                </select>
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label">Reference No</label>
-                                <input class="form-control" id="paymentReferenceNo" placeholder="UPI / cheque / bank ref">
-                            </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label">Remarks</label>
-                                <input class="form-control" id="paymentRemarks" placeholder="Optional note for receipt">
-                            </div>
-                        </div>
-
-                        <div class="selected-dues-box">
-                            <div class="d-flex justify-content-between gap-2">
-                                <span class="section-note fw-bold">Collecting Against</span>
-                                <span class="section-note" id="selectedDueCount">0 dues</span>
-                            </div>
-                            <ul id="selectedDuesSummary">
-                                <li>No dues selected</li>
-                            </ul>
-                        </div>
-
-                        <div class="balance-box">
-                            <div class="balance-row primary">
-                                <span>Selected Dues</span>
-                                <strong id="selectedPayableAmount">₹0</strong>
-                            </div>
-
-                            <div class="balance-row">
-                                <span>Concession Applied</span>
-                                <strong id="concessionAppliedAmount">₹0</strong>
-                            </div>
-
-                            <div class="balance-row">
-                                <span>Paying Now</span>
-                                <strong id="payingNowAmount">₹0</strong>
-                            </div>
-
-                            <div class="balance-row danger" id="remainingBalanceRow">
-                                <span>Remaining Balance</span>
-                                <strong id="remainingBalanceAmount">₹0</strong>
-                            </div>
-
-                            <div class="balance-row success" id="advanceAddedRow">
-                                <span>Advance Added</span>
-                                <strong id="advanceAddedAmount">₹0</strong>
-                            </div>
-                        </div>
-
-                        <button type="button" class="btn btn-primary btn-premium w-100 mt-3" id="confirmPaymentBtn">
-                            <i class="bx bx-check-circle me-1"></i>
-                            Confirm Payment
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="erp-panel history-panel">
-                <div class="panel-header">
+        <!-- ════════════ RIGHT: HISTORY ════════════ -->
+        <div class="erp-panel history-panel">
+            <div class="panel-header">
+                <div>
                     <div class="panel-title">Transaction History</div>
                     <div class="panel-subtitle">Receipts, print, WhatsApp and download</div>
                 </div>
+                <span class="panel-count" id="historyCount">0</span>
+            </div>
 
-                <div class="panel-body">
-                    <div class="history-list" id="historyList"></div>
+            <div class="panel-body">
+                <div class="search-wrap">
+                    <i class="bx bx-search"></i>
+                    <input class="form-control" id="historySearch" placeholder="Search receipt no, mode...">
                 </div>
+
+                <div class="history-list" id="historyList"></div>
             </div>
         </div>
     </div>
@@ -1195,6 +1721,7 @@
 </div><!-- ec-page-shell -->
 </div><!-- container-fluid -->
 
+<!-- ════════════ MODAL: EXTRA CHARGE ════════════ -->
 <div class="modal fade" id="extraChargeModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -1247,6 +1774,7 @@
     </div>
 </div>
 
+<!-- ════════════ MODAL: CONCESSION ════════════ -->
 <div class="modal fade" id="concessionModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -1311,6 +1839,7 @@
     </div>
 </div>
 
+<!-- ════════════ MODAL: PAYMENT CONFIRM ════════════ -->
 <div class="modal fade" id="paymentConfirmModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -1327,6 +1856,10 @@
                     <div class="confirm-row">
                         <span>Collected Amount</span>
                         <strong id="confirmCollectedAmount">₹0</strong>
+                    </div>
+                    <div class="confirm-row success">
+                        <span>Advance Adjusted</span>
+                        <strong id="confirmAdvanceUsed">₹0</strong>
                     </div>
                     <div class="confirm-row primary">
                         <span>Adjusted Against Dues</span>
@@ -1349,7 +1882,139 @@
                 <button type="button" class="btn btn-outline-secondary btn-premium" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary btn-premium" id="finalConfirmPaymentBtn">
                     <i class="bx bx-check-circle me-1"></i>
-                    Confirm & Collect
+                    Confirm &amp; Collect
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════ MODAL: RECEIPT PREVIEW ════════════ -->
+<div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1">Fee Receipt</h5>
+                    <small class="text-muted" id="receiptModalSubtitle">Print, share on WhatsApp or save as PDF.</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="receipt-paper" id="receiptPaper"></div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-premium" id="receiptWhatsAppBtn">
+                    <i class="bx bxl-whatsapp me-1"></i> WhatsApp
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-premium" id="receiptDownloadBtn">
+                    <i class="bx bx-download me-1"></i> Save PDF
+                </button>
+                <button type="button" class="btn btn-primary btn-premium" id="receiptPrintBtn">
+                    <i class="bx bx-printer me-1"></i> Print
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════ MODAL: VOID RECEIPT ════════════ -->
+<div class="modal fade" id="voidReceiptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1">Void Receipt</h5>
+                    <small class="text-muted">Reverses the payment allocation. This cannot be undone.</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="confirm-summary">
+                    <div class="confirm-row">
+                        <span>Receipt No</span>
+                        <strong id="voidReceiptNo">—</strong>
+                    </div>
+                    <div class="confirm-row danger">
+                        <span>Amount to Reverse</span>
+                        <strong id="voidReceiptAmount">₹0</strong>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <label class="form-label required">Reason for Voiding</label>
+                    <textarea class="form-control" id="voidReason" rows="2" placeholder="e.g. wrong amount entered, duplicate entry"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-premium" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger btn-premium" id="confirmVoidBtn">
+                    <i class="bx bx-x-circle me-1"></i>
+                    Void Receipt
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════ MODAL: DAY-END / COUNTER CLOSE SUMMARY ════════════ -->
+<div class="modal fade" id="dayEndModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1">Day-End Collection Summary</h5>
+                    <small class="text-muted" id="dayEndSubtitle">Today's collection grouped by payment mode — for counter reconciliation.</small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="daysum-total">
+                    <div class="daysum-box primary">
+                        <div class="label">Total Collected</div>
+                        <div class="value" id="dayEndTotal">₹0</div>
+                    </div>
+                    <div class="daysum-box">
+                        <div class="label">Receipts</div>
+                        <div class="value" id="dayEndCount">0</div>
+                    </div>
+                    <div class="daysum-box success">
+                        <div class="label">Cash In Hand</div>
+                        <div class="value" id="dayEndCash">₹0</div>
+                    </div>
+                </div>
+
+                <table class="daysum-table">
+                    <thead>
+                        <tr>
+                            <th>Payment Mode</th>
+                            <th class="num">Receipts</th>
+                            <th class="num">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dayEndModeRows"></tbody>
+                    <tfoot>
+                        <tr>
+                            <td>Total</td>
+                            <td class="num" id="dayEndFootCount">0</td>
+                            <td class="num" id="dayEndFootAmount">₹0</td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="confirm-note" id="dayEndNote">No collection recorded today yet.</div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-premium" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary btn-premium" id="dayEndPrintBtn">
+                    <i class="bx bx-printer me-1"></i>
+                    Print Summary
                 </button>
             </div>
         </div>
@@ -1367,6 +2032,7 @@
                 preventDuplicates: true
             };
 
+            /* ═══════════════════ MOCK DATA (replace with API) ═══════════════════ */
             const students = [
                 {
                     id: 1,
@@ -1375,12 +2041,12 @@
                     section: "A",
                     admissionNo: "ADM20260314001",
                     parent: "Rajesh ji",
+                    parentMobile: "9876543210",
                     lastPaymentDate: "12 Feb 2026",
-                    avatar: "VJ",
                     advanceBalance: 0,
                     ledger: [
-                        { id: 101, feeHead: "Tuition Fee", period: "March 2026", cycle: "Monthly", type: "Mandatory", dueDate: "10 Mar 2026", originalAmount: 1600, concessionAmount: 0, paidAmount: 0, status: "Overdue", source: "Monthly Scheduler" },
-                        { id: 102, feeHead: "Exam Fee", period: "2026-27", cycle: "Yearly", type: "Mandatory", dueDate: "15 Mar 2026", originalAmount: 800, concessionAmount: 0, paidAmount: 0, status: "Pending", source: "Fee Structure" }
+                        { id: 101, feeHead: "Tuition Fee", period: "March 2026", cycle: "Monthly", type: "Mandatory", dueDate: "10 Mar 2026", originalAmount: 1600, concessionAmount: 0, paidAmount: 0, source: "Monthly Scheduler" },
+                        { id: 102, feeHead: "Exam Fee", period: "2026-27", cycle: "Yearly", type: "Mandatory", dueDate: "15 Mar 2026", originalAmount: 800, concessionAmount: 0, paidAmount: 0, source: "Fee Structure" }
                     ],
                     history: [
                         { receiptNo: "RCPT-2026-0008", amount: 3000, mode: "Cash", date: "12 Feb 2026", desc: "Tuition Fee - February", allocations: ["Tuition Fee - February 2026"] },
@@ -1394,13 +2060,13 @@
                     section: "B",
                     admissionNo: "ADM20260207004",
                     parent: "Bhukal Verma",
+                    parentMobile: "9876500011",
                     lastPaymentDate: "05 Mar 2026",
-                    avatar: "AV",
                     advanceBalance: 0,
                     ledger: [
-                        { id: 201, feeHead: "Tuition Fee", period: "March 2026", cycle: "Monthly", type: "Mandatory", dueDate: "10 Mar 2026", originalAmount: 2500, concessionAmount: 0, paidAmount: 0, status: "Overdue", source: "Monthly Scheduler" },
-                        { id: 202, feeHead: "Transport Fee", period: "March 2026", cycle: "Monthly", type: "Optional", dueDate: "10 Mar 2026", originalAmount: 1200, concessionAmount: 0, paidAmount: 0, status: "Overdue", source: "Monthly Scheduler" },
-                        { id: 203, feeHead: "Activity Fee", period: "2026-27", cycle: "Yearly", type: "Optional", dueDate: "20 Mar 2026", originalAmount: 774, concessionAmount: 0, paidAmount: 0, status: "Pending", source: "Fee Structure" }
+                        { id: 201, feeHead: "Tuition Fee", period: "March 2026", cycle: "Monthly", type: "Mandatory", dueDate: "10 Mar 2026", originalAmount: 2500, concessionAmount: 0, paidAmount: 0, source: "Monthly Scheduler" },
+                        { id: 202, feeHead: "Transport Fee", period: "March 2026", cycle: "Monthly", type: "Optional", dueDate: "10 Mar 2026", originalAmount: 1200, concessionAmount: 0, paidAmount: 0, source: "Monthly Scheduler" },
+                        { id: 203, feeHead: "Activity Fee", period: "2026-27", cycle: "Yearly", type: "Optional", dueDate: "20 Mar 2026", originalAmount: 774, concessionAmount: 0, paidAmount: 0, source: "Fee Structure" }
                     ],
                     history: [
                         { receiptNo: "RCPT-2026-0019", amount: 5500, mode: "Cash", date: "12 Feb 2026", desc: "Admission + Exam Fee", allocations: ["Admission Fee", "Exam Fee"] },
@@ -1416,13 +2082,13 @@
                     section: "A",
                     admissionNo: "ADM20260207003",
                     parent: "Mahesh Gupta",
+                    parentMobile: "9876500022",
                     lastPaymentDate: "15 Feb 2026",
-                    avatar: "SG",
                     advanceBalance: 4000,
                     ledger: [
-                        { id: 301, feeHead: "Board Fee", period: "2026-27", cycle: "Yearly", type: "Mandatory", dueDate: "01 Mar 2026", originalAmount: 2500, concessionAmount: 500, paidAmount: 0, status: "Overdue", source: "Fee Structure" },
-                        { id: 302, feeHead: "Tuition Fee", period: "March 2026", cycle: "Monthly", type: "Mandatory", dueDate: "10 Mar 2026", originalAmount: 3200, concessionAmount: 0, paidAmount: 1200, status: "Partial", source: "Monthly Scheduler" },
-                        { id: 303, feeHead: "Exam Fee", period: "2026-27", cycle: "Yearly", type: "Mandatory", dueDate: "15 Mar 2026", originalAmount: 2600, concessionAmount: 0, paidAmount: 0, status: "Pending", source: "Fee Structure" }
+                        { id: 301, feeHead: "Board Fee", period: "2026-27", cycle: "Yearly", type: "Mandatory", dueDate: "01 Mar 2026", originalAmount: 2500, concessionAmount: 500, paidAmount: 0, source: "Fee Structure" },
+                        { id: 302, feeHead: "Tuition Fee", period: "March 2026", cycle: "Monthly", type: "Mandatory", dueDate: "10 Mar 2026", originalAmount: 3200, concessionAmount: 0, paidAmount: 1200, source: "Monthly Scheduler" },
+                        { id: 303, feeHead: "Exam Fee", period: "2026-27", cycle: "Yearly", type: "Mandatory", dueDate: "15 Mar 2026", originalAmount: 2600, concessionAmount: 0, paidAmount: 0, source: "Fee Structure" }
                     ],
                     history: [
                         { receiptNo: "RCPT-2026-0011", amount: 6000, mode: "Cash", date: "15 Feb 2026", desc: "Admission Fee", allocations: ["Admission Fee"] },
@@ -1436,12 +2102,12 @@
                     section: "A",
                     admissionNo: "ADM20260207002",
                     parent: "Ramesh Sherma",
+                    parentMobile: "9876500033",
                     lastPaymentDate: "08 Feb 2026",
-                    avatar: "DS",
                     advanceBalance: 0,
                     ledger: [
-                        { id: 401, feeHead: "Lab Fee", period: "2026-27", cycle: "Yearly", type: "Mandatory", dueDate: "05 Mar 2026", originalAmount: 3000, concessionAmount: 0, paidAmount: 3000, status: "Paid", source: "Fee Structure" },
-                        { id: 402, feeHead: "Tuition Fee", period: "March 2026", cycle: "Monthly", type: "Mandatory", dueDate: "10 Mar 2026", originalAmount: 3900, concessionAmount: 0, paidAmount: 0, status: "Pending", source: "Monthly Scheduler" }
+                        { id: 401, feeHead: "Lab Fee", period: "2026-27", cycle: "Yearly", type: "Mandatory", dueDate: "05 Mar 2026", originalAmount: 3000, concessionAmount: 0, paidAmount: 3000, source: "Fee Structure" },
+                        { id: 402, feeHead: "Tuition Fee", period: "March 2026", cycle: "Monthly", type: "Mandatory", dueDate: "10 Mar 2026", originalAmount: 3900, concessionAmount: 0, paidAmount: 0, source: "Monthly Scheduler" }
                     ],
                     history: [
                         { receiptNo: "RCPT-2026-0009", amount: 3900, mode: "Cash", date: "08 Feb 2026", desc: "Tuition Fee - February", allocations: ["Tuition Fee - February 2026"] }
@@ -1449,87 +2115,203 @@
                 }
             ];
 
+            /* ═══════════════════ STATE ═══════════════════ */
+            const schoolName = "EduCore Public School";
+            const avatarPalette = [
+                "linear-gradient(135deg, #ffb45c, #ff8a00)",
+                "linear-gradient(135deg, #54dceb, #00bad1)",
+                "linear-gradient(135deg, #5be49b, #28c76f)",
+                "linear-gradient(135deg, #a78bfa, #7c3aed)",
+                "linear-gradient(135deg, #f58e8f, #ea5455)"
+            ];
+
             let selectedStudentId = 2;
             let activeDueFilter = "All";
             let receiptCounter = 25;
-            let collectionType = "Fee Collection";
+            let paymentMode = "Cash";
             let pendingPaymentContext = null;
+            let activeReceipt = null;      // { student, item } shown in receipt modal
+            let voidTarget = null;         // { student, item } pending void
 
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            /* Snapshot opening paid amounts so "Paid So Far" never double counts
+               new receipts (a new payment updates both ledger and history). */
+            students.forEach(function (student) {
+                student.openingPaid = student.ledger.reduce(function (sum, due) {
+                    return sum + Number(due.paidAmount || 0);
+                }, 0);
+            });
+
+            /* ═══════════════════ HELPERS ═══════════════════ */
             function formatINR(amount) {
                 return "₹" + Number(amount || 0).toLocaleString("en-IN");
             }
 
+            function formatDate(date) {
+                return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+            }
+
+            function escapeHtml(value) {
+                return String(value == null ? "" : value)
+                    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+            }
+
             function balanceOf(due) {
-                return Math.max(
-                    0,
-                    Number(due.originalAmount || 0) -
-                    Number(due.concessionAmount || 0) -
-                    Number(due.paidAmount || 0)
-                );
+                return Math.max(0, Number(due.originalAmount || 0) - Number(due.concessionAmount || 0) - Number(due.paidAmount || 0));
             }
 
-            function concessionOf(due) {
-                return Number(due.concessionAmount || 0);
+            function daysOverdue(due) {
+                const dueDate = new Date(due.dueDate);
+                if (isNaN(dueDate)) return 0;
+                dueDate.setHours(0, 0, 0, 0);
+                return Math.floor((today - dueDate) / 86400000);
             }
 
-            function getSelectedStudent() {
-                return students.find(x => x.id === selectedStudentId) || students[0];
-            }
-
-            function studentPending(student) {
-                return student.ledger.reduce((sum, due) => sum + balanceOf(due), 0);
-            }
-
-            function studentPaid(student) {
-                return student.ledger.reduce((sum, due) => sum + Number(due.paidAmount || 0), 0) +
-                    student.history.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-            }
-
-            function studentTotalLedger(student) {
-                return student.ledger.reduce((sum, due) => sum + Number(due.originalAmount || 0), 0);
-            }
-
-            function getStudentStatus(student) {
-                const pending = studentPending(student);
-                const hasOverdue = student.ledger.some(due => balanceOf(due) > 0 && due.status === "Overdue");
-
-                if (pending <= 0) return "Paid";
-                if (hasOverdue) return "Overdue";
+            /* Status is computed live from balance, payments and due date —
+               never stored, so it can never go stale. */
+            function statusOf(due) {
+                if (balanceOf(due) <= 0) return "Paid";
+                if (Number(due.paidAmount || 0) > 0 || Number(due.concessionAmount || 0) > 0) return "Partial";
+                if (daysOverdue(due) > 0) return "Overdue";
                 return "Pending";
             }
 
-            function refreshDueStatus(due) {
-                if (balanceOf(due) <= 0) {
-                    due.status = "Paid";
-                } else if (Number(due.paidAmount || 0) > 0 || Number(due.concessionAmount || 0) > 0) {
-                    due.status = "Partial";
-                } else if (due.status !== "Overdue") {
-                    due.status = "Pending";
-                }
+            function getSelectedStudent() {
+                return students.find(function (x) { return x.id === selectedStudentId; }) || students[0];
+            }
+
+            function studentPending(student) {
+                return student.ledger.reduce(function (sum, due) { return sum + balanceOf(due); }, 0);
+            }
+
+            function receiptsOf(student) {
+                return student.history.filter(function (item) { return item.receiptNo && !item.voided; });
+            }
+
+            /* Money actually received = opening ledger payments + live receipts. */
+            function studentPaid(student) {
+                return student.openingPaid + receiptsOf(student).reduce(function (sum, item) {
+                    return sum + Number(item.amount || 0);
+                }, 0);
+            }
+
+            function studentTotalLedger(student) {
+                return student.ledger.reduce(function (sum, due) { return sum + Number(due.originalAmount || 0); }, 0);
+            }
+
+            function getStudentStatus(student) {
+                if (studentPending(student) <= 0) return "Paid";
+                const hasOverdue = student.ledger.some(function (due) {
+                    return balanceOf(due) > 0 && daysOverdue(due) > 0;
+                });
+                return hasOverdue ? "Overdue" : "Pending";
             }
 
             function getSelectedDues() {
-                return getSelectedStudent().ledger.filter(due => due.selected && balanceOf(due) > 0);
+                return getSelectedStudent().ledger.filter(function (due) { return due.selected && balanceOf(due) > 0; });
+            }
+
+            /* Amount the cashier intends to collect against this due in THIS
+               transaction. Defaults to the full balance, but can be reduced
+               per-due via the inline input (clamped to 0..balance). */
+            function payAmountOf(due) {
+                const bal = balanceOf(due);
+                let p = (typeof due.payAmount === "number") ? due.payAmount : bal;
+                if (isNaN(p) || p < 0) p = 0;
+                if (p > bal) p = bal;
+                return p;
             }
 
             function selectedDuesTotal() {
-                return getSelectedDues().reduce((sum, due) => sum + balanceOf(due), 0);
+                return getSelectedDues().reduce(function (sum, due) { return sum + payAmountOf(due); }, 0);
             }
 
             function selectedConcessionTotal() {
-                return getSelectedDues().reduce((sum, due) => sum + concessionOf(due), 0);
+                return getSelectedDues().reduce(function (sum, due) { return sum + Number(due.concessionAmount || 0); }, 0);
+            }
+
+            function avatarOf(student) {
+                const parts = student.name.trim().split(/\s+/);
+                return (parts[0][0] + (parts[1] ? parts[1][0] : "")).toUpperCase();
+            }
+
+            function avatarBg(student) {
+                return avatarPalette[student.id % avatarPalette.length];
+            }
+
+            function pillClassFor(status) {
+                return status === "Overdue" ? "pill-overdue"
+                    : status === "Partial" ? "pill-partial"
+                    : status === "Paid" ? "pill-paid"
+                    : "pill-pending";
+            }
+
+            function modeIcon(mode) {
+                switch (mode) {
+                    case "Cash": return "bx-money";
+                    case "UPI": return "bx-qr-scan";
+                    case "Card": return "bx-credit-card-front";
+                    case "Bank Transfer": return "bx-buildings";
+                    case "Cheque": return "bx-notepad";
+                    default: return "bx-purchase-tag-alt";
+                }
+            }
+
+            /* ═══════════════════ PAYMENT CONTEXT ═══════════════════
+               One source of truth for the whole payment math:
+               advance first (if switched on), then cash; excess cash → advance. */
+            function buildPaymentContext() {
+                const student = getSelectedStudent();
+                const selected = getSelectedDues();
+                const selectedAmount = selectedDuesTotal();
+                const useAdvance = $("#useAdvanceSwitch").is(":checked") && selectedAmount > 0;
+                const advanceUsed = useAdvance ? Math.min(Number(student.advanceBalance || 0), selectedAmount) : 0;
+                const remainingAfterAdvance = selectedAmount - advanceUsed;
+                const amount = Number($("#paymentAmount").val() || 0);
+                const adjustedFromCash = Math.min(amount, remainingAfterAdvance);
+                const advanceAdded = Math.max(0, amount - remainingAfterAdvance);
+                const totalAdjusted = advanceUsed + adjustedFromCash;
+
+                let type = "Fee Collection";
+                if (selectedAmount <= 0 && amount > 0) {
+                    type = "Advance Payment";
+                } else if (amount <= 0 && advanceUsed > 0) {
+                    type = "Advance Adjustment";
+                } else if (totalAdjusted < selectedAmount) {
+                    type = "Partial Payment";
+                } else if (advanceAdded > 0) {
+                    type = "Fee Collection + Advance";
+                }
+
+                return {
+                    selected: selected,
+                    selectedAmount: selectedAmount,
+                    amount: amount,
+                    advanceUsed: advanceUsed,
+                    adjustedFromCash: adjustedFromCash,
+                    totalAdjusted: totalAdjusted,
+                    advanceAdded: advanceAdded,
+                    remaining: Math.max(0, selectedAmount - totalAdjusted),
+                    mode: paymentMode,
+                    referenceNo: ($("#paymentReferenceNo").val() || "").trim(),
+                    remarks: ($("#paymentRemarks").val() || "").trim(),
+                    collectionType: type
+                };
             }
 
             function setCollectionType(type) {
-                collectionType = type;
-                $("#collectionType").val(type);
-
                 const pill = $("#collectionModePill");
                 pill.removeClass("advance partial");
 
                 if (type === "Advance Payment") {
                     $("#paymentSectionTitle").text("Advance Payment");
                     pill.addClass("advance").html('<i class="bx bx-wallet"></i> Advance');
+                } else if (type === "Advance Adjustment") {
+                    $("#paymentSectionTitle").text("Advance Adjustment");
+                    pill.addClass("advance").html('<i class="bx bx-transfer"></i> From Advance');
                 } else if (type === "Partial Payment") {
                     $("#paymentSectionTitle").text("Collect Payment");
                     pill.addClass("partial").html('<i class="bx bx-adjust"></i> Partial');
@@ -1539,51 +2321,92 @@
                 }
             }
 
+            /* ═══════════════════ RENDER: STUDENTS ═══════════════════ */
+            function buildClassSectionFilters() {
+                const classes = [];
+                const sections = [];
+
+                students.forEach(function (student) {
+                    if (classes.indexOf(student.className) < 0) classes.push(student.className);
+                    if (sections.indexOf(student.section) < 0) sections.push(student.section);
+                });
+
+                classes.sort(function (a, b) { return parseInt(a) - parseInt(b); });
+                sections.sort();
+
+                $("#filterClass").html('<option>All Classes</option>' + classes.map(function (c) { return "<option>" + escapeHtml(c) + "</option>"; }).join(""));
+                $("#filterSection").html('<option>All Sections</option>' + sections.map(function (s) { return "<option>" + escapeHtml(s) + "</option>"; }).join(""));
+            }
+
             function renderStudentList() {
                 const selectedClass = $("#filterClass").val();
                 const selectedSection = $("#filterSection").val();
                 const search = ($("#studentSearch").val() || "").toLowerCase();
 
+                const matched = students.filter(function (student) {
+                    const classMatch = selectedClass === "All Classes" || student.className === selectedClass;
+                    const sectionMatch = selectedSection === "All Sections" || student.section === selectedSection;
+                    const searchMatch =
+                        student.name.toLowerCase().indexOf(search) >= 0 ||
+                        student.admissionNo.toLowerCase().indexOf(search) >= 0 ||
+                        (student.parent || "").toLowerCase().indexOf(search) >= 0;
+                    const statusMatch = activeDueFilter === "All" || getStudentStatus(student) === activeDueFilter;
+                    return classMatch && sectionMatch && searchMatch && statusMatch;
+                });
+
                 let html = "";
 
-                students
-                    .filter(student => {
-                        const classMatch = selectedClass === "All Classes" || student.className === selectedClass;
-                        const sectionMatch = selectedSection === "All Sections" || student.section === selectedSection;
-                        const searchMatch = student.name.toLowerCase().includes(search) || student.admissionNo.toLowerCase().includes(search);
-                        const statusMatch = activeDueFilter === "All" || getStudentStatus(student) === activeDueFilter;
+                matched.forEach(function (student) {
+                    const pending = studentPending(student);
+                    const total = studentTotalLedger(student);
+                    const concession = student.ledger.reduce(function (sum, due) { return sum + Number(due.concessionAmount || 0); }, 0);
+                    const settledPct = total > 0 ? Math.min(100, Math.round((total - pending) / total * 100)) : 100;
+                    const status = getStudentStatus(student);
 
-                        return classMatch && sectionMatch && searchMatch && statusMatch;
-                    })
-                    .forEach(student => {
-                        html += `
-                            <div class="student-item ${student.id === selectedStudentId ? "active" : ""}" data-student-id="${student.id}">
-                                <div class="student-name">${student.name}</div>
-                                <div class="student-meta">${student.className} - ${student.section} • ${student.admissionNo}</div>
-                                <div class="student-extra">Last payment: ${student.lastPaymentDate || "No payment"}</div>
-                                <div class="student-extra">Advance: ${formatINR(student.advanceBalance || 0)}</div>
-                                <div class="student-due">Due: ${formatINR(studentPending(student))}</div>
-                            </div>`;
-                    });
+                    html +=
+                        '<div class="student-item ' + (student.id === selectedStudentId ? "active" : "") + '" data-student-id="' + student.id + '">' +
+                            '<div class="student-mini-avatar" style="background:' + avatarBg(student) + '">' + escapeHtml(avatarOf(student)) + '</div>' +
+                            '<div class="flex-grow-1" style="min-width:0">' +
+                                '<div class="d-flex justify-content-between align-items-start gap-2">' +
+                                    '<div class="student-name">' + escapeHtml(student.name) + '</div>' +
+                                    '<span class="pill ' + pillClassFor(status) + '">' + status + '</span>' +
+                                '</div>' +
+                                '<div class="student-meta">' + escapeHtml(student.className) + ' - ' + escapeHtml(student.section) + ' • ' + escapeHtml(student.admissionNo) + '</div>' +
+                                '<div class="student-bottom">' +
+                                    '<span class="student-due ' + (pending <= 0 ? "clear" : "") + '">' +
+                                        (pending <= 0 ? '<i class="bx bx-check-circle"></i> No dues' : 'Due: ' + formatINR(pending)) +
+                                    '</span>' +
+                                    (Number(student.advanceBalance || 0) > 0
+                                        ? '<span class="pill pill-advance"><i class="bx bx-wallet"></i> ' + formatINR(student.advanceBalance) + '</span>'
+                                        : '') +
+                                '</div>' +
+                                '<div class="student-progress"><span style="width:' + settledPct + '%"></span></div>' +
+                            '</div>' +
+                        '</div>';
+                });
 
                 if (!html) {
-                    html = `
-                        <div class="empty-state">
-                            <i class="bx bx-search"></i>
-                            <h6>No students found</h6>
-                            <p>Try another search or filter.</p>
-                        </div>`;
+                    html =
+                        '<div class="empty-state">' +
+                            '<i class="bx bx-search"></i>' +
+                            '<h6>No students found</h6>' +
+                            '<p>Try another search or filter.</p>' +
+                        '</div>';
                 }
 
                 $("#studentList").html(html);
+                $("#studentCount").text(matched.length + " of " + students.length);
             }
 
+            /* ═══════════════════ RENDER: SELECTED STUDENT ═══════════════════ */
             function renderSelectedStudent() {
                 const student = getSelectedStudent();
+                const status = getStudentStatus(student);
 
-                $("#selectedAvatar").text(student.avatar);
+                $("#selectedAvatar").text(avatarOf(student)).css("background", avatarBg(student));
                 $("#selectedName").text(student.name);
-                $("#selectedInfo").text(`Class ${student.className} - ${student.section} • ${student.admissionNo} • Parent: ${student.parent}`);
+                $("#selectedInfo").text("Class " + student.className + " - " + student.section + " • " + student.admissionNo + " • Parent: " + student.parent);
+                $("#selectedStatusPill").attr("class", "pill " + pillClassFor(status)).text(status === "Paid" ? "All Clear" : status);
                 $("#totalLedgerCharges").text(formatINR(studentTotalLedger(student)));
                 $("#paidSoFar").text(formatINR(studentPaid(student)));
                 $("#pendingDue").text(formatINR(studentPending(student)));
@@ -1594,218 +2417,369 @@
                 updatePaymentSummary();
             }
 
+            /* ═══════════════════ RENDER: DUES ═══════════════════ */
             function renderDues() {
                 const student = getSelectedStudent();
                 let html = "";
 
                 student.ledger
-                    .filter(due => balanceOf(due) > 0)
-                    .forEach(due => {
-                        const statusClass = due.status === "Overdue"
-                            ? "status-overdue"
-                            : due.status === "Partial"
-                                ? "status-partial"
-                                : due.status === "Paid"
-                                    ? "status-paid"
-                                    : "status-pending";
-
+                    .filter(function (due) { return balanceOf(due) > 0; })
+                    .sort(function (a, b) { return new Date(a.dueDate) - new Date(b.dueDate); })
+                    .forEach(function (due) {
+                        const status = statusOf(due);
+                        const overdueDays = daysOverdue(due);
                         const isExtra = due.source === "Extra Charge";
+                        const accent = status === "Overdue" ? "acc-overdue" : status === "Partial" ? "acc-partial" : "acc-pending";
 
-                        html += `
-                            <label class="due-item">
-                                <input class="form-check-input due-check" type="checkbox" data-due-id="${due.id}" ${due.selected ? "checked" : ""}>
-                                <div>
-                                    <div class="due-title">${due.feeHead} - ${due.period}</div>
-                                    <div class="due-sub">Due on: ${due.dueDate}</div>
-                                    <div class="due-badges">
-                                        <span class="due-status ${statusClass}">${due.status}</span>
-                                        <span class="due-badge badge-cycle">${due.cycle}</span>
-                                        <span class="due-badge badge-optional">${due.type}</span>
-                                        ${isExtra ? `<span class="due-badge badge-extra">Extra Charge</span>` : ""}
-                                    </div>
-                                </div>
-                                <div class="due-amount">
-                                    ${formatINR(balanceOf(due))}
-                                    <span class="due-small">Original ${formatINR(due.originalAmount)}</span>
-                                    <span class="due-small">Concession ${formatINR(due.concessionAmount || 0)}</span>
-                                    <span class="due-small">Paid ${formatINR(due.paidAmount || 0)}</span>
-                                    <span class="due-small">Balance ${formatINR(balanceOf(due))}</span>
-                                </div>
-                            </label>`;
+                        html +=
+                            '<label class="due-item ' + accent + (due.selected ? " checked" : "") + '">' +
+                                '<input class="form-check-input due-check" type="checkbox" data-due-id="' + due.id + '" ' + (due.selected ? "checked" : "") + '>' +
+                                '<div style="min-width:0">' +
+                                    '<div class="due-title">' + escapeHtml(due.feeHead) + ' - ' + escapeHtml(due.period) + '</div>' +
+                                    '<div class="due-sub">Due on: ' + escapeHtml(due.dueDate) + '</div>' +
+                                    '<div class="due-badges">' +
+                                        '<span class="pill ' + pillClassFor(status) + '">' + status + '</span>' +
+                                        (overdueDays > 0 ? '<span class="pill pill-overdue"><i class="bx bx-time-five"></i> ' + overdueDays + 'd late</span>' : '') +
+                                        '<span class="pill pill-cycle">' + escapeHtml(due.cycle) + '</span>' +
+                                        '<span class="pill pill-neutral">' + escapeHtml(due.type) + '</span>' +
+                                        (isExtra ? '<span class="pill pill-extra">Extra Charge</span>' : '') +
+                                    '</div>' +
+                                '</div>' +
+                                '<div class="due-amount">' +
+                                    formatINR(balanceOf(due)) +
+                                    '<span class="due-small">Original ' + formatINR(due.originalAmount) + '</span>' +
+                                    (Number(due.concessionAmount || 0) > 0 ? '<span class="due-small">Concession ' + formatINR(due.concessionAmount) + '</span>' : '') +
+                                    (Number(due.paidAmount || 0) > 0 ? '<span class="due-small">Paid ' + formatINR(due.paidAmount) + '</span>' : '') +
+                                    (due.selected
+                                        ? '<div class="due-pay-field">' +
+                                            '<span class="due-pay-label">Pay ₹</span>' +
+                                            '<input type="number" class="due-pay-input" data-due-id="' + due.id + '" value="' + payAmountOf(due) + '" min="0" max="' + balanceOf(due) + '">' +
+                                          '</div>'
+                                        : '') +
+                                '</div>' +
+                            '</label>';
                     });
 
                 if (!html) {
-                    html = `
-                        <div class="empty-state">
-                            <i class="bx bx-check-circle"></i>
-                            <h6>No pending dues</h6>
-                            <p>This student has no pending fee dues.</p>
-                        </div>`;
+                    html =
+                        '<div class="empty-state">' +
+                            '<i class="bx bx-check-circle"></i>' +
+                            '<h6>No pending dues</h6>' +
+                            '<p>This student has no pending fee dues. Any payment will be saved as advance.</p>' +
+                        '</div>';
                 }
 
                 $("#dueList").html(html);
             }
 
+            /* ═══════════════════ RENDER: HISTORY ═══════════════════ */
             function renderHistory() {
                 const student = getSelectedStudent();
+                const search = ($("#historySearch").val() || "").toLowerCase();
                 let html = "";
+                let count = 0;
 
-                student.history.forEach(item => {
-                    html += `
-                        <div class="history-item">
-                            <div class="history-top">
-                                <div>
-                                    <div class="receipt-no">${item.receiptNo || item.type || "LEDGER"}</div>
-                                    <div class="history-amount">${formatINR(item.amount || item.concessionApplied || 0)}</div>
-                                    <div class="history-mode">${item.mode || item.type || "Ledger"}</div>
-                                </div>
-                                <div class="history-date">${item.date}</div>
-                            </div>
+                student.history.forEach(function (item, index) {
+                    const haystack = ((item.receiptNo || "") + " " + (item.mode || "") + " " + (item.desc || "")).toLowerCase();
+                    if (search && haystack.indexOf(search) < 0) return;
 
-                            <div class="history-desc">${item.desc}</div>
+                    count++;
 
-                            ${item.referenceNo ? `<div class="history-date mt-1">Ref: ${item.referenceNo}</div>` : ""}
-                            ${typeof item.adjustedAgainstDues !== "undefined" ? `<div class="history-date mt-1">Adjusted Against Dues: ${formatINR(item.adjustedAgainstDues)}</div>` : ""}
-                            ${item.advanceAdded ? `<div class="history-date mt-1">Advance Added: ${formatINR(item.advanceAdded)}</div>` : ""}
-                            ${item.concessionApplied ? `<div class="history-date mt-1">Concession Applied: ${formatINR(item.concessionApplied)}</div>` : ""}
+                    const isReceipt = !!item.receiptNo;
+                    const allocations = item.allocations || [];
+                    const allocationHtml = allocations.length
+                        ? allocations.map(function (allocation) {
+                            const label = typeof allocation === "string" ? allocation : allocation.label;
+                            return '<span class="pill pill-cycle me-1 mb-1">' + escapeHtml(label) + '</span>';
+                        }).join("")
+                        : '<span class="pill pill-neutral me-1 mb-1">Advance Balance</span>';
 
-                            <div class="mt-2">
-                                ${(item.allocations || []).length
-                                    ? (item.allocations || []).map(allocation => `<span class="due-badge badge-cycle me-1 mb-1">${typeof allocation === "string" ? allocation : allocation.label}</span>`).join("")
-                                    : `<span class="due-badge badge-optional me-1 mb-1">Advance Balance</span>`}
-                            </div>
-
-                            <div class="history-actions">
-                                <button type="button" class="icon-btn" title="Print"><i class="bx bx-printer"></i></button>
-                                <button type="button" class="icon-btn" title="WhatsApp"><i class="bx bxl-whatsapp"></i></button>
-                                <button type="button" class="icon-btn" title="Download"><i class="bx bx-download"></i></button>
-                            </div>
-                        </div>`;
+                    html +=
+                        '<div class="history-item ' + (item.voided ? "voided" : "") + '" data-history-index="' + index + '">' +
+                            '<div class="history-top">' +
+                                '<div class="d-flex gap-2" style="min-width:0">' +
+                                    '<div class="history-mode-icon"><i class="bx ' + modeIcon(item.mode) + '"></i></div>' +
+                                    '<div style="min-width:0">' +
+                                        '<div class="receipt-no">' + escapeHtml(item.receiptNo || item.type || "LEDGER") +
+                                            (item.voided ? ' <span class="pill pill-void">VOID</span>' : '') +
+                                        '</div>' +
+                                        '<div class="history-amount">' + formatINR(item.amount || item.concessionApplied || 0) + '</div>' +
+                                    '</div>' +
+                                '</div>' +
+                                '<div class="history-date">' + escapeHtml(item.date) + '</div>' +
+                            '</div>' +
+                            '<div class="history-desc">' + escapeHtml(item.desc) + '</div>' +
+                            (item.referenceNo ? '<div class="history-date mt-1">Ref: ' + escapeHtml(item.referenceNo) + '</div>' : '') +
+                            (item.advanceUsed ? '<div class="history-date mt-1">Advance Adjusted: ' + formatINR(item.advanceUsed) + '</div>' : '') +
+                            (typeof item.adjustedAgainstDues !== "undefined" ? '<div class="history-date mt-1">Adjusted Against Dues: ' + formatINR(item.adjustedAgainstDues) + '</div>' : '') +
+                            (item.advanceAdded ? '<div class="history-date mt-1">Advance Added: ' + formatINR(item.advanceAdded) + '</div>' : '') +
+                            (item.concessionApplied ? '<div class="history-date mt-1">Concession Applied: ' + formatINR(item.concessionApplied) + '</div>' : '') +
+                            (item.voided ? '<div class="history-date mt-1">Voided: ' + escapeHtml(item.voidReason || "") + '</div>' : '') +
+                            '<div class="mt-2">' + allocationHtml + '</div>' +
+                            (isReceipt && !item.voided
+                                ? '<div class="history-actions">' +
+                                    '<button type="button" class="icon-btn history-view-btn" title="View / Print Receipt"><i class="bx bx-printer"></i></button>' +
+                                    '<button type="button" class="icon-btn history-whatsapp-btn" title="Share on WhatsApp"><i class="bx bxl-whatsapp"></i></button>' +
+                                    '<button type="button" class="icon-btn history-download-btn" title="Save as PDF"><i class="bx bx-download"></i></button>' +
+                                    (item.canVoid ? '<button type="button" class="icon-btn danger history-void-btn" title="Void Receipt"><i class="bx bx-x-circle"></i></button>' : '') +
+                                  '</div>'
+                                : '') +
+                        '</div>';
                 });
 
                 if (!html) {
-                    html = `
-                        <div class="empty-state">
-                            <i class="bx bx-receipt"></i>
-                            <h6>No payments yet</h6>
-                            <p>Transaction history will appear here.</p>
-                        </div>`;
+                    html =
+                        '<div class="empty-state">' +
+                            '<i class="bx bx-receipt"></i>' +
+                            '<h6>' + (search ? "No matching receipts" : "No payments yet") + '</h6>' +
+                            '<p>' + (search ? "Try another receipt number or mode." : "Transaction history will appear here.") + '</p>' +
+                        '</div>';
                 }
 
                 $("#historyList").html(html);
+                $("#historyCount").text(count);
             }
 
+            /* ═══════════════════ RENDER: PAYMENT SUMMARY ═══════════════════ */
             function updatePaymentSummary() {
+                const student = getSelectedStudent();
                 const selected = getSelectedDues();
                 const selectedAmount = selectedDuesTotal();
-                const concessionAmount = selectedConcessionTotal();
+                const advanceAvailable = Number(student.advanceBalance || 0);
+
+                /* Advance toggle visibility */
+                $("#advanceToggleBox").toggleClass("show", advanceAvailable > 0 && selectedAmount > 0);
+                $("#advanceAvailableLabel").text(formatINR(advanceAvailable));
+                if (!(advanceAvailable > 0 && selectedAmount > 0)) {
+                    $("#useAdvanceSwitch").prop("checked", false);
+                }
+
+                /* Auto-fill the cash amount with whatever is still needed after advance. */
+                const useAdvance = $("#useAdvanceSwitch").is(":checked") && selectedAmount > 0;
+                const advancePreview = useAdvance ? Math.min(advanceAvailable, selectedAmount) : 0;
+                const cashNeeded = Math.max(0, selectedAmount - advancePreview);
 
                 if ($("#paymentAmount").data("auto") !== false && selectedAmount > 0) {
-                    $("#paymentAmount").val(selectedAmount);
+                    $("#paymentAmount").val(cashNeeded > 0 ? cashNeeded : "");
                 }
 
-                const actualPayingNow = Number($("#paymentAmount").val() || 0);
-                const remaining = Math.max(0, selectedAmount - actualPayingNow);
-                const advanceAdded = Math.max(0, actualPayingNow - selectedAmount);
+                const ctx = buildPaymentContext();
+                setCollectionType(ctx.collectionType);
 
-                if (selectedAmount <= 0 && actualPayingNow > 0) {
-                    setCollectionType("Advance Payment");
-                } else if (selectedAmount > 0 && actualPayingNow > 0 && actualPayingNow < selectedAmount) {
-                    setCollectionType("Partial Payment");
-                } else {
-                    setCollectionType("Fee Collection");
-                }
-
-                $("#selectedPayableAmount").text(formatINR(selectedAmount));
-                $("#concessionAppliedAmount").text(formatINR(concessionAmount));
-                $("#payingNowAmount").text(formatINR(actualPayingNow));
-                $("#remainingBalanceAmount").text(formatINR(remaining));
-                $("#advanceAddedAmount").text(formatINR(advanceAdded));
+                $("#selectedPayableAmount").text(formatINR(ctx.selectedAmount));
+                $("#concessionAppliedAmount").text(formatINR(selectedConcessionTotal()));
+                $("#advanceUsedAmount").text(formatINR(ctx.advanceUsed));
+                $("#payingNowAmount").text(formatINR(ctx.amount));
+                $("#remainingBalanceAmount").text(formatINR(ctx.remaining));
+                $("#advanceAddedAmount").text(formatINR(ctx.advanceAdded));
                 $("#selectedDueCount").text(selected.length + (selected.length === 1 ? " due" : " dues"));
 
-                $("#remainingBalanceRow").toggle(selectedAmount > 0);
-                $("#advanceAddedRow").toggle(advanceAdded > 0 || (selectedAmount <= 0 && actualPayingNow > 0));
+                $("#advanceUsedRow").toggle(ctx.advanceUsed > 0);
+                $("#remainingBalanceRow").toggle(ctx.selectedAmount > 0);
+                $("#advanceAddedRow").toggle(ctx.advanceAdded > 0 || (ctx.selectedAmount <= 0 && ctx.amount > 0));
 
-                $("#noDueInfoBox").toggleClass("show", selectedAmount <= 0 && actualPayingNow > 0);
-                $("#partialInfoBox").toggleClass("show", selectedAmount > 0 && actualPayingNow > 0 && actualPayingNow < selectedAmount);
-                $("#advanceInfoBox").toggleClass("show", advanceAdded > 0);
+                $("#noDueInfoBox").toggleClass("show", ctx.selectedAmount <= 0 && ctx.amount > 0);
+                $("#partialInfoBox").toggleClass("show", ctx.selectedAmount > 0 && (ctx.amount > 0 || ctx.advanceUsed > 0) && ctx.totalAdjusted < ctx.selectedAmount);
+                $("#advanceInfoBox").toggleClass("show", ctx.advanceAdded > 0);
+
+                /* Reference no becomes mandatory for non-cash modes. */
+                $("#referenceNoLabel").toggleClass("required", paymentMode !== "Cash");
+
+                /* Sticky collect bar — mirrors the collectable amount, always reachable. */
+                const stickyAmount = ctx.amount > 0 ? ctx.amount : ctx.advanceUsed;
+                $("#stickyPayingAmount").text(formatINR(stickyAmount));
+                $("#stickyCollectBar").toggleClass("show", stickyAmount > 0);
 
                 if (!selected.length) {
                     $("#selectedDuesSummary").html("<li>No dues selected. Payment will be treated as advance payment if amount is entered.</li>");
+                } else {
+                    $("#selectedDuesSummary").html(selected.map(function (due) {
+                        const pay = payAmountOf(due);
+                        const partial = pay < balanceOf(due);
+                        return "<li>" + escapeHtml(due.feeHead) + " - " + escapeHtml(due.period) + " — Paying " + formatINR(pay) +
+                            (partial ? " <span style='color:#168090'>(of " + formatINR(balanceOf(due)) + ")</span>" : "") + "</li>";
+                    }).join(""));
+                }
+            }
+
+            /* ═══════════════════ RENDER: KPI CARDS ═══════════════════ */
+            function updateTopCards() {
+                const todayLabel = formatDate(today);
+                let collectedToday = 0, receiptsTodayCount = 0, totalCollected = 0, pendingDue = 0, advanceHeld = 0, overdueCount = 0;
+
+                students.forEach(function (student) {
+                    receiptsOf(student).forEach(function (item) {
+                        totalCollected += Number(item.amount || 0);
+                        if (item.date === todayLabel) {
+                            collectedToday += Number(item.amount || 0);
+                            receiptsTodayCount++;
+                        }
+                    });
+
+                    pendingDue += studentPending(student);
+                    advanceHeld += Number(student.advanceBalance || 0);
+                    if (getStudentStatus(student) === "Overdue") overdueCount++;
+                });
+
+                $("#collectedToday").text(formatINR(collectedToday));
+                $("#receiptsToday").text(receiptsTodayCount);
+                $("#totalCollected").text(formatINR(totalCollected));
+                $("#totalPendingDue").text(formatINR(pendingDue));
+                $("#overdueStudents").text(overdueCount);
+                $("#totalAdvanceHeld").text(formatINR(advanceHeld));
+            }
+
+            /* ═══════════════════ DAY-END / COUNTER CLOSE ═══════════════════ */
+            function renderDayEndSummary() {
+                const todayLabel = formatDate(today);
+                const modeOrder = ["Cash", "UPI", "Card", "Bank Transfer", "Cheque"];
+                const modes = {};
+                let total = 0, count = 0;
+
+                students.forEach(function (student) {
+                    receiptsOf(student).forEach(function (item) {
+                        if (item.date !== todayLabel) return;
+                        const m = item.mode || "Other";
+                        if (!modes[m]) modes[m] = { count: 0, amount: 0 };
+                        modes[m].count++;
+                        modes[m].amount += Number(item.amount || 0);
+                        total += Number(item.amount || 0);
+                        count++;
+                    });
+                });
+
+                const keys = modeOrder.filter(function (m) { return modes[m]; })
+                    .concat(Object.keys(modes).filter(function (m) { return modeOrder.indexOf(m) < 0; }));
+
+                let rows = "";
+                keys.forEach(function (m) {
+                    rows +=
+                        "<tr>" +
+                            "<td><span class='daysum-mode'><i class='bx " + modeIcon(m) + "'></i> " + escapeHtml(m) + "</span></td>" +
+                            "<td class='num'>" + modes[m].count + "</td>" +
+                            "<td class='num'>" + formatINR(modes[m].amount) + "</td>" +
+                        "</tr>";
+                });
+
+                if (!rows) {
+                    rows = "<tr><td colspan='3' style='text-align:center;color:#8b8175'>No collection today.</td></tr>";
+                }
+
+                const cashAmount = modes["Cash"] ? modes["Cash"].amount : 0;
+
+                $("#dayEndModeRows").html(rows);
+                $("#dayEndTotal").text(formatINR(total));
+                $("#dayEndCount").text(count);
+                $("#dayEndCash").text(formatINR(cashAmount));
+                $("#dayEndFootCount").text(count);
+                $("#dayEndFootAmount").text(formatINR(total));
+                $("#dayEndSubtitle").text("Collection for " + todayLabel + " — grouped by payment mode.");
+                $("#dayEndNote").text(count
+                    ? "Cash drawer should match " + formatINR(cashAmount) + ". Digital modes (UPI / Card / Bank / Cheque) settle to the bank account."
+                    : "No collection recorded today yet.");
+
+                return { total: total, count: count, todayLabel: todayLabel, modes: modes, keys: keys };
+            }
+
+            function printDayEndSummary() {
+                const s = renderDayEndSummary();
+                const win = window.open("", "_blank", "width=720,height=820");
+                if (!win) {
+                    toastr.warning("Pop-up blocked. Please allow pop-ups to print.");
                     return;
                 }
 
-                $("#selectedDuesSummary").html(selected.map(due => `<li>${due.period} ${due.feeHead} - Balance ${formatINR(balanceOf(due))}</li>`).join(""));
+                let rows = "";
+                s.keys.forEach(function (m) {
+                    rows += "<tr><td>" + escapeHtml(m) + "</td><td style='text-align:right'>" + s.modes[m].count + "</td><td style='text-align:right'>" + formatINR(s.modes[m].amount) + "</td></tr>";
+                });
+                if (!rows) {
+                    rows = "<tr><td colspan='3' style='text-align:center'>No collection today.</td></tr>";
+                }
+
+                win.document.write(
+                    "<html><head><title>Day Summary " + escapeHtml(s.todayLabel) + "<\/title>" +
+                    "<style>" +
+                        "body{font-family:Segoe UI,Arial,sans-serif;color:#2b2c40;padding:24px;font-size:13px}" +
+                        "h3{margin:0 0 4px}" +
+                        "table{width:100%;border-collapse:collapse;margin-top:12px}" +
+                        "th,td{border:1px solid #ddd;padding:7px 9px}" +
+                        "th{background:#f7f7f7;text-align:left}" +
+                        "tfoot td{font-weight:700}" +
+                    "<\/style><\/head><body>" +
+                        "<h3>" + escapeHtml(schoolName) + "</h3>" +
+                        "<div>Day-End Collection Summary — " + escapeHtml(s.todayLabel) + "</div>" +
+                        "<table>" +
+                            "<thead><tr><th>Payment Mode</th><th style='text-align:right'>Receipts</th><th style='text-align:right'>Amount</th></tr></thead>" +
+                            "<tbody>" + rows + "</tbody>" +
+                            "<tfoot><tr><td>Total</td><td style='text-align:right'>" + s.count + "</td><td style='text-align:right'>" + formatINR(s.total) + "</td></tr></tfoot>" +
+                        "</table>" +
+                        "<p style='margin-top:28px'>Counter Signature: ____________________</p>" +
+                    "<\/body><\/html>"
+                );
+                win.document.close();
+                win.focus();
+                setTimeout(function () { win.print(); }, 250);
             }
 
-            function updateTopCards() {
-                const collectedMonth = students.reduce((sum, student) => {
-                    return sum + student.history
-                        .filter(item => item.receiptNo)
-                        .reduce((innerSum, item) => innerSum + Number(item.amount || 0), 0);
-                }, 0);
-
-                const pendingDue = students.reduce((sum, student) => sum + studentPending(student), 0);
-
-                $("#collectedToday").text(formatINR(0));
-                $("#collectedMonth").text(formatINR(collectedMonth));
-                $("#totalPendingDue").text(formatINR(pendingDue));
-            }
-
+            /* ═══════════════════ PAYMENT FLOW ═══════════════════ */
             function resetPaymentForm() {
                 setCollectionType("Fee Collection");
-                $("#paymentMode").val("Cash");
+                paymentMode = "Cash";
+                $(".mode-pill").removeClass("active").filter('[data-mode="Cash"]').addClass("active");
                 $("#paymentReferenceNo").val("");
                 $("#paymentRemarks").val("");
+                $("#useAdvanceSwitch").prop("checked", false);
                 $("#paymentAmount").val("").data("auto", true);
                 pendingPaymentContext = null;
                 $("#noDueInfoBox, #advanceInfoBox, #partialInfoBox").removeClass("show");
+                $("#stickyCollectBar").removeClass("show");
             }
 
-            function buildPaymentContext() {
-                const selected = getSelectedDues();
-                const selectedAmount = selectedDuesTotal();
-                const amount = Number($("#paymentAmount").val() || 0);
-                const adjustedAgainstDues = Math.min(amount, selectedAmount);
-                const advanceAdded = Math.max(0, amount - selectedAmount);
-
-                let type = "Fee Collection";
-
-                if (selectedAmount <= 0 && amount > 0) {
-                    type = "Advance Payment";
-                } else if (amount < selectedAmount) {
-                    type = "Partial Payment";
-                } else if (amount > selectedAmount) {
-                    type = "Fee Collection + Advance";
+            function validatePaymentContext(ctx) {
+                if (ctx.amount < 0) {
+                    toastr.error("Amount cannot be negative.");
+                    return false;
                 }
 
-                return {
-                    selected,
-                    selectedAmount,
-                    amount,
-                    adjustedAgainstDues,
-                    advanceAdded,
-                    mode: $("#paymentMode").val(),
-                    referenceNo: $("#paymentReferenceNo").val(),
-                    remarks: $("#paymentRemarks").val(),
-                    collectionType: type
-                };
+                if (ctx.amount <= 0 && ctx.advanceUsed <= 0) {
+                    toastr.error("Enter a payment amount or use advance balance.");
+                    return false;
+                }
+
+                if (ctx.amount > 0 && ctx.mode !== "Cash" && !ctx.referenceNo) {
+                    toastr.error("Reference number is required for " + ctx.mode + " payments.");
+                    $("#paymentReferenceNo").trigger("focus");
+                    return false;
+                }
+
+                return true;
             }
 
             function showPaymentConfirmModal(ctx) {
-                const isAdvance = ctx.selectedAmount <= 0 || ctx.advanceAdded > 0;
-
-                $("#paymentConfirmTitle").text("Confirm Payment");
+                $("#paymentConfirmTitle").text("Confirm " + ctx.collectionType);
                 $("#paymentConfirmSubtitle").text("Review payment allocation before collection.");
                 $("#confirmCollectedAmount").text(formatINR(ctx.amount));
-                $("#confirmAdjustedAmount").text(formatINR(ctx.adjustedAgainstDues));
+                $("#confirmAdvanceUsed").text(formatINR(ctx.advanceUsed));
+                $("#confirmAdjustedAmount").text(formatINR(ctx.totalAdjusted));
                 $("#confirmAdvanceAdded").text(formatINR(ctx.advanceAdded));
                 $("#confirmCollectionType").text(ctx.collectionType);
-                $("#confirmNote").text(
-                    isAdvance
-                        ? "Advance amount will be stored as student advance balance and can be adjusted in future fee dues."
-                        : "Payment will be adjusted against selected dues using oldest due first."
-                );
+
+                let note;
+                if (ctx.collectionType === "Advance Payment") {
+                    note = "No dues selected — full amount will be stored as advance balance and can be adjusted in future fee dues.";
+                } else if (ctx.advanceUsed > 0 && ctx.advanceAdded > 0) {
+                    note = "Advance balance will be adjusted first, then cash. Extra cash returns to advance balance.";
+                } else if (ctx.advanceUsed > 0) {
+                    note = "Advance balance of " + formatINR(ctx.advanceUsed) + " will be consumed against selected dues (oldest first).";
+                } else if (ctx.advanceAdded > 0) {
+                    note = "Extra " + formatINR(ctx.advanceAdded) + " will be stored as advance balance for future dues.";
+                } else if (ctx.collectionType === "Partial Payment") {
+                    note = "Amount is less than selected dues. Payment will be adjusted oldest due first; the rest stays pending.";
+                } else {
+                    note = "Payment will be adjusted against selected dues using oldest due first.";
+                }
+                $("#confirmNote").text(note);
 
                 pendingPaymentContext = ctx;
                 $("#paymentConfirmModal").modal("show");
@@ -1813,71 +2787,220 @@
 
             function processPayment(ctx) {
                 const student = getSelectedStudent();
-                let remaining = Math.min(ctx.amount, ctx.selectedAmount);
+                let remaining = ctx.totalAdjusted;
                 const allocationObjects = [];
 
                 ctx.selected
-                    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
-                    .forEach(due => {
+                    .slice()
+                    .sort(function (a, b) { return new Date(a.dueDate) - new Date(b.dueDate); })
+                    .forEach(function (due) {
                         if (remaining <= 0) return;
 
-                        const before = balanceOf(due);
-                        const applied = Math.min(before, remaining);
-
+                        const applied = Math.min(balanceOf(due), payAmountOf(due), remaining);
                         due.paidAmount = Number(due.paidAmount || 0) + applied;
                         remaining -= applied;
                         due.selected = false;
-
-                        refreshDueStatus(due);
+                        delete due.payAmount;
 
                         allocationObjects.push({
                             ledgerId: due.id,
-                            label: `${due.feeHead} - ${due.period}`,
+                            label: due.feeHead + " - " + due.period,
                             appliedAmount: applied,
-                            concessionAmount: concessionOf(due),
                             balanceAfter: balanceOf(due)
                         });
                     });
 
-                receiptCounter++;
-                student.lastPaymentDate = new Date().toLocaleDateString("en-GB", {
-                    day: "2-digit",
-                    month: "short",
-                    year: "numeric"
-                });
-
+                if (ctx.advanceUsed > 0) {
+                    student.advanceBalance = Math.max(0, Number(student.advanceBalance || 0) - ctx.advanceUsed);
+                }
                 if (ctx.advanceAdded > 0) {
                     student.advanceBalance = Number(student.advanceBalance || 0) + ctx.advanceAdded;
                 }
 
-                const desc = ctx.selectedAmount <= 0
-                    ? "Advance Payment Receipt"
-                    : ctx.amount < ctx.selectedAmount
-                        ? "Partial Payment Receipt"
-                        : ctx.advanceAdded > 0
-                            ? "Fee Collection + Advance Receipt"
-                            : "Fee Collection Receipt";
+                receiptCounter++;
+                const todayLabel = formatDate(today);
+                student.lastPaymentDate = todayLabel;
 
-                student.history.unshift({
+                const desc = ctx.collectionType === "Advance Payment" ? "Advance Payment Receipt"
+                    : ctx.collectionType === "Advance Adjustment" ? "Advance Adjustment Receipt"
+                    : ctx.collectionType === "Partial Payment" ? "Partial Payment Receipt"
+                    : ctx.collectionType === "Fee Collection + Advance" ? "Fee Collection + Advance Receipt"
+                    : "Fee Collection Receipt";
+
+                const receipt = {
                     receiptNo: "RCPT-2026-" + String(receiptCounter).padStart(4, "0"),
                     amount: ctx.amount,
                     mode: ctx.mode,
-                    date: student.lastPaymentDate,
-                    desc: ctx.remarks ? `${desc} - ${ctx.remarks}` : desc,
+                    date: todayLabel,
+                    desc: ctx.remarks ? desc + " - " + ctx.remarks : desc,
                     referenceNo: ctx.referenceNo,
-                    adjustedAgainstDues: ctx.adjustedAgainstDues,
+                    advanceUsed: ctx.advanceUsed,
+                    adjustedAgainstDues: ctx.totalAdjusted,
                     advanceAdded: ctx.advanceAdded,
-                    allocations: allocationObjects
-                });
+                    allocations: allocationObjects,
+                    canVoid: true
+                };
+
+                student.history.unshift(receipt);
 
                 resetPaymentForm();
-                updateTopCards();
-                renderStudentList();
-                renderSelectedStudent();
+                refreshAll();
 
-                toastr.success("Receipt generated — " + ctx.collectionType + " recorded.");
+                toastr.success("Receipt " + receipt.receiptNo + " — " + ctx.collectionType + " recorded.");
+                openReceiptModal(student, receipt);
             }
 
+            /* ═══════════════════ RECEIPT PREVIEW / PRINT ═══════════════════ */
+            function buildReceiptHtml(student, item) {
+                const allocations = item.allocations || [];
+                let rows = "";
+
+                allocations.forEach(function (allocation, i) {
+                    const label = typeof allocation === "string" ? allocation : allocation.label;
+                    const applied = typeof allocation === "string" ? "" : formatINR(allocation.appliedAmount);
+                    const after = (typeof allocation === "string" || typeof allocation.balanceAfter === "undefined") ? "" : formatINR(allocation.balanceAfter);
+
+                    rows +=
+                        "<tr>" +
+                            "<td>" + (i + 1) + "</td>" +
+                            "<td>" + escapeHtml(label) + "</td>" +
+                            "<td style='text-align:right'>" + applied + "</td>" +
+                            "<td style='text-align:right'>" + after + "</td>" +
+                        "</tr>";
+                });
+
+                if (!rows) {
+                    rows = "<tr><td colspan='4' style='text-align:center'>Stored as advance balance</td></tr>";
+                }
+
+                return (
+                    '<div class="receipt-school">' +
+                        "<h5>" + escapeHtml(schoolName) + "</h5>" +
+                        "<small>Fee Receipt • Session 2026-27</small>" +
+                    "</div>" +
+                    '<div class="receipt-meta">' +
+                        "<div>Receipt No: <strong>" + escapeHtml(item.receiptNo) + "</strong></div>" +
+                        "<div>Date: <strong>" + escapeHtml(item.date) + "</strong></div>" +
+                    "</div>" +
+                    '<div class="receipt-meta">' +
+                        "<div>Student: <strong>" + escapeHtml(student.name) + "</strong> (" + escapeHtml(student.className) + " - " + escapeHtml(student.section) + ")</div>" +
+                        "<div>Adm No: <strong>" + escapeHtml(student.admissionNo) + "</strong></div>" +
+                    "</div>" +
+                    '<table class="receipt-table">' +
+                        "<thead><tr><th>#</th><th>Fee Head</th><th style='text-align:right'>Adjusted</th><th style='text-align:right'>Balance After</th></tr></thead>" +
+                        "<tbody>" + rows + "</tbody>" +
+                    "</table>" +
+                    '<div class="receipt-totals">' +
+                        (item.advanceUsed ? "<div>Advance Adjusted: " + formatINR(item.advanceUsed) + "</div>" : "") +
+                        "<div>Amount Collected (" + escapeHtml(item.mode || "-") + "): <span style='font-size:1rem'>" + formatINR(item.amount) + "</span></div>" +
+                        (item.advanceAdded ? "<div>Advance Added: " + formatINR(item.advanceAdded) + "</div>" : "") +
+                        (item.referenceNo ? "<div>Ref No: " + escapeHtml(item.referenceNo) + "</div>" : "") +
+                    "</div>" +
+                    '<div class="receipt-foot">' +
+                        "<span>Parent: " + escapeHtml(student.parent || "-") + "</span>" +
+                        "<span>Authorised Signatory</span>" +
+                    "</div>"
+                );
+            }
+
+            function openReceiptModal(student, item) {
+                activeReceipt = { student: student, item: item };
+                $("#receiptModalSubtitle").text(item.receiptNo + " • " + student.name);
+                $("#receiptPaper").html(buildReceiptHtml(student, item));
+                $("#receiptModal").modal("show");
+            }
+
+            function printReceipt(autoPrint) {
+                if (!activeReceipt) return;
+
+                const win = window.open("", "_blank", "width=760,height=900");
+                if (!win) {
+                    toastr.warning("Pop-up blocked. Please allow pop-ups to print receipts.");
+                    return;
+                }
+
+                const copy = function (label) {
+                    return "<div class='receipt-copy'>" +
+                        "<div class='copy-tag'>" + label + "</div>" +
+                        buildReceiptHtml(activeReceipt.student, activeReceipt.item) +
+                    "</div>";
+                };
+
+                win.document.write(
+                    "<html><head><title>" + activeReceipt.item.receiptNo + "<\/title>" +
+                    "<style>" +
+                        "body{font-family:Segoe UI,Arial,sans-serif;color:#2b2c40;padding:24px;font-size:13px}" +
+                        ".receipt-school{text-align:center;border-bottom:2px dashed #ccc;padding-bottom:10px;margin-bottom:10px}" +
+                        ".receipt-school h5{margin:0 0 2px;font-size:18px}" +
+                        ".receipt-meta{display:flex;justify-content:space-between;margin-bottom:10px}" +
+                        ".receipt-table{width:100%;border-collapse:collapse;margin-bottom:10px}" +
+                        ".receipt-table th,.receipt-table td{border:1px solid #ddd;padding:6px 8px;font-size:12px}" +
+                        ".receipt-table th{background:#f7f7f7}" +
+                        ".receipt-totals{text-align:right;font-weight:700}" +
+                        ".receipt-totals div{margin-bottom:3px}" +
+                        ".receipt-foot{border-top:2px dashed #ccc;margin-top:14px;padding-top:10px;display:flex;justify-content:space-between;color:#777;font-size:11px}" +
+                        ".copy-tag{display:inline-block;background:#fff4e6;color:#eb7d00;border:1px solid #ffd9a8;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:8px}" +
+                        ".receipt-copy{page-break-inside:avoid}" +
+                        ".copy-divider{border-top:1px dashed #bbb;margin:20px 0}" +
+                    "<\/style><\/head><body>" +
+                        copy("PARENT COPY") +
+                        "<div class='copy-divider'><\/div>" +
+                        copy("OFFICE COPY") +
+                    "<\/body><\/html>"
+                );
+                win.document.close();
+                win.focus();
+
+                if (autoPrint) {
+                    setTimeout(function () { win.print(); }, 250);
+                }
+            }
+
+            function shareReceiptWhatsApp(student, item) {
+                const text =
+                    schoolName + " - Fee Receipt\n" +
+                    "Receipt: " + item.receiptNo + "\n" +
+                    "Student: " + student.name + " (" + student.className + "-" + student.section + ")\n" +
+                    "Amount: " + formatINR(item.amount) + " via " + (item.mode || "-") + "\n" +
+                    "Date: " + item.date + "\n" +
+                    "Pending Due: " + formatINR(studentPending(student));
+
+                const phone = (student.parentMobile || "").replace(/\D/g, "");
+                const url = phone
+                    ? "https://wa.me/91" + phone + "?text=" + encodeURIComponent(text)
+                    : "https://wa.me/?text=" + encodeURIComponent(text);
+
+                window.open(url, "_blank");
+            }
+
+            /* ═══════════════════ VOID RECEIPT ═══════════════════ */
+            function voidReceipt(student, item, reason) {
+                (item.allocations || []).forEach(function (allocation) {
+                    if (typeof allocation === "string" || !allocation.ledgerId) return;
+
+                    const due = student.ledger.find(function (row) { return row.id === allocation.ledgerId; });
+                    if (due) {
+                        due.paidAmount = Math.max(0, Number(due.paidAmount || 0) - Number(allocation.appliedAmount || 0));
+                    }
+                });
+
+                /* Return consumed advance, remove added advance. */
+                if (item.advanceUsed) {
+                    student.advanceBalance = Number(student.advanceBalance || 0) + Number(item.advanceUsed);
+                }
+                if (item.advanceAdded) {
+                    student.advanceBalance = Math.max(0, Number(student.advanceBalance || 0) - Number(item.advanceAdded));
+                }
+
+                item.voided = true;
+                item.canVoid = false;
+                item.voidReason = reason;
+
+                refreshAll();
+                toastr.success("Receipt " + item.receiptNo + " voided and allocations reversed.");
+            }
+
+            /* ═══════════════════ CONCESSION ═══════════════════ */
             function updateConcessionPreview() {
                 const selectedAmount = selectedDuesTotal();
                 const enteredAmount = Number($("#concessionAmount").val() || 0);
@@ -1890,9 +3013,18 @@
                 return concession;
             }
 
+            function refreshAll() {
+                updateTopCards();
+                renderStudentList();
+                renderSelectedStudent();
+            }
+
+            /* ═══════════════════ EVENTS ═══════════════════ */
             $(document).on("click", ".student-item", function () {
                 selectedStudentId = Number($(this).data("student-id"));
+                getSelectedStudent().ledger.forEach(function (due) { due.selected = false; delete due.payAmount; });
                 resetPaymentForm();
+                $("#historySearch").val("");
                 renderStudentList();
                 renderSelectedStudent();
             });
@@ -1906,28 +3038,112 @@
 
             $(document).on("change", ".due-check", function () {
                 const dueId = Number($(this).data("due-id"));
-                const due = getSelectedStudent().ledger.find(item => item.id === dueId);
+                const due = getSelectedStudent().ledger.find(function (item) { return item.id === dueId; });
 
                 if (due) {
                     due.selected = $(this).is(":checked");
+                    if (due.selected) {
+                        due.payAmount = balanceOf(due);
+                    } else {
+                        delete due.payAmount;
+                    }
                 }
+
+                $("#paymentAmount").data("auto", true);
+                renderDues();
+                updatePaymentSummary();
+            });
+
+            /* Per-due amount — lets the cashier pay a specific amount against a
+               specific fee head instead of the default oldest-first split. */
+            $(document).on("input", ".due-pay-input", function () {
+                const dueId = Number($(this).data("due-id"));
+                const due = getSelectedStudent().ledger.find(function (item) { return item.id === dueId; });
+                if (!due) return;
+
+                const bal = balanceOf(due);
+                let val = Number($(this).val());
+                if (isNaN(val) || val < 0) val = 0;
+                if (val > bal) { val = bal; $(this).val(bal); }
+                due.payAmount = val;
 
                 $("#paymentAmount").data("auto", true);
                 updatePaymentSummary();
             });
 
+            $("#selectAllDuesBtn").on("click", function () {
+                const student = getSelectedStudent();
+                let any = false;
+
+                student.ledger.forEach(function (due) {
+                    if (balanceOf(due) > 0) {
+                        due.selected = true;
+                        due.payAmount = balanceOf(due);
+                        any = true;
+                    }
+                });
+
+                if (!any) {
+                    toastr.info("No pending dues to select.");
+                    return;
+                }
+
+                $("#paymentAmount").data("auto", true);
+                renderDues();
+                updatePaymentSummary();
+            });
+
+            $("#clearDuesBtn").on("click", function () {
+                getSelectedStudent().ledger.forEach(function (due) { due.selected = false; delete due.payAmount; });
+                $("#paymentAmount").data("auto", true);
+                renderDues();
+                updatePaymentSummary();
+            });
+
             $("#filterClass, #filterSection").on("change", renderStudentList);
             $("#studentSearch").on("input", renderStudentList);
+            $("#historySearch").on("input", renderHistory);
+
+            /* "/" anywhere focuses the student search — fast counter workflow. */
+            $(document).on("keydown", function (e) {
+                if (e.key === "/" && !$(e.target).is("input, textarea, select")) {
+                    e.preventDefault();
+                    $("#studentSearch").trigger("focus");
+                }
+            });
+
+            $(document).on("click", ".mode-pill", function () {
+                paymentMode = $(this).data("mode");
+                $(".mode-pill").removeClass("active");
+                $(this).addClass("active");
+                updatePaymentSummary();
+            });
 
             $("#paymentAmount").on("input", function () {
                 $(this).data("auto", false);
                 updatePaymentSummary();
             });
 
-            $("#openGlobalConcessionBtn").on("click", function () {
-                const selected = getSelectedDues();
+            $("#useAdvanceSwitch").on("change", function () {
+                $("#paymentAmount").data("auto", true);
+                updatePaymentSummary();
+            });
 
-                if (!selected.length || selectedDuesTotal() <= 0) {
+            $("#confirmPaymentBtn, #stickyCollectBtn").on("click", function () {
+                const ctx = buildPaymentContext();
+                if (!validatePaymentContext(ctx)) return;
+                showPaymentConfirmModal(ctx);
+            });
+
+            $("#finalConfirmPaymentBtn").on("click", function () {
+                if (!pendingPaymentContext) return;
+                $("#paymentConfirmModal").modal("hide");
+                processPayment(pendingPaymentContext);
+            });
+
+            /* ── Concession ── */
+            $("#openGlobalConcessionBtn").on("click", function () {
+                if (!getSelectedDues().length || selectedDuesTotal() <= 0) {
                     toastr.warning("Select at least one due before applying concession.");
                     return;
                 }
@@ -1968,21 +3184,18 @@
                 const allocationObjects = [];
 
                 selected
-                    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
-                    .forEach(due => {
+                    .slice()
+                    .sort(function (a, b) { return new Date(a.dueDate) - new Date(b.dueDate); })
+                    .forEach(function (due) {
                         if (remainingConcession <= 0) return;
 
-                        const before = balanceOf(due);
-                        const applied = Math.min(before, remainingConcession);
-
+                        const applied = Math.min(balanceOf(due), remainingConcession);
                         due.concessionAmount = Number(due.concessionAmount || 0) + applied;
                         remainingConcession -= applied;
 
-                        refreshDueStatus(due);
-
                         allocationObjects.push({
                             ledgerId: due.id,
-                            label: `${due.feeHead} - ${due.period}`,
+                            label: due.feeHead + " - " + due.period,
                             appliedAmount: 0,
                             concessionAmount: applied,
                             balanceAfter: balanceOf(due)
@@ -1993,49 +3206,20 @@
                     type: type,
                     amount: 0,
                     mode: type,
-                    date: new Date().toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric"
-                    }),
-                    desc: `${type} Applied - ${reason}`,
+                    date: formatDate(today),
+                    desc: type + " Applied - " + reason,
                     concessionApplied: amount,
                     allocations: allocationObjects
                 });
 
                 $("#concessionModal").modal("hide");
                 $("#paymentAmount").data("auto", true);
-                updateTopCards();
-                renderStudentList();
-                renderSelectedStudent();
+                refreshAll();
 
                 toastr.success(type + " applied successfully.");
             });
 
-            $("#confirmPaymentBtn").on("click", function () {
-                const amount = Number($("#paymentAmount").val() || 0);
-
-                if (amount <= 0) {
-                    toastr.error("Enter a valid payment amount.");
-                    return;
-                }
-
-                const ctx = buildPaymentContext();
-
-                if (ctx.advanceAdded > 0 || ctx.selectedAmount <= 0) {
-                    showPaymentConfirmModal(ctx);
-                } else {
-                    processPayment(ctx);
-                }
-            });
-
-            $("#finalConfirmPaymentBtn").on("click", function () {
-                if (!pendingPaymentContext) return;
-
-                $("#paymentConfirmModal").modal("hide");
-                processPayment(pendingPaymentContext);
-            });
-
+            /* ── Extra charge ── */
             $("#saveExtraChargeBtn").on("click", function () {
                 const student = getSelectedStudent();
                 const chargeType = $("#extraChargeType").val();
@@ -2053,32 +3237,18 @@
                     return;
                 }
 
-                const dueDate = dueDateRaw
-                    ? new Date(dueDateRaw).toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric"
-                    })
-                    : new Date().toLocaleDateString("en-GB", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric"
-                    });
+                const dueDate = dueDateRaw ? formatDate(new Date(dueDateRaw)) : formatDate(today);
 
                 student.ledger.push({
                     id: Date.now(),
                     feeHead: chargeType,
-                    period: new Date().toLocaleDateString("en-GB", {
-                        month: "long",
-                        year: "numeric"
-                    }),
+                    period: today.toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
                     cycle: "One Time",
                     type: "Manual",
                     dueDate: dueDate,
                     originalAmount: amount,
                     concessionAmount: 0,
                     paidAmount: 0,
-                    status: "Pending",
                     source: "Extra Charge",
                     selected: true,
                     reason: reason
@@ -2090,15 +3260,79 @@
                 $("#extraChargeModal").modal("hide");
 
                 $("#paymentAmount").data("auto", true);
-                updateTopCards();
-                renderStudentList();
-                renderSelectedStudent();
+                refreshAll();
+
+                toastr.success(chargeType + " of " + formatINR(amount) + " added to ledger.");
             });
 
+            /* ── History actions ── */
+            function historyItemFromEvent(el) {
+                const index = Number($(el).closest(".history-item").data("history-index"));
+                const student = getSelectedStudent();
+                return { student: student, item: student.history[index] };
+            }
+
+            $(document).on("click", ".history-view-btn", function () {
+                const target = historyItemFromEvent(this);
+                openReceiptModal(target.student, target.item);
+            });
+
+            $(document).on("click", ".history-whatsapp-btn", function () {
+                const target = historyItemFromEvent(this);
+                shareReceiptWhatsApp(target.student, target.item);
+            });
+
+            $(document).on("click", ".history-download-btn", function () {
+                const target = historyItemFromEvent(this);
+                activeReceipt = target;
+                printReceipt(true);
+                toastr.info("Use 'Save as PDF' as the printer destination to download.");
+            });
+
+            $(document).on("click", ".history-void-btn", function () {
+                voidTarget = historyItemFromEvent(this);
+                $("#voidReceiptNo").text(voidTarget.item.receiptNo);
+                $("#voidReceiptAmount").text(formatINR(voidTarget.item.amount));
+                $("#voidReason").val("");
+                $("#voidReceiptModal").modal("show");
+            });
+
+            $("#confirmVoidBtn").on("click", function () {
+                if (!voidTarget) return;
+
+                const reason = ($("#voidReason").val() || "").trim();
+                if (!reason) {
+                    toastr.error("Reason is required to void a receipt.");
+                    return;
+                }
+
+                $("#voidReceiptModal").modal("hide");
+                voidReceipt(voidTarget.student, voidTarget.item, reason);
+                voidTarget = null;
+            });
+
+            /* ── Receipt modal actions ── */
+            $("#receiptPrintBtn").on("click", function () { printReceipt(true); });
+            $("#receiptDownloadBtn").on("click", function () {
+                printReceipt(true);
+                toastr.info("Use 'Save as PDF' as the printer destination to download.");
+            });
+            $("#receiptWhatsAppBtn").on("click", function () {
+                if (activeReceipt) shareReceiptWhatsApp(activeReceipt.student, activeReceipt.item);
+            });
+
+            /* ── Day-end summary ── */
+            $("#dayEndBtn").on("click", function () {
+                renderDayEndSummary();
+                $("#dayEndModal").modal("show");
+            });
+
+            $("#dayEndPrintBtn").on("click", printDayEndSummary);
+
+            /* ═══════════════════ INIT ═══════════════════ */
+            buildClassSectionFilters();
             resetPaymentForm();
-            updateTopCards();
-            renderStudentList();
-            renderSelectedStudent();
+            refreshAll();
         });
     </script>
 }

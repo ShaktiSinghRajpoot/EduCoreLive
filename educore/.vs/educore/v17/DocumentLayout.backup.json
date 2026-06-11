@@ -3,16 +3,24 @@
   "WorkspaceRootPath": "D:\\Github\\EduCoreLive\\educore\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\erp\\controllers\\feecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\controllers\\feecontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\erp\\views\\fee\\managefee.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\views\\fee\\managefee.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\admin\\views\\schoolsettings\\enquirycrm.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\admin\\views\\schoolsettings\\enquirycrm.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\admin\\controllers\\schoolsettingscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\admin\\controllers\\schoolsettingscontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\admin\\views\\schoolsettings\\enquirycrm.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
-      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\admin\\views\\schoolsettings\\enquirycrm.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelive\\educore\\areas\\admin\\controllers\\enquirycontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -30,7 +38,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 4,
+          "SelectedChildIndex": 5,
           "Children": [
             {
               "$type": "Bookmark",
@@ -50,20 +58,46 @@
             },
             {
               "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "ManageFee.cshtml",
+              "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Views\\Fee\\ManageFee.cshtml",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Views\\Fee\\ManageFee.cshtml",
+              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Views\\Fee\\ManageFee.cshtml",
+              "RelativeToolTip": "Areas\\ERP\\Views\\Fee\\ManageFee.cshtml",
+              "ViewState": "AgIAAKgJAAAAAAAAAAAEwNsJAACHAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-06-11T17:19:59.288Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "FeeController.cs",
+              "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Controllers\\FeeController.cs",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Controllers\\FeeController.cs",
+              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Controllers\\FeeController.cs",
+              "RelativeToolTip": "Areas\\ERP\\Controllers\\FeeController.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAoAAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-06-11T17:19:39.598Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
               "Title": "Program.cs",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Program.cs",
               "RelativeDocumentMoniker": "Program.cs",
-              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Program.cs*",
-              "RelativeToolTip": "Program.cs*",
-              "ViewState": "AgIAAJYAAAAAAAAAAAAYwJsAAAAAAAAAAAAAAA==",
+              "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Program.cs",
+              "RelativeToolTip": "Program.cs",
+              "ViewState": "AgIAAIQAAAAAAAAAAAAAAIMAAAARAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-06-10T16:46:00.605Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
               "Title": "SchoolSettingsController.cs",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
               "RelativeDocumentMoniker": "Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
@@ -71,7 +105,8 @@
               "RelativeToolTip": "Areas\\Admin\\Controllers\\SchoolSettingsController.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAgAAAAdAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-06-10T02:27:06.242Z"
+              "WhenOpened": "2026-06-10T02:27:06.242Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
@@ -81,13 +116,14 @@
               "RelativeDocumentMoniker": "Areas\\Admin\\Views\\SchoolSettings\\EnquiryCRM.cshtml",
               "ToolTip": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Views\\SchoolSettings\\EnquiryCRM.cshtml",
               "RelativeToolTip": "Areas\\Admin\\Views\\SchoolSettings\\EnquiryCRM.cshtml",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAUAAAAEAAAAAAAAAA==",
+              "ViewState": "AgIAAI0DAAAAAAAAAAAAAMIBAAAgAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-06-09T19:36:17.801Z"
+              "WhenOpened": "2026-06-09T19:36:17.801Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 5,
               "Title": "EnquiryController.cs",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\Admin\\Controllers\\EnquiryController.cs",
               "RelativeDocumentMoniker": "Areas\\Admin\\Controllers\\EnquiryController.cs",
@@ -99,7 +135,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 6,
               "Title": "AdmissionController.cs",
               "DocumentMoniker": "D:\\Github\\EduCoreLive\\educore\\Areas\\ERP\\Controllers\\AdmissionController.cs",
               "RelativeDocumentMoniker": "Areas\\ERP\\Controllers\\AdmissionController.cs",
