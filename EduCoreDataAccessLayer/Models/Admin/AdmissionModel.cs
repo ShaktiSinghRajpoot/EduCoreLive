@@ -32,6 +32,28 @@ namespace EduCoreDataAccessLayer.Models.Admin
         public string?   MobileNumber     { get; set; }
         public string?   AlternateMobile  { get; set; }
         public string?   Address          { get; set; }
+        // Identity / demographics
+        public string?   BloodGroup       { get; set; }
+        public string?   Religion         { get; set; }
+        public string?   Category         { get; set; }   // General/OBC/SC/ST/EWS
+        public string?   Nationality      { get; set; }
+        public string?   MotherTongue     { get; set; }
+        public string?   IdProofNo        { get; set; }   // Aadhaar / birth-cert no
+        // Previous school (transfers)
+        public string?   PrevSchoolName   { get; set; }
+        public string?   PrevBoard        { get; set; }
+        public string?   PrevClass        { get; set; }
+        public string?   PrevTcNo         { get; set; }
+        // Parent details (full)
+        public string?   FatherOccupation     { get; set; }
+        public string?   FatherQualification  { get; set; }
+        public string?   FatherEmail          { get; set; }
+        public string?   MotherOccupation     { get; set; }
+        public string?   MotherQualification  { get; set; }
+        public string?   MotherEmail          { get; set; }
+        public decimal?  AnnualIncome         { get; set; }
+        // Documents checklist (JSON array of {name,status})
+        public string?   DocumentsJson    { get; set; }
         // Fee snapshot totals
         public decimal   PayTodayTotal    { get; set; }
         public decimal   MonthlyTotal     { get; set; }

@@ -163,46 +163,6 @@ namespace educore.Areas.Admin.Controllers
 
         #endregion
 
-        #region AcademicSetup
-        public async Task<IActionResult> AcademicSetup(int academicYearId = 0)
-        {
-            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
-            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
-            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
-
-            var academicYears = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear");
-            if (academicYearId <= 0 && academicYears.Any())
-            {
-                academicYearId = Convert.ToInt32(academicYears.First().Value);
-            }
-
-            var model = await _schoolSettingsService.GetAcademicSetupAsync(tenantId, schoolId, academicYearId, actionUserId);
-            model ??= new AcademicSetupModel();
-
-            model.AcademicYears = academicYears;
-            model.AcademicYearId = academicYearId;
-
-            return View(model);
-        }
-        [HttpPost]
-        public async Task<IActionResult> SaveAcademicSetup(AcademicSetupModel model)
-        {
-            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
-            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
-            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
-            var result = await _schoolSettingsService.SaveAcademicSetupAsync(model, tenantId, schoolId, actionUserId);
-            if (result > 0)
-            {
-                TempData["SuccessMessage"] = "Academic setup saved successfully.";
-            }
-            else
-            {
-                TempData["ErrorMessage"] = "Unable to save academic setup.";
-            }
-            return RedirectToAction(nameof(AcademicSetup));
-        }
-
-        #endregion
 
         #region FeeHead
         public async Task<IActionResult> FeeHead()
@@ -463,10 +423,199 @@ namespace educore.Areas.Admin.Controllers
             return View();
         }
 
-        public IActionResult ClassSection()
+        #region ClassSection
+        // Classes & Sections — configured per academic year. This is the single
+        // page for academic structure (replaces the old AcademicSetup page); it
+        // reads/writes through the same academic-setup stored procedure.
+        public async Task<IActionResult> ClassSection(int academicYearId = 0)
         {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var academicYears = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear");
+            if (academicYearId <= 0 && academicYears.Any())
+            {
+                // Default to the current session (falls back to the most recent year).
+                var current = academicYears.FirstOrDefault(y => y.Selected) ?? academicYears.First();
+                academicYearId = Convert.ToInt32(current.Value);
+            }
+
+            var setup = await _schoolSettingsService.GetAcademicSetupAsync(tenantId, schoolId, academicYearId, actionUserId);
+
+            // Full shape the page's JS consumes (order = display order; strength is live).
+            var classes = (setup?.ClassDetails ?? new List<AcademicClassDetail>()).Select(c => new
+            {
+                name        = c.ClassName,
+                rank        = c.DisplayOrder,
+                stream      = c.Stream,
+                coordinator = c.Coordinator,
+                sections    = c.Sections.Select(s => new
+                {
+                    name     = s.SectionName,
+                    capacity = s.Capacity,
+                    room     = s.RoomNo,
+                    strength = s.Strength
+                })
+            });
+
+            ViewBag.AcademicYears = academicYears;
+            ViewBag.AcademicYearId = academicYearId;
+            ViewBag.ClassDataJson = System.Text.Json.JsonSerializer.Serialize(classes);
+
             return View();
         }
+
+        // Persists the full structure for one academic year (replace-all),
+        // matching the stored procedure's semantics.
+        [HttpPost]
+        public async Task<IActionResult> SaveClassSection([FromBody] ClassSectionSaveDto dto)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            if (dto == null || dto.AcademicYearId <= 0)
+                return Json(new { success = false, message = "Select an academic year first." });
+
+            var model = new AcademicSetupModel { AcademicYearId = dto.AcademicYearId };
+
+            foreach (var c in dto.Classes ?? new List<ClassSectionItemDto>())
+            {
+                var name = (c.Name ?? string.Empty).Trim();
+                if (name.Length == 0 ||
+                    model.ClassDetails.Any(x => x.ClassName.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                var sections = (c.Sections ?? new List<SectionItemDto>())
+                    .Where(s => !string.IsNullOrWhiteSpace(s.Name))
+                    .Select((s, i) => new AcademicSectionDetail
+                    {
+                        SectionName  = s.Name!.Trim(),
+                        DisplayOrder = i + 1,
+                        Capacity     = s.Capacity,
+                        RoomNo       = string.IsNullOrWhiteSpace(s.Room) ? null : s.Room!.Trim()
+                    })
+                    .ToList();
+
+                model.ClassDetails.Add(new AcademicClassDetail
+                {
+                    ClassName    = name,
+                    DisplayOrder = c.Rank,
+                    Stream       = string.IsNullOrWhiteSpace(c.Stream) ? null : c.Stream!.Trim(),
+                    Coordinator  = string.IsNullOrWhiteSpace(c.Coordinator) ? null : c.Coordinator!.Trim(),
+                    Sections     = sections
+                });
+            }
+
+            int result;
+            try
+            {
+                result = await _schoolSettingsService.SaveAcademicSetupAsync(model, tenantId, schoolId, actionUserId);
+            }
+            catch (Npgsql.PostgresException ex)
+            {
+                // Surfaces the "students still enrolled" guard (and any other SP RAISE).
+                return Json(new { success = false, message = ex.MessageText });
+            }
+
+            return Json(new { success = result > 0 });
+        }
+        #endregion
+
+        #region AcademicYear
+        // Academic Year / Session management — create, edit, set-current, delete.
+        public async Task<IActionResult> AcademicYears()
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var years = await _schoolSettingsService.GetAcademicYearsAsync(tenantId, schoolId, actionUserId);
+
+            ViewBag.YearsJson = System.Text.Json.JsonSerializer.Serialize(years.Select(y => new
+            {
+                id           = y.AcademicYearId,
+                name         = y.AcademicYearName,
+                startDate    = y.StartDate?.ToString("yyyy-MM-dd"),
+                endDate      = y.EndDate?.ToString("yyyy-MM-dd"),
+                isCurrent    = y.IsCurrent,
+                classCount   = y.ClassCount,
+                studentCount = y.StudentCount
+            }));
+
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SaveAcademicYear([FromBody] AcademicYearSaveDto dto)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            if (dto == null || string.IsNullOrWhiteSpace(dto.Name))
+                return Json(new { success = false, message = "Academic year name is required." });
+
+            var model = new AcademicYearModel
+            {
+                AcademicYearId   = dto.Id,
+                AcademicYearName = dto.Name.Trim(),
+                StartDate        = ParseDate(dto.StartDate),
+                EndDate          = ParseDate(dto.EndDate),
+                IsCurrent        = dto.IsCurrent
+            };
+
+            try
+            {
+                var (ok, msg, id) = await _schoolSettingsService.SaveAcademicYearAsync(model, tenantId, schoolId, actionUserId);
+                return Json(new { success = ok, message = msg, id });
+            }
+            catch (Npgsql.PostgresException ex)
+            {
+                return Json(new { success = false, message = ex.MessageText });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> SetCurrentAcademicYear([FromBody] AcademicYearIdDto dto)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            try
+            {
+                var (ok, msg) = await _schoolSettingsService.SetCurrentAcademicYearAsync(dto?.Id ?? 0, tenantId, schoolId, actionUserId);
+                return Json(new { success = ok, message = msg });
+            }
+            catch (Npgsql.PostgresException ex)
+            {
+                return Json(new { success = false, message = ex.MessageText });
+            }
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteAcademicYear([FromBody] AcademicYearIdDto dto)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            try
+            {
+                var (ok, msg) = await _schoolSettingsService.DeleteAcademicYearAsync(dto?.Id ?? 0, tenantId, schoolId, actionUserId);
+                return Json(new { success = ok, message = msg });
+            }
+            catch (Npgsql.PostgresException ex)
+            {
+                return Json(new { success = false, message = ex.MessageText });
+            }
+        }
+
+        private static DateTime? ParseDate(string? s) =>
+            DateTime.TryParse(s, out var d) ? d : (DateTime?)null;
+        #endregion
 
         public IActionResult AssignClassTeacher()
         {
@@ -482,5 +631,43 @@ namespace educore.Areas.Admin.Controllers
         {
             return View();
         }
+    }
+
+    // ── Payload for the Classes & Sections save (per academic year) ──
+    public class ClassSectionSaveDto
+    {
+        public int AcademicYearId { get; set; }
+        public List<ClassSectionItemDto> Classes { get; set; } = new();
+    }
+
+    public class ClassSectionItemDto
+    {
+        public string? Name { get; set; }
+        public int Rank { get; set; }
+        public string? Stream { get; set; }
+        public string? Coordinator { get; set; }
+        public List<SectionItemDto> Sections { get; set; } = new();
+    }
+
+    public class SectionItemDto
+    {
+        public string? Name { get; set; }
+        public int? Capacity { get; set; }
+        public string? Room { get; set; }
+    }
+
+    // ── Payload for Academic Year / Session save ──
+    public class AcademicYearSaveDto
+    {
+        public int Id { get; set; }
+        public string? Name { get; set; }
+        public string? StartDate { get; set; }
+        public string? EndDate { get; set; }
+        public bool IsCurrent { get; set; }
+    }
+
+    public class AcademicYearIdDto
+    {
+        public int Id { get; set; }
     }
 }

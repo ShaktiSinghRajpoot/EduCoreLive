@@ -1,0 +1,374 @@
+@{
+    ViewData["Title"] = "Leave Management";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+    :root {
+        --lm-orange:#ff8a00; --lm-orange-soft:#fff4e6;
+        --lm-border:#ececf5; --lm-heading:#2b1b12; --lm-text:#2b2c40; --lm-muted:#8b8175;
+    }
+    .lm-page{ color:var(--lm-text); }
+    .dropdown-toggle::after{ display:none; }
+
+    /* ── Summary cards ── */
+    .lm-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.5rem; }
+    .lm-stat{
+        position:relative; overflow:hidden;
+        border:1px solid var(--lm-border); border-radius:18px; background:#fff;
+        padding:1.15rem 1.25rem; transition:transform .2s ease, box-shadow .2s ease;
+    }
+    .lm-stat:hover{ transform:translateY(-3px); box-shadow:0 14px 30px rgba(43,27,18,.08); }
+    .lm-stat::after{ content:''; position:absolute; right:-18px; top:-18px; width:74px; height:74px; border-radius:50%; opacity:.10; }
+    .lm-stat .lm-stat-ic{ width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.35rem; margin-bottom:.7rem; }
+    .lm-stat .lm-stat-val{ font-size:1.7rem; font-weight:900; color:var(--lm-heading); line-height:1; }
+    .lm-stat .lm-stat-lbl{ font-size:.74rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--lm-muted); margin-top:.25rem; }
+    .s-pend  .lm-stat-ic{ background:#fff3cd; color:#d97706; } .s-pend::after{ background:#d97706; }
+    .s-today .lm-stat-ic{ background:#e7f0ff; color:#3b82f6; } .s-today::after{ background:#3b82f6; }
+    .s-appr  .lm-stat-ic{ background:#dcfce7; color:#16a34a; } .s-appr::after{ background:#16a34a; }
+    .s-bal   .lm-stat-ic{ background:var(--lm-orange-soft); color:var(--lm-orange); } .s-bal::after{ background:var(--lm-orange); }
+
+    /* ── Toolbar / tabs ── */
+    .lm-toolbar{ display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:1.1rem; }
+    .lm-tabs{ display:inline-flex; background:#f4f3f1; border-radius:12px; padding:4px; gap:2px; flex-wrap:wrap; }
+    .lm-tab{
+        border:0; background:transparent; border-radius:9px; cursor:pointer;
+        font-size:.82rem; font-weight:800; color:var(--lm-muted);
+        padding:.5rem .95rem; transition:.16s; display:inline-flex; align-items:center; gap:.4rem; white-space:nowrap;
+    }
+    .lm-tab .lm-tab-count{ font-size:.7rem; font-weight:900; background:#e2e0dc; color:var(--lm-text); border-radius:999px; padding:.05rem .42rem; }
+    .lm-tab.active{ background:#fff; color:var(--lm-orange); box-shadow:0 3px 10px rgba(43,27,18,.08); }
+    .lm-tab.active .lm-tab-count{ background:var(--lm-orange); color:#fff; }
+
+    .btn-lm-apply{ background:linear-gradient(135deg,#ff8a00,#ffa733); border:0; color:#fff; border-radius:12px; font-weight:800; padding:.6rem 1.15rem; box-shadow:0 10px 22px rgba(255,138,0,.25); transition:.18s; display:inline-flex; align-items:center; gap:.45rem; }
+    .btn-lm-apply:hover{ color:#fff; transform:translateY(-1px); box-shadow:0 14px 26px rgba(255,138,0,.3); }
+
+    /* ── Request cards ── */
+    .lm-list{ display:flex; flex-direction:column; gap:.85rem; }
+    .lm-card{
+        border:1px solid var(--lm-border); border-left:4px solid #cbd5e1; border-radius:16px; background:#fff;
+        padding:1rem 1.15rem; display:flex; align-items:center; gap:1rem; flex-wrap:wrap;
+        transition:box-shadow .18s ease, transform .18s ease;
+    }
+    .lm-card:hover{ box-shadow:0 12px 26px rgba(43,27,18,.07); transform:translateY(-2px); }
+    .lm-card.is-pending { border-left-color:#d97706; }
+    .lm-card.is-approved{ border-left-color:#16a34a; }
+    .lm-card.is-rejected{ border-left-color:#dc2626; }
+
+    .lm-av{ width:48px; height:48px; flex:0 0 48px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:.92rem; }
+    .lm-who{ flex:1 1 200px; min-width:0; }
+    .lm-name{ font-size:.96rem; font-weight:900; color:var(--lm-heading); }
+    .lm-meta{ font-size:.76rem; font-weight:700; color:var(--lm-muted); margin-top:.1rem; }
+
+    .lm-type{ display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.28rem .65rem; font-size:.72rem; font-weight:800; white-space:nowrap; }
+    .t-casual{ background:#e7f0ff; color:#2563eb; }
+    .t-sick{ background:#fde8e8; color:#dc2626; }
+    .t-earned{ background:#dcfce7; color:#15803d; }
+    .t-maternity{ background:#fce7f3; color:#be185d; }
+    .t-comp{ background:#f3e8ff; color:#7c3aed; }
+
+    .lm-dates{ flex:1 1 180px; min-width:0; }
+    .lm-dates .lm-range{ font-size:.85rem; font-weight:800; color:var(--lm-text); display:flex; align-items:center; gap:.35rem; }
+    .lm-dates .lm-days{ font-size:.72rem; font-weight:700; color:var(--lm-muted); margin-top:.12rem; }
+    .lm-reason{ font-size:.78rem; color:var(--lm-muted); font-weight:600; font-style:italic; }
+
+    .lm-status{ display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.3rem .7rem; font-size:.72rem; font-weight:900; white-space:nowrap; }
+    .lm-status::before{ content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+    .st-pending{ background:#fffbeb; color:#d97706; }
+    .st-approved{ background:#ecfdf3; color:#16a34a; }
+    .st-rejected{ background:#fef2f2; color:#dc2626; }
+
+    .lm-actions{ display:flex; gap:.45rem; flex:0 0 auto; }
+    .lm-btn{ border:0; border-radius:10px; cursor:pointer; font-weight:800; font-size:.78rem; padding:.5rem .8rem; display:inline-flex; align-items:center; gap:.3rem; transition:.15s; }
+    .lm-btn-approve{ background:#16a34a; color:#fff; } .lm-btn-approve:hover{ background:#15803d; }
+    .lm-btn-reject{ background:#fff; color:#dc2626; border:1px solid #fbcfcf; } .lm-btn-reject:hover{ background:#fef2f2; border-color:#dc2626; }
+
+    .lm-empty{ text-align:center; padding:3rem 1rem; }
+    .lm-empty-ic{ width:66px; height:66px; border-radius:20px; background:var(--lm-orange-soft); color:var(--lm-orange); display:inline-flex; align-items:center; justify-content:center; font-size:1.9rem; margin-bottom:.9rem; }
+
+    /* ── Leave balance strip (legend) ── */
+    .lm-balance{ display:flex; gap:.6rem; flex-wrap:wrap; }
+    .lm-bal-chip{ display:flex; align-items:center; gap:.5rem; border:1px solid var(--lm-border); border-radius:12px; background:#fff; padding:.5rem .8rem; }
+    .lm-bal-dot{ width:10px; height:10px; border-radius:50%; }
+    .lm-bal-name{ font-size:.74rem; font-weight:800; color:var(--lm-text); }
+    .lm-bal-val{ font-size:.74rem; font-weight:900; color:var(--lm-heading); }
+
+    /* ── Apply modal ── */
+    .lm-modal .modal-content{ border:0; border-radius:24px; overflow:hidden; box-shadow:0 28px 70px rgba(43,27,18,.2); }
+    .lm-modal .modal-header{ background:linear-gradient(135deg,var(--lm-orange-soft),#fff 70%); border-bottom:1px solid var(--lm-border); padding:1.25rem 1.5rem; }
+    .lm-modal .modal-title{ color:var(--lm-heading); font-weight:900; }
+    .lm-modal .form-label{ font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--lm-muted); margin-bottom:.35rem; }
+    .lm-modal .form-control,.lm-modal .form-select{ border:1px solid var(--lm-border); border-radius:12px; min-height:46px; font-weight:650; font-size:.9rem; }
+    .lm-modal .form-control:focus,.lm-modal .form-select:focus{ border-color:rgba(255,138,0,.6); box-shadow:0 0 0 4px rgba(255,138,0,.12); }
+    .lm-modal textarea.form-control{ min-height:90px; }
+    .lm-daypill{ background:var(--lm-orange-soft); color:var(--lm-orange); border-radius:999px; font-size:.78rem; font-weight:900; padding:.3rem .8rem; }
+
+    @@media (max-width:991.98px){ .lm-stats{ grid-template-columns:repeat(2,1fr); } }
+    @@media (max-width:575.98px){
+        .lm-stats{ grid-template-columns:1fr 1fr; gap:.7rem; }
+        .lm-card{ gap:.7rem; }
+        .lm-actions{ width:100%; }
+        .lm-btn{ flex:1 1 0; justify-content:center; }
+    }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content lm-page">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-calendar-minus fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Leave Management</h4>
+            <div class="ec-page-subtitle">Review, approve and track staff leave requests</div>
+          </div>
+        </div>
+        <button class="btn-lm-apply" data-bs-toggle="modal" data-bs-target="#applyLeaveModal">
+          <i class="bx bx-plus-circle"></i><span>Apply Leave</span>
+        </button>
+      </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+    }
+
+    <!-- Summary cards -->
+    <div class="lm-stats">
+      <div class="lm-stat s-pend">
+        <div class="lm-stat-ic"><i class="bx bx-time-five"></i></div>
+        <div class="lm-stat-val" id="kpiPending">0</div>
+        <div class="lm-stat-lbl">Pending Approvals</div>
+      </div>
+      <div class="lm-stat s-today">
+        <div class="lm-stat-ic"><i class="bx bx-user-minus"></i></div>
+        <div class="lm-stat-val" id="kpiToday">0</div>
+        <div class="lm-stat-lbl">On Leave Today</div>
+      </div>
+      <div class="lm-stat s-appr">
+        <div class="lm-stat-ic"><i class="bx bx-check-circle"></i></div>
+        <div class="lm-stat-val" id="kpiApproved">0</div>
+        <div class="lm-stat-lbl">Approved This Month</div>
+      </div>
+      <div class="lm-stat s-bal">
+        <div class="lm-stat-ic"><i class="bx bx-wallet"></i></div>
+        <div class="lm-stat-val" id="kpiRequests">0</div>
+        <div class="lm-stat-lbl">Total Requests</div>
+      </div>
+    </div>
+
+    <!-- Leave balance legend -->
+    <div class="ec-card mb-3">
+      <div class="ec-card-body py-3">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="lm-balance">
+            <div class="lm-bal-chip"><span class="lm-bal-dot" style="background:#2563eb;"></span><span class="lm-bal-name">Casual</span><span class="lm-bal-val">12/yr</span></div>
+            <div class="lm-bal-chip"><span class="lm-bal-dot" style="background:#dc2626;"></span><span class="lm-bal-name">Sick</span><span class="lm-bal-val">10/yr</span></div>
+            <div class="lm-bal-chip"><span class="lm-bal-dot" style="background:#16a34a;"></span><span class="lm-bal-name">Earned</span><span class="lm-bal-val">15/yr</span></div>
+            <div class="lm-bal-chip"><span class="lm-bal-dot" style="background:#be185d;"></span><span class="lm-bal-name">Maternity</span><span class="lm-bal-val">90 days</span></div>
+            <div class="lm-bal-chip"><span class="lm-bal-dot" style="background:#7c3aed;"></span><span class="lm-bal-name">Comp-off</span><span class="lm-bal-val">As earned</span></div>
+          </div>
+          <span class="text-muted" style="font-size:.74rem;font-weight:700;"><i class="bx bx-info-circle me-1"></i>Annual entitlement per staff</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="lm-toolbar">
+      <div class="lm-tabs" id="lmTabs">
+        <button class="lm-tab active" data-f="all">All <span class="lm-tab-count" id="cAll">0</span></button>
+        <button class="lm-tab" data-f="pending">Pending <span class="lm-tab-count" id="cPending">0</span></button>
+        <button class="lm-tab" data-f="approved">Approved <span class="lm-tab-count" id="cApproved">0</span></button>
+        <button class="lm-tab" data-f="rejected">Rejected <span class="lm-tab-count" id="cRejected">0</span></button>
+      </div>
+      <div class="position-relative" style="max-width:240px;width:100%;">
+        <i class="bx bx-search" style="position:absolute;left:.7rem;top:50%;transform:translateY(-50%);color:var(--lm-muted);"></i>
+        <input type="search" class="form-control" id="lmSearch" placeholder="Search staff…" style="padding-left:2.1rem;border-radius:12px;min-height:42px;">
+      </div>
+    </div>
+
+    <!-- List -->
+    <div class="lm-list" id="lmList"></div>
+    <div class="lm-empty d-none" id="lmEmpty">
+      <div class="lm-empty-ic"><i class="bx bx-calendar-x"></i></div>
+      <h6 class="fw-bold mb-1" style="color:var(--lm-heading);">No leave requests</h6>
+      <p class="text-muted small mb-0">Nothing matches this filter.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- Apply Leave modal -->
+<div class="modal fade lm-modal" id="applyLeaveModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="d-flex align-items-center gap-3">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center"><i class="bx bx-calendar-plus fs-5"></i></div>
+          <div>
+            <h5 class="modal-title mb-0">Apply for Leave</h5>
+            <small class="text-muted fw-semibold">Submit a leave request for approval</small>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form asp-area="ERP" asp-controller="Leave" asp-action="ApplyLeave" method="post" novalidate>
+        @Html.AntiForgeryToken()
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Staff Member</label>
+              <select name="StaffId" class="form-select" required>
+                <option value="">Select staff</option>
+                <option value="3">Anita Desai · EMP-003</option>
+                <option value="4">Vikram Joshi · EMP-004</option>
+                <option value="5">Pooja Nair · EMP-005</option>
+                <option value="8">Sanjay Patil · EMP-008</option>
+                <option value="9">Kavya Reddy · EMP-009</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Leave Type</label>
+              <select name="LeaveType" class="form-select" required>
+                <option value="">Select type</option>
+                <option>Casual</option><option>Sick</option><option>Earned</option>
+                <option>Maternity</option><option>Comp-off</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label">From Date</label>
+              <input type="date" name="FromDate" id="lvFrom" class="form-control" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">To Date</label>
+              <input type="date" name="ToDate" id="lvTo" class="form-control" required>
+            </div>
+            <div class="col-12">
+              <div class="d-flex align-items-center gap-2">
+                <span class="text-muted" style="font-size:.78rem;font-weight:700;">Duration:</span>
+                <span class="lm-daypill" id="lvDays">— days</span>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Reason</label>
+              <textarea name="Reason" class="form-control" rows="3" placeholder="Brief reason for leave" required></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-lm-apply"><i class="bx bx-send"></i>Submit Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(document).ready(function () {
+    if (typeof toastr !== 'undefined') toastr.options = { closeButton:true, progressBar:true, timeOut:'3000', positionClass:'toast-top-right' };
+    function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
+
+    const COLORS = { primary:'bg-label-primary text-primary', info:'bg-label-info text-info', success:'bg-label-success text-success', warning:'bg-label-warning text-warning', danger:'bg-label-danger text-danger' };
+    const TYPE = { Casual:'t-casual', Sick:'t-sick', Earned:'t-earned', Maternity:'t-maternity', 'Comp-off':'t-comp' };
+
+    let requests = [
+        { id:1, name:'Pooja Nair',   emp:'EMP-005', desig:'Science Teacher', av:'PN', c:'danger',  type:'Sick',     from:'2026-06-10', to:'2026-06-12', reason:'Viral fever, doctor advised rest.', status:'pending' },
+        { id:2, name:'Vikram Joshi', emp:'EMP-004', desig:'Maths Teacher',   av:'VJ', c:'warning', type:'Casual',   from:'2026-06-15', to:'2026-06-15', reason:'Personal work.', status:'pending' },
+        { id:3, name:'Lata Sharma',  emp:'EMP-011', desig:'PT Teacher',      av:'LS', c:'danger',  type:'Earned',   from:'2026-06-18', to:'2026-06-22', reason:'Family function out of town.', status:'pending' },
+        { id:4, name:'Anita Desai',  emp:'EMP-003', desig:'Senior Teacher',  av:'AD', c:'success', type:'Casual',   from:'2026-06-05', to:'2026-06-05', reason:'Bank work.', status:'approved' },
+        { id:5, name:'Kavya Reddy',  emp:'EMP-009', desig:'Hindi Teacher',   av:'KR', c:'success', type:'Sick',     from:'2026-06-02', to:'2026-06-03', reason:'Migraine.', status:'approved' },
+        { id:6, name:'Sanjay Patil', emp:'EMP-008', desig:'English Teacher', av:'SP', c:'info',    type:'Earned',   from:'2026-05-28', to:'2026-05-30', reason:'Vacation.', status:'approved' },
+        { id:7, name:'Neha Kapoor',  emp:'EMP-013', desig:'Computer Teacher',av:'NK', c:'primary', type:'Casual',   from:'2026-06-01', to:'2026-06-01', reason:'Late application, denied.', status:'rejected' }
+    ];
+
+    let curFilter = 'all', curSearch = '';
+    const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function fmt(d){ const x=new Date(d); return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]; }
+    function days(a,b){ return Math.round((new Date(b)-new Date(a))/86400000)+1; }
+    function todayIso(){ return new Date().toISOString().slice(0,10); }
+    function isOnLeaveToday(r){ const t=todayIso(); return r.status==='approved' && r.from<=t && r.to>=t; }
+
+    function statusBadge(s){
+        const m={ pending:['st-pending','Pending'], approved:['st-approved','Approved'], rejected:['st-rejected','Rejected'] };
+        const x=m[s]||m.pending; return '<span class="lm-status '+x[0]+'">'+x[1]+'</span>';
+    }
+
+    function updateKpis(){
+        $('#kpiPending').text(requests.filter(r=>r.status==='pending').length);
+        $('#kpiToday').text(requests.filter(isOnLeaveToday).length);
+        $('#kpiApproved').text(requests.filter(r=>r.status==='approved').length);
+        $('#kpiRequests').text(requests.length);
+        $('#cAll').text(requests.length);
+        $('#cPending').text(requests.filter(r=>r.status==='pending').length);
+        $('#cApproved').text(requests.filter(r=>r.status==='approved').length);
+        $('#cRejected').text(requests.filter(r=>r.status==='rejected').length);
+    }
+
+    function render(){
+        let list = requests.slice();
+        if(curFilter!=='all') list = list.filter(r=>r.status===curFilter);
+        if(curSearch) list = list.filter(r=>r.name.toLowerCase().includes(curSearch) || r.emp.toLowerCase().includes(curSearch));
+
+        if(!list.length){ $('#lmList').html(''); $('#lmEmpty').removeClass('d-none'); updateKpis(); return; }
+        $('#lmEmpty').addClass('d-none');
+
+        $('#lmList').html(list.map(function(r){
+            const d = days(r.from,r.to);
+            const range = r.from===r.to ? fmt(r.from) : fmt(r.from)+' → '+fmt(r.to);
+            const actions = r.status==='pending'
+              ? '<div class="lm-actions">'
+                + '<button class="lm-btn lm-btn-approve" data-act="approve" data-id="'+r.id+'"><i class="bx bx-check"></i>Approve</button>'
+                + '<button class="lm-btn lm-btn-reject" data-act="reject" data-id="'+r.id+'"><i class="bx bx-x"></i>Reject</button>'
+                + '</div>'
+              : '<div class="lm-actions">'+statusBadge(r.status)+'</div>';
+            return ''
+              + '<div class="lm-card is-'+r.status+'">'
+              +   '<div class="lm-av '+COLORS[r.c]+'">'+r.av+'</div>'
+              +   '<div class="lm-who"><div class="lm-name">'+r.name+'</div><div class="lm-meta">'+r.emp+' · '+r.desig+'</div></div>'
+              +   '<div><span class="lm-type '+(TYPE[r.type]||'t-casual')+'"><i class="bx bx-bookmark"></i>'+r.type+'</span></div>'
+              +   '<div class="lm-dates"><div class="lm-range"><i class="bx bx-calendar"></i>'+range+'</div><div class="lm-days">'+d+' day'+(d>1?'s':'')+' · <span class="lm-reason">'+r.reason+'</span></div></div>'
+              +   actions
+              + '</div>';
+        }).join(''));
+        updateKpis();
+    }
+
+    // Tabs
+    $('#lmTabs').on('click','.lm-tab',function(){
+        $('.lm-tab').removeClass('active'); $(this).addClass('active');
+        curFilter = $(this).data('f'); render();
+    });
+    // Search
+    $('#lmSearch').on('input',function(){ curSearch = this.value.toLowerCase().trim(); render(); });
+
+    // Approve / Reject (front-end demo — real action posts to LeaveController)
+    $('#lmList').on('click','.lm-btn',function(){
+        const id = Number($(this).data('id')), act = $(this).data('act');
+        const r = requests.find(x=>x.id===id); if(!r) return;
+        r.status = act==='approve' ? 'approved' : 'rejected';
+        render();
+        toast(act==='approve'?'success':'warning', r.name+"'s leave "+(act==='approve'?'approved':'rejected')+'.');
+    });
+
+    // Modal duration
+    function calcDays(){
+        const f=$('#lvFrom').val(), t=$('#lvTo').val();
+        if(f&&t&&new Date(t)>=new Date(f)){ const d=days(f,t); $('#lvDays').text(d+' day'+(d>1?'s':'')); }
+        else $('#lvDays').text('— days');
+    }
+    $('#lvFrom,#lvTo').on('change', calcDays);
+    $('#lvFrom').attr('min', todayIso());
+
+    render();
+});
+</script>
+}

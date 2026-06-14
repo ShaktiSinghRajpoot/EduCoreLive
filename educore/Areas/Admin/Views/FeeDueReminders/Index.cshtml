@@ -1,0 +1,927 @@
+@{
+    ViewData["Title"] = "Fee Due Reminders";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    // ----- Demo data. Replace with database data (outstanding dues per student). -----
+    var defaulters = new[]
+    {
+        new { Name="Yash Kumar",    Class="12th", Av="YK", Cl="primary",   Parent="Ramesh Kumar",  Phone="+91 98100 11223", Due="20,750", DueNum=20750, Days=45, Last="Never",       Lastn=9999 },
+        new { Name="Demo Student",  Class="8th",  Av="DS", Cl="info",      Parent="Suresh Gupta",  Phone="+91 99200 33445", Due="20,000", DueNum=20000, Days=30, Last="5 days ago",  Lastn=5 },
+        new { Name="Deepak Sharma", Class="11th", Av="DS", Cl="success",   Parent="Mahesh Sharma", Phone="+91 98300 55667", Due="19,650", DueNum=19650, Days=38, Last="Never",       Lastn=9999 },
+        new { Name="Vikash Ji",     Class="4th",  Av="VJ", Cl="warning",   Parent="Dinesh Yadav",  Phone="+91 97400 77889", Due="17,200", DueNum=17200, Days=62, Last="12 days ago", Lastn=12 },
+        new { Name="Hema",          Class="UKG",  Av="H",  Cl="danger",    Parent="Anita Devi",    Phone="+91 96500 99001", Due="16,899", DueNum=16899, Days=22, Last="Never",       Lastn=9999 },
+        new { Name="Govind",        Class="UKG",  Av="G",  Cl="secondary", Parent="Kailash Meena", Phone="+91 95600 22113", Due="12,999", DueNum=12999, Days=15, Last="3 days ago",  Lastn=3 },
+        new { Name="Mohan Lal",     Class="8th",  Av="ML", Cl="danger",    Parent="Prakash Lal",   Phone="+91 94700 44225", Due="11,250", DueNum=11250, Days=52, Last="Never",       Lastn=9999 },
+        new { Name="New Saloni",    Class="9th",  Av="NS", Cl="info",      Parent="Vijay Saini",   Phone="+91 93800 66337", Due="11,150", DueNum=11150, Days=18, Last="8 days ago",  Lastn=8 },
+        new { Name="Anmol",         Class="2nd",  Av="A",  Cl="success",   Parent="Rohit Gupta",   Phone="+91 92900 88449", Due="7,540",  DueNum=7540,  Days=12, Last="Never",       Lastn=9999 },
+        new { Name="Akash Verma",   Class="9th",  Av="AV", Cl="primary",   Parent="Sanjay Verma",  Phone="+91 91000 11552", Due="4,474",  DueNum=4474,  Days=8,  Last="2 days ago",  Lastn=2 },
+    };
+
+    var classes = new[] { "UKG", "2nd", "4th", "8th", "9th", "11th", "12th" };
+    var classOrder = new[] { "Nursery", "LKG", "UKG", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th" };
+
+    string Soft(string c) => c switch
+    {
+        "primary" => "soft-orange",
+        "info" => "soft-blue",
+        "success" => "soft-green",
+        "warning" => "soft-amber",
+        "danger" => "soft-red",
+        _ => "soft-grey"
+    };
+    string Bucket(int d) => d <= 30 ? "a" : d <= 60 ? "b" : "c";
+    (string cls, string txt) DaysBadge(int d) =>
+        d <= 30 ? ("fdr-od-a", d + "d") : d <= 60 ? ("fdr-od-b", d + "d") : ("fdr-od-c", d + "d");
+    int ClassIdx(string c) => Array.IndexOf(classOrder, c);
+}
+
+@section PageStyles {
+    <link href="~/css/educore-theme.css" rel="stylesheet" />
+    <style>
+        .fdr-page {
+            font-family: "Public Sans", system-ui, sans-serif;
+        }
+
+            /* tighten the shared page chrome */
+            .fdr-page .ec-page-content {
+                padding: 1.25rem;
+            }
+
+            .fdr-page .ec-page-header {
+                padding: 1rem 1.15rem;
+                margin-bottom: 1rem;
+            }
+
+            .fdr-page .ec-page-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 20px;
+            }
+
+            .fdr-page .ec-page-title {
+                font-size: 1.2rem;
+            }
+
+            .fdr-page .ec-card {
+                margin-bottom: 0;
+            }
+
+            .fdr-page .ec-card-header {
+                padding: .85rem 1rem;
+            }
+
+            .fdr-page .ec-card-body {
+                padding: 1rem;
+            }
+
+            .fdr-page .ec-section-icon {
+                width: 34px;
+                height: 34px;
+                font-size: 15px;
+            }
+
+            .fdr-page .ec-section-title {
+                font-size: .92rem;
+            }
+
+        .soft-orange {
+            background: var(--ec-primary-light);
+            color: var(--ec-primary);
+        }
+
+        .soft-green {
+            background: #ecfdf3;
+            color: #16a34a;
+        }
+
+        .soft-red {
+            background: #fff1f0;
+            color: #dc2626;
+        }
+
+        .soft-amber {
+            background: #fff7e6;
+            color: #d97706;
+        }
+
+        .soft-blue {
+            background: #eff6ff;
+            color: #0284c7;
+        }
+
+        .soft-grey {
+            background: #f1f1f4;
+            color: #6b7280;
+        }
+
+        /* ---- compact stat strip ---- */
+        .fdr-stat {
+            display: flex;
+            align-items: center;
+            gap: .7rem;
+            background: var(--ec-white);
+            border: 1px solid var(--ec-border);
+            border-radius: var(--ec-radius-sm);
+            padding: .7rem .85rem;
+            height: 100%;
+        }
+
+        .fdr-stat-ic {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex: 0 0 auto;
+        }
+
+        .fdr-stat-label {
+            color: var(--ec-text-light);
+            font-size: .68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            line-height: 1.1;
+        }
+
+        .fdr-stat-value {
+            color: var(--ec-text-dark);
+            font-size: 1.2rem;
+            font-weight: 900;
+            line-height: 1.15;
+        }
+
+        /* ---- table ---- */
+        .fdr-table {
+            font-size: .84rem;
+        }
+
+            .fdr-table thead th {
+                padding: .55rem .7rem;
+                white-space: nowrap;
+                font-size: .68rem;
+                text-transform: uppercase;
+                letter-spacing: .03em;
+                user-select: none;
+            }
+
+            .fdr-table tbody td {
+                padding: .5rem .7rem;
+                vertical-align: middle;
+                border-bottom: 1px solid #f4eee7;
+            }
+
+            .fdr-table tbody tr.fdr-selected {
+                background: rgba(255,138,0,.06);
+            }
+
+        .fdr-sort {
+            cursor: pointer;
+        }
+
+            .fdr-sort:hover {
+                color: var(--ec-primary);
+            }
+
+            .fdr-sort i {
+                font-size: .9rem;
+                opacity: .35;
+                vertical-align: middle;
+            }
+
+            .fdr-sort.asc i, .fdr-sort.desc i {
+                opacity: 1;
+                color: var(--ec-primary);
+            }
+
+        .fdr-avatar {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .72rem;
+            font-weight: 800;
+            flex: 0 0 auto;
+        }
+
+        .fdr-od-a, .fdr-od-b, .fdr-od-c {
+            display: inline-flex;
+            align-items: center;
+            padding: .18rem .5rem;
+            border-radius: 999px;
+            font-size: .7rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .fdr-od-a {
+            background: #fff7e6;
+            color: #d97706;
+        }
+
+        .fdr-od-b {
+            background: #ffeede;
+            color: #ea580c;
+        }
+
+        .fdr-od-c {
+            background: #fff1f0;
+            color: #dc2626;
+        }
+
+        /* pagination */
+        .fdr-pager {
+            display: flex;
+            gap: .25rem;
+        }
+
+        .fdr-pg {
+            min-width: 28px;
+            height: 28px;
+            border: 1px solid var(--ec-border);
+            background: #fff;
+            border-radius: 8px;
+            font-size: .8rem;
+            font-weight: 700;
+            color: var(--ec-text-muted);
+            cursor: pointer;
+            transition: var(--ec-transition);
+        }
+
+            .fdr-pg:hover:not(:disabled) {
+                border-color: #ffce99;
+                color: var(--ec-primary);
+            }
+
+            .fdr-pg.active {
+                background: var(--ec-primary);
+                border-color: var(--ec-primary);
+                color: #fff;
+            }
+
+            .fdr-pg:disabled {
+                opacity: .45;
+                cursor: default;
+            }
+
+        /* ---- compose ---- */
+        .fdr-compose {
+            position: sticky;
+            top: 1rem;
+        }
+
+        .fdr-label {
+            color: var(--ec-text-light);
+            font-size: .68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            margin-bottom: .35rem;
+            display: block;
+        }
+
+        .fdr-langs {
+            display: flex;
+            gap: .35rem;
+            overflow-x: auto;
+            padding-bottom: .3rem;
+            scrollbar-width: thin;
+        }
+
+            .fdr-langs::-webkit-scrollbar {
+                height: 4px;
+            }
+
+            .fdr-langs::-webkit-scrollbar-thumb {
+                background: #e7d8c6;
+                border-radius: 999px;
+            }
+
+        .fdr-lang {
+            flex: 0 0 auto;
+            border: 1.5px solid var(--ec-border);
+            background: #fff;
+            color: var(--ec-text-muted);
+            border-radius: 999px;
+            padding: .28rem .7rem;
+            font-size: .78rem;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: var(--ec-transition);
+        }
+
+            .fdr-lang:hover {
+                border-color: #ffce99;
+            }
+
+            .fdr-lang.active {
+                background: var(--ec-primary);
+                border-color: var(--ec-primary);
+                color: #fff;
+            }
+
+        .fdr-channel {
+            flex: 1;
+            border: 1.5px solid var(--ec-border);
+            background: #fff;
+            border-radius: var(--ec-radius-sm);
+            padding: .45rem .3rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: .15rem;
+            cursor: pointer;
+            font-size: .72rem;
+            font-weight: 700;
+            color: var(--ec-text-muted);
+            transition: var(--ec-transition);
+            user-select: none;
+        }
+
+            .fdr-channel i {
+                font-size: 1.15rem;
+            }
+
+            .fdr-channel.active {
+                color: #fff;
+                border-color: transparent;
+            }
+
+                .fdr-channel.active.ch-wa {
+                    background: #25d366;
+                }
+
+                .fdr-channel.active.ch-sms {
+                    background: var(--ec-primary);
+                }
+
+                .fdr-channel.active.ch-email {
+                    background: #0ea5e9;
+                }
+
+        .fdr-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: .15rem .45rem;
+            border-radius: 7px;
+            background: var(--ec-primary-light);
+            color: var(--ec-primary);
+            font-size: .7rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: 0;
+            transition: var(--ec-transition);
+        }
+
+            .fdr-tag:hover {
+                background: #ffe6c7;
+            }
+
+        .fdr-msg {
+            min-height: 96px;
+            resize: vertical;
+            font-size: .85rem;
+        }
+
+        .fdr-meter {
+            font-size: .7rem;
+            color: var(--ec-text-light);
+            font-weight: 700;
+        }
+
+        .fdr-preview {
+            background: #ece5dd url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath fill='%23e2d9cd' d='M0 0h2v2H0z'/%3E%3C/svg%3E");
+            border-radius: 12px;
+            padding: .8rem;
+        }
+
+        .fdr-bubble {
+            background: #dcf8c6;
+            border-radius: 10px;
+            padding: .5rem .65rem;
+            font-size: .82rem;
+            color: #111b21;
+            box-shadow: 0 1px 1px rgba(0,0,0,.08);
+            max-width: 94%;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.4;
+        }
+
+            .fdr-bubble .fdr-time {
+                display: block;
+                text-align: right;
+                font-size: .62rem;
+                color: #667781;
+                margin-top: .15rem;
+            }
+
+        .fdr-toast-wrap {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1080;
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+        }
+
+        .fdr-toast {
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            background: #fff;
+            border-left: 4px solid #16a34a;
+            border-radius: 10px;
+            box-shadow: var(--ec-shadow-lg);
+            padding: .6rem .9rem;
+            min-width: 15rem;
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--ec-text);
+            animation: fdrIn .25s ease;
+        }
+
+        @@keyframes fdrIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .fdr-empty {
+            color: var(--ec-text-muted);
+            text-align: center;
+            padding: 2rem 1rem;
+            display: none;
+        }
+    </style>
+}
+
+<div class="ec-page-shell fdr-page">
+    <div class="ec-page-content">
+
+        @* ===== Header ===== *@
+        <div class="ec-page-header">
+            <div class="ec-page-header-inner d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
+                <div class="ec-page-title-wrap d-flex align-items-center gap-3">
+                    <div class="ec-page-icon"><i class="bx bx-bell-plus"></i></div>
+                    <div>
+                        <h3 class="ec-page-title mb-0">Fee Due Reminders</h3>
+                        <p class="ec-page-subtitle mb-0">Remind parents in their language via WhatsApp, SMS or Email.</p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" id="fdrExport"><i class="bx bx-download me-1"></i>Export</button>
+                    <a href="/ERP/Fee/ManageFee" class="btn btn-sm btn-primary"><i class="bx bx-wallet me-1"></i>Collect Fee</a>
+                </div>
+            </div>
+        </div>
+
+        @* ===== Compact stat strip ===== *@
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-xl-3">
+                <div class="fdr-stat">
+                    <span class="fdr-stat-ic soft-red"><i class="bx bx-error-circle"></i></span>
+                    <div><div class="fdr-stat-label mb-1">Outstanding</div><div class="fdr-stat-value">₹1,41,912</div></div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="fdr-stat">
+                    <span class="fdr-stat-ic soft-amber"><i class="bx bx-user-x"></i></span>
+                    <div><div class="fdr-stat-label mb-1">With Due</div><div class="fdr-stat-value">10</div></div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="fdr-stat">
+                    <span class="fdr-stat-ic soft-green"><i class="bx bx-bell"></i></span>
+                    <div><div class="fdr-stat-label mb-1">Sent Today</div><div class="fdr-stat-value">6</div></div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="fdr-stat">
+                    <span class="fdr-stat-ic soft-orange"><i class="bx bx-calculator"></i></span>
+                    <div><div class="fdr-stat-label mb-1">Avg / Student</div><div class="fdr-stat-value">₹14,191</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+
+            @* ===== Defaulters ===== *@
+            <div class="col-12 col-xl-8">
+                <div class="ec-card">
+                    <div class="ec-card-header">
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                            <div class="ec-section-title-wrap">
+                                <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
+                                <div>
+                                    <h5 class="ec-section-title mb-0">Defaulters</h5>
+                                    <p class="ec-section-subtitle mb-0">Select students to remind</p>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <input type="search" id="fdrSearch" class="form-control form-control-sm" placeholder="Search..." style="min-width:8rem">
+                                <select id="fdrClass" class="form-select form-select-sm" style="min-width:6.5rem">
+                                    <option value="">Class</option>
+                                    @foreach (var c in classes)
+                                    {
+                                        <option value="@c">@c</option>
+                                    }
+                                </select>
+                                <select id="fdrBucket" class="form-select form-select-sm" style="min-width:7rem">
+                                    <option value="">Overdue</option>
+                                    <option value="a">0–30 d</option>
+                                    <option value="b">31–60 d</option>
+                                    <option value="c">60+ d</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table fdr-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width:2rem"><input class="form-check-input" type="checkbox" id="fdrSelectAll"></th>
+                                    <th class="fdr-sort" data-key="name">Student <i class="bx bx-chevron-down"></i></th>
+                                    <th class="fdr-sort" data-key="class">Class <i class="bx bx-chevron-down"></i></th>
+                                    <th class="fdr-sort" data-key="due">Due <i class="bx bx-chevron-down"></i></th>
+                                    <th class="fdr-sort" data-key="days">Overdue <i class="bx bx-chevron-down"></i></th>
+                                    <th class="fdr-sort" data-key="last">Last <i class="bx bx-chevron-down"></i></th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="fdrBody">
+                                @foreach (var d in defaulters)
+                                {
+                                    var badge = DaysBadge(d.Days);
+                                    <tr data-name="@d.Name.ToLower()" data-class="@d.Class" data-classidx="@ClassIdx(d.Class)" data-bucket="@Bucket(d.Days)" data-due="@d.DueNum" data-days="@d.Days" data-last="@d.Lastn">
+                                        <td><input class="form-check-input fdr-check" type="checkbox" data-name="@d.Name"></td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="fdr-avatar bg-label-@d.Cl text-@d.Cl">@d.Av</span>
+                                                <div class="lh-sm">
+                                                    <div class="fw-semibold">@d.Name</div>
+                                                    <small class="text-muted">@d.Parent · @d.Phone</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>@d.Class</td>
+                                        <td><span class="fw-bold" style="color:#dc2626">₹@d.Due</span></td>
+                                        <td><span class="@badge.cls">@badge.txt</span></td>
+                                        <td class="fdr-last"><small class="text-muted">@d.Last</small></td>
+                                        <td class="text-end"><button type="button" class="btn btn-icon btn-sm btn-outline-primary fdr-remind-one" title="Remind"><i class="bx bx-bell"></i></button></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        <div class="fdr-empty" id="fdrEmpty"><i class="bx bx-search-alt fs-4 d-block mb-1"></i>No students match your filters.</div>
+                    </div>
+                    <div class="ec-card-header border-top">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted" id="fdrCount"></small>
+                            <div class="fdr-pager" id="fdrPager"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ===== Compose ===== *@
+            <div class="col-12 col-xl-4">
+                <div class="ec-card fdr-compose">
+                    <div class="ec-card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="ec-section-title-wrap">
+                                <span class="ec-section-icon"><i class="bx bx-message-rounded-dots"></i></span>
+                                <div>
+                                    <h5 class="ec-section-title mb-0">Compose</h5>
+                                    <p class="ec-section-subtitle mb-0">Multi-language</p>
+                                </div>
+                            </div>
+                            <span class="badge bg-label-warning"><span id="fdrSelCount">0</span> selected</span>
+                        </div>
+                    </div>
+                    <div class="ec-card-body">
+
+                        <label class="fdr-label">Language</label>
+                        <div class="fdr-langs mb-2">
+                            <button type="button" class="fdr-lang active" data-lang="en">English</button>
+                            <button type="button" class="fdr-lang" data-lang="hi">हिन्दी</button>
+                            <button type="button" class="fdr-lang" data-lang="enhi">EN + हिन्दी</button>
+                            <button type="button" class="fdr-lang" data-lang="mr">मराठी</button>
+                            <button type="button" class="fdr-lang" data-lang="gu">ગુજરાતી</button>
+                            <button type="button" class="fdr-lang" data-lang="bn">বাংলা</button>
+                            <button type="button" class="fdr-lang" data-lang="pa">ਪੰਜਾਬੀ</button>
+                            <button type="button" class="fdr-lang" data-lang="ta">தமிழ்</button>
+                            <button type="button" class="fdr-lang" data-lang="te">తెలుగు</button>
+                        </div>
+
+                        <label class="fdr-label">Channels</label>
+                        <div class="d-flex gap-2 mb-2">
+                            <div class="fdr-channel ch-wa active" data-ch="WhatsApp"><i class="bx bxl-whatsapp"></i>WhatsApp</div>
+                            <div class="fdr-channel ch-sms active" data-ch="SMS"><i class="bx bx-message-dots"></i>SMS</div>
+                            <div class="fdr-channel ch-email" data-ch="Email"><i class="bx bx-envelope"></i>Email</div>
+                        </div>
+
+                        <label class="fdr-label">Tone</label>
+                        <select id="fdrTone" class="form-select form-select-sm mb-2">
+                            <option value="polite">Polite reminder</option>
+                            <option value="firm">Firm reminder</option>
+                            <option value="final">Final notice</option>
+                        </select>
+
+                        <label class="fdr-label">Insert Field</label>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            <button type="button" class="fdr-tag" data-tag="{student_name}">Student</button>
+                            <button type="button" class="fdr-tag" data-tag="{class}">Class</button>
+                            <button type="button" class="fdr-tag" data-tag="{due_amount}">Due ₹</button>
+                            <button type="button" class="fdr-tag" data-tag="{days}">Days</button>
+                            <button type="button" class="fdr-tag" data-tag="{school_name}">School</button>
+                        </div>
+
+                        <textarea id="fdrMessage" class="form-control fdr-msg mb-1"></textarea>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="fdr-meter"><span id="fdrChars">0</span> chars · <span id="fdrParts">1</span> SMS</span>
+                            <span class="fdr-meter" id="fdrScript">Latin</span>
+                        </div>
+
+                        <label class="fdr-label">Preview</label>
+                        <div class="fdr-preview mb-2">
+                            <div class="fdr-bubble"><span id="fdrPreviewText"></span><span class="fdr-time">12:30 PM ✓✓</span></div>
+                        </div>
+
+                        <div class="btn-group w-100 mb-2" role="group">
+                            <input type="radio" class="btn-check" name="fdrWhen" id="fdrNow" value="now" checked>
+                            <label class="btn btn-sm btn-outline-primary" for="fdrNow"><i class="bx bx-send me-1"></i>Now</label>
+                            <input type="radio" class="btn-check" name="fdrWhen" id="fdrLater" value="later">
+                            <label class="btn btn-sm btn-outline-primary" for="fdrLater"><i class="bx bx-time me-1"></i>Schedule</label>
+                        </div>
+                        <input type="datetime-local" id="fdrSchedule" class="form-control form-control-sm mb-2 d-none">
+
+                        <button type="button" class="btn btn-primary w-100 btn-sm" id="fdrSend" disabled>
+                            <i class="bx bx-paper-plane me-1"></i>Send to <span id="fdrSendCount">0</span>
+                        </button>
+                        <small class="text-muted d-block text-center mt-1" style="font-size:.72rem">Est. ₹<span id="fdrCost">0.00</span> · ₹0.25/SMS segment</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ===== History ===== *@
+        <div class="ec-card mt-3">
+            <div class="ec-card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="ec-section-title-wrap">
+                        <span class="ec-section-icon"><i class="bx bx-history"></i></span>
+                        <div>
+                            <h5 class="ec-section-title mb-0">Recent Reminder History</h5>
+                            <p class="ec-section-subtitle mb-0">Last 7 days</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary">View All</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table fdr-table mb-0">
+                    <thead><tr><th>Student</th><th>Channel</th><th>Language</th><th>Tone</th><th>Sent</th><th>Status</th></tr></thead>
+                    <tbody>
+                        @{
+                            var history = new[]
+                            {
+                                new { N="Akash Verma", Ch="WhatsApp", Ic="bxl-whatsapp", ChCl="success", Lang="हिन्दी", Tone="Polite", When="Today, 11:20 AM", St="Read", StCl="success" },
+                                new { N="New Saloni",  Ch="SMS",      Ic="bx-message-dots", ChCl="warning", Lang="English", Tone="Firm", When="Today, 10:05 AM", St="Delivered", StCl="info" },
+                                new { N="Govind",      Ch="WhatsApp", Ic="bxl-whatsapp", ChCl="success", Lang="EN + हिन्दी", Tone="Polite", When="Yesterday, 4:30 PM", St="Read", StCl="success" },
+                                new { N="Demo Student",Ch="Email",    Ic="bx-envelope", ChCl="info", Lang="English", Tone="Final", When="Yesterday, 2:15 PM", St="Delivered", StCl="info" },
+                                new { N="Vikash Ji",   Ch="SMS",      Ic="bx-message-dots", ChCl="warning", Lang="मराठी", Tone="Final", When="2 days ago", St="Failed", StCl="danger" },
+                            };
+                        }
+                        @foreach (var h in history)
+                        {
+                            <tr>
+                                <td class="fw-semibold">@h.N</td>
+                                <td><span class="badge bg-label-@h.ChCl"><i class="bx @h.Ic me-1"></i>@h.Ch</span></td>
+                                <td class="fw-semibold">@h.Lang</td>
+                                <td><small class="text-muted">@h.Tone</small></td>
+                                <td><small class="text-muted">@h.When</small></td>
+                                <td><span class="badge bg-label-@h.StCl">@h.St</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="fdr-toast-wrap" id="fdrToastWrap"></div>
+
+@section PageScripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const SAMPLE = { name: 'Yash Kumar', cls: '12th', due: '20,750', days: '45', school: 'EduCore School' };
+            const PAGE_SIZE = 6;
+
+            const T = {
+                en: {
+                    polite: 'Dear Parent, gentle reminder: the fee of ₹{due_amount} for {student_name} ({class}) is still pending. Kindly clear it at your convenience. Thank you! – {school_name}',
+                    firm: 'Dear Parent, the fee of ₹{due_amount} for {student_name} ({class}) is overdue by {days} days. Please pay immediately to avoid late charges. – {school_name}',
+                    final: 'FINAL NOTICE: The fee of ₹{due_amount} for {student_name} ({class}) is overdue by {days} days. Immediate payment is required. – {school_name}'
+                },
+                hi: {
+                    polite: 'प्रिय अभिभावक, सादर सूचना: {student_name} ({class}) की ₹{due_amount} फीस अभी बाकी है। कृपया सुविधानुसार जमा करें। धन्यवाद! – {school_name}',
+                    firm: 'प्रिय अभिभावक, {student_name} ({class}) की ₹{due_amount} फीस {days} दिनों से बकाया है। कृपया विलंब शुल्क से बचने हेतु शीघ्र भुगतान करें। – {school_name}',
+                    final: 'अंतिम सूचना: {student_name} ({class}) की ₹{due_amount} फीस {days} दिनों से बकाया है। कृपया तुरंत भुगतान करें। – {school_name}'
+                },
+                mr: { polite: 'प्रिय पालक, नम्र स्मरण: {student_name} ({class}) यांची ₹{due_amount} फी अद्याप बाकी आहे. कृपया सोयीनुसार भरावी. धन्यवाद! – {school_name}' },
+                gu: { polite: 'પ્રિય વાલી, નમ્ર યાદ: {student_name} ({class}) ની ₹{due_amount} ફી હજુ બાકી છે. કૃપા કરી અનુકૂળતાએ ભરો. આભાર! – {school_name}' },
+                bn: { polite: 'প্রিয় অভিভাবক, বিনীত স্মরণ: {student_name} ({class})-এর ₹{due_amount} ফি এখনও বাকি আছে। অনুগ্রহ করে সুবিধামতো পরিশোধ করুন। ধন্যবাদ! – {school_name}' },
+                pa: { polite: 'ਪਿਆਰੇ ਮਾਪੇ, ਨਿਮਰ ਯਾਦ: {student_name} ({class}) ਦੀ ₹{due_amount} ਫੀਸ ਅਜੇ ਬਾਕੀ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਸਹੂਲਤ ਅਨੁਸਾਰ ਜਮ੍ਹਾਂ ਕਰੋ। ਧੰਨਵਾਦ! – {school_name}' },
+                ta: { polite: 'அன்புள்ள பெற்றோரே, அன்பான நினைவூட்டல்: {student_name} ({class}) இன் ₹{due_amount} கட்டணம் இன்னும் நிலுவையில் உள்ளது. தயவுசெய்து வசதியான நேரத்தில் செலுத்தவும். நன்றி! – {school_name}' },
+                te: { polite: 'ప్రియమైన తల్లిదండ్రులారా, మృదువైన గుర్తుచేయుట: {student_name} ({class}) యొక్క ₹{due_amount} ఫీజు ఇంకా బాకీ ఉంది. దయచేసి అనుకూల సమయంలో చెల్లించండి. ధన్యవాదాలు! – {school_name}' }
+            };
+            const LANG_NAME = { en: 'English', hi: 'हिन्दी', enhi: 'EN + हिन्दी', mr: 'मराठी', gu: 'ગુજરાતી', bn: 'বাংলা', pa: 'ਪੰਜਾਬੀ', ta: 'தமிழ்', te: 'తెలుగు' };
+
+            let lang = 'en', tone = 'polite', sortKey = null, sortDir = 1, page = 1;
+
+            const $ = s => document.querySelector(s);
+            const tbody = $('#fdrBody');
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+            const checks = () => Array.from(document.querySelectorAll('.fdr-check'));
+            const msg = $('#fdrMessage');
+
+            // ---------- compose ----------
+            function buildTemplate() {
+                if (lang === 'enhi') return T.en[tone] + '\n\n' + (T.hi[tone] || T.hi.polite);
+                const l = T[lang] || T.en;
+                return l[tone] || l.polite || T.en[tone];
+            }
+            function loadTemplate() { msg.value = buildTemplate(); renderPreview(); updateMeter(); }
+            function fillTags(t) {
+                return t.replace(/{student_name}/g, SAMPLE.name).replace(/{class}/g, SAMPLE.cls)
+                        .replace(/{due_amount}/g, SAMPLE.due).replace(/{days}/g, SAMPLE.days).replace(/{school_name}/g, SAMPLE.school);
+            }
+            function renderPreview() { $('#fdrPreviewText').textContent = fillTags(msg.value); }
+            function updateMeter() {
+                const text = fillTags(msg.value);
+                const unicode = /[^\x00-\x7F]/.test(text.replace(/[₹–✓]/g, ''));
+                const len = text.length, limit = unicode ? 70 : 160;
+                const parts = Math.max(1, Math.ceil(len / limit));
+                $('#fdrChars').textContent = len;
+                $('#fdrParts').textContent = parts;
+                $('#fdrScript').textContent = unicode ? 'Unicode' : 'Latin';
+                return parts;
+            }
+            function activeChannels() { return Array.from(document.querySelectorAll('.fdr-channel.active')).map(c => c.dataset.ch); }
+            function refreshCompose() {
+                const n = checks().filter(c => c.checked).length;
+                $('#fdrSelCount').textContent = n;
+                $('#fdrSendCount').textContent = n;
+                const ch = activeChannels();
+                const smsParts = ch.includes('SMS') ? updateMeter() : 0;
+                $('#fdrCost').textContent = (n * smsParts * 0.25).toFixed(2);
+                $('#fdrSend').disabled = n === 0 || ch.length === 0;
+                allRows.forEach(tr => tr.classList.toggle('fdr-selected', tr.querySelector('.fdr-check').checked));
+            }
+
+            // ---------- table: filter + sort + paginate ----------
+            function getFiltered() {
+                const q = $('#fdrSearch').value.toLowerCase().trim();
+                const cls = $('#fdrClass').value;
+                const bucket = $('#fdrBucket').value;
+                return allRows.filter(tr =>
+                    (!q || tr.dataset.name.includes(q)) &&
+                    (!cls || tr.dataset.class === cls) &&
+                    (!bucket || tr.dataset.bucket === bucket));
+            }
+            function sortVal(tr, key) {
+                if (key === 'name') return tr.dataset.name;
+                if (key === 'class') return +tr.dataset.classidx;
+                if (key === 'due') return +tr.dataset.due;
+                if (key === 'days') return +tr.dataset.days;
+                if (key === 'last') return +tr.dataset.last;
+                return 0;
+            }
+            function renderTable() {
+                let rows = getFiltered();
+                if (sortKey) rows.sort((a, b) => {
+                    const x = sortVal(a, sortKey), y = sortVal(b, sortKey);
+                    return (x < y ? -1 : x > y ? 1 : 0) * sortDir;
+                });
+                const total = rows.length;
+                const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                if (page > pages) page = pages;
+                const start = (page - 1) * PAGE_SIZE;
+                const slice = rows.slice(start, start + PAGE_SIZE);
+
+                allRows.forEach(tr => tr.style.display = 'none');
+                slice.forEach(tr => { tr.style.display = ''; tbody.appendChild(tr); });
+
+                $('#fdrEmpty').style.display = total === 0 ? 'block' : 'none';
+                $('#fdrCount').textContent = total === 0 ? 'No results'
+                    : 'Showing ' + (start + 1) + '–' + (start + slice.length) + ' of ' + total;
+
+                // pager
+                let html = '<button class="fdr-pg" data-pg="prev"' + (page === 1 ? ' disabled' : '') + '>‹</button>';
+                for (let p = 1; p <= pages; p++) html += '<button class="fdr-pg' + (p === page ? ' active' : '') + '" data-pg="' + p + '">' + p + '</button>';
+                html += '<button class="fdr-pg" data-pg="next"' + (page === pages ? ' disabled' : '') + '>›</button>';
+                $('#fdrPager').innerHTML = html;
+                $('#fdrPager').querySelectorAll('.fdr-pg').forEach(b => b.addEventListener('click', function () {
+                    const v = this.dataset.pg;
+                    if (v === 'prev') page = Math.max(1, page - 1);
+                    else if (v === 'next') page = Math.min(pages, page + 1);
+                    else page = +v;
+                    renderTable();
+                }));
+            }
+            function updateSortIcons() {
+                document.querySelectorAll('.fdr-sort').forEach(th => {
+                    th.classList.remove('asc', 'desc');
+                    const ic = th.querySelector('i');
+                    ic.className = 'bx bx-chevron-down';
+                    if (th.dataset.key === sortKey) {
+                        th.classList.add(sortDir === 1 ? 'asc' : 'desc');
+                        ic.className = sortDir === 1 ? 'bx bx-chevron-up' : 'bx bx-chevron-down';
+                    }
+                });
+            }
+
+            document.querySelectorAll('.fdr-sort').forEach(th => th.addEventListener('click', function () {
+                const key = this.dataset.key;
+                if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
+                updateSortIcons(); renderTable();
+            }));
+            ['#fdrSearch', '#fdrClass', '#fdrBucket'].forEach(s => {
+                $(s).addEventListener('input', () => { page = 1; renderTable(); });
+                $(s).addEventListener('change', () => { page = 1; renderTable(); });
+            });
+
+            // ---------- interactions ----------
+            document.querySelectorAll('.fdr-lang').forEach(b => b.addEventListener('click', function () {
+                document.querySelectorAll('.fdr-lang').forEach(x => x.classList.remove('active'));
+                this.classList.add('active'); lang = this.dataset.lang; loadTemplate(); refreshCompose();
+            }));
+            $('#fdrTone').addEventListener('change', function () { tone = this.value; loadTemplate(); refreshCompose(); });
+            msg.addEventListener('input', function () { renderPreview(); refreshCompose(); });
+            document.querySelectorAll('.fdr-tag').forEach(btn => btn.addEventListener('click', function () {
+                const tag = this.dataset.tag, s = msg.selectionStart, e = msg.selectionEnd;
+                msg.value = msg.value.slice(0, s) + tag + msg.value.slice(e);
+                msg.focus(); msg.selectionStart = msg.selectionEnd = s + tag.length;
+                renderPreview(); refreshCompose();
+            }));
+            document.querySelectorAll('.fdr-channel').forEach(c => c.addEventListener('click', function () { this.classList.toggle('active'); refreshCompose(); }));
+            $('#fdrSelectAll').addEventListener('change', function () {
+                allRows.forEach(tr => { if (tr.style.display !== 'none') tr.querySelector('.fdr-check').checked = this.checked; });
+                refreshCompose();
+            });
+            checks().forEach(c => c.addEventListener('change', refreshCompose));
+            document.querySelectorAll('input[name="fdrWhen"]').forEach(r => r.addEventListener('change', function () {
+                $('#fdrSchedule').classList.toggle('d-none', this.value !== 'later');
+            }));
+
+            function toast(text, color) {
+                const el = document.createElement('div');
+                el.className = 'fdr-toast';
+                if (color) el.style.borderLeftColor = color;
+                el.innerHTML = '<i class="bx bx-check-circle" style="color:' + (color || '#16a34a') + ';font-size:1.15rem"></i><span>' + text + '</span>';
+                $('#fdrToastWrap').appendChild(el);
+                setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3000);
+            }
+
+            document.querySelectorAll('.fdr-remind-one').forEach(btn => btn.addEventListener('click', function () {
+                const tr = this.closest('tr'), name = tr.querySelector('.fw-semibold').textContent, ch = activeChannels();
+                if (!ch.length) { toast('Select at least one channel first', '#dc2626'); return; }
+                tr.querySelector('.fdr-last').innerHTML = '<small class="fw-semibold" style="color:#16a34a"><i class="bx bx-check"></i> Just now</small>';
+                tr.dataset.last = '0';
+                toast('Reminder sent to ' + name + ' in ' + LANG_NAME[lang] + ' via ' + ch.join(' + '));
+            }));
+            $('#fdrSend').addEventListener('click', function () {
+                const sel = checks().filter(c => c.checked), ch = activeChannels();
+                if (!sel.length || !ch.length) return;
+                sel.forEach(c => {
+                    const tr = c.closest('tr');
+                    tr.querySelector('.fdr-last').innerHTML = '<small class="fw-semibold" style="color:#16a34a"><i class="bx bx-check"></i> Just now</small>';
+                    tr.dataset.last = '0'; c.checked = false;
+                });
+                $('#fdrSelectAll').checked = false; refreshCompose();
+                const when = $('#fdrLater').checked ? 'scheduled' : 'sent';
+                toast('Reminder ' + when + ' to ' + sel.length + ' student' + (sel.length > 1 ? 's' : '') + ' in ' + LANG_NAME[lang] + ' via ' + ch.join(' + '));
+            });
+            $('#fdrExport').addEventListener('click', () => toast('Defaulter list exported to Excel', '#ff8a00'));
+
+            loadTemplate();
+            renderTable();
+            refreshCompose();
+        });
+    </script>
+}

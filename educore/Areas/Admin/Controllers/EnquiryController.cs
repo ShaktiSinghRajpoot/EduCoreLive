@@ -12,15 +12,18 @@ namespace educore.Areas.Admin.Controllers
     {
         private readonly IEnquiryService _enquiryService;
         private readonly ISchoolSettingsService _schoolSettingsService;
+        private readonly IAdmissionWorkflowService _admissionWorkflowService;
         private readonly IBaseService _baseService;
 
         public EnquiryController(
             IEnquiryService enquiryService,
             ISchoolSettingsService schoolSettingsService,
+            IAdmissionWorkflowService admissionWorkflowService,
             IBaseService baseService)
         {
             _enquiryService = enquiryService;
             _schoolSettingsService = schoolSettingsService;
+            _admissionWorkflowService = admissionWorkflowService;
             _baseService = baseService;
         }
 
@@ -41,6 +44,9 @@ namespace educore.Areas.Admin.Controllers
             // Counsellors — try loading; empty list is acceptable if not configured
             try { model.AvailableCounsellors = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Counsellor"); }
             catch { model.AvailableCounsellors = new List<SelectListItem>(); }
+
+            // Admission workflow settings — drive show/hide of the Registration stage.
+            model.Workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, actionUserId);
 
             return View("~/Areas/Admin/Views/SchoolSettings/EnquiryCRM.cshtml", model);
         }
@@ -150,6 +156,54 @@ namespace educore.Areas.Admin.Controllers
             });
         }
 
+        // ── GET: /Admin/Enquiry/GetEnquiry (AJAX) — for edit prefill ──
+        [HttpGet]
+        public async Task<IActionResult> GetEnquiry(int id)
+        {
+            int tenantId = TenantId(), schoolId = SchoolId(), actionUserId = UserId();
+
+            var e = await _enquiryService.GetEnquiryByIdAsync(id, tenantId, schoolId, actionUserId);
+            if (e == null)
+                return Json(new { success = false, message = "Enquiry not found." });
+
+            // Once admitted, corrections must go through Edit Student — the enquiry is locked.
+            if (e.AdmissionId.HasValue)
+                return Json(new { success = false, locked = true, message = "This enquiry is already admitted. Edit the student record instead." });
+
+            return Json(new
+            {
+                success = true,
+                data = new
+                {
+                    enquiryId        = e.EnquiryId,
+                    studentName      = e.StudentName,
+                    gender           = e.Gender,
+                    dob              = e.Dob?.ToString("yyyy-MM-dd"),
+                    className        = e.ClassName,
+                    session          = e.Session,
+                    currentSchool    = e.CurrentSchool,
+                    currentClass     = e.CurrentClass,
+                    interestedStream = e.InterestedStream,
+                    fatherName       = e.FatherName,
+                    fatherMobile     = e.FatherMobile,
+                    motherName       = e.MotherName,
+                    motherMobile     = e.MotherMobile,
+                    parentEmail      = e.ParentEmail,
+                    whatsAppNumber   = e.WhatsAppNumber,
+                    city             = e.City,
+                    areaLocality     = e.AreaLocality,
+                    leadSource       = e.LeadSource,
+                    status           = e.Status,
+                    referrerName     = e.ReferrerName,
+                    referrerMobile   = e.ReferrerMobile,
+                    assignedToId     = e.AssignedToId,
+                    nextFollowupDate = e.NextFollowupDate?.ToString("yyyy-MM-dd"),
+                    transportRequired = e.TransportRequired,
+                    notes            = e.Notes
+                }
+            });
+        }
+
         // ── POST: /Admin/Enquiry/SaveEnquiry ─────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -158,6 +212,33 @@ namespace educore.Areas.Admin.Controllers
             int tenantId = TenantId();
             int schoolId = SchoolId();
             int actionUserId = UserId();
+
+            // Edit path: correct DETAILS only — never the state-machine / registration fields.
+            if (model.EnquiryId > 0)
+            {
+                var existing = await _enquiryService.GetEnquiryByIdAsync(model.EnquiryId, tenantId, schoolId, actionUserId);
+                if (existing != null)
+                {
+                    // An admitted enquiry is locked — corrections go through Edit Student.
+                    if (existing.AdmissionId.HasValue)
+                    {
+                        TempData["Result"] = "0";
+                        TempData["Message"] = "This enquiry is already admitted. Edit the student record instead.";
+                        return RedirectToAction(nameof(EnquiryCRM));
+                    }
+
+                    // Preserve status & registration so editing can't reset the status
+                    // (e.g. Not Interested → New) or wipe a registration number / fee.
+                    // These change only through their own actions (status dropdown, Register).
+                    model.Status              = existing.Status;
+                    model.Priority            = existing.Priority;
+                    model.LostReason          = existing.LostReason;
+                    model.EstimatedFee        = existing.EstimatedFee;
+                    model.RegistrationNumber  = existing.RegistrationNumber;
+                    model.RegistrationDate    = existing.RegistrationDate;
+                    model.RegistrationFeePaid = existing.RegistrationFeePaid;
+                }
+            }
 
             // Primary mobile: use father mobile if main mobile is blank
             if (string.IsNullOrWhiteSpace(model.Mobile) && !string.IsNullOrWhiteSpace(model.FatherMobile))
@@ -194,6 +275,10 @@ namespace educore.Areas.Admin.Controllers
 
             if (req == null || req.EnquiryId <= 0)
                 return Json(new { success = false, message = "Invalid request." });
+
+            // Block action-driven statuses from the follow-up "also update status" path too.
+            if (IsActionDrivenStatus(req.NewStatus))
+                return Json(new { success = false, message = "Use the Register or Convert action to set this status." });
 
             // Require lost reason when marking as Not Interested
             if (req.NewStatus is "Not Interested" or "Dropped" && string.IsNullOrWhiteSpace(req.LostReason))
@@ -233,6 +318,11 @@ namespace educore.Areas.Admin.Controllers
             if (req == null || req.EnquiryId <= 0 || string.IsNullOrWhiteSpace(req.Status))
                 return Json(new { success = false, message = "Invalid request." });
 
+            // Action-driven statuses cannot be set directly — they require their side-effects
+            // (registration number / student record). Use the Register / Convert actions.
+            if (IsActionDrivenStatus(req.Status))
+                return Json(new { success = false, message = "Use the Register or Convert action to set this status." });
+
             if (req.Status is "Not Interested" or "Dropped" && string.IsNullOrWhiteSpace(req.LostReason))
                 return Json(new { success = false, message = "Please select a reason for Not Interested." });
 
@@ -241,6 +331,44 @@ namespace educore.Areas.Admin.Controllers
                 tenantId, schoolId, actionUserId);
 
             return Json(new { success = success > 0, message });
+        }
+
+        // ── POST: /Admin/Enquiry/RegisterEnquiry (AJAX) ──────────
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegisterEnquiry([FromBody] RegisterEnquiryRequest req)
+        {
+            int tenantId = TenantId();
+            int schoolId = SchoolId();
+            int actionUserId = UserId();
+
+            if (req == null || req.EnquiryId <= 0)
+                return Json(new { success = false, message = "Invalid request." });
+
+            // Registration must be enabled for this school.
+            var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, actionUserId);
+            if (!workflow.EnableRegistration)
+                return Json(new { success = false, message = "Registration is not enabled for this school." });
+
+            // Manual number is required only when auto-generate is off.
+            if (!workflow.AutoGenerateRegistrationNumber && string.IsNullOrWhiteSpace(req.RegistrationNumber))
+                return Json(new { success = false, message = "Please enter a registration number." });
+
+            DateOnly? regDate = null;
+            if (!string.IsNullOrWhiteSpace(req.RegistrationDate) &&
+                DateOnly.TryParse(req.RegistrationDate, out var parsed))
+                regDate = parsed;
+
+            var (success, message, regNo) = await _enquiryService.RegisterEnquiryAsync(
+                req.EnquiryId,
+                NullIfEmpty(req.RegistrationNumber),
+                regDate,
+                req.RegistrationFeePaid,
+                workflow.AutoGenerateRegistrationNumber,
+                workflow.RegistrationNumberPrefix,
+                tenantId, schoolId, actionUserId);
+
+            return Json(new { success = success > 0, message, registrationNumber = regNo });
         }
 
         // ── POST: /Admin/Enquiry/DeleteEnquiry (AJAX) ─────────────
@@ -264,6 +392,11 @@ namespace educore.Areas.Admin.Controllers
         private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
         private int UserId() => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
         private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+        // Statuses that may only be set by their owning action (Register / admission save),
+        // never by a direct status change — they carry required data/side-effects.
+        private static bool IsActionDrivenStatus(string? status) =>
+            status is "Registration Done" or "Admission Confirmed";
 
     }
 }

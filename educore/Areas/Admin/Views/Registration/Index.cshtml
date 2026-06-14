@@ -1,0 +1,389 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model EduCoreDataAccessLayer.Models.Admin.RegistrationPageModel
+@{
+    ViewData["Title"] = "Registrations";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var stats = Model.Stats;
+}
+
+@section PageStyles {
+<style>
+    .reg-kpi { border:1px solid var(--ec-border); border-radius:14px; background:#fff; padding:1rem 1.1rem; height:100%; display:flex; align-items:center; gap:.9rem; transition:box-shadow .18s; }
+    .reg-kpi:hover { box-shadow:0 6px 18px rgba(0,0,0,.06); }
+    .reg-kpi .ic { width:44px; height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0; }
+    .reg-kpi .val { font-size:1.55rem; font-weight:800; line-height:1; }
+    .reg-kpi .lbl { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ec-text-muted); }
+    .reg-tbl thead th { background:linear-gradient(180deg,#fffaf3,#fff6ea); color:var(--ec-text-light); font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; padding:.75rem .9rem; white-space:nowrap; }
+    .reg-tbl tbody td { padding:.7rem .9rem; vertical-align:middle; font-size:.84rem; font-weight:600; border-bottom:1px solid #f4f0eb; }
+    .reg-tbl tbody tr:hover td { background:#fffaf3; }
+    .reg-no { font-weight:800; color:var(--ec-primary); font-size:.85rem; }
+    .reg-bdg { display:inline-flex; align-items:center; gap:.28rem; padding:.24rem .6rem; border-radius:999px; font-size:.69rem; font-weight:800; white-space:nowrap; }
+    .b-paid    { background:#d1f0e0; color:#0a5a35; }
+    .b-unpaid  { background:#fde8e8; color:#842029; }
+    .b-regdone { background:#e2e3e5; color:#495057; }
+    .b-admitted{ background:#d4edda; color:#155724; }
+    .reg-act-btn { width:31px; height:31px; padding:0; border-radius:7px; }
+    /* ── Print slip ── */
+    .reg-slip { font-family:'Segoe UI',sans-serif; color:#222; }
+    .reg-slip h4 { font-weight:800; margin-bottom:.15rem; }
+    .reg-slip .slip-row { display:flex; justify-content:space-between; padding:.45rem 0; border-bottom:1px dashed #ddd; font-size:.9rem; }
+    .reg-slip .slip-row span:first-child { color:#666; font-weight:600; }
+    .reg-slip .slip-row span:last-child { font-weight:700; }
+    @@media print {
+        body * { visibility:hidden !important; }
+        #regSlipPrintArea, #regSlipPrintArea * { visibility:visible !important; }
+        #regSlipPrintArea { position:absolute; left:0; top:0; width:100%; padding:24px; }
+        .modal-footer, .btn-close { display:none !important; }
+    }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <!-- Header -->
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+        <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+          <div class="ec-page-icon"><i class="bx bx-clipboard"></i></div>
+          <div>
+            <h3 class="ec-page-title mb-1">Registrations</h3>
+            <p class="ec-page-subtitle mb-0">All registered students with their registration numbers &amp; details.</p>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline-secondary" id="btnExport"><i class="bx bx-export me-1"></i> Export</button>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-xl-3">
+        <div class="reg-kpi"><div class="ic bg-label-primary"><i class="bx bx-clipboard text-primary"></i></div>
+          <div><div class="val text-primary" id="kpiTotal">@stats.TotalRegistered</div><div class="lbl">Registered</div></div></div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="reg-kpi"><div class="ic bg-label-success"><i class="bx bx-check-circle text-success"></i></div>
+          <div><div class="val text-success" id="kpiPaid">@stats.FeeCollected</div><div class="lbl">Fee Collected</div></div></div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="reg-kpi"><div class="ic bg-label-danger"><i class="bx bx-error-circle text-danger"></i></div>
+          <div><div class="val text-danger" id="kpiPending">@stats.FeePending</div><div class="lbl">Fee Pending</div></div></div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="reg-kpi"><div class="ic bg-label-info"><i class="bx bx-user-check text-info"></i></div>
+          <div><div class="val text-info" id="kpiConverted">@stats.Converted</div><div class="lbl">Admitted</div></div></div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="ec-card mb-3">
+      <div class="ec-card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-lg-4">
+            <div class="input-group">
+              <span class="input-group-text bg-transparent border-end-0 pe-1"><i class="bx bx-search text-muted"></i></span>
+              <input type="search" class="form-control border-start-0 ps-0" id="regSearch" placeholder="Search name, reg no or mobile..." />
+            </div>
+          </div>
+          <div class="col-6 col-lg-2">
+            <select class="form-select" id="fSession"><option value="">All Sessions</option>
+              @foreach (var s in Model.AvailableSessions) { <option value="@s.Text">@s.Text</option> }
+            </select>
+          </div>
+          <div class="col-6 col-lg-2">
+            <select class="form-select" id="fClass"><option value="">All Classes</option>
+              @foreach (var c in Model.AvailableClasses) { <option value="@c.Text">@c.Text</option> }
+            </select>
+          </div>
+          @if (Model.RegistrationFeeEnabled)
+          {
+          <div class="col-6 col-lg-2">
+            <select class="form-select" id="fFee"><option value="">All Fees</option>
+              <option value="paid">Fee Collected</option><option value="unpaid">Fee Pending</option>
+            </select>
+          </div>
+          }
+          <div class="col-6 col-lg-2">
+            <button class="btn btn-outline-secondary w-100" id="btnClear"><i class="bx bx-x"></i> Clear</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="ec-card">
+      <div class="table-responsive">
+        <table class="table reg-tbl align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Reg No</th><th>Student</th><th>Class / Session</th>
+              <th>Parent &amp; Contact</th><th>Reg Date</th>
+              @if (Model.RegistrationFeeEnabled) { <th>Fee</th> }
+              <th>Status</th><th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="regBody">
+            <tr><td colspan="8" class="text-center py-5 text-muted">
+              <div class="spinner-border spinner-border-sm text-primary me-2"></div>Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="text-center py-5 d-none" id="regEmpty">
+        <div class="avatar avatar-lg mx-auto mb-3"><span class="avatar-initial rounded bg-label-secondary"><i class="bx bx-clipboard"></i></span></div>
+        <h6 class="mb-1">No registrations found</h6>
+        <p class="text-muted mb-0">Registered students will appear here.</p>
+      </div>
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-3 border-top" id="pgBar">
+        <div class="d-flex align-items-center gap-2">
+          <label class="text-muted" style="font-size:.77rem">Per page:</label>
+          <select class="form-select form-select-sm" id="pageSize" style="width:auto"><option>10</option><option>25</option><option>50</option></select>
+          <span class="text-muted" id="pgInfo" style="font-size:.77rem"></span>
+        </div>
+        <nav><ul class="pagination pagination-sm mb-0" id="pgControls"></ul></nav>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Print Slip Modal ── -->
+<div class="modal fade" id="slipModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body">
+        <div id="regSlipPrintArea" class="reg-slip">
+          <div class="text-center mb-3">
+            <h4>Registration Slip</h4>
+            <div class="text-muted" style="font-size:.85rem">Admission Registration Confirmation</div>
+          </div>
+          <div class="slip-row"><span>Registration No</span><span id="slipNo">—</span></div>
+          <div class="slip-row"><span>Student Name</span><span id="slipName">—</span></div>
+          <div class="slip-row"><span>Class</span><span id="slipClass">—</span></div>
+          <div class="slip-row"><span>Session</span><span id="slipSession">—</span></div>
+          <div class="slip-row"><span>Parent / Guardian</span><span id="slipParent">—</span></div>
+          <div class="slip-row"><span>Contact</span><span id="slipMobile">—</span></div>
+          <div class="slip-row"><span>Registration Date</span><span id="slipDate">—</span></div>
+          <div class="slip-row" id="slipFeeRow"><span>Registration Fee</span><span id="slipFee">—</span></div>
+          <div class="mt-5 d-flex justify-content-between" style="font-size:.85rem;">
+            <div>____________________<br/>Parent Signature</div>
+            <div class="text-end">____________________<br/>Authorised Signatory</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="btnPrintSlip"><i class="bx bx-printer me-1"></i> Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Cancel Registration Modal ── -->
+<div class="modal fade" id="cancelRegModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-header d-flex align-items-center justify-content-between gap-2">
+        <div class="d-flex align-items-center gap-2"><i class="bx bx-x-circle text-danger fs-5"></i><h6 class="modal-title mb-0">Cancel Registration</h6></div>
+        <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="cancelEnquiryId" />
+        <p class="mb-2">Cancel registration for <strong id="cancelName"></strong>? The lead will be marked <strong>Not Interested</strong> (withdrawn).</p>
+        <label class="form-label">Reason <span class="text-danger">*</span></label>
+        <select class="form-select" id="cancelReason">
+          <option value="" disabled selected>Select reason</option>
+          <option>Fees Too High</option>
+          <option>Admitted to Another School</option>
+          <option>Distance / Transport Issue</option>
+          <option>Changed Mind</option>
+          <option>Not Responding</option>
+          <option>Other</option>
+        </select>
+        <div class="alert alert-warning mt-3 mb-0 py-2" id="cancelFeeNote" style="font-size:.82rem">
+          <i class="bx bx-info-circle me-1"></i>The registration fee already collected is <strong>non-refundable</strong> and stays on record. The registration number is kept for audit.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Keep</button>
+        <button type="button" class="btn btn-danger btn-sm" id="confirmCancelReg"><i class="bx bx-x me-1"></i> Mark Withdrawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+    toastr.options = { closeButton:true, progressBar:true, positionClass:'toast-top-right', timeOut:3000 };
+
+    var FEE_ENABLED = @(Model.RegistrationFeeEnabled ? "true" : "false");
+    var csrf = $('input[name="__RequestVerificationToken"]').first().val() || $('[name="__RequestVerificationToken"]').val() || '';
+    var ADMISSION_URL = '@Url.Action("Create", "Admission", new { area = "ERP" })';
+    var ENQUIRY_EDIT_URL = '@Url.Action("EnquiryCRM", "Enquiry", new { area = "Admin" })';
+
+    var F = { page:1, pageSize:10, search:'', session:'', className:'', feeStatus:'' };
+    var lastRows = [];
+
+    function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+    function feeBadge(paid){ return paid ? '<span class="reg-bdg b-paid">Paid</span>' : '<span class="reg-bdg b-unpaid">Pending</span>'; }
+    function statusBadge(r){
+        if (r.isAdmitted) return '<span class="reg-bdg b-admitted">Admitted</span>';
+        if (r.status === 'Not Interested') return '<span class="reg-bdg b-unpaid">Withdrawn</span>';
+        return '<span class="reg-bdg b-regdone">Registered</span>';
+    }
+
+    function rowHtml(r) {
+        var withdrawn = (r.status === 'Not Interested');   // cancelled — fee retained, lead lost
+        var active    = !r.isAdmitted && !withdrawn;
+        var actions = '<div class="d-inline-flex gap-1 align-items-center justify-content-end flex-nowrap">';
+        // Edit (correct details) — opens the enquiry form in the CRM; hidden once admitted
+        if (!r.isAdmitted)
+            actions += '<a href="'+ENQUIRY_EDIT_URL+'?editId='+r.enquiryId+'" class="btn btn-sm btn-icon btn-outline-primary reg-act-btn" title="Edit details"><i class="bx bx-edit"></i></a>';
+        // Re-print slip (always available — audit record)
+        actions += '<button class="btn btn-sm btn-icon btn-outline-secondary reg-act-btn btn-slip" title="Print slip" data-id="'+r.enquiryId+'"><i class="bx bx-printer"></i></button>';
+        // Mark fee paid
+        if (FEE_ENABLED && !r.registrationFeePaid && active)
+            actions += '<button class="btn btn-sm btn-icon btn-outline-success reg-act-btn btn-fee" title="Mark fee collected" data-id="'+r.enquiryId+'"><i class="bx bx-rupee"></i></button>';
+        // Convert to admission
+        if (active)
+            actions += '<a href="'+ADMISSION_URL+'?enquiryId='+r.enquiryId+'" class="btn btn-sm btn-icon btn-success reg-act-btn" title="Convert to Admission"><i class="bx bx-user-check"></i></a>';
+        // Cancel (mark withdrawn / Not Interested — fee retained)
+        if (active)
+            actions += '<button class="btn btn-sm btn-icon btn-outline-danger reg-act-btn btn-cancel" title="Cancel registration" data-id="'+r.enquiryId+'" data-name="'+esc(r.studentName)+'"><i class="bx bx-x"></i></button>';
+        actions += '</div>';
+
+        var feeCol = FEE_ENABLED ? '<td>'+feeBadge(r.registrationFeePaid)+'</td>' : '';
+        return '<tr>'
+            + '<td><span class="reg-no">'+esc(r.registrationNumber)+'</span></td>'
+            + '<td class="fw-bold">'+esc(r.studentName)+'</td>'
+            + '<td>'+esc(r.className||'—')+' <span class="text-muted">· '+esc(r.session||'—')+'</span></td>'
+            + '<td>'+esc(r.parentName||'—')+'<div class="text-muted" style="font-size:.76rem">'+esc(r.mobile||'')+'</div></td>'
+            + '<td>'+esc(r.registrationDate)+'</td>'
+            + feeCol
+            + '<td>'+statusBadge(r)+'</td>'
+            + '<td class="text-end">'+actions+'</td>'
+            + '</tr>';
+    }
+
+    function load() {
+        $.get('/Admin/Registration/GetRegistrationsData', {
+            page:F.page, pageSize:F.pageSize, search:F.search,
+            session:F.session, className:F.className, feeStatus:F.feeStatus
+        }).done(function (d) {
+            if (!d.success) return;
+            lastRows = d.rows || [];
+            if (lastRows.length === 0) {
+                $('#regBody').html('');
+                $('#regEmpty').removeClass('d-none');
+            } else {
+                $('#regEmpty').addClass('d-none');
+                $('#regBody').html(lastRows.map(rowHtml).join(''));
+            }
+            if (d.stats) {
+                $('#kpiTotal').text(d.stats.totalRegistered);
+                $('#kpiPaid').text(d.stats.feeCollected);
+                $('#kpiPending').text(d.stats.feePending);
+                $('#kpiConverted').text(d.stats.converted);
+            }
+            renderPaging(d);
+        }).fail(function () { toastr.error('Failed to load registrations.'); });
+    }
+
+    function renderPaging(d) {
+        var from = d.totalCount === 0 ? 0 : (d.page-1)*d.pageSize + 1;
+        var to = Math.min(d.page*d.pageSize, d.totalCount);
+        $('#pgInfo').text(d.totalCount ? ('Showing '+from+'–'+to+' of '+d.totalCount) : '0 results');
+        var html = '';
+        if (d.totalPages > 1) {
+            html += pgItem(d.page-1, '«', d.page<=1, false);
+            for (var p=1; p<=d.totalPages; p++) html += pgItem(p, p, false, p===d.page);
+            html += pgItem(d.page+1, '»', d.page>=d.totalPages, false);
+        }
+        $('#pgControls').html(html);
+    }
+    function pgItem(p,label,disabled,active){
+        return '<li class="page-item'+(disabled?' disabled':'')+(active?' active':'')+'"><a class="page-link" href="#" data-p="'+p+'">'+label+'</a></li>';
+    }
+
+    /* ── events ── */
+    var searchTimer;
+    $('#regSearch').on('input', function(){ clearTimeout(searchTimer); var v=this.value; searchTimer=setTimeout(function(){ F.search=v; F.page=1; load(); },300); });
+    $('#fSession,#fClass,#fFee').on('change', function(){ F.session=$('#fSession').val(); F.className=$('#fClass').val(); F.feeStatus=$('#fFee').val()||''; F.page=1; load(); });
+    $('#pageSize').on('change', function(){ F.pageSize=parseInt(this.value); F.page=1; load(); });
+    $('#btnClear').on('click', function(){ $('#regSearch').val(''); $('#fSession,#fClass,#fFee').val(''); F.search=F.session=F.className=F.feeStatus=''; F.page=1; load(); });
+    $('#pgControls').on('click', '.page-link', function(e){ e.preventDefault(); var p=parseInt($(this).data('p')); if(p>=1){ F.page=p; load(); } });
+
+    /* ── print slip ── */
+    $('#regBody').on('click', '.btn-slip', function(){
+        var id = $(this).data('id');
+        var r = lastRows.find(function(x){ return x.enquiryId === id; });
+        if (!r) return;
+        $('#slipNo').text(r.registrationNumber||'—');
+        $('#slipName').text(r.studentName||'—');
+        $('#slipClass').text(r.className||'—');
+        $('#slipSession').text(r.session||'—');
+        $('#slipParent').text(r.parentName||'—');
+        $('#slipMobile').text(r.mobile||'—');
+        $('#slipDate').text(r.registrationDate||'—');
+        if (FEE_ENABLED) { $('#slipFeeRow').show(); $('#slipFee').text(r.registrationFeePaid ? 'Paid' : 'Pending'); }
+        else $('#slipFeeRow').hide();
+        new bootstrap.Modal(document.getElementById('slipModal')).show();
+    });
+    $('#btnPrintSlip').on('click', function(){ window.print(); });
+
+    /* ── mark fee paid ── */
+    $('#regBody').on('click', '.btn-fee', function(){
+        var id = $(this).data('id');
+        $.ajax({ url:'/Admin/Registration/MarkFeePaid', type:'POST', contentType:'application/json',
+            headers:{ 'RequestVerificationToken':csrf }, data: JSON.stringify({ enquiryId:id }) })
+        .done(function(res){ if(res.success){ toastr.success(res.message); load(); } else toastr.error(res.message||'Failed.'); })
+        .fail(function(){ toastr.error('Something went wrong.'); });
+    });
+
+    /* ── cancel registration (mark withdrawn / Not Interested) ── */
+    $('#regBody').on('click', '.btn-cancel', function(){
+        var id = $(this).data('id');
+        var r = lastRows.find(function(x){ return x.enquiryId === id; });
+        $('#cancelEnquiryId').val(id);
+        $('#cancelName').text($(this).data('name'));
+        $('#cancelReason').val('');
+        // Non-refundable note only when this lead actually paid the registration fee.
+        $('#cancelFeeNote').toggle(!!(FEE_ENABLED && r && r.registrationFeePaid));
+        new bootstrap.Modal(document.getElementById('cancelRegModal')).show();
+    });
+    $('#confirmCancelReg').on('click', function(){
+        var id = parseInt($('#cancelEnquiryId').val());
+        var reason = $('#cancelReason').val();
+        if (!reason) { toastr.error('Please select a reason.'); return; }
+        var $b = $(this).prop('disabled', true).html('<i class="bx bx-loader-circle bx-spin me-1"></i>…');
+        $.ajax({ url:'/Admin/Registration/Cancel', type:'POST', contentType:'application/json',
+            headers:{ 'RequestVerificationToken':csrf }, data: JSON.stringify({ enquiryId:id, reason:reason }) })
+        .done(function(res){
+            if(res.success){ bootstrap.Modal.getInstance(document.getElementById('cancelRegModal')).hide(); toastr.success(res.message); load(); }
+            else toastr.error(res.message||'Failed.');
+        })
+        .fail(function(){ toastr.error('Something went wrong.'); })
+        .always(function(){ $b.prop('disabled', false).html('<i class="bx bx-x me-1"></i> Mark Withdrawn'); });
+    });
+
+    /* ── export current view to CSV ── */
+    $('#btnExport').on('click', function(){
+        if (!lastRows.length) { toastr.info('Nothing to export.'); return; }
+        var head = ['Reg No','Student','Class','Session','Parent','Mobile','Reg Date','Fee','Status'];
+        var lines = lastRows.map(function(r){
+            return [r.registrationNumber, r.studentName, r.className, r.session, r.parentName, r.mobile,
+                    r.registrationDate, (FEE_ENABLED ? (r.registrationFeePaid?'Paid':'Pending') : ''), (r.isAdmitted?'Admitted':'Registered')];
+        });
+        var csv = '﻿' + [head].concat(lines).map(function(row){
+            return row.map(function(c){ return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'; }).join(',');
+        }).join('\r\n');
+        var a = $('<a>').attr({ href:'data:text/csv;charset=utf-8,'+encodeURIComponent(csv), download:'registrations_'+new Date().toISOString().slice(0,10)+'.csv' }).appendTo('body');
+        a[0].click(); a.remove();
+    });
+
+    load();
+});
+</script>
+}

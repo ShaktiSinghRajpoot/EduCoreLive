@@ -1,3 +1,5 @@
+@using System.Linq
+@using Microsoft.AspNetCore.Mvc.Rendering
 @{
     ViewData["Title"] = "Classes & Sections";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -199,12 +201,24 @@
         </div>
 
         <div class="cs-fbar">
+          <select class="cs-srch-inp" id="csYear" style="flex:0 0 auto;width:auto;padding:0 .75rem;font-weight:700;" title="Academic year">
+            @foreach (var y in (ViewBag.AcademicYears as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>()))
+            {
+                if (y.Value == Convert.ToString(ViewBag.AcademicYearId))
+                {
+                    <option value="@y.Value" selected>@y.Text</option>
+                }
+                else
+                {
+                    <option value="@y.Value">@y.Text</option>
+                }
+            }
+          </select>
           <div class="cs-srch-wrap">
             <i class="bx bx-search cs-srch-ic"></i>
             <input type="search" class="cs-srch-inp" id="csSearch" placeholder="Search class or section…">
           </div>
           <button class="cs-btn" id="btnExpand"><i class="bx bx-expand-vertical"></i>Expand all</button>
-          <button class="cs-btn" id="btnClone"><i class="bx bx-copy-alt"></i>Clone last year</button>
           <button class="cs-btn primary ms-auto" id="btnAddClass"><i class="bx bx-plus"></i>Add Class</button>
         </div>
       </div>
@@ -292,7 +306,7 @@
         <div class="row g-3">
           <div class="col-12 col-sm-6">
             <label class="form-label cs-modal-lbl">Section Name</label>
-            <input type="text" class="form-control" id="mSecName" placeholder="e.g. A">
+            <input type="text" class="form-control" id="mSecName" placeholder="e.g. A or Science">
           </div>
           <div class="col-12 col-sm-6">
             <label class="form-label cs-modal-lbl">Capacity</label>
@@ -322,50 +336,62 @@
 (function(){
 'use strict';
 
+var ACADEMIC_YEAR_ID = @(ViewBag.AcademicYearId ?? 0);
+var URL_SAVE = '@Url.Action("SaveClassSection", "SchoolSettings", new { area = "Admin" })';
+var seed = @Html.Raw(ViewBag.ClassDataJson ?? "[]");
+
 var nextClassId=100, nextSecId=900;
 var editClassId=null, secCtx={classId:null, secId:null};
+var openSet={};
 
-/* Mock structure (would come from SP). cap = capacity, str = current strength */
-var DATA=[
-  {id:1, name:'Class 1',  rank:1,  stream:'gen', coord:'Mrs. Rao',
-    sections:[
-      {id:11,name:'A',cap:40,str:38,teacher:'Mrs. Rao',room:'101'},
-      {id:12,name:'B',cap:40,str:35,teacher:'Ms. Dsouza',room:'102'}
-    ]},
-  {id:2, name:'Class 2',  rank:2,  stream:'gen', coord:'Mr. Khanna',
-    sections:[
-      {id:21,name:'A',cap:40,str:40,teacher:'Mr. Khanna',room:'103'},
-      {id:22,name:'B',cap:40,str:33,teacher:'Mrs. Iyer',room:'104'}
-    ]},
-  {id:3, name:'Class 5',  rank:5,  stream:'gen', coord:'Mrs. Sharma',
-    sections:[
-      {id:31,name:'A',cap:42,str:39,teacher:'Mrs. Sharma',room:'201'},
-      {id:32,name:'B',cap:42,str:41,teacher:'Mr. Banerjee',room:'202'},
-      {id:33,name:'C',cap:42,str:28,teacher:'Ms. Fernandes',room:'203'}
-    ]},
-  {id:4, name:'Class 10', rank:10, stream:'gen', coord:'Mr. Mehta',
-    sections:[
-      {id:41,name:'A',cap:45,str:44,teacher:'Mr. Mehta',room:'301'},
-      {id:42,name:'B',cap:45,str:45,teacher:'Mrs. Pillai',room:'302'}
-    ]},
-  {id:5, name:'Class 11', rank:11, stream:'sci', coord:'Dr. Nair',
-    sections:[
-      {id:51,name:'A',cap:50,str:31,teacher:'Dr. Nair',room:'401'}
-    ]},
-  {id:6, name:'Class 12', rank:12, stream:'com', coord:'Mr. Gupta',
-    sections:[
-      {id:61,name:'A',cap:50,str:22,teacher:'Mr. Gupta',room:'402'}
-    ]}
-];
-
-var openSet={};   // classId -> bool
+/* Build the working model from the server (row order = display order). */
+var DATA=(seed||[]).map(function(c,i){
+  return {
+    id:++nextClassId,
+    name:c.name,
+    rank:c.rank||(i+1),
+    stream:c.stream||'gen',
+    coord:c.coordinator||'',
+    sections:(c.sections||[]).map(function(s){
+      return {id:++nextSecId, name:s.name, cap:(s.capacity||0), str:(s.strength||0), room:(s.room||''), teacher:''};
+    })
+  };
+});
 
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
-function classStr(c){ return c.sections.reduce(function(a,s){return a+s.str;},0); }
-function classCap(c){ return c.sections.reduce(function(a,s){return a+s.cap;},0); }
+function classStr(c){ return c.sections.reduce(function(a,s){return a+(s.str||0);},0); }
+function classCap(c){ return c.sections.reduce(function(a,s){return a+(s.cap||0);},0); }
 function streamLbl(s){ return {gen:'General',sci:'Science',com:'Commerce',art:'Arts'}[s]||'General'; }
 function barCls(pct){ return pct>=100?'full':(pct>=85?'warn':'ok'); }
+
+/* -- Persist the whole structure for the selected year (replace-all) -- */
+function persist(okMsg){
+  if(!ACADEMIC_YEAR_ID){ toast('error','Select an academic year first.'); return; }
+  var payload={
+    academicYearId:ACADEMIC_YEAR_ID,
+    classes:DATA.slice().sort(function(a,b){return a.rank-b.rank;}).map(function(c){
+      return {
+        name:c.name, rank:c.rank, stream:c.stream, coordinator:c.coord,
+        sections:c.sections.map(function(s){ return {name:s.name, capacity:s.cap||null, room:s.room}; })
+      };
+    })
+  };
+  fetch(URL_SAVE,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
+    body:JSON.stringify(payload)
+  })
+  .then(function(r){return r.json();})
+  .then(function(res){
+    if(res && res.success){ if(okMsg) toast('success', okMsg); }
+    else {
+      toast('error',(res && res.message) || 'Save failed.');
+      setTimeout(function(){ window.location.reload(); }, 1200); /* resync from server */
+    }
+  })
+  .catch(function(){ toast('error','Save failed. Check your connection.'); });
+}
 
 /* Summary */
 function updateCards(){
@@ -381,7 +407,6 @@ function updateCards(){
 function render(){
   var q=document.getElementById('csSearch').value.toLowerCase().trim();
   var list=DATA.slice().sort(function(a,b){return a.rank-b.rank;});
-
   var box=document.getElementById('classList'), empty=document.getElementById('emptyState');
   var matched=0, html='';
 
@@ -406,7 +431,7 @@ function render(){
         +'</div>'
         +'<div class="cs-sec-meta"><i class="bx bx-user-voice"></i>'+esc(s.teacher||'No teacher')+'</div>'
         +'<div class="cs-sec-meta"><i class="bx bx-door-open"></i>Room '+esc(s.room||'—')+'</div>'
-        +'<div class="cs-occ-row"><span class="cs-occ-num">'+s.str+' / '+s.cap+'</span><span class="cs-occ-pct">'+p+'%</span></div>'
+        +'<div class="cs-occ-row"><span class="cs-occ-num">'+s.str+' / '+(s.cap||'—')+'</span><span class="cs-occ-pct">'+(s.cap?p+'%':'')+'</span></div>'
         +'<div class="cs-bar"><div class="cs-bar-fill '+barCls(p)+'" style="width:'+Math.min(p,100)+'%"></div></div>'
         +'</div>';
     }).join('');
@@ -419,14 +444,14 @@ function render(){
     html+='<div class="cs-class'+(isOpen?' open':'')+'" data-c="'+c.id+'">'
       +'<div class="cs-class-head js-toggle" data-c="'+c.id+'">'
       +  '<i class="bx bx-chevron-right cs-chev"></i>'
-      +  '<div class="cs-rank">'+(c.rank||'–')+'</div>'
+      +  '<div class="cs-rank">'+(c.rank||'-')+'</div>'
       +  '<div class="flex-grow-1">'
       +    '<div class="d-flex align-items-center gap-2 flex-wrap"><span class="cs-class-name">'+esc(c.name)+'</span>'+streamBadge+'</div>'
       +    '<div class="cs-class-meta">'+(c.coord?('Coordinator: '+esc(c.coord)):'No coordinator')+'</div>'
       +  '</div>'
       +  '<div class="d-flex align-items-center gap-3 cs-class-meta-wrap">'
       +    '<span class="cs-pill"><i class="bx bx-grid"></i>'+c.sections.length+' sec</span>'
-      +    '<span class="cs-pill"><i class="bx bx-group"></i>'+str+'/'+cap+'</span>'
+      +    '<span class="cs-pill"><i class="bx bx-group"></i>'+str+'/'+(cap||'—')+'</span>'
       +  '</div>'
       +  '<div class="d-flex gap-1">'
       +    '<button class="cs-icon-btn js-edit-class" data-c="'+c.id+'" title="Edit class"><i class="bx bx-edit-alt"></i></button>'
@@ -467,7 +492,7 @@ function openClassModal(id){
   var c=id?DATA.find(function(x){return x.id===id;}):null;
   document.getElementById('classModalTitle').textContent=c?'Edit Class':'Add Class';
   document.getElementById('mClassName').value=c?c.name:'';
-  document.getElementById('mClassRank').value=c?c.rank:'';
+  document.getElementById('mClassRank').value=c?c.rank:(DATA.length+1);
   document.getElementById('mClassStream').value=c?c.stream:'gen';
   document.getElementById('mClassCoord').value=c?(c.coord||''):'';
   new bootstrap.Modal(document.getElementById('classModal')).show();
@@ -476,22 +501,21 @@ document.getElementById('btnAddClass').addEventListener('click',function(){ open
 document.getElementById('classSave').addEventListener('click',function(){
   var name=document.getElementById('mClassName').value.trim();
   if(!name){ toast('error','Class name is required.'); return; }
-  var rank=parseInt(document.getElementById('mClassRank').value,10)||0;
+  var rank=parseInt(document.getElementById('mClassRank').value,10)||(DATA.length+1);
   var stream=document.getElementById('mClassStream').value;
   var coord=document.getElementById('mClassCoord').value.trim();
+  var dup=DATA.some(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==editClassId;});
+  if(dup){ toast('warning','A class with this name already exists.'); return; }
   if(editClassId){
     var c=DATA.find(function(x){return x.id===editClassId;});
     c.name=name; c.rank=rank; c.stream=stream; c.coord=coord;
-    toast('success','Class updated.');
   } else {
     var nid=++nextClassId;
     DATA.push({id:nid,name:name,rank:rank,stream:stream,coord:coord,sections:[]});
     openSet[nid]=true;
-    toast('success','Class added.');
   }
-  // Wire to SP: save class (id,name,rank,stream,coord)
   bootstrap.Modal.getInstance(document.getElementById('classModal')).hide();
-  updateCards(); render();
+  updateCards(); render(); persist('Class saved.');
 });
 function delClass(id){
   var c=DATA.find(function(x){return x.id===id;});
@@ -499,8 +523,7 @@ function delClass(id){
   if(classStr(c)>0){ toast('error','Cannot delete — '+classStr(c)+' students are enrolled. Move them first.'); return; }
   if(!confirm('Delete '+c.name+' and its '+c.sections.length+' section(s)?')) return;
   DATA=DATA.filter(function(x){return x.id!==id;});
-  // Wire to SP: delete class
-  updateCards(); render(); toast('success',c.name+' deleted.');
+  updateCards(); render(); persist(c.name+' deleted.');
 }
 
 /* ---- Section modal ---- */
@@ -511,7 +534,7 @@ function openSecModal(classId,secId){
   document.getElementById('secModalTitle').textContent=s?'Edit Section':'Add Section';
   document.getElementById('secModalSub').textContent=c.name;
   document.getElementById('mSecName').value=s?s.name:'';
-  document.getElementById('mSecCap').value=s?s.cap:40;
+  document.getElementById('mSecCap').value=s?(s.cap||''):40;
   document.getElementById('mSecRoom').value=s?(s.room||''):'';
   document.getElementById('mSecTeacherView').textContent=(s&&s.teacher)?s.teacher:'Not assigned';
   new bootstrap.Modal(document.getElementById('secModal')).show();
@@ -523,19 +546,18 @@ document.getElementById('secSave').addEventListener('click',function(){
   if(!name){ toast('error','Section name is required.'); return; }
   var cap=parseInt(document.getElementById('mSecCap').value,10)||0;
   var room=document.getElementById('mSecRoom').value.trim();
+  var dup=c.sections.some(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==secCtx.secId;});
+  if(dup){ toast('warning','This section already exists in '+c.name+'.'); return; }
   if(secCtx.secId){
     var s=c.sections.find(function(x){return x.id===secCtx.secId;});
-    if(cap<s.str){ toast('error','Capacity ('+cap+') is below current strength ('+s.str+').'); return; }
-    s.name=name; s.cap=cap; s.room=room;   /* teacher is managed on the Assign Class Teacher page */
-    toast('success','Section updated.');
+    if(cap && cap<s.str){ toast('error','Capacity ('+cap+') is below current strength ('+s.str+').'); return; }
+    s.name=name; s.cap=cap; s.room=room;
   } else {
     c.sections.push({id:++nextSecId,name:name,cap:cap,str:0,teacher:'',room:room});
-    toast('success','Section added to '+c.name+'.');
   }
   openSet[c.id]=true;
-  // Wire to SP: save section (classId,secId,name,cap,teacher,room)
   bootstrap.Modal.getInstance(document.getElementById('secModal')).hide();
-  updateCards(); render();
+  updateCards(); render(); persist('Section saved.');
 });
 function delSection(classId,secId){
   var c=DATA.find(function(x){return x.id===classId;});
@@ -545,8 +567,7 @@ function delSection(classId,secId){
   if(!confirm('Delete Section '+s.name+' of '+c.name+'?')) return;
   c.sections=c.sections.filter(function(x){return x.id!==secId;});
   openSet[c.id]=true;
-  // Wire to SP: delete section
-  updateCards(); render(); toast('success','Section deleted.');
+  updateCards(); render(); persist('Section deleted.');
 }
 
 /* ---- Toolbar ---- */
@@ -557,11 +578,12 @@ document.getElementById('btnExpand').addEventListener('click',function(){
   this.innerHTML=allOpen?'<i class="bx bx-collapse-vertical"></i>Collapse all':'<i class="bx bx-expand-vertical"></i>Expand all';
   render();
 });
-document.getElementById('btnClone').addEventListener('click',function(){
-  // Wire to SP: clone previous session structure into current year
-  toast('info','Clone previous session: copies all classes & sections (without students) into the new academic year.');
-});
 document.getElementById('csSearch').addEventListener('input',render);
+document.getElementById('csYear').addEventListener('change',function(){
+  var url=new URL(window.location.href);
+  url.searchParams.set('academicYearId', this.value);
+  window.location.href=url.toString();
+});
 
 /* Init */
 updateCards();

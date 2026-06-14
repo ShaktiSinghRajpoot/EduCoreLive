@@ -1,18 +1,32 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using educore.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
     public class StudentController : Controller
     {
-        
+        private readonly IBaseService _baseService;
+
+        public StudentController(IBaseService baseService)
+        {
+            _baseService = baseService;
+        }
+
         public IActionResult StudentAttendance()
         {
             return View();
         }
-         
-        public IActionResult StudentList()
+
+        public async Task<IActionResult> StudentList()
         {
+            // Filter dropdowns share the same source as Admission / Enquiry.
+            try { ViewBag.Classes = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class"); }
+            catch { ViewBag.Classes = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+
+            try { ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear"); }
+            catch { ViewBag.Sessions = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+
             return View();
         }
 

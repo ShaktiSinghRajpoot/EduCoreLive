@@ -28,8 +28,24 @@ build_property._RazorSourceGeneratorDebug =
 build_property.EffectiveAnalysisLevelStyle = 9.0
 build_property.EnableCodeStyleSeverity = 
 
-[D:/Github/EduCoreLive/educore/Areas/Admin/Views/SchoolSettings/AcademicSetup.cshtml]
-build_metadata.AdditionalFiles.TargetPath = QXJlYXNcQWRtaW5cVmlld3NcU2Nob29sU2V0dGluZ3NcQWNhZGVtaWNTZXR1cC5jc2h0bWw=
+[D:/Github/EduCoreLive/educore/Areas/Admin/Views/AdmissionWorkflow/WorkflowSettings.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcQWRtaW5cVmlld3NcQWRtaXNzaW9uV29ya2Zsb3dcV29ya2Zsb3dTZXR0aW5ncy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/Admin/Views/FeeDueReminders/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcQWRtaW5cVmlld3NcRmVlRHVlUmVtaW5kZXJzXEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/Admin/Views/PaymentVerification/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcQWRtaW5cVmlld3NcUGF5bWVudFZlcmlmaWNhdGlvblxJbmRleC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/Admin/Views/Registration/Index.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcQWRtaW5cVmlld3NcUmVnaXN0cmF0aW9uXEluZGV4LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/Admin/Views/SchoolSettings/AcademicYears.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcQWRtaW5cVmlld3NcU2Nob29sU2V0dGluZ3NcQWNhZGVtaWNZZWFycy5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/Github/EduCoreLive/educore/Areas/Admin/Views/SchoolSettings/AssignClassTeacher.cshtml]
@@ -68,12 +84,12 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcQWRtaW5cVmlld3NcU2Nob29sU2V0dGluZ3NcVGltZXRhYmxlLmNzaHRtbA==
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Admission/Dashboard.cshtml]
-build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEFkbWlzc2lvblxEYXNoYm9hcmQuY3NodG1s
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Admission/Create.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEFkbWlzc2lvblxDcmVhdGUuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
-[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Admission/StudentList.cshtml]
-build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEFkbWlzc2lvblxTdHVkZW50TGlzdC5jc2h0bWw=
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Admission/Dashboard.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEFkbWlzc2lvblxEYXNoYm9hcmQuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/Github/EduCoreLive/educore/Areas/ERP/Views/Attendance/AttendanceReport.cshtml]
@@ -102,6 +118,30 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/Github/EduCoreLive/educore/Areas/ERP/Views/Fee/PurchaseEntry.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEZlZVxQdXJjaGFzZUVudHJ5LmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Leave/LeaveManagement.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXExlYXZlXExlYXZlTWFuYWdlbWVudC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Payroll/PayrollManagement.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFBheXJvbGxcUGF5cm9sbE1hbmFnZW1lbnQuY3NodG1s
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Staff/AddStaff.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFN0YWZmXEFkZFN0YWZmLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Staff/EditStaff.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFN0YWZmXEVkaXRTdGFmZi5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Staff/StaffList.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFN0YWZmXFN0YWZmTGlzdC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/Staff/StaffProfile.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFN0YWZmXFN0YWZmUHJvZmlsZS5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/Github/EduCoreLive/educore/Areas/ERP/Views/Student/Dashboard.cshtml]

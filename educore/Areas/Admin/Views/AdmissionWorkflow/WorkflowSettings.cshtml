@@ -1,0 +1,352 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model EduCoreDataAccessLayer.Models.Admin.AdmissionWorkflowModel
+@{
+    ViewData["Title"] = "Admission Workflow";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<style>
+    .aw-page .ec-page-shell {
+        min-height: 100vh;
+        background:
+            radial-gradient(circle at top left, rgba(255, 138, 0, .13), transparent 34rem),
+            radial-gradient(circle at bottom right, rgba(255, 173, 66, .10), transparent 32rem),
+            linear-gradient(135deg, #fff8ef 0%, #f8f7f5 48%, #ffffff 100%);
+    }
+    .aw-page .ec-card {
+        border: 1px solid rgba(236, 236, 245, .95);
+        border-radius: 1.35rem;
+        background: rgba(255, 255, 255, .92);
+        box-shadow: 0 14px 34px rgba(43, 44, 64, .07);
+    }
+    .aw-page .ec-card-header, .aw-page .ec-card-body { padding: 1.25rem; }
+    .aw-page .form-label {
+        color: #9a938b; font-size: .76rem; font-weight: 900;
+        letter-spacing: .03em; text-transform: uppercase;
+    }
+    .aw-page .form-control, .aw-page .form-select {
+        min-height: 46px; border-radius: .95rem; border-color: #ececf5;
+        color: #2b2c40; font-weight: 700; background-color: #fff;
+    }
+    .aw-page .form-control:focus, .aw-page .form-select:focus {
+        border-color: rgba(255, 138, 0, .65); box-shadow: 0 0 0 .25rem rgba(255, 138, 0, .12);
+    }
+    .aw-page .btn { border-radius: .95rem; font-weight: 900; min-height: 44px; transition: all .2s ease; }
+    .aw-page .btn-primary {
+        background: linear-gradient(135deg, #ff8a00, #ffad42); border-color: #ff8a00;
+        box-shadow: 0 10px 22px rgba(255, 138, 0, .22);
+    }
+    .aw-page .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 28px rgba(255, 138, 0, .28); }
+    .aw-page .btn-outline-secondary { border-color: #ececf5; color: #2b2c40; background: #fff; }
+    .aw-page .btn-outline-secondary:hover { background: #fff4e6; border-color: rgba(255, 138, 0, .25); color: #2b1b12; }
+
+    /* ── Setting row ── */
+    .aw-row {
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+        padding: 1rem 1.1rem; border: 1px solid #f0edf8; border-radius: 1.1rem;
+        background: #fff; margin-bottom: .9rem; transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    .aw-row:hover { border-color: rgba(255, 138, 0, .22); box-shadow: 0 8px 20px rgba(43,44,64,.05); }
+    .aw-row.is-child { margin-left: clamp(0px, 3vw, 2.25rem); background: #fffdf9; }
+    .aw-row-title { color: #2b1b12; font-weight: 900; font-size: .96rem; }
+    .aw-row-desc  { color: #9a938b; font-weight: 600; font-size: .82rem; margin-top: .2rem; }
+    .aw-row-extra { margin-top: .85rem; max-width: 320px; }
+
+    /* ── Bigger switch ── */
+    .aw-switch { padding-left: 3.25rem; min-height: 1.6rem; }
+    .aw-switch .form-check-input { width: 2.7rem; height: 1.5rem; margin-left: -3.25rem; cursor: pointer; }
+    .aw-switch .form-check-input:checked { background-color: #ff8a00; border-color: #ff8a00; }
+    .aw-switch .form-check-input:focus { border-color: rgba(255,138,0,.65); box-shadow: 0 0 0 .25rem rgba(255,138,0,.12); }
+
+    .aw-disabled { opacity: .45; pointer-events: none; }
+
+    /* ── Flow preview ── */
+    .aw-flow { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+    .aw-chip {
+        display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .85rem;
+        border-radius: 999px; font-weight: 800; font-size: .82rem; white-space: nowrap;
+        background: #fff7ed; color: #b35a00; border: 1px solid rgba(255,138,0,.22);
+    }
+    .aw-chip.aw-chip-reg { background: #eef6ff; color: #1d4ed8; border-color: rgba(29,78,216,.18); }
+    .aw-chip.aw-chip-end { background: #ecfdf3; color: #047857; border-color: rgba(4,120,87,.18); }
+    .aw-arrow { color: #c9c4bd; font-size: 1.1rem; }
+
+    .aw-page .ec-sticky-actions {
+        bottom: 1rem; padding: .85rem; border-radius: 1.2rem;
+        border: 1px solid rgba(236, 236, 245, .95); background: rgba(255, 255, 255, .9);
+        backdrop-filter: blur(12px); box-shadow: 0 14px 34px rgba(43, 44, 64, .10);
+    }
+    @@media (max-width: 575.98px) {
+        .aw-row { flex-direction: column; }
+        .aw-row.is-child { margin-left: 0; }
+        .ec-sticky-actions { flex-direction: column; align-items: stretch; }
+        .ec-sticky-actions .btn { width: 100%; }
+    }
+</style>
+}
+
+<div class="aw-page">
+  <div class="ec-page-shell">
+    <div class="ec-page-content">
+
+      <form asp-area="Admin" asp-controller="AdmissionWorkflow" asp-action="SaveWorkflowSettings"
+            method="post" id="awForm">
+        @Html.AntiForgeryToken()
+
+        <!-- ── Page header ── -->
+        <div class="ec-card mb-4">
+          <div class="ec-card-header">
+            <div class="ec-section-title-wrap d-flex align-items-start gap-3">
+              <div class="ec-section-icon"><i class="bx bx-git-branch"></i></div>
+              <div>
+                <h5 class="ec-section-title mb-1">Admission Workflow</h5>
+                <p class="ec-section-subtitle mb-0">
+                  Configure how this school moves a parent from enquiry to admission.
+                  Turn the Registration stage on or off to match your process.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Live flow preview ── -->
+        <div class="ec-card mb-4">
+          <div class="ec-card-body">
+            <div class="form-label mb-2">Resulting Journey</div>
+            <div class="aw-flow" id="awFlow"><!-- built by JS --></div>
+          </div>
+        </div>
+
+        <!-- ── Registration settings ── -->
+        <div class="ec-card mb-4">
+          <div class="ec-card-header">
+            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+              <div class="ec-section-icon"><i class="bx bx-clipboard"></i></div>
+              <div>
+                <h5 class="ec-section-title mb-0">Registration Stage</h5>
+                <p class="ec-section-subtitle mb-0">A paid, numbered step some schools require before admission.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="ec-card-body">
+
+            <!-- Master: Enable Registration -->
+            <div class="aw-row">
+              <div>
+                <div class="aw-row-title">Enable Registration</div>
+                <div class="aw-row-desc">
+                  When off, the school admits directly from enquiry and the Registration stage is hidden everywhere.
+                </div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="EnableRegistration" asp-for="EnableRegistration" />
+              </div>
+            </div>
+
+            <!-- Dependent block -->
+            <div id="regChildren">
+
+              <div class="aw-row is-child">
+                <div>
+                  <div class="aw-row-title">Registration Required Before Admission</div>
+                  <div class="aw-row-desc">
+                    When on, an enquiry cannot be converted to admission until registration is completed.
+                  </div>
+                </div>
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="RegistrationRequiredBeforeAdmission"
+                         asp-for="RegistrationRequiredBeforeAdmission" />
+                </div>
+              </div>
+
+              <div class="aw-row is-child">
+                <div class="flex-grow-1">
+                  <div class="aw-row-title">Auto-Generate Registration Number</div>
+                  <div class="aw-row-desc">
+                    Issue a sequential number automatically. Turn off to enter numbers manually.
+                  </div>
+                  <div class="aw-row-extra" id="prefixWrap">
+                    <label class="form-label">Registration Number Prefix</label>
+                    <input type="text" class="form-control" asp-for="RegistrationNumberPrefix"
+                           placeholder="e.g. REG-" maxlength="20" />
+                  </div>
+                </div>
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="AutoGenerateRegistrationNumber"
+                         asp-for="AutoGenerateRegistrationNumber" />
+                </div>
+              </div>
+
+              <div class="aw-row is-child">
+                <div class="flex-grow-1">
+                  <div class="aw-row-title">Enable Registration Fee</div>
+                  <div class="aw-row-desc">
+                    When on, a registration fee can be configured and collected at the registration step.
+                  </div>
+                  <div class="aw-row-extra" id="feeWrap">
+                    <label class="form-label">Registration Fee Amount (₹)</label>
+                    <input type="number" class="form-control" asp-for="RegistrationFeeAmount"
+                           min="0" step="1" placeholder="0" />
+                  </div>
+                </div>
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="EnableRegistrationFee"
+                         asp-for="EnableRegistrationFee" />
+                </div>
+              </div>
+
+            </div><!-- /regChildren -->
+          </div>
+        </div>
+
+        <!-- ── Admission settings ── -->
+        <div class="ec-card mb-4">
+          <div class="ec-card-header">
+            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+              <div class="ec-section-icon"><i class="bx bx-wallet"></i></div>
+              <div>
+                <h5 class="ec-section-title mb-0">Admission</h5>
+                <p class="ec-section-subtitle mb-0">How fees are handled when a student is admitted.</p>
+              </div>
+            </div>
+          </div>
+          <div class="ec-card-body">
+            <div class="aw-row">
+              <div>
+                <div class="aw-row-title">Collect Fee at Admission</div>
+                <div class="aw-row-desc">
+                  When on, the admission form can collect the fee on the spot and issue a receipt.
+                  When off, admission only creates the fee ledger and collection happens in the Fee module.
+                </div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="CollectFeeAtAdmission" asp-for="CollectFeeAtAdmission" />
+              </div>
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Security Deposit</div>
+                <div class="aw-row-desc">
+                  When on, a one-time security deposit is added to the admission's due-now charges and flows into the student's fee ledger.
+                </div>
+                <div class="aw-row-extra" id="secWrap">
+                  <label class="form-label">Security Deposit Amount (₹)</label>
+                  <input type="number" class="form-control" asp-for="SecurityFeeAmount"
+                         min="0" step="1" placeholder="0" />
+                </div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="EnableSecurityFee" asp-for="EnableSecurityFee" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Sticky actions ── -->
+        <div class="ec-sticky-actions d-flex flex-column flex-sm-row justify-content-end gap-2">
+          <a asp-area="Admin" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings"
+             class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bx bx-save me-1"></i> Save Settings
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    if (typeof toastr !== 'undefined') {
+        toastr.options = { closeButton: true, progressBar: true, positionClass: 'toast-top-right', timeOut: 3000 };
+    }
+
+    @if (TempData["Message"] != null)
+    {
+        <text>
+        (function () {
+            var r = '@TempData["Result"]';
+            var m = '@Html.Raw((TempData["Message"] ?? "").ToString().Replace("'", "\\'"))';
+            if (typeof toastr !== 'undefined') { r === '1' ? toastr.success(m) : toastr.error(m); }
+        })();
+        </text>
+    }
+
+    var $enable   = $('#EnableRegistration');
+    var $required = $('#RegistrationRequiredBeforeAdmission');
+    var $autoNum  = $('#AutoGenerateRegistrationNumber');
+    var $fee      = $('#EnableRegistrationFee');
+    var $children = $('#regChildren');
+    var $secFee   = $('#EnableSecurityFee');
+
+    /* ── enable/disable dependent settings ── */
+    function syncDependents() {
+        var on = $enable.is(':checked');
+        $children.toggleClass('aw-disabled', !on);
+
+        // prefix only relevant when auto-generate is on
+        $('#prefixWrap').toggle($autoNum.is(':checked'));
+        // fee amount only relevant when fee is on
+        $('#feeWrap').toggle($fee.is(':checked'));
+        // security deposit amount only relevant when enabled
+        $('#secWrap').toggle($secFee.is(':checked'));
+
+        renderFlow();
+    }
+
+    /* ── live journey preview ── */
+    function chip(text, cls) { return '<span class="aw-chip ' + (cls || '') + '">' + text + '</span>'; }
+    function arrow() { return '<i class="bx bx-right-arrow-alt aw-arrow"></i>'; }
+
+    function renderFlow() {
+        var parts = [chip('<i class="bx bx-message-square-detail"></i> Enquiry'), arrow(),
+                     chip('Follow-up'), arrow(), chip('Interested')];
+
+        if ($enable.is(':checked')) {
+            var regLabel = 'Registration';
+            if ($fee.is(':checked')) regLabel += ' + Fee';
+            parts.push(arrow());
+            parts.push(chip('<i class="bx bx-clipboard"></i> ' + regLabel +
+                            ($required.is(':checked') ? ' (required)' : ''), 'aw-chip-reg'));
+        }
+
+        parts.push(arrow());
+        parts.push(chip('<i class="bx bx-user-check"></i> Admission'));
+        parts.push(arrow());
+        parts.push(chip('Student Created', 'aw-chip-end'));
+
+        $('#awFlow').html(parts.join(''));
+    }
+
+    $enable.add($required).add($autoNum).add($fee).add($secFee).on('change', syncDependents);
+
+    /* ── validate before submit ── */
+    $('#awForm').on('submit', function () {
+        if ($enable.is(':checked') && $fee.is(':checked')) {
+            var amt = parseFloat($('#RegistrationFeeAmount').val() || '0');
+            if (isNaN(amt) || amt < 0) {
+                if (typeof toastr !== 'undefined') toastr.error('Please enter a valid registration fee amount.');
+                return false;
+            }
+        }
+        if ($secFee.is(':checked')) {
+            var sec = parseFloat($('#SecurityFeeAmount').val() || '0');
+            if (isNaN(sec) || sec < 0) {
+                if (typeof toastr !== 'undefined') toastr.error('Please enter a valid security deposit amount.');
+                return false;
+            }
+        }
+        return true;
+    });
+
+    syncDependents();
+});
+</script>
+}

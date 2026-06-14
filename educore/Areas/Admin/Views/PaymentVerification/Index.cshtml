@@ -1,0 +1,756 @@
+@{
+    ViewData["Title"] = "Payment Verification";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    // ----- Demo data. Replace with database data (online payments awaiting verification). -----
+    var payments = new[]
+    {
+        new { Id="P1", Status="pending",  Student="Akash Verma",  Av="AV", Cl="primary",   Parent="Sanjay Verma",  Class="9th", Amount="5,000",  AmtNum=5000,  Mode="UPI",    Ref="UPI-884213",  Sub="10 min ago",  Time=10,   Note="" },
+        new { Id="P2", Status="pending",  Student="New Saloni",   Av="NS", Cl="info",      Parent="Vijay Saini",   Class="9th", Amount="12,000", AmtNum=12000, Mode="Bank",   Ref="NEFT-77231",  Sub="45 min ago",  Time=45,   Note="" },
+        new { Id="P3", Status="pending",  Student="Anmol",        Av="A",  Cl="success",   Parent="Rohit Gupta",   Class="2nd", Amount="7,540",  AmtNum=7540,  Mode="UPI",    Ref="UPI-884198",  Sub="2 hrs ago",   Time=120,  Note="" },
+        new { Id="P4", Status="pending",  Student="Mohan Lal",    Av="ML", Cl="danger",    Parent="Prakash Lal",   Class="8th", Amount="11,250", AmtNum=11250, Mode="Cheque", Ref="CHQ-556231",  Sub="3 hrs ago",   Time=180,  Note="" },
+        new { Id="P5", Status="pending",  Student="Govind",       Av="G",  Cl="secondary", Parent="Kailash Meena", Class="UKG", Amount="3,000",  AmtNum=3000,  Mode="UPI",    Ref="UPI-884177",  Sub="Yesterday",   Time=1440, Note="" },
+        new { Id="P6", Status="verified", Student="Yash Kumar",   Av="YK", Cl="primary",   Parent="Ramesh Kumar",  Class="12th",Amount="10,000", AmtNum=10000, Mode="UPI",    Ref="UPI-884101",  Sub="Today, 11:20 AM", Time=240, Note="Admin" },
+        new { Id="P7", Status="verified", Student="Hema",         Av="H",  Cl="danger",    Parent="Anita Devi",    Class="UKG", Amount="1,251",  AmtNum=1251,  Mode="Card",   Ref="CARD-99812",  Sub="Today, 10:05 AM", Time=300, Note="Accountant" },
+        new { Id="P8", Status="verified", Student="Deepak Sharma",Av="DS", Cl="success",   Parent="Mahesh Sharma", Class="11th",Amount="1,100",  AmtNum=1100,  Mode="UPI",    Ref="UPI-884077",  Sub="Today, 9:30 AM",  Time=360, Note="Admin" },
+        new { Id="P9", Status="verified", Student="Vikash Ji",    Av="VJ", Cl="warning",   Parent="Dinesh Yadav",  Class="4th", Amount="950",    AmtNum=950,   Mode="Bank",   Ref="NEFT-76990",  Sub="Today, 8:50 AM",  Time=400, Note="Admin" },
+        new { Id="P10",Status="rejected", Student="Demo Student", Av="DS", Cl="info",      Parent="Suresh Gupta",  Class="8th", Amount="500",    AmtNum=500,   Mode="Cheque", Ref="CHQ-552210",  Sub="Yesterday",       Time=1500,Note="Cheque bounced" },
+        new { Id="P11",Status="rejected", Student="Govind",       Av="G",  Cl="secondary", Parent="Kailash Meena", Class="UKG", Amount="2,000",  AmtNum=2000,  Mode="UPI",    Ref="UPI-883001",  Sub="2 days ago",      Time=2880,Note="Amount mismatch" },
+    };
+
+    string ModeIcon(string m) => m switch { "UPI" => "bx-mobile-alt", "Bank" => "bx-building", "Cheque" => "bx-receipt", "Card" => "bx-credit-card", _ => "bx-wallet" };
+    string ModeSoft(string m) => m switch { "UPI" => "soft-green", "Bank" => "soft-blue", "Cheque" => "soft-amber", "Card" => "soft-orange", _ => "soft-grey" };
+
+    var pendingCount = payments.Count(p => p.Status == "pending");
+    var verifiedCount = payments.Count(p => p.Status == "verified");
+    var rejectedCount = payments.Count(p => p.Status == "rejected");
+    var awaiting = payments.Where(p => p.Status == "pending").Sum(p => p.AmtNum);
+}
+
+@section PageStyles {
+    <link href="~/css/educore-theme.css" rel="stylesheet" />
+    <style>
+        .pv-page {
+            font-family: "Public Sans", system-ui, sans-serif;
+        }
+
+            .pv-page .ec-page-content {
+                padding: 1.25rem;
+            }
+
+            .pv-page .ec-page-header {
+                padding: 1rem 1.15rem;
+                margin-bottom: 1rem;
+            }
+
+            .pv-page .ec-page-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 20px;
+            }
+
+            .pv-page .ec-page-title {
+                font-size: 1.2rem;
+            }
+
+            .pv-page .ec-card {
+                margin-bottom: 0;
+            }
+
+            .pv-page .ec-card-header {
+                padding: .85rem 1rem;
+            }
+
+            .pv-page .ec-section-icon {
+                width: 34px;
+                height: 34px;
+                font-size: 15px;
+            }
+
+            .pv-page .ec-section-title {
+                font-size: .92rem;
+            }
+
+        .soft-orange {
+            background: var(--ec-primary-light);
+            color: var(--ec-primary);
+        }
+
+        .soft-green {
+            background: #ecfdf3;
+            color: #16a34a;
+        }
+
+        .soft-red {
+            background: #fff1f0;
+            color: #dc2626;
+        }
+
+        .soft-amber {
+            background: #fff7e6;
+            color: #d97706;
+        }
+
+        .soft-blue {
+            background: #eff6ff;
+            color: #0284c7;
+        }
+
+        .soft-grey {
+            background: #f1f1f4;
+            color: #6b7280;
+        }
+
+        /* stat strip */
+        .pv-stat {
+            display: flex;
+            align-items: center;
+            gap: .7rem;
+            background: var(--ec-white);
+            border: 1px solid var(--ec-border);
+            border-radius: var(--ec-radius-sm);
+            padding: .7rem .85rem;
+            height: 100%;
+        }
+
+        .pv-stat-ic {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex: 0 0 auto;
+        }
+
+        .pv-stat-label {
+            color: var(--ec-text-light);
+            font-size: .68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+        }
+
+        .pv-stat-value {
+            color: var(--ec-text-dark);
+            font-size: 1.2rem;
+            font-weight: 900;
+            line-height: 1.15;
+        }
+
+        /* tabs */
+        .pv-tabs {
+            display: flex;
+            gap: .35rem;
+            flex-wrap: wrap;
+        }
+
+        .pv-tab {
+            border: 1px solid var(--ec-border);
+            background: #fff;
+            color: var(--ec-text-muted);
+            border-radius: 999px;
+            padding: .3rem .85rem;
+            font-size: .8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--ec-transition);
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+        }
+
+            .pv-tab:hover {
+                border-color: #ffce99;
+            }
+
+            .pv-tab.active {
+                background: var(--ec-primary);
+                border-color: var(--ec-primary);
+                color: #fff;
+            }
+
+            .pv-tab .pv-tab-n {
+                background: rgba(0,0,0,.08);
+                border-radius: 999px;
+                padding: 0 .4rem;
+                font-size: .72rem;
+            }
+
+            .pv-tab.active .pv-tab-n {
+                background: rgba(255,255,255,.25);
+            }
+
+        /* table */
+        .pv-table {
+            font-size: .84rem;
+        }
+
+            .pv-table thead th {
+                padding: .55rem .7rem;
+                white-space: nowrap;
+                font-size: .68rem;
+                text-transform: uppercase;
+                letter-spacing: .03em;
+                user-select: none;
+            }
+
+            .pv-table tbody td {
+                padding: .5rem .7rem;
+                vertical-align: middle;
+                border-bottom: 1px solid #f4eee7;
+            }
+
+            .pv-table tbody tr.pv-selected {
+                background: rgba(255,138,0,.06);
+            }
+
+        .pv-sort {
+            cursor: pointer;
+        }
+
+            .pv-sort:hover {
+                color: var(--ec-primary);
+            }
+
+            .pv-sort i {
+                font-size: .9rem;
+                opacity: .35;
+                vertical-align: middle;
+            }
+
+            .pv-sort.asc i, .pv-sort.desc i {
+                opacity: 1;
+                color: var(--ec-primary);
+            }
+
+        .pv-avatar {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .72rem;
+            font-weight: 800;
+            flex: 0 0 auto;
+        }
+
+        .pv-mode {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            padding: .18rem .5rem;
+            border-radius: 7px;
+            font-size: .72rem;
+            font-weight: 800;
+        }
+
+        /* pagination */
+        .pv-pager {
+            display: flex;
+            gap: .25rem;
+        }
+
+        .pv-pg {
+            min-width: 28px;
+            height: 28px;
+            border: 1px solid var(--ec-border);
+            background: #fff;
+            border-radius: 8px;
+            font-size: .8rem;
+            font-weight: 700;
+            color: var(--ec-text-muted);
+            cursor: pointer;
+            transition: var(--ec-transition);
+        }
+
+            .pv-pg:hover:not(:disabled) {
+                border-color: #ffce99;
+                color: var(--ec-primary);
+            }
+
+            .pv-pg.active {
+                background: var(--ec-primary);
+                border-color: var(--ec-primary);
+                color: #fff;
+            }
+
+            .pv-pg:disabled {
+                opacity: .45;
+                cursor: default;
+            }
+
+        /* proof receipt mock */
+        .pv-receipt {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--ec-border);
+        }
+
+        .pv-receipt-top {
+            background: linear-gradient(135deg,#16a34a,#15803d);
+            color: #fff;
+            text-align: center;
+            padding: 1.4rem 1rem 1.1rem;
+        }
+
+        .pv-receipt-check {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(255,255,255,.2);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: .5rem;
+        }
+
+        .pv-receipt-amt {
+            font-size: 1.8rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .pv-receipt-body {
+            background: #fff;
+            padding: 1rem 1.1rem;
+        }
+
+        .pv-rrow {
+            display: flex;
+            justify-content: space-between;
+            padding: .45rem 0;
+            border-bottom: 1px dashed #eee3d8;
+            font-size: .85rem;
+        }
+
+            .pv-rrow:last-child {
+                border-bottom: 0;
+            }
+
+            .pv-rrow .k {
+                color: var(--ec-text-muted);
+                font-weight: 600;
+            }
+
+            .pv-rrow .v {
+                font-weight: 800;
+                color: var(--ec-text-dark);
+            }
+
+        .pv-toast-wrap {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1090;
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+        }
+
+        .pv-toast {
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            background: #fff;
+            border-left: 4px solid #16a34a;
+            border-radius: 10px;
+            box-shadow: var(--ec-shadow-lg);
+            padding: .6rem .9rem;
+            min-width: 15rem;
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--ec-text);
+            animation: pvIn .25s ease;
+        }
+
+        @@keyframes pvIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .pv-empty {
+            color: var(--ec-text-muted);
+            text-align: center;
+            padding: 2.5rem 1rem;
+            display: none;
+        }
+    </style>
+}
+
+<div class="ec-page-shell pv-page">
+    <div class="ec-page-content">
+
+        @* ===== Header ===== *@
+        <div class="ec-page-header">
+            <div class="ec-page-header-inner d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
+                <div class="ec-page-title-wrap d-flex align-items-center gap-3">
+                    <div class="ec-page-icon"><i class="bx bx-check-shield"></i></div>
+                    <div>
+                        <h3 class="ec-page-title mb-0">Payment Verification</h3>
+                        <p class="ec-page-subtitle mb-0">Review and verify online payments before they post to the ledger.</p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" id="pvSync"><i class="bx bx-sync me-1"></i>Sync Gateway</button>
+                    <button class="btn btn-sm btn-outline-secondary" id="pvExport"><i class="bx bx-download me-1"></i>Export</button>
+                </div>
+            </div>
+        </div>
+
+        @* ===== Stat strip ===== *@
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-xl-3">
+                <div class="pv-stat">
+                    <span class="pv-stat-ic soft-amber"><i class="bx bx-time-five"></i></span>
+                    <div><div class="pv-stat-label mb-1">Pending</div><div class="pv-stat-value" id="pvStatPending">@pendingCount</div></div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="pv-stat">
+                    <span class="pv-stat-ic soft-orange"><i class="bx bx-hourglass"></i></span>
+                    <div><div class="pv-stat-label mb-1">Awaiting</div><div class="pv-stat-value">₹<span id="pvStatAwaiting">@awaiting.ToString("N0")</span></div></div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="pv-stat">
+                    <span class="pv-stat-ic soft-green"><i class="bx bx-check-double"></i></span>
+                    <div><div class="pv-stat-label mb-1">Verified Today</div><div class="pv-stat-value" id="pvStatVerified">@verifiedCount</div></div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="pv-stat">
+                    <span class="pv-stat-ic soft-red"><i class="bx bx-x-circle"></i></span>
+                    <div><div class="pv-stat-label mb-1">Rejected</div><div class="pv-stat-value" id="pvStatRejected">@rejectedCount</div></div>
+                </div>
+            </div>
+        </div>
+
+        @* ===== Table card ===== *@
+        <div class="ec-card">
+            <div class="ec-card-header">
+                <div class="d-flex flex-column flex-lg-row justify-content-between gap-2">
+                    <div class="pv-tabs">
+                        <button type="button" class="pv-tab active" data-status="pending">Pending <span class="pv-tab-n" id="pvTabPending">@pendingCount</span></button>
+                        <button type="button" class="pv-tab" data-status="verified">Verified <span class="pv-tab-n" id="pvTabVerified">@verifiedCount</span></button>
+                        <button type="button" class="pv-tab" data-status="rejected">Rejected <span class="pv-tab-n" id="pvTabRejected">@rejectedCount</span></button>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-success" id="pvApproveSel" disabled><i class="bx bx-check-double me-1"></i>Approve (<span id="pvSelCount">0</span>)</button>
+                        <input type="search" id="pvSearch" class="form-control form-control-sm" placeholder="Search..." style="min-width:8rem">
+                        <select id="pvMode" class="form-select form-select-sm" style="min-width:6.5rem">
+                            <option value="">Mode</option>
+                            <option value="UPI">UPI</option>
+                            <option value="Bank">Bank</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Card">Card</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table pv-table mb-0">
+                    <thead>
+                        <tr>
+                            <th style="width:2rem" id="pvCheckHead"><input class="form-check-input" type="checkbox" id="pvSelectAll"></th>
+                            <th class="pv-sort" data-key="name">Student <i class="bx bx-chevron-down"></i></th>
+                            <th class="pv-sort" data-key="amount">Amount <i class="bx bx-chevron-down"></i></th>
+                            <th>Payment</th>
+                            <th class="pv-sort" data-key="time">Submitted <i class="bx bx-chevron-down"></i></th>
+                            <th>Status / Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pvBody">
+                        @foreach (var p in payments)
+                        {
+                            <tr data-id="@p.Id" data-status="@p.Status" data-name="@p.Student.ToLower()" data-amount="@p.AmtNum" data-time="@p.Time" data-mode="@p.Mode"
+                                data-student="@p.Student" data-parent="@p.Parent" data-class="@p.Class" data-amt="@p.Amount" data-ref="@p.Ref" data-sub="@p.Sub">
+                                <td class="pv-check-cell">
+                                    @if (p.Status == "pending")
+                                    {
+                                        <input class="form-check-input pv-check" type="checkbox">
+                                    }
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="pv-avatar bg-label-@p.Cl text-@p.Cl">@p.Av</span>
+                                        <div class="lh-sm">
+                                            <div class="fw-semibold">@p.Student</div>
+                                            <small class="text-muted">@p.Parent · @p.Class</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="fw-bold">₹@p.Amount</span></td>
+                                <td>
+                                    <span class="pv-mode @ModeSoft(p.Mode)"><i class="bx @ModeIcon(p.Mode)"></i>@p.Mode</span>
+                                    <div><small class="text-muted">@p.Ref</small></div>
+                                </td>
+                                <td><small class="text-muted">@p.Sub</small></td>
+                                <td class="pv-action">
+                                    @if (p.Status == "pending")
+                                    {
+                                        <div class="d-flex gap-1">
+                                            <button type="button" class="btn btn-icon btn-sm btn-outline-secondary pv-view" title="View proof"><i class="bx bx-show"></i></button>
+                                            <button type="button" class="btn btn-icon btn-sm btn-success pv-approve" title="Approve"><i class="bx bx-check"></i></button>
+                                            <button type="button" class="btn btn-icon btn-sm btn-outline-danger pv-reject" title="Reject"><i class="bx bx-x"></i></button>
+                                        </div>
+                                    }
+                                    else if (p.Status == "verified")
+                                    {
+                                        <span class="badge bg-label-success"><i class="bx bx-check me-1"></i>Verified · @p.Note</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-label-danger" title="@p.Note"><i class="bx bx-x me-1"></i>Rejected</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="pv-empty" id="pvEmpty"><i class="bx bx-check-shield fs-3 d-block mb-1"></i>Nothing here right now.</div>
+            </div>
+            <div class="ec-card-header border-top">
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted" id="pvCount"></small>
+                    <div class="pv-pager" id="pvPager"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@* ===== Proof modal ===== *@
+<div class="modal fade" id="pvModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Verify Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="pv-receipt mb-3">
+                    <div class="pv-receipt-top">
+                        <div class="pv-receipt-check"><i class="bx bx-check"></i></div>
+                        <div class="pv-receipt-amt">₹<span id="pvmAmt"></span></div>
+                        <div style="opacity:.9;font-size:.85rem;margin-top:.2rem">Payment Successful</div>
+                    </div>
+                    <div class="pv-receipt-body">
+                        <div class="pv-rrow"><span class="k">Paid To</span><span class="v">EduCore School</span></div>
+                        <div class="pv-rrow"><span class="k">From</span><span class="v" id="pvmParent"></span></div>
+                        <div class="pv-rrow"><span class="k">Student</span><span class="v" id="pvmStudent"></span></div>
+                        <div class="pv-rrow"><span class="k">Mode</span><span class="v" id="pvmMode"></span></div>
+                        <div class="pv-rrow"><span class="k">Reference / UTR</span><span class="v" id="pvmRef"></span></div>
+                        <div class="pv-rrow"><span class="k">Submitted</span><span class="v" id="pvmSub"></span></div>
+                    </div>
+                </div>
+                <label class="form-label">Remark (optional)</label>
+                <textarea id="pvmRemark" class="form-control" rows="2" placeholder="Add a note for the audit trail..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-danger" id="pvmReject"><i class="bx bx-x me-1"></i>Reject</button>
+                <button type="button" class="btn btn-success" id="pvmApprove"><i class="bx bx-check me-1"></i>Approve &amp; Post</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="pv-toast-wrap" id="pvToastWrap"></div>
+
+@section PageScripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const PAGE_SIZE = 6;
+            let statusFilter = 'pending', sortKey = null, sortDir = 1, page = 1, currentRow = null;
+
+            const $ = s => document.querySelector(s);
+            const tbody = $('#pvBody');
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+            const pvModal = new bootstrap.Modal($('#pvModal'));
+
+            function toast(text, color) {
+                const el = document.createElement('div');
+                el.className = 'pv-toast';
+                if (color) el.style.borderLeftColor = color;
+                el.innerHTML = '<i class="bx bx-check-circle" style="color:' + (color || '#16a34a') + ';font-size:1.15rem"></i><span>' + text + '</span>';
+                $('#pvToastWrap').appendChild(el);
+                setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3000);
+            }
+
+            // ---------- stats ----------
+            function recompute() {
+                let pend = 0, ver = 0, rej = 0, awaiting = 0;
+                allRows.forEach(tr => {
+                    if (tr.dataset.status === 'pending') { pend++; awaiting += +tr.dataset.amount; }
+                    else if (tr.dataset.status === 'verified') ver++;
+                    else if (tr.dataset.status === 'rejected') rej++;
+                });
+                $('#pvStatPending').textContent = pend;
+                $('#pvStatAwaiting').textContent = awaiting.toLocaleString('en-IN');
+                $('#pvStatVerified').textContent = ver;
+                $('#pvStatRejected').textContent = rej;
+                $('#pvTabPending').textContent = pend;
+                $('#pvTabVerified').textContent = ver;
+                $('#pvTabRejected').textContent = rej;
+            }
+
+            // ---------- table ----------
+            function getFiltered() {
+                const q = $('#pvSearch').value.toLowerCase().trim();
+                const mode = $('#pvMode').value;
+                return allRows.filter(tr =>
+                    tr.dataset.status === statusFilter &&
+                    (!q || tr.dataset.name.includes(q)) &&
+                    (!mode || tr.dataset.mode === mode));
+            }
+            function sortVal(tr, key) {
+                if (key === 'name') return tr.dataset.name;
+                if (key === 'amount') return +tr.dataset.amount;
+                if (key === 'time') return +tr.dataset.time;
+                return 0;
+            }
+            function renderTable() {
+                let rows = getFiltered();
+                if (sortKey) rows.sort((a, b) => {
+                    const x = sortVal(a, sortKey), y = sortVal(b, sortKey);
+                    return (x < y ? -1 : x > y ? 1 : 0) * sortDir;
+                });
+                const total = rows.length;
+                const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+                if (page > pages) page = pages;
+                const start = (page - 1) * PAGE_SIZE;
+                const slice = rows.slice(start, start + PAGE_SIZE);
+
+                allRows.forEach(tr => tr.style.display = 'none');
+                slice.forEach(tr => { tr.style.display = ''; tbody.appendChild(tr); });
+
+                $('#pvEmpty').style.display = total === 0 ? 'block' : 'none';
+                $('#pvCount').textContent = total === 0 ? 'No records'
+                    : 'Showing ' + (start + 1) + '–' + (start + slice.length) + ' of ' + total;
+
+                let html = '<button class="pv-pg" data-pg="prev"' + (page === 1 ? ' disabled' : '') + '>‹</button>';
+                for (let p = 1; p <= pages; p++) html += '<button class="pv-pg' + (p === page ? ' active' : '') + '" data-pg="' + p + '">' + p + '</button>';
+                html += '<button class="pv-pg" data-pg="next"' + (page === pages ? ' disabled' : '') + '>›</button>';
+                $('#pvPager').innerHTML = html;
+                $('#pvPager').querySelectorAll('.pv-pg').forEach(b => b.addEventListener('click', function () {
+                    const v = this.dataset.pg;
+                    if (v === 'prev') page = Math.max(1, page - 1);
+                    else if (v === 'next') page = Math.min(pages, page + 1);
+                    else page = +v;
+                    renderTable();
+                }));
+                // checkbox column only relevant on pending tab
+                const showCheck = statusFilter === 'pending';
+                $('#pvCheckHead').style.visibility = showCheck ? 'visible' : 'hidden';
+                refreshSel();
+            }
+            function updateSortIcons() {
+                document.querySelectorAll('.pv-sort').forEach(th => {
+                    th.classList.remove('asc', 'desc');
+                    const ic = th.querySelector('i');
+                    ic.className = 'bx bx-chevron-down';
+                    if (th.dataset.key === sortKey) {
+                        th.classList.add(sortDir === 1 ? 'asc' : 'desc');
+                        ic.className = sortDir === 1 ? 'bx bx-chevron-up' : 'bx bx-chevron-down';
+                    }
+                });
+            }
+
+            // ---------- selection ----------
+            function visibleChecks() { return allRows.filter(tr => tr.style.display !== 'none' && tr.dataset.status === 'pending').map(tr => tr.querySelector('.pv-check')).filter(Boolean); }
+            function allChecked() { return allRows.map(tr => tr.querySelector('.pv-check')).filter(c => c && c.checked); }
+            function refreshSel() {
+                const n = allChecked().length;
+                $('#pvSelCount').textContent = n;
+                $('#pvApproveSel').disabled = n === 0;
+                allRows.forEach(tr => { const c = tr.querySelector('.pv-check'); tr.classList.toggle('pv-selected', !!(c && c.checked)); });
+            }
+
+            // ---------- actions ----------
+            function setAction(tr, status, note) {
+                tr.dataset.status = status;
+                const cell = tr.querySelector('.pv-action');
+                if (status === 'verified') cell.innerHTML = '<span class="badge bg-label-success"><i class="bx bx-check me-1"></i>Verified · ' + note + '</span>';
+                else cell.innerHTML = '<span class="badge bg-label-danger" title="' + note + '"><i class="bx bx-x me-1"></i>Rejected</span>';
+                const cc = tr.querySelector('.pv-check-cell');
+                if (cc) cc.innerHTML = '';
+                recompute();
+                renderTable();
+            }
+            function approve(tr) { setAction(tr, 'verified', 'You · just now'); toast('Payment of ₹' + tr.dataset.amt + ' for ' + tr.dataset.student + ' verified & posted'); }
+            function reject(tr, reason) { setAction(tr, 'rejected', reason || 'Rejected'); toast('Payment for ' + tr.dataset.student + ' rejected', '#dc2626'); }
+
+            // delegated row actions
+            tbody.addEventListener('click', function (e) {
+                const tr = e.target.closest('tr'); if (!tr) return;
+                if (e.target.closest('.pv-approve')) approve(tr);
+                else if (e.target.closest('.pv-reject')) reject(tr, 'Rejected by reviewer');
+                else if (e.target.closest('.pv-view')) {
+                    currentRow = tr;
+                    $('#pvmAmt').textContent = tr.dataset.amt;
+                    $('#pvmParent').textContent = tr.dataset.parent;
+                    $('#pvmStudent').textContent = tr.dataset.student + ' (' + tr.dataset.class + ')';
+                    $('#pvmMode').textContent = tr.dataset.mode;
+                    $('#pvmRef').textContent = tr.dataset.ref;
+                    $('#pvmSub').textContent = tr.dataset.sub;
+                    $('#pvmRemark').value = '';
+                    pvModal.show();
+                }
+            });
+            tbody.addEventListener('change', function (e) { if (e.target.classList.contains('pv-check')) refreshSel(); });
+
+            // modal buttons
+            $('#pvmApprove').addEventListener('click', function () { if (currentRow) approve(currentRow); pvModal.hide(); });
+            $('#pvmReject').addEventListener('click', function () { if (currentRow) reject(currentRow, $('#pvmRemark').value.trim() || 'Rejected'); pvModal.hide(); });
+
+            // bulk approve
+            $('#pvApproveSel').addEventListener('click', function () {
+                const sel = allChecked(); if (!sel.length) return;
+                const n = sel.length;
+                sel.forEach(c => approve(c.closest('tr')));
+                toast(n + ' payment' + (n > 1 ? 's' : '') + ' verified & posted to ledger');
+            });
+            $('#pvSelectAll').addEventListener('change', function () {
+                visibleChecks().forEach(c => c.checked = this.checked); refreshSel();
+            });
+
+            // tabs
+            document.querySelectorAll('.pv-tab').forEach(t => t.addEventListener('click', function () {
+                document.querySelectorAll('.pv-tab').forEach(x => x.classList.remove('active'));
+                this.classList.add('active');
+                statusFilter = this.dataset.status;
+                $('#pvApproveSel').style.display = statusFilter === 'pending' ? '' : 'none';
+                $('#pvSelectAll').checked = false;
+                page = 1; renderTable();
+            }));
+
+            // sort + filter
+            document.querySelectorAll('.pv-sort').forEach(th => th.addEventListener('click', function () {
+                const key = this.dataset.key;
+                if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
+                updateSortIcons(); renderTable();
+            }));
+            ['#pvSearch', '#pvMode'].forEach(s => {
+                $(s).addEventListener('input', () => { page = 1; renderTable(); });
+                $(s).addEventListener('change', () => { page = 1; renderTable(); });
+            });
+
+            $('#pvExport').addEventListener('click', () => toast('Payment report exported to Excel', '#ff8a00'));
+            $('#pvSync').addEventListener('click', () => toast('Synced with payment gateway · 0 new', '#0284c7'));
+
+            recompute();
+            renderTable();
+        });
+    </script>
+}

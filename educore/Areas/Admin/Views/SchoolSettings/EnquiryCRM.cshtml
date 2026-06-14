@@ -7,6 +7,7 @@
     var sessions     = Model.AvailableSessions;
     var classes      = Model.AvailableClasses;
     var counsellors  = Model.AvailableCounsellors;
+    var showRegistration = Model.Workflow.EnableRegistration;
 }
 
 @section PageStyles {
@@ -176,28 +177,27 @@
 @* Standalone CSRF token for all AJAX POST calls on this page *@
 @Html.AntiForgeryToken()
 
-<div class="container-fluid flex-grow-1 container-p-y">
+<div class="ec-page-shell enquiry-crm-page">
+    <div class="ec-page-content">
 
     <!-- ── Page Header ─── -->
-    <div class="ec-card mb-4">
-        <div class="ec-card-header">
-            <div class="d-flex justify-content-between align-items-center gap-3">
-                <div class="ec-section-title-wrap">
-                    <div class="ec-section-icon"><i class="bx bx-message-square-detail"></i></div>
-                    <div>
-                        <h5 class="mb-0">Enquiry CRM</h5>
-                        <small class="text-muted">Track admission enquiries, follow-ups &amp; conversion pipeline.</small>
-                    </div>
+    <div class="ec-page-header">
+        <div class="ec-page-header-inner d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+            <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                <div class="ec-page-icon"><i class="bx bx-message-square-detail"></i></div>
+                <div>
+                    <h3 class="ec-page-title mb-1">Enquiry CRM</h3>
+                    <p class="ec-page-subtitle mb-0">Track admission enquiries, follow-ups &amp; conversion pipeline.</p>
                 </div>
-                <div class="d-flex gap-2 flex-shrink-0">
-                    <button type="button" class="btn btn-outline-secondary btn-sm">
-                        <i class="bx bx-export me-1"></i> Export
-                    </button>
-                    <button type="button" class="btn btn-primary btn-sm"
-                            data-bs-toggle="modal" data-bs-target="#addEnquiryModal">
-                        <i class="bx bx-user-plus me-1"></i> Add Enquiry
-                    </button>
-                </div>
+            </div>
+            <div class="d-flex gap-2 flex-shrink-0">
+                <button type="button" class="btn btn-outline-secondary">
+                    <i class="bx bx-export me-1"></i> Export
+                </button>
+                <button type="button" class="btn btn-primary" id="btnAddEnquiry"
+                        data-bs-toggle="modal" data-bs-target="#addEnquiryModal">
+                    <i class="bx bx-user-plus me-1"></i> Add Enquiry
+                </button>
             </div>
         </div>
     </div>
@@ -247,8 +247,8 @@
         <div class="ec-card-header">
             <div class="d-flex justify-content-between align-items-center gap-3">
                 <div class="ec-section-title-wrap">
-                    <div class="ec-section-icon"><i class="bx bx-git-branch"></i></div>
-                    <div><h6 class="mb-0">Admission Pipeline</h6><small class="text-muted">Click a stage to filter.</small></div>
+                    <span class="ec-section-icon"><i class="bx bx-git-branch"></i></span>
+                    <div><h5 class="ec-section-title mb-1">Admission Pipeline</h5><p class="ec-section-subtitle mb-0">Click a stage to filter.</p></div>
                 </div>
             </div>
         </div>
@@ -259,7 +259,10 @@
                 <a class="pipeline-tab"        data-pipeline="followup"      href="#"><span class="ptab-count">@stats.CntFollowup</span><span class="ptab-label">Follow-up</span></a>
                 <a class="pipeline-tab"        data-pipeline="interested"    href="#"><span class="ptab-count">@stats.CntInterested</span><span class="ptab-label">Interested</span></a>
                 <a class="pipeline-tab"        data-pipeline="campusvisit"   href="#"><span class="ptab-count">@stats.CntCampusVisit</span><span class="ptab-label">Campus Visit</span></a>
+                @if (showRegistration)
+                {
                 <a class="pipeline-tab"        data-pipeline="registered"    href="#"><span class="ptab-count">@stats.CntRegistered</span><span class="ptab-label">Registered</span></a>
+                }
                 <a class="pipeline-tab"        data-pipeline="admitted"      href="#"><span class="ptab-count">@stats.Admitted</span><span class="ptab-label">Admitted</span></a>
                 <a class="pipeline-tab"        data-pipeline="notinterested" href="#"><span class="ptab-count text-danger">@stats.CntNotInterested</span><span class="ptab-label">Not Interested</span></a>
             </div>
@@ -271,8 +274,8 @@
         <div class="ec-card-header">
             <div class="d-flex justify-content-between align-items-center gap-3">
                 <div class="ec-section-title-wrap">
-                    <div class="ec-section-icon"><i class="bx bx-filter-alt"></i></div>
-                    <div><h6 class="mb-0">Search &amp; Filter</h6></div>
+                    <span class="ec-section-icon"><i class="bx bx-filter-alt"></i></span>
+                    <div><h5 class="ec-section-title mb-0">Search &amp; Filter</h5></div>
                 </div>
             </div>
         </div>
@@ -340,10 +343,10 @@
         <div class="ec-card-header">
             <div class="d-flex justify-content-between align-items-center gap-3">
                 <div class="ec-section-title-wrap">
-                    <div class="ec-section-icon"><i class="bx bx-list-ul"></i></div>
+                    <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
                     <div>
-                        <h6 class="mb-0">Enquiries</h6>
-                        <small class="text-muted" id="tableSubtitle">Loading...</small>
+                        <h5 class="ec-section-title mb-1">Enquiries</h5>
+                        <p class="ec-section-subtitle mb-0" id="tableSubtitle">Loading...</p>
                     </div>
                 </div>
             </div>
@@ -417,7 +420,8 @@
         </div>
     </div>
 
-</div><!-- container-fluid -->
+    </div><!-- ec-page-content -->
+</div><!-- ec-page-shell -->
 
 <!-- ════════════════════════════════════════════════════════
      ADD ENQUIRY MODAL
@@ -427,13 +431,13 @@
         <div class="modal-content">
             <form asp-action="SaveEnquiry" asp-controller="Enquiry" asp-area="Admin" method="post">
                 @Html.AntiForgeryToken()
-                <input type="hidden" name="EnquiryId" value="0" />
+                <input type="hidden" name="EnquiryId" id="enquiryFormId" value="0" />
 
                 <div class="modal-header">
                     <div class="d-flex justify-content-between align-items-center w-100 me-3">
                         <div class="ec-section-title-wrap">
                             <div class="ec-section-icon"><i class="bx bx-user-plus"></i></div>
-                            <div><h5 class="modal-title mb-0">Add Enquiry</h5><small class="text-muted">Capture student &amp; parent details.</small></div>
+                            <div><h5 class="modal-title mb-0" id="enquiryModalTitle">Add Enquiry</h5><small class="text-muted" id="enquiryModalSubtitle">Capture student &amp; parent details.</small></div>
                         </div>
                     </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -472,8 +476,8 @@
                         <div class="col-12 col-md-6">
                             <label class="form-label">Academic Session <span class="text-danger">*</span></label>
                             <select class="form-select" name="Session" required>
-                                <option value="" disabled selected>Select session</option>
-                                @foreach (var s in sessions){<option value="@s.Text">@s.Text</option>}
+                                <option value="" disabled>Select session</option>
+                                @foreach (var s in sessions){<option value="@s.Text" selected="@s.Selected">@s.Text</option>}
                             </select>
                         </div>
                         <!-- Current school + class -->
@@ -592,9 +596,9 @@
                                 <option>Social Media</option>
                             </select>
                         </div>
-                        <div class="col-12 col-md-6">
+                        <div class="col-12 col-md-6" id="initialStatusRow">
                             <label class="form-label">Initial Status</label>
-                            <select class="form-select" name="Status">
+                            <select class="form-select" name="Status" id="addInitialStatus">
                                 <option selected>New</option>
                                 <option>Follow-up Pending</option>
                                 <option>Interested</option>
@@ -727,10 +731,10 @@
                             <option value="Follow-up Pending">Follow-up Pending</option>
                             <option value="Interested">Interested</option>
                             <option value="Campus Visit Scheduled">Campus Visit Scheduled</option>
-                            <option value="Registration Done">Registration Done</option>
-                            <option value="Admission Confirmed">Admission Confirmed</option>
                             <option value="Not Interested">Not Interested</option>
                         </select>
+                        @* Registration Done / Admission Confirmed are intentionally omitted —
+                           they are set only by the Register action and admission save. *@
                     </div>
 
                     <!-- Lost reason — shown when status or outcome = Not Interested -->
@@ -872,6 +876,88 @@
 </div>
 
 <!-- ════════════════════════════════════════════════════════
+     REGISTER ENQUIRY MODAL
+═════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="registerEnquiryModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="ec-section-title-wrap">
+                    <div class="ec-section-icon" style="background:rgba(255,138,0,.12)">
+                        <i class="bx bx-clipboard text-primary"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title mb-0">Register Enquiry</h5>
+                        <small class="text-muted">Issue a registration number for this lead.</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="regEnquiryId" />
+
+                <!-- Summary -->
+                <div class="ec-card mb-3" style="border:1.5px solid #ffe2c2;background:#fff8ef;">
+                    <div class="ec-card-body py-3">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <small class="text-muted d-block" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Student</small>
+                                <div class="fw-bold" id="regStudentName">—</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Parent</small>
+                                <div class="fw-bold" id="regParentName">—</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Class</small>
+                                <div class="fw-bold" id="regClassName">—</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block" style="font-size:.7rem;text-transform:uppercase;letter-spacing:.05em">Session</small>
+                                <div class="fw-bold" id="regSession">—</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">Registration Number</label>
+                        <input type="text" class="form-control" id="regNumber" maxlength="40" />
+                        <small class="text-muted" id="regNumberHint"></small>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label">Registration Date</label>
+                        <input type="date" class="form-control" id="regDate" />
+                    </div>
+
+                    <!-- Registration fee — shown only when fee is enabled -->
+                    <div class="col-12 d-none" id="regFeeRow">
+                        <div class="d-flex align-items-center justify-content-between p-2 rounded"
+                             style="background:#fff8ef;border:1px solid #ffe2c2;">
+                            <div>
+                                <div class="fw-bold" style="font-size:.88rem">Registration Fee</div>
+                                <small class="text-muted">Amount: <span class="fw-bold" id="regFeeAmountLabel">₹0</span></small>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" id="regFeePaid" />
+                                <label class="form-check-label" for="regFeePaid" style="font-size:.82rem">Fee collected</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmRegisterBtn">
+                    <i class="bx bx-check me-1"></i> Complete Registration
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
      DELETE CONFIRMATION MODAL
 ═════════════════════════════════════════════════════════ -->
 <div class="modal fade" id="deleteEnquiryModal" tabindex="-1" aria-hidden="true">
@@ -976,13 +1062,22 @@ $(document).ready(function () {
     }
 
     /* ── Status dropdown ────────────────────────────────── */
+    // Registration stage shows only when the school enables it in Admission Workflow settings.
+    var SHOW_REGISTRATION = @(showRegistration ? "true" : "false");
+    // When true, an enquiry must be "Registration Done" before it can be converted to admission.
+    var REGISTRATION_REQUIRED = @((showRegistration && Model.Workflow.RegistrationRequiredBeforeAdmission) ? "true" : "false");
+    var REG_FEE_ENABLED = @((showRegistration && Model.Workflow.EnableRegistrationFee) ? "true" : "false");
+    var REG_FEE_AMOUNT  = @(((showRegistration && Model.Workflow.EnableRegistrationFee) ? Model.Workflow.RegistrationFeeAmount : 0).ToString(System.Globalization.CultureInfo.InvariantCulture));
+    var REG_AUTO_NUMBER = @(Model.Workflow.AutoGenerateRegistrationNumber ? "true" : "false");
+    // Only MANUAL statuses belong here. Registration Done and Admission Confirmed are
+    // action-driven (set by the Register action / admission save) and must NOT be
+    // directly selectable — picking them here would create records with no registration
+    // number / no student. They are reached only through their proper actions.
     var STATUS_LIST = [
         { key:'New',                    label:'New',                    icon:'bx-user',         cls:'' },
         { key:'Follow-up Pending',      label:'Follow-up Pending',      icon:'bx-phone',        cls:'' },
         { key:'Interested',             label:'Interested',             icon:'bx-heart',        cls:'' },
         { key:'Campus Visit Scheduled', label:'Campus Visit Scheduled', icon:'bx-building',     cls:'' },
-        { key:'Registration Done',      label:'Registration Done',      icon:'bx-clipboard',    cls:'' },
-        { key:'Admission Confirmed',    label:'Admission Confirmed',    icon:'bx-check-circle', cls:'text-success fw-semibold' },
         { key:'Not Interested',         label:'Not Interested',         icon:'bx-x-circle',     cls:'text-danger' }
     ];
 
@@ -990,6 +1085,12 @@ $(document).ready(function () {
         if (r.isTerminal) {
             return '<span class="badge bg-label-success" title="Admission Confirmed — final status">'
                 + '<i class="bx bx-check-circle me-1"></i>' + esc(r.status) + '</span>';
+        }
+        // Registration Done is action-driven (issued by the Register action). Lock it as a
+        // badge — to revert, use Cancel Registration on the Registrations screen.
+        if (r.status === 'Registration Done') {
+            return '<span class="badge bg-label-secondary" title="Registered — use Cancel Registration to revert">'
+                + '<i class="bx bx-clipboard me-1"></i>' + esc(r.status) + '</span>';
         }
         var items = STATUS_LIST.map(function (s) {
             var isActive  = (s.key === r.status);
@@ -1068,20 +1169,29 @@ $(document).ready(function () {
             + '</td>'
             + '<td><span class="lead-meta">' + esc(r.daysSinceLabel) + '</span></td>'
             + '<td class="text-end"><div class="d-inline-flex gap-1 align-items-center flex-nowrap">'
-            /* Log Follow-up — NO stopPropagation; delegation on document handles it */
+            /* ── Contact: Call · WhatsApp ── */
+            +   '<a href="' + esc(r.callUrl) + '"'
+            +     ' class="btn btn-sm btn-icon btn-outline-info crm-action-btn" title="Call">'
+            +     '<i class="bx bx-phone-call"></i></a>'
+            +   '<a href="' + esc(r.whatsAppUrl) + '" target="_blank"'
+            +     ' class="btn btn-sm btn-icon btn-outline-success crm-action-btn" title="WhatsApp">'
+            +     '<i class="bx bxl-whatsapp"></i></a>'
+            +   '<div class="vr mx-1" style="opacity:.18"></div>'
+            /* ── Nurture & progress: Follow-up · Register · Convert ── */
             +   '<button type="button" class="btn btn-sm btn-icon btn-outline-secondary crm-action-btn btn-log-followup"'
             +     ' title="Log Follow-up"'
             +     ' data-id="' + r.enquiryId + '" data-name="' + esc(r.studentName) + '">'
             +     '<i class="bx bx-calendar-plus"></i></button>'
-            /* WhatsApp */
-            +   '<a href="' + esc(r.whatsAppUrl) + '" target="_blank"'
-            +     ' class="btn btn-sm btn-icon btn-outline-success crm-action-btn" title="WhatsApp">'
-            +     '<i class="bx bxl-whatsapp"></i></a>'
-            /* Call */
-            +   '<a href="' + esc(r.callUrl) + '"'
-            +     ' class="btn btn-sm btn-icon btn-outline-info crm-action-btn" title="Call">'
-            +     '<i class="bx bx-phone-call"></i></a>'
-            /* Convert to Admission — only when not terminal */
+            + ((SHOW_REGISTRATION && !r.isTerminal && r.status !== 'Registration Done')
+                ? '<button type="button" class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-register-enquiry"'
+                +   ' title="Register"'
+                +   ' data-id="'      + r.enquiryId       + '"'
+                +   ' data-name="'    + esc(r.studentName) + '"'
+                +   ' data-parent="'  + esc(r.parentName)  + '"'
+                +   ' data-class="'   + esc(r.className)   + '"'
+                +   ' data-session="' + esc(r.session)     + '">'
+                +   '<i class="bx bx-clipboard"></i></button>'
+                : '')
             + (!r.isTerminal
                 ? '<button type="button" class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"'
                 +   ' title="Convert to Admission"'
@@ -1090,10 +1200,16 @@ $(document).ready(function () {
                 +   ' data-parent="'  + esc(r.parentName)    + '"'
                 +   ' data-mobile="'  + esc(r.mobile)        + '"'
                 +   ' data-class="'   + esc(r.className)     + '"'
-                +   ' data-session="' + esc(r.session)       + '">'
+                +   ' data-session="' + esc(r.session)       + '"'
+                +   ' data-status="'  + esc(r.status)        + '">'
                 +   '<i class="bx bx-user-check"></i></button>'
                 : '')
-            /* Delete */
+            +   '<div class="vr mx-1" style="opacity:.18"></div>'
+            /* ── Manage: Edit · Delete ── */
+            + (r.status !== 'Admission Confirmed'
+                ? '<button type="button" class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-edit-enquiry"'
+                +   ' title="Edit enquiry" data-id="' + r.enquiryId + '"><i class="bx bx-edit"></i></button>'
+                : '')
             +   '<button type="button" class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"'
             +     ' title="Delete"'
             +     ' data-id="'   + r.enquiryId       + '"'
@@ -1129,12 +1245,24 @@ $(document).ready(function () {
             + '</div>'
             + '<div class="d-flex justify-content-between align-items-center">'
             +   '<div class="' + esc(r.followupCssClass) + '" style="font-size:.76rem">' + fwIcon + esc(r.followupDisplay) + '</div>'
-            +   '<div class="d-flex gap-1 flex-wrap">'
+            +   '<div class="d-flex gap-1 flex-wrap align-items-center">'
+            /* ── Contact: Call · WhatsApp ── */
+            +     '<a href="' + esc(r.callUrl) + '" class="btn btn-sm btn-icon btn-outline-info crm-action-btn"><i class="bx bx-phone-call"></i></a>'
+            +     '<a href="' + esc(r.whatsAppUrl) + '" target="_blank" class="btn btn-sm btn-icon btn-outline-success crm-action-btn"><i class="bx bxl-whatsapp"></i></a>'
+            +     '<div class="vr mx-1" style="opacity:.18"></div>'
+            /* ── Nurture & progress: Follow-up · Register · Convert ── */
             +     '<button class="btn btn-sm btn-icon btn-outline-secondary crm-action-btn btn-log-followup"'
             +       ' data-id="' + r.enquiryId + '" data-name="' + esc(r.studentName) + '">'
             +       '<i class="bx bx-calendar-plus"></i></button>'
-            +     '<a href="' + esc(r.callUrl) + '" class="btn btn-sm btn-icon btn-outline-info crm-action-btn"><i class="bx bx-phone-call"></i></a>'
-            +     '<a href="' + esc(r.whatsAppUrl) + '" target="_blank" class="btn btn-sm btn-icon btn-outline-success crm-action-btn"><i class="bx bxl-whatsapp"></i></a>'
+            + ((SHOW_REGISTRATION && !r.isTerminal && r.status !== 'Registration Done')
+                ? '<button class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-register-enquiry"'
+                +   ' data-id="'      + r.enquiryId       + '"'
+                +   ' data-name="'    + esc(r.studentName) + '"'
+                +   ' data-parent="'  + esc(r.parentName)  + '"'
+                +   ' data-class="'   + esc(r.className)   + '"'
+                +   ' data-session="' + esc(r.session)     + '">'
+                +   '<i class="bx bx-clipboard"></i></button>'
+                : '')
             + (!r.isTerminal
                 ? '<button class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"'
                 +   ' data-id="'      + r.enquiryId       + '"'
@@ -1142,8 +1270,14 @@ $(document).ready(function () {
                 +   ' data-parent="'  + esc(r.parentName)  + '"'
                 +   ' data-mobile="'  + esc(r.mobile)      + '"'
                 +   ' data-class="'   + esc(r.className)   + '"'
-                +   ' data-session="' + esc(r.session)     + '">'
+                +   ' data-session="' + esc(r.session)     + '"'
+                +   ' data-status="'  + esc(r.status)      + '">'
                 +   '<i class="bx bx-user-check"></i></button>'
+                : '')
+            +     '<div class="vr mx-1" style="opacity:.18"></div>'
+            /* ── Manage: Edit · Delete ── */
+            + (r.status !== 'Admission Confirmed'
+                ? '<button class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-edit-enquiry" data-id="' + r.enquiryId + '"><i class="bx bx-edit"></i></button>'
                 : '')
             +     '<button class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"'
             +       ' data-id="' + r.enquiryId + '" data-name="' + esc(r.studentName) + '">'
@@ -1478,6 +1612,81 @@ $(document).ready(function () {
         });
     });
 
+    /* ── Register Enquiry ───────────────────────────────── */
+    $(document).on('click', '.btn-register-enquiry', function () {
+        var $btn = $(this);
+        $('#regEnquiryId').val($btn.data('id'));
+        $('#regStudentName').text($btn.data('name'));
+        $('#regParentName').text($btn.data('parent') || '—');
+        $('#regClassName').text($btn.data('class')   || '—');
+        $('#regSession').text($btn.data('session')   || '—');
+
+        // Registration number: auto-generated on save, or manual entry.
+        var $num = $('#regNumber');
+        if (REG_AUTO_NUMBER) {
+            $num.val('').prop('disabled', true);
+            $('#regNumberHint').text('Auto-generated when you save.');
+        } else {
+            $num.val('').prop('disabled', false);
+            $('#regNumberHint').text('Enter the registration number.');
+        }
+
+        // Default date = today (YYYY-MM-DD).
+        $('#regDate').val(new Date().toISOString().slice(0, 10));
+
+        // Fee row (only when enabled).
+        if (REG_FEE_ENABLED) {
+            $('#regFeeRow').removeClass('d-none');
+            $('#regFeePaid').prop('checked', false);
+            $('#regFeeAmountLabel').text('₹' + Number(REG_FEE_AMOUNT).toLocaleString('en-IN'));
+        } else {
+            $('#regFeeRow').addClass('d-none');
+        }
+
+        new bootstrap.Modal(document.getElementById('registerEnquiryModal')).show();
+    });
+
+    $('#confirmRegisterBtn').on('click', function () {
+        var id = parseInt($('#regEnquiryId').val());
+        if (!id) { return; }
+
+        var regNumber = REG_AUTO_NUMBER ? '' : $.trim($('#regNumber').val());
+        if (!REG_AUTO_NUMBER && regNumber === '') {
+            toastr.error('Please enter a registration number.');
+            return;
+        }
+
+        var $btn = $(this).prop('disabled', true)
+                          .html('<i class="bx bx-loader-circle bx-spin me-1"></i> Saving…');
+
+        $.ajax({
+            url:         '/Admin/Enquiry/RegisterEnquiry',
+            type:        'POST',
+            contentType: 'application/json',
+            headers:     { 'RequestVerificationToken': csrf },
+            data: JSON.stringify({
+                enquiryId:           id,
+                registrationNumber:  regNumber,
+                registrationDate:    $('#regDate').val(),
+                registrationFeePaid: REG_FEE_ENABLED && $('#regFeePaid').is(':checked')
+            })
+        })
+        .done(function (res) {
+            if (res && res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('registerEnquiryModal')).hide();
+                toastr.success((res.message || 'Registration completed.') +
+                               (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
+                fetchData(false);
+            } else {
+                toastr.error((res && res.message) || 'Unable to complete registration.');
+            }
+        })
+        .fail(function () { toastr.error('Something went wrong while registering.'); })
+        .always(function () {
+            $btn.prop('disabled', false).html('<i class="bx bx-check me-1"></i> Complete Registration');
+        });
+    });
+
     /* ── Convert to Admission ───────────────────────────── */
     $(document).on('click', '.btn-convert-admission', function () {
         var $btn    = $(this);
@@ -1487,6 +1696,14 @@ $(document).ready(function () {
         var mobile  = $btn.data('mobile');
         var cls     = $btn.data('class');
         var session = $btn.data('session');
+        var status  = $btn.data('status');
+
+        // Gate: when the school requires registration before admission, block
+        // conversion until the lead has reached "Registration Done".
+        if (REGISTRATION_REQUIRED && status !== 'Registration Done') {
+            toastr.warning('Complete registration for ' + name + ' before converting to admission.');
+            return;
+        }
 
         $('#convertEnquiryId').val(id);
         $('#cvStudentName').text(name);
@@ -1587,6 +1804,99 @@ $(document).ready(function () {
     });
     // Default state: WhatsApp field is readonly (syncs from father mobile)
     $('#addWhatsApp').prop('readonly', true);
+
+    /* ── Edit Enquiry ───────────────────────────────────── */
+    function setEnqVal(name, val) {
+        $('[name="' + name + '"]', '#addEnquiryModal').val(val == null ? '' : val);
+    }
+
+    function enquiryFormReset() {
+        $('#addEnquiryModal form')[0].reset();
+        $('#enquiryFormId').val('0');
+        $('#enquiryModalTitle').text('Add Enquiry');
+        $('#enquiryModalSubtitle').text('Capture student & parent details.');
+        $('#saveEnquiryBtn').html('<i class="bx bx-save me-1"></i> Save Enquiry');
+        $('#streamRow,#referrerNameRow,#referrerMobileRow').addClass('d-none');
+        $('#whatsappSameAsMobile').prop('checked', true);
+        $('#addWhatsApp').prop('readonly', true);
+        $('#initialStatusRow').removeClass('d-none');   // status applies on Add only
+    }
+
+    function enquiryFormFill(d) {
+        enquiryFormReset();
+        $('#enquiryFormId').val(d.enquiryId);
+        $('#enquiryModalTitle').text('Edit Enquiry');
+        $('#enquiryModalSubtitle').text('Update student & parent details.');
+        $('#saveEnquiryBtn').html('<i class="bx bx-save me-1"></i> Update Enquiry');
+
+        setEnqVal('StudentName', d.studentName);
+        setEnqVal('Gender', d.gender);
+        setEnqVal('Dob', d.dob);
+        setEnqVal('ClassName', d.className);
+        setEnqVal('Session', d.session);
+        setEnqVal('CurrentSchool', d.currentSchool);
+        setEnqVal('CurrentClass', d.currentClass);
+        setEnqVal('InterestedStream', d.interestedStream);
+        setEnqVal('FatherName', d.fatherName);
+        $('#addFatherMobile').val(d.fatherMobile || '');
+        setEnqVal('MotherName', d.motherName);
+        setEnqVal('MotherMobile', d.motherMobile);
+        setEnqVal('ParentEmail', d.parentEmail);
+        setEnqVal('City', d.city);
+        setEnqVal('AreaLocality', d.areaLocality);
+        setEnqVal('LeadSource', d.leadSource);
+        // Status is NOT editable here — it's managed by the status dropdown / actions.
+        // Hide the Initial Status field and leave the existing status untouched server-side.
+        $('#initialStatusRow').addClass('d-none');
+        setEnqVal('ReferrerName', d.referrerName);
+        setEnqVal('ReferrerMobile', d.referrerMobile);
+        if (d.assignedToId) setEnqVal('AssignedToId', d.assignedToId);
+        setEnqVal('NextFollowupDate', d.nextFollowupDate);
+        setEnqVal('Notes', d.notes);
+        $('#addPrimaryMobile').val(d.fatherMobile || '');
+
+        $('input[name="TransportRequired"][value="' + (d.transportRequired ? 'true' : 'false') + '"]').prop('checked', true);
+
+        // WhatsApp: distinct number → uncheck "same as mobile"
+        if (d.whatsAppNumber && d.whatsAppNumber !== d.fatherMobile) {
+            $('#whatsappSameAsMobile').prop('checked', false);
+            $('#addWhatsApp').val(d.whatsAppNumber).prop('readonly', false);
+        } else {
+            $('#whatsappSameAsMobile').prop('checked', true);
+            $('#addWhatsApp').val(d.fatherMobile || '').prop('readonly', true);
+        }
+
+        // Fire conditional toggles (stream for 11/12, referrer for Referral)
+        $('#addClassName').trigger('change');
+        $('#addLeadSource').trigger('change');
+    }
+
+    function openEditEnquiry(id) {
+        $.get('/Admin/Enquiry/GetEnquiry', { id: id })
+            .done(function (res) {
+                if (res.success) {
+                    enquiryFormFill(res.data);
+                    new bootstrap.Modal(document.getElementById('addEnquiryModal')).show();
+                } else {
+                    toastr.error(res.message || 'Unable to load enquiry.');
+                }
+            })
+            .fail(function () { toastr.error('Failed to load enquiry.'); });
+    }
+
+    $(document).on('click', '.btn-edit-enquiry', function (e) {
+        e.stopPropagation();
+        openEditEnquiry($(this).data('id'));
+    });
+
+    // Add button → always start fresh
+    $('#btnAddEnquiry').on('click', enquiryFormReset);
+
+    // Auto-open edit when arriving with ?editId= (e.g. from the Registrations screen)
+    (function () {
+        var editId = new URLSearchParams(window.location.search).get('editId');
+        if (editId && parseInt(editId) > 0) openEditEnquiry(parseInt(editId));
+    })();
 
     /* ── Add Enquiry form validation ────────────────────── */
     $('#addEnquiryModal form').on('submit',function(e){

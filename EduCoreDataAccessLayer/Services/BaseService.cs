@@ -89,12 +89,15 @@ namespace educore.Services
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                 return list;
 
+            bool hasSelected = ds.Tables[0].Columns.Contains("IsSelected");
+
             foreach (DataRow row in ds.Tables[0].Rows)
             {
                 list.Add(new SelectListItem
                 {
                     Text = row["Name"]?.ToString() ?? string.Empty,
-                    Value = row["Code"]?.ToString() ?? string.Empty
+                    Value = row["Code"]?.ToString() ?? string.Empty,
+                    Selected = hasSelected && row["IsSelected"] != DBNull.Value && Convert.ToBoolean(row["IsSelected"])
                 });
             }
 

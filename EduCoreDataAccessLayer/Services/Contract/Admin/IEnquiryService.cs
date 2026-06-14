@@ -35,6 +35,19 @@ namespace EduCoreDataAccessLayer.Services.Contract.Admin
             int enquiryId, string status, string? lostReason,
             int tenantId, int schoolId, int actionUserId);
 
+        // Register an enquiry — issues a registration number, records date/fee,
+        // and moves the lead to "Registration Done".
+        Task<(int Success, string Message, string? RegistrationNumber)> RegisterEnquiryAsync(
+            int       enquiryId,
+            string?   registrationNumber,
+            DateOnly? registrationDate,
+            bool      registrationFeePaid,
+            bool      autoGenerate,
+            string?   prefix,
+            int       tenantId,
+            int       schoolId,
+            int       actionUserId);
+
         // Follow-up log (records interaction + optionally changes status)
         Task<int> LogFollowupAsync(
             int      enquiryId,

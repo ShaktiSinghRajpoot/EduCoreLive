@@ -21,6 +21,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.Admin
         Task<int> SaveAcademicSetupAsync(AcademicSetupModel model, int tenantId, int schoolId, int actionUserId);
         #endregion
 
+        #region Academic Year
+        Task<List<AcademicYearModel>> GetAcademicYearsAsync(int tenantId, int schoolId, int actionUserId);
+        Task<(bool Success, string Message, int Id)> SaveAcademicYearAsync(AcademicYearModel model, int tenantId, int schoolId, int actionUserId);
+        Task<(bool Success, string Message)> SetCurrentAcademicYearAsync(int academicYearId, int tenantId, int schoolId, int actionUserId);
+        Task<(bool Success, string Message)> DeleteAcademicYearAsync(int academicYearId, int tenantId, int schoolId, int actionUserId);
+        #endregion
+
         #region Fee Head
         Task<List<FeeHead>> GetFeeHeadAsync(int tenantId, int schoolId, int actionUserId);
         Task<FeeHead?> GetFeeHeadByIdAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId);

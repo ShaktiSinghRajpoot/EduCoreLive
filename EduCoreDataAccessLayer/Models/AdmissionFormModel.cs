@@ -23,9 +23,38 @@ namespace EduCoreDataAccessLayer.Models
         public string? MobileNumber { get; set; }
         public string? AlternateMobile { get; set; }
         public string? Address { get; set; }
+        // ── Identity / demographics ──
+        public string? BloodGroup { get; set; }
+        public string? Religion { get; set; }
+        public string? Category { get; set; }
+        public string? Nationality { get; set; }
+        public string? MotherTongue { get; set; }
+        public string? IdProofNo { get; set; }
+        // ── Previous school (transfers) ──
+        public string? PrevSchoolName { get; set; }
+        public string? PrevBoard { get; set; }
+        public string? PrevClass { get; set; }
+        public string? PrevTcNo { get; set; }
+        // ── Parent details (full) ──
+        public string? FatherOccupation { get; set; }
+        public string? FatherQualification { get; set; }
+        public string? FatherEmail { get; set; }
+        public string? MotherOccupation { get; set; }
+        public string? MotherQualification { get; set; }
+        public string? MotherEmail { get; set; }
+        public decimal? AnnualIncome { get; set; }
+        // ── Documents checklist (JSON array of {name,status}) ──
+        public string? DocumentsJson { get; set; }
         public string? DiscountType { get; set; }
         public string? DiscountReason { get; set; }
         public string? LedgerPreviewJson { get; set; }
         public int? EnquiryId { get; set; }
+
+        // ── Collect fee at admission (only when the school enables it) ──
+        public bool     CollectFeeNow   { get; set; }
+        public decimal? PaymentAmount   { get; set; }
+        public string?  PaymentMode     { get; set; }
+        public string?  PaymentReference { get; set; }
+        public string?  PaymentRemarks  { get; set; }
     }
 }

@@ -15,22 +15,36 @@ namespace educore.Areas.ERP.Controllers
         private readonly IAdmissionService _admissionService;
         private readonly IEnquiryService _enquiryService;
         private readonly ISchoolSettingsService _schoolSettingsService;
+        private readonly IAdmissionWorkflowService _admissionWorkflowService;
+        private readonly IFeePaymentService _feePaymentService;
         private readonly IBaseService _baseService;
 
-        public AdmissionController(IAdmissionService admissionService, IEnquiryService enquiryService, ISchoolSettingsService schoolSettingsService, IBaseService baseService)
+        public AdmissionController(IAdmissionService admissionService, IEnquiryService enquiryService, ISchoolSettingsService schoolSettingsService, IAdmissionWorkflowService admissionWorkflowService, IFeePaymentService feePaymentService, IBaseService baseService)
         {
             _admissionService = admissionService;
             _enquiryService = enquiryService;
             _schoolSettingsService = schoolSettingsService;
+            _admissionWorkflowService = admissionWorkflowService;
+            _feePaymentService = feePaymentService;
             _baseService = baseService;
         }
 
-        // ── Pages ────────────────────────────────────────────────
-        public async Task<IActionResult> StudentList()
+        // Registration gate: when the school requires registration before admission,
+        // an enquiry must be "Registration Done" before it can be converted.
+        private async Task<bool> RegistrationSatisfiedAsync(EnquiryModel enquiry, int tenantId, int schoolId, int userId)
         {
-            await LoadDropdownsAsync();
-            return View();
+            var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
+            if (!workflow.EnableRegistration || !workflow.RegistrationRequiredBeforeAdmission)
+                return true;
+            return string.Equals(enquiry.Status, "Registration Done", StringComparison.OrdinalIgnoreCase);
         }
+
+        // ── Pages ────────────────────────────────────────────────
+        // The student list is consolidated into a single page under the
+        // Student controller. This old route redirects there so existing
+        // links/bookmarks keep working.
+        public IActionResult StudentList()
+            => RedirectToAction("StudentList", "Student", new { area = "ERP" });
 
         public IActionResult Dashboard() => View();
 
@@ -48,6 +62,14 @@ namespace educore.Areas.ERP.Controllers
 
                 if (enquiry != null)
                 {
+                    // Server-side registration gate (mirrors the CRM client-side check).
+                    if (!await RegistrationSatisfiedAsync(enquiry, TenantId(), SchoolId(), UserId()))
+                    {
+                        TempData["Result"] = "0";
+                        TempData["Message"] = "Complete registration before converting this enquiry to admission.";
+                        return RedirectToAction("EnquiryCRM", "Enquiry", new { area = "Admin" });
+                    }
+
                     ViewBag.PrefillEnquiryId = enquiry.EnquiryId;
                     ViewBag.PrefillJson = JsonSerializer.Serialize(new
                     {
@@ -63,7 +85,7 @@ namespace educore.Areas.ERP.Controllers
                     });
                 }
             }
-            return View(nameof(StudentList));
+            return View("Create");
         }
 
         // ── POST: /ERP/Admission/SaveAdmission ───────────────────
@@ -92,6 +114,14 @@ namespace educore.Areas.ERP.Controllers
             if (errors.Count > 0)
                 return Json(new { success = false, message = string.Join(" ", errors) });
 
+            // Registration gate — enforce on the actual mutation, not just the UI.
+            if (form.EnquiryId is > 0)
+            {
+                var enquiry = await _enquiryService.GetEnquiryByIdAsync(form.EnquiryId.Value, tenantId, schoolId, userId);
+                if (enquiry != null && !await RegistrationSatisfiedAsync(enquiry, tenantId, schoolId, userId))
+                    return Json(new { success = false, message = "Complete registration before admitting this enquiry." });
+            }
+
             var model = new AdmissionModel
             {
                 AdmissionNo      = NullIfEmpty(form.AdmissionNo),
@@ -108,6 +138,24 @@ namespace educore.Areas.ERP.Controllers
                 MobileNumber     = NullIfEmpty(form.MobileNumber),
                 AlternateMobile  = NullIfEmpty(form.AlternateMobile),
                 Address          = NullIfEmpty(form.Address),
+                BloodGroup          = NullIfEmpty(form.BloodGroup),
+                Religion            = NullIfEmpty(form.Religion),
+                Category            = NullIfEmpty(form.Category),
+                Nationality         = NullIfEmpty(form.Nationality),
+                MotherTongue        = NullIfEmpty(form.MotherTongue),
+                IdProofNo           = NullIfEmpty(form.IdProofNo),
+                PrevSchoolName      = NullIfEmpty(form.PrevSchoolName),
+                PrevBoard           = NullIfEmpty(form.PrevBoard),
+                PrevClass           = NullIfEmpty(form.PrevClass),
+                PrevTcNo            = NullIfEmpty(form.PrevTcNo),
+                FatherOccupation    = NullIfEmpty(form.FatherOccupation),
+                FatherQualification = NullIfEmpty(form.FatherQualification),
+                FatherEmail         = NullIfEmpty(form.FatherEmail),
+                MotherOccupation    = NullIfEmpty(form.MotherOccupation),
+                MotherQualification = NullIfEmpty(form.MotherQualification),
+                MotherEmail         = NullIfEmpty(form.MotherEmail),
+                AnnualIncome        = form.AnnualIncome,
+                DocumentsJson       = NormalizeJsonArray(form.DocumentsJson),
                 PayTodayTotal    = totals.PayToday,
                 MonthlyTotal     = totals.Monthly,
                 YearlyTotal      = totals.Yearly,
@@ -121,7 +169,39 @@ namespace educore.Areas.ERP.Controllers
             };
 
             var result = await _admissionService.SaveAdmissionAsync(model, tenantId, schoolId, userId);
-            return Json(new { success = result.Success, message = result.Message, admissionNo = result.AdmissionNo, studentId = result.StudentId });
+
+            // ── Collect fee at admission (only when the school enables it) ──
+            string? receiptNo = null;
+            string? feeMessage = null;
+            if (result.Success && result.StudentId > 0 && form.CollectFeeNow)
+            {
+                var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
+                var payAmount = form.PaymentAmount ?? 0m;
+
+                if (workflow.CollectFeeAtAdmission && payAmount > 0)
+                {
+                    var (paid, payMsg, rcp) = await _feePaymentService.RecordPaymentAsync(
+                        result.StudentId, payAmount,
+                        NullIfEmpty(form.PaymentMode) ?? "Cash",
+                        NullIfEmpty(form.PaymentReference),
+                        NullIfEmpty(form.PaymentRemarks),
+                        model.AcademicYear,
+                        tenantId, schoolId, userId);
+
+                    receiptNo  = rcp;
+                    feeMessage = paid ? $"Receipt {rcp} generated." : $"Admission saved, but payment failed: {payMsg}";
+                }
+            }
+
+            return Json(new
+            {
+                success    = result.Success,
+                message    = result.Message,
+                admissionNo = result.AdmissionNo,
+                studentId  = result.StudentId,
+                receiptNo,
+                feeMessage
+            });
         }
 
         // ── GET: /ERP/Admission/GetStudentsData (AJAX) ───────────
@@ -249,6 +329,13 @@ namespace educore.Areas.ERP.Controllers
             try { ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear"); }
             catch { ViewBag.Sessions = new List<SelectListItem>(); }
             // Sections are class-dependent → loaded dynamically via GetSections.
+
+            // Whether the admission form may collect fee on the spot, and the
+            // optional one-time security deposit configured for this school.
+            var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
+            ViewBag.CollectFeeAtAdmission = workflow.CollectFeeAtAdmission;
+            ViewBag.EnableSecurityFee = workflow.EnableSecurityFee;
+            ViewBag.SecurityFeeAmount = workflow.SecurityFeeAmount;
         }
 
         // ── Ledger JSON parsing ──────────────────────────────────
@@ -334,5 +421,17 @@ namespace educore.Areas.ERP.Controllers
         private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
         private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
         private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+        // Pass-through for the documents checklist only if it is a valid JSON array; otherwise null.
+        private static string? NormalizeJsonArray(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return null;
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                return doc.RootElement.ValueKind == JsonValueKind.Array ? json : null;
+            }
+            catch (JsonException) { return null; }
+        }
     }
 }

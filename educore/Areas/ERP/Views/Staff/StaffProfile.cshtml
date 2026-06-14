@@ -1,0 +1,181 @@
+@{
+    ViewData["Title"] = "Staff Profile";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    int staffId = ViewBag.StaffId ?? 0;
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+.sp-page{ color:var(--ec-text); }
+.sp-breadcrumb{ display:flex; align-items:center; gap:.4rem; font-size:.76rem; font-weight:700; color:var(--ec-text-muted); margin-bottom:.35rem; }
+.sp-breadcrumb a{ color:var(--ec-text-muted); text-decoration:none; }
+.sp-breadcrumb a:hover{ color:var(--ec-primary); }
+.sp-breadcrumb span{ color:var(--ec-text-dark); }
+
+.sp-hero{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:linear-gradient(135deg,var(--ec-primary-soft) 0%,#fff 65%); padding:1.5rem; display:flex; align-items:center; gap:1.25rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+.sp-av{ width:84px; height:84px; flex:0 0 84px; border-radius:22px; display:flex; align-items:center; justify-content:center; font-size:1.9rem; font-weight:900; }
+.sp-name{ font-size:1.35rem; font-weight:900; color:var(--ec-text-dark); line-height:1.2; }
+.sp-sub{ font-size:.85rem; font-weight:700; color:var(--ec-text-muted); }
+.sp-bdg{ display:inline-flex; align-items:center; gap:.28rem; padding:.26rem .65rem; border-radius:999px; font-size:.69rem; font-weight:800; }
+.sp-bdg::before{ content:''; width:5px; height:5px; border-radius:50%; }
+.b-active{ background:#d4edda; color:#155724; } .b-active::before{ background:#28a745; }
+
+.sp-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; margin-bottom:1.25rem; }
+.sp-card-hdr{ display:flex; align-items:center; gap:.85rem; padding:1rem 1.25rem .75rem; border-bottom:1px solid var(--ec-border); }
+.sp-sec-ic{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; background:var(--ec-primary-light); color:var(--ec-primary); display:flex; align-items:center; justify-content:center; font-size:1rem; }
+.sp-sec-title{ font-size:.9rem; font-weight:900; color:var(--ec-text-dark); }
+.sp-card-body{ padding:1.1rem 1.25rem; }
+.sp-field{ margin-bottom:1rem; }
+.sp-field label{ font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--ec-text-light); display:block; margin-bottom:.2rem; }
+.sp-field span{ font-size:.9rem; font-weight:700; color:var(--ec-text-dark); }
+
+.sp-stat{ border:1px solid var(--ec-border); border-radius:14px; padding:1rem; text-align:center; height:100%; }
+.sp-stat-val{ font-size:1.4rem; font-weight:900; color:var(--ec-text-dark); }
+.sp-stat-lbl{ font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--ec-text-muted); }
+.sp-link{ display:flex; align-items:center; gap:.75rem; padding:.6rem .7rem; border:1px solid var(--ec-border); border-radius:13px; text-decoration:none; transition:all .16s ease; background:#fff; }
+.sp-link:hover{ border-color:rgba(255,138,0,.4); background:#fffaf3; transform:translateX(2px); }
+.sp-link-ic{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:1.15rem; }
+.sp-link-txt{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
+.sp-link-t{ font-size:.86rem; font-weight:800; color:var(--ec-text-dark); }
+.sp-link-s{ font-size:.72rem; font-weight:600; color:var(--ec-text-muted); }
+.sp-link-go{ font-size:1.2rem; color:var(--ec-text-muted); transition:color .16s; }
+.sp-link:hover .sp-link-go{ color:var(--ec-primary); }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content sp-page">
+
+    <div class="sp-breadcrumb">
+      <a asp-area="ERP" asp-controller="Staff" asp-action="StaffList">All Staff</a>
+      <i class="bx bx-chevron-right"></i><span>Profile</span>
+    </div>
+
+    <div class="sp-hero">
+      <div class="sp-av bg-label-primary text-primary" id="spAv">—</div>
+      <div class="flex-grow-1">
+        <div class="sp-name" id="spName">Staff Member</div>
+        <div class="sp-sub" id="spSub">Designation · Department</div>
+        <div class="mt-2 d-flex gap-2 flex-wrap">
+          <span class="sp-bdg b-active" id="spStatus">Active</span>
+          <span class="text-muted" style="font-size:.8rem;font-weight:700;" id="spEmp">EMP-000</span>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <a class="btn btn-primary d-flex align-items-center gap-1"
+           asp-area="ERP" asp-controller="Staff" asp-action="EditStaff" asp-route-id="@staffId">
+          <i class="bx bx-edit"></i><span>Edit Profile</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="row g-0 g-lg-3">
+      <div class="col-12 col-lg-7">
+
+        <div class="sp-card">
+          <div class="sp-card-hdr">
+            <div class="sp-sec-ic"><i class="bx bx-user"></i></div>
+            <div class="sp-sec-title">Personal Details</div>
+          </div>
+          <div class="sp-card-body">
+            <div class="row">
+              <div class="col-6 col-md-4 sp-field"><label>Gender</label><span id="spGender">—</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Date of Birth</label><span id="spDob">—</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Blood Group</label><span id="spBlood">—</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Mobile</label><span id="spPhone">—</span></div>
+              <div class="col-12 col-md-8 sp-field"><label>Email</label><span id="spEmail">—</span></div>
+              <div class="col-12 sp-field mb-0"><label>Address</label><span id="spAddr">—</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sp-card">
+          <div class="sp-card-hdr">
+            <div class="sp-sec-ic"><i class="bx bx-briefcase"></i></div>
+            <div class="sp-sec-title">Employment Details</div>
+          </div>
+          <div class="sp-card-body">
+            <div class="row">
+              <div class="col-6 col-md-4 sp-field"><label>Designation</label><span id="spDesig">—</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Staff Type</label><span id="spType">—</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Department</label><span id="spDept">—</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Joining Date</label><span id="spJoin">—</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Qualification</label><span id="spQual">—</span></div>
+              <div class="col-6 col-md-4 sp-field mb-0"><label>Experience</label><span id="spExp">—</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="col-12 col-lg-5">
+
+        <div class="sp-card">
+          <div class="sp-card-hdr">
+            <div class="sp-sec-ic"><i class="bx bx-bar-chart-alt-2"></i></div>
+            <div class="sp-sec-title">HR Snapshot</div>
+          </div>
+          <div class="sp-card-body">
+            <div class="row g-2">
+              <div class="col-6"><div class="sp-stat"><div class="sp-stat-val" id="spAttend">—</div><div class="sp-stat-lbl">Attendance</div></div></div>
+              <div class="col-6"><div class="sp-stat"><div class="sp-stat-val" id="spLeaves">—</div><div class="sp-stat-lbl">Leaves Taken</div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sp-card">
+          <div class="sp-card-hdr">
+            <div class="sp-sec-ic"><i class="bx bx-link-external"></i></div>
+            <div class="sp-sec-title">HR Quick Links</div>
+          </div>
+          <div class="sp-card-body">
+            <div class="d-flex flex-column gap-2">
+              <a class="sp-link" asp-area="ERP" asp-controller="Attendance" asp-action="StaffAttendance" asp-route-id="@staffId">
+                <span class="sp-link-ic" style="background:#e7f0ff;color:#3b82f6;"><i class="bx bx-user-voice"></i></span>
+                <span class="sp-link-txt"><span class="sp-link-t">Staff Attendance</span><span class="sp-link-s">View daily attendance</span></span>
+                <i class="bx bx-chevron-right sp-link-go"></i>
+              </a>
+              <a class="sp-link" asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement" asp-route-id="@staffId">
+                <span class="sp-link-ic" style="background:#fce7f3;color:#be185d;"><i class="bx bx-calendar-minus"></i></span>
+                <span class="sp-link-txt"><span class="sp-link-t">Leave History</span><span class="sp-link-s">Requests &amp; balance</span></span>
+                <i class="bx bx-chevron-right sp-link-go"></i>
+              </a>
+              <a class="sp-link" asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement" asp-route-id="@staffId">
+                <span class="sp-link-ic" style="background:#dcfce7;color:#16a34a;"><i class="bx bx-money"></i></span>
+                <span class="sp-link-txt"><span class="sp-link-t">Payroll / Payslips</span><span class="sp-link-s">Salary &amp; deductions</span></span>
+                <i class="bx bx-chevron-right sp-link-go"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+(function(){
+  /* Mock data — replace with model binding once the SP is ready. */
+  var STAFF={
+    1:{name:'Sunita Rao',color:'primary',gender:'Female',dob:'12 Mar 1980',blood:'B+',phone:'9876500011',email:'sunita.rao@school.edu',addr:'12 MG Road, Pune',emp:'EMP-001',desig:'Principal',type:'Non-Teaching',dept:'Administration',join:'01 Jun 2015',qual:'M.A, B.Ed',exp:'18 yrs',status:'Active',attend:'97%',leaves:'4'},
+    3:{name:'Anita Desai',color:'success',gender:'Female',dob:'05 Aug 1985',blood:'O+',phone:'9876500013',email:'anita.desai@school.edu',addr:'8 Park Street, Pune',emp:'EMP-003',desig:'Senior Teacher',type:'Teaching',dept:'Teaching',join:'15 Jul 2017',qual:'M.Sc, B.Ed',exp:'12 yrs',status:'Active',attend:'94%',leaves:'7'},
+    4:{name:'Vikram Joshi',color:'warning',gender:'Male',dob:'22 Nov 1988',blood:'A+',phone:'9876500014',email:'vikram.joshi@school.edu',addr:'45 Lake View, Pune',emp:'EMP-004',desig:'Maths Teacher',type:'Teaching',dept:'Teaching',join:'20 Jun 2018',qual:'M.Sc, B.Ed',exp:'9 yrs',status:'Active',attend:'91%',leaves:'9'}
+  };
+  var id=@staffId;
+  var s=STAFF[id]||STAFF[1];
+  function set(elId,val){var el=document.getElementById(elId);if(el)el.textContent=val||'—';}
+  function ini(n){return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();}
+  var av=document.getElementById('spAv');
+  av.textContent=ini(s.name); av.className='sp-av bg-label-'+s.color+' text-'+s.color;
+  set('spName',s.name); set('spSub',s.desig+' · '+s.dept); set('spStatus',s.status); set('spEmp',s.emp);
+  set('spGender',s.gender); set('spDob',s.dob); set('spBlood',s.blood); set('spPhone',s.phone);
+  set('spEmail',s.email); set('spAddr',s.addr); set('spDesig',s.desig); set('spType',s.type);
+  set('spDept',s.dept); set('spJoin',s.join); set('spQual',s.qual); set('spExp',s.exp);
+  set('spAttend',s.attend); set('spLeaves',s.leaves);
+})();
+</script>
+}

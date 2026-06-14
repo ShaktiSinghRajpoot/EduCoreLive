@@ -1,5 +1,17 @@
 @{
     ViewData["Title"] = "Dashboard";
+    var greeting = DateTime.Now.Hour < 12 ? "Good morning" : DateTime.Now.Hour < 17 ? "Good afternoon" : "Good evening";
+
+    // map per-item accent -> soft theme class
+    string Soft(string c) => c switch
+    {
+        "primary" => "soft-orange",
+        "info" => "soft-blue",
+        "success" => "soft-green",
+        "warning" => "soft-amber",
+        "danger" => "soft-red",
+        _ => "soft-grey"
+    };
 }
 
 @section VendorStyles {
@@ -11,310 +23,882 @@
 }
 
 @section PageStyles {
+    <link href="~/css/educore-theme.css" rel="stylesheet" />
     <style>
-        .erp-dashboard {
-            --erp-radius: 1rem;
-            --erp-border: var(--ec-border, #ececf5);
-            --erp-muted:  var(--ec-text-muted, #8b8175);
+        .dash {
+            font-family: "Public Sans", system-ui, sans-serif;
         }
 
-            .erp-dashboard .card {
-                border:        1px solid var(--ec-border, #ececf5);
-                border-radius: var(--erp-radius);
-                box-shadow:    0 .125rem .75rem rgba(67,89,113,.06);
-            }
-
-            .erp-dashboard .card-header {
-                border-bottom: 1px solid var(--ec-border, #ececf5);
-                padding:       1.25rem 1.25rem .5rem;
-            }
-
-            .erp-dashboard .card-body {
-                padding: 1.25rem;
-            }
-
-        .erp-alert {
-            border-radius: var(--erp-radius);
-            background: #fff;
-            border-left: .35rem solid #ea5455;
-            box-shadow: 0 .125rem .75rem rgba(67,89,113,.08);
+        /* ---- generic card ---- */
+        .dash-card {
+            background: var(--ec-white);
+            border: 1px solid var(--ec-border);
+            border-radius: var(--ec-radius);
+            transition: var(--ec-transition);
         }
 
-        .erp-alert-icon, .erp-stat-icon {
-            width: 2.75rem;
-            height: 2.75rem;
+            .dash-card:hover {
+                box-shadow: var(--ec-shadow);
+            }
+
+        .dash-card-head {
+            padding: 1.1rem 1.25rem .35rem;
+        }
+
+        .dash-card-body {
+            padding: 1.25rem;
+        }
+
+        .dash-card-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--ec-text-dark);
+            margin: 0;
+        }
+
+        .dash-sub {
+            color: var(--ec-text-muted);
+            font-size: .8rem;
+        }
+
+        /* ---- entrance ---- */
+        @@keyframes dashUp {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .dash-animate {
+            animation: dashUp .5s ease both;
+        }
+
+        /* ---- hero ---- */
+        .dash-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: var(--ec-radius-lg);
+            color: #fff;
+            background: linear-gradient(120deg,#ff8a00 0%,#ff6f00 48%,#ffa733 130%);
+            box-shadow: 0 .75rem 2rem rgba(255,138,0,.32);
+        }
+
+            .dash-hero::before {
+                content: "";
+                position: absolute;
+                width: 18rem;
+                height: 18rem;
+                top: -8rem;
+                right: -4rem;
+                border-radius: 50%;
+                background: radial-gradient(circle,rgba(255,255,255,.25),transparent 70%);
+            }
+
+        .dash-hero-body {
+            position: relative;
+            z-index: 1;
+            padding: 1.6rem 1.75rem;
+        }
+
+        .dash-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            background: rgba(255,255,255,.18);
+            border: 1px solid rgba(255,255,255,.25);
+            border-radius: 999px;
+            padding: .3rem .8rem;
+            font-size: .76rem;
+            font-weight: 700;
+        }
+
+        /* ---- soft icon tints ---- */
+        .dash-icon {
+            width: 2.85rem;
+            height: 2.85rem;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            border-radius: .85rem;
+            border-radius: 14px;
             flex: 0 0 auto;
+            font-size: 1.35rem;
         }
 
-        .erp-stat-card {
-            min-height: 8.4rem;
-            transition: transform .2s ease, box-shadow .2s ease;
+        .soft-orange {
+            background: var(--ec-primary-light);
+            color: var(--ec-primary);
         }
 
-            .erp-stat-card:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 .5rem 1.25rem rgba(67,89,113,.09);
+        .soft-green {
+            background: #ecfdf3;
+            color: #16a34a;
+        }
+
+        .soft-red {
+            background: #fff1f0;
+            color: #dc2626;
+        }
+
+        .soft-amber {
+            background: #fff7e6;
+            color: #d97706;
+        }
+
+        .soft-blue {
+            background: #eff6ff;
+            color: #0284c7;
+        }
+
+        .soft-grey {
+            background: #f1f1f4;
+            color: #6b7280;
+        }
+
+        .dash-label {
+            color: var(--ec-text-light);
+            font-size: .72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .dash-value {
+            color: var(--ec-text-dark);
+            font-size: 1.55rem;
+            font-weight: 900;
+            line-height: 1.1;
+        }
+
+        /* ---- KPI ---- */
+        .dash-kpi {
+            position: relative;
+            overflow: hidden;
+            min-height: 9.5rem;
+            transition: var(--ec-transition);
+        }
+
+            .dash-kpi:hover {
+                transform: translateY(-3px);
+                box-shadow: var(--ec-shadow);
             }
 
-        .erp-label {
-            color: var(--erp-muted);
-            font-size: .78rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: .03em;
-        }
+            .dash-kpi .dash-spark {
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: 0;
+            }
 
-        .erp-value {
-            color:       var(--ec-text-dark, #2b1b12);
-            font-size:   1.45rem;
-            font-weight: 800;
-            line-height: 1.2;
-        }
-
-        .erp-subtext {
-            color: var(--erp-muted);
-            font-size: .85rem;
-        }
-
-        .erp-progress {
-            height: .45rem;
+        .dash-progress {
+            height: .4rem;
             border-radius: 999px;
-            background: #f0f2f4;
+            background: #f0eee9;
             overflow: hidden;
         }
 
-            .erp-progress span {
+            .dash-progress span {
                 display: block;
                 height: 100%;
                 border-radius: inherit;
             }
 
-        .erp-dark-card {
-            color: #fff;
-            background: linear-gradient(135deg,#1f2937,#111827);
+        /* ---- widget rows ---- */
+        .dash-scroll {
+            max-height: 21rem;
+            overflow-y: auto;
         }
 
-            .erp-dark-card .erp-label, .erp-dark-card .erp-subtext {
-                color: rgba(255,255,255,.68);
+            .dash-scroll::-webkit-scrollbar {
+                width: 5px;
             }
 
-        .erp-chart {
-            min-height: 315px;
+            .dash-scroll::-webkit-scrollbar-thumb {
+                background: #e7d8c6;
+                border-radius: 999px;
+            }
+
+        .dash-row {
+            display: flex;
+            align-items: center;
+            gap: .85rem;
+            padding: .7rem 0;
+            border-bottom: 1px solid #f4eee7;
         }
 
-        .erp-mini-chart {
-            min-height: 230px;
-        }
+            .dash-row:last-child {
+                border-bottom: 0;
+            }
 
-        .erp-table thead th {
-            color:          var(--erp-muted);
-            font-size:      .76rem;
-            font-weight:    700;
-            text-transform: uppercase;
-            letter-spacing: .035em;
-            background:     #faf9f7;
-            border-bottom:  1px solid var(--ec-border-warm, #f0eee9);
-            white-space:    nowrap;
-        }
-
-        .erp-table tbody td {
-            padding:        1rem .9rem;
-            vertical-align: middle;
-            border-bottom:  1px solid var(--ec-border, #ececf5);
-        }
-
-        .erp-table tbody tr:hover {
-            background: #fffaf5;
-        }
-
-        .erp-avatar {
-            width: 2.25rem;
-            height: 2.25rem;
+        .dash-avatar {
+            width: 2.4rem;
+            height: 2.4rem;
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             font-size: .8rem;
-            font-weight: 700;
+            font-weight: 800;
+            flex: 0 0 auto;
         }
 
-        .erp-status {
+        .dash-pill {
             display: inline-flex;
             align-items: center;
-            padding: .35rem .75rem;
+            gap: .3rem;
+            padding: .28rem .6rem;
             border-radius: 999px;
-            font-size: .74rem;
-            font-weight: 700;
-            text-transform: uppercase;
+            font-size: .72rem;
+            font-weight: 800;
         }
 
-        .erp-search {
+        /* ---- timeline ---- */
+        .dash-timeline {
+            position: relative;
+            padding-left: 1.4rem;
+            margin: 0;
+            list-style: none;
+        }
+
+            .dash-timeline::before {
+                content: "";
+                position: absolute;
+                left: .32rem;
+                top: .35rem;
+                bottom: .35rem;
+                width: 2px;
+                background: #f0e7db;
+            }
+
+            .dash-timeline li {
+                position: relative;
+                padding-bottom: 1.1rem;
+            }
+
+                .dash-timeline li:last-child {
+                    padding-bottom: 0;
+                }
+
+                .dash-timeline li::before {
+                    content: "";
+                    position: absolute;
+                    left: -1.4rem;
+                    top: .25rem;
+                    width: .7rem;
+                    height: .7rem;
+                    border-radius: 50%;
+                    background: var(--ec-primary);
+                    box-shadow: 0 0 0 3px rgba(255,138,0,.18);
+                }
+
+        /* ---- quick links ---- */
+        .dash-quick {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: .5rem;
+            padding: 1.1rem .5rem;
+            border-radius: 14px;
+            text-align: center;
+            text-decoration: none;
+            color: var(--ec-text-muted);
+            background: var(--ec-bg-soft);
+            transition: var(--ec-transition);
+            height: 100%;
+        }
+
+            .dash-quick:hover {
+                transform: translateY(-3px);
+                color: var(--ec-primary);
+                background: #fff;
+                box-shadow: var(--ec-shadow);
+            }
+
+            .dash-quick i {
+                font-size: 1.5rem;
+            }
+
+            .dash-quick span {
+                font-size: .78rem;
+                font-weight: 700;
+            }
+
+        /* ---- table ---- */
+        .dash-table tbody td {
+            padding: .85rem .9rem;
+            vertical-align: middle;
+            border-bottom: 1px solid #f4eee7;
+        }
+
+        .dash-table tbody tr:hover {
+            background: rgba(255,138,0,.04);
+        }
+
+        .dash-search {
             max-width: 18rem;
         }
+
+        .dash-chart {
+            min-height: 320px;
+        }
+
         @@media (max-width: 991.98px) {
-            .erp-search
-
-        {
-            max-width: 100%;
+            .dash-search {
+                max-width: 100%;
+            }
         }
-
-        .erp-chart {
-            min-height: 280px;
-        }
-
-        }
-        @@media (max-width: 575.98px) {
-            .erp-dashboard .card-body
-
-        {
-            padding: 1rem;
-        }
-
-        .erp-value {
-            font-size: 1.25rem;
-        }
-
-        .erp-stat-card {
-            min-height: auto;
-        }
-
-        }</style>
+    </style>
 }
 
-@* ************** School ERP Dashboard ************** *@
-<div class="erp-dashboard">
+@* ******************** EduCore — School Admin Dashboard ******************** *@
+<div class="dash">
     <div class="row g-4">
-       
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Staff Attendance</div><div class="erp-value mb-2">0 <span class="fs-6 fw-normal text-muted">/ 11</span></div><span class="badge bg-label-danger">0%</span><span class="erp-subtext ms-2">Present Today</span></div><span class="erp-stat-icon bg-label-primary text-primary"><i class="icon-base bx bx-user-check icon-lg"></i></span></div></div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Student Attendance</div><div class="erp-value mb-2">0 <span class="fs-6 fw-normal text-muted">/ 13</span></div><span class="badge bg-label-danger">0%</span><span class="erp-subtext ms-2">Present Today</span></div><span class="erp-stat-icon bg-label-info text-info"><i class="icon-base bx bx-group icon-lg"></i></span></div></div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Total Collection</div><div class="erp-value mb-2">₹ 13,201</div><small class="text-success fw-medium"><i class="icon-base bx bx-trending-up"></i> +12.5%</small></div><span class="erp-stat-icon bg-label-success text-success"><i class="icon-base bx bx-wallet icon-lg"></i></span></div></div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Total Due</div><div class="erp-value mb-2">₹ 141,912</div><small class="text-danger fw-medium">Action Required</small></div><span class="erp-stat-icon bg-label-danger text-danger"><i class="icon-base bx bx-error-circle icon-lg"></i></span></div></div>
-        </div>
 
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Avg. Fee / Student</div><div class="erp-value mb-2">₹ 3,300</div><small class="erp-subtext">Per Transaction</small></div><span class="erp-stat-icon bg-label-primary text-primary"><i class="icon-base bx bx-credit-card icon-lg"></i></span></div></div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100 border border-success border-opacity-25"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3 text-success">Txns Count</div><div class="erp-value mb-2">4</div><small class="erp-subtext">Successful</small></div><span class="erp-stat-icon bg-label-success text-success"><i class="icon-base bx bx-transfer-alt icon-lg"></i></span></div></div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Students With Due</div><div class="erp-value mb-2">10</div><small class="text-warning fw-medium">77% of Total</small></div><span class="erp-stat-icon bg-label-warning text-warning"><i class="icon-base bx bx-user-x icon-lg"></i></span></div></div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Total Students</div><div class="erp-value mb-2">13</div><span class="badge bg-label-success">+1</span><span class="erp-subtext ms-2">New Admissions</span></div><span class="erp-stat-icon bg-label-secondary text-secondary"><i class="icon-base bx bx-user-plus icon-lg"></i></span></div></div>
-        </div>
-
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body"><div class="d-flex justify-content-between"><div><div class="erp-label mb-3">Collection Efficiency</div><div class="erp-value mb-2">8%</div></div><span class="erp-stat-icon bg-label-success text-success"><i class="icon-base bx bx-purchase-tag icon-lg"></i></span></div><div class="erp-progress mt-2"><span class="bg-success" style="width:8%"></span></div><small class="erp-subtext">Of yearly target</small></div></div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Revenue Growth</div><div class="erp-value mb-2">13101%</div><small class="text-success fw-medium"><i class="icon-base bx bx-up-arrow-alt"></i> vs Previous Period</small></div><span class="erp-stat-icon bg-label-warning text-warning"><i class="icon-base bx bx-line-chart icon-lg"></i></span></div></div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Defaulter Rate</div><div class="erp-value mb-2">77%</div><small class="text-danger fw-medium">High Risk</small></div><span class="erp-stat-icon bg-label-danger text-danger"><i class="icon-base bx bx-pulse icon-lg"></i></span></div></div>
-        </div>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card erp-stat-card erp-dark-card h-100"><div class="card-body d-flex justify-content-between gap-3"><div><div class="erp-label mb-3">Current Bill (Quarterly)</div><div class="erp-value text-white mb-2">₹0.00</div><small class="erp-subtext"><i class="icon-base bx bxs-circle text-warning me-1" style="font-size:.55rem"></i> Free Trial Plan</small></div><span class="erp-stat-icon bg-white bg-opacity-10 text-white"><i class="icon-base bx bx-receipt icon-lg"></i></span></div></div>
-        </div>
-
-        <div class="col-12 col-xl-8">
-            <div class="card h-100">
-                <div class="card-header d-flex flex-column flex-md-row justify-content-between gap-2">
-                    <div><h5 class="mb-1">Collection Trend</h5><small class="text-muted">Recent fee collection activity</small></div>
-                    <div class="d-flex gap-2"><button class="btn btn-sm btn-label-primary">Monthly</button><button class="btn btn-sm btn-outline-secondary">Export</button></div>
-                </div>
-                <div class="card-body"><div id="collectionTrendChart" class="erp-chart"></div></div>
-            </div>
-        </div>
-        <div class="col-12 col-xl-4">
-            <div class="row g-4 h-100">
-                <div class="col-12 col-md-6 col-xl-12">
-                    <div class="card h-100"><div class="card-header"><h5 class="mb-1">Payment Modes</h5><small class="text-muted">Collection by method</small></div><div class="card-body"><div id="paymentModesChart" class="erp-mini-chart"></div><div class="d-flex justify-content-between mt-2"><span class="erp-subtext">Cash</span><strong>100%</strong></div></div></div>
-                </div>
-                <div class="col-12 col-md-6 col-xl-12">
-                    <div class="card h-100"><div class="card-header"><h5 class="mb-1">Fee Status</h5><small class="text-muted">Collected vs expected</small></div><div class="card-body"><div class="d-flex justify-content-between mb-2"><span class="erp-subtext">Collection</span><strong>8.5%</strong></div><div class="erp-progress mb-3"><span class="bg-success" style="width:8.5%"></span></div><div id="feeStatusChart" class="erp-mini-chart"></div></div></div>
+        @* ============ HERO + LIVE ATTENDANCE ============ *@
+        <div class="col-12 col-xxl-8 dash-animate">
+            <div class="dash-hero h-100">
+                <div class="dash-hero-body d-flex flex-column h-100">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                        <div>
+                            <span class="dash-chip mb-3"><i class="bx bx-calendar"></i> @DateTime.Now.ToString("dddd, dd MMMM yyyy")</span>
+                            <h3 class="text-white fw-bold mb-1">@greeting, Admin 👋</h3>
+                            <p class="mb-0" style="color:rgba(255,255,255,.9);max-width:36rem">
+                                You've collected <strong class="text-white">₹13,201</strong> today across
+                                <strong class="text-white">4</strong> transactions.
+                                <strong class="text-white">10</strong> students still have pending dues.
+                            </p>
+                        </div>
+                        <span class="dash-chip"><i class="bx bx-book-open"></i> Session 2025–26</span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-auto pt-4">
+                        <a href="/ERP/Admission/ManageAdmission" class="btn btn-sm btn-light text-dark fw-semibold"><i class="bx bx-user-plus me-1"></i>New Admission</a>
+                        <a href="/ERP/Fee/ManageFee" class="btn btn-sm btn-outline-light"><i class="bx bx-wallet me-1"></i>Collect Fee</a>
+                        <a href="/ERP/Attendance/StudentAttendance" class="btn btn-sm btn-outline-light"><i class="bx bx-user-check me-1"></i>Mark Attendance</a>
+                        <a href="/Admin/FeeDueReminders" class="btn btn-sm btn-outline-light"><i class="bx bx-bell me-1"></i>Send Reminders</a>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
-                    <div><h5 class="mb-1">Student Fee Matrix</h5><small class="text-muted">Showing top 10 results from 13 records</small></div>
-                    <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-lg-auto"><input type="search" class="form-control erp-search" placeholder="Search student or class..." /><button class="btn btn-primary"><i class="icon-base bx bx-download me-1"></i>Export</button></div>
+        <div class="col-12 col-xxl-4 dash-animate" style="animation-delay:.05s">
+            <div class="dash-card h-100">
+                <div class="dash-card-head d-flex justify-content-between align-items-center">
+                    <div><h5 class="dash-card-title">Today's Attendance</h5><small class="dash-sub">Live snapshot</small></div>
+                    <span class="dash-pill soft-green">Live</span>
+                </div>
+                <div class="dash-card-body">
+                    <div class="row align-items-center">
+                        <div class="col-6"><div id="attendanceGauge"></div></div>
+                        <div class="col-6">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1"><span class="dash-sub"><i class="bx bxs-circle me-1" style="color:#0284c7;font-size:.5rem"></i>Students</span><strong>11/13</strong></div>
+                                <div class="dash-progress"><span style="width:85%;background:#0284c7"></span></div>
+                            </div>
+                            <div>
+                                <div class="d-flex justify-content-between mb-1"><span class="dash-sub"><i class="bx bxs-circle me-1" style="color:#ff8a00;font-size:.5rem"></i>Staff</span><strong>9/11</strong></div>
+                                <div class="dash-progress"><span style="width:82%;background:#ff8a00"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ============ PRIMARY KPI CARDS ============ *@
+        @{
+            var kpis = new[] {
+                new { Label="Total Students", Value="13", Trend="+1 new admission", Soft="soft-green", Icon="bx-group", Spark="sparkStudents", Up=true },
+                new { Label="Total Staff", Value="11", Trend="2 on leave today", Soft="soft-orange", Icon="bx-id-card", Spark="sparkStaff", Up=true },
+                new { Label="Today's Collection", Value="₹13,201", Trend="+12.5% vs yesterday", Soft="soft-blue", Icon="bx-wallet", Spark="sparkCollection", Up=true },
+                new { Label="Outstanding Due", Value="₹1,41,912", Trend="10 students pending", Soft="soft-red", Icon="bx-error-circle", Spark="sparkDue", Up=false },
+            };
+        }
+        @for (var i = 0; i < kpis.Length; i++)
+        {
+            var k = kpis[i];
+            <div class="col-12 col-sm-6 col-xl-3 dash-animate" style="animation-delay:@($"{0.05 * (i + 2):0.00}".Replace(",", "."))s">
+                <div class="dash-card dash-kpi h-100">
+                    <div class="dash-card-body">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="dash-label mb-2">@k.Label</div>
+                                <div class="dash-value mb-1">@k.Value</div>
+                                <small class="fw-semibold" style="color:@(k.Up ? "#16a34a" : "#dc2626")"><i class="bx @(k.Up ? "bx-trending-up" : "bx-trending-down")"></i> @k.Trend</small>
+                            </div>
+                            <span class="dash-icon @k.Soft"><i class="bx @k.Icon"></i></span>
+                        </div>
+                    </div>
+                    <div id="@k.Spark" class="dash-spark"></div>
+                </div>
+            </div>
+        }
+
+        @* ============ COLLECTION TREND + TARGET ============ *@
+        <div class="col-12 col-xl-8 dash-animate">
+            <div class="dash-card h-100">
+                <div class="dash-card-head d-flex flex-column flex-md-row justify-content-between gap-2">
+                    <div><h5 class="dash-card-title">Fee Collection Trend</h5><small class="dash-sub">Daily collection over the last 7 days</small></div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-primary">Week</button>
+                        <button class="btn btn-sm btn-outline-secondary">Month</button>
+                        <button class="btn btn-sm btn-outline-secondary"><i class="bx bx-download"></i></button>
+                    </div>
+                </div>
+                <div class="dash-card-body"><div id="collectionTrendChart" class="dash-chart"></div></div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4 dash-animate" style="animation-delay:.05s">
+            <div class="dash-card h-100">
+                <div class="dash-card-head"><h5 class="dash-card-title">Collection Target</h5><small class="dash-sub">This month's progress</small></div>
+                <div class="dash-card-body text-center">
+                    <div id="targetRadial"></div>
+                    <div class="row g-2 mt-2">
+                        <div class="col-6">
+                            <div class="p-2 rounded" style="background:var(--ec-bg-soft)">
+                                <div class="dash-label mb-1">Collected</div>
+                                <h6 class="mb-0" style="color:#16a34a">₹13,201</h6>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-2 rounded" style="background:var(--ec-bg-soft)">
+                                <div class="dash-label mb-1">Target</div>
+                                <h6 class="mb-0">₹50,000</h6>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ============ ANALYTICS ============ *@
+        <div class="col-12 col-lg-6 col-xl-4 dash-animate">
+            <div class="dash-card h-100">
+                <div class="dash-card-head"><h5 class="dash-card-title">Income vs Expense</h5><small class="dash-sub">Last 6 months</small></div>
+                <div class="dash-card-body"><div id="incomeExpenseChart"></div></div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6 col-xl-4 dash-animate" style="animation-delay:.05s">
+            <div class="dash-card h-100">
+                <div class="dash-card-head"><h5 class="dash-card-title">Class-wise Strength</h5><small class="dash-sub">Students per class</small></div>
+                <div class="dash-card-body"><div id="classStrengthChart"></div></div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4 dash-animate" style="animation-delay:.1s">
+            <div class="dash-card h-100">
+                <div class="dash-card-head"><h5 class="dash-card-title">Payment Modes</h5><small class="dash-sub">Collection by method</small></div>
+                <div class="dash-card-body">
+                    <div id="paymentModeChart"></div>
+                    <div class="row text-center g-2 mt-2">
+                        <div class="col"><div class="dash-label mb-1">Cash</div><h6 class="mb-0" style="color:#16a34a">72%</h6></div>
+                        <div class="col border-start"><div class="dash-label mb-1">UPI</div><h6 class="mb-0" style="color:#ff8a00">21%</h6></div>
+                        <div class="col border-start"><div class="dash-label mb-1">Card</div><h6 class="mb-0" style="color:#d97706">7%</h6></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ============ OPERATIONAL ============ *@
+        <div class="col-12 col-lg-6 col-xl-4 dash-animate">
+            <div class="dash-card h-100">
+                <div class="dash-card-head d-flex justify-content-between align-items-center">
+                    <div><h5 class="dash-card-title">Top Fee Defaulters</h5><small class="dash-sub">Highest outstanding dues</small></div>
+                    <a href="/Admin/FeeDueReminders" class="btn btn-sm btn-primary">Remind All</a>
+                </div>
+                <div class="dash-card-body dash-scroll">
+                    @{
+                        var defaulters = new[] {
+                            new { N="Yash Kumar", C="12th", Due="₹20,750", Av="YK", Cl="primary" },
+                            new { N="Demo Student", C="8th", Due="₹20,000", Av="DS", Cl="info" },
+                            new { N="Deepak Sharma", C="11th", Due="₹19,650", Av="DS", Cl="success" },
+                            new { N="Vikash Ji", C="4th", Due="₹17,200", Av="VJ", Cl="warning" },
+                            new { N="Hema", C="UKG", Due="₹16,899", Av="H", Cl="danger" },
+                            new { N="Govind", C="UKG", Due="₹12,999", Av="G", Cl="secondary" },
+                        };
+                    }
+                    @foreach (var d in defaulters)
+                    {
+                        <div class="dash-row">
+                            <span class="dash-avatar @Soft(d.Cl)">@d.Av</span>
+                            <div class="flex-grow-1 min-w-0">
+                                <h6 class="mb-0 text-truncate">@d.N</h6>
+                                <small class="text-muted">Class @d.C</small>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold" style="color:#dc2626">@d.Due</div>
+                                <a href="/Admin/FeeDueReminders" class="small" style="color:var(--ec-primary)"><i class="bx bx-bell"></i> Remind</a>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6 col-xl-4 dash-animate" style="animation-delay:.05s">
+            <div class="dash-card h-100">
+                <div class="dash-card-head d-flex justify-content-between align-items-center">
+                    <div><h5 class="dash-card-title">Recent Transactions</h5><small class="dash-sub">Latest fee receipts</small></div>
+                    <a href="/ERP/Fee/ManageFee" class="btn btn-sm btn-outline-secondary">View All</a>
+                </div>
+                <div class="dash-card-body dash-scroll">
+                    @{
+                        var txns = new[] {
+                            new { N="Anmol", R="#RCPT-1042", Amt="₹10,000", Mode="UPI", Time="10 min ago" },
+                            new { N="Akash Verma", R="#RCPT-1041", Amt="₹16,276", Mode="Cash", Time="45 min ago" },
+                            new { N="Govind", R="#RCPT-1040", Amt="₹2,001", Mode="Cash", Time="2 hrs ago" },
+                            new { N="New Saloni", R="#RCPT-1039", Amt="₹100", Mode="UPI", Time="3 hrs ago" },
+                            new { N="Hema", R="#RCPT-1038", Amt="₹1,251", Mode="Card", Time="Yesterday" },
+                        };
+                    }
+                    @foreach (var t in txns)
+                    {
+                        <div class="dash-row">
+                            <span class="dash-icon soft-green" style="width:2.4rem;height:2.4rem;font-size:1.1rem"><i class="bx bx-rupee"></i></span>
+                            <div class="flex-grow-1 min-w-0">
+                                <h6 class="mb-0 text-truncate">@t.N</h6>
+                                <small class="text-muted">@t.R · @t.Mode</small>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold" style="color:#16a34a">@t.Amt</div>
+                                <small class="text-muted">@t.Time</small>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-4 dash-animate" style="animation-delay:.1s">
+            <div class="dash-card h-100">
+                <div class="dash-card-head d-flex justify-content-between align-items-center">
+                    <div><h5 class="dash-card-title">Pending Approvals</h5><small class="dash-sub">Needs your action</small></div>
+                    <span class="dash-pill soft-amber">5 pending</span>
+                </div>
+                <div class="dash-card-body dash-scroll">
+                    @{
+                        var approvals = new[] {
+                            new { N="Sunita Devi", T="Casual Leave · 2 days", Ic="bx-calendar-minus", Soft="soft-amber", Link="/ERP/Leave/LeaveManagement" },
+                            new { N="Rakesh Kumar", T="Payment verification · ₹5,000", Ic="bx-check-shield", Soft="soft-blue", Link="/Admin/PaymentVerification" },
+                            new { N="Priya Sharma", T="Sick Leave · 1 day", Ic="bx-calendar-minus", Soft="soft-amber", Link="/ERP/Leave/LeaveManagement" },
+                            new { N="Amit Singh", T="Payment verification · ₹12,000", Ic="bx-check-shield", Soft="soft-blue", Link="/Admin/PaymentVerification" },
+                        };
+                    }
+                    @foreach (var a in approvals)
+                    {
+                        <div class="dash-row">
+                            <span class="dash-icon @a.Soft" style="width:2.4rem;height:2.4rem;font-size:1.1rem"><i class="bx @a.Ic"></i></span>
+                            <div class="flex-grow-1 min-w-0">
+                                <h6 class="mb-0 text-truncate">@a.N</h6>
+                                <small class="text-muted text-truncate d-block">@a.T</small>
+                            </div>
+                            <div class="d-flex gap-1">
+                                <a href="@a.Link" class="btn btn-icon btn-sm btn-primary" title="Approve"><i class="bx bx-check"></i></a>
+                                <a href="@a.Link" class="btn btn-icon btn-sm btn-outline-secondary" title="Reject"><i class="bx bx-x"></i></a>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ============ EVENTS · NOTICES · BIRTHDAYS ============ *@
+        <div class="col-12 col-lg-6 col-xl-4 dash-animate">
+            <div class="dash-card h-100">
+                <div class="dash-card-head"><h5 class="dash-card-title">Upcoming Events</h5><small class="dash-sub">Academic calendar</small></div>
+                <div class="dash-card-body">
+                    <ul class="dash-timeline">
+                        <li><div class="d-flex justify-content-between"><h6 class="mb-0">Half-Yearly Exams</h6><small class="text-muted">15 Jun</small></div><small class="text-muted">All classes · Term 1</small></li>
+                        <li><div class="d-flex justify-content-between"><h6 class="mb-0">Parent-Teacher Meeting</h6><small class="text-muted">20 Jun</small></div><small class="text-muted">10:00 AM · Main Hall</small></li>
+                        <li><div class="d-flex justify-content-between"><h6 class="mb-0">Annual Sports Day</h6><small class="text-muted">28 Jun</small></div><small class="text-muted">Playground · Full day</small></li>
+                        <li><div class="d-flex justify-content-between"><h6 class="mb-0">Summer Break Begins</h6><small class="text-muted">01 Jul</small></div><small class="text-muted">School closed</small></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-6 col-xl-4 dash-animate" style="animation-delay:.05s">
+            <div class="dash-card h-100">
+                <div class="dash-card-head d-flex justify-content-between align-items-center">
+                    <div><h5 class="dash-card-title">Notice Board</h5><small class="dash-sub">Latest announcements</small></div>
+                    <a href="/Admin/NoticeBoard" class="btn btn-sm btn-primary">Post</a>
+                </div>
+                <div class="dash-card-body dash-scroll">
+                    @{
+                        var notices = new[] {
+                            new { T="Fee submission deadline extended to 30th June", Cat="Fees", Soft="soft-green", Date="Today" },
+                            new { T="Holiday on account of local elections", Cat="Holiday", Soft="soft-amber", Date="2 days ago" },
+                            new { T="New library books available for issue", Cat="Library", Soft="soft-blue", Date="4 days ago" },
+                            new { T="Updated bus routes effective next week", Cat="Transport", Soft="soft-orange", Date="1 week ago" },
+                        };
+                    }
+                    @foreach (var n in notices)
+                    {
+                        <div class="dash-row align-items-start">
+                            <span class="dash-icon @n.Soft" style="width:2.4rem;height:2.4rem;font-size:1.1rem"><i class="bx bx-news"></i></span>
+                            <div class="flex-grow-1 min-w-0">
+                                <p class="mb-1 fw-semibold" style="line-height:1.3">@n.T</p>
+                                <span class="dash-pill @n.Soft me-1">@n.Cat</span><small class="text-muted">@n.Date</small>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-4 dash-animate" style="animation-delay:.1s">
+            <div class="dash-card h-100">
+                <div class="dash-card-head"><h5 class="dash-card-title">🎂 Birthdays Today</h5><small class="dash-sub">Wish them well</small></div>
+                <div class="dash-card-body dash-scroll">
+                    @{
+                        var bdays = new[] {
+                            new { N="Anmol Gupta", R="Student · Class 2nd", Av="AG", Cl="primary" },
+                            new { N="Priya Sharma", R="Teacher · Science", Av="PS", Cl="info" },
+                            new { N="Govind", R="Student · UKG", Av="G", Cl="success" },
+                        };
+                    }
+                    @foreach (var b in bdays)
+                    {
+                        <div class="dash-row">
+                            <span class="dash-avatar @Soft(b.Cl)">@b.Av</span>
+                            <div class="flex-grow-1 min-w-0">
+                                <h6 class="mb-0 text-truncate">@b.N</h6>
+                                <small class="text-muted">@b.R</small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary"><i class="bx bx-gift me-1"></i>Wish</button>
+                        </div>
+                    }
+                    <div class="text-center pt-2"><small class="text-muted">3 birthdays today</small></div>
+                </div>
+            </div>
+        </div>
+
+        @* ============ QUICK ACCESS ============ *@
+        <div class="col-12 dash-animate">
+            <div class="dash-card">
+                <div class="dash-card-head"><h5 class="dash-card-title">Quick Access</h5><small class="dash-sub">Jump to any module</small></div>
+                <div class="dash-card-body">
+                    <div class="row g-3">
+                        @{
+                            var links = new[] {
+                                new { L="Students", I="bx-group", U="/ERP/Student/StudentList", C="#ff8a00" },
+                                new { L="Admission", I="bx-user-plus", U="/ERP/Admission/ManageAdmission", C="#16a34a" },
+                                new { L="Fees", I="bx-wallet", U="/ERP/Fee/ManageFee", C="#0284c7" },
+                                new { L="Attendance", I="bx-user-check", U="/ERP/Attendance/StudentAttendance", C="#d97706" },
+                                new { L="Exams", I="bx-file", U="/ERP/Exam/CreateExam", C="#dc2626" },
+                                new { L="Staff", I="bx-id-card", U="/ERP/Staff/StaffList", C="#9333ea" },
+                                new { L="Payroll", I="bx-money", U="/ERP/Payroll/PayrollManagement", C="#16a34a" },
+                                new { L="Leave", I="bx-calendar-minus", U="/ERP/Leave/LeaveManagement", C="#e83e8c" },
+                                new { L="Inventory", I="bx-package", U="/ERP/Fee/InventoryItem", C="#ff5722" },
+                                new { L="Reminders", I="bx-bell", U="/Admin/FeeDueReminders", C="#ff8a00" },
+                                new { L="Reports", I="bx-bar-chart-alt-2", U="/Admin/Reports", C="#009688" },
+                                new { L="Settings", I="bx-cog", U="/Admin/SchoolSettings/BasicProfile", C="#6b7280" },
+                            };
+                        }
+                        @foreach (var l in links)
+                        {
+                            <div class="col-6 col-sm-4 col-md-3 col-xl-2">
+                                <a href="@l.U" class="dash-quick">
+                                    <i class="bx @l.I" style="color:@l.C"></i>
+                                    <span>@l.L</span>
+                                </a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ============ STUDENT FEE MATRIX ============ *@
+        <div class="col-12 dash-animate">
+            <div class="dash-card">
+                <div class="dash-card-head d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+                    <div><h5 class="dash-card-title">Student Fee Matrix</h5><small class="dash-sub">Top 10 of 13 records by outstanding due</small></div>
+                    <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-lg-auto">
+                        <input type="search" class="form-control dash-search" placeholder="Search student or class...">
+                        <a href="/Admin/FeeDueReminders" class="btn btn-primary"><i class="bx bx-bell me-1"></i>Remind Defaulters</a>
+                    </div>
                 </div>
                 <div class="table-responsive">
-                    <table class="table erp-table mb-0">
-                        <thead><tr><th>Student Name</th><th>Class</th><th>Total Fee</th><th>Paid</th><th>Due</th><th>Status</th><th>Last Payment</th></tr></thead>
+                    <table class="table dash-table mb-0">
+                        <thead><tr><th>Student</th><th>Class</th><th>Total Fee</th><th>Paid</th><th>Due</th><th>Status</th><th>Last Payment</th></tr></thead>
                         <tbody>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-primary text-primary">YK</span><div><h6 class="mb-0">Yash Kumar</h6><small class="text-muted">Student</small></div></div></td><td>12th</td><td>₹ 20,750</td><td class="text-success fw-semibold">₹ 0</td><td class="text-danger fw-semibold">₹ 20,750</td><td><span class="erp-status bg-label-danger text-danger">Pending</span></td><td>-</td></tr>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-info text-info">DS</span><div><h6 class="mb-0">Demo student</h6><small class="text-muted">Student</small></div></div></td><td>8th</td><td>₹ 20,500</td><td class="text-success fw-semibold">₹ 500</td><td class="text-danger fw-semibold">₹ 20,000</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>3/23/2026</td></tr>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-success text-success">DS</span><div><h6 class="mb-0">Deepak Sherma</h6><small class="text-muted">Student</small></div></div></td><td>11th</td><td>₹ 20,750</td><td class="text-success fw-semibold">₹ 1,100</td><td class="text-danger fw-semibold">₹ 19,650</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>3/21/2026</td></tr>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-primary text-primary">VJ</span><div><h6 class="mb-0">Vikash ji</h6><small class="text-muted">Student</small></div></div></td><td>4th</td><td>₹ 18,150</td><td class="text-success fw-semibold">₹ 950</td><td class="text-danger fw-semibold">₹ 17,200</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>3/14/2026</td></tr>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-danger text-danger">H</span><div><h6 class="mb-0">Hema</h6><small class="text-muted">Student</small></div></div></td><td>UKG</td><td>₹ 18,150</td><td class="text-success fw-semibold">₹ 1,251</td><td class="text-danger fw-semibold">₹ 16,899</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>4/22/2026</td></tr>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-secondary text-secondary">G</span><div><h6 class="mb-0">Govind</h6><small class="text-muted">Student</small></div></div></td><td>UKG</td><td>₹ 15,000</td><td class="text-success fw-semibold">₹ 2,001</td><td class="text-danger fw-semibold">₹ 12,999</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>5/3/2026</td></tr>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-danger text-danger">ML</span><div><h6 class="mb-0">Mohan Lal</h6><small class="text-muted">Student</small></div></div></td><td>8th</td><td>₹ 11,250</td><td class="text-success fw-semibold">₹ 0</td><td class="text-danger fw-semibold">₹ 11,250</td><td><span class="erp-status bg-label-danger text-danger">Pending</span></td><td>-</td></tr>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-info text-info">NS</span><div><h6 class="mb-0">New saloni</h6><small class="text-muted">Student</small></div></div></td><td>9th</td><td>₹ 11,250</td><td class="text-success fw-semibold">₹ 100</td><td class="text-danger fw-semibold">₹ 11,150</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>4/28/2026</td></tr>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-success text-success">A</span><div><h6 class="mb-0">Anmol</h6><small class="text-muted">Student</small></div></div></td><td>2nd</td><td>₹ 17,540</td><td class="text-success fw-semibold">₹ 10,000</td><td class="text-danger fw-semibold">₹ 7,540</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>5/3/2026</td></tr>
-                            <tr><td><div class="d-flex align-items-center gap-3"><span class="erp-avatar bg-label-primary text-primary">AV</span><div><h6 class="mb-0">Akash Verma</h6><small class="text-muted">Student</small></div></div></td><td>9th</td><td>₹ 20,750</td><td class="text-success fw-semibold">₹ 16,276</td><td class="text-danger fw-semibold">₹ 4,474</td><td><span class="erp-status bg-label-warning text-warning">Partial</span></td><td>5/6/2026</td></tr>
+                            @{
+                                var rows = new[] {
+                                    new { N="Yash Kumar", C="12th", Av="YK", Cl="primary", Tot="₹20,750", Paid="₹0", Due="₹20,750", St="Pending", StSoft="soft-red", Last="-" },
+                                    new { N="Demo Student", C="8th", Av="DS", Cl="info", Tot="₹20,500", Paid="₹500", Due="₹20,000", St="Partial", StSoft="soft-amber", Last="23 Mar" },
+                                    new { N="Deepak Sharma", C="11th", Av="DS", Cl="success", Tot="₹20,750", Paid="₹1,100", Due="₹19,650", St="Partial", StSoft="soft-amber", Last="21 Mar" },
+                                    new { N="Vikash Ji", C="4th", Av="VJ", Cl="warning", Tot="₹18,150", Paid="₹950", Due="₹17,200", St="Partial", StSoft="soft-amber", Last="14 Mar" },
+                                    new { N="Hema", C="UKG", Av="H", Cl="danger", Tot="₹18,150", Paid="₹1,251", Due="₹16,899", St="Partial", StSoft="soft-amber", Last="22 Apr" },
+                                    new { N="Govind", C="UKG", Av="G", Cl="secondary", Tot="₹15,000", Paid="₹2,001", Due="₹12,999", St="Partial", StSoft="soft-amber", Last="03 May" },
+                                    new { N="Mohan Lal", C="8th", Av="ML", Cl="danger", Tot="₹11,250", Paid="₹0", Due="₹11,250", St="Pending", StSoft="soft-red", Last="-" },
+                                    new { N="New Saloni", C="9th", Av="NS", Cl="info", Tot="₹11,250", Paid="₹100", Due="₹11,150", St="Partial", StSoft="soft-amber", Last="28 Apr" },
+                                    new { N="Anmol", C="2nd", Av="A", Cl="success", Tot="₹17,540", Paid="₹10,000", Due="₹7,540", St="Partial", StSoft="soft-amber", Last="03 May" },
+                                    new { N="Akash Verma", C="9th", Av="AV", Cl="primary", Tot="₹20,750", Paid="₹16,276", Due="₹4,474", St="Partial", StSoft="soft-amber", Last="06 May" },
+                                };
+                            }
+                            @foreach (var r in rows)
+                            {
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-3">
+                                            <span class="dash-avatar @Soft(r.Cl)">@r.Av</span>
+                                            <div><h6 class="mb-0">@r.N</h6><small class="text-muted">Student</small></div>
+                                        </div>
+                                    </td>
+                                    <td>@r.C</td>
+                                    <td>@r.Tot</td>
+                                    <td class="fw-semibold" style="color:#16a34a">@r.Paid</td>
+                                    <td class="fw-semibold" style="color:#dc2626">@r.Due</td>
+                                    <td><span class="dash-pill @r.StSoft"><i class="bx bxs-circle" style="font-size:.5rem"></i>@r.St</span></td>
+                                    <td>@r.Last</td>
+                                </tr>
+                            }
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
+
     </div>
 </div>
 
 @section PageScripts {
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-          const primary = '#696cff', success = '#28c76f', warning = '#ff9f43', danger = '#ea5455';
+            const orange = '#ff8a00', green = '#16a34a', red = '#dc2626', amber = '#d97706', blue = '#0284c7';
+            const axis = '#a99e90', grid = '#f0e7db';
 
-          if (document.querySelector('#collectionTrendChart')) {
-            new ApexCharts(document.querySelector('#collectionTrendChart'), {
-              chart: { type: 'area', height: 315, toolbar: { show: false }, parentHeightOffset: 0 },
-              series: [{ name: 'Collection', data: [2000, 5600, 10000, 7200, 13201] }],
-              xaxis: { categories: ['1 May', '2 May', '3 May', '4 May', '6 May'], labels: { style: { colors: '#a1acb8' } } },
-              yaxis: { labels: { formatter: value => '₹' + Math.round(value / 1000) + 'k', style: { colors: '#a1acb8' } } },
-              stroke: { curve: 'smooth', width: 3 },
-              colors: [primary],
-              dataLabels: { enabled: false },
-              grid: { borderColor: '#eceef1' },
-              fill: { type: 'gradient', gradient: { opacityFrom: .32, opacityTo: .04 } },
-              tooltip: { y: { formatter: value => '₹ ' + value.toLocaleString('en-IN') } }
-            }).render();
-          }
+            function spark(id, color, data) {
+                const el = document.querySelector('#' + id);
+                if (!el) return;
+                new ApexCharts(el, {
+                    chart: { type: 'area', height: 55, sparkline: { enabled: true } },
+                    series: [{ data: data }],
+                    stroke: { curve: 'smooth', width: 2 },
+                    fill: { type: 'gradient', gradient: { opacityFrom: .4, opacityTo: .05 } },
+                    colors: [color],
+                    tooltip: { enabled: false }
+                }).render();
+            }
+            spark('sparkStudents', green, [10, 11, 11, 12, 12, 13, 13]);
+            spark('sparkStaff', orange, [9, 10, 10, 11, 11, 11, 11]);
+            spark('sparkCollection', blue, [2, 5, 4, 8, 7, 11, 13]);
+            spark('sparkDue', red, [16, 15, 15, 14, 13, 12, 14]);
 
-          if (document.querySelector('#paymentModesChart')) {
-            new ApexCharts(document.querySelector('#paymentModesChart'), {
-              chart: { type: 'donut', height: 230 },
-              series: [100], labels: ['Cash'], colors: [success],
-              dataLabels: { enabled: false }, legend: { show: false },
-              stroke: { width: 0 }, plotOptions: { pie: { donut: { size: '68%' } } }
-            }).render();
-          }
+            // ---- Attendance gauge ----
+            if (document.querySelector('#attendanceGauge')) {
+                new ApexCharts(document.querySelector('#attendanceGauge'), {
+                    chart: { type: 'radialBar', height: 200 },
+                    series: [84],
+                    colors: [orange],
+                    plotOptions: {
+                        radialBar: {
+                            hollow: { size: '60%' },
+                            track: { background: '#f0eee9' },
+                            dataLabels: {
+                                name: { offsetY: 22, color: '#8b8175', fontSize: '.8rem' },
+                                value: { offsetY: -14, fontSize: '1.6rem', fontWeight: 800, color: '#2b1b12', formatter: v => v + '%' }
+                            }
+                        }
+                    },
+                    fill: { type: 'gradient', gradient: { shade: 'light', type: 'horizontal', gradientToColors: ['#ffb300'], stops: [0, 100] } },
+                    stroke: { lineCap: 'round' },
+                    labels: ['Present']
+                }).render();
+            }
 
-          if (document.querySelector('#feeStatusChart')) {
-            new ApexCharts(document.querySelector('#feeStatusChart'), {
-              chart: { type: 'bar', height: 210, toolbar: { show: false } },
-              series: [{ name: 'Students', data: [3, 10] }],
-              xaxis: { categories: ['Fully Paid', 'Due / Partial'] },
-              colors: [success, danger], dataLabels: { enabled: false },
-              plotOptions: { bar: { borderRadius: 6, distributed: true, columnWidth: '48%' } },
-              grid: { borderColor: '#eceef1' }, legend: { show: false }
-            }).render();
-          }
+            // ---- Collection trend ----
+            if (document.querySelector('#collectionTrendChart')) {
+                new ApexCharts(document.querySelector('#collectionTrendChart'), {
+                    chart: { type: 'area', height: 320, toolbar: { show: false }, parentHeightOffset: 0 },
+                    series: [
+                        { name: 'Collected', data: [2000, 5600, 4200, 8100, 7200, 11000, 13201] },
+                        { name: 'Due Cleared', data: [800, 1200, 2100, 1800, 3200, 2600, 4100] }
+                    ],
+                    xaxis: { categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], labels: { style: { colors: axis } }, axisBorder: { show: false }, axisTicks: { show: false } },
+                    yaxis: { labels: { formatter: v => '₹' + Math.round(v / 1000) + 'k', style: { colors: axis } } },
+                    stroke: { curve: 'smooth', width: 3 },
+                    colors: [orange, green],
+                    dataLabels: { enabled: false },
+                    grid: { borderColor: grid, strokeDashArray: 4 },
+                    fill: { type: 'gradient', gradient: { opacityFrom: .3, opacityTo: .03 } },
+                    markers: { size: 0, hover: { size: 6 } },
+                    legend: { position: 'top', horizontalAlign: 'right' },
+                    tooltip: { y: { formatter: v => '₹ ' + v.toLocaleString('en-IN') } }
+                }).render();
+            }
+
+            // ---- Target radial ----
+            if (document.querySelector('#targetRadial')) {
+                new ApexCharts(document.querySelector('#targetRadial'), {
+                    chart: { type: 'radialBar', height: 260 },
+                    series: [26],
+                    colors: [orange],
+                    plotOptions: {
+                        radialBar: {
+                            hollow: { size: '62%' },
+                            track: { background: '#f0eee9' },
+                            dataLabels: {
+                                name: { offsetY: 24, color: '#8b8175', fontSize: '.85rem' },
+                                value: { offsetY: -12, fontSize: '1.9rem', fontWeight: 800, color: '#2b1b12', formatter: v => v + '%' }
+                            }
+                        }
+                    },
+                    fill: { type: 'gradient', gradient: { shade: 'light', type: 'horizontal', gradientToColors: ['#ffb300'], stops: [0, 100] } },
+                    stroke: { lineCap: 'round' },
+                    labels: ['Achieved']
+                }).render();
+            }
+
+            // ---- Income vs Expense ----
+            if (document.querySelector('#incomeExpenseChart')) {
+                new ApexCharts(document.querySelector('#incomeExpenseChart'), {
+                    chart: { type: 'bar', height: 280, toolbar: { show: false } },
+                    series: [
+                        { name: 'Income', data: [42, 55, 48, 62, 58, 71] },
+                        { name: 'Expense', data: [28, 34, 30, 38, 33, 41] }
+                    ],
+                    colors: [green, red],
+                    plotOptions: { bar: { borderRadius: 5, columnWidth: '55%' } },
+                    dataLabels: { enabled: false },
+                    xaxis: { categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], labels: { style: { colors: axis } }, axisBorder: { show: false }, axisTicks: { show: false } },
+                    yaxis: { labels: { formatter: v => '₹' + v + 'k', style: { colors: axis } } },
+                    grid: { borderColor: grid, strokeDashArray: 4 },
+                    legend: { position: 'top', horizontalAlign: 'right' },
+                    tooltip: { y: { formatter: v => '₹ ' + v + ',000' } }
+                }).render();
+            }
+
+            // ---- Class strength ----
+            if (document.querySelector('#classStrengthChart')) {
+                new ApexCharts(document.querySelector('#classStrengthChart'), {
+                    chart: { type: 'bar', height: 280, toolbar: { show: false } },
+                    series: [{ name: 'Students', data: [2, 3, 2, 1, 1, 2, 1, 1] }],
+                    plotOptions: { bar: { borderRadius: 5, horizontal: true, barHeight: '60%', distributed: true } },
+                    dataLabels: { enabled: true, style: { colors: ['#fff'] } },
+                    xaxis: { categories: ['UKG', '2nd', '4th', '8th', '9th', '11th', '12th', 'Other'], labels: { style: { colors: axis } } },
+                    grid: { borderColor: grid, strokeDashArray: 4 },
+                    legend: { show: false },
+                    colors: ['#ff8a00', '#ffa733', '#16a34a', '#d97706', '#0284c7', '#9333ea', '#ff5722', '#6b7280']
+                }).render();
+            }
+
+            // ---- Payment mode donut ----
+            if (document.querySelector('#paymentModeChart')) {
+                new ApexCharts(document.querySelector('#paymentModeChart'), {
+                    chart: { type: 'donut', height: 240 },
+                    series: [72, 21, 7],
+                    labels: ['Cash', 'UPI', 'Card'],
+                    colors: [green, orange, amber],
+                    stroke: { width: 0 },
+                    dataLabels: { enabled: false },
+                    legend: { show: false },
+                    plotOptions: { pie: { donut: { size: '70%', labels: { show: true, value: { fontSize: '1.4rem', fontWeight: 800, color: '#2b1b12' }, total: { show: true, label: 'Total', color: '#8b8175', formatter: () => '₹13.2k' } } } } }
+                }).render();
+            }
         });
     </script>
 }

@@ -241,6 +241,57 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
             return (success, msg);
         }
 
+        // ── Register enquiry ─────────────────────────────────────
+        public async Task<(int Success, string Message, string? RegistrationNumber)> RegisterEnquiryAsync(
+            int enquiryId, string? registrationNumber, DateOnly? registrationDate,
+            bool registrationFeePaid, bool autoGenerate, string? prefix,
+            int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || enquiryId <= 0)
+                return (0, "Invalid request.", null);
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",             NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",             NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id",        NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_enquiry_id",            NpgsqlDbType.Integer) { Value = enquiryId },
+                new("p_registration_number",   NpgsqlDbType.Text)    { Value = (object?)registrationNumber ?? DBNull.Value },
+                new("p_registration_date",     NpgsqlDbType.Date)    { Value = (object?)registrationDate   ?? DBNull.Value },
+                new("p_registration_fee_paid", NpgsqlDbType.Boolean) { Value = registrationFeePaid },
+                new("p_auto_generate",         NpgsqlDbType.Boolean) { Value = autoGenerate },
+                new("p_prefix",                NpgsqlDbType.Text)    { Value = (object?)prefix ?? DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "register_enquiry_cursor" }
+            };
+
+            try
+            {
+                using var dal = new PostgreSqlDal(_connectionString);
+                var ds = await dal.ExecuteProcedureWithCursorsAsync("core.sp_enquiry_register", parameters);
+
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return (0, "No response.", null);
+
+                var row     = ds.Tables[0].Rows[0];
+                int success = row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]) ? 1 : 0;
+                string msg  = row.Table.Columns.Contains("message") && row["message"] != DBNull.Value
+                                ? row["message"].ToString()! : (success > 0 ? "Registration completed." : "Error.");
+                string? regNo = row.Table.Columns.Contains("registration_number") && row["registration_number"] != DBNull.Value
+                                ? row["registration_number"].ToString() : null;
+                return (success, msg, regNo);
+            }
+            catch (PostgresException pex)
+            {
+                // Surface the proc's RAISE EXCEPTION message (e.g. "already admitted").
+                return (0, pex.MessageText, null);
+            }
+            catch
+            {
+                return (0, "Unable to complete registration.", null);
+            }
+        }
+
         // ── Log follow-up ────────────────────────────────────────
         public async Task<int> LogFollowupAsync(
             int      enquiryId,
@@ -306,12 +357,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
             {
                 list.Add(new EnquiryFollowupModel
                 {
-                    FollowupId        = IntVal(row, "followup_id"),
-                    EnquiryId         = enquiryId,
-                    FollowupDate      = row["followup_date"]       == DBNull.Value ? DateTime.UtcNow       : Convert.ToDateTime(row["followup_date"]),
-                    FollowupType      = row["followup_type"]       == DBNull.Value ? "Call"                : row["followup_type"].ToString()!,
-                    Outcome           = row["outcome"]             == DBNull.Value ? null                  : row["outcome"].ToString(),
-                    Notes             = row["notes"]               == DBNull.Value ? null                  : row["notes"].ToString(),
+                    FollowupId = IntVal(row, "followup_id"),
+                    EnquiryId  = enquiryId,
+                    FollowupDate = row["followup_date"] == DBNull.Value ? DateTime.UtcNow : Convert.ToDateTime(row["followup_date"]),
+                    FollowupType = row["followup_type"] == DBNull.Value ? "Call": row["followup_type"].ToString()!,
+                    Outcome=row["outcome"]== DBNull.Value ? null: row["outcome"].ToString(),
+                    Notes  = row["notes"]               == DBNull.Value ? null                  : row["notes"].ToString(),
                     NextFollowupDate  = row["next_followup_date"]  == DBNull.Value ? null                  : DateOnly.FromDateTime(Convert.ToDateTime(row["next_followup_date"])),
                     StatusBefore      = row["status_before"]       == DBNull.Value ? null                  : row["status_before"].ToString(),
                     StatusAfter       = row["status_after"]        == DBNull.Value ? null                  : row["status_after"].ToString(),

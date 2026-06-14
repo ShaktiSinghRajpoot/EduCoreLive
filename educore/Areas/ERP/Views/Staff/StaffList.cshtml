@@ -1,0 +1,486 @@
+@{
+    ViewData["Title"] = "All Staff";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+@@media (max-width:575.98px){
+    .sl-pg-btn,.sl-view-btn,.sl-filter-row .btn,.dropdown-item{ width:auto !important; }
+}
+.dropdown-toggle::after{ display:none; }
+
+/* summary cards */
+.sl-card{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
+    background:#fff; padding:1.1rem 1.2rem;
+    display:flex; align-items:center; gap:.9rem;
+    transition:var(--ec-transition); height:100%;
+}
+.sl-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); border-color:rgba(255,138,0,.22); }
+.sl-card-ic{ width:46px; height:46px; flex:0 0 46px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; }
+.sl-card-val{ font-size:1.5rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.sl-card-lbl{ font-size:.71rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+/* ── Filter bar ─────────────────────────────── */
+.sl-fbar{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.sl-srch-wrap{ position:relative; flex:1 1 180px; max-width:260px; }
+.sl-srch-ic{ position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:var(--ec-text-muted); font-size:1rem; pointer-events:none; line-height:1; }
+.sl-srch-inp{ width:100%; height:34px; padding:0 .75rem 0 2rem; border-radius:8px; border:1px solid var(--ec-border); background:#fafaf8; font-size:.82rem; font-weight:600; color:var(--ec-text); outline:none; transition:var(--ec-transition); }
+.sl-srch-inp::placeholder{ color:var(--ec-text-muted); }
+.sl-srch-inp:focus{ border-color:rgba(255,138,0,.55); background:#fff; box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+.sl-fbar-div{ width:1px; height:22px; background:var(--ec-border); flex-shrink:0; }
+.sl-chip{ height:34px; padding:0 .65rem; border-radius:8px; border:1px solid var(--ec-border); background:#fafaf8; font-size:.78rem; font-weight:700; color:var(--ec-text-muted); cursor:pointer; outline:none; transition:var(--ec-transition); white-space:nowrap; flex-shrink:0; appearance:auto; -webkit-appearance:auto; }
+.sl-chip:hover{ border-color:rgba(255,138,0,.4); background:#fff; color:var(--ec-text); }
+.sl-chip:focus{ border-color:var(--ec-primary); box-shadow:0 0 0 3px rgba(255,138,0,.1); background:#fff; }
+.sl-chip.active-filter{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.45); color:var(--ec-primary); }
+.sl-clear-btn{ height:34px; padding:0 .75rem; border-radius:8px; border:1px solid #f5c2c7; background:#fff0f0; color:#dc3545; font-size:.76rem; font-weight:700; cursor:pointer; outline:none; display:inline-flex; align-items:center; gap:.3rem; transition:var(--ec-transition); flex-shrink:0; }
+.sl-clear-btn:hover{ background:#fde8e8; border-color:#dc3545; }
+.sl-export-btn{ height:34px; width:34px; border-radius:8px; border:1px solid var(--ec-border); background:#fafaf8; color:var(--ec-text-muted); font-size:1rem; cursor:pointer; outline:none; display:inline-flex; align-items:center; justify-content:center; transition:var(--ec-transition); flex-shrink:0; }
+.sl-export-btn:hover{ background:#fff; color:var(--ec-primary); border-color:rgba(255,138,0,.4); }
+.sl-export-btn.xl:hover{ color:#198754; border-color:#198754; }
+.sl-export-btn.pdf:hover{ color:#dc3545; border-color:#dc3545; }
+
+@@media (max-width:991.98px){ .sl-srch-wrap{ max-width:100%; } .sl-fbar-div{ display:none; } }
+@@media (max-width:575.98px){ .sl-fbar{ gap:.4rem; } .sl-srch-wrap{ flex:1 1 100%; max-width:100%; } .sl-chip{ font-size:.75rem; height:32px; } .sl-clear-btn{ height:32px; } .sl-export-btn{ height:32px; width:32px; } }
+
+/* table */
+.sl-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.sl-tbl{ min-width:920px; width:100%; }
+.sl-tbl thead th{ background:linear-gradient(180deg,#fffaf3,#fff6ea); color:var(--ec-text-light); font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; font-weight:800; padding:.8rem .9rem; border-bottom:1px solid var(--ec-border); white-space:nowrap; user-select:none; }
+.sl-sortable{ cursor:pointer; }
+.sl-sortable:hover{ background:#fff0e0; color:var(--ec-primary); }
+.sl-si{ font-size:.85rem; opacity:.35; vertical-align:middle; margin-left:3px; }
+.sl-si-on{ opacity:1; color:var(--ec-primary); }
+.sl-tbl tbody td{ padding:.78rem .9rem; vertical-align:middle; border-bottom:1px solid #f4f0eb; font-size:.84rem; font-weight:600; color:var(--ec-text); }
+.sl-tbl tbody tr:hover td{ background:#fffaf3; cursor:pointer; }
+
+/* staff cell */
+.sl-av{ width:36px; height:36px; flex:0 0 36px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:800; }
+.sl-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.87rem; line-height:1.2; }
+.sl-rl{ font-size:.72rem; color:var(--ec-text-muted); }
+
+/* gender */
+.sl-gen{ display:inline-flex; align-items:center; gap:.3rem; font-size:.82rem; }
+.sl-gen i{ font-size:.95rem; }
+.gm{ color:#2196f3; } .gf{ color:#e83e8c; } .go{ color:#8592a3; }
+
+/* role pill */
+.sl-role{ display:inline-flex; align-items:center; gap:.3rem; padding:.24rem .6rem; border-radius:8px; font-size:.72rem; font-weight:800; background:#eef0ff; color:#5a5fe0; white-space:nowrap; }
+
+/* badges */
+.sl-bdg{ display:inline-flex; align-items:center; gap:.28rem; padding:.26rem .65rem; border-radius:999px; font-size:.69rem; font-weight:800; white-space:nowrap; }
+.sl-bdg::before{ content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.b-active  { background:#d4edda; color:#155724; } .b-active::before  { background:#28a745; }
+.b-inactive{ background:#e2e3e5; color:#495057; } .b-inactive::before{ background:#6c757d; }
+.b-leave   { background:#fff3cd; color:#664d03; } .b-leave::before   { background:#ffc107; }
+
+/* view btn */
+.sl-view-btn{ display:inline-flex; align-items:center; gap:.28rem; padding:.28rem .7rem; border-radius:8px; font-size:.77rem; font-weight:700; background:var(--ec-primary-light); color:var(--ec-primary); border:1px solid rgba(255,138,0,.2); cursor:pointer; transition:var(--ec-transition); white-space:nowrap; text-decoration:none; }
+.sl-view-btn:hover{ background:#ffe0b2; color:#e65c00; }
+
+/* pagination */
+.sl-pg-wrap{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.65rem; padding-top:1rem; border-top:1px solid var(--ec-border); }
+.sl-pg-info{ font-size:.81rem; color:var(--ec-text-muted); font-weight:650; }
+.sl-pg-btn{ width:32px !important; height:32px; border-radius:7px; border:1px solid var(--ec-border); background:#fff; color:var(--ec-text); font-size:.8rem; font-weight:700; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:var(--ec-transition); padding:0; }
+.sl-pg-btn:hover:not(:disabled){ background:var(--ec-primary-light); border-color:var(--ec-primary); color:var(--ec-primary); }
+.sl-pg-btn.active{ background:var(--ec-primary); border-color:var(--ec-primary); color:#fff; }
+.sl-pg-btn:disabled{ opacity:.35; cursor:not-allowed; }
+
+/* empty */
+.sl-empty{ padding:3rem 1rem; text-align:center; }
+.sl-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }
+
+/* mobile */
+.sl-mob-list{ display:none; }
+.sl-mob-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; padding:.95rem; margin-bottom:.7rem; }
+.sl-mob-top{ display:flex; align-items:center; gap:.7rem; margin-bottom:.7rem; }
+.sl-mob-av{ width:42px; height:42px; flex:0 0 42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.82rem; font-weight:800; }
+.sl-mob-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.45rem .7rem; margin-bottom:.7rem; }
+.sl-mob-field label{ font-size:.67rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--ec-text-light); display:block; }
+.sl-mob-field span { font-size:.82rem; font-weight:700; color:var(--ec-text); }
+
+@@media print{
+    .layout-menu,.layout-navbar,.ec-page-header,.sl-filter-section,.sl-pg-wrap,.sl-sum-section,.sl-view-btn{ display:none !important; }
+    .sl-tbl-wrap{ overflow:visible !important; }
+    .sl-tbl{ min-width:100% !important; font-size:.75rem; }
+    .ec-page-shell{ box-shadow:none !important; border:none !important; }
+}
+@@media (max-width:767.98px){
+    .sl-tbl-wrap{ display:none; }
+    .sl-mob-list{ display:block; }
+    .sl-pg-wrap{ justify-content:center; }
+    .sl-pg-info{ width:100%; text-align:center; }
+}
+@@media (max-width:575.98px){ .sl-card{ padding:.85rem 1rem; } .sl-card-val{ font-size:1.3rem; } .sl-mob-grid{ grid-template-columns:1fr; } }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-group fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">All Staff</h4>
+            <div class="ec-page-subtitle">Manage teaching and non-teaching staff records</div>
+          </div>
+        </div>
+        <a class="btn btn-primary d-flex align-items-center gap-1"
+           asp-area="ERP" asp-controller="Staff" asp-action="AddStaff">
+          <i class="bx bx-user-plus"></i><span>Add Staff</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4 sl-sum-section">
+      <div class="col-6 col-lg-3">
+        <div class="sl-card">
+          <div class="sl-card-ic bg-label-primary text-primary"><i class="bx bx-group"></i></div>
+          <div><div class="sl-card-val" id="sumTotal">—</div><div class="sl-card-lbl">Total Staff</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sl-card">
+          <div class="sl-card-ic bg-label-info text-info"><i class="bx bx-chalkboard"></i></div>
+          <div><div class="sl-card-val" id="sumTeaching">—</div><div class="sl-card-lbl">Teaching</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sl-card">
+          <div class="sl-card-ic bg-label-warning text-warning"><i class="bx bx-briefcase"></i></div>
+          <div><div class="sl-card-val" id="sumNonTeaching">—</div><div class="sl-card-lbl">Non-Teaching</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sl-card">
+          <div class="sl-card-ic bg-label-success text-success"><i class="bx bx-user-check"></i></div>
+          <div><div class="sl-card-val" id="sumActive">—</div><div class="sl-card-lbl">Active</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ec-card mb-0">
+
+      <div class="ec-card-header">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
+            <div>
+              <div class="ec-section-title">Staff Records</div>
+              <div class="ec-section-subtitle" id="resultText">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sl-fbar">
+
+          <div class="sl-srch-wrap">
+            <i class="bx bx-search sl-srch-ic"></i>
+            <input type="search" class="sl-srch-inp" id="slSearch" placeholder="Search name, emp ID, designation…">
+          </div>
+
+          <div class="sl-fbar-div"></div>
+
+          <select class="sl-chip" id="fDept">
+            <option value="">Department</option>
+            <option>Teaching</option><option>Administration</option>
+            <option>Accounts</option><option>Library</option>
+            <option>Transport</option><option>Support Staff</option>
+          </select>
+
+          <select class="sl-chip" id="fType">
+            <option value="">Type</option>
+            <option>Teaching</option><option>Non-Teaching</option>
+          </select>
+
+          <select class="sl-chip" id="fGender">
+            <option value="">Gender</option>
+            <option>Male</option><option>Female</option><option>Other</option>
+          </select>
+
+          <select class="sl-chip" id="fStatus">
+            <option value="">Status</option>
+            <option>Active</option><option>On Leave</option><option>Inactive</option>
+          </select>
+
+          <select class="sl-chip" id="perPage" title="Rows per page">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+          </select>
+
+          <button class="sl-clear-btn d-none" id="clearBtn" title="Clear all filters">
+            <i class="bx bx-x"></i>Clear
+          </button>
+
+          <div class="ms-auto d-flex gap-1 align-items-center">
+            <button class="sl-export-btn xl" id="btnExcel" title="Export to Excel">
+              <i class="bx bx-spreadsheet"></i>
+            </button>
+            <button class="sl-export-btn pdf" id="btnPdf" title="Export to PDF">
+              <i class="bxs-file-pdf bx"></i>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="ec-card-body pt-2">
+
+        <div class="sl-tbl-wrap">
+          <table class="table sl-tbl align-middle mb-0">
+            <thead>
+              <tr>
+                <th class="sl-sortable" data-col="name">Staff <i class="bx bx-sort sl-si" id="si-name"></i></th>
+                <th>Designation</th>
+                <th>Department</th>
+                <th>Gender</th>
+                <th class="sl-sortable" data-col="joinDate">Joining Date <i class="bx bx-sort sl-si" id="si-joinDate"></i></th>
+                <th>Contact</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+          <div class="sl-empty d-none" id="emptyDesk">
+            <div class="sl-empty-ic"><i class="bx bx-search-alt"></i></div>
+            <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No staff found</h6>
+            <p class="text-muted small mb-3">Try adjusting your search or filters.</p>
+          </div>
+        </div>
+
+        <div class="sl-mob-list" id="mobList"></div>
+        <div class="sl-empty d-none" id="emptyMob">
+          <div class="sl-empty-ic"><i class="bx bx-search-alt"></i></div>
+          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No staff found</h6>
+          <p class="text-muted small mb-3">Try adjusting filters.</p>
+        </div>
+
+        <div class="sl-pg-wrap" id="pgWrap">
+          <div class="sl-pg-info" id="pgInfo">—</div>
+          <div class="d-flex gap-1 flex-wrap justify-content-end" id="pgBtns"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+(function(){
+'use strict';
+
+var PAGE=1, PER=10, sortCol=null, sortDir='asc', filtered=[];
+
+/* ── Mock Data ──────────────────────────────── */
+var staff=[
+  {id:1, name:'Sunita Rao',      emp:'EMP-001',desig:'Principal',          dept:'Administration',type:'Non-Teaching',gender:'Female',joinDate:'2015-06-01',phone:'9876500011',email:'sunita.rao@school.edu',  status:'Active',  color:'primary'  },
+  {id:2, name:'Rakesh Mehta',    emp:'EMP-002',desig:'Vice Principal',     dept:'Administration',type:'Non-Teaching',gender:'Male',  joinDate:'2016-04-10',phone:'9876500012',email:'rakesh.mehta@school.edu', status:'Active',  color:'info'     },
+  {id:3, name:'Anita Desai',     emp:'EMP-003',desig:'Senior Teacher',     dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2017-07-15',phone:'9876500013',email:'anita.desai@school.edu', status:'Active',  color:'success'  },
+  {id:4, name:'Vikram Joshi',    emp:'EMP-004',desig:'Maths Teacher',      dept:'Teaching',      type:'Teaching',    gender:'Male',  joinDate:'2018-06-20',phone:'9876500014',email:'vikram.joshi@school.edu',status:'Active',  color:'warning'  },
+  {id:5, name:'Pooja Nair',      emp:'EMP-005',desig:'Science Teacher',    dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2018-08-01',phone:'9876500015',email:'pooja.nair@school.edu',  status:'On Leave',color:'danger'   },
+  {id:6, name:'Arun Kumar',      emp:'EMP-006',desig:'Accountant',         dept:'Accounts',      type:'Non-Teaching',gender:'Male',  joinDate:'2019-01-05',phone:'9876500016',email:'arun.kumar@school.edu',  status:'Active',  color:'secondary'},
+  {id:7, name:'Meena Iyer',      emp:'EMP-007',desig:'Librarian',          dept:'Library',       type:'Non-Teaching',gender:'Female',joinDate:'2019-06-11',phone:'9876500017',email:'meena.iyer@school.edu',  status:'Active',  color:'primary'  },
+  {id:8, name:'Sanjay Patil',    emp:'EMP-008',desig:'English Teacher',    dept:'Teaching',      type:'Teaching',    gender:'Male',  joinDate:'2020-07-01',phone:'9876500018',email:'sanjay.patil@school.edu',status:'Active',  color:'info'     },
+  {id:9, name:'Kavya Reddy',     emp:'EMP-009',desig:'Hindi Teacher',      dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2020-08-15',phone:'9876500019',email:'kavya.reddy@school.edu', status:'Active',  color:'success'  },
+  {id:10,name:'Ramesh Gupta',    emp:'EMP-010',desig:'Receptionist',       dept:'Administration',type:'Non-Teaching',gender:'Male',  joinDate:'2021-02-01',phone:'9876500020',email:'ramesh.gupta@school.edu',status:'Active',  color:'warning'  },
+  {id:11,name:'Lata Sharma',     emp:'EMP-011',desig:'PT Teacher',         dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2021-06-10',phone:'9876500021',email:'lata.sharma@school.edu', status:'On Leave',color:'danger'   },
+  {id:12,name:'Deepak Verma',    emp:'EMP-012',desig:'Bus Driver',         dept:'Transport',     type:'Non-Teaching',gender:'Male',  joinDate:'2021-07-20',phone:'9876500022',email:'deepak.verma@school.edu',status:'Active',  color:'secondary'},
+  {id:13,name:'Neha Kapoor',     emp:'EMP-013',desig:'Computer Teacher',   dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2022-04-01',phone:'9876500023',email:'neha.kapoor@school.edu', status:'Active',  color:'primary'  },
+  {id:14,name:'Mahesh Pillai',   emp:'EMP-014',desig:'Lab Assistant',      dept:'Support Staff', type:'Non-Teaching',gender:'Male',  joinDate:'2022-06-15',phone:'9876500024',email:'mahesh.pillai@school.edu',status:'Active', color:'info'     },
+  {id:15,name:'Ritu Singh',      emp:'EMP-015',desig:'Primary Teacher',    dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2022-08-01',phone:'9876500025',email:'ritu.singh@school.edu',  status:'Active',  color:'success'  },
+  {id:16,name:'Gopal Das',       emp:'EMP-016',desig:'Peon',               dept:'Support Staff', type:'Non-Teaching',gender:'Male',  joinDate:'2023-01-10',phone:'9876500026',email:'gopal.das@school.edu',   status:'Active',  color:'warning'  },
+  {id:17,name:'Shalini Roy',     emp:'EMP-017',desig:'Art Teacher',        dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2023-06-01',phone:'9876500027',email:'shalini.roy@school.edu', status:'Active',  color:'danger'   },
+  {id:18,name:'Naveen Rao',      emp:'EMP-018',desig:'Accounts Assistant', dept:'Accounts',      type:'Non-Teaching',gender:'Male',  joinDate:'2023-07-15',phone:'9876500028',email:'naveen.rao@school.edu',  status:'Inactive',color:'secondary'},
+  {id:19,name:'Preeti Jain',     emp:'EMP-019',desig:'Pre-Primary Teacher',dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2024-04-01',phone:'9876500029',email:'preeti.jain@school.edu', status:'Active',  color:'primary'  },
+  {id:20,name:'Imran Khan',      emp:'EMP-020',desig:'Security Guard',     dept:'Support Staff', type:'Non-Teaching',gender:'Male',  joinDate:'2024-06-10',phone:'9876500030',email:'imran.khan@school.edu',  status:'Active',  color:'info'     }
+];
+
+/* ── Helpers ─────────────────────────────────── */
+var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDate(d){var x=new Date(d);return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]+' '+x.getFullYear();}
+function ini(n){return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();}
+function statB(s){var m={Active:'b-active',Inactive:'b-inactive','On Leave':'b-leave'};return '<span class="sl-bdg '+(m[s]||'b-inactive')+'">'+s+'</span>';}
+function gHtml(g){var m={Male:['gm','bx-male'],Female:['gf','bx-female'],Other:['go','bx-user']},c=m[g]||m.Other;return '<span class="sl-gen '+c[0]+'"><i class="bx '+c[1]+'"></i>'+g+'</span>';}
+function roleHtml(t){var ic=t==='Teaching'?'bx-chalkboard':'bx-briefcase';return '<span class="sl-role"><i class="bx '+ic+'"></i>'+t+'</span>';}
+
+/* ── Sort ────────────────────────────────────── */
+function doSort(list){
+  if(!sortCol)return list;
+  return list.slice().sort(function(a,b){
+    var va=a[sortCol],vb=b[sortCol];
+    if(sortCol==='joinDate'){va=new Date(va);vb=new Date(vb);}
+    return sortDir==='asc'?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0);
+  });
+}
+function updateSortIcons(){
+  ['name','joinDate'].forEach(function(c){
+    var el=document.getElementById('si-'+c);
+    if(!el)return;
+    el.className='bx bx-sort sl-si';
+    if(c===sortCol) el.className='bx '+(sortDir==='asc'?'bx-sort-up':'bx-sort-down')+' sl-si sl-si-on';
+  });
+}
+
+/* ── Filter ──────────────────────────────────── */
+function applyFilters(){
+  var q=document.getElementById('slSearch').value.toLowerCase().trim(),
+      dept=document.getElementById('fDept').value,
+      type=document.getElementById('fType').value,
+      gen=document.getElementById('fGender').value,
+      st=document.getElementById('fStatus').value;
+
+  filtered=staff.filter(function(s){
+    return(!q||s.name.toLowerCase().includes(q)||s.emp.toLowerCase().includes(q)||s.desig.toLowerCase().includes(q))
+      &&(!dept||s.dept===dept)&&(!type||s.type===type)
+      &&(!gen||s.gender===gen)&&(!st||s.status===st);
+  });
+
+  ['fDept','fType','fGender','fStatus'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.classList.toggle('active-filter', el.value!=='');
+  });
+
+  var hasFilter=dept||type||gen||st||q;
+  var cb=document.getElementById('clearBtn');
+  if(cb) cb.classList.toggle('d-none',!hasFilter);
+
+  updateCards();PAGE=1;render();
+}
+function updateCards(){
+  var src=filtered.length?filtered:staff;
+  document.getElementById('sumTotal').textContent=src.length;
+  document.getElementById('sumTeaching').textContent=src.filter(function(s){return s.type==='Teaching';}).length;
+  document.getElementById('sumNonTeaching').textContent=src.filter(function(s){return s.type==='Non-Teaching';}).length;
+  document.getElementById('sumActive').textContent=src.filter(function(s){return s.status==='Active';}).length;
+}
+
+/* ── Render ──────────────────────────────────── */
+function render(){
+  var sorted=doSort(filtered),total=sorted.length;
+  PER=parseInt(document.getElementById('perPage').value);
+  var pages=Math.ceil(total/PER)||1;
+  if(PAGE>pages)PAGE=pages;
+  var start=(PAGE-1)*PER,end=Math.min(start+PER,total),slice=sorted.slice(start,end);
+  renderDesk(slice);
+  renderMob(slice);
+  renderPag(pages,total,start,end);
+  document.getElementById('resultText').textContent=total?'Showing '+(start+1)+'–'+end+' of '+total+' staff':'No staff found';
+}
+
+function profUrl(id){ return '@Url.Action("StaffProfile","Staff",new{area="ERP"})' + '/' + id; }
+
+function renderDesk(slice){
+  var tb=document.getElementById('tblBody'),em=document.getElementById('emptyDesk');
+  if(!slice.length){tb.innerHTML='';em.classList.remove('d-none');document.getElementById('pgWrap').classList.add('d-none');return;}
+  em.classList.add('d-none');document.getElementById('pgWrap').classList.remove('d-none');
+  tb.innerHTML=slice.map(function(s){
+    return '<tr>'
+      +'<td>'
+      +  '<a href="'+profUrl(s.id)+'" class="d-flex align-items-center gap-2 text-decoration-none" style="cursor:pointer;">'
+      +    '<span class="sl-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
+      +    '<div><div class="sl-nm">'+s.name+'</div><div class="sl-rl">'+s.emp+'</div></div>'
+      +  '</a>'
+      +'</td>'
+      +'<td><span class="fw-bold">'+s.desig+'</span></td>'
+      +'<td>'+roleHtml(s.type)+' <span class="text-muted d-block mt-1" style="font-size:.72rem;">'+s.dept+'</span></td>'
+      +'<td>'+gHtml(s.gender)+'</td>'
+      +'<td>'+fmtDate(s.joinDate)+'</td>'
+      +'<td>'+s.phone+'</td>'
+      +'<td>'+statB(s.status)+'</td>'
+      +'<td><a href="'+profUrl(s.id)+'" class="sl-view-btn"><i class="bx bx-user"></i>Profile</a></td>'
+      +'</tr>';
+  }).join('');
+}
+
+function renderMob(slice){
+  var list=document.getElementById('mobList'),em=document.getElementById('emptyMob');
+  if(!slice.length){list.innerHTML='';em.classList.remove('d-none');return;}
+  em.classList.add('d-none');
+  list.innerHTML=slice.map(function(s){
+    return '<div class="sl-mob-card">'
+      +'<div class="sl-mob-top">'
+      +  '<span class="sl-mob-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
+      +  '<div class="flex-grow-1"><div class="sl-nm">'+s.name+'</div><div class="sl-rl">'+s.emp+' · '+s.desig+'</div></div>'
+      +  statB(s.status)
+      +'</div>'
+      +'<div class="sl-mob-grid">'
+      +  '<div class="sl-mob-field"><label>Department</label><span>'+s.dept+'</span></div>'
+      +  '<div class="sl-mob-field"><label>Type</label><span>'+s.type+'</span></div>'
+      +  '<div class="sl-mob-field"><label>Joined</label><span>'+fmtDate(s.joinDate)+'</span></div>'
+      +  '<div class="sl-mob-field"><label>Gender</label><span>'+s.gender+'</span></div>'
+      +  '<div class="sl-mob-field"><label>Contact</label><span>'+s.phone+'</span></div>'
+      +  '<div class="sl-mob-field"><label>Email</label><span>'+s.email+'</span></div>'
+      +'</div>'
+      +'<a href="'+profUrl(s.id)+'" class="btn btn-sm btn-primary w-100"><i class="bx bx-user me-1"></i>View Profile</a>'
+      +'</div>';
+  }).join('');
+}
+
+function renderPag(pages,total,start,end){
+  var info=document.getElementById('pgInfo'),btns=document.getElementById('pgBtns');
+  info.textContent='Showing '+(start+1)+'–'+end+' of '+total+' staff';
+  if(pages<=1){btns.innerHTML='';return;}
+  var h='<button class="sl-pg-btn" id="pPrev" '+(PAGE===1?'disabled':'')+'><i class="bx bx-chevron-left"></i></button>';
+  var fr=Math.max(1,PAGE-2),to=Math.min(pages,fr+4);fr=Math.max(1,to-4);
+  if(fr>1)h+='<button class="sl-pg-btn" data-p="1">1</button>'+(fr>2?'<span class="sl-pg-info px-1">…</span>':'');
+  for(var i=fr;i<=to;i++)h+='<button class="sl-pg-btn'+(i===PAGE?' active':'')+'" data-p="'+i+'">'+i+'</button>';
+  if(to<pages)h+=(to<pages-1?'<span class="sl-pg-info px-1">…</span>':'')+'<button class="sl-pg-btn" data-p="'+pages+'">'+pages+'</button>';
+  h+='<button class="sl-pg-btn" id="pNext" '+(PAGE===pages?'disabled':'')+'><i class="bx bx-chevron-right"></i></button>';
+  btns.innerHTML=h;
+  btns.querySelectorAll('[data-p]').forEach(function(b){b.addEventListener('click',function(){PAGE=parseInt(this.dataset.p);render();});});
+  var pv=btns.querySelector('#pPrev'),nx=btns.querySelector('#pNext');
+  if(pv)pv.addEventListener('click',function(){if(PAGE>1){PAGE--;render();}});
+  if(nx)nx.addEventListener('click',function(){if(PAGE<pages){PAGE++;render();}});
+}
+
+/* ── Export ──────────────────────────────────── */
+document.getElementById('btnExcel').addEventListener('click',function(){
+  var hdr=['Emp ID','Name','Designation','Department','Type','Gender','Joining Date','Phone','Email','Status'];
+  var rows=filtered.map(function(s){return[s.emp,s.name,s.desig,s.dept,s.type,s.gender,fmtDate(s.joinDate),s.phone,s.email,s.status];});
+  var csv='﻿'+[hdr].concat(rows).map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='staff_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  if(typeof toastr!=='undefined')toastr.success(filtered.length+' staff exported.');
+});
+document.getElementById('btnPdf').addEventListener('click',function(){window.print();});
+
+/* ── Wire filters & sort ─────────────────────── */
+['slSearch','fDept','fType','fGender','fStatus','perPage'].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el) el.addEventListener(id==='slSearch'?'input':'change', applyFilters);
+});
+document.getElementById('clearBtn').addEventListener('click',function(){
+  document.getElementById('slSearch').value='';
+  ['fDept','fType','fGender','fStatus'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el){el.value='';el.classList.remove('active-filter');}
+  });
+  applyFilters();
+});
+document.querySelectorAll('.sl-sortable').forEach(function(th){
+  th.addEventListener('click',function(){
+    var c=this.dataset.col;
+    if(sortCol===c)sortDir=sortDir==='asc'?'desc':'asc';
+    else{sortCol=c;sortDir='asc';}
+    updateSortIcons();render();
+  });
+});
+
+if(typeof toastr!=='undefined')toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
+
+applyFilters();
+})();
+</script>
+}

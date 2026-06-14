@@ -268,6 +268,22 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                         if (!model.ClassSections.ContainsKey(className))
                             model.ClassSections[className] = new List<string>();
 
+                        // Rich per-class detail (one entry per class).
+                        var detail = model.ClassDetails
+                            .FirstOrDefault(c => c.ClassName.Equals(className, StringComparison.OrdinalIgnoreCase));
+                        if (detail == null)
+                        {
+                            detail = new AcademicClassDetail
+                            {
+                                AcademicClassId = AsInt(row, "academic_class_id"),
+                                ClassName       = className,
+                                DisplayOrder    = AsInt(row, "class_display_order"),
+                                Stream          = AsStr(row, "stream"),
+                                Coordinator     = AsStr(row, "coordinator")
+                            };
+                            model.ClassDetails.Add(detail);
+                        }
+
                         if (row.Table.Columns.Contains("section_name") && row["section_name"] != DBNull.Value)
                         {
                             var sectionName = row["section_name"].ToString()?.Trim() ?? string.Empty;
@@ -276,6 +292,20 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                                 && !model.ClassSections[className].Any(x => x.Equals(sectionName, StringComparison.OrdinalIgnoreCase)))
                             {
                                 model.ClassSections[className].Add(sectionName);
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(sectionName)
+                                && !detail.Sections.Any(s => s.SectionName.Equals(sectionName, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                detail.Sections.Add(new AcademicSectionDetail
+                                {
+                                    AcademicClassSectionId = AsInt(row, "academic_class_section_id"),
+                                    SectionName            = sectionName,
+                                    DisplayOrder           = AsInt(row, "section_display_order"),
+                                    Capacity               = AsNullableInt(row, "capacity"),
+                                    RoomNo                 = AsStr(row, "room_no"),
+                                    Strength               = AsInt(row, "strength")
+                                });
                             }
                         }
                     }
@@ -324,31 +354,139 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 
         private string BuildAcademicSetupJson(AcademicSetupModel model)
         {
-            var classes = new List<AcademicClassJsonModel>();
-
-            foreach (var className in model.Classes.Where(x => !string.IsNullOrWhiteSpace(x)))
-            {
-                var cleanClassName = className.Trim();
-
-                var sections = new List<string>();
-
-                if (model.ClassSections.ContainsKey(cleanClassName))
+            var classes = model.ClassDetails
+                .Where(c => !string.IsNullOrWhiteSpace(c.ClassName))
+                .Select((c, idx) => new
                 {
-                    sections = model.ClassSections[cleanClassName]
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Select(x => x.Trim())
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                }
-
-                classes.Add(new AcademicClassJsonModel
-                {
-                    ClassName = cleanClassName,
-                    Sections = sections
-                });
-            }
+                    className    = c.ClassName.Trim(),
+                    displayOrder = c.DisplayOrder > 0 ? c.DisplayOrder : idx + 1,
+                    stream       = string.IsNullOrWhiteSpace(c.Stream) ? null : c.Stream.Trim(),
+                    coordinator  = string.IsNullOrWhiteSpace(c.Coordinator) ? null : c.Coordinator.Trim(),
+                    sections     = c.Sections
+                        .Where(s => !string.IsNullOrWhiteSpace(s.SectionName))
+                        .Select(s => new
+                        {
+                            sectionName = s.SectionName.Trim(),
+                            capacity    = s.Capacity,
+                            roomNo      = string.IsNullOrWhiteSpace(s.RoomNo) ? null : s.RoomNo.Trim()
+                        })
+                        .ToList()
+                })
+                .ToList();
 
             return JsonSerializer.Serialize(classes);
+        }
+
+        // ── Row helpers ──────────────────────────────────────────
+        private static bool    Col(DataRow r, string c)         => r.Table.Columns.Contains(c);
+        private static int     AsInt(DataRow r, string c)       => Col(r, c) && r[c] != DBNull.Value ? Convert.ToInt32(r[c]) : 0;
+        private static int?    AsNullableInt(DataRow r, string c)=> Col(r, c) && r[c] != DBNull.Value ? Convert.ToInt32(r[c]) : (int?)null;
+        private static string? AsStr(DataRow r, string c)        => Col(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
+        private static bool    AsBool(DataRow r, string c)       => Col(r, c) && r[c] != DBNull.Value && Convert.ToBoolean(r[c]);
+        private static DateTime? AsDate(DataRow r, string c)
+        {
+            if (!Col(r, c) || r[c] == DBNull.Value) return null;
+            var v = r[c];
+            return v switch
+            {
+                DateTime dt                                      => dt,
+                DateOnly d                                       => d.ToDateTime(TimeOnly.MinValue),
+                string s when DateTime.TryParse(s, out var p)    => p,
+                _                                                => Convert.ToDateTime(v)
+            };
+        }
+
+        #endregion
+
+        #region Academic Year
+
+        private const string SpAcademicYearManage = "academic.sp_school_admin_academic_year_manage";
+
+        public async Task<List<AcademicYearModel>> GetAcademicYearsAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<AcademicYearModel>();
+            if (tenantId <= 1 || schoolId <= 0) return list;
+
+            var ds = await RunAcademicYearAsync("GetAcademicYears", tenantId, schoolId, actionUserId, null, null, null, null, false, "academic_years_cursor");
+
+            if (ds.Tables.Count == 0) return list;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                list.Add(new AcademicYearModel
+                {
+                    AcademicYearId   = AsInt(row, "academic_year_id"),
+                    AcademicYearName = AsStr(row, "academic_year_name") ?? string.Empty,
+                    StartDate        = AsDate(row, "start_date"),
+                    EndDate          = AsDate(row, "end_date"),
+                    IsCurrent        = AsBool(row, "is_current"),
+                    ClassCount       = AsInt(row, "class_count"),
+                    StudentCount     = AsInt(row, "student_count")
+                });
+            }
+            return list;
+        }
+
+        public async Task<(bool Success, string Message, int Id)> SaveAcademicYearAsync(
+            AcademicYearModel model, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.", 0);
+
+            var ds = await RunAcademicYearAsync("SaveAcademicYear", tenantId, schoolId, actionUserId,
+                model.AcademicYearId > 0 ? model.AcademicYearId : (int?)null,
+                model.AcademicYearName, model.StartDate, model.EndDate, model.IsCurrent, "academic_year_save_cursor");
+
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.", 0);
+            var row = ds.Tables[0].Rows[0];
+            return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty, AsInt(row, "academic_year_id"));
+        }
+
+        public async Task<(bool Success, string Message)> SetCurrentAcademicYearAsync(
+            int academicYearId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
+
+            var ds = await RunAcademicYearAsync("SetCurrentAcademicYear", tenantId, schoolId, actionUserId,
+                academicYearId, null, null, null, false, "academic_year_current_cursor");
+
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.");
+            var row = ds.Tables[0].Rows[0];
+            return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty);
+        }
+
+        public async Task<(bool Success, string Message)> DeleteAcademicYearAsync(
+            int academicYearId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
+
+            var ds = await RunAcademicYearAsync("DeleteAcademicYear", tenantId, schoolId, actionUserId,
+                academicYearId, null, null, null, false, "academic_year_delete_cursor");
+
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.");
+            var row = ds.Tables[0].Rows[0];
+            return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty);
+        }
+
+        private async Task<DataSet> RunAcademicYearAsync(
+            string operation, int tenantId, int schoolId, int actionUserId,
+            int? academicYearId, string? name, DateTime? startDate, DateTime? endDate, bool isCurrent, string cursorName)
+        {
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_operation",          NpgsqlDbType.Varchar) { Value = operation },
+                new("p_tenant_id",          NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",          NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id",     NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_academic_year_id",   NpgsqlDbType.Integer) { Value = (object?)academicYearId ?? DBNull.Value },
+                new("p_academic_year_name", NpgsqlDbType.Varchar) { Value = (object?)name ?? DBNull.Value },
+                new("p_start_date",         NpgsqlDbType.Date)    { Value = (object?)startDate ?? DBNull.Value },
+                new("p_end_date",           NpgsqlDbType.Date)    { Value = (object?)endDate ?? DBNull.Value },
+                new("p_is_current",         NpgsqlDbType.Boolean) { Value = isCurrent },
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = cursorName }
+            };
+
+            using var dal = new PostgreSqlDal(_connectionString);
+            return await dal.ExecuteProcedureWithCursorsAsync(SpAcademicYearManage, parameters);
         }
 
         #endregion

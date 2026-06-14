@@ -1,0 +1,358 @@
+@{
+    ViewData["Title"] = "Payroll & Salary";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+    :root{
+        --pr-orange:#ff8a00; --pr-orange-soft:#fff4e6;
+        --pr-border:#ececf5; --pr-heading:#2b1b12; --pr-text:#2b2c40; --pr-muted:#8b8175;
+        --pr-green:#16a34a; --pr-red:#dc2626; --pr-amber:#d97706;
+    }
+    .pr-page{ color:var(--pr-text); }
+    .dropdown-toggle::after{ display:none; }
+
+    /* KPI cards */
+    .pr-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.25rem; }
+    .pr-stat{ position:relative; overflow:hidden; border:1px solid var(--pr-border); border-radius:18px; background:#fff; padding:1.15rem 1.25rem; transition:transform .2s,box-shadow .2s; }
+    .pr-stat:hover{ transform:translateY(-3px); box-shadow:0 14px 30px rgba(43,27,18,.08); }
+    .pr-stat-ic{ width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.35rem; margin-bottom:.7rem; }
+    .pr-stat-val{ font-size:1.55rem; font-weight:900; color:var(--pr-heading); line-height:1; }
+    .pr-stat-lbl{ font-size:.74rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--pr-muted); margin-top:.25rem; }
+    .k-net .pr-stat-ic{ background:var(--pr-orange-soft); color:var(--pr-orange); }
+    .k-ded .pr-stat-ic{ background:#fde8e8; color:var(--pr-red); }
+    .k-paid .pr-stat-ic{ background:#dcfce7; color:var(--pr-green); }
+    .k-pend .pr-stat-ic{ background:#fff3cd; color:var(--pr-amber); }
+
+    /* toolbar */
+    .pr-toolbar{ display:flex; align-items:flex-end; gap:1rem; flex-wrap:wrap; margin-bottom:1.1rem; }
+    .pr-field-label{ font-size:.7rem; font-weight:800; color:var(--pr-muted); margin-bottom:.3rem; letter-spacing:.02em; }
+    .pr-page .form-select{ min-height:44px; border-radius:12px; border-color:var(--pr-border); font-weight:700; font-size:.88rem; }
+    .pr-page .form-select:focus{ border-color:var(--pr-orange); box-shadow:0 0 0 4px rgba(255,138,0,.12); }
+    .btn-pr-run{ background:linear-gradient(135deg,#ff8a00,#ffa733); border:0; color:#fff; border-radius:12px; font-weight:800; padding:.6rem 1.15rem; min-height:44px; box-shadow:0 10px 22px rgba(255,138,0,.25); transition:.18s; display:inline-flex; align-items:center; gap:.45rem; }
+    .btn-pr-run:hover{ color:#fff; transform:translateY(-1px); }
+
+    /* table */
+    .pr-tbl-wrap{ overflow-x:auto; }
+    .pr-tbl{ min-width:880px; width:100%; border-collapse:separate; border-spacing:0 .55rem; }
+    .pr-tbl thead th{ font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--pr-muted); padding:.4rem .9rem; white-space:nowrap; }
+    .pr-tbl tbody tr{ background:#fff; box-shadow:0 1px 0 rgba(43,27,18,.04); }
+    .pr-tbl tbody td{ padding:.85rem .9rem; vertical-align:middle; border-top:1px solid var(--pr-border); border-bottom:1px solid var(--pr-border); }
+    .pr-tbl tbody td:first-child{ border-left:1px solid var(--pr-border); border-radius:14px 0 0 14px; }
+    .pr-tbl tbody td:last-child{ border-right:1px solid var(--pr-border); border-radius:0 14px 14px 0; }
+    .pr-tbl tbody tr:hover td{ background:#fffaf3; }
+    .pr-staff{ display:flex; align-items:center; gap:.7rem; }
+    .pr-av{ width:42px; height:42px; flex:0 0 42px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:.8rem; }
+    .pr-nm{ font-weight:900; color:var(--pr-heading); font-size:.88rem; }
+    .pr-sub{ font-size:.72rem; font-weight:700; color:var(--pr-muted); }
+    .pr-amt{ font-weight:800; font-variant-numeric:tabular-nums; }
+    .pr-amt.ded{ color:var(--pr-red); }
+    .pr-amt.net{ color:var(--pr-green); font-weight:900; font-size:.96rem; }
+    .pr-lop{ display:inline-flex; align-items:center; gap:.3rem; font-size:.78rem; font-weight:800; }
+    .pr-lop.zero{ color:var(--pr-muted); } .pr-lop.has{ color:var(--pr-amber); }
+    .pr-status{ display:inline-flex; align-items:center; gap:.3rem; border-radius:999px; padding:.3rem .7rem; font-size:.7rem; font-weight:900; white-space:nowrap; }
+    .pr-status::before{ content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+    .ps-paid{ background:#ecfdf3; color:var(--pr-green); } .ps-pending{ background:#fffbeb; color:var(--pr-amber); }
+    .pr-view{ border:1px solid var(--pr-border); background:#fff; border-radius:10px; font-weight:800; font-size:.76rem; color:var(--pr-text); padding:.45rem .75rem; cursor:pointer; transition:.15s; display:inline-flex; align-items:center; gap:.3rem; }
+    .pr-view:hover{ border-color:var(--pr-orange); color:var(--pr-orange); }
+
+    /* payslip modal */
+    .ps-modal .modal-content{ border:0; border-radius:22px; overflow:hidden; box-shadow:0 28px 70px rgba(43,27,18,.22); }
+    .ps-head{ background:linear-gradient(135deg,var(--pr-orange-soft),#fff 72%); border-bottom:1px solid var(--pr-border); padding:1.25rem 1.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+    .ps-cols{ display:grid; grid-template-columns:1fr 1fr; gap:0; }
+    .ps-col{ padding:1.1rem 1.35rem; }
+    .ps-col.earn{ border-right:1px solid var(--pr-border); }
+    .ps-col-title{ font-size:.72rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.7rem; display:flex; align-items:center; gap:.4rem; }
+    .ps-col.earn .ps-col-title{ color:var(--pr-green); }
+    .ps-col.ded .ps-col-title{ color:var(--pr-red); }
+    .ps-line{ display:flex; justify-content:space-between; gap:1rem; font-size:.84rem; padding:.4rem 0; border-bottom:1px dashed #efece8; }
+    .ps-line span:first-child{ color:var(--pr-muted); font-weight:700; }
+    .ps-line span:last-child{ font-weight:800; font-variant-numeric:tabular-nums; color:var(--pr-text); }
+    .ps-line.total{ border-bottom:0; margin-top:.4rem; padding-top:.6rem; border-top:2px solid var(--pr-border); }
+    .ps-line.total span{ font-weight:900; font-size:.9rem; color:var(--pr-heading); }
+    .ps-att{ display:flex; gap:.5rem; flex-wrap:wrap; padding:.9rem 1.35rem; background:#faf9f7; border-top:1px solid var(--pr-border); border-bottom:1px solid var(--pr-border); }
+    .ps-att-chip{ background:#fff; border:1px solid var(--pr-border); border-radius:10px; padding:.4rem .65rem; text-align:center; min-width:74px; }
+    .ps-att-v{ font-weight:900; font-size:.95rem; color:var(--pr-heading); }
+    .ps-att-l{ font-size:.64rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--pr-muted); }
+    .ps-net{ display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.5rem; background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; }
+    .ps-net .l{ font-size:.8rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; opacity:.9; }
+    .ps-net .v{ font-size:1.7rem; font-weight:900; }
+    .ps-note{ font-size:.7rem; color:var(--pr-muted); font-weight:700; padding:.6rem 1.5rem; }
+
+    @@media (max-width:991.98px){ .pr-stats{ grid-template-columns:repeat(2,1fr);} }
+    @@media (max-width:575.98px){ .pr-stats{ grid-template-columns:1fr 1fr; gap:.7rem;} .ps-cols{ grid-template-columns:1fr;} .ps-col.earn{ border-right:0; border-bottom:1px solid var(--pr-border);} }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content pr-page">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center"><i class="bx bx-money fs-4"></i></div>
+          <div>
+            <h4 class="ec-page-title mb-1">Payroll &amp; Salary</h4>
+            <div class="ec-page-subtitle">Monthly salary run — earnings, statutory deductions &amp; loss-of-pay from attendance</div>
+          </div>
+        </div>
+        <button class="btn-pr-run" id="btnExport"><i class="bx bx-download"></i><span>Export</span></button>
+      </div>
+    </div>
+
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
+    }
+
+    <div class="pr-stats">
+      <div class="pr-stat k-net"><div class="pr-stat-ic"><i class="bx bx-wallet"></i></div><div class="pr-stat-val" id="kNet">₹0</div><div class="pr-stat-lbl">Net Payroll</div></div>
+      <div class="pr-stat k-ded"><div class="pr-stat-ic"><i class="bx bx-minus-circle"></i></div><div class="pr-stat-val" id="kDed">₹0</div><div class="pr-stat-lbl">Total Deductions</div></div>
+      <div class="pr-stat k-paid"><div class="pr-stat-ic"><i class="bx bx-check-circle"></i></div><div class="pr-stat-val" id="kPaid">0</div><div class="pr-stat-lbl">Payslips Paid</div></div>
+      <div class="pr-stat k-pend"><div class="pr-stat-ic"><i class="bx bx-time-five"></i></div><div class="pr-stat-val" id="kPend">0</div><div class="pr-stat-lbl">Pending Payslips</div></div>
+    </div>
+
+    <div class="pr-toolbar">
+      <div>
+        <div class="pr-field-label">PAY PERIOD</div>
+        <select class="form-select" id="fMonth">
+          <option value="2026-06" selected>June 2026</option>
+          <option value="2026-05">May 2026</option>
+          <option value="2026-04">April 2026</option>
+        </select>
+      </div>
+      <div>
+        <div class="pr-field-label">DEPARTMENT</div>
+        <select class="form-select" id="fDept">
+          <option value="">All Departments</option>
+          <option>Teaching</option><option>Administration</option>
+          <option>Accounts</option><option>Library</option>
+          <option>Transport</option><option>Support Staff</option>
+        </select>
+      </div>
+      <button class="btn-pr-run ms-auto" id="btnRun"><i class="bx bx-play-circle"></i><span>Run Payroll</span></button>
+    </div>
+
+    <div class="ec-card">
+      <div class="ec-card-body">
+        <div class="pr-tbl-wrap">
+          <table class="pr-tbl">
+            <thead>
+              <tr>
+                <th>Staff</th>
+                <th class="text-end">Gross</th>
+                <th class="text-end">Deductions</th>
+                <th class="text-center">LOP</th>
+                <th class="text-end">Net Pay</th>
+                <th class="text-center">Status</th>
+                <th class="text-center">Payslip</th>
+              </tr>
+            </thead>
+            <tbody id="prBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Payslip modal -->
+<div class="modal fade ps-modal" id="payslipModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="ps-head">
+        <div class="d-flex align-items-center gap-3">
+          <div class="pr-av" id="psAv">--</div>
+          <div>
+            <div class="pr-nm" id="psName" style="font-size:1rem;">Staff Name</div>
+            <div class="pr-sub" id="psSub">EMP · Designation</div>
+          </div>
+        </div>
+        <div class="text-end">
+          <div style="font-size:.7rem;font-weight:800;color:var(--pr-muted);text-transform:uppercase;">Payslip</div>
+          <div style="font-weight:900;color:var(--pr-heading);" id="psPeriod">June 2026</div>
+        </div>
+      </div>
+
+      <div class="ps-att" id="psAtt"></div>
+
+      <div class="ps-cols">
+        <div class="ps-col earn">
+          <div class="ps-col-title"><i class="bx bx-trending-up"></i>Earnings</div>
+          <div id="psEarn"></div>
+        </div>
+        <div class="ps-col ded">
+          <div class="ps-col-title"><i class="bx bx-trending-down"></i>Deductions</div>
+          <div id="psDed"></div>
+        </div>
+      </div>
+
+      <div class="ps-net">
+        <span class="l">Net Salary Payable</span>
+        <span class="v" id="psNet">₹0</span>
+      </div>
+      <div class="ps-note"><i class="bx bx-info-circle me-1"></i>LOP = (Gross ÷ working days) × unpaid days. Unpaid days are pulled from Staff Attendance (absent + ½×half-day) and unpaid Leave.</div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn-pr-run" id="psPrint"><i class="bx bx-printer"></i>Print</button>
+        <button type="button" class="btn btn-success px-4 fw-bold" id="psMarkPaid"><i class="bx bx-check me-1"></i>Mark Paid</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(document).ready(function () {
+    if (typeof toastr !== 'undefined') toastr.options = { closeButton:true, progressBar:true, timeOut:'3000', positionClass:'toast-top-right' };
+    function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
+
+    const COLORS = ['bg-label-primary text-primary','bg-label-info text-info','bg-label-success text-success','bg-label-warning text-warning','bg-label-danger text-danger'];
+    function inr(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
+
+    /* ── Salary structures + monthly attendance (mock; from Staff/Attendance/Leave modules) ──
+       attendance: working = working days in month; absent, half, unpaidLeave feed Loss of Pay.
+       paidLeave is informational (no LOP).                                                     */
+    const STAFF = [
+      { id:1,  name:'Sunita Rao',    emp:'EMP-001', desig:'Principal',        dept:'Administration', av:'SR', basic:60000, conveyance:1600, medical:1250, special:9000, att:{working:26,present:26,half:0,paidLeave:0,absent:0,unpaidLeave:0}, status:'paid' },
+      { id:2,  name:'Rakesh Mehta',  emp:'EMP-002', desig:'Vice Principal',   dept:'Administration', av:'RM', basic:48000, conveyance:1600, medical:1250, special:7000, att:{working:26,present:25,half:0,paidLeave:1,absent:0,unpaidLeave:0}, status:'paid' },
+      { id:3,  name:'Anita Desai',   emp:'EMP-003', desig:'Senior Teacher',   dept:'Teaching',       av:'AD', basic:38000, conveyance:1600, medical:1250, special:5000, att:{working:26,present:25,half:0,paidLeave:1,absent:0,unpaidLeave:0}, status:'pending' },
+      { id:4,  name:'Vikram Joshi',  emp:'EMP-004', desig:'Maths Teacher',    dept:'Teaching',       av:'VJ', basic:32000, conveyance:1600, medical:1250, special:4000, att:{working:26,present:24,half:1,paidLeave:0,absent:1,unpaidLeave:0}, status:'pending' },
+      { id:5,  name:'Pooja Nair',    emp:'EMP-005', desig:'Science Teacher',  dept:'Teaching',       av:'PN', basic:30000, conveyance:1600, medical:1250, special:3500, att:{working:26,present:21,half:0,paidLeave:2,absent:0,unpaidLeave:3}, status:'pending' },
+      { id:6,  name:'Arun Kumar',    emp:'EMP-006', desig:'Accountant',       dept:'Accounts',       av:'AK', basic:28000, conveyance:1600, medical:1250, special:3000, att:{working:26,present:26,half:0,paidLeave:0,absent:0,unpaidLeave:0}, status:'pending' },
+      { id:7,  name:'Meena Iyer',    emp:'EMP-007', desig:'Librarian',        dept:'Library',        av:'MI', basic:22000, conveyance:1600, medical:1250, special:2500, att:{working:26,present:25,half:2,paidLeave:0,absent:0,unpaidLeave:0}, status:'pending' },
+      { id:8,  name:'Deepak Verma',  emp:'EMP-012', desig:'Bus Driver',       dept:'Transport',      av:'DV', basic:16000, conveyance:1600, medical:1250, special:1500, att:{working:26,present:24,half:0,paidLeave:0,absent:2,unpaidLeave:0}, status:'pending' },
+      { id:9,  name:'Gopal Das',     emp:'EMP-016', desig:'Peon',             dept:'Support Staff',  av:'GD', basic:13000, conveyance:1600, medical:1250, special:1200, att:{working:26,present:26,half:0,paidLeave:0,absent:0,unpaidLeave:0}, status:'pending' }
+    ];
+
+    /* ── India new-regime TDS (FY 24-25), monthly estimate ── */
+    function annualTDS(monthlyGross){
+        const annual = monthlyGross * 12;
+        let taxable = Math.max(0, annual - 50000);        // standard deduction
+        if (taxable <= 700000) return 0;                  // 87A rebate (new regime)
+        const slabs = [[300000,0],[400000,.05],[300000,.10],[200000,.15],[300000,.20],[Infinity,.30]];
+        let rem = taxable, tax = 0;
+        for (const [width,rate] of slabs){ if(rem<=0) break; const part=Math.min(rem,width); tax+=part*rate; rem-=part; }
+        return tax * 1.04;                                 // + 4% cess
+    }
+
+    /* ── Core payroll computation (the real logic) ── */
+    function compute(s){
+        const hra = Math.round(s.basic * 0.40);            // HRA 40% of basic
+        const da  = Math.round(s.basic * 0.10);            // DA 10% of basic
+        const gross = s.basic + hra + da + s.conveyance + s.medical + s.special;
+
+        const epf = Math.min(Math.round(s.basic * 0.12), 1800);          // 12% basic, ₹15k cap → ₹1,800
+        const esi = gross <= 21000 ? Math.round(gross * 0.0075) : 0;       // 0.75% if gross ≤ ₹21k
+        const pt  = 200;                                                   // professional tax
+        const tds = Math.round(annualTDS(gross) / 12);                    // monthly TDS
+
+        const lopDays = s.att.absent + s.att.half * 0.5 + s.att.unpaidLeave;
+        const perDay  = gross / s.att.working;
+        const lop     = Math.round(perDay * lopDays);
+
+        const totalDed = epf + esi + pt + tds + lop;
+        const net = gross - totalDed;
+        return { hra, da, gross, epf, esi, pt, tds, lopDays, lop, totalDed, net };
+    }
+
+    function periodLabel(){ return $('#fMonth option:selected').text(); }
+
+    function visible(){
+        const dept = $('#fDept').val();
+        return STAFF.filter(s => !dept || s.dept === dept);
+    }
+
+    function render(){
+        const rows = visible();
+        let totNet = 0, totDed = 0, paid = 0, pend = 0;
+
+        $('#prBody').html(rows.map(function(s){
+            const c = compute(s);
+            totNet += c.net; totDed += c.totalDed;
+            s.status === 'paid' ? paid++ : pend++;
+            const lopCls = c.lopDays > 0 ? 'has' : 'zero';
+            const col = COLORS[s.id % COLORS.length];
+            return ''
+              + '<tr>'
+              +   '<td><div class="pr-staff"><div class="pr-av '+col+'">'+s.av+'</div><div><div class="pr-nm">'+s.name+'</div><div class="pr-sub">'+s.emp+' · '+s.desig+'</div></div></div></td>'
+              +   '<td class="text-end pr-amt">'+inr(c.gross)+'</td>'
+              +   '<td class="text-end pr-amt ded">−'+inr(c.totalDed)+'</td>'
+              +   '<td class="text-center"><span class="pr-lop '+lopCls+'"><i class="bx bx-calendar-x"></i>'+c.lopDays+'</span></td>'
+              +   '<td class="text-end pr-amt net">'+inr(c.net)+'</td>'
+              +   '<td class="text-center"><span class="pr-status '+(s.status==='paid'?'ps-paid':'ps-pending')+'">'+(s.status==='paid'?'Paid':'Pending')+'</span></td>'
+              +   '<td class="text-center"><button class="pr-view" data-id="'+s.id+'"><i class="bx bx-receipt"></i>View</button></td>'
+              + '</tr>';
+        }).join(''));
+
+        $('#kNet').text(inr(totNet));
+        $('#kDed').text(inr(totDed));
+        $('#kPaid').text(paid);
+        $('#kPend').text(pend);
+    }
+
+    /* ── Payslip modal ── */
+    let activeId = null;
+    function openPayslip(s){
+        activeId = s.id;
+        const c = compute(s);
+        $('#psAv').attr('class','pr-av '+COLORS[s.id % COLORS.length]).text(s.av);
+        $('#psName').text(s.name);
+        $('#psSub').text(s.emp + ' · ' + s.desig + ' · ' + s.dept);
+        $('#psPeriod').text(periodLabel());
+
+        $('#psAtt').html(
+            chip('Working', s.att.working) + chip('Present', s.att.present) + chip('Half', s.att.half) +
+            chip('Paid Lv', s.att.paidLeave) + chip('LOP Days', c.lopDays, c.lopDays>0)
+        );
+
+        $('#psEarn').html(
+            line('Basic', s.basic) + line('HRA (40%)', c.hra) + line('DA (10%)', c.da) +
+            line('Conveyance', s.conveyance) + line('Medical', s.medical) + line('Special Allowance', s.special) +
+            lineTotal('Gross Earnings', c.gross)
+        );
+        $('#psDed').html(
+            line('EPF (12% basic)', c.epf) + line('ESI', c.esi) + line('Professional Tax', c.pt) +
+            line('TDS', c.tds) + line('Loss of Pay ('+c.lopDays+'d)', c.lop) +
+            lineTotal('Total Deductions', c.totalDed)
+        );
+        $('#psNet').text(inr(c.net));
+
+        $('#psMarkPaid').prop('disabled', s.status==='paid').html(
+            s.status==='paid' ? '<i class="bx bx-check-double me-1"></i>Already Paid' : '<i class="bx bx-check me-1"></i>Mark Paid'
+        );
+        new bootstrap.Modal(document.getElementById('payslipModal')).show();
+    }
+    function chip(l,v,warn){ return '<div class="ps-att-chip"><div class="ps-att-v" '+(warn?'style="color:var(--pr-amber)"':'')+'>'+v+'</div><div class="ps-att-l">'+l+'</div></div>'; }
+    function line(l,v){ return '<div class="ps-line"><span>'+l+'</span><span>'+inr(v)+'</span></div>'; }
+    function lineTotal(l,v){ return '<div class="ps-line total"><span>'+l+'</span><span>'+inr(v)+'</span></div>'; }
+
+    $('#prBody').on('click','.pr-view',function(){ const s=STAFF.find(x=>x.id===Number($(this).data('id'))); if(s) openPayslip(s); });
+
+    $('#psMarkPaid').on('click',function(){
+        const s = STAFF.find(x=>x.id===activeId); if(!s) return;
+        s.status='paid'; render();
+        bootstrap.Modal.getInstance(document.getElementById('payslipModal')).hide();
+        toast('success', s.name+"'s salary marked as paid.");
+    });
+    $('#psPrint').on('click',function(){ window.print(); });
+
+    $('#fMonth, #fDept').on('change', render);
+    $('#btnRun').on('click', function(){ render(); toast('success','Payroll computed for '+periodLabel()+'.'); });
+    $('#btnExport').on('click', function(){
+        const rows = visible().map(function(s){ const c=compute(s); return [s.emp,s.name,s.dept,c.gross,c.epf,c.esi,c.pt,c.tds,c.lop,c.totalDed,c.net,s.status]; });
+        const hdr = ['Emp','Name','Dept','Gross','EPF','ESI','PT','TDS','LOP','TotalDeductions','NetPay','Status'];
+        const csv = '﻿'+[hdr].concat(rows).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+        const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+        a.download='payroll_'+$('#fMonth').val()+'.csv'; a.click();
+        toast('success','Payroll exported.');
+    });
+
+    render();
+});
+</script>
+}

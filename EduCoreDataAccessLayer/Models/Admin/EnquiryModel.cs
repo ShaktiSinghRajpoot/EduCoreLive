@@ -301,6 +301,9 @@ namespace EduCoreDataAccessLayer.Models.Admin
         public List<SelectListItem>    AvailableSessions  { get; set; } = new();
         public int AvailableSessionsid { get; set; } = new();
         public List<SelectListItem>    AvailableCounsellors { get; set; } = new();
+
+        // Admission workflow settings — drive show/hide of the Registration stage.
+        public AdmissionWorkflowModel  Workflow { get; set; } = new();
         // Pagination
         public int  PageNumber { get; set; } = 1;
         public int  PageSize   { get; set; } = 10;
@@ -330,5 +333,13 @@ namespace EduCoreDataAccessLayer.Models.Admin
     public class DeleteEnquiryRequest
     {
         public int EnquiryId { get; set; }
+    }
+
+    public class RegisterEnquiryRequest
+    {
+        public int     EnquiryId           { get; set; }
+        public string? RegistrationNumber  { get; set; }   // blank => auto-generate
+        public string? RegistrationDate    { get; set; }   // blank => today
+        public bool    RegistrationFeePaid { get; set; }
     }
 }

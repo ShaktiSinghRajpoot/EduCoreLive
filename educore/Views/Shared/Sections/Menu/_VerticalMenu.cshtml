@@ -236,13 +236,14 @@
         <li class="menu-header"><span class="menu-header-text">Academic</span></li>
 
         @* ---- Front Office ---- *@
-        <li class='menu-item @Open("EnquiryCRM","Visitor","CallLog","Postal","Complaint")'>
+        <li class='menu-item @Open("EnquiryCRM","Registration","Visitor","CallLog","Postal","Complaint")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-buildings ic-front"></i>
                 <div class="text-truncate">Front Office</div>
-            </a> 
+            </a>
             <ul class="menu-sub">
                 <li class='menu-item @On("EnquiryCRM")'><a asp-area="Admin" asp-controller="Enquiry" asp-action="EnquiryCRM" class="menu-link"><i class="bx bx-message-square-detail submenu-icon c-pink"></i><div class="text-truncate">Admission Enquiry</div><span class="ec-badge ec-badge-hot">CRM</span></a></li>
+                <li class='menu-item @On("Registration")'><a asp-area="Admin" asp-controller="Registration" asp-action="Index" class="menu-link"><i class="bx bx-clipboard submenu-icon c-orange"></i><div class="text-truncate">Registrations</div></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-blue"></i><div class="text-truncate">Visitor Book</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-phone-call submenu-icon c-green"></i><div class="text-truncate">Phone Call Log</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-envelope submenu-icon c-orange"></i><div class="text-truncate">Postal Dispatch/Receive</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
@@ -251,14 +252,14 @@
         </li>
 
         @* ---- Students ---- *@
-        <li class='menu-item @Open("StudentList","ManageAdmission","EditStudent")'>
+        <li class='menu-item @Open("StudentList","Admission/Create","EditStudent")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-plus ic-students"></i>
                 <div class="text-truncate">Students</div>
             </a>
             <ul class="menu-sub">
                 <li class='menu-item @On("StudentList")'><a asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Student Directory</div></a></li>
-                <li class='menu-item @On("ManageAdmission")'><a asp-area="ERP" asp-controller="Admission" asp-action="ManageAdmission" class="menu-link"><i class="bx bx-user-plus submenu-icon c-green"></i><div class="text-truncate">New Admission</div></a></li>
+                <li class='menu-item @On("Admission/Create")'><a asp-area="ERP" asp-controller="Admission" asp-action="Create" class="menu-link"><i class="bx bx-user-plus submenu-icon c-green"></i><div class="text-truncate">New Admission</div></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-category submenu-icon c-purple"></i><div class="text-truncate">Student Categories</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class='menu-item @On("Promotion")'><a asp-area="ERP" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
                 <li class='menu-item @On("Inactive")'><a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
@@ -316,7 +317,7 @@
         <li class="menu-header"><span class="menu-header-text">Finance</span></li>
 
         @* ---- Fees ---- *@
-        <li class='menu-item @Open("FeeStructure","FeeHead","ManageFee")'>
+        <li class='menu-item @Open("FeeStructure","FeeHead","ManageFee","PaymentVerification","FeeDueReminders")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-wallet ic-fees"></i>
                 <div class="text-truncate">Fees &amp; Collection</div>
@@ -325,8 +326,8 @@
                 <li class='menu-item @On("FeeStructure")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="FeeStructure" class="menu-link"><i class="bx bx-credit-card submenu-icon c-green"></i><div class="text-truncate">Fee Structure</div></a></li>
                 <li class='menu-item @On("FeeHead")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="FeeHead" class="menu-link"><i class="bx bx-list-ul submenu-icon c-teal"></i><div class="text-truncate">Fee Heads</div></a></li>
                 <li class='menu-item @On("ManageFee")'><a asp-area="ERP" asp-controller="Fee" asp-action="ManageFee" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Collect Fees</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-check-shield submenu-icon c-indigo"></i><div class="text-truncate">Payment Verification</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Due Reminders</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("PaymentVerification")'><a asp-area="Admin" asp-controller="PaymentVerification" asp-action="Index" class="menu-link"><i class="bx bx-check-shield submenu-icon c-indigo"></i><div class="text-truncate">Payment Verification</div></a></li>
+                <li class='menu-item @On("FeeDueReminders")'><a asp-area="Admin" asp-controller="FeeDueReminders" asp-action="Index" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Due Reminders</div></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-bar-chart-alt-2 submenu-icon c-blue"></i><div class="text-truncate">Fee Reports</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
@@ -348,16 +349,16 @@
         <li class="menu-header"><span class="menu-header-text">People &amp; Facilities</span></li>
 
         @* ---- HR ---- *@
-        <li class='menu-item'>
+        <li class='menu-item @Open("StaffList","AddStaff","EditStaff","StaffProfile","LeaveManagement","PayrollManagement")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-group ic-hr"></i>
                 <div class="text-truncate">Human Resources</div>
             </a>
             <ul class="menu-sub">
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Staff Directory</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("StaffList")'><a asp-area="ERP" asp-controller="Staff" asp-action="StaffList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Staff Directory</div></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-sitemap submenu-icon c-purple"></i><div class="text-truncate">Departments &amp; Designations</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-calendar-minus submenu-icon c-pink"></i><div class="text-truncate">Leave Management</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Payroll &amp; Salary</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("LeaveManagement")'><a asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement" class="menu-link"><i class="bx bx-calendar-minus submenu-icon c-pink"></i><div class="text-truncate">Leave Management</div></a></li>
+                <li class='menu-item @On("PayrollManagement")'><a asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Payroll &amp; Salary</div></a></li>
             </ul>
         </li>
 
@@ -459,18 +460,32 @@
         <li class="menu-header"><span class="menu-header-text">Administration</span></li>
 
         @* ---- Settings ---- *@
-        <li class='menu-item @Open("BasicProfile","AcademicSetup")'>
+        <li class='menu-item @Open("BasicProfile","AcademicYears")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-cog ic-settings"></i>
                 <div class="text-truncate">Settings</div>
             </a>
             <ul class="menu-sub">
                 <li class='menu-item @On("BasicProfile")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="BasicProfile" class="menu-link"><i class="bx bx-buildings submenu-icon c-blue"></i><div class="text-truncate">School Profile</div></a></li>
-                <li class='menu-item @On("AcademicSetup")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="AcademicSetup" class="menu-link"><i class="bx bx-book-open submenu-icon c-purple"></i><div class="text-truncate">Academic Setup</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Academic Year / Session</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("AcademicYears")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="AcademicYears" class="menu-link"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Academic Year / Session</div></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-user-circle submenu-icon c-indigo"></i><div class="text-truncate">Users &amp; Roles</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-plug submenu-icon c-green"></i><div class="text-truncate">SMS / Payment Gateway</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-data submenu-icon c-teal"></i><div class="text-truncate">Backup &amp; Restore</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+            </ul>
+        </li>
+
+        @* ---- Admission Workflow ---- *@
+        <li class='menu-item @Open("AdmissionWorkflow","WorkflowSettings")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-git-branch ic-workflow"></i>
+                <div class="text-truncate">Admission Workflow</div>
+            </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("WorkflowSettings")'><a asp-area="Admin" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings" class="menu-link"><i class="bx bx-slider-alt submenu-icon c-orange"></i><div class="text-truncate">Workflow Settings</div></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-check-shield submenu-icon c-indigo"></i><div class="text-truncate">Document Verification</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-edit-alt submenu-icon c-blue"></i><div class="text-truncate">Entrance Test</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-conversation submenu-icon c-green"></i><div class="text-truncate">Interview</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-badge-check submenu-icon c-purple"></i><div class="text-truncate">Approvals</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
 
