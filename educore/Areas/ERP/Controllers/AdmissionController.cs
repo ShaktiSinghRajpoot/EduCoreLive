@@ -144,6 +144,8 @@ namespace educore.Areas.ERP.Controllers
                 Nationality         = NullIfEmpty(form.Nationality),
                 MotherTongue        = NullIfEmpty(form.MotherTongue),
                 IdProofNo           = NullIfEmpty(form.IdProofNo),
+                ApaarId             = NullIfEmpty(form.ApaarId),
+                UdiseStudentId      = NullIfEmpty(form.UdiseStudentId),
                 PrevSchoolName      = NullIfEmpty(form.PrevSchoolName),
                 PrevBoard           = NullIfEmpty(form.PrevBoard),
                 PrevClass           = NullIfEmpty(form.PrevClass),
@@ -257,44 +259,67 @@ namespace educore.Areas.ERP.Controllers
             if (string.IsNullOrWhiteSpace(className) || string.IsNullOrWhiteSpace(academicYear))
                 return Json(new { success = false, message = "Class and academic year are required." });
 
+            int tenantId = TenantId(), schoolId = SchoolId(), userId = UserId();
+
             var details = await _schoolSettingsService.GetFeeStructureDetailsAsync(
-                className, academicYear, TenantId(), SchoolId(), UserId());
+                className, academicYear, tenantId, schoolId, userId);
 
             if (details == null || details.Count == 0)
                 return Json(new { success = false, message = "No fee structure configured for this class and year. Configure it under School Settings → Fee Structure." });
 
+            var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
+
+            // Admission collects Admission-point heads (admission fee, security deposit)
+            // as "due now", and Recurring heads as "scheduled / billed later". It never
+            // collects Registration-point heads (those are taken at the registration step).
+            // A refundable Admission head (the security deposit) is only charged when the
+            // school enables the security deposit toggle in Workflow Settings.
+            var visible = details.Where(d =>
+                !string.Equals(d.CollectionPoint, "Registration", StringComparison.OrdinalIgnoreCase) &&
+                (!(IsAdmissionPoint(d.CollectionPoint) && d.IsRefundable) || workflow.EnableSecurityFee));
+
             return Json(new
             {
                 success = true,
-                fees = details.Select(d => new
+                fees = visible.Select(d => new
                 {
-                    feeHeadId   = d.FeeHeadId,
-                    feeHeadName = d.FeeHeadName,
-                    frequency   = string.IsNullOrWhiteSpace(d.Frequency) ? "Yearly" : d.Frequency,
-                    amount      = d.Amount,
-                    group       = GroupForFrequency(d.Frequency),
-                    stage       = StageForFrequency(d.Frequency),
+                    feeHeadId       = d.FeeHeadId,
+                    feeHeadName     = d.FeeHeadName,
+                    frequency       = string.IsNullOrWhiteSpace(d.Frequency) ? "Yearly" : d.Frequency,
+                    amount          = d.Amount,
+                    collectionPoint = string.IsNullOrWhiteSpace(d.CollectionPoint) ? "Recurring" : d.CollectionPoint,
+                    isRefundable    = d.IsRefundable,
+                    group           = IsAdmissionPoint(d.CollectionPoint) ? "One Time Payable Now" : GroupForFrequency(d.Frequency),
+                    // Due-now vs scheduled is driven by the Collection Point, not the billing cycle.
+                    stage           = IsAdmissionPoint(d.CollectionPoint) ? "Admission" : StageForFrequency(d.Frequency),
                     // All configured heads are part of the class structure → mandatory by default.
-                    mandatory   = true
+                    mandatory       = true
                 })
             });
         }
+
+        private static bool IsAdmissionPoint(string? collectionPoint) =>
+            string.Equals(collectionPoint, "Admission", StringComparison.OrdinalIgnoreCase);
         public IActionResult ManageAdmission()
         {
             return View();
         }
         private static string GroupForFrequency(string? freq) => freq switch
         {
-            "One Time" => "One Time Payable Now",
-            "Monthly"  => "Monthly Recurring",
-            _          => "Yearly Charges"
+            "One Time"    => "One Time Payable Now",
+            "Monthly"     => "Monthly Recurring",
+            "Quarterly"   => "Quarterly Recurring",
+            "Half Yearly" => "Half-Yearly Charges",
+            _             => "Yearly Charges"
         };
 
         private static string StageForFrequency(string? freq) => freq switch
         {
-            "One Time" => "Admission",
-            "Monthly"  => "Monthly",
-            _          => "Yearly"
+            "One Time"    => "Admission",
+            "Monthly"     => "Monthly",
+            "Quarterly"   => "Quarterly",
+            "Half Yearly" => "HalfYearly",
+            _             => "Yearly"
         };
 
         // ── GET: /ERP/Admission/GetSections (AJAX) ───────────────
@@ -330,12 +355,11 @@ namespace educore.Areas.ERP.Controllers
             catch { ViewBag.Sessions = new List<SelectListItem>(); }
             // Sections are class-dependent → loaded dynamically via GetSections.
 
-            // Whether the admission form may collect fee on the spot, and the
-            // optional one-time security deposit configured for this school.
+            // Whether the admission form may collect fee on the spot. The security
+            // deposit (and every other charge) is now a Fee Head pulled via the fee
+            // structure, so no amount is read from the workflow settings here.
             var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
             ViewBag.CollectFeeAtAdmission = workflow.CollectFeeAtAdmission;
-            ViewBag.EnableSecurityFee = workflow.EnableSecurityFee;
-            ViewBag.SecurityFeeAmount = workflow.SecurityFeeAmount;
         }
 
         // ── Ledger JSON parsing ──────────────────────────────────
@@ -406,10 +430,13 @@ namespace educore.Areas.ERP.Controllers
 
         private static string NormalizeFreq(string? f) => f switch
         {
-            "Monthly"  => "Monthly",
-            "One Time" => "One Time",
-            "OneTime"  => "One Time",
-            _          => "Yearly"
+            "Monthly"     => "Monthly",
+            "Quarterly"   => "Quarterly",
+            "Half Yearly" => "Half Yearly",
+            "HalfYearly"  => "Half Yearly",
+            "One Time"    => "One Time",
+            "OneTime"     => "One Time",
+            _             => "Yearly"
         };
 
         private static int?    GetInt(JsonElement e, string p) => e.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : null;

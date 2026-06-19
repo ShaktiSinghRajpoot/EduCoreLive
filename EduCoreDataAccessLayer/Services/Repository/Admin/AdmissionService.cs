@@ -65,6 +65,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new("p_nationality",          NpgsqlDbType.Text)    { Value = (object?)model.Nationality         ?? DBNull.Value },
                 new("p_mother_tongue",        NpgsqlDbType.Text)    { Value = (object?)model.MotherTongue        ?? DBNull.Value },
                 new("p_id_proof_no",          NpgsqlDbType.Text)    { Value = (object?)model.IdProofNo           ?? DBNull.Value },
+                new("p_apaar_id",             NpgsqlDbType.Text)    { Value = (object?)model.ApaarId             ?? DBNull.Value },
+                new("p_udise_student_id",     NpgsqlDbType.Text)    { Value = (object?)model.UdiseStudentId      ?? DBNull.Value },
                 new("p_prev_school_name",     NpgsqlDbType.Text)    { Value = (object?)model.PrevSchoolName       ?? DBNull.Value },
                 new("p_prev_board",           NpgsqlDbType.Text)    { Value = (object?)model.PrevBoard            ?? DBNull.Value },
                 new("p_prev_class",           NpgsqlDbType.Text)    { Value = (object?)model.PrevClass            ?? DBNull.Value },

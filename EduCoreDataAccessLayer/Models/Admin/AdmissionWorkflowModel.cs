@@ -20,11 +20,12 @@ namespace EduCoreDataAccessLayer.Models.Admin
         /// <summary>When true, an enquiry cannot be converted to admission until registered.</summary>
         public bool RegistrationRequiredBeforeAdmission { get; set; }
 
-        /// <summary>When true, a registration fee can be configured and collected.</summary>
+        /// <summary>
+        /// When true, this school collects a registration fee at the registration step.
+        /// The amount is master data — defined as a Fee Head with Collection Point =
+        /// "Registration" in School Settings → Fee Head, not stored here.
+        /// </summary>
         public bool EnableRegistrationFee { get; set; }
-
-        /// <summary>Registration fee value (used only when <see cref="EnableRegistrationFee"/> is true).</summary>
-        public decimal RegistrationFeeAmount { get; set; }
 
         /// <summary>When true, registration numbers are auto-generated using the prefix below.</summary>
         public bool AutoGenerateRegistrationNumber { get; set; } = true;
@@ -37,10 +38,11 @@ namespace EduCoreDataAccessLayer.Models.Admin
         /// <summary>When true, the admission form can collect fee on the spot and issue a receipt.</summary>
         public bool CollectFeeAtAdmission { get; set; }
 
-        /// <summary>When true, a one-time security deposit is added to the admission's due-now charges.</summary>
+        /// <summary>
+        /// When true, this school charges a one-time security deposit at admission.
+        /// The amount is master data — defined as a refundable Fee Head with Collection
+        /// Point = "Admission" in School Settings → Fee Head, not stored here.
+        /// </summary>
         public bool EnableSecurityFee { get; set; }
-
-        /// <summary>Security deposit value (used only when <see cref="EnableSecurityFee"/> is true).</summary>
-        public decimal SecurityFeeAmount { get; set; }
     }
 }

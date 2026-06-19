@@ -341,5 +341,7 @@ namespace EduCoreDataAccessLayer.Models.Admin
         public string? RegistrationNumber  { get; set; }   // blank => auto-generate
         public string? RegistrationDate    { get; set; }   // blank => today
         public bool    RegistrationFeePaid { get; set; }
+        public string? PaymentMode         { get; set; }   // Cash / UPI / Card / … (when fee collected)
+        public string? PaymentReference    { get; set; }   // txn / cheque no (optional)
     }
 }

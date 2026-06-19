@@ -527,6 +527,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 model.DefaultAmount = row["default_amount"] == DBNull.Value ? 0 : Convert.ToDecimal(row["default_amount"]);
                 model.FeeType = row["fee_type"] == DBNull.Value ? string.Empty : row["fee_type"].ToString() ?? string.Empty;
                 model.FeeGroup = row["fee_group"] == DBNull.Value ? "Academic" : row["fee_group"].ToString() ?? "Academic";
+                model.CollectionPoint = GetCollectionPoint(row);
+                model.IsRefundable = GetRefundable(row);
                 model.DisplayOrder = row["display_order"] == DBNull.Value ? 0 : Convert.ToInt32(row["display_order"]);
                 model.IsActive = row["is_active"] != DBNull.Value && Convert.ToBoolean(row["is_active"]);
 
@@ -569,11 +571,24 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
             model.DefaultAmount = row["default_amount"] == DBNull.Value ? 0 : Convert.ToDecimal(row["default_amount"]);
             model.FeeType = row["fee_type"] == DBNull.Value ? string.Empty : row["fee_type"].ToString() ?? string.Empty;
             model.FeeGroup = row["fee_group"] == DBNull.Value ? "Academic" : row["fee_group"].ToString() ?? "Academic";
+            model.CollectionPoint = GetCollectionPoint(row);
+            model.IsRefundable = GetRefundable(row);
             model.DisplayOrder = row["display_order"] == DBNull.Value ? 0 : Convert.ToInt32(row["display_order"]);
             model.IsActive = row["is_active"] != DBNull.Value && Convert.ToBoolean(row["is_active"]);
 
             return model;
         }
+
+        // Tolerant readers: the collection_point / is_refundable columns may not exist
+        // on a backend that hasn't run the fee_collection_point migration yet.
+        private static string GetCollectionPoint(DataRow row) =>
+            row.Table.Columns.Contains("collection_point") && row["collection_point"] != DBNull.Value
+                ? (row["collection_point"].ToString() ?? "Recurring")
+                : "Recurring";
+
+        private static bool GetRefundable(DataRow row) =>
+            row.Table.Columns.Contains("is_refundable") && row["is_refundable"] != DBNull.Value
+                && Convert.ToBoolean(row["is_refundable"]);
 
         public async Task<int> SaveFeeHeadAsync(FeeHead model, int tenantId, int schoolId, int actionUserId)
         {
@@ -594,6 +609,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_default_amount", model.DefaultAmount),
                 new NpgsqlParameter("p_fee_type", model.FeeType),
                 new NpgsqlParameter("p_fee_group", model.FeeGroup),
+                new NpgsqlParameter("p_collection_point", string.IsNullOrWhiteSpace(model.CollectionPoint) ? "Recurring" : model.CollectionPoint),
+                new NpgsqlParameter("p_is_refundable", model.IsRefundable),
                 new NpgsqlParameter("p_display_order", model.DisplayOrder),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "save_fee_head_cursor" }
             };
@@ -786,7 +803,42 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 list.Add(model);
             }
 
+            // Collection point & refundable live on the fee-head master (single source
+            // of truth); enrich the structure rows so consumers (admission) know when
+            // each head is due without storing it twice.
+            if (list.Count > 0)
+            {
+                var heads = await GetFeeHeadAsync(tenantId, schoolId, actionUserId);
+                var byId = heads.Where(h => h.FeeHeadId > 0)
+                                .GroupBy(h => h.FeeHeadId)
+                                .ToDictionary(g => g.Key, g => g.First());
+
+                foreach (var detail in list)
+                {
+                    if (detail.FeeHeadId > 0 && byId.TryGetValue(detail.FeeHeadId, out var head))
+                    {
+                        detail.CollectionPoint = head.CollectionPoint;
+                        detail.IsRefundable = head.IsRefundable;
+                    }
+                }
+            }
+
             return list;
+        }
+
+        public async Task<decimal> GetCollectionPointTotalAsync(
+            string className, string academicYear, string collectionPoint,
+            int tenantId, int schoolId, int actionUserId)
+        {
+            if (string.IsNullOrWhiteSpace(className) || string.IsNullOrWhiteSpace(academicYear))
+                return 0m;
+
+            var details = await GetFeeStructureDetailsAsync(className, academicYear, tenantId, schoolId, actionUserId);
+
+            return details
+                .Where(d => d.IsSelected &&
+                            string.Equals(d.CollectionPoint, collectionPoint, StringComparison.OrdinalIgnoreCase))
+                .Sum(d => d.Amount);
         }
 
         public async Task<int> SaveFeeStructureAsync(FeeStructureModel model, int tenantId, int schoolId, int actionUserId)
@@ -804,10 +856,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 
             foreach (var className in model.SelectedClasses)
             {
-                decimal oneTimeTotal = selectedFeeHeads.Where(x => x.Frequency == "One Time").Sum(x => x.Amount);
-                decimal monthlyTotal = selectedFeeHeads.Where(x => x.Frequency == "Monthly").Sum(x => x.Amount);
-                decimal yearlyTotal = selectedFeeHeads.Where(x => x.Frequency == "Yearly").Sum(x => x.Amount);
-                decimal annualTotal = oneTimeTotal + (monthlyTotal * 12) + yearlyTotal;
+                decimal oneTimeTotal    = selectedFeeHeads.Where(x => x.Frequency == "One Time").Sum(x => x.Amount);
+                decimal monthlyTotal    = selectedFeeHeads.Where(x => x.Frequency == "Monthly").Sum(x => x.Amount);
+                decimal quarterlyTotal  = selectedFeeHeads.Where(x => x.Frequency == "Quarterly").Sum(x => x.Amount);
+                decimal halfYearlyTotal = selectedFeeHeads.Where(x => x.Frequency == "Half Yearly").Sum(x => x.Amount);
+                decimal yearlyTotal     = selectedFeeHeads.Where(x => x.Frequency == "Yearly").Sum(x => x.Amount);
+                // Annualise every billing cycle: monthly×12, quarterly×4, half-yearly×2,
+                // yearly×1, plus one-time charges. (Previously Quarterly/Half-Yearly were
+                // dropped, understating the annual estimate.)
+                decimal annualTotal = oneTimeTotal + (monthlyTotal * 12) + (quarterlyTotal * 4)
+                                      + (halfYearlyTotal * 2) + yearlyTotal;
 
                 var headerParameters = new NpgsqlParameter[]
                 {

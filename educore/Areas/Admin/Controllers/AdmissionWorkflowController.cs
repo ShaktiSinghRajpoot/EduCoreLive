@@ -40,33 +40,12 @@ namespace educore.Areas.Admin.Controllers
             int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
             // Normalise dependent flags so an invalid combination can never be persisted:
-            // child settings only make sense when their parent toggle is on.
+            // child settings only make sense when their parent toggle is on. Fee amounts
+            // are no longer stored here — they live as Fee Heads (School Settings → Fee Head).
             if (!model.EnableRegistration)
             {
                 model.RegistrationRequiredBeforeAdmission = false;
                 model.EnableRegistrationFee = false;
-            }
-
-            if (!model.EnableRegistrationFee)
-            {
-                model.RegistrationFeeAmount = 0m;
-            }
-            else if (model.RegistrationFeeAmount < 0m)
-            {
-                TempData["Result"] = "0";
-                TempData["Message"] = "Registration fee amount cannot be negative.";
-                return RedirectToAction(nameof(WorkflowSettings));
-            }
-
-            if (!model.EnableSecurityFee)
-            {
-                model.SecurityFeeAmount = 0m;
-            }
-            else if (model.SecurityFeeAmount < 0m)
-            {
-                TempData["Result"] = "0";
-                TempData["Message"] = "Security deposit amount cannot be negative.";
-                return RedirectToAction(nameof(WorkflowSettings));
             }
 
             var result = await _admissionWorkflowService.SaveAdmissionWorkflowAsync(model, tenantId, schoolId, actionUserId);

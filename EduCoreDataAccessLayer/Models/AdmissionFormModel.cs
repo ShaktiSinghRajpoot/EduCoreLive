@@ -30,6 +30,9 @@ namespace EduCoreDataAccessLayer.Models
         public string? Nationality { get; set; }
         public string? MotherTongue { get; set; }
         public string? IdProofNo { get; set; }
+        // ── Government identifiers (all optional — see Aadhaar/RTE note) ──
+        public string? ApaarId { get; set; }
+        public string? UdiseStudentId { get; set; }
         // ── Previous school (transfers) ──
         public string? PrevSchoolName { get; set; }
         public string? PrevBoard { get; set; }

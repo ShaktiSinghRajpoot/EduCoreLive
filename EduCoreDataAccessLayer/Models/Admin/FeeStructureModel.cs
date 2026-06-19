@@ -40,5 +40,11 @@
         public string FeeGroup { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public bool IsSelected { get; set; }
+
+        /// <summary>Lifecycle trigger inherited from the fee head master: Registration / Admission / Recurring.</summary>
+        public string CollectionPoint { get; set; } = "Recurring";
+
+        /// <summary>Refundable flag inherited from the fee head master (e.g. security deposit).</summary>
+        public bool IsRefundable { get; set; }
     }
 }

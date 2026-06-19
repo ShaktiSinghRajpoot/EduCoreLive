@@ -59,6 +59,20 @@ namespace EduCoreDataAccessLayer.Services.Contract.Admin
             int actionUserId
         );
 
+        /// <summary>
+        /// Sum of the configured fee-structure amounts for a class/year whose fee head
+        /// Collection Point matches (e.g. "Registration" → the registration fee,
+        /// "Admission" → one-time admission charges). Returns 0 when none configured.
+        /// </summary>
+        Task<decimal> GetCollectionPointTotalAsync(
+            string className,
+            string academicYear,
+            string collectionPoint,
+            int tenantId,
+            int schoolId,
+            int actionUserId
+        );
+
         Task<int> SaveFeeStructureAsync(
             FeeStructureModel model,
             int tenantId,

@@ -13,17 +13,20 @@ namespace educore.Areas.Admin.Controllers
         private readonly IEnquiryService _enquiryService;
         private readonly ISchoolSettingsService _schoolSettingsService;
         private readonly IAdmissionWorkflowService _admissionWorkflowService;
+        private readonly IFeePaymentService _feePaymentService;
         private readonly IBaseService _baseService;
 
         public EnquiryController(
             IEnquiryService enquiryService,
             ISchoolSettingsService schoolSettingsService,
             IAdmissionWorkflowService admissionWorkflowService,
+            IFeePaymentService feePaymentService,
             IBaseService baseService)
         {
             _enquiryService = enquiryService;
             _schoolSettingsService = schoolSettingsService;
             _admissionWorkflowService = admissionWorkflowService;
+            _feePaymentService = feePaymentService;
             _baseService = baseService;
         }
 
@@ -368,7 +371,50 @@ namespace educore.Areas.Admin.Controllers
                 workflow.RegistrationNumberPrefix,
                 tenantId, schoolId, actionUserId);
 
-            return Json(new { success = success > 0, message, registrationNumber = regNo });
+            // When the registration fee was collected, record a real payment + receipt
+            // against the enquiry. The amount is master data — the sum of Registration-
+            // point Fee Heads for the enquiry's class — never trusted from the client.
+            string? receiptNo = null;
+            if (success > 0 && req.RegistrationFeePaid && workflow.EnableRegistration && workflow.EnableRegistrationFee)
+            {
+                var enquiry = await _enquiryService.GetEnquiryByIdAsync(req.EnquiryId, tenantId, schoolId, actionUserId);
+                if (enquiry != null)
+                {
+                    decimal regFee = await _schoolSettingsService.GetCollectionPointTotalAsync(
+                        enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
+                        "Registration", tenantId, schoolId, actionUserId);
+
+                    if (regFee > 0)
+                    {
+                        var (paid, _, rcp) = await _feePaymentService.RecordRegistrationPaymentAsync(
+                            req.EnquiryId, regFee,
+                            NullIfEmpty(req.PaymentMode) ?? "Cash",
+                            NullIfEmpty(req.PaymentReference),
+                            "Registration fee",
+                            enquiry.Session,
+                            tenantId, schoolId, actionUserId);
+
+                        if (paid) receiptNo = rcp;
+                    }
+                }
+            }
+
+            return Json(new { success = success > 0, message, registrationNumber = regNo, receiptNo });
+        }
+
+        // ── GET: /Admin/Enquiry/GetRegistrationFee (AJAX) ────────
+        // Registration fee for a class/year = sum of Registration-point Fee Heads
+        // configured in the fee structure. Drives the register modal's amount label.
+        [HttpGet]
+        public async Task<IActionResult> GetRegistrationFee(string className, string academicYear)
+        {
+            if (string.IsNullOrWhiteSpace(className) || string.IsNullOrWhiteSpace(academicYear))
+                return Json(new { success = false, amount = 0m });
+
+            decimal amount = await _schoolSettingsService.GetCollectionPointTotalAsync(
+                className, academicYear, "Registration", TenantId(), SchoolId(), UserId());
+
+            return Json(new { success = true, amount });
         }
 
         // ── POST: /Admin/Enquiry/DeleteEnquiry (AJAX) ─────────────

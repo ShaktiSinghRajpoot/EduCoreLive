@@ -258,7 +258,7 @@
                     </div>
                 </div>
 
-                <a asp-controller="Fee" asp-action="FeeHeadMaster" class="btn btn-outline-secondary fee-action-btn">
+                <a asp-area="Admin" asp-controller="SchoolSettings" asp-action="FeeHead" class="btn btn-outline-secondary fee-action-btn">
                     <i class="bx bx-category me-1"></i>
                     Fee Head Master
                 </a>
@@ -580,7 +580,7 @@
                             </div>
 
                             <small class="text-muted d-block mt-3">
-                                Formula: One Time + Monthly × 12 + Yearly
+                                Formula: One Time + Monthly × 12 + Quarterly × 4 + Half-Yearly × 2 + Yearly
                             </small>
 
                             <hr />
@@ -790,6 +790,8 @@
             function updateSummary() {
                 let oneTime = 0;
                 let monthly = 0;
+                let quarterly = 0;
+                let halfYearly = 0;
                 let yearly = 0;
                 let selectedFeeHeads = 0;
 
@@ -822,11 +824,14 @@
                     selectedFeeHeadHtml += `<span class="summary-chip">${feeHeadName}</span>`;
 
                     if (cycle === 'one time') oneTime += amount;
-                    if (cycle === 'monthly') monthly += amount;
-                    if (cycle === 'yearly') yearly += amount;
+                    else if (cycle === 'monthly') monthly += amount;
+                    else if (cycle === 'quarterly') quarterly += amount;
+                    else if (cycle === 'half yearly') halfYearly += amount;
+                    else yearly += amount;
                 });
 
-                let annualTotal = oneTime + (monthly * 12) + yearly;
+                // Annualise each billing cycle so Quarterly/Half-Yearly heads are counted.
+                let annualTotal = oneTime + (monthly * 12) + (quarterly * 4) + (halfYearly * 2) + yearly;
 
                 $('#selectedFeeHeadCount').text(selectedFeeHeads);
                 $('#oneTimeTotal').text(formatINR(oneTime));
@@ -905,6 +910,17 @@
                 $('.class-checkbox').prop('checked', false);
                 $('.class-chip-card').removeClass('active');
                 let selectedCheckbox = $('.class-checkbox[value="' + className + '"]');
+
+                // Defensive: if this class no longer exists in Academic Setup there is
+                // no chip to select, so an update could never succeed. Tell the user
+                // instead of entering a broken edit state.
+                if (selectedCheckbox.length === 0) {
+                    $('#IsEditMode').val('false');
+                    $('#EditClassName').val('');
+                    showToast('error', 'Class "' + className + '" is no longer configured in Academic Setup. Re-create the structure for a current class.');
+                    return;
+                }
+
                 selectedCheckbox.prop('checked', true);
                 selectedCheckbox.closest('.class-chip-card').addClass('active');
 
@@ -973,7 +989,6 @@
             });
 
             $('#feeStructureForm').on('submit', function (e) {
-                debugger;
                 let academicYear = $('#AcademicYear').val();
                 let selectedClasses = $('.class-checkbox:checked').length;
                 let selectedFeeHeads = $('.fee-head-checkbox:checked').length;

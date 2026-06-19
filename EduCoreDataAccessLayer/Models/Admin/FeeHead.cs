@@ -20,6 +20,17 @@ namespace EduCoreDataAccessLayer.Models.Admin
         public string FeeType { get; set; } = string.Empty;
         public string FeeGroup { get; set; } = "Academic";
 
+        /// <summary>
+        /// When this charge is first due in the student lifecycle:
+        /// "Registration" (pre-admission), "Admission" (one-time on joining), or
+        /// "Recurring" (collected ongoing in the Fee module). Drives where the
+        /// head is collected; independent of <see cref="Frequency"/> (the billing cycle).
+        /// </summary>
+        public string CollectionPoint { get; set; } = "Recurring";
+
+        /// <summary>True for refundable charges such as a security deposit / caution money.</summary>
+        public bool IsRefundable { get; set; }
+
         public int DisplayOrder { get; set; }
         public bool IsActive { get; set; } = true;
     }

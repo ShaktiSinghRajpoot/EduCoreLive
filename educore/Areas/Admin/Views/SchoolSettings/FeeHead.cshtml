@@ -340,7 +340,7 @@
                                 </div>
                             </div>
 
-                            <div class="mb-4">
+                            <div class="mb-3">
                                 <label class="form-label">Fee Group</label>
 
                                 <select asp-for="FeeGroup" class="form-select" id="FeeGroup">
@@ -353,6 +353,39 @@
 
                                 <small class="text-muted">
                                     Used for reporting and filtering only.
+                                </small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Collection Point <span class="text-danger">*</span>
+                                </label>
+
+                                <select asp-for="CollectionPoint" class="form-select" id="CollectionPoint">
+                                    <option value="Registration">Registration (before admission)</option>
+                                    <option value="Admission">Admission (one-time, on joining)</option>
+                                    <option value="Recurring">Recurring (collected ongoing in Fee module)</option>
+                                </select>
+
+                                <small class="text-muted">
+                                    When this charge is first due. Example: Registration Fee = Registration,
+                                    Admission Fee / Security Deposit = Admission, Tuition = Recurring.
+                                </small>
+                            </div>
+
+                            <div class="mb-4">
+                                <div class="form-check form-switch">
+                                    <input asp-for="IsRefundable"
+                                           class="form-check-input"
+                                           type="checkbox"
+                                           id="IsRefundable" />
+                                    <label class="form-check-label" for="IsRefundable">
+                                        Refundable
+                                    </label>
+                                </div>
+
+                                <small class="text-muted">
+                                    Turn on for deposits returned when the student leaves (e.g. Security Deposit).
                                 </small>
                             </div>
 
@@ -446,6 +479,11 @@
 
                                                 <small class="text-muted">
                                                     @item.FeeGroup
+                                                    <span class="badge bg-label-secondary ms-1">@item.CollectionPoint</span>
+                                                    @if (item.IsRefundable)
+                                                    {
+                                                        <span class="badge bg-label-info ms-1">Refundable</span>
+                                                    }
                                                 </small>
                                             </div>
                                         </div>
@@ -571,6 +609,8 @@
                 $('#Frequency').val('');
                 $('#DefaultAmount').val('');
                 $('#FeeGroup').val('Academic');
+                $('#CollectionPoint').val('Recurring');
+                $('#IsRefundable').prop('checked', false);
                 $('input[name="FeeType"]').prop('checked', false);
                 $('#feeHeadFormTitle').text('Create Fee Head');
                 $('#cancelEditButton').addClass('d-none');
@@ -615,6 +655,8 @@
                         $('#Frequency').val(response.data.frequency);
                         $('#DefaultAmount').val(response.data.defaultAmount);
                         $('#FeeGroup').val(response.data.feeGroup);
+                        $('#CollectionPoint').val(response.data.collectionPoint || 'Recurring');
+                        $('#IsRefundable').prop('checked', !!response.data.isRefundable);
 
                         $('input[name="FeeType"][value="' + response.data.feeType + '"]').prop('checked', true);
 

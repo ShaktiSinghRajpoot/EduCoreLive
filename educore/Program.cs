@@ -87,6 +87,9 @@ builder.Services.AddScoped<ISchoolSettingsService, SchoolSettingsService>();
 builder.Services.AddScoped<ISchoolService, SchoolService>();
 builder.Services.AddScoped<IEnquiryService, EnquiryService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
+builder.Services.AddScoped<IAdmissionWorkflowService, AdmissionWorkflowService>();
+builder.Services.AddScoped<IRegistrationService, RegistrationService>();
+builder.Services.AddScoped<IFeePaymentService, FeePaymentService>();
 
 builder.Logging.AddConsole();
 

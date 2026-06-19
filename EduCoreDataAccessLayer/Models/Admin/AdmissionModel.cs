@@ -39,6 +39,8 @@ namespace EduCoreDataAccessLayer.Models.Admin
         public string?   Nationality      { get; set; }
         public string?   MotherTongue     { get; set; }
         public string?   IdProofNo        { get; set; }   // Aadhaar / birth-cert no
+        public string?   ApaarId          { get; set; }   // APAAR / "One Nation One Student ID" (12-digit)
+        public string?   UdiseStudentId   { get; set; }   // UDISE+ PEN (Permanent Education Number)
         // Previous school (transfers)
         public string?   PrevSchoolName   { get; set; }
         public string?   PrevBoard        { get; set; }

@@ -186,9 +186,13 @@
                     When on, a registration fee can be configured and collected at the registration step.
                   </div>
                   <div class="aw-row-extra" id="feeWrap">
-                    <label class="form-label">Registration Fee Amount (₹)</label>
-                    <input type="number" class="form-control" asp-for="RegistrationFeeAmount"
-                           min="0" step="1" placeholder="0" />
+                    <div class="aw-row-desc">
+                      <i class="bx bx-info-circle"></i>
+                      Set the amount in
+                      <a asp-area="Admin" asp-controller="SchoolSettings" asp-action="FeeHead" target="_blank">
+                        School Settings → Fee Head</a>
+                      as a head with <strong>Collection Point = Registration</strong>.
+                    </div>
                   </div>
                 </div>
                 <div class="form-check form-switch aw-switch m-0">
@@ -233,9 +237,13 @@
                   When on, a one-time security deposit is added to the admission's due-now charges and flows into the student's fee ledger.
                 </div>
                 <div class="aw-row-extra" id="secWrap">
-                  <label class="form-label">Security Deposit Amount (₹)</label>
-                  <input type="number" class="form-control" asp-for="SecurityFeeAmount"
-                         min="0" step="1" placeholder="0" />
+                  <div class="aw-row-desc">
+                    <i class="bx bx-info-circle"></i>
+                    Set the amount in
+                    <a asp-area="Admin" asp-controller="SchoolSettings" asp-action="FeeHead" target="_blank">
+                      School Settings → Fee Head</a>
+                    as a <strong>Refundable</strong> head with <strong>Collection Point = Admission</strong>.
+                  </div>
                 </div>
               </div>
               <div class="form-check form-switch aw-switch m-0">
@@ -326,25 +334,6 @@ $(function () {
     }
 
     $enable.add($required).add($autoNum).add($fee).add($secFee).on('change', syncDependents);
-
-    /* ── validate before submit ── */
-    $('#awForm').on('submit', function () {
-        if ($enable.is(':checked') && $fee.is(':checked')) {
-            var amt = parseFloat($('#RegistrationFeeAmount').val() || '0');
-            if (isNaN(amt) || amt < 0) {
-                if (typeof toastr !== 'undefined') toastr.error('Please enter a valid registration fee amount.');
-                return false;
-            }
-        }
-        if ($secFee.is(':checked')) {
-            var sec = parseFloat($('#SecurityFeeAmount').val() || '0');
-            if (isNaN(sec) || sec < 0) {
-                if (typeof toastr !== 'undefined') toastr.error('Please enter a valid security deposit amount.');
-                return false;
-            }
-        }
-        return true;
-    });
 
     syncDependents();
 });

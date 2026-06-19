@@ -291,6 +291,19 @@ namespace educore.Areas.Admin.Controllers
             // ── Existing structures — marks which classes are already set up ─
             var existingStructures = await _schoolSettingsService.GetFeeStructureAsync(tenantId, schoolId, actionUserId);
 
+            // Only surface structures for classes that still exist in Academic Setup.
+            // A class that was renamed/removed leaves an orphaned structure behind;
+            // listing it lets the user click "Edit" on a class that has no chip to
+            // select, so the form submits with no class and fails with a flashing
+            // "select at least one class" error. Hide those orphans from the list.
+            if (availableClasses.Count > 0)
+            {
+                var currentClasses = new HashSet<string>(availableClasses, StringComparer.OrdinalIgnoreCase);
+                existingStructures = existingStructures
+                    .Where(s => currentClasses.Contains(s.ClassName))
+                    .ToList();
+            }
+
             // Current academic year string (e.g. "2026-2027")
             string currentAy = academicYears.FirstOrDefault()
                 ?? (DateTime.Now.Month >= 4
@@ -312,6 +325,8 @@ namespace educore.Areas.Admin.Controllers
                     FeeGroup    = fh.Frequency == "One Time" ? "one-time"
                                 : fh.Frequency == "Monthly"  ? "monthly"
                                 :                              "yearly",
+                    CollectionPoint = fh.CollectionPoint,
+                    IsRefundable    = fh.IsRefundable,
                     Amount      = fh.DefaultAmount,
                     IsSelected  = fh.FeeType == "Mandatory"
                 }).ToList()

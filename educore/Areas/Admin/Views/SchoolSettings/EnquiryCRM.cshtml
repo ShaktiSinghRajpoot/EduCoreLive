@@ -944,6 +944,23 @@
                                 <label class="form-check-label" for="regFeePaid" style="font-size:.82rem">Fee collected</label>
                             </div>
                         </div>
+                        <!-- Payment details — shown only when fee is collected; issues a receipt -->
+                        <div class="row g-2 mt-1 d-none" id="regPaymentRow">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Payment Mode</label>
+                                <select class="form-select" id="regPaymentMode">
+                                    <option value="Cash" selected>Cash</option>
+                                    <option value="UPI">UPI</option>
+                                    <option value="Card">Card</option>
+                                    <option value="Cheque">Cheque</option>
+                                    <option value="Bank Transfer">Bank Transfer</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Reference No <span class="text-muted">(optional)</span></label>
+                                <input type="text" class="form-control" id="regPaymentReference" maxlength="60" />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1067,7 +1084,10 @@ $(document).ready(function () {
     // When true, an enquiry must be "Registration Done" before it can be converted to admission.
     var REGISTRATION_REQUIRED = @((showRegistration && Model.Workflow.RegistrationRequiredBeforeAdmission) ? "true" : "false");
     var REG_FEE_ENABLED = @((showRegistration && Model.Workflow.EnableRegistrationFee) ? "true" : "false");
-    var REG_FEE_AMOUNT  = @(((showRegistration && Model.Workflow.EnableRegistrationFee) ? Model.Workflow.RegistrationFeeAmount : 0).ToString(System.Globalization.CultureInfo.InvariantCulture));
+    // The registration fee amount is master data — the sum of Registration-point Fee
+    // Heads for the enquiry's class. It is fetched per-enquiry when the register modal
+    // opens (see openRegisterModal), not stored on the workflow settings.
+    var REG_FEE_AMOUNT  = 0;
     var REG_AUTO_NUMBER = @(Model.Workflow.AutoGenerateRegistrationNumber ? "true" : "false");
     // Only MANUAL statuses belong here. Registration Done and Admission Confirmed are
     // action-driven (set by the Register action / admission save) and must NOT be
@@ -1634,16 +1654,34 @@ $(document).ready(function () {
         // Default date = today (YYYY-MM-DD).
         $('#regDate').val(new Date().toISOString().slice(0, 10));
 
-        // Fee row (only when enabled).
+        // Fee row (only when enabled). The amount is the sum of Registration-point
+        // Fee Heads for this enquiry's class — fetched fresh from the fee structure.
         if (REG_FEE_ENABLED) {
             $('#regFeeRow').removeClass('d-none');
+            $('#regPaymentRow').addClass('d-none');
             $('#regFeePaid').prop('checked', false);
-            $('#regFeeAmountLabel').text('₹' + Number(REG_FEE_AMOUNT).toLocaleString('en-IN'));
+            $('#regPaymentReference').val('');
+            $('#regPaymentMode').val('Cash');
+            $('#regFeeAmountLabel').text('Loading…');
+            REG_FEE_AMOUNT = 0;
+            $.getJSON('/Admin/Enquiry/GetRegistrationFee',
+                      { className: $btn.data('class') || '', academicYear: $btn.data('session') || '' })
+                .done(function (res) {
+                    REG_FEE_AMOUNT = (res && res.amount) ? Number(res.amount) : 0;
+                    $('#regFeeAmountLabel').text('₹' + REG_FEE_AMOUNT.toLocaleString('en-IN') +
+                        (REG_FEE_AMOUNT === 0 ? ' — configure a Registration-point Fee Head' : ''));
+                })
+                .fail(function () { $('#regFeeAmountLabel').text('₹0'); });
         } else {
             $('#regFeeRow').addClass('d-none');
         }
 
         new bootstrap.Modal(document.getElementById('registerEnquiryModal')).show();
+    });
+
+    // Payment details appear only when the registration fee is marked collected.
+    $(document).on('change', '#regFeePaid', function () {
+        $('#regPaymentRow').toggleClass('d-none', !$(this).is(':checked'));
     });
 
     $('#confirmRegisterBtn').on('click', function () {
@@ -1668,14 +1706,17 @@ $(document).ready(function () {
                 enquiryId:           id,
                 registrationNumber:  regNumber,
                 registrationDate:    $('#regDate').val(),
-                registrationFeePaid: REG_FEE_ENABLED && $('#regFeePaid').is(':checked')
+                registrationFeePaid: REG_FEE_ENABLED && $('#regFeePaid').is(':checked'),
+                paymentMode:         $('#regPaymentMode').val(),
+                paymentReference:    $.trim($('#regPaymentReference').val())
             })
         })
         .done(function (res) {
             if (res && res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('registerEnquiryModal')).hide();
                 toastr.success((res.message || 'Registration completed.') +
-                               (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
+                               (res.registrationNumber ? ' (' + res.registrationNumber + ')' : '') +
+                               (res.receiptNo ? ' · Receipt ' + res.receiptNo : ''));
                 fetchData(false);
             } else {
                 toastr.error((res && res.message) || 'Unable to complete registration.');
