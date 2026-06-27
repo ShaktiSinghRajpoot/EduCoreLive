@@ -1,3 +1,4 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @using System.Linq
 @using Microsoft.AspNetCore.Mvc.Rendering
 @{
@@ -217,6 +218,7 @@
 /* empty state */
 .sl-empty{ padding:3rem 1rem; text-align:center; }
 .sl-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }
+@@media (min-width:768px){ #emptyMob{ display:none !important; } }
 
 /* mobile cards */
 .sl-mob-list{ display:none; }

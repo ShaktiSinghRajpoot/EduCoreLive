@@ -24,6 +24,7 @@
     <Folder Include="Areas\Admin\Models\" />
     <Folder Include="Areas\ERP\Data\" />
     <Folder Include="Areas\ERP\Models\" />
+    <Folder Include="docs\" />
     <Folder Include="wwwroot\css\Admin\" />
     <Folder Include="wwwroot\css\ERP\" />
     <Folder Include="wwwroot\css\SuperAdmin\" />

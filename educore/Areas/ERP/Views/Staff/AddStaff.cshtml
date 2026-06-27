@@ -1,6 +1,10 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model EduCoreDataAccessLayer.Models.StaffModel
 @{
     ViewData["Title"] = "Add Staff";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var dd = ViewBag.Dropdowns as EduCoreDataAccessLayer.Models.StaffDropdowns ?? new EduCoreDataAccessLayer.Models.StaffDropdowns();
+    var designationsJson = System.Text.Json.JsonSerializer.Serialize(dd.Designations);
 }
 
 @section PageStyles {
@@ -29,6 +33,7 @@
 .es-page .form-control::placeholder{ color:var(--ec-text-muted); opacity:1; }
 .es-page textarea.form-control{ min-height:90px; resize:vertical; }
 .es-sticky{ position:sticky; bottom:0; background:rgba(255,255,255,.95); backdrop-filter:blur(10px); border-top:1px solid var(--ec-border); padding:1rem 1.25rem; display:flex; justify-content:flex-end; gap:.75rem; border-radius:0 0 var(--ec-radius) var(--ec-radius); z-index:5; }
+.es-login-toggle{ display:flex; align-items:center; gap:.6rem; }
 </style>
 }
 
@@ -56,10 +61,7 @@
       </div>
     </div>
 
-    @if (TempData["SuccessMessage"] != null)
-    {
-        <div class="alert alert-success">@TempData["SuccessMessage"]</div>
-    }
+    <div asp-validation-summary="All" class="alert alert-danger" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
 
     <form asp-area="ERP" asp-controller="Staff" asp-action="AddStaff" method="post" novalidate>
       @Html.AntiForgeryToken()
@@ -77,35 +79,35 @@
               <div class="row g-3">
                 <div class="col-12 col-md-4">
                   <label class="es-label required">Full Name</label>
-                  <input type="text" name="FullName" class="form-control" placeholder="Enter full name" required>
+                  <input asp-for="FullName" class="form-control" placeholder="Enter full name">
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="es-label required">Gender</label>
-                  <select name="Gender" class="form-select" required>
+                  <label class="es-label">Gender</label>
+                  <select asp-for="Gender" class="form-select">
                     <option value="">Select</option><option>Male</option><option>Female</option><option>Other</option>
                   </select>
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="es-label required">Date of Birth</label>
-                  <input type="date" name="DateOfBirth" class="form-control" required>
+                  <label class="es-label">Date of Birth</label>
+                  <input asp-for="DateOfBirth" type="date" class="form-control">
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="es-label required">Mobile Number</label>
-                  <input type="tel" name="MobileNumber" maxlength="10" pattern="[0-9]{10}" class="form-control" placeholder="10 digit mobile" required>
+                  <label class="es-label">Mobile Number</label>
+                  <input asp-for="Mobile" maxlength="10" class="form-control" placeholder="10 digit mobile">
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="es-label required">Email</label>
-                  <input type="email" name="Email" class="form-control" placeholder="name@school.edu" required>
+                  <label class="es-label">Email</label>
+                  <input asp-for="Email" type="email" class="form-control" placeholder="name@school.edu">
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label">Blood Group</label>
-                  <select name="BloodGroup" class="form-select">
+                  <select asp-for="BloodGroup" class="form-select">
                     <option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
                   </select>
                 </div>
                 <div class="col-12">
                   <label class="es-label">Address</label>
-                  <textarea name="Address" class="form-control" rows="2" placeholder="Complete address"></textarea>
+                  <textarea asp-for="Address" class="form-control" rows="2" placeholder="Complete address"></textarea>
                 </div>
               </div>
             </div>
@@ -115,47 +117,56 @@
           <div class="es-card">
             <div class="es-card-hdr">
               <div class="es-sec-ic"><i class="bx bx-briefcase"></i></div>
-              <div><div class="es-sec-title">Employment Details</div><div class="es-sec-sub">Role, department and joining</div></div>
+              <div><div class="es-sec-title">Employment Details</div><div class="es-sec-sub">Designation, department and joining</div></div>
             </div>
             <div class="es-card-body">
               <div class="row g-3">
                 <div class="col-12 col-md-4">
-                  <label class="es-label required">Employee ID</label>
-                  <input type="text" name="EmployeeId" class="form-control" placeholder="e.g. EMP-021" required>
+                  <label class="es-label">Employee ID</label>
+                  <input asp-for="EmployeeCode" class="form-control" placeholder="e.g. EMP-021">
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label required">Designation</label>
-                  <input type="text" name="Designation" class="form-control" placeholder="e.g. Maths Teacher" required>
+                  <select asp-for="Designation" id="ddDesignation" class="form-select">
+                    <option value="">Select designation</option>
+                    @foreach (var g in dd.Designations)
+                    {
+                        <option value="@g.Name">@g.Name</option>
+                    }
+                  </select>
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="es-label required">Staff Type</label>
-                  <select name="StaffType" class="form-select" required>
-                    <option value="">Select</option><option>Teaching</option><option>Non-Teaching</option>
+                  <label class="es-label">Staff Type</label>
+                  <select asp-for="StaffType" id="ddStaffType" class="form-select">
+                    <option value="">Select</option>
+                    <option>Teaching</option><option>Non-Teaching</option><option>Transport</option><option>Support</option>
                   </select>
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label required">Department</label>
-                  <select name="Department" class="form-select" required>
-                    <option value="">Select</option>
-                    <option>Teaching</option><option>Administration</option><option>Accounts</option>
-                    <option>Library</option><option>Transport</option><option>Support Staff</option>
+                  <select asp-for="Department" class="form-select">
+                    <option value="">Select department</option>
+                    @foreach (var d in dd.Departments)
+                    {
+                        <option value="@d">@d</option>
+                    }
                   </select>
                 </div>
                 <div class="col-12 col-md-4">
-                  <label class="es-label required">Joining Date</label>
-                  <input type="date" name="JoiningDate" class="form-control" required>
+                  <label class="es-label">Joining Date</label>
+                  <input asp-for="JoiningDate" type="date" class="form-control">
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label">Highest Qualification</label>
-                  <input type="text" name="Qualification" class="form-control" placeholder="e.g. M.Sc, B.Ed">
+                  <input asp-for="Qualification" class="form-control" placeholder="e.g. M.Sc, B.Ed">
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label">Experience (years)</label>
-                  <input type="number" name="ExperienceYears" min="0" class="form-control" placeholder="0">
+                  <input asp-for="ExperienceYears" type="number" min="0" class="form-control" placeholder="0">
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label">Employment Status</label>
-                  <select name="Status" class="form-select">
+                  <select asp-for="Status" class="form-select">
                     <option>Active</option><option>On Leave</option><option>Inactive</option>
                   </select>
                 </div>
@@ -173,23 +184,60 @@
               <div class="row g-3">
                 <div class="col-12 col-md-4">
                   <label class="es-label">Monthly Salary (₹)</label>
-                  <input type="number" name="MonthlySalary" min="0" class="form-control" placeholder="e.g. 35000">
+                  <input asp-for="MonthlySalary" type="number" min="0" class="form-control" placeholder="e.g. 35000">
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label">Bank Account No</label>
-                  <input type="text" name="BankAccountNo" class="form-control" placeholder="Account number">
+                  <input asp-for="BankAccountNo" class="form-control" placeholder="Account number">
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label">IFSC Code</label>
-                  <input type="text" name="IfscCode" class="form-control" placeholder="e.g. SBIN0001234">
+                  <input asp-for="IfscCode" class="form-control" placeholder="e.g. SBIN0001234">
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label">PAN</label>
-                  <input type="text" name="Pan" class="form-control" placeholder="ABCDE1234F">
+                  <input asp-for="Pan" class="form-control" placeholder="ABCDE1234F">
                 </div>
                 <div class="col-12 col-md-4">
                   <label class="es-label">Aadhaar No</label>
-                  <input type="text" name="Aadhaar" maxlength="12" class="form-control" placeholder="12 digit Aadhaar">
+                  <input asp-for="Aadhaar" maxlength="12" class="form-control" placeholder="12 digit Aadhaar">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- App Login (optional) -->
+          <div class="es-card">
+            <div class="es-card-hdr">
+              <div class="es-sec-ic"><i class="bx bx-log-in-circle"></i></div>
+              <div><div class="es-sec-title">App Login (optional)</div><div class="es-sec-sub">Give this staff member access to EduCore. Leave off for drivers, peons, etc.</div></div>
+            </div>
+            <div class="es-card-body">
+              <div class="es-login-toggle mb-3">
+                <input asp-for="CreateLogin" type="checkbox" class="form-check-input mt-0" id="chkLogin" style="width:2.4em;height:1.3em;">
+                <label for="chkLogin" class="fw-bold mb-0" style="color:var(--ec-text-dark);">Create a login for this staff member</label>
+              </div>
+              <div class="row g-3" id="loginFields" style="display:none;">
+                <div class="col-12 col-md-4">
+                  <label class="es-label required">Login Email</label>
+                  <div class="text-muted small">Uses the Email entered above.</div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="es-label required">Temporary Password</label>
+                  <input asp-for="LoginPassword" type="password" class="form-control" placeholder="At least 8 characters" autocomplete="new-password">
+                </div>
+                <div class="col-12">
+                  <label class="es-label required">Role(s)</label>
+                  <div class="d-flex flex-wrap gap-3">
+                    @foreach (var r in dd.Roles)
+                    {
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="RoleIds" value="@r.RoleId" id="role_@r.RoleId" checked="@Model.RoleIds.Contains(r.RoleId)">
+                        <label class="form-check-label" for="role_@r.RoleId">@r.RoleName</label>
+                      </div>
+                    }
+                  </div>
+                  <div class="text-muted small mt-1">Pick one or more — the person gets the combined access of every role selected.</div>
                 </div>
               </div>
             </div>
@@ -206,3 +254,27 @@
 
   </div>
 </div>
+
+@section PageScripts {
+<partial name="_ValidationScriptsPartial" />
+<script>
+(function(){
+  var designations = @Html.Raw(designationsJson);
+  var ddDes = document.getElementById('ddDesignation');
+  var ddType = document.getElementById('ddStaffType');
+  // Auto-fill Staff Type from the chosen designation's default bucket.
+  if (ddDes && ddType){
+    ddDes.addEventListener('change', function(){
+      var match = designations.find(function(d){ return d.Name === ddDes.value; });
+      if (match && !ddType.value) ddType.value = match.StaffType;
+      else if (match) ddType.value = match.StaffType;
+    });
+  }
+  // Toggle login fields.
+  var chk = document.getElementById('chkLogin');
+  var box = document.getElementById('loginFields');
+  function sync(){ if(box) box.style.display = chk && chk.checked ? 'flex' : 'none'; }
+  if (chk){ chk.addEventListener('change', sync); sync(); }
+})();
+</script>
+}

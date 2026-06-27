@@ -15,15 +15,21 @@ namespace EduCoreDataAccessLayer.Services
         Task<List<UserViewModel>> GetUserRolesAsync(int userId);
         Task SaveLoginAttemptAsync(string email, bool isSuccess, string? failureReason);
         Task SaveUserSessionAsync(int userId, HttpContext httpContext);
+        Task ChangePasswordAsync(int userId, string passwordHash);
+
+        /// <summary>Stores an OTP hash for the user matched by email-or-phone; returns the user + contacts (null if no match).</summary>
+        Task<UserViewModel?> RequestPasswordOtpAsync(string identifier, string otpHash);
+        /// <summary>Verifies the OTP for the user and, on success, sets the new password. Returns OK | INVALID | EXPIRED | LOCKED.</summary>
+        Task<string> ResetWithOtpAsync(int userId, string otpHash, string passwordHash);
     }
 
     public class LoginService : ILoginService
     {
-        private readonly string _connectionString;
+        private readonly PgExec _db;
 
-        public LoginService(IConfiguration configuration)
+        public LoginService(PgExec db)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")!;
+            _db = db;
         }
 
         public async Task<UserViewModel?> GetLoginInfoAsync(string email)
@@ -33,7 +39,7 @@ namespace EduCoreDataAccessLayer.Services
                 email: email
             );
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync("core.sp_login_management", parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -49,7 +55,7 @@ namespace EduCoreDataAccessLayer.Services
                 userId: userId
             );
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync("core.sp_login_management", parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -67,7 +73,7 @@ namespace EduCoreDataAccessLayer.Services
                 userId: userId
             );
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync("core.sp_login_management", parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -90,7 +96,7 @@ namespace EduCoreDataAccessLayer.Services
                 failureReason: failureReason
             );
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             await dal.ExecuteNonQueryProcedureAsync("core.sp_login_management", parameters);
         }
 
@@ -106,8 +112,68 @@ namespace EduCoreDataAccessLayer.Services
                 userAgent: userAgent
             );
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             await dal.ExecuteNonQueryProcedureAsync("core.sp_login_management", parameters);
+        }
+
+        public async Task ChangePasswordAsync(int userId, string passwordHash)
+        {
+            var parameters = BuildLoginParameters(
+                operationType: "CHANGE_PASSWORD",
+                userId: userId,
+                passwordHash: passwordHash
+            );
+
+            var dal = _db;
+            await dal.ExecuteNonQueryProcedureAsync("core.sp_login_management", parameters);
+        }
+
+        public async Task<UserViewModel?> RequestPasswordOtpAsync(string identifier, string otpHash)
+        {
+            var parameters = BuildResetParameters("REQUEST", identifier: identifier, otpHash: otpHash);
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_password_reset", parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                return null;
+
+            var row = ds.Tables[0].Rows[0];
+            return new UserViewModel
+            {
+                UserId = ToInt(row, "user_id"),
+                Email = ToStringValue(row, "email"),
+                Phone = ToStringValue(row, "phone"),
+                FullName = ToStringValue(row, "full_name")
+            };
+        }
+
+        public async Task<string> ResetWithOtpAsync(int userId, string otpHash, string passwordHash)
+        {
+            var parameters = BuildResetParameters("RESET_WITH_OTP", otpHash: otpHash, passwordHash: passwordHash, userId: userId);
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_password_reset", parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                return "EXPIRED";
+
+            return ToStringValue(ds.Tables[0].Rows[0], "status") ?? "EXPIRED";
+        }
+
+        private static NpgsqlParameter[] BuildResetParameters(
+            string operationType,
+            string? identifier = null,
+            string? otpHash = null,
+            string? passwordHash = null,
+            int? userId = null)
+        {
+            // Order matches the core.sp_password_reset signature (positional CALL).
+            return new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation_type", operationType),
+                new NpgsqlParameter("p_identifier", (object?)identifier ?? DBNull.Value),
+                new NpgsqlParameter("p_otp_hash", (object?)otpHash ?? DBNull.Value),
+                new NpgsqlParameter("p_password_hash", (object?)passwordHash ?? DBNull.Value),
+                new NpgsqlParameter("p_user_id", (object?)userId ?? DBNull.Value),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "reset_cursor" }
+            };
         }
 
         private static NpgsqlParameter[] BuildLoginParameters(
@@ -117,8 +183,12 @@ namespace EduCoreDataAccessLayer.Services
             bool? isSuccess = null,
             string? failureReason = null,
             string? ipAddress = null,
-            string? userAgent = null)
+            string? userAgent = null,
+            string? passwordHash = null)
         {
+            // NOTE: order must match the core.sp_login_management signature exactly —
+            // PgExec calls it as a positional stored procedure. p_password_hash sits
+            // just before the p_result refcursor.
             return new NpgsqlParameter[]
             {
                 new NpgsqlParameter("p_operation_type", operationType),
@@ -128,6 +198,7 @@ namespace EduCoreDataAccessLayer.Services
                 new NpgsqlParameter("p_failure_reason", (object?)failureReason ?? DBNull.Value),
                 new NpgsqlParameter("p_ip_address", (object?)ipAddress ?? DBNull.Value),
                 new NpgsqlParameter("p_user_agent", (object?)userAgent ?? DBNull.Value),
+                new NpgsqlParameter("p_password_hash", (object?)passwordHash ?? DBNull.Value),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "login_cursor" }
             };
         }
@@ -145,6 +216,7 @@ namespace EduCoreDataAccessLayer.Services
 
                 IsActive = ToBool(row, "is_active"),
                 IsDeleted = ToBool(row, "is_deleted"),
+                MustChangePassword = ToBool(row, "must_change_password"),
 
                 FullName = ToStringValue(row, "full_name"),
                 Phone = ToStringValue(row, "phone"),

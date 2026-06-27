@@ -315,20 +315,6 @@
                 timeOut: 3500
             };
 
-            @if (TempData["Message"] != null)
-            {
-                    <text>
-                        var result = '@TempData["Result"]';
-                        var message = '@TempData["Message"]';
-
-                        if (result === "1") {
-                            toastr.success(message);
-                        } else {
-                            toastr.error(message);
-                        }
-                    </text>
-            }
-
             @if (!ViewData.ModelState.IsValid)
             {
                     foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))

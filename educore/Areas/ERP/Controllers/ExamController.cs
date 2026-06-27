@@ -1,8 +1,10 @@
+using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
+    [HasPermission("exams.view")]
     public class ExamController : Controller
     {
         public IActionResult CreateExam()
@@ -20,6 +22,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [HasPermission("exams.manage")]
         [ValidateAntiForgeryToken]
         public IActionResult SaveMarks(IFormCollection form)
         {

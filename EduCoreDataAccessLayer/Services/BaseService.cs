@@ -19,11 +19,11 @@ namespace educore.Services
 
     public class BaseService : IBaseService
     {
-        private readonly string _connectionString;
+        private readonly PgExec _db;
         // string ModelId;
-        public BaseService(IConfiguration configuration)
+        public BaseService(PgExec db)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
+            _db = db;
         }
 
         //public Tuple<string, string, string, int, int, int, string> GetServerDate()
@@ -80,7 +80,7 @@ namespace educore.Services
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "dropdown_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
 
             var ds = await dal.ExecuteProcedureWithCursorsAsync(
                 procedureName,

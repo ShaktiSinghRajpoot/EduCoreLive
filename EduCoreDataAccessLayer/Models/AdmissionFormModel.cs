@@ -59,5 +59,9 @@ namespace EduCoreDataAccessLayer.Models
         public string?  PaymentMode     { get; set; }
         public string?  PaymentReference { get; set; }
         public string?  PaymentRemarks  { get; set; }
+
+        // ── Transport (optional): assign a route+stop at admission ──
+        public int? TransportRouteId { get; set; }
+        public int? TransportStopId  { get; set; }
     }
 }

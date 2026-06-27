@@ -5,7 +5,7 @@ namespace educore.Models
 {
     public class SchoolManageModel
     {
-        public string Operation { get; set; } = "I";
+        public string Operation { get; set; } = "INSERT";
         public int? SchoolId { get; set; }
 
         [Required(ErrorMessage = "School name is required.")]
@@ -92,6 +92,8 @@ namespace educore.Models
         public bool EnableSms { get; set; }
         public bool EnableEmail { get; set; } = true;
         public bool EnableWhatsapp { get; set; }
+
+        public int? AdminUserId { get; set; }
 
         public bool CreateSchoolAdmin { get; set; } = true;
 

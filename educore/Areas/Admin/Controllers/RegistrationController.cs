@@ -2,26 +2,37 @@ using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.Admin;
 using EduCoreDataAccessLayer.Services.Contract.Admin;
+using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace educore.Areas.Admin.Controllers
 {
     [Area("Admin")]
     //[Authorize(Roles = AppRoles.SchoolAdmin)]
+    [HasPermission("registration.view")]
     public class RegistrationController : Controller
     {
         private readonly IRegistrationService _registrationService;
         private readonly IAdmissionWorkflowService _admissionWorkflowService;
         private readonly IBaseService _baseService;
+        private readonly IEnquiryService _enquiryService;
+        private readonly ISchoolSettingsService _schoolSettingsService;
+        private readonly IFeePaymentService _feePaymentService;
 
         public RegistrationController(
             IRegistrationService registrationService,
             IAdmissionWorkflowService admissionWorkflowService,
-            IBaseService baseService)
+            IBaseService baseService,
+            IEnquiryService enquiryService,
+            ISchoolSettingsService schoolSettingsService,
+            IFeePaymentService feePaymentService)
         {
             _registrationService = registrationService;
             _admissionWorkflowService = admissionWorkflowService;
             _baseService = baseService;
+            _enquiryService = enquiryService;
+            _schoolSettingsService = schoolSettingsService;
+            _feePaymentService = feePaymentService;
         }
 
         // ── GET: /Admin/Registration/Index ───────────────────────
@@ -31,7 +42,7 @@ namespace educore.Areas.Admin.Controllers
             int tenantId = TenantId(), schoolId = SchoolId(), userId = UserId();
 
             var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
-
+             
             var model = new RegistrationPageModel
             {
                 Stats                 = await _registrationService.GetStatsAsync(tenantId, schoolId, userId),
@@ -98,6 +109,7 @@ namespace educore.Areas.Admin.Controllers
 
         // ── POST: /Admin/Registration/Cancel (AJAX) ──────────────
         [HttpPost]
+        [HasPermission("registration.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Cancel([FromBody] CancelRegistrationRequest req)
         {
@@ -112,16 +124,47 @@ namespace educore.Areas.Admin.Controllers
 
         // ── POST: /Admin/Registration/MarkFeePaid (AJAX) ─────────
         [HttpPost]
+        [HasPermission("registration.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> MarkFeePaid([FromBody] MarkRegistrationFeeRequest req)
         {
             if (req == null || req.EnquiryId <= 0)
                 return Json(new { success = false, message = "Invalid request." });
 
-            var (success, message) = await _registrationService.MarkFeePaidAsync(
-                req.EnquiryId, TenantId(), SchoolId(), UserId());
+            int tenantId = TenantId(), schoolId = SchoolId(), actionUserId = UserId();
 
-            return Json(new { success = success > 0, message });
+            var (success, message) = await _registrationService.MarkFeePaidAsync(
+                req.EnquiryId, tenantId, schoolId, actionUserId);
+
+            // Flipping the "fee paid" flag must also issue a real receipt — the same
+            // way the CRM register modal does. The amount is master data (sum of the
+            // Registration-point Fee Heads for the enquiry's class), never client-supplied.
+            string? receiptNo = null;
+            if (success > 0)
+            {
+                var enquiry = await _enquiryService.GetEnquiryByIdAsync(req.EnquiryId, tenantId, schoolId, actionUserId);
+                if (enquiry != null)
+                {
+                    decimal regFee = await _schoolSettingsService.GetCollectionPointTotalAsync(
+                        enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
+                        "Registration", tenantId, schoolId, actionUserId);
+
+                    if (regFee > 0)
+                    {
+                        var (paid, _, rcp) = await _feePaymentService.RecordRegistrationPaymentAsync(
+                            req.EnquiryId, regFee,
+                            NullIfEmpty(req.PaymentMode) ?? "Cash",
+                            NullIfEmpty(req.PaymentReference),
+                            "Registration fee",
+                            enquiry.Session,
+                            tenantId, schoolId, actionUserId);
+
+                        if (paid) receiptNo = rcp;
+                    }
+                }
+            }
+
+            return Json(new { success = success > 0, message, receiptNo });
         }
 
         // ── Helpers ──────────────────────────────────────────────

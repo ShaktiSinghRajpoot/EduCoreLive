@@ -1,0 +1,240 @@
+@{
+    ViewData["Title"] = "Fee Reports";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@*
+   Fee Reports — Collection Register (date range, by mode + by head) and
+   Defaulters / Outstanding (class-wise aging). core.sp_fee_collection_register
+   and core.sp_fee_defaulters_get. Read-only; CSV export + print client-side.
+*@
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+.fee-rep-page{ --suc:#28c76f;--suc-soft:#e8fadf;--dng:#ea5455;--dng-soft:#fdeceb;--amb:#ff9f43;--amb-soft:#fff1e0;--info:#00bad1;--info-soft:#dff7fa; color:var(--ec-text); }
+.fee-rep-page .view-tabs{ display:flex;gap:.4rem;border-bottom:1px solid var(--ec-border);margin-bottom:1rem; }
+.fee-rep-page .view-tab{ border:0;background:none;padding:.55rem .25rem;margin-right:1.2rem;font-size:.92rem;font-weight:850;color:var(--ec-text-muted);cursor:pointer;border-bottom:3px solid transparent; }
+.fee-rep-page .view-tab.active{ color:var(--ec-primary);border-bottom-color:var(--ec-primary); }
+.fee-rep-page .filter-bar{ background:linear-gradient(180deg,#fff,#fff7ed);border:1px solid rgba(255,138,0,.18);border-radius:14px; }
+.fee-rep-page .sumcard{ border:1px solid var(--ec-border);border-radius:13px;padding:.8rem 1rem;background:#fff;height:100%; }
+.fee-rep-page .sumcard .l{ font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ec-text-muted); }
+.fee-rep-page .sumcard .v{ font-size:1.3rem;font-weight:950;color:var(--ec-text-dark);font-variant-numeric:tabular-nums;margin-top:.15rem; }
+.fee-rep-page .sumcard.tot{ background:linear-gradient(135deg,var(--ec-primary-light),#fff);border-color:#ffc98a; } .fee-rep-page .sumcard.tot .v{ color:var(--ec-primary); }
+.fee-rep-page .chip{ display:inline-flex;gap:.4rem;align-items:center;border:1px solid var(--ec-border);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;font-weight:700;margin:0 .35rem .35rem 0; }
+.fee-rep-page .chip b{ font-variant-numeric:tabular-nums; }
+.fee-rep-page .num{ font-variant-numeric:tabular-nums;text-align:right; }
+.fee-rep-page .age0{ color:var(--ec-text-muted); } .fee-rep-page .age1{ color:var(--amb); } .fee-rep-page .age2{ color:#e07b39; } .fee-rep-page .age3{ color:var(--dng);font-weight:800; }
+.fee-rep-page .ec-table tbody tr td{ font-size:.85rem; }
+@@media print{ .no-print{ display:none!important; } .ec-page-shell{ box-shadow:none;border:0; } .view-tab{ display:none; } }
+</style>
+}
+
+<div class="ec-page-shell fee-rep-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header no-print">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-bar-chart-alt-2"></i></div>
+          <div><h4 class="ec-page-title mb-1">Fee Reports</h4><p class="ec-page-subtitle">Collection register and outstanding defaulters</p></div>
+        </div>
+        <a href="@Url.Action("ManageFee","Fee",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-wallet me-1"></i>Counter</a>
+      </div>
+    </div>
+
+    <div class="view-tabs no-print">
+      <button class="view-tab active" data-v="register">Collection Register</button>
+      <button class="view-tab" data-v="defaulters">Defaulters / Outstanding</button>
+      <button class="view-tab" data-v="audit">Concessions &amp; Cancellations</button>
+    </div>
+
+    <!-- COLLECTION REGISTER -->
+    <div id="v-register">
+      <div class="filter-bar p-3 mb-3 no-print">
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label class="form-label">From</label><input type="date" id="rFrom" class="form-control"></div>
+          <div class="col-6 col-md-3"><label class="form-label">To</label><input type="date" id="rTo" class="form-control"></div>
+          <div class="col-12 col-md-6 d-flex gap-2">
+            <button id="rLoad" class="btn btn-primary"><i class="bx bx-search me-1"></i>Load</button>
+            <button id="rCsv" class="btn btn-outline-secondary"><i class="bx bx-download me-1"></i>CSV</button>
+            <button id="rPrint" class="btn btn-outline-secondary"><i class="bx bx-printer me-1"></i>Print</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Total collected</div><div class="v" id="rTotal">₹0</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Receipts</div><div class="v" id="rCount">0</div></div></div>
+        <div class="col-12 col-md-6"><div class="sumcard"><div class="l">By mode</div><div class="mt-1" id="rModes">—</div></div></div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-8">
+          <div class="ec-card"><div class="ec-card-body p-0">
+            <div class="table-responsive" style="max-height:560px;overflow:auto">
+              <table class="table ec-table mb-0"><thead><tr><th>Date</th><th>Receipt</th><th>Student</th><th>Class</th><th>Mode</th><th class="text-end">Amount</th></tr></thead>
+              <tbody id="rRows"></tbody></table>
+            </div>
+          </div></div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap"><div class="ec-section-icon"><i class="bx bx-purchase-tag"></i></div><h6 class="ec-section-title mb-0">By fee head</h6></div></div>
+            <div class="ec-card-body p-0"><div class="table-responsive"><table class="table ec-table mb-0"><thead><tr><th>Head</th><th class="text-end">Amount</th></tr></thead><tbody id="rHeads"></tbody></table></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEFAULTERS -->
+    <div id="v-defaulters" class="d-none">
+      <div class="filter-bar p-3 mb-3 no-print">
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label class="form-label">Class</label><select id="dClass" class="form-select"><option value="">All classes</option></select></div>
+          <div class="col-6 col-md-3"><label class="form-label">Section</label><input id="dSection" class="form-control" placeholder="All"></div>
+          <div class="col-12 col-md-6 d-flex gap-2">
+            <button id="dLoad" class="btn btn-primary"><i class="bx bx-search me-1"></i>Load</button>
+            <button id="dCsv" class="btn btn-outline-secondary"><i class="bx bx-download me-1"></i>CSV</button>
+            <button id="dPrint" class="btn btn-outline-secondary"><i class="bx bx-printer me-1"></i>Print</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Total outstanding</div><div class="v" id="dTotal">₹0</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Defaulters</div><div class="v" id="dCount">0</div></div></div>
+      </div>
+
+      <div class="ec-card"><div class="ec-card-body p-0">
+        <div class="table-responsive" style="max-height:600px;overflow:auto">
+          <table class="table ec-table mb-0">
+            <thead><tr><th>Student</th><th>Adm No</th><th>Class</th><th class="text-end">Not due</th><th class="text-end">0–30d</th><th class="text-end">31–60d</th><th class="text-end">60+d</th><th class="text-end">Outstanding</th></tr></thead>
+            <tbody id="dRows"></tbody>
+          </table>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- CONCESSIONS & CANCELLATIONS -->
+    <div id="v-audit" class="d-none">
+      <div class="filter-bar p-3 mb-3 no-print">
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label class="form-label">From</label><input type="date" id="aFrom" class="form-control"></div>
+          <div class="col-6 col-md-3"><label class="form-label">To</label><input type="date" id="aTo" class="form-control"></div>
+          <div class="col-12 col-md-6 d-flex gap-2">
+            <button id="aLoad" class="btn btn-primary"><i class="bx bx-search me-1"></i>Load</button>
+            <button id="aPrint" class="btn btn-outline-secondary"><i class="bx bx-printer me-1"></i>Print</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Concession given</div><div class="v" id="aConcTotal">₹0</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Receipts cancelled</div><div class="v" id="aCancCount">0</div></div></div>
+      </div>
+
+      <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap"><div class="ec-section-icon"><i class="bx bx-purchase-tag"></i></div><h6 class="ec-section-title mb-0">Concessions / discounts given</h6></div></div>
+        <div class="ec-card-body p-0"><div class="table-responsive">
+          <table class="table ec-table mb-0"><thead><tr><th>Date</th><th>Receipt</th><th>Student</th><th>Type</th><th>Reason</th><th class="text-end">Concession</th></tr></thead><tbody id="aConcRows"></tbody></table>
+        </div></div>
+      </div>
+
+      <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap"><div class="ec-section-icon"><i class="bx bx-x-circle"></i></div><h6 class="ec-section-title mb-0">Cancelled receipts</h6></div></div>
+        <div class="ec-card-body p-0"><div class="table-responsive">
+          <table class="table ec-table mb-0"><thead><tr><th>Cancelled</th><th>Receipt</th><th>Student</th><th>Reason</th><th>Authorised by</th><th class="text-end">Amount</th></tr></thead><tbody id="aCancRows"></tbody></table>
+        </div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+    function money(n){ return '₹' + Math.round(Number(n||0)).toLocaleString('en-IN'); }
+    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+    function notify(t,m){ if (typeof toastr!=='undefined') toastr[t](m); }
+    function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+    function monthStart(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'; }
+    function csv(rows, name){
+        var body=rows.map(function(r){ return r.map(function(c){ return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+        var a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(body); a.download=name; a.click();
+    }
+    var URL={ reg:'@Url.Action("GetCollectionRegister","Fee",new{area="ERP"})', def:'@Url.Action("GetDefaulters","Fee",new{area="ERP"})', classes:'@Url.Action("GetClasses","Fee",new{area="ERP"})', audit:'@Url.Action("GetConcessionCancelRegister","Fee",new{area="ERP"})' };
+
+    // tabs
+    $('.view-tab').on('click', function(){ var v=$(this).data('v'); $('.view-tab').removeClass('active'); $(this).addClass('active');
+        $('#v-register').toggleClass('d-none', v!=='register');
+        $('#v-defaulters').toggleClass('d-none', v!=='defaulters');
+        $('#v-audit').toggleClass('d-none', v!=='audit'); });
+
+    // ── collection register ──
+    var regData={receipts:[]};
+    $('#rFrom').val(monthStart()); $('#rTo').val(todayStr());
+    function loadReg(){
+        $.getJSON(URL.reg,{from:$('#rFrom').val(),to:$('#rTo').val()}).done(function(d){
+            regData=d;
+            $('#rTotal').text(money(d.total)); $('#rCount').text((d.receipts||[]).length);
+            $('#rModes').html((d.modes||[]).length? d.modes.map(function(m){ return '<span class="chip">'+esc(m.mode)+' <b>'+money(m.amount)+'</b></span>'; }).join('') : '<span class="text-muted">—</span>');
+            $('#rHeads').html((d.heads||[]).length? d.heads.map(function(h){ return '<tr><td>'+esc(h.head)+'</td><td class="num">'+money(h.amount)+'</td></tr>'; }).join('') : '<tr><td colspan="2" class="text-muted text-center py-3">—</td></tr>');
+            $('#rRows').html((d.receipts||[]).length? d.receipts.map(function(r){
+                return '<tr><td class="text-muted">'+esc(r.date||'—')+'</td><td class="fw-semibold">'+esc(r.receiptNo)+'</td><td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td><td>'+esc(r.cls)+'</td><td>'+esc(r.mode)+'</td><td class="num fw-bold">'+money(r.amount)+'</td></tr>';
+            }).join('') : '<tr><td colspan="6" class="text-muted text-center py-4">No receipts in this range.</td></tr>');
+        }).fail(function(){ notify('error','Could not load the register.'); });
+    }
+    $('#rLoad').on('click', loadReg);
+    $('#rPrint').on('click', function(){ window.print(); });
+    $('#rCsv').on('click', function(){
+        var rows=[['Date','Receipt','Student','Adm No','Class','Mode','Amount']];
+        (regData.receipts||[]).forEach(function(r){ rows.push([r.date,r.receiptNo,r.student,r.admNo,r.cls,r.mode,r.amount]); });
+        csv(rows,'collection-register.csv');
+    });
+
+    // ── defaulters ──
+    var defData=[];
+    $.getJSON(URL.classes).done(function(c){ var h='<option value="">All classes</option>'; (c||[]).forEach(function(x){ h+='<option>'+esc(x)+'</option>'; }); $('#dClass').html(h); });
+    function loadDef(){
+        $.getJSON(URL.def,{className:$('#dClass').val(),section:$('#dSection').val()}).done(function(rows){
+            defData=rows||[];
+            var tot=defData.reduce(function(t,r){ return t+Number(r.outstanding||0); },0);
+            $('#dTotal').text(money(tot)); $('#dCount').text(defData.length);
+            $('#dRows').html(defData.length? defData.map(function(r){
+                return '<tr><td class="fw-semibold">'+esc(r.student)+(r.roll?'<div class="text-muted" style="font-size:.72rem">Roll '+esc(r.roll)+'</div>':'')+'</td><td>'+esc(r.admNo)+'</td><td>'+esc(r.cls)+'</td>'+
+                       '<td class="num age0">'+money(r.notDue)+'</td><td class="num age1">'+money(r.d0_30)+'</td><td class="num age2">'+money(r.d31_60)+'</td><td class="num age3">'+money(r.d60plus)+'</td>'+
+                       '<td class="num fw-bold">'+money(r.outstanding)+'</td></tr>';
+            }).join('') : '<tr><td colspan="8" class="text-muted text-center py-4">No outstanding dues. 🎉</td></tr>');
+        }).fail(function(){ notify('error','Could not load defaulters.'); });
+    }
+    $('#dLoad').on('click', loadDef);
+    $('#dPrint').on('click', function(){ window.print(); });
+    $('#dCsv').on('click', function(){
+        var rows=[['Student','Adm No','Class','Roll','Not due','0-30','31-60','60+','Outstanding']];
+        defData.forEach(function(r){ rows.push([r.student,r.admNo,r.cls,r.roll,r.notDue,r.d0_30,r.d31_60,r.d60plus,r.outstanding]); });
+        csv(rows,'defaulters.csv');
+    });
+
+    // ── concessions & cancellations ──
+    $('#aFrom').val(monthStart()); $('#aTo').val(todayStr());
+    function loadAudit(){
+        $.getJSON(URL.audit,{from:$('#aFrom').val(),to:$('#aTo').val()}).done(function(d){
+            var conc=d.concessions||[], canc=d.cancels||[];
+            $('#aConcTotal').text(money(conc.reduce(function(t,r){return t+Number(r.amount||0);},0)));
+            $('#aCancCount').text(canc.length);
+            $('#aConcRows').html(conc.length? conc.map(function(r){
+                return '<tr><td class="text-muted">'+esc(r.date||'—')+'</td><td class="fw-semibold">'+esc(r.receiptNo)+'</td><td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td><td>'+esc(r.kind||'—')+'</td><td>'+esc(r.reason||'—')+'</td><td class="num fw-bold" style="color:var(--info)">'+money(r.amount)+'</td></tr>';
+            }).join('') : '<tr><td colspan="6" class="text-muted text-center py-4">No concessions in this range.</td></tr>');
+            $('#aCancRows').html(canc.length? canc.map(function(r){
+                return '<tr><td class="text-muted">'+esc(r.cancelledAt||r.date||'—')+'</td><td class="fw-semibold">'+esc(r.receiptNo)+'</td><td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td><td>'+esc(r.reason||'—')+'</td><td>'+esc(r.authorisedBy||'—')+'</td><td class="num fw-bold" style="color:var(--dng)">'+money(r.amount)+'</td></tr>';
+            }).join('') : '<tr><td colspan="6" class="text-muted text-center py-4">No cancellations in this range.</td></tr>');
+        }).fail(function(){ notify('error','Could not load the register.'); });
+    }
+    $('#aLoad').on('click', loadAudit);
+    $('#aPrint').on('click', function(){ window.print(); });
+
+    if (typeof toastr !== 'undefined') toastr.options = { closeButton:true, progressBar:true, positionClass:'toast-top-right', timeOut:3000 };
+    loadReg(); loadAudit();
+});
+</script>
+}

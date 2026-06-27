@@ -12,17 +12,23 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 {
     public class SchoolSettingsService : ISchoolSettingsService
     {
-        private readonly string _connectionString;
+        private readonly PgExec _db;
+        private readonly AppCache _cache;
         private const string SpBasicProfileManage = "core.sp_school_admin_basic_profile_manage";
         private const string SpSchoolDropdowns = "config.sp_school_dropdowns";
         private const string SpAcademicSetupManage = "academic.sp_school_admin_academic_setup_manage";
         private const string SpFeeHeadManage = "core.sp_school_admin_fee_head_manage";
         private const string SpFeeStructureManage = "core.sp_school_admin_fee_structure_manage";
 
-        public SchoolSettingsService(IConfiguration configuration)
+        public SchoolSettingsService(PgExec db, AppCache cache)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")!;
+            _db = db;
+            _cache = cache;
         }
+
+        // WHY (Fix #6): cache keys for the two read-mostly lookups below. Tenant/school-scoped.
+        private static string FeeHeadsKey(int tenantId, int schoolId)  => AppCache.Key("feeheads", tenantId, schoolId);
+        private static string DropdownsKey(int tenantId, int schoolId) => AppCache.Key("dropdowns:basicprofile", tenantId, schoolId);
 
         #region Basic Profile
 
@@ -69,7 +75,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "basic_profile_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpBasicProfileManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
@@ -169,7 +175,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "basic_profile_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpBasicProfileManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return 0;
@@ -182,6 +188,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
         {
             if (tenantId <= 1 || schoolId <= 0) return new SchoolDropdownModel();
 
+            // WHY (Fix #6): reference dropdowns (boards, mediums, statuses, academic years...) change
+            // rarely. Cache 30 min per tenant/school; the academic-years sublist is busted on academic
+            // year Save / SetCurrent / Delete so newly added years appear immediately.
+            return await _cache.GetOrCreateAsync(DropdownsKey(tenantId, schoolId), async () =>
+            {
             var parameters = new NpgsqlParameter[]
             {
                 new NpgsqlParameter("p_tenants", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cur_tenants" },
@@ -197,7 +208,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_time_formats", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cur_time_formats" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpSchoolDropdowns, parameters);
             var dropdowns = new SchoolDropdownModel();
 
@@ -214,6 +225,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
             if (ds.Tables.Count > 10) foreach (DataRow row in ds.Tables[10].Rows) dropdowns.TimeFormats.Add(new DropdownItem { Id = row["id"] == DBNull.Value ? 0 : Convert.ToInt32(row["id"]), Name = row["name"] == DBNull.Value ? string.Empty : row["name"].ToString() ?? string.Empty });
 
             return dropdowns;
+            }, TimeSpan.FromMinutes(30));
         }
 
         #endregion
@@ -237,7 +249,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpAcademicSetupManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -341,7 +353,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "academic_setup_save_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpAcademicSetupManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -438,6 +450,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.", 0);
             var row = ds.Tables[0].Rows[0];
+            _cache.Remove(DropdownsKey(tenantId, schoolId));   // WHY (Fix #6): academic years feed the basic-profile dropdowns
             return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty, AsInt(row, "academic_year_id"));
         }
 
@@ -451,6 +464,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.");
             var row = ds.Tables[0].Rows[0];
+            _cache.Remove(DropdownsKey(tenantId, schoolId));   // WHY (Fix #6): "current year" change affects the dropdowns
             return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty);
         }
 
@@ -464,6 +478,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.");
             var row = ds.Tables[0].Rows[0];
+            _cache.Remove(DropdownsKey(tenantId, schoolId));   // WHY (Fix #6): deleted year must drop from the dropdowns
             return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty);
         }
 
@@ -485,7 +500,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = cursorName }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             return await dal.ExecuteProcedureWithCursorsAsync(SpAcademicYearManage, parameters);
         }
 
@@ -495,9 +510,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 
         public async Task<List<FeeHead>> GetFeeHeadAsync(int tenantId, int schoolId, int actionUserId)
         {
-            var list = new List<FeeHead>();
+            if (tenantId <= 1 || schoolId <= 0) return new List<FeeHead>();
 
-            if (tenantId <= 1 || schoolId <= 0) return list;
+            // WHY (Fix #6): fee heads are read on many screens but change rarely. Cache per
+            // tenant/school; busted on SaveFeeHead / DeleteFeeHead / ToggleFeeHeadStatus.
+            return await _cache.GetOrCreateAsync(FeeHeadsKey(tenantId, schoolId), async () =>
+            {
+            var list = new List<FeeHead>();
 
             var parameters = new NpgsqlParameter[]
             {
@@ -508,7 +527,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "fee_head_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeHeadManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -536,6 +555,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
             }
 
             return list;
+            });
         }
 
         public async Task<FeeHead?> GetFeeHeadByIdAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId)
@@ -552,7 +572,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "fee_head_by_id_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeHeadManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -615,12 +635,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "save_fee_head_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeHeadManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                 return 0;
 
+            _cache.Remove(FeeHeadsKey(tenantId, schoolId));   // WHY (Fix #6): invalidate so the edit shows immediately
             return 1;
         }
 
@@ -628,9 +649,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
         {
             if (tenantId <= 1 || schoolId <= 0) return 0;
 
+            // Cascade delete: removes the head from fee structures, student plans and
+            // the ledger (paid + unpaid dues), then soft-deletes the head. Receipts
+            // are kept intact (they are independent snapshots).
             var parameters = new NpgsqlParameter[]
             {
-                new NpgsqlParameter("p_operation", "DeleteFeeHead"),
                 new NpgsqlParameter("p_tenant_id", tenantId),
                 new NpgsqlParameter("p_school_id", schoolId),
                 new NpgsqlParameter("p_action_user_id", actionUserId),
@@ -638,13 +661,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "delete_fee_head_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
-            var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeHeadManage, parameters);
+            var dal = _db;
+            var ds = await dal.ExecuteProcedureWithCursorsAsync("core.sp_fee_head_delete_cascade", parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                 return 0;
 
-            return 1;
+            var row = ds.Tables[0].Rows[0];
+            bool ok = row.Table.Columns.Contains("success") && row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]);
+            _cache.Remove(FeeHeadsKey(tenantId, schoolId));   // WHY (Fix #6): invalidate after delete
+            return ok ? 1 : 0;
         }
 
         public async Task<int> ToggleFeeHeadStatusAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId)
@@ -661,12 +687,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "toggle_fee_head_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeHeadManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                 return 0;
 
+            _cache.Remove(FeeHeadsKey(tenantId, schoolId));   // WHY (Fix #6): invalidate after status toggle
             return 1;
         }
 
@@ -689,7 +716,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "fee_structure_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -736,7 +763,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "fee_structure_by_class_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -780,7 +807,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "fee_structure_detail_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -882,7 +909,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "save_fee_structure_cursor" }
                 };
 
-                using var dal = new PostgreSqlDal(_connectionString);
+                var dal = _db;
                 var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, headerParameters);
 
                 if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -905,7 +932,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                         new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "save_fee_structure_detail_cursor" }
                     };
 
-                    using var detailDal = new PostgreSqlDal(_connectionString);
+                    var detailDal = _db;
                     await detailDal.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, detailParameters);
                 }
             }
@@ -927,7 +954,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "delete_fee_structure_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)

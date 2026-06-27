@@ -1,14 +1,15 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model educore.Models.SchoolManageModel;
 
 @{
-    ViewData["Title"] = "Add School";
+    bool isEdit = Model.SchoolId > 0;
+    ViewData["Title"] = isEdit ? "Edit School" : "Add School";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 }
 @section PageStyles {
 <style>
     .step-sidebar {
-        min-height: 720px;
+        min-height: 560px;
     }
 
     .step-item {
@@ -138,7 +139,7 @@
     <div class="ec-page-shell row g-0">
         <div class="col-lg-4 ec-sidebar step-sidebar">
             <div class="d-flex justify-content-between align-items-center mb-5">
-                <h4 class="fw-bold mb-0">Add School</h4>
+                <h4 class="fw-bold mb-0">@(Model.SchoolId > 0 ? "Edit School" : "Add School")</h4>
                 <a href="/SuperAdmin/Schools/SchoolList" class="btn btn-sm btn-label-secondary">Back</a>
             </div>
         <!-- LEFT STEPPER -->
@@ -146,44 +147,20 @@
             <div class="step-item active" data-step="1">
                 <div class="step-icon"><i class="bx bx-buildings"></i></div>
                 <div>
-                    <div class="step-title">Organization</div>
-                    <div class="step-desc">Select or create tenant</div>
+                    <div class="step-title">Organization &amp; School</div>
+                    <div class="step-desc">Tenant and school basics</div>
                 </div>
             </div>
 
             <div class="step-item" data-step="2">
-                <div class="step-icon"><i class="bx bx-building-house"></i></div>
+                <div class="step-icon"><i class="bx bx-map"></i></div>
                 <div>
-                    <div class="step-title">School Info</div>
-                    <div class="step-desc">Basic school details</div>
+                    <div class="step-title">Address &amp; Contact</div>
+                    <div class="step-desc">Location and contact person</div>
                 </div>
             </div>
 
             <div class="step-item" data-step="3">
-                <div class="step-icon"><i class="bx bx-map"></i></div>
-                <div>
-                    <div class="step-title">Address Details</div>
-                    <div class="step-desc">Primary location</div>
-                </div>
-            </div>
-
-            <div class="step-item" data-step="4">
-                <div class="step-icon"><i class="bx bx-user"></i></div>
-                <div>
-                    <div class="step-title">Primary Contact</div>
-                    <div class="step-desc">School contact person</div>
-                </div>
-            </div>
-
-            <div class="step-item" data-step="5">
-                <div class="step-icon"><i class="bx bx-cog"></i></div>
-                <div>
-                    <div class="step-title">Settings</div>
-                    <div class="step-desc">System preferences</div>
-                </div>
-            </div>
-
-            <div class="step-item" data-step="6">
                 <div class="step-icon"><i class="bx bx-lock-alt"></i></div>
                 <div>
                     <div class="step-title">School Admin</div>
@@ -191,10 +168,10 @@
                 </div>
             </div>
 
-            <div class="step-item" data-step="7">
+            <div class="step-item" data-step="4">
                 <div class="step-icon"><i class="bx bx-check-circle"></i></div>
                 <div>
-                    <div class="step-title">Review & Save</div>
+                    <div class="step-title">Review &amp; Save</div>
                     <div class="step-desc">Confirm information</div>
                 </div>
             </div>
@@ -207,18 +184,39 @@
 
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
 
-                <input asp-for="Operation" type="hidden" value="I" />
+                <input asp-for="Operation" type="hidden" value="INSERT" />
                 <input asp-for="SchoolId" type="hidden" />
+                <input asp-for="AddressTypeId" type="hidden" value="1" />
+                <input asp-for="ContactTypeId" type="hidden" value="1" />
 
-                <!-- STEP 1: TENANT -->
+                @* Optional fields kept out of the wizard but round-tripped so an Edit
+                   never wipes values the school may already have set. *@
+                <input asp-for="Website" type="hidden" />
+                <input asp-for="RegistrationNumber" type="hidden" />
+                <input asp-for="AffiliationNumber" type="hidden" />
+                <input asp-for="OwnershipTypeId" type="hidden" />
+                <input asp-for="MediumId" type="hidden" />
+                <input asp-for="EstablishedYear" type="hidden" />
+                <input asp-for="AddressLine2" type="hidden" />
+                <input asp-for="District" type="hidden" />
+                <input asp-for="Designation" type="hidden" />
+                <input asp-for="AlternatePhone" type="hidden" />
+                <input asp-for="AcademicYearId" type="hidden" />
+                <input asp-for="DateFormatId" type="hidden" />
+                <input asp-for="TimeFormatId" type="hidden" />
+                <input asp-for="EnableSms" type="hidden" />
+                <input asp-for="EnableEmail" type="hidden" />
+                <input asp-for="EnableWhatsapp" type="hidden" />
+
+                <!-- STEP 1: ORGANIZATION & SCHOOL -->
                 <div class="step-content" data-step-content="1">
                     <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-buildings"></i></div>
-                    <h4 class="fw-bold">Organization / Tenant</h4>
-                    <p class="text-muted mb-4">Select existing organization or create a new tenant.</p>
+                    <h4 class="fw-bold">Organization &amp; School</h4>
+                    <p class="text-muted mb-4">Select the tenant and enter the core school details.</p>
 
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label">Tenant Option *</label>
+                            <label class="form-label">Tenant Option <span class="text-danger">*</span></label>
                             <select asp-for="TenantMode" class="form-select" id="TenantMode">
                                 <option value="existing">Select Existing Tenant</option>
                                 <option value="new">Create New Tenant</option>
@@ -227,7 +225,7 @@
                         </div>
 
                         <div class="col-12" id="existingTenantBox">
-                            <label class="form-label">Select Tenant *</label>
+                            <label class="form-label">Select Tenant <span class="text-danger">*</span></label>
                             <select asp-for="TenantId"
                                     class="form-select"
                                     asp-items="@(new SelectList(Model.TenantList, "Value", "Text"))">
@@ -238,13 +236,13 @@
 
                         <div id="newTenantBox" class="row g-3 d-none">
                             <div class="col-md-6">
-                                <label class="form-label">Organization Name *</label>
+                                <label class="form-label">Organization Name <span class="text-danger">*</span></label>
                                 <input asp-for="TenantName" class="form-control" placeholder="DPS Group" />
                                 <span asp-validation-for="TenantName" class="text-danger small"></span>
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Tenant Code *</label>
+                                <label class="form-label">Tenant Code <span class="text-danger">*</span></label>
                                 <input asp-for="TenantCode" class="form-control" placeholder="dps-group" />
                                 <span asp-validation-for="TenantCode" class="text-danger small"></span>
                             </div>
@@ -261,18 +259,11 @@
                                 <span asp-validation-for="TenantPhone" class="text-danger small"></span>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                <!-- STEP 2: SCHOOL INFO -->
-                <div class="step-content" data-step-content="2">
-                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-building-house"></i></div>
-                    <h4 class="fw-bold">School Information</h4>
-                    <p class="text-muted mb-4">Enter basic school and registration details.</p>
+                        <div class="col-12"><hr class="my-1" /></div>
 
-                    <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label">School Name *</label>
+                            <label class="form-label">School Name <span class="text-danger">*</span></label>
                             <input asp-for="SchoolName" class="form-control" placeholder="International Public School" />
                             <span asp-validation-for="SchoolName" class="text-danger small"></span>
                         </div>
@@ -284,13 +275,7 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Website</label>
-                            <input asp-for="Website" class="form-control" placeholder="www.school.com" />
-                            <span asp-validation-for="Website" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Status *</label>
+                            <label class="form-label">Status <span class="text-danger">*</span></label>
                             <select asp-for="StatusId"
                                     class="form-select"
                                     asp-items="@(new SelectList(Model.StatusList, "Value", "Text"))">
@@ -299,8 +284,8 @@
                             <span asp-validation-for="StatusId" class="text-danger small"></span>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label">Board</label>
+                        <div class="col-md-6">
+                            <label class="form-label">Board <span class="text-danger">*</span></label>
                             <select asp-for="BoardId"
                                     class="form-select"
                                     asp-items="@(new SelectList(Model.BoardList, "Value", "Text"))">
@@ -309,8 +294,8 @@
                             <span asp-validation-for="BoardId" class="text-danger small"></span>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label">School Type</label>
+                        <div class="col-md-6">
+                            <label class="form-label">School Type <span class="text-danger">*</span></label>
                             <select asp-for="SchoolTypeId"
                                     class="form-select"
                                     asp-items="@(new SelectList(Model.SchoolTypeList, "Value", "Text"))">
@@ -318,107 +303,52 @@
                             </select>
                             <span asp-validation-for="SchoolTypeId" class="text-danger small"></span>
                         </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Ownership Type</label>
-                            <select asp-for="OwnershipTypeId"
-                                    class="form-select"
-                                    asp-items="@(new SelectList(Model.OwnershipTypeList, "Value", "Text"))">
-                                <option value="">Select Ownership</option>
-                            </select>
-                            <span asp-validation-for="OwnershipTypeId" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Medium</label>
-                            <select asp-for="MediumId"
-                                    class="form-select"
-                                    asp-items="@(new SelectList(Model.MediumList, "Value", "Text"))">
-                                <option value="">Select Medium</option>
-                            </select>
-                            <span asp-validation-for="MediumId" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Established Year</label>
-                            <input asp-for="EstablishedYear" class="form-control" placeholder="2005" />
-                            <span asp-validation-for="EstablishedYear" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Registration No.</label>
-                            <input asp-for="RegistrationNumber" class="form-control" />
-                            <span asp-validation-for="RegistrationNumber" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Affiliation No.</label>
-                            <input asp-for="AffiliationNumber" class="form-control" autocomplete="off" />
-                            <span asp-validation-for="AffiliationNumber" class="text-danger small"></span>
-                        </div>
                     </div>
                 </div>
 
-                <!-- STEP 3: ADDRESS -->
-                <div class="step-content d-none" data-step-content="3">
-                    <input asp-for="AddressTypeId" type="hidden" value="1" />
-
+                <!-- STEP 2: ADDRESS & CONTACT -->
+                <div class="step-content d-none" data-step-content="2">
                     <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-map"></i></div>
-                    <h4 class="fw-bold">Address Details</h4>
-                    <p class="text-muted mb-4">Enter the primary school address.</p>
+                    <h4 class="fw-bold">Address &amp; Contact</h4>
+                    <p class="text-muted mb-4">Primary location and main contact person.</p>
 
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label">Address Line 1 *</label>
+                            <label class="form-label">Address Line 1 <span class="text-danger">*</span></label>
                             <input asp-for="AddressLine1" class="form-control" placeholder="Building / Street / Area" />
                             <span asp-validation-for="AddressLine1" class="text-danger small"></span>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">City *</label>
+                        <div class="col-md-4">
+                            <label class="form-label">City <span class="text-danger">*</span></label>
                             <input asp-for="City" class="form-control" />
                             <span asp-validation-for="City" class="text-danger small"></span>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">District</label>
-                            <input asp-for="District" class="form-control" />
-                            <span asp-validation-for="District" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">State *</label>
+                        <div class="col-md-4">
+                            <label class="form-label">State <span class="text-danger">*</span></label>
                             <input asp-for="State" class="form-control" />
                             <span asp-validation-for="State" class="text-danger small"></span>
                         </div>
 
-                        <div class="col-md-6">
-                            <label class="form-label">Pincode *</label>
+                        <div class="col-md-4">
+                            <label class="form-label">Pincode <span class="text-danger">*</span></label>
                             <input asp-for="Pincode" class="form-control" />
                             <span asp-validation-for="Pincode" class="text-danger small"></span>
                         </div>
-                    </div>
-                </div>
 
-                <!-- STEP 4: CONTACT -->
-                <div class="step-content d-none" data-step-content="4">
-                    <input asp-for="ContactTypeId" type="hidden" value="1" />
+                        <div class="col-12"><hr class="my-1" /></div>
 
-                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-user"></i></div>
-                    <h4 class="fw-bold">Primary Contact</h4>
-                    <p class="text-muted mb-4">Add the main school contact person.</p>
-
-                    <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Contact Name *</label>
+                            <label class="form-label">Contact Name <span class="text-danger">*</span></label>
                             <input asp-for="ContactName" class="form-control" />
                             <span asp-validation-for="ContactName" class="text-danger small"></span>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Designation</label>
-                            <input asp-for="Designation" class="form-control" placeholder="Principal / Admin" />
-                            <span asp-validation-for="Designation" class="text-danger small"></span>
+                            <label class="form-label">Phone <span class="text-danger">*</span></label>
+                            <input asp-for="Phone" class="form-control" />
+                            <span asp-validation-for="Phone" class="text-danger small"></span>
                         </div>
 
                         <div class="col-md-6">
@@ -426,100 +356,43 @@
                             <input asp-for="ContactEmail" class="form-control" />
                             <span asp-validation-for="ContactEmail" class="text-danger small"></span>
                         </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Phone *</label>
-                            <input asp-for="Phone" class="form-control" />
-                            <span asp-validation-for="Phone" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label">Alternate Phone</label>
-                            <input asp-for="AlternatePhone" class="form-control" />
-                            <span asp-validation-for="AlternatePhone" class="text-danger small"></span>
-                        </div>
                     </div>
                 </div>
 
-                <!-- STEP 5: SETTINGS -->
-                <div class="step-content d-none" data-step-content="5">
-                    <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-cog"></i></div>
-                    <h4 class="fw-bold">System Settings</h4>
-                    <p class="text-muted mb-4">Configure default academic and communication settings.</p>
-
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label">Academic Year</label>
-                            <select asp-for="AcademicYearId"
-                                    class="form-select"
-                                    asp-items="@(new SelectList(Model.AcademicYearList, "Value", "Text"))">
-                                <option value="">Select Year</option>
-                            </select>
-                            <span asp-validation-for="AcademicYearId" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Date Format</label>
-                            <select asp-for="DateFormatId"
-                                    class="form-select"
-                                    asp-items="@(new SelectList(Model.DateFormatList, "Value", "Text"))">
-                                <option value="">Select Date Format</option>
-                            </select>
-                            <span asp-validation-for="DateFormatId" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Time Format</label>
-                            <select asp-for="TimeFormatId"
-                                    class="form-select"
-                                    asp-items="@(new SelectList(Model.TimeFormatList, "Value", "Text"))">
-                                <option value="">Select Time Format</option>
-                            </select>
-                            <span asp-validation-for="TimeFormatId" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-12">
-                            <div class="p-3 bg-light rounded">
-                                <div class="form-check form-switch mb-2">
-                                    <input asp-for="EnableSms" class="form-check-input" type="checkbox" />
-                                    <label class="form-check-label">SMS Alerts</label>
-                                </div>
-
-                                <div class="form-check form-switch mb-2">
-                                    <input asp-for="EnableEmail" class="form-check-input" type="checkbox" />
-                                    <label class="form-check-label">Email Alerts</label>
-                                </div>
-
-                                <div class="form-check form-switch">
-                                    <input asp-for="EnableWhatsapp" class="form-check-input" type="checkbox" />
-                                    <label class="form-check-label">WhatsApp Alerts</label>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- STEP 6: ADMIN -->
-                <div class="step-content d-none" data-step-content="6">
+                <!-- STEP 3: ADMIN -->
+                <div class="step-content d-none" data-step-content="3">
                     <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-lock-alt"></i></div>
                     <h4 class="fw-bold">School Admin Account</h4>
-                    <p class="text-muted mb-4">Create login credentials for the school administrator.</p>
+                    <p class="text-muted mb-4">
+                        @(isEdit
+                            ? "Update the school administrator's login details. Leave the password blank to keep the current one."
+                            : "Create login credentials for the school administrator.")
+                    </p>
 
-                    <div class="form-check form-switch mb-4">
-                        <input asp-for="CreateSchoolAdmin" class="form-check-input" type="checkbox" id="CreateSchoolAdmin" checked />
-                        <label class="form-check-label">Create School Admin now</label>
-                    </div>
+                    <input asp-for="AdminUserId" type="hidden" />
+
+                    @if (!isEdit)
+                    {
+                        <div class="form-check form-switch mb-4">
+                            <input asp-for="CreateSchoolAdmin" class="form-check-input" type="checkbox" id="CreateSchoolAdmin" checked />
+                            <label class="form-check-label">Create School Admin now</label>
+                        </div>
+                    }
+                    else
+                    {
+                        <input asp-for="CreateSchoolAdmin" type="hidden" />
+                    }
 
                     <div id="adminFields">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label">Admin Full Name *</label>
+                                <label class="form-label">Admin Full Name <span class="text-danger">*</span></label>
                                 <input asp-for="AdminFullName" class="form-control" />
                                 <span asp-validation-for="AdminFullName" class="text-danger small"></span>
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Admin Email *</label>
+                                <label class="form-label">Admin Email <span class="text-danger">*</span></label>
                                 <input asp-for="AdminEmail" class="form-control" />
                                 <span asp-validation-for="AdminEmail" class="text-danger small"></span>
                             </div>
@@ -530,27 +403,38 @@
                                 <span asp-validation-for="AdminPhone" class="text-danger small"></span>
                             </div>
 
-                            <div class="col-md-6 d-flex align-items-end">
-                                <div class="form-check form-switch">
-                                    <input asp-for="AutoGeneratePassword" class="form-check-input" type="checkbox" id="AutoGeneratePassword" checked />
-                                    <label class="form-check-label">Auto-generate password</label>
+                            @if (!isEdit)
+                            {
+                                <div class="col-md-6 d-flex align-items-end">
+                                    <div class="form-check form-switch">
+                                        <input asp-for="AutoGeneratePassword" class="form-check-input" type="checkbox" id="AutoGeneratePassword" checked />
+                                        <label class="form-check-label">Auto-generate password</label>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div class="col-md-6" id="passwordBox">
-                                <label class="form-label">Password</label>
-                                <input asp-for="Password" type="password" class="form-control" />
-                                <span asp-validation-for="Password" class="text-danger small"></span>
-                            </div>
+                                <div class="col-md-6" id="passwordBox">
+                                    <label class="form-label">Password</label>
+                                    <input asp-for="Password" type="password" class="form-control" />
+                                    <span asp-validation-for="Password" class="text-danger small"></span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="col-md-6" id="passwordBox">
+                                    <label class="form-label">Reset Password <span class="text-muted small">(leave blank to keep current)</span></label>
+                                    <input asp-for="Password" type="password" class="form-control" autocomplete="new-password" />
+                                    <span asp-validation-for="Password" class="text-danger small"></span>
+                                </div>
+                            }
                         </div>
                     </div>
                 </div>
 
-                <!-- STEP 7: REVIEW -->
-                <div class="step-content d-none" data-step-content="7">
+                <!-- STEP 4: REVIEW -->
+                <div class="step-content d-none" data-step-content="4">
                     <div class="ec-section-icon mb-3" style="width:46px;height:46px;border-radius:12px;font-size:22px;"><i class="bx bx-check-circle"></i></div>
-                    <h4 class="fw-bold">Review & Save</h4>
-                    <p class="text-muted mb-4">Review the information before creating the school.</p>
+                    <h4 class="fw-bold">Review &amp; Save</h4>
+                    <p class="text-muted mb-4">Review the information before saving the school.</p>
 
                     <div class="alert alert-info">
                         School code will be generated automatically after saving.
@@ -616,10 +500,10 @@
     </div>
 </div>
 @section PageScripts {
-    @* <partial name="_ValidationScriptsPartial" /> *@
     <script>
         let currentStep = 1;
-        const totalSteps = 7;
+        const totalSteps = 4;
+        const isEdit = @(isEdit ? "true" : "false");
 
         function showStep(step) {
             $(".step-content").addClass("d-none");
@@ -741,32 +625,12 @@
                     }
                 }
 
-                if (name === "Website" && value !== "" && !/^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/.*)?$/.test(value)) {
-                    showError(input, "Enter valid website.");
-                    isValid = false;
-                }
-
                 if (name === "ContactEmail" && value !== "" && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
                     showError(input, "Enter valid contact email.");
                     isValid = false;
                 }
 
-                if (name === "AlternatePhone" && value !== "" && !/^[6-9][0-9]{9}$/.test(value)) {
-                    showError(input, "Enter valid alternate phone number.");
-                    isValid = false;
-                }
-
-                if (name === "EstablishedYear" && value !== "") {
-                    let year = parseInt(value);
-                    let currentYear = new Date().getFullYear();
-
-                    if (isNaN(year) || year < 1800 || year > currentYear) {
-                        showError(input, "Enter valid established year.");
-                        isValid = false;
-                    }
-                }
-
-                if ($("#CreateSchoolAdmin").is(":checked")) {
+                if (isEdit || $("#CreateSchoolAdmin").is(":checked")) {
                     if (name === "AdminFullName" && value === "") {
                         showError(input, "Admin full name is required.");
                         isValid = false;
@@ -787,7 +651,13 @@
                         isValid = false;
                     }
 
-                    if (!$("#AutoGeneratePassword").is(":checked")) {
+                    if (isEdit) {
+                        // Edit: password optional (blank keeps current); validate length only if typed.
+                        if (name === "Password" && value !== "" && value.length < 6) {
+                            showError(input, "Password must be at least 6 characters.");
+                            isValid = false;
+                        }
+                    } else if (!$("#AutoGeneratePassword").is(":checked")) {
                         if (name === "Password" && value === "") {
                             showError(input, "Password is required.");
                             isValid = false;
@@ -909,8 +779,10 @@
         $(document).ready(function () {
             showStep(1);
             toggleTenantMode();
-            $("#adminFields").toggle($("#CreateSchoolAdmin").is(":checked"));
-            $("#passwordBox").toggle(!$("#AutoGeneratePassword").is(":checked"));
+            // On edit the admin fields are always shown (existing admin) and the password box
+            // is an optional reset; on create they follow the toggles.
+            $("#adminFields").toggle(isEdit || $("#CreateSchoolAdmin").is(":checked"));
+            $("#passwordBox").toggle(isEdit || !$("#AutoGeneratePassword").is(":checked"));
         });
     </script>
 }

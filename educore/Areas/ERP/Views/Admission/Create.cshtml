@@ -81,7 +81,7 @@
       </div>
     </div>
 
-    <form id="admissionForm" novalidate>
+    <form id="admissionForm" autocomplete="off" novalidate>
         @Html.AntiForgeryToken()
         <input type="hidden" name="EnquiryId" id="adm_EnquiryId" value="@(ViewBag.PrefillEnquiryId ?? "")" />
         <div class="row g-4">
@@ -351,18 +351,9 @@
                             <ul class="adm-steps">
                                 <li><i class="bx bx-check-circle"></i><span>One-time charges shown as <strong>due now</strong></span></li>
                                 <li><i class="bx bx-check-circle"></i><span>Monthly &amp; yearly fees scheduled for later</span></li>
-                                <li><i class="bx bx-check-circle"></i><span>Apply concession &amp; optional store add-ons</span></li>
+                                <li><i class="bx bx-check-circle"></i><span>Apply concession on one-time fees</span></li>
                             </ul>
                         </div>
-                    </div>
-
-                    <div id="kitPanel" class="d-none">
-                        <div class="fee-group-title d-flex align-items-center justify-content-between">
-                            <span><i class="bx bx-package me-1"></i>Optional Store Add-ons</span>
-                            <span class="optional-chip">Optional</span>
-                        </div>
-                        <div class="kit-meta mb-2" style="margin-top:-.25rem;">Inventory / store sale — added to today's collection, separate from school fees.</div>
-                        <div id="kitItems"><!-- store add-ons rendered from the shared inventory catalog --></div>
                     </div>
 
                     <div id="concessionPanel" class="d-none">
@@ -428,6 +419,40 @@
                         </div>
                     </div>
                     }
+
+                    @if (ViewBag.EnableTransport == true)
+                    {
+                    <!-- ── Transport (optional) ── -->
+                    <div id="transportPanel" class="mt-2">
+                        <div class="fee-group-title d-flex align-items-center justify-content-between">
+                            <span><i class="bx bx-bus me-1"></i>School Transport</span>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" id="usesTransport">
+                            </div>
+                        </div>
+                        <div class="fee-summary d-none" id="transportFields">
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label">Route</label>
+                                    <select id="transportRoute" class="form-select"><option value="">Select Route</option></select>
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label">Stop</label>
+                                    <select id="transportStop" class="form-select" disabled><option value="">Select route first</option></select>
+                                </div>
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center justify-content-between px-1">
+                                        <span class="text-muted" style="font-size:.8rem">Monthly bus fee (billed with monthly dues)</span>
+                                        <strong id="transportFare" style="color:#ff8a00">₹0</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="transportRouteId" name="TransportRouteId" />
+                    <input type="hidden" id="transportStopId" name="TransportStopId" />
+                    }
+
                     <input type="hidden" id="ledgerJson" name="LedgerPreviewJson" />
                 </div>
             </div>
@@ -452,8 +477,10 @@
   </div>
 </div>
 
+@await Html.PartialAsync("_FeeReceiptModal")
+
 @section PageScripts {
-<script src="~/js/inventory-catalog.js" asp-append-version="true"></script>
+<script src="~/js/fee-receipt.js" asp-append-version="true"></script>
 <script>
 /* =========================================================
    NEW ADMISSION (dedicated page)
@@ -470,7 +497,6 @@ $(function () {
     var $feeBox     = $('#feeContent');
     var $annual     = $('#annualTotalText');
     var $annualRef  = $('#annualRefText');
-    var $kit        = $('#kitPanel');
     var $concession = $('#concessionPanel');
     var $discType   = $('#discountType');
     var $discValue  = $('#discountValue');
@@ -478,6 +504,7 @@ $(function () {
     var $discReason = $('#discountReason');
     var $ledger     = $('#ledgerJson');
     var $form       = $('#admissionForm');
+    var payTodayMax = 0;   // max cash collectable at admission = amount due now
 
     var URL_FEES     = '@Url.Action("GetFeeStructure", "Admission", new { area = "ERP" })';
     var URL_SECTIONS = '@Url.Action("GetSections", "Admission", new { area = "ERP" })';
@@ -485,11 +512,6 @@ $(function () {
     var URL_LIST     = '@Url.Action("StudentList", "Student", new { area = "ERP" })';
 
     var fees = [];   // fee rows for the selected class + year
-
-    // Optional store add-ons come from the shared inventory catalog (single source of
-    // truth), not a hardcoded list — so a school's real saleable items drive the panel.
-    var KIT = (window.EduInventory && typeof window.EduInventory.admissionKit === 'function')
-        ? window.EduInventory.admissionKit() : [];
 
     function money(n) { return '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN'); }
 
@@ -524,7 +546,6 @@ $(function () {
         fees = [];
         $annual.text('₹0');
         $annualRef.text('One-time charges due now');
-        $kit.addClass('d-none');
         $concession.addClass('d-none');
         $ledger.val('');
         $feeBox.html('<div class="fee-empty"><i class="bx bx-wallet"></i><h6>Select Academic Year &amp; Class</h6>' +
@@ -532,7 +553,7 @@ $(function () {
             '<ul class="adm-steps">' +
             '<li><i class="bx bx-check-circle"></i><span>One-time charges shown as <strong>due now</strong></span></li>' +
             '<li><i class="bx bx-check-circle"></i><span>Monthly &amp; yearly fees scheduled for later</span></li>' +
-            '<li><i class="bx bx-check-circle"></i><span>Apply concession &amp; optional store add-ons</span></li>' +
+            '<li><i class="bx bx-check-circle"></i><span>Apply concession on one-time fees</span></li>' +
             '</ul></div>');
     }
 
@@ -547,7 +568,6 @@ $(function () {
                     fees = [];
                     $annual.text('₹0');
                     $annualRef.text('One-time charges due now');
-                    $kit.addClass('d-none');
                     $concession.addClass('d-none');
                     $ledger.val('');
                     $feeBox.html('<div class="fee-empty"><i class="bx bx-error-circle"></i><h6>No Fee Structure</h6><p class="mb-0">' + ((res && res.message) || 'Configure fee structure for this class first.') + '</p></div>');
@@ -562,7 +582,6 @@ $(function () {
                         mandatory: f.mandatory !== false, selected: true
                     };
                 });
-                if (KIT.length) $kit.removeClass('d-none');
                 $concession.removeClass('d-none');
                 renderFees();
             })
@@ -579,28 +598,6 @@ $(function () {
         if (v <= 0) return 0;
         if ($discType.val() === 'percentage') return Math.round((base * Math.min(v, 100)) / 100);
         return Math.min(v, base);
-    }
-    function kitTotal() {
-        var t = 0;
-        $('.kit-checkbox:checked').each(function () { t += Number($(this).data('amount') || 0); });
-        return t;
-    }
-
-    // Build the store add-on rows once from the catalog. Mandatory kit items are pre-ticked.
-    function renderKitItems() {
-        if (!KIT.length) { $('#kitItems').empty(); $kit.addClass('d-none'); return; }
-        var html = '';
-        $.each(KIT, function (_, it) {
-            var amt = Number(it.selling || 0);
-            html += '<label class="fee-check-row" style="cursor:pointer;">' +
-                '<div class="d-flex gap-2 align-items-start">' +
-                '<input type="checkbox" class="form-check-input kit-checkbox mt-1" data-amount="' + amt + '" ' +
-                'name="SelectedKitItems" value="' + it.name + '"' + (it.mandatory ? ' checked' : '') + '>' +
-                '<div><div class="fw-bold" style="color:var(--ec-heading)">' + it.name + '</div>' +
-                '<small>' + (it.category || 'Store item') + '</small></div>' +
-                '</div><strong>' + money(amt) + '</strong></label>';
-        });
-        $('#kitItems').html(html);
     }
 
     function renderFees() {
@@ -644,31 +641,35 @@ $(function () {
         }
 
         var payNow = 0, monthly = 0, quarterly = 0, halfYearly = 0, yearly = 0, annual = 0;
+        // Discountable base excludes refundable deposits (Caution Money) — a discount
+        // applies to income heads only, never to a deposit the school returns.
+        var discountableNow = 0, discountableAnnual = 0;
         $.each(fees, function (_, f) {
             if (!f.selected) return;
-            annual += (f.cycle === 'Monthly' ? f.amount * 12
+            var annualAmt = (f.cycle === 'Monthly' ? f.amount * 12
                 : f.cycle === 'Quarterly' ? f.amount * 4
                 : f.cycle === 'Half Yearly' ? f.amount * 2
                 : f.amount);
-            if (f.stage === 'Admission') payNow += f.amount;
+            annual += annualAmt;
+            if (!f.refundable) discountableAnnual += annualAmt;
+            if (f.stage === 'Admission') { payNow += f.amount; if (!f.refundable) discountableNow += f.amount; }
             else if (f.stage === 'Monthly') monthly += f.amount;
             else if (f.stage === 'Quarterly') quarterly += f.amount;
             else if (f.stage === 'HalfYearly') halfYearly += f.amount;
             else if (f.stage === 'Yearly') yearly += f.amount;
         });
 
-        var kit = kitTotal();
         var applyTo = $discApply.val();
-        var disc = discountOn(applyTo === 'annual' ? annual : payNow);
-        // Pay-today = one-time fees + optional store add-ons − concession (if applied here).
-        var payToday = payNow + kit - (applyTo === 'payToday' ? disc : 0);
-        // Estimated annual = school fees for the year (store kit is not a recurring fee).
+        var disc = discountOn(applyTo === 'annual' ? discountableAnnual : discountableNow);
+        // Pay-today = one-time school fees − concession (if applied here). Store add-ons
+        // are NOT charged at admission (sold separately at the store), so they never
+        // contribute to the amount collected.
+        var payToday = payNow - (applyTo === 'payToday' ? disc : 0);
         var estAnnual = annual - (applyTo === 'annual' ? disc : 0);
 
         var summary = '<div class="fee-summary">' +
             '<div class="fee-group-title" style="margin:0 0 .5rem;">Due at Admission</div>' +
             '<div class="summary-line"><span>One-Time Fees</span><strong>' + money(payNow) + '</strong></div>';
-        if (kit > 0) summary += '<div class="summary-line"><span>Store Add-ons</span><strong>' + money(kit) + '</strong></div>';
         if (applyTo === 'payToday' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + money(disc) + '</strong></div>';
         summary += '<hr class="opacity-25"><div class="summary-line"><span style="color:var(--ec-heading);font-weight:950;">Collect at Admission</span><strong style="color:var(--ec-primary);">' + money(payToday) + '</strong></div>';
         summary += '<div class="fee-group-title" style="margin:1rem 0 .5rem;">Scheduled — Billed Later</div>' +
@@ -685,9 +686,12 @@ $(function () {
         $annualRef.text('Est. annual fee ' + money(estAnnual) + ' · billed through the year');
         $feeBox.html(html);
 
-        // Default "Amount to Collect" to Pay Today (until the user edits it).
-        if ($('#paymentAmount').length && !window._payEdited) {
-            $('#paymentAmount').val(Math.round(payToday));
+        // Cap collection at the amount due now (no advance/prepay at admission — that's
+        // the Fee counter's job). Default "Amount to Collect" to Pay Today until edited.
+        payTodayMax = Math.round(payToday);
+        if ($('#paymentAmount').length) {
+            $('#paymentAmount').attr('max', payTodayMax);
+            if (!window._payEdited) $('#paymentAmount').val(payTodayMax);
         }
 
         $ledger.val(JSON.stringify({
@@ -699,9 +703,6 @@ $(function () {
                     ? { feeHeadId: f.id, feeHeadName: f.name, frequency: f.cycle, amount: f.amount, mandatory: f.mandatory }
                     : null;
             }),
-            selectedKitItems: $('.kit-checkbox:checked').map(function () {
-                return { name: $(this).val(), amount: Number($(this).data('amount') || 0) };
-            }).get(),
             concession: {
                 type: $discType.val(), value: Number($discValue.val() || 0),
                 applyTo: applyTo, calculatedAmount: disc, reason: $discReason.val() || ''
@@ -714,7 +715,6 @@ $(function () {
     $year.add($class).on('change', function () { loadFees(); loadSections(); });
     $admDate.add($discType).add($discApply).on('change', renderFees);
     $discValue.add($discReason).on('input', renderFees);
-    $(document).on('change', '.kit-checkbox', renderFees);
     $feeBox.on('change', '.optional-fee-checkbox', function () {
         fees[Number($(this).data('index'))].selected = this.checked;
         renderFees();
@@ -722,6 +722,15 @@ $(function () {
 
     /* ── Collect Now (only present when the school enables it) ── */
     $('#paymentAmount').on('input', function () { window._payEdited = true; });
+    // Block overpay: at admission you can collect at most the amount due now. Advance
+    // / prepay must go through the Fee counter (ManageFee). Clamp back on blur + warn.
+    $('#paymentAmount').on('change', function () {
+        var v = Number($(this).val() || 0);
+        if (payTodayMax > 0 && v > payTodayMax) {
+            $(this).val(payTodayMax);
+            notify('warning', 'Amount cannot exceed ' + money(payTodayMax) + ' (due now). For advance / prepay use the Fee counter.');
+        }
+    });
     $('#collectFeeNow').on('change', function () {
         $('#collectNowFields').toggle(this.checked);
     });
@@ -730,10 +739,46 @@ $(function () {
         $('#paymentRefRow').toggle($(this).val() !== 'Cash');
     }).trigger('change');
 
+    /* ── transport (optional) ── only wired when the school runs buses ── */
+    @if (ViewBag.EnableTransport == true)
+    {
+    <text>
+    var transportRoutes = [];
+    $.getJSON('@Url.Action("GetTransportRoutes","Admission",new{area="ERP"})', function (r) {
+        transportRoutes = r || [];
+        var h = '<option value="">Select Route</option>';
+        transportRoutes.forEach(function (x) { h += '<option value="' + x.routeId + '">' + x.routeName + '</option>'; });
+        $('#transportRoute').html(h);
+    });
+    function transMoney(n) { return '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN'); }
+    function clearTransport() {
+        $('#transportRoute').val(''); $('#transportStop').prop('disabled', true).html('<option value="">Select route first</option>');
+        $('#transportFare').text('₹0'); $('#transportRouteId').val(''); $('#transportStopId').val('');
+    }
+    $('#usesTransport').on('change', function () {
+        $('#transportFields').toggleClass('d-none', !this.checked);
+        if (!this.checked) clearTransport();
+    });
+    $('#transportRoute').on('change', function () {
+        var r = transportRoutes.find(function (x) { return x.routeId === Number($('#transportRoute').val()); });
+        $('#transportRouteId').val(r ? r.routeId : '');
+        $('#transportStopId').val(''); $('#transportFare').text('₹0');
+        if (!r) { $('#transportStop').prop('disabled', true).html('<option value="">Select route first</option>'); return; }
+        var h = '<option value="">Select Stop</option>';
+        r.stops.forEach(function (s) { h += '<option value="' + s.stopId + '" data-fare="' + s.fare + '">' + s.stopName + ' — ' + transMoney(s.fare) + '</option>'; });
+        $('#transportStop').html(h).prop('disabled', false);
+    });
+    $('#transportStop').on('change', function () {
+        var fare = Number($(this).find(':selected').data('fare')) || 0;
+        $('#transportFare').text(transMoney(fare));
+        $('#transportStopId').val($(this).val() || '');
+    });
+    </text>
+    }
+
     /* ── submit (AJAX) ───────────────────────────────── */
     $form.on('submit', function (e) {
         e.preventDefault();
-
         if (!this.checkValidity()) { $form.addClass('was-validated'); return; }
         if (Number($discValue.val() || 0) > 0 && !$.trim($discReason.val())) {
             $discReason.focus();
@@ -746,6 +791,13 @@ $(function () {
             } else {
                 notify('error', 'No fee structure is configured for ' + $class.val() + ' (' + $year.val() + '). Set it up under School Settings → Fee Structure first.');
             }
+            return;
+        }
+        // Overpay guard: collect at most the amount due now (advance/prepay → Fee counter).
+        if ($('#collectFeeNow').is(':checked') && payTodayMax > 0 &&
+            Number($('#paymentAmount').val() || 0) > payTodayMax) {
+            $('#paymentAmount').focus();
+            notify('error', 'Amount to collect cannot exceed ' + money(payTodayMax) + ' (due now). For advance / prepay use the Fee counter.');
             return;
         }
 
@@ -771,8 +823,15 @@ $(function () {
                 var msg = 'Admission ' + (res.admissionNo || '') + ' saved.';
                 if (res.receiptNo) msg += ' Receipt ' + res.receiptNo + ' generated.';
                 notify('success', msg);
-                // Hand off to the student list (it will re-fetch the fresh record).
-                setTimeout(function () { window.location.href = URL_LIST; }, 900);
+                // If a fee was collected, show the printable receipt; go to the
+                // student list once the user closes it. Otherwise redirect straight away.
+                if (res.receiptNo && window.EcReceipt) {
+                    var modalEl = document.getElementById('ecReceiptModal');
+                    if (modalEl) modalEl.addEventListener('hidden.bs.modal', function () { window.location.href = URL_LIST; }, { once: true });
+                    EcReceipt.show(res.receiptNo);
+                } else {
+                    setTimeout(function () { window.location.href = URL_LIST; }, 900);
+                }
             } else {
                 notify('error', (res && res.message) || 'Unable to save admission.');
                 $btn.prop('disabled', false).html(oldHtml);
@@ -788,7 +847,6 @@ $(function () {
         toastr.options = { closeButton: true, progressBar: true, positionClass: 'toast-top-right', timeOut: 3000 };
     }
 
-    renderKitItems();
     showEmptyFees();
 
     /* ── prefill from a converted enquiry ────────────── */

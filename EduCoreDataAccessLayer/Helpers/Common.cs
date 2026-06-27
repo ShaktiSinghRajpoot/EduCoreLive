@@ -13,6 +13,8 @@ namespace EduCoreDataAccessLayer.Helpers
 
         public const string SK_UserId = "_userid";
         public const string SK_RoleId = "_roleid";
+        // Session key: the role a multi-role user has chosen to "focus" on (0/absent = combined view of all roles).
+        public const string SK_ActiveRoleId = "_activeroleid";
         public const string SK_UserName = "_username";
         public const string SK_Desig = "_desig";
         public const string SK_ThemeMode = "_thememode";

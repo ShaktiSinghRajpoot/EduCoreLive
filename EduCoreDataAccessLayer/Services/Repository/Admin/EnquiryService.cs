@@ -2,6 +2,7 @@ using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.Admin;
 using EduCoreDataAccessLayer.Services.Contract.Admin;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using System.Data;
@@ -10,19 +11,22 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 {
     public class EnquiryService : IEnquiryService
     {
-        private readonly string _connectionString;
+        private readonly PgExec _db;
         private const string SpMain     = "core.sp_enquiry_crm_manage";
         private const string SpFollowup = "core.sp_enquiry_followup_manage";
 
-        public EnquiryService(IConfiguration configuration)
+        // WHY: log the real cause before catch blocks swallow it into a friendly message.
+        private readonly ILogger<EnquiryService> _logger;
+
+        public EnquiryService(PgExec db, ILogger<EnquiryService> logger)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")!;
+            _db = db;
+            _logger = logger;
         }
 
         // ── Page load ────────────────────────────────────────────
-        public async Task<EnquiryCrmPageModel> GetEnquiryCrmPageAsync(
-            int tenantId, int schoolId, int actionUserId)
-        {
+        public async Task<EnquiryCrmPageModel> GetEnquiryCrmPageAsync(int tenantId, int schoolId, int actionUserId)
+{
             var (items, totalCount) = await GetEnquiriesAsync(tenantId, schoolId, actionUserId, 1, 10);
             return new EnquiryCrmPageModel
             {
@@ -75,11 +79,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "p_result" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
 
-            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (list, 0);
-
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+            { 
+                return (list, 0);
+            }
             int totalCount = 0;
             foreach (DataRow row in ds.Tables[0].Rows)
             {
@@ -107,7 +113,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "kpi_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return stats;
@@ -130,8 +136,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
         }
 
         // ── Single enquiry ───────────────────────────────────────
-        public async Task<EnquiryModel?> GetEnquiryByIdAsync(
-            int enquiryId, int tenantId, int schoolId, int actionUserId)
+        public async Task<EnquiryModel?> GetEnquiryByIdAsync(int enquiryId, int tenantId, int schoolId, int actionUserId)
         {
             if (tenantId <= 1 || schoolId <= 0 || enquiryId <= 0) return null;
 
@@ -146,7 +151,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
@@ -201,7 +206,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "save_enquiry_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return 0;
@@ -230,7 +235,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "update_status_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (0, "No response.");
@@ -267,7 +272,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 
             try
             {
-                using var dal = new PostgreSqlDal(_connectionString);
+                var dal = _db;
                 var ds = await dal.ExecuteProcedureWithCursorsAsync("core.sp_enquiry_register", parameters);
 
                 if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -284,10 +289,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
             catch (PostgresException pex)
             {
                 // Surface the proc's RAISE EXCEPTION message (e.g. "already admitted").
+                // WHY: Warning, not Error — this is usually an expected business rule from the proc.
+                _logger.LogWarning(pex, "Enquiry registration rejected for enquiry {EnquiryId}, school {SchoolId}. SqlState {SqlState}", enquiryId, schoolId, pex.SqlState);
                 return (0, pex.MessageText, null);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Unexpected error registering enquiry {EnquiryId}, school {SchoolId}.", enquiryId, schoolId);
                 return (0, "Unable to complete registration.", null);
             }
         }
@@ -324,7 +332,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "log_followup_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFollowup, parameters);
 
             return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0 ? 1 : 0;
@@ -348,7 +356,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "get_followups_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFollowup, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return list;
@@ -391,7 +399,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "status_history_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFollowup, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return list;
@@ -429,7 +437,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "delete_enquiry_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
             return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0 ? 1 : 0;
         }

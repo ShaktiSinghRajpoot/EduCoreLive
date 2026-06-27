@@ -579,13 +579,10 @@
             const allRows = Array.from(tbody.querySelectorAll('tr'));
             const pvModal = new bootstrap.Modal($('#pvModal'));
 
+            // Unified: route through the app-wide ecToast/toastr (maps legacy colors to a toast type).
             function toast(text, color) {
-                const el = document.createElement('div');
-                el.className = 'pv-toast';
-                if (color) el.style.borderLeftColor = color;
-                el.innerHTML = '<i class="bx bx-check-circle" style="color:' + (color || '#16a34a') + ';font-size:1.15rem"></i><span>' + text + '</span>';
-                $('#pvToastWrap').appendChild(el);
-                setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3000);
+                const map = { '#dc2626': 'error', '#ff8a00': 'warning', '#0284c7': 'info' };
+                window.ecToast(color ? (map[String(color).toLowerCase()] || 'success') : 'success', text);
             }
 
             // ---------- stats ----------

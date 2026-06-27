@@ -1,7 +1,9 @@
+@model EduCoreDataAccessLayer.Models.StaffModel
 @{
     ViewData["Title"] = "Edit Staff";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
-    int staffId = ViewBag.StaffId ?? 0;
+    int staffId = Model.StaffId;
+    var dd = ViewBag.Dropdowns as EduCoreDataAccessLayer.Models.StaffDropdowns ?? new EduCoreDataAccessLayer.Models.StaffDropdowns();
 }
 
 @section PageStyles {
@@ -17,7 +19,6 @@
 .es-breadcrumb a:hover{ color:var(--ec-primary); }
 .es-breadcrumb span{ color:var(--ec-text-dark); }
 .es-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; margin-bottom:1.25rem; transition:var(--ec-transition); }
-.es-card:hover{ border-color:rgba(255,138,0,.2); box-shadow:0 8px 24px rgba(43,27,18,.06); }
 .es-card-hdr{ display:flex; align-items:center; gap:.85rem; padding:1rem 1.25rem .75rem; border-bottom:1px solid var(--ec-border); }
 .es-sec-ic{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; background:var(--ec-primary-light); color:var(--ec-primary); display:flex; align-items:center; justify-content:center; font-size:1rem; }
 .es-sec-title{ font-size:.9rem; font-weight:900; color:var(--ec-text-dark); }
@@ -27,8 +28,8 @@
 .es-label.required::after{ content:" *"; color:#ea5455; }
 .es-page .form-control,.es-page .form-select{ border:1px solid var(--ec-border); border-radius:12px; min-height:46px; font-size:.88rem; font-weight:650; color:var(--ec-text); background:#fff; transition:border-color .2s,box-shadow .2s; }
 .es-page .form-control:focus,.es-page .form-select:focus{ border-color:rgba(255,138,0,.6); box-shadow:0 0 0 4px rgba(255,138,0,.11); }
-.es-readonly{ background:#f9f8f6 !important; color:var(--ec-text-muted) !important; cursor:not-allowed; }
 .es-sticky{ position:sticky; bottom:0; background:rgba(255,255,255,.95); backdrop-filter:blur(10px); border-top:1px solid var(--ec-border); padding:1rem 1.25rem; display:flex; justify-content:flex-end; gap:.75rem; border-radius:0 0 var(--ec-radius) var(--ec-radius); z-index:5; }
+.es-login-toggle{ display:flex; align-items:center; gap:.6rem; }
 </style>
 }
 
@@ -58,10 +59,14 @@
       </div>
     </div>
 
+    <div asp-validation-summary="All" class="alert alert-danger" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
+
     <form asp-area="ERP" asp-controller="Staff" asp-action="EditStaff" method="post" novalidate>
       @Html.AntiForgeryToken()
       <input type="hidden" name="id" value="@staffId" />
+      <input asp-for="UserId" type="hidden" />
 
+      <!-- Personal -->
       <div class="es-card">
         <div class="es-card-hdr">
           <div class="es-sec-ic"><i class="bx bx-user"></i></div>
@@ -71,72 +76,191 @@
           <div class="row g-3">
             <div class="col-12 col-md-4">
               <label class="es-label required">Full Name</label>
-              <input type="text" id="f_FullName" name="FullName" class="form-control" required>
+              <input asp-for="FullName" class="form-control">
             </div>
             <div class="col-12 col-md-4">
-              <label class="es-label required">Gender</label>
-              <select id="f_Gender" name="Gender" class="form-select" required>
+              <label class="es-label">Gender</label>
+              <select asp-for="Gender" class="form-select">
                 <option value="">Select</option><option>Male</option><option>Female</option><option>Other</option>
               </select>
             </div>
             <div class="col-12 col-md-4">
-              <label class="es-label required">Mobile Number</label>
-              <input type="tel" id="f_MobileNumber" name="MobileNumber" maxlength="10" pattern="[0-9]{10}" class="form-control" required>
+              <label class="es-label">Date of Birth</label>
+              <input asp-for="DateOfBirth" type="date" class="form-control">
             </div>
             <div class="col-12 col-md-4">
-              <label class="es-label required">Email</label>
-              <input type="email" id="f_Email" name="Email" class="form-control" required>
+              <label class="es-label">Mobile Number</label>
+              <input asp-for="Mobile" maxlength="10" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="es-label">Email</label>
+              <input asp-for="Email" type="email" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="es-label">Blood Group</label>
+              <select asp-for="BloodGroup" class="form-select">
+                <option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+              </select>
             </div>
             <div class="col-12">
               <label class="es-label">Address</label>
-              <textarea id="f_Address" name="Address" class="form-control" rows="2"></textarea>
+              <textarea asp-for="Address" class="form-control" rows="2"></textarea>
             </div>
           </div>
         </div>
       </div>
 
+      <!-- Employment -->
       <div class="es-card">
         <div class="es-card-hdr">
           <div class="es-sec-ic"><i class="bx bx-briefcase"></i></div>
-          <div><div class="es-sec-title">Employment Details</div><div class="es-sec-sub">Role, department and joining</div></div>
+          <div><div class="es-sec-title">Employment Details</div><div class="es-sec-sub">Designation, department and joining</div></div>
         </div>
         <div class="es-card-body">
           <div class="row g-3">
             <div class="col-12 col-md-4">
               <label class="es-label">Employee ID</label>
-              <input type="text" id="f_EmployeeId" name="EmployeeId" class="form-control es-readonly" readonly>
+              <input asp-for="EmployeeCode" class="form-control">
             </div>
             <div class="col-12 col-md-4">
               <label class="es-label required">Designation</label>
-              <input type="text" id="f_Designation" name="Designation" class="form-control" required>
+              <select asp-for="Designation" class="form-select">
+                <option value="">Select designation</option>
+                @foreach (var g in dd.Designations)
+                {
+                    <option value="@g.Name">@g.Name</option>
+                }
+              </select>
             </div>
             <div class="col-12 col-md-4">
-              <label class="es-label required">Staff Type</label>
-              <select id="f_StaffType" name="StaffType" class="form-select" required>
-                <option value="">Select</option><option>Teaching</option><option>Non-Teaching</option>
+              <label class="es-label">Staff Type</label>
+              <select asp-for="StaffType" class="form-select">
+                <option value="">Select</option>
+                <option>Teaching</option><option>Non-Teaching</option><option>Transport</option><option>Support</option>
               </select>
             </div>
             <div class="col-12 col-md-4">
               <label class="es-label required">Department</label>
-              <select id="f_Department" name="Department" class="form-select" required>
-                <option value="">Select</option>
-                <option>Teaching</option><option>Administration</option><option>Accounts</option>
-                <option>Library</option><option>Transport</option><option>Support Staff</option>
+              <select asp-for="Department" class="form-select">
+                <option value="">Select department</option>
+                @foreach (var d in dd.Departments)
+                {
+                    <option value="@d">@d</option>
+                }
               </select>
             </div>
             <div class="col-12 col-md-4">
-              <label class="es-label required">Joining Date</label>
-              <input type="date" id="f_JoiningDate" name="JoiningDate" class="form-control" required>
+              <label class="es-label">Joining Date</label>
+              <input asp-for="JoiningDate" type="date" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="es-label">Qualification</label>
+              <input asp-for="Qualification" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="es-label">Experience (years)</label>
+              <input asp-for="ExperienceYears" type="number" min="0" class="form-control">
             </div>
             <div class="col-12 col-md-4">
               <label class="es-label">Employment Status</label>
-              <select id="f_Status" name="Status" class="form-select">
+              <select asp-for="Status" class="form-select">
                 <option>Active</option><option>On Leave</option><option>Inactive</option>
               </select>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Payroll / Bank -->
+      <div class="es-card">
+        <div class="es-card-hdr">
+          <div class="es-sec-ic"><i class="bx bx-money"></i></div>
+          <div><div class="es-sec-title">Payroll &amp; Bank</div><div class="es-sec-sub">Salary and account details for payroll</div></div>
+        </div>
+        <div class="es-card-body">
+          <div class="row g-3">
+            <div class="col-12 col-md-4">
+              <label class="es-label">Monthly Salary (₹)</label>
+              <input asp-for="MonthlySalary" type="number" min="0" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="es-label">Bank Account No</label>
+              <input asp-for="BankAccountNo" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="es-label">IFSC Code</label>
+              <input asp-for="IfscCode" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="es-label">PAN</label>
+              <input asp-for="Pan" class="form-control">
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="es-label">Aadhaar No</label>
+              <input asp-for="Aadhaar" maxlength="12" class="form-control">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      @if (Model.UserId is null)
+      {
+        <!-- Grant login (only when none exists yet) -->
+        <div class="es-card">
+          <div class="es-card-hdr">
+            <div class="es-sec-ic"><i class="bx bx-log-in-circle"></i></div>
+            <div><div class="es-sec-title">App Access (optional)</div><div class="es-sec-sub">This person has no login yet. Tick to create one.</div></div>
+          </div>
+          <div class="es-card-body">
+            <div class="es-login-toggle mb-3">
+              <input asp-for="CreateLogin" type="checkbox" class="form-check-input mt-0" id="chkLogin" style="width:2.4em;height:1.3em;">
+              <label for="chkLogin" class="fw-bold mb-0" style="color:var(--ec-text-dark);">Create a login for this person</label>
+            </div>
+            <div class="row g-3" id="loginFields" style="display:none;">
+              <div class="col-12 col-md-4">
+                <label class="es-label required">Temporary Password</label>
+                <input asp-for="LoginPassword" type="password" class="form-control" placeholder="At least 8 characters" autocomplete="new-password">
+              </div>
+              <div class="col-12">
+                <label class="es-label required">Role(s)</label>
+                <div class="d-flex flex-wrap gap-3">
+                  @foreach (var r in dd.Roles)
+                  {
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="RoleIds" value="@r.RoleId" id="role_@r.RoleId" checked="@Model.RoleIds.Contains(r.RoleId)">
+                      <label class="form-check-label" for="role_@r.RoleId">@r.RoleName</label>
+                    </div>
+                  }
+                </div>
+                <div class="text-muted small mt-1">Pick one or more — the person gets the combined access of every role selected.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+      else
+      {
+        <!-- Manage access for an existing login -->
+        <div class="es-card">
+          <div class="es-card-hdr">
+            <div class="es-sec-ic"><i class="bx bx-log-in-circle"></i></div>
+            <div><div class="es-sec-title">App Access</div><div class="es-sec-sub">This person can log in. Set the role(s) that control what they can do.</div></div>
+          </div>
+          <div class="es-card-body">
+            <label class="es-label required">Role(s)</label>
+            <div class="d-flex flex-wrap gap-3">
+              @foreach (var r in dd.Roles)
+              {
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="RoleIds" value="@r.RoleId" id="role_@r.RoleId" checked="@Model.RoleIds.Contains(r.RoleId)">
+                  <label class="form-check-label" for="role_@r.RoleId">@r.RoleName</label>
+                </div>
+              }
+            </div>
+            <div class="text-muted small mt-1">Permissions are the combined access of every role ticked. Changes take effect the next time they load a page.</div>
+          </div>
+        </div>
+      }
 
       <div class="es-sticky">
         <a class="btn btn-outline-secondary px-4" asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@staffId">Cancel</a>
@@ -149,21 +273,13 @@
 </div>
 
 @section PageScripts {
+<partial name="_ValidationScriptsPartial" />
 <script>
 (function(){
-  /* Mock prefill — replace with model binding once the SP is ready. */
-  var STAFF={
-    1:{name:'Sunita Rao',gender:'Female',phone:'9876500011',email:'sunita.rao@school.edu',addr:'12 MG Road, Pune',emp:'EMP-001',desig:'Principal',type:'Non-Teaching',dept:'Administration',join:'2015-06-01',status:'Active'},
-    3:{name:'Anita Desai',gender:'Female',phone:'9876500013',email:'anita.desai@school.edu',addr:'8 Park Street, Pune',emp:'EMP-003',desig:'Senior Teacher',type:'Teaching',dept:'Teaching',join:'2017-07-15',status:'Active'},
-    4:{name:'Vikram Joshi',gender:'Male',phone:'9876500014',email:'vikram.joshi@school.edu',addr:'45 Lake View, Pune',emp:'EMP-004',desig:'Maths Teacher',type:'Teaching',dept:'Teaching',join:'2018-06-20',status:'Active'}
-  };
-  var id=@staffId;
-  var s=STAFF[id]||{name:'',gender:'',phone:'',email:'',addr:'',emp:'EMP-'+String(id).padStart(3,'0'),desig:'',type:'',dept:'',join:'',status:'Active'};
-  function set(elId,val){var el=document.getElementById(elId);if(el)el.value=val||'';}
-  set('f_FullName',s.name); set('f_Gender',s.gender); set('f_MobileNumber',s.phone);
-  set('f_Email',s.email); set('f_Address',s.addr); set('f_EmployeeId',s.emp);
-  set('f_Designation',s.desig); set('f_StaffType',s.type); set('f_Department',s.dept);
-  set('f_JoiningDate',s.join); set('f_Status',s.status);
+  var chk = document.getElementById('chkLogin');
+  var box = document.getElementById('loginFields');
+  function sync(){ if(box) box.style.display = chk && chk.checked ? 'flex' : 'none'; }
+  if (chk){ chk.addEventListener('change', sync); sync(); }
 })();
 </script>
 }

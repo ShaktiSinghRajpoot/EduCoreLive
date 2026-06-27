@@ -431,14 +431,9 @@ $(document).ready(function () {
     let originalSnap  = [];   // snapshot of subjects when class was loaded
 
     // ── Helpers ──────────────────────────────────────────────────────────────
+    // Unified: route through the app-wide ecToast/toastr.
     function showToast(msg, type) {
-        const t     = document.getElementById('smToast');
-        const color = type === 'error' ? '#dc3545' : '#28a745';
-        t.style.borderLeftColor = color;
-        t.querySelector('i').style.color = color;
-        $('#smToastMsg').text(msg);
-        $(t).addClass('show');
-        setTimeout(() => $(t).removeClass('show'), 3200);
+        window.ecToast(type === 'error' ? 'error' : 'success', msg);
     }
 
     function getSubjects(cls) {

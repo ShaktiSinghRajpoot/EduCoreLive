@@ -1,8 +1,10 @@
+using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
+    [HasPermission("staff.view")]
     public class PayrollController : Controller
     {
         public IActionResult PayrollManagement()
@@ -11,6 +13,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
         public IActionResult MarkPaid(int id)
         {
@@ -21,6 +24,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
         public IActionResult RunPayroll(IFormCollection form)
         {

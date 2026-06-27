@@ -1,7 +1,18 @@
 @using System.Security.Claims
 @using EduCoreDataAccessLayer.Helpers
+@inject EduCoreDataAccessLayer.Services.IPermissionService PermissionService
 
 @{
+    // Multi-role "focus" switch: list the user's roles (only relevant when they hold 2+).
+    int _navTId = int.TryParse(User.FindFirst(Common.SK_TenantId)?.Value, out var _nt) ? _nt : 0;
+    int _navSId = int.TryParse(User.FindFirst(Common.SK_SchoolId)?.Value, out var _ns) ? _ns : 0;
+    int _navUId = int.TryParse(User.FindFirst(Common.SK_UserId)?.Value, out var _nu) ? _nu : 0;
+    var switchRoles = await PermissionService.GetUserRolesListAsync(_navTId, _navSId, _navUId);
+    int activeRoleId = Context.Session.GetInt32(Common.SK_ActiveRoleId) ?? 0;
+    string activeRoleLabel = activeRoleId > 0
+        ? (switchRoles.FirstOrDefault(r => r.RoleId == activeRoleId).RoleName ?? "All roles")
+        : "All roles";
+
     var userName = User.FindFirst(Common.SK_UserName)?.Value
                 ?? User.Identity?.Name
                 ?? "User";
@@ -158,6 +169,50 @@
                         </div>
                     </li>
                 }
+                @* ── Switch role (only when the user holds more than one) ───── *@
+                @if (switchRoles.Count > 1)
+                {
+                    <li>
+                        <div class="px-4 pt-2 pb-1">
+                            <small class="text-muted d-block" style="font-size:.65rem;text-transform:uppercase;letter-spacing:.04em;">Viewing as</small>
+                        </div>
+                    </li>
+                    <li>
+                        <form asp-area="" asp-controller="Account" asp-action="SwitchRole" method="post" class="m-0">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="roleId" value="0" />
+                            <button type="submit" class="dropdown-item d-flex align-items-center gap-2 py-2 @(activeRoleId == 0 ? "active fw-semibold" : "")" style="background:none;border:none;cursor:pointer;text-align:left;width:100%;">
+                                <i class="icon-base bx bx-layer icon-md"></i>
+                                All roles (combined)
+                                @if (activeRoleId == 0) { <i class="bx bx-check ms-auto"></i> }
+                            </button>
+                        </form>
+                    </li>
+                    @foreach (var r in switchRoles)
+                    {
+                        <li>
+                            <form asp-area="" asp-controller="Account" asp-action="SwitchRole" method="post" class="m-0">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="roleId" value="@r.RoleId" />
+                                <button type="submit" class="dropdown-item d-flex align-items-center gap-2 py-2 @(activeRoleId == r.RoleId ? "active fw-semibold" : "")" style="background:none;border:none;cursor:pointer;text-align:left;width:100%;">
+                                    <i class="icon-base bx bx-user icon-md"></i>
+                                    @r.RoleName
+                                    @if (activeRoleId == r.RoleId) { <i class="bx bx-check ms-auto"></i> }
+                                </button>
+                            </form>
+                        </li>
+                    }
+                    <li><hr class="dropdown-divider my-0"></li>
+                }
+
+                <li>
+                    <a asp-area="" asp-controller="Account" asp-action="ChangePassword"
+                       class="dropdown-item d-flex align-items-center gap-2 py-2">
+                        <i class="icon-base bx bx-key icon-md"></i>
+                        Change Password
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider my-0"></li>
                 <li>
                     <form asp-area="" asp-controller="Account" asp-action="Logout" method="post"
                           class="py-1">

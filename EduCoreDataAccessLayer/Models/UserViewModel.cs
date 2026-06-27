@@ -19,6 +19,7 @@
         public bool IsActive { get; set; }
         public bool IsDeleted { get; set; }
         public bool RememberMe { get; set; }
+        public bool MustChangePassword { get; set; }
 
         public string? PasswordHash { get; set; }
     }

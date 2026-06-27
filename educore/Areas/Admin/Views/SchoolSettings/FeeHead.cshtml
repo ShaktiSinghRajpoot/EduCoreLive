@@ -678,20 +678,6 @@
             });
 
             filterFeeHeads();
-
-            @if (TempData["SuccessMessage"] != null)
-            {
-                    <text>
-                        showToast('success', '@TempData["SuccessMessage"]');
-                    </text>
-            }
-
-            @if (TempData["ErrorMessage"] != null)
-            {
-                    <text>
-                        showToast('error', '@TempData["ErrorMessage"]');
-                    </text>
-            }
         });
     </script>
 }

@@ -2,6 +2,7 @@ using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.Admin;
 using EduCoreDataAccessLayer.Services.Contract.Admin;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using System.Data;
@@ -10,12 +11,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 {
     public class RegistrationService : IRegistrationService
     {
-        private readonly string _connectionString;
+        private readonly PgExec _db;
         private const string SpManage = "core.sp_registration_manage";
 
-        public RegistrationService(IConfiguration configuration)
+        // WHY: log the real cause before catch blocks swallow it into a friendly message.
+        private readonly ILogger<RegistrationService> _logger;
+
+        public RegistrationService(PgExec db, ILogger<RegistrationService> logger)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")!;
+            _db = db;
+            _logger = logger;
         }
 
         public async Task<(List<RegistrationListItem> Items, int TotalCount)> GetRegistrationsAsync(
@@ -45,7 +50,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
             };
 
             int total = 0;
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpManage, parameters);
 
             if (ds.Tables.Count > 0)
@@ -88,7 +93,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpManage, parameters);
 
             if (ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
@@ -131,7 +136,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 
             try
             {
-                using var dal = new PostgreSqlDal(_connectionString);
+                var dal = _db;
                 var ds = await dal.ExecuteProcedureWithCursorsAsync(SpManage, parameters);
 
                 if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -145,10 +150,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
             }
             catch (PostgresException pex)
             {
+                _logger.LogWarning(pex, "Registration action '{Operation}' rejected for enquiry {EnquiryId}, school {SchoolId}. SqlState {SqlState}", operation, enquiryId, schoolId, pex.SqlState);
                 return (0, pex.MessageText);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Unexpected error in registration action '{Operation}' for enquiry {EnquiryId}, school {SchoolId}.", operation, enquiryId, schoolId);
                 return (0, "Unable to complete the action.");
             }
         }

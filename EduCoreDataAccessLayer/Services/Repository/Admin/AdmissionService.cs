@@ -11,18 +11,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 {
     public class AdmissionService : IAdmissionService
     {
-        private readonly string _connectionString;
+        private readonly PgExec _db;
         private const string SpMain = "core.sp_admission_manage";
 
-        public AdmissionService(IConfiguration configuration)
+        public AdmissionService(PgExec db)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")!;
+            _db = db;
         }
 
         // ── Save admission ───────────────────────────────────────
-        public async Task<AdmissionSaveResult> SaveAdmissionAsync(
-            AdmissionModel model, int tenantId, int schoolId, int actionUserId,
-            decimal concessionCap = 100000m)
+        public async Task<AdmissionSaveResult> SaveAdmissionAsync(AdmissionModel model, int tenantId, int schoolId, int actionUserId, decimal concessionCap = 100000m)
         {
             if (tenantId <= 1 || schoolId <= 0)
                 return new AdmissionSaveResult { Success = false, Message = "Invalid tenant/school context." };
@@ -94,7 +92,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "save_admission_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -138,7 +136,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "students_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (list, 0);
@@ -169,7 +167,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "student_by_id_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
@@ -223,7 +221,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     { Direction = ParameterDirection.InputOutput, Value = "delete_student_cursor" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
             return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0 ? 1 : 0;
         }

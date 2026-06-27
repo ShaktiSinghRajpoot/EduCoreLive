@@ -13,6 +13,7 @@ namespace EduCoreDataAccessLayer.Models.Admin
         public DateOnly? DueDate          { get; set; }
         public decimal   AmountDue        { get; set; }
         public decimal   AmountPaid       { get; set; }
+        public decimal   Concession       { get; set; }
         public decimal   Outstanding      { get; set; }
     }
 }

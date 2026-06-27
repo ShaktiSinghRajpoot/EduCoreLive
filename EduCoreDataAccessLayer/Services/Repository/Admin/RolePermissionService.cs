@@ -9,11 +9,11 @@ using System.Data;
 
 public class RolePermissionService : IRolePermissionService
 {
-    private readonly string _connectionString;
+    private readonly PgExec _db;
 
-    public RolePermissionService(IConfiguration configuration)
+    public RolePermissionService(PgExec db)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection")!;
+        _db = db;
     }
 
     public async Task<List<RolePermissionDto>> GetRolePermissionsAsync(int tenantId, int schoolId, int roleId)
@@ -29,7 +29,7 @@ public class RolePermissionService : IRolePermissionService
             new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "permission_cursor" }
         };
 
-        using var dal = new PostgreSqlDal(_connectionString);
+        var dal = _db;
         var ds = await dal.ExecuteProcedureWithCursorsAsync(
             "config.sp_role_permission_management",
             parameters

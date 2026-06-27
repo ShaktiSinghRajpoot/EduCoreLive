@@ -10,34 +10,55 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
 {
     public class SchoolService : ISchoolService
     {
-        private readonly string _connectionString;
+        private readonly PgExec _db;
 
         private const string SpSchoolManage = "core.sp_school_manage";
+        private const string SpSchoolList = "core.sp_school_list";
         private const string SpSchoolDropdowns = "config.sp_school_dropdowns";
 
-        public SchoolService(IConfiguration configuration)
+        public SchoolService(PgExec db)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")!;
+            _db = db;
         }
 
-        public async Task<List<SchoolListModel>> GetSchoolsAsync(int tenantId, int actionUserId)
+        public async Task<(List<SchoolListModel> Rows, int TotalCount, int ActiveCount)> GetSchoolsAsync(
+            int tenantId, int actionUserId,
+            string? search, string? city, string? state,
+            int? statusId, int? boardId, int? schoolTypeId,
+            DateTime? fromDate, DateTime? toDate,
+            int pageNo, int pageSize)
         {
             var schools = new List<SchoolListModel>();
 
-            var parameters = BuildSchoolParameters("L", tenantId, actionUserId);
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_search", (object?)search ?? DBNull.Value),
+                new NpgsqlParameter("p_city", (object?)city ?? DBNull.Value),
+                new NpgsqlParameter("p_state", (object?)state ?? DBNull.Value),
+                new NpgsqlParameter("p_status_id", (object?)statusId ?? DBNull.Value),
+                new NpgsqlParameter("p_board_id", (object?)boardId ?? DBNull.Value),
+                new NpgsqlParameter("p_school_type_id", (object?)schoolTypeId ?? DBNull.Value),
+                new NpgsqlParameter("p_from_date", NpgsqlDbType.Date) { Value = (object?)fromDate ?? DBNull.Value },
+                new NpgsqlParameter("p_to_date", NpgsqlDbType.Date) { Value = (object?)toDate ?? DBNull.Value },
+                new NpgsqlParameter("p_page_no", pageNo),
+                new NpgsqlParameter("p_page_size", pageSize),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "school_list_cursor" }
+            };
 
-            using var dal = new PostgreSqlDal(_connectionString);
-            var ds = await dal.ExecuteProcedureWithCursorsAsync(SpSchoolManage, parameters);
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpSchoolList, parameters);
 
             if (ds.Tables.Count == 0)
-                return schools;
+                return (schools, 0, 0);
 
-            foreach (DataRow row in ds.Tables[0].Rows)
+            var table = ds.Tables[0];
+
+            foreach (DataRow row in table.Rows)
             {
                 schools.Add(new SchoolListModel
                 {
                     SchoolId = ToInt(row["school_id"], 0),
-                    //TenantId = ToInt(row["tenant_id"], 0),
                     TenantName = row["tenant_name"]?.ToString(),
                     TenantCode = row["tenant_name"]?.ToString(),
                     SchoolCode = row["school_code"]?.ToString(),
@@ -54,16 +75,19 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 });
             }
 
-            return schools;
+            int total = table.Rows.Count > 0 ? ToInt(table.Rows[0]["total_count"], 0) : 0;
+            int active = table.Rows.Count > 0 ? ToInt(table.Rows[0]["active_count"], 0) : 0;
+
+            return (schools, total, active);
         }
 
         public async Task<int> CreateSchoolAsync(SchoolManageModel model, int tenantId, int actionUserId)
         {
-            model.Operation = "I";
+            model.Operation = "INSERT";
 
-            var parameters = BuildSchoolParameters("I", tenantId, actionUserId, model);
+            var parameters = BuildSchoolParameters("INSERT", tenantId, actionUserId, model);
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpSchoolManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -74,11 +98,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
 
         public async Task<int> SaveSchoolAsync(SchoolManageModel model, int tenantId, int actionUserId)
         {
-            var operation = string.IsNullOrWhiteSpace(model.Operation) ? "I" : model.Operation;
+            var operation = string.IsNullOrWhiteSpace(model.Operation) ? "INSERT" : model.Operation;
 
             var parameters = BuildSchoolParameters(operation, tenantId, actionUserId, model);
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpSchoolManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -92,12 +116,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
             var model = new SchoolManageModel
             {
                 SchoolId = schoolId,
-                Operation = "G"
+                Operation = "GET"
             };
 
-            var parameters = BuildSchoolParameters("G", tenantId, actionUserId, model);
+            var parameters = BuildSchoolParameters("GET", tenantId, actionUserId, model);
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpSchoolManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -107,7 +131,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
 
             return new SchoolManageModel
             {
-                Operation = "U",
+                Operation = "UPDATE",
 
                 TenantMode = "existing",
                 TenantId = HasColumn(row, "tenant_id") ? ToInt(row["tenant_id"], tenantId) : tenantId,
@@ -149,8 +173,15 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 EnableEmail = ToBool(row["enable_email"]),
                 EnableWhatsapp = ToBool(row["enable_whatsapp"]),
 
-                CreateSchoolAdmin = false,
-                AutoGeneratePassword = true
+                // Existing school admin (for edit pre-fill). When one exists, keep the admin
+                // section "on" so its details are submitted and updated on save.
+                AdminUserId = HasColumn(row, "admin_user_id") ? ToNullableInt(row["admin_user_id"]) : null,
+                AdminFullName = HasColumn(row, "admin_full_name") ? row["admin_full_name"]?.ToString() : null,
+                AdminEmail = HasColumn(row, "admin_email") ? row["admin_email"]?.ToString() : null,
+                AdminPhone = HasColumn(row, "admin_phone") ? row["admin_phone"]?.ToString() : null,
+
+                CreateSchoolAdmin = HasColumn(row, "admin_user_id") && ToNullableInt(row["admin_user_id"]).HasValue,
+                AutoGeneratePassword = false
             };
         }
 
@@ -159,12 +190,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
             var model = new SchoolManageModel
             {
                 SchoolId = schoolId,
-                Operation = "D"
+                Operation = "DELETE"
             };
 
-            var parameters = BuildSchoolParameters("D", tenantId, actionUserId, model);
+            var parameters = BuildSchoolParameters("DELETE", tenantId, actionUserId, model);
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             await dal.ExecuteProcedureWithCursorsAsync(SpSchoolManage, parameters);
         }
 
@@ -185,7 +216,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 new NpgsqlParameter("p_time_formats", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cur_time_formats" }
             };
 
-            using var dal = new PostgreSqlDal(_connectionString);
+            var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpSchoolDropdowns, parameters);
 
             return new SchoolDropdownModel

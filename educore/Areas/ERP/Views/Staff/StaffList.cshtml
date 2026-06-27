@@ -1,6 +1,26 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model List<EduCoreDataAccessLayer.Models.StaffListItem>
 @{
     ViewData["Title"] = "All Staff";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var palette = new[] { "primary", "info", "success", "warning", "danger", "secondary" };
+    var staffData = Model.Select((s, i) => new
+    {
+        id = s.StaffId,
+        name = s.FullName,
+        emp = s.EmployeeCode ?? "",
+        desig = s.Designation ?? "",
+        dept = s.Department ?? "",
+        type = s.StaffType ?? "",
+        gender = s.Gender ?? "",
+        joinDate = s.JoiningDate.HasValue ? s.JoiningDate.Value.ToString("yyyy-MM-dd") : "",
+        phone = s.Mobile ?? "",
+        email = s.Email ?? "",
+        status = string.IsNullOrEmpty(s.Status) ? "Active" : s.Status,
+        color = palette[i % palette.Length]
+    });
+    var staffJson = System.Text.Json.JsonSerializer.Serialize(staffData);
 }
 
 @section PageStyles {
@@ -91,6 +111,9 @@
 /* empty */
 .sl-empty{ padding:3rem 1rem; text-align:center; }
 .sl-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }
+/* #emptyDesk lives inside .sl-tbl-wrap (hidden on mobile); the mobile empty-state
+   must never show on desktop, otherwise both appear at once when the list is empty. */
+@@media (min-width:768px){ #emptyMob{ display:none !important; } }
 
 /* mobile */
 .sl-mob-list{ display:none; }
@@ -281,29 +304,8 @@
 
 var PAGE=1, PER=10, sortCol=null, sortDir='asc', filtered=[];
 
-/* ── Mock Data ──────────────────────────────── */
-var staff=[
-  {id:1, name:'Sunita Rao',      emp:'EMP-001',desig:'Principal',          dept:'Administration',type:'Non-Teaching',gender:'Female',joinDate:'2015-06-01',phone:'9876500011',email:'sunita.rao@school.edu',  status:'Active',  color:'primary'  },
-  {id:2, name:'Rakesh Mehta',    emp:'EMP-002',desig:'Vice Principal',     dept:'Administration',type:'Non-Teaching',gender:'Male',  joinDate:'2016-04-10',phone:'9876500012',email:'rakesh.mehta@school.edu', status:'Active',  color:'info'     },
-  {id:3, name:'Anita Desai',     emp:'EMP-003',desig:'Senior Teacher',     dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2017-07-15',phone:'9876500013',email:'anita.desai@school.edu', status:'Active',  color:'success'  },
-  {id:4, name:'Vikram Joshi',    emp:'EMP-004',desig:'Maths Teacher',      dept:'Teaching',      type:'Teaching',    gender:'Male',  joinDate:'2018-06-20',phone:'9876500014',email:'vikram.joshi@school.edu',status:'Active',  color:'warning'  },
-  {id:5, name:'Pooja Nair',      emp:'EMP-005',desig:'Science Teacher',    dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2018-08-01',phone:'9876500015',email:'pooja.nair@school.edu',  status:'On Leave',color:'danger'   },
-  {id:6, name:'Arun Kumar',      emp:'EMP-006',desig:'Accountant',         dept:'Accounts',      type:'Non-Teaching',gender:'Male',  joinDate:'2019-01-05',phone:'9876500016',email:'arun.kumar@school.edu',  status:'Active',  color:'secondary'},
-  {id:7, name:'Meena Iyer',      emp:'EMP-007',desig:'Librarian',          dept:'Library',       type:'Non-Teaching',gender:'Female',joinDate:'2019-06-11',phone:'9876500017',email:'meena.iyer@school.edu',  status:'Active',  color:'primary'  },
-  {id:8, name:'Sanjay Patil',    emp:'EMP-008',desig:'English Teacher',    dept:'Teaching',      type:'Teaching',    gender:'Male',  joinDate:'2020-07-01',phone:'9876500018',email:'sanjay.patil@school.edu',status:'Active',  color:'info'     },
-  {id:9, name:'Kavya Reddy',     emp:'EMP-009',desig:'Hindi Teacher',      dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2020-08-15',phone:'9876500019',email:'kavya.reddy@school.edu', status:'Active',  color:'success'  },
-  {id:10,name:'Ramesh Gupta',    emp:'EMP-010',desig:'Receptionist',       dept:'Administration',type:'Non-Teaching',gender:'Male',  joinDate:'2021-02-01',phone:'9876500020',email:'ramesh.gupta@school.edu',status:'Active',  color:'warning'  },
-  {id:11,name:'Lata Sharma',     emp:'EMP-011',desig:'PT Teacher',         dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2021-06-10',phone:'9876500021',email:'lata.sharma@school.edu', status:'On Leave',color:'danger'   },
-  {id:12,name:'Deepak Verma',    emp:'EMP-012',desig:'Bus Driver',         dept:'Transport',     type:'Non-Teaching',gender:'Male',  joinDate:'2021-07-20',phone:'9876500022',email:'deepak.verma@school.edu',status:'Active',  color:'secondary'},
-  {id:13,name:'Neha Kapoor',     emp:'EMP-013',desig:'Computer Teacher',   dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2022-04-01',phone:'9876500023',email:'neha.kapoor@school.edu', status:'Active',  color:'primary'  },
-  {id:14,name:'Mahesh Pillai',   emp:'EMP-014',desig:'Lab Assistant',      dept:'Support Staff', type:'Non-Teaching',gender:'Male',  joinDate:'2022-06-15',phone:'9876500024',email:'mahesh.pillai@school.edu',status:'Active', color:'info'     },
-  {id:15,name:'Ritu Singh',      emp:'EMP-015',desig:'Primary Teacher',    dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2022-08-01',phone:'9876500025',email:'ritu.singh@school.edu',  status:'Active',  color:'success'  },
-  {id:16,name:'Gopal Das',       emp:'EMP-016',desig:'Peon',               dept:'Support Staff', type:'Non-Teaching',gender:'Male',  joinDate:'2023-01-10',phone:'9876500026',email:'gopal.das@school.edu',   status:'Active',  color:'warning'  },
-  {id:17,name:'Shalini Roy',     emp:'EMP-017',desig:'Art Teacher',        dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2023-06-01',phone:'9876500027',email:'shalini.roy@school.edu', status:'Active',  color:'danger'   },
-  {id:18,name:'Naveen Rao',      emp:'EMP-018',desig:'Accounts Assistant', dept:'Accounts',      type:'Non-Teaching',gender:'Male',  joinDate:'2023-07-15',phone:'9876500028',email:'naveen.rao@school.edu',  status:'Inactive',color:'secondary'},
-  {id:19,name:'Preeti Jain',     emp:'EMP-019',desig:'Pre-Primary Teacher',dept:'Teaching',      type:'Teaching',    gender:'Female',joinDate:'2024-04-01',phone:'9876500029',email:'preeti.jain@school.edu', status:'Active',  color:'primary'  },
-  {id:20,name:'Imran Khan',      emp:'EMP-020',desig:'Security Guard',     dept:'Support Staff', type:'Non-Teaching',gender:'Male',  joinDate:'2024-06-10',phone:'9876500030',email:'imran.khan@school.edu',  status:'Active',  color:'info'     }
-];
+/* ── Live data (from core.staff via StaffController) ── */
+var staff = @Html.Raw(staffJson);
 
 /* ── Helpers ─────────────────────────────────── */
 var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];

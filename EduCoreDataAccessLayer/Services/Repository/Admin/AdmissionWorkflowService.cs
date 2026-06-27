@@ -11,13 +11,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
 {
     public class AdmissionWorkflowService : IAdmissionWorkflowService
     {
-        private readonly string _connectionString;
+        private readonly PgExec _db;
         private readonly ILogger<AdmissionWorkflowService>? _logger;
         private const string SpAdmissionWorkflowManage = "core.sp_school_admin_admission_workflow_manage";
 
-        public AdmissionWorkflowService(IConfiguration configuration, ILogger<AdmissionWorkflowService>? logger = null)
+        public AdmissionWorkflowService(PgExec db, ILogger<AdmissionWorkflowService>? logger = null)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")!;
+            _db = db;
             _logger = logger;
         }
 
@@ -44,12 +44,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_registration_number_prefix", DBNull.Value),
                 new NpgsqlParameter("p_collect_fee_at_admission", DBNull.Value),
                 new NpgsqlParameter("p_enable_security_fee", DBNull.Value),
+                new NpgsqlParameter("p_enable_transport", DBNull.Value),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
             };
 
             try
             {
-                using var dal = new PostgreSqlDal(_connectionString);
+                var dal = _db;
                 var ds = await dal.ExecuteProcedureWithCursorsAsync(SpAdmissionWorkflowManage, parameters);
 
                 if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -63,6 +64,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 model.AutoGenerateRegistrationNumber = GetBool(row, "auto_generate_registration_number", true);
                 model.CollectFeeAtAdmission = GetBool(row, "collect_fee_at_admission");
                 model.EnableSecurityFee = GetBool(row, "enable_security_fee");
+                // Default true: a school with no saved row, or a backend missing the
+                // column, still sees Transport (matches pre-toggle behaviour).
+                model.EnableTransport = GetBool(row, "enable_transport", true);
 
                 if (row.Table.Columns.Contains("registration_number_prefix") && row["registration_number_prefix"] != DBNull.Value)
                     model.RegistrationNumberPrefix = row["registration_number_prefix"].ToString() ?? "REG-";
@@ -110,12 +114,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 new NpgsqlParameter("p_registration_number_prefix", prefix),
                 new NpgsqlParameter("p_collect_fee_at_admission", model.CollectFeeAtAdmission),
                 new NpgsqlParameter("p_enable_security_fee", enableSec),
+                new NpgsqlParameter("p_enable_transport", model.EnableTransport),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "admission_workflow_save_cursor" }
             };
 
             try
             {
-                using var dal = new PostgreSqlDal(_connectionString);
+                var dal = _db;
                 var ds = await dal.ExecuteProcedureWithCursorsAsync(SpAdmissionWorkflowManage, parameters);
 
                 if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)

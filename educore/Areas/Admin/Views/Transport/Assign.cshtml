@@ -1,0 +1,124 @@
+@{
+    ViewData["Title"] = "Assign Transport";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<style>
+.ta-page{--p:#ff8a00;--soft:#fff4e6;--border:#ececf5;--heading:#2b1b12;--muted:#8b8175;}
+.ta-page .form-label{color:#9a938b;font-size:.74rem;font-weight:800;text-transform:uppercase;margin-bottom:.35rem;}
+.ta-page .form-select,.ta-page .form-control{border:1px solid var(--border);border-radius:12px;min-height:46px;font-weight:650;}
+.ta-page .btn-primary{background:linear-gradient(135deg,#ff8a00,#ff9f2f);border:0;border-radius:999px;font-weight:800;box-shadow:0 12px 24px rgba(255,138,0,.22);}
+.ta-card{border:1px solid var(--border);border-radius:16px;background:#fff;}
+.filter-bar{background:linear-gradient(180deg,#fff,#fff7ed);border:1px solid rgba(255,138,0,.18);border-radius:18px;}
+.fare-box{background:var(--soft);border-radius:14px;padding:1rem 1.2rem;text-align:center;}
+.fare-box .amt{font-size:1.6rem;font-weight:950;color:var(--p);line-height:1;}
+.fare-box .lbl{font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--muted);}
+.cur-assign{background:#f0fbf4;border:1px solid #b6e9c9;border-radius:14px;padding:.8rem 1rem;}
+.empty{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);}
+.empty i{font-size:2.6rem;color:var(--p);margin-bottom:.5rem;}
+</style>
+}
+
+<div class="ec-page-shell ta-page">
+  <div class="ec-page-content">
+    <div class="d-flex align-items-center gap-2 mb-4">
+      <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center" style="background:var(--soft);color:var(--p);width:46px;height:46px"><i class="bx bx-link fs-4"></i></div>
+      <div><h4 class="mb-0" style="color:var(--heading);font-weight:900">Assign Transport</h4>
+        <div class="text-muted" style="font-size:.8rem">Assign a student to a route &amp; stop — their monthly bus fee is generated automatically</div></div>
+    </div>
+
+    <div class="filter-bar p-3 p-lg-4 mb-4">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3"><label class="form-label">Session</label><select id="fSession" class="form-select"></select></div>
+        <div class="col-md-3"><label class="form-label">Class</label><select id="fClass" class="form-select"><option value="">Select Class</option></select></div>
+        <div class="col-md-3"><label class="form-label">Section</label><select id="fSection" class="form-select" disabled><option value="">Select class first</option></select></div>
+        <div class="col-md-3"><label class="form-label">Student</label><select id="fStudent" class="form-select" disabled><option value="">Select section first</option></select></div>
+      </div>
+    </div>
+
+    <div class="ta-card p-3 p-lg-4">
+      <div id="paneEmpty" class="empty"><i class="bx bx-user-circle"></i><h6 class="fw-bold" style="color:var(--heading)">No student selected</h6><p class="mb-0">Pick a student above to assign or change transport.</p></div>
+
+      <div id="pane" class="d-none">
+        <div id="curAssign" class="cur-assign mb-3 d-none">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div><strong>Currently assigned:</strong> <span id="curText">—</span></div>
+            <button class="btn btn-sm btn-outline-danger rounded-pill" id="removeBtn"><i class="bx bx-x me-1"></i>Remove Transport</button>
+          </div>
+        </div>
+
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4"><label class="form-label">Route</label><select id="aRoute" class="form-select"><option value="">Select Route</option></select></div>
+          <div class="col-md-4"><label class="form-label">Stop</label><select id="aStop" class="form-select" disabled><option value="">Select route first</option></select></div>
+          <div class="col-md-2"><div class="fare-box"><div class="amt" id="aFare">₹0</div><div class="lbl">Monthly</div></div></div>
+          <div class="col-md-2"><button class="btn btn-primary w-100" id="saveBtn" disabled><i class="bx bx-check me-1"></i>Assign</button></div>
+        </div>
+        <div class="text-muted mt-2" style="font-size:.8rem"><i class="bx bx-info-circle"></i> Bus fee is billed monthly from this month to the end of the academic year, and appears on the Fee Collection counter.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function(){
+  'use strict';
+  var CSRF=$('input[name="__RequestVerificationToken"]').val();
+  var URL={ sessions:'@Url.Action("GetSessions")', classes:'@Url.Action("GetClasses")', sections:'@Url.Action("GetSections")', students:'@Url.Action("GetStudents")',
+            routes:'@Url.Action("GetRoutesDropdown")', getAssign:'@Url.Action("GetAssignment")', save:'@Url.Action("SaveAssignment")', remove:'@Url.Action("RemoveAssignment")' };
+  function notify(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
+  function money(n){ return '₹'+Math.round(Number(n||0)).toLocaleString('en-IN'); }
+  function post(url,data){ return $.ajax({url:url,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},data:JSON.stringify(data)}); }
+  function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
+  function fill($el,items,ph){ var h=ph?'<option value="">'+ph+'</option>':''; items.forEach(function(x){h+='<option value="'+x+'">'+x+'</option>';}); $el.html(h); }
+
+  var $session=$('#fSession'),$class=$('#fClass'),$section=$('#fSection'),$student=$('#fStudent');
+  var students=[], routes=[], currentStudent=null;
+
+  // cascade
+  $.getJSON(URL.sessions,function(s){ fill($session,s,null); $session.val(s[0]); loadClasses(); });
+  $.getJSON(URL.routes,function(r){ routes=r||[]; fillRoutes(); });
+
+  function loadClasses(){ clearPane(); $.getJSON(URL.classes,function(c){ fill($class,c,'Select Class'); }); $section.prop('disabled',true).html('<option value="">Select class first</option>'); $student.prop('disabled',true).html('<option value="">Select section first</option>'); }
+  $session.on('change',loadClasses);
+  $class.on('change',function(){ clearPane(); $student.prop('disabled',true).html('<option value="">Select section first</option>'); if(!$class.val()){ $section.prop('disabled',true).html('<option value="">Select class first</option>'); return; } $.getJSON(URL.sections,{session:$session.val(),className:$class.val()},function(sec){ fill($section,sec,'Select Section'); $section.prop('disabled',sec.length===0); }); });
+  $section.on('change',function(){ clearPane(); if(!$section.val()){ $student.prop('disabled',true).html('<option value="">Select section first</option>'); return; } $.getJSON(URL.students,{session:$session.val(),className:$class.val(),section:$section.val()},function(list){ students=list||[]; var h='<option value="">'+(students.length?'Select Student':'No students')+'</option>'; students.forEach(function(s){ h+='<option value="'+s.id+'">Roll '+(s.roll||'—')+' — '+s.name+' ('+s.admNo+')</option>'; }); $student.html(h).prop('disabled',students.length===0); }); });
+  $student.on('change',function(){ var id=Number($(this).val()); if(!id){ clearPane(); return; } currentStudent=students.find(function(s){return s.id===id;}); openStudent(); });
+
+  function clearPane(){ currentStudent=null; $('#pane').addClass('d-none'); $('#paneEmpty').removeClass('d-none'); }
+  function openStudent(){
+    $('#paneEmpty').addClass('d-none'); $('#pane').removeClass('d-none');
+    $('#aRoute').val(''); $('#aStop').prop('disabled',true).html('<option value="">Select route first</option>'); $('#aFare').text('₹0'); $('#saveBtn').prop('disabled',true);
+    $.getJSON(URL.getAssign,{studentId:currentStudent.id},function(a){
+      if(a){ $('#curAssign').removeClass('d-none'); $('#curText').text(a.routeName+' · '+a.stopName+' · '+money(a.fare)+'/mo'); }
+      else { $('#curAssign').addClass('d-none'); }
+    });
+  }
+
+  function fillRoutes(){ var h='<option value="">Select Route</option>'; routes.forEach(function(r){ h+='<option value="'+r.routeId+'">'+r.routeName+'</option>'; }); $('#aRoute').html(h); }
+  $('#aRoute').on('change',function(){
+    var r=routes.find(function(x){return x.routeId===Number($('#aRoute').val());});
+    if(!r){ $('#aStop').prop('disabled',true).html('<option value="">Select route first</option>'); $('#aFare').text('₹0'); $('#saveBtn').prop('disabled',true); return; }
+    var h='<option value="">Select Stop</option>'; r.stops.forEach(function(s){ h+='<option value="'+s.stopId+'" data-fare="'+s.fare+'">'+s.stopName+' — '+money(s.fare)+'</option>'; });
+    $('#aStop').html(h).prop('disabled',false); $('#aFare').text('₹0'); $('#saveBtn').prop('disabled',true);
+  });
+  $('#aStop').on('change',function(){ var fare=Number($(this).find(':selected').data('fare'))||0; $('#aFare').text(money(fare)); $('#saveBtn').prop('disabled', !$(this).val()); });
+
+  $('#saveBtn').on('click',function(){
+    var routeId=Number($('#aRoute').val()), stopId=Number($('#aStop').val());
+    if(!routeId||!stopId){ notify('warning','Select a route and stop.'); return; }
+    var $b=$(this), old=$b.html(); $b.prop('disabled',true).html('<i class="bx bx-loader-circle bx-spin"></i>');
+    post(URL.save,{ studentId:currentStudent.id, routeId:routeId, stopId:stopId, session:$session.val() })
+      .done(function(res){ $b.prop('disabled',false).html(old); notify(res.success?'success':'error',res.message); if(res.success) openStudent(); })
+      .fail(function(){ $b.prop('disabled',false).html(old); notify('error','Could not assign transport.'); });
+  });
+  $('#removeBtn').on('click',function(){ if(!currentStudent||!confirm('Remove transport for this student? Future unpaid bus dues will be removed.')) return;
+    postForm(URL.remove,{studentId:currentStudent.id}).done(function(res){ notify(res.success?'success':'error',res.message); if(res.success) openStudent(); }); });
+
+  if(typeof toastr!=='undefined') toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
+});
+</script>
+}
