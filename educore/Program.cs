@@ -120,11 +120,12 @@ builder.Services.AddRateLimiter(options =>
 // note): e.g. append ";Maximum Pool Size=100" to the connection string.
 builder.Services.AddSingleton(_ =>
 {
-    var connString = builder.Configuration.GetConnectionString("DefaultConnection")
+    var raw = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException(
             "DefaultConnection is not configured. Set it in appsettings.Development.json (local) " +
             "or the ConnectionStrings__DefaultConnection environment variable (production).");
-    return new NpgsqlDataSourceBuilder(connString).Build();
+    // Accept BOTH a keyword string and a libpq URI (see NormalizeConnString at end of file).
+    return new NpgsqlDataSourceBuilder(NormalizeConnString(raw)).Build();
 });
 
 // WHY (Fix #2): the async, reader-based DAL. Stateless over the singleton data source, so singleton.
@@ -276,3 +277,36 @@ app.MapControllerRoute(
 app.MapRazorPages();
 
 app.Run();
+
+// WHY: Railway (and many PaaS hosts) expose the database as a libpq URI, e.g.
+//   postgresql://user:pass@host:5432/dbname?sslmode=require
+// but Npgsql's builder only accepts keyword form (Host=...;Port=...;Username=...;Password=...)
+// and throws "Format of the initialization string does not conform to specification" on a URI.
+// Accept both: if the value is a postgres URI, convert it to keyword form; otherwise pass through.
+static string NormalizeConnString(string raw)
+{
+    if (string.IsNullOrWhiteSpace(raw)) return raw;
+    if (!raw.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase)
+        && !raw.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
+        return raw; // already keyword form — leave as-is
+
+    var uri = new Uri(raw);
+    var creds = uri.UserInfo.Split(':', 2);
+    var csb = new NpgsqlConnectionStringBuilder
+    {
+        Host = uri.Host,
+        Port = uri.Port > 0 ? uri.Port : 5432,
+        Database = uri.AbsolutePath.Trim('/'),
+        Username = Uri.UnescapeDataString(creds[0]),
+        Password = creds.Length > 1 ? Uri.UnescapeDataString(creds[1]) : null
+    };
+    // carry over ?sslmode=... if the URI specifies one (Railway public proxy uses require)
+    foreach (var part in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+    {
+        var kv = part.Split('=', 2);
+        if (kv.Length == 2 && kv[0].Equals("sslmode", StringComparison.OrdinalIgnoreCase)
+            && Enum.TryParse<SslMode>(kv[1], ignoreCase: true, out var mode))
+            csb.SslMode = mode;
+    }
+    return csb.ConnectionString;
+}
