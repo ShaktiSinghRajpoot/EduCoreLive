@@ -4,13 +4,15 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models;
 using EduCoreDataAccessLayer.Models.Admin;
 using EduCoreDataAccessLayer.Services.Contract.Admin;
+using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
-    public class AdmissionController : Controller 
+    [HasPermission("students.view")]
+    public class AdmissionController : Controller
     {
         private readonly IAdmissionService _admissionService;
         private readonly IEnquiryService _enquiryService;
@@ -18,8 +20,9 @@ namespace educore.Areas.ERP.Controllers
         private readonly IAdmissionWorkflowService _admissionWorkflowService;
         private readonly IFeePaymentService _feePaymentService;
         private readonly IBaseService _baseService;
+        private readonly ITransportService _transportService;
 
-        public AdmissionController(IAdmissionService admissionService, IEnquiryService enquiryService, ISchoolSettingsService schoolSettingsService, IAdmissionWorkflowService admissionWorkflowService, IFeePaymentService feePaymentService, IBaseService baseService)
+        public AdmissionController(IAdmissionService admissionService, IEnquiryService enquiryService, ISchoolSettingsService schoolSettingsService, IAdmissionWorkflowService admissionWorkflowService, IFeePaymentService feePaymentService, IBaseService baseService, ITransportService transportService)
         {
             _admissionService = admissionService;
             _enquiryService = enquiryService;
@@ -27,6 +30,23 @@ namespace educore.Areas.ERP.Controllers
             _admissionWorkflowService = admissionWorkflowService;
             _feePaymentService = feePaymentService;
             _baseService = baseService;
+            _transportService = transportService;
+        }
+
+        // ── GET: /ERP/Admission/GetTransportRoutes (AJAX) ────────
+        // Routes + stops for the optional "uses transport" panel on the form.
+        [HttpGet]
+        public async Task<IActionResult> GetTransportRoutes()
+        {
+            var rows = await _transportService.GetRoutesDropdownAsync(TenantId(), SchoolId(), UserId());
+            var routes = rows.GroupBy(r => new { r.RouteId, r.RouteName })
+                .Select(g => new
+                {
+                    routeId   = g.Key.RouteId,
+                    routeName = g.Key.RouteName,
+                    stops     = g.Select(s => new { stopId = s.StopId, stopName = s.StopName, fare = s.MonthlyFare })
+                });
+            return Json(routes);
         }
 
         // Registration gate: when the school requires registration before admission,
@@ -90,6 +110,7 @@ namespace educore.Areas.ERP.Controllers
 
         // ── POST: /ERP/Admission/SaveAdmission ───────────────────
         [HttpPost]
+        [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveAdmission(AdmissionFormModel form)
         {
@@ -110,6 +131,13 @@ namespace educore.Areas.ERP.Controllers
 
             if (concession.Amount > 0 && string.IsNullOrWhiteSpace(form.DiscountReason))
                 errors.Add("A concession reason is required when a discount is applied.");
+
+            // Overpay guard (mirrors the client): at admission you can collect at most the
+            // amount due now. Advance / prepay must go through the Fee counter (ManageFee),
+            // which has the advance-wallet support the admission screen intentionally omits.
+            // This stops cash beyond the dues being silently dropped by the allocation.
+            if (form.CollectFeeNow && (form.PaymentAmount ?? 0m) > totals.PayToday + 0.01m)
+                errors.Add($"Amount to collect cannot exceed ₹{totals.PayToday:0} due now. Use the Fee counter for advance/prepay.");
 
             if (errors.Count > 0)
                 return Json(new { success = false, message = string.Join(" ", errors) });
@@ -172,27 +200,78 @@ namespace educore.Areas.ERP.Controllers
 
             var result = await _admissionService.SaveAdmissionAsync(model, tenantId, schoolId, userId);
 
-            // ── Collect fee at admission (only when the school enables it) ──
+            // ── Record concession + collect fee at admission ──
+            // Both the cash collected now AND any admission-time concession are pushed
+            // through the shared fee engine (CollectPaymentAsync), so core.student_ledger
+            // stays the single source of truth. A discount on its own — even when no cash
+            // is taken (school doesn't collect at admission, or the cashier unticked
+            // "Collect Fee Now") — still writes a concession voucher onto the ledger.
+            // Otherwise the discounted portion would linger forever as a phantom due.
             string? receiptNo = null;
             string? feeMessage = null;
-            if (result.Success && result.StudentId > 0 && form.CollectFeeNow)
+            if (result.Success && result.StudentId > 0)
             {
-                var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
-                var payAmount = form.PaymentAmount ?? 0m;
+                var workflow   = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
+                var payAmount  = (form.CollectFeeNow && workflow.CollectFeeAtAdmission) ? (form.PaymentAmount ?? 0m) : 0m;
+                var concAmount = concession.Amount;
 
-                if (workflow.CollectFeeAtAdmission && payAmount > 0)
+                if (payAmount > 0 || concAmount > 0)
                 {
-                    var (paid, payMsg, rcp) = await _feePaymentService.RecordPaymentAsync(
-                        result.StudentId, payAmount,
-                        NullIfEmpty(form.PaymentMode) ?? "Cash",
-                        NullIfEmpty(form.PaymentReference),
-                        NullIfEmpty(form.PaymentRemarks),
-                        model.AcademicYear,
-                        tenantId, schoolId, userId);
+                    // Itemise the lump cash + concession across the just-created dues so the
+                    // receipt lists each charge (admission fee, security, …) instead of one
+                    // opaque line, and the concession is recorded as real concession on each
+                    // ledger row. Admission-point charges are settled first (that's what the
+                    // cashier is collecting now), then the earliest scheduled dues — never
+                    // over-allocating a row and never dropping cash.
+                    var dues  = await _feePaymentService.GetStudentDuesAsync(result.StudentId, tenantId, schoolId, userId);
 
-                    receiptNo  = rcp;
-                    feeMessage = paid ? $"Receipt {rcp} generated." : $"Admission saved, but payment failed: {payMsg}";
+                    // Refundable deposit heads (Caution Money etc.) — the discount must skip
+                    // these. The ledger doesn't carry the flag, so read it from the structure.
+                    var structure = await _schoolSettingsService.GetFeeStructureDetailsAsync(
+                        model.ClassName, model.AcademicYear, tenantId, schoolId, userId);
+                    var refundableHeads = (structure ?? new List<FeeStructureDetailModel>())
+                        .Where(s => s.IsRefundable)
+                        .Select(s => s.FeeHeadName)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                    var items = AllocateAdmissionPayment(dues, payAmount, concAmount, refundableHeads);
+
+                    if (items.Count > 0)
+                    {
+                        var res = await _feePaymentService.CollectPaymentAsync(
+                            result.StudentId, items, new List<FeeExtraItem>(),
+                            NullIfEmpty(form.PaymentMode) ?? "Cash",
+                            NullIfEmpty(form.PaymentReference),
+                            NullIfEmpty(form.PaymentRemarks),
+                            model.AcademicYear,
+                            tenantId, schoolId, userId,
+                            discountType:   MapDiscountType(form.DiscountType),
+                            discountValue:  concession.Value,
+                            discountReason: NullIfEmpty(form.DiscountReason));
+
+                        receiptNo  = res.ReceiptNo;
+                        feeMessage = !res.Success
+                            ? $"Admission saved, but payment failed: {res.Message}"
+                            : (payAmount > 0 ? $"Receipt {res.ReceiptNo} generated."
+                                             : $"Concession recorded (receipt {res.ReceiptNo}).");
+                    }
+                    else if (payAmount > 0)
+                    {
+                        feeMessage = "Admission saved, but no outstanding dues were found to collect against.";
+                    }
                 }
+            }
+
+            // ── Assign transport (optional) ── generates monthly bus-fee dues
+            // through the end of the academic year, just like the mid-year Assign page.
+            if (result.Success && result.StudentId > 0 && form.TransportRouteId is > 0 && form.TransportStopId is > 0)
+            {
+                var admDate = model.AdmissionDate ?? DateOnly.FromDateTime(DateTime.Today);
+                int months = MonthsToYearEnd(model.AcademicYear, admDate);
+                await _transportService.SaveAssignmentAsync(
+                    result.StudentId, form.TransportRouteId.Value, form.TransportStopId.Value,
+                    model.AcademicYear, admDate, months,
+                    tenantId, schoolId, userId);
             }
 
             return Json(new
@@ -360,6 +439,8 @@ namespace educore.Areas.ERP.Controllers
             // structure, so no amount is read from the workflow settings here.
             var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
             ViewBag.CollectFeeAtAdmission = workflow.CollectFeeAtAdmission;
+            // Hide the admission Transport panel for schools that don't run buses.
+            ViewBag.EnableTransport = workflow.EnableTransport;
         }
 
         // ── Ledger JSON parsing ──────────────────────────────────
@@ -393,20 +474,11 @@ namespace educore.Areas.ERP.Controllers
                         }
                     }
 
-                    // Admission-kit items become One Time fee heads on the ledger
-                    if (root.TryGetProperty("selectedKitItems", out var kit) && kit.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var k in kit.EnumerateArray())
-                        {
-                            fees.Add(new StudentFeePlanItem
-                            {
-                                FeeHeadName = GetStr(k, "name") ?? "Kit Item",
-                                Frequency   = "One Time",
-                                Amount      = GetDec(k, "amount"),
-                                IsOptional  = true
-                            });
-                        }
-                    }
+                    // NOTE: store add-ons (uniform/tie/belt/books) are deliberately NOT
+                    // booked here. They are store/inventory sales, not school fees — mixing
+                    // them into the fee ledger pollutes fee revenue and there is no inventory
+                    // backend to track stock. The admission panel keeps them as a handover
+                    // checklist only; selling them belongs in a dedicated Store module.
 
                     if (root.TryGetProperty("summary", out var sum))
                     {
@@ -427,6 +499,87 @@ namespace educore.Areas.ERP.Controllers
 
             return (fees, (payToday, monthly, yearly, annual), (concValue, concAmount));
         }
+
+        // Bill transport from the admission month through the end of the academic
+        // year (Indian April–March), capped at 12. Falls back to 12 if unparsable.
+        private static int MonthsToYearEnd(string? academicYear, DateOnly start)
+        {
+            int endYear;
+            if (!string.IsNullOrWhiteSpace(academicYear) && academicYear.Length >= 4 &&
+                int.TryParse(academicYear.Substring(0, 4), out var firstYear))
+                endYear = firstYear + 1;
+            else
+                endYear = start.Month >= 4 ? start.Year + 1 : start.Year;
+
+            var yearEnd = new DateOnly(endYear, 3, 31);
+            if (yearEnd < start) return 1;
+            int months = (yearEnd.Year - start.Year) * 12 + (yearEnd.Month - start.Month) + 1;
+            return Math.Clamp(months, 1, 12);
+        }
+
+        // Spreads the lump "collect at admission" cash AND any concession across the
+        // student's freshly created dues, so the receipt is itemised and the discount is
+        // recorded as real concession on each ledger row (not a phantom unpaid balance).
+        // Admission-point charges (ledger label 'Admission') are settled first, then the
+        // earliest remaining dues by due date. The concession is written off first so each
+        // due's payable balance shrinks before cash is applied; every line is capped at its
+        // outstanding so a row is never over-allocated and no money is dropped.
+        private static List<FeeCollectItem> AllocateAdmissionPayment(
+            List<StudentDueItem> dues, decimal cash, decimal concession, HashSet<string> refundableHeads)
+        {
+            var ordered = dues
+                .Where(d => d.Outstanding > 0)
+                .OrderByDescending(d => string.Equals(d.InstallmentLabel, "Admission", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(d => d.DueDate ?? DateOnly.MaxValue)
+                .ThenBy(d => d.LedgerId)
+                .ToList();
+
+            var concByLedger = new Dictionary<int, decimal>();
+            var cashByLedger = new Dictionary<int, decimal>();
+
+            // 1) Write off the concession first so each due's payable balance shrinks —
+            //    but NEVER against a refundable deposit (e.g. Caution Money). A discount
+            //    applies to income heads only; a deposit is a liability the school returns,
+            //    so it must always be collected in full. Cash (step 2) still fills it.
+            decimal concLeft = concession;
+            foreach (var d in ordered)
+            {
+                if (concLeft <= 0) break;
+                if (refundableHeads.Contains(d.FeeHeadName)) continue;
+                decimal take = Math.Min(concLeft, d.Outstanding);
+                concByLedger[d.LedgerId] = take;
+                concLeft -= take;
+            }
+
+            // 2) Apply cash to whatever each due still owes after concession.
+            decimal cashLeft = cash;
+            foreach (var d in ordered)
+            {
+                if (cashLeft <= 0) break;
+                decimal payable = d.Outstanding - concByLedger.GetValueOrDefault(d.LedgerId);
+                if (payable <= 0) continue;
+                decimal take = Math.Min(cashLeft, payable);
+                cashByLedger[d.LedgerId] = take;
+                cashLeft -= take;
+            }
+
+            return ordered
+                .Where(d => cashByLedger.ContainsKey(d.LedgerId) || concByLedger.ContainsKey(d.LedgerId))
+                .Select(d => new FeeCollectItem
+                {
+                    LedgerId   = d.LedgerId,
+                    Amount     = cashByLedger.GetValueOrDefault(d.LedgerId),
+                    Concession = concByLedger.GetValueOrDefault(d.LedgerId)
+                })
+                .ToList();
+        }
+
+        // The admission form sends the discount type as 'fixed' / 'percentage'; the fee
+        // engine stores it as 'Flat' / 'Percent' on the receipt header.
+        private static string? MapDiscountType(string? t) =>
+            string.Equals(t, "percentage", StringComparison.OrdinalIgnoreCase) ? "Percent"
+            : string.Equals(t, "fixed", StringComparison.OrdinalIgnoreCase)     ? "Flat"
+            : null;
 
         private static string NormalizeFreq(string? f) => f switch
         {

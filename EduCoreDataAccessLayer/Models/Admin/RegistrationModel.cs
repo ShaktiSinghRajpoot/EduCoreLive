@@ -50,6 +50,8 @@ namespace EduCoreDataAccessLayer.Models.Admin
 
     public class MarkRegistrationFeeRequest
     {
-        public int EnquiryId { get; set; }
+        public int     EnquiryId        { get; set; }
+        public string? PaymentMode      { get; set; }
+        public string? PaymentReference { get; set; }
     }
 }

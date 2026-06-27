@@ -1,10 +1,66 @@
 @using EduCoreDataAccessLayer.Helpers
+@using EduCoreDataAccessLayer.Services.Contract.Admin
 @using System.Security.Claims
+@inject IAdmissionWorkflowService AdmissionWorkflowService
+@inject EduCoreDataAccessLayer.Services.IPermissionService PermissionService
 
 @{
     var currentPage = Context.Request.Path.Value ?? "";
     var appName = "EduCore";
     var supportUrl = "#";
+
+    // Identity / scope (hoisted so the permission gating below can reuse them).
+    int _tId = int.TryParse(User.FindFirst(Common.SK_TenantId)?.Value, out var _t) ? _t : 0;
+    int _sId = int.TryParse(User.FindFirst(Common.SK_SchoolId)?.Value, out var _s) ? _s : 0;
+    int _uId = int.TryParse(User.FindFirst(Common.SK_UserId)?.Value, out var _u) ? _u : 0;
+
+    // Per-school module visibility. The Transport menu is hidden for schools that
+    // turned the module off in Admission Workflow settings. Defaults to visible if
+    // the school scope or settings can't be resolved (matches pre-toggle behaviour).
+    bool showTransport = true;
+    if (_tId > 1 && _sId > 0)
+    {
+        try { showTransport = (await AdmissionWorkflowService.GetAdmissionWorkflowAsync(_tId, _sId, _uId)).EnableTransport; }
+        catch { showTransport = true; }
+    }
+
+    // ── Dynamic RBAC menu gating ──────────────────────────────────────────────
+    // Admins (SUPER_ADMIN / SCHOOL_ADMIN) bypass and see everything. Every other
+    // user sees only what the UNION of their roles allows. Resolve ONCE per render.
+    int _activeRoleId = Context.Session.GetInt32(Common.SK_ActiveRoleId) ?? 0;   // multi-role "focus" (0 = combined)
+    var _access = await PermissionService.GetUserAccessAsync(_tId, _sId, _uId, _activeRoleId);
+    bool isAdmin = _access.IsAdmin;
+    var _perms = _access.Keys;
+    bool Can(string key) => isAdmin || _perms.Contains(key);
+
+    // Group visibility (a group shows if the role can reach at least one item).
+    bool gFrontOffice = Can("enquiry.view") || Can("registration.view");
+    bool gStudents    = Can("students.view");
+    bool gAcademics   = Can("academics.view");
+    bool gAttendance  = Can("attendance.view");
+    bool gExams       = Can("exams.view");
+    bool secAcademic  = gFrontOffice || gStudents || gAcademics || gAttendance || gExams;
+
+    bool gFees        = Can("fees.view");
+    bool gAccounting  = isAdmin;                       // no permission key yet → admin-only placeholder
+    bool secFinance   = gFees || gAccounting;
+
+    bool gHR          = Can("staff.view");
+    bool gLibrary     = isAdmin;                       // placeholder module
+    bool gTransport   = showTransport && Can("transport.view");
+    bool gHostel      = isAdmin;                       // placeholder module
+    bool gInventory   = Can("fees.view");             // Inventory pages live in the Fee controller for now
+    bool secPeople    = gHR || gLibrary || gTransport || gHostel || gInventory;
+
+    bool gComm        = isAdmin;                       // placeholder modules
+    bool gCert        = isAdmin;
+    bool gReports     = isAdmin || Can("reports.view");
+    bool secEngagement = gComm || gCert || gReports;
+
+    bool gSettings    = Can("settings.view") || Can("rbac.manage");
+    bool gWorkflow    = Can("admission_workflow.view");
+    bool gBilling     = isAdmin;                       // placeholder module
+    bool secAdmin     = gSettings || gWorkflow || gBilling;
 
     bool IsActive(string value) =>
         currentPage.Contains(value, StringComparison.OrdinalIgnoreCase);
@@ -233,25 +289,39 @@
         </li>
 
         @* ===================== ACADEMIC ZONE ===================== *@
+        @if (secAcademic)
+        {
         <li class="menu-header"><span class="menu-header-text">Academic</span></li>
+        }
 
         @* ---- Front Office ---- *@
+        @if (gFrontOffice)
+        {
         <li class='menu-item @Open("EnquiryCRM","Registration","Visitor","CallLog","Postal","Complaint")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-buildings ic-front"></i>
                 <div class="text-truncate">Front Office</div>
             </a>
             <ul class="menu-sub">
+                @if (Can("enquiry.view"))
+                {
                 <li class='menu-item @On("EnquiryCRM")'><a asp-area="Admin" asp-controller="Enquiry" asp-action="EnquiryCRM" class="menu-link"><i class="bx bx-message-square-detail submenu-icon c-pink"></i><div class="text-truncate">Admission Enquiry</div><span class="ec-badge ec-badge-hot">CRM</span></a></li>
+                }
+                @if (Can("registration.view"))
+                {
                 <li class='menu-item @On("Registration")'><a asp-area="Admin" asp-controller="Registration" asp-action="Index" class="menu-link"><i class="bx bx-clipboard submenu-icon c-orange"></i><div class="text-truncate">Registrations</div></a></li>
+                }
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-blue"></i><div class="text-truncate">Visitor Book</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-phone-call submenu-icon c-green"></i><div class="text-truncate">Phone Call Log</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-envelope submenu-icon c-orange"></i><div class="text-truncate">Postal Dispatch/Receive</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-comment-error submenu-icon c-red"></i><div class="text-truncate">Complaints</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Students ---- *@
+        @if (gStudents)
+        {
         <li class='menu-item @Open("StudentList","Admission/Create","EditStudent")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-plus ic-students"></i>
@@ -265,8 +335,11 @@
                 <li class='menu-item @On("Inactive")'><a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Academics ---- *@
+        @if (gAcademics)
+        {
         <li class='menu-item @Open("SubjectManagement")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-book ic-academic"></i>
@@ -283,8 +356,11 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-folder-open submenu-icon c-pink"></i><div class="text-truncate">Study Materials</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Attendance ---- *@
+        @if (gAttendance)
+        {
         <li class='menu-item @Open("StudentAttendance")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-check ic-att"></i>
@@ -296,8 +372,11 @@
                 <li class='menu-item @On("AttendanceReport")'><a asp-area="ERP" asp-controller="Attendance" asp-action="AttendanceReport" class="menu-link"><i class="bx bx-bar-chart submenu-icon c-purple"></i><div class="text-truncate">Attendance Reports</div></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Examinations ---- *@
+        @if (gExams)
+        {
         <li class='menu-item @Open("CreateExam","MarkEntry")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-file ic-exam"></i>
@@ -312,11 +391,17 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-line-chart submenu-icon c-teal"></i><div class="text-truncate">Result Analysis</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ===================== FINANCE ZONE ===================== *@
+        @if (secFinance)
+        {
         <li class="menu-header"><span class="menu-header-text">Finance</span></li>
+        }
 
         @* ---- Fees ---- *@
+        @if (gFees)
+        {
         <li class='menu-item @Open("FeeStructure","FeeHead","ManageFee","PaymentVerification","FeeDueReminders")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-wallet ic-fees"></i>
@@ -331,8 +416,11 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-bar-chart-alt-2 submenu-icon c-blue"></i><div class="text-truncate">Fee Reports</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Accounting ---- *@
+        @if (gAccounting)
+        {
         <li class='menu-item'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-receipt ic-account"></i>
@@ -344,11 +432,17 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-book-bookmark submenu-icon c-teal"></i><div class="text-truncate">Account Ledger</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ===================== PEOPLE & FACILITIES ===================== *@
+        @if (secPeople)
+        {
         <li class="menu-header"><span class="menu-header-text">People &amp; Facilities</span></li>
+        }
 
         @* ---- HR ---- *@
+        @if (gHR)
+        {
         <li class='menu-item @Open("StaffList","AddStaff","EditStaff","StaffProfile","LeaveManagement","PayrollManagement")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-group ic-hr"></i>
@@ -361,8 +455,11 @@
                 <li class='menu-item @On("PayrollManagement")'><a asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Payroll &amp; Salary</div></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Library ---- *@
+        @if (gLibrary)
+        {
         <li class='menu-item'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-book-reader ic-library"></i>
@@ -374,22 +471,28 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-green"></i><div class="text-truncate">Members</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
-        @* ---- Transport ---- *@
+        @* ---- Transport (hidden when module off, or when the role lacks transport.view) ---- *@
+        @if (gTransport)
+        {
         <li class='menu-item'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-bus ic-bus"></i>
                 <div class="text-truncate">Transport</div>
             </a>
             <ul class="menu-sub">
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-map submenu-icon c-blue"></i><div class="text-truncate">Routes</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-car submenu-icon c-purple"></i><div class="text-truncate">Vehicles &amp; Drivers</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("Routes")'><a asp-area="Admin" asp-controller="Transport" asp-action="Routes" class="menu-link"><i class="bx bx-map submenu-icon c-blue"></i><div class="text-truncate">Routes</div></a></li>
+                <li class='menu-item @On("Vehicles")'><a asp-area="Admin" asp-controller="Transport" asp-action="Vehicles" class="menu-link"><i class="bx bx-car submenu-icon c-purple"></i><div class="text-truncate">Vehicles &amp; Drivers</div></a></li>
+                <li class='menu-item @On("Assign")'><a asp-area="Admin" asp-controller="Transport" asp-action="Assign" class="menu-link"><i class="bx bx-link submenu-icon c-green"></i><div class="text-truncate">Assign Transport</div></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-current-location submenu-icon c-red"></i><div class="text-truncate">Live Bus Tracking</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-link submenu-icon c-green"></i><div class="text-truncate">Assign Transport</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Hostel ---- *@
+        @if (gHostel)
+        {
         <li class='menu-item'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-building-house ic-hostel"></i>
@@ -401,8 +504,11 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-key submenu-icon c-green"></i><div class="text-truncate">Room Allocation</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Inventory ---- *@
+        @if (gInventory)
+        {
         <li class='menu-item @Open("InventoryItem","PurchaseEntry")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-package ic-inv"></i>
@@ -415,11 +521,17 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-log-out-circle submenu-icon c-purple"></i><div class="text-truncate">Issue Items</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ===================== ENGAGEMENT ===================== *@
+        @if (secEngagement)
+        {
         <li class="menu-header"><span class="menu-header-text">Engagement</span></li>
+        }
 
         @* ---- Communication ---- *@
+        @if (gComm)
+        {
         <li class='menu-item'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-broadcast ic-comm"></i>
@@ -432,8 +544,11 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-bell-ring submenu-icon c-amber"></i><div class="text-truncate">Smart Bell</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Certificates ---- *@
+        @if (gCert)
+        {
         <li class='menu-item'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-certification ic-cert"></i>
@@ -446,8 +561,11 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-award submenu-icon c-purple"></i><div class="text-truncate">Custom Certificates</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Reports ---- *@
+        @if (gReports)
+        {
         <li class="menu-item">
             <a href="javascript:void(0);" class="menu-link menu-soon">
                 <i class="menu-icon icon-base bx bx-bar-chart-alt-2 ic-reports"></i>
@@ -455,26 +573,44 @@
                 <span class="ec-badge ec-badge-soon">soon</span>
             </a>
         </li>
+        }
 
         @* ===================== ADMINISTRATION ===================== *@
+        @if (secAdmin)
+        {
         <li class="menu-header"><span class="menu-header-text">Administration</span></li>
+        }
 
         @* ---- Settings ---- *@
+        @if (gSettings)
+        {
         <li class='menu-item @Open("BasicProfile","AcademicYears")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-cog ic-settings"></i>
                 <div class="text-truncate">Settings</div>
             </a>
             <ul class="menu-sub">
+                @if (Can("settings.view"))
+                {
                 <li class='menu-item @On("BasicProfile")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="BasicProfile" class="menu-link"><i class="bx bx-buildings submenu-icon c-blue"></i><div class="text-truncate">School Profile</div></a></li>
                 <li class='menu-item @On("AcademicYears")'><a asp-area="Admin" asp-controller="SchoolSettings" asp-action="AcademicYears" class="menu-link"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Academic Year / Session</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-user-circle submenu-icon c-indigo"></i><div class="text-truncate">Users &amp; Roles</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                }
+                @if (Can("rbac.manage"))
+                {
+                <li class='menu-item @On("Roles")'><a asp-area="Admin" asp-controller="Roles" asp-action="Index" class="menu-link"><i class="bx bx-user-circle submenu-icon c-indigo"></i><div class="text-truncate">Users &amp; Roles</div></a></li>
+                }
+                @if (Can("settings.view"))
+                {
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-plug submenu-icon c-green"></i><div class="text-truncate">SMS / Payment Gateway</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-data submenu-icon c-teal"></i><div class="text-truncate">Backup &amp; Restore</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                }
             </ul>
         </li>
+        }
 
         @* ---- Admission Workflow ---- *@
+        @if (gWorkflow)
+        {
         <li class='menu-item @Open("AdmissionWorkflow","WorkflowSettings")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-git-branch ic-workflow"></i>
@@ -488,8 +624,11 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-badge-check submenu-icon c-purple"></i><div class="text-truncate">Approvals</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
+        }
 
         @* ---- Billing ---- *@
+        @if (gBilling)
+        {
         <li class="menu-item">
             <a href="javascript:void(0);" class="menu-link menu-soon">
                 <i class="menu-icon icon-base bx bx-credit-card ic-billing"></i>
@@ -497,6 +636,7 @@
                 <span class="ec-badge ec-badge-soon">soon</span>
             </a>
         </li>
+        }
 
         @* ===================== MORE ===================== *@
         <li class="menu-header"><span class="menu-header-text">More</span></li>
@@ -547,6 +687,84 @@
                 });
                 item.classList.toggle("open", opening);
             });
+        }
+
+        // --- Active-state resolver (robust, URL-based) ------------------------
+        // Source of truth for "where am I": match the current URL to a menu link,
+        // mark it active, and OPEN every parent above it. This replaces the old
+        // server-side substring matching, which had incomplete keyword lists
+        // (some pages never highlighted) and collisions (wrong item highlighted).
+        // Runs on every page load, so the active branch is always expanded.
+        if (layoutMenu) {
+            (function resolveActive() {
+                function norm(p) {
+                    p = (p || "").toLowerCase();
+                    if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
+                    return p;
+                }
+                function pathOf(a) {
+                    try { return norm(new URL(a.href, location.origin).pathname); }
+                    catch (e) { return ""; }
+                }
+                var here  = norm(location.pathname);
+                var links = Array.prototype.slice.call(
+                    layoutMenu.querySelectorAll('a.menu-link[href]'));
+                links = links.filter(function (a) {
+                    var h = a.getAttribute('href') || '';
+                    return h && h.indexOf('javascript:') !== 0 && h !== '#';
+                });
+
+                // 1) Best match: exact URL, or the current page sits *under* a link's
+                //    URL (covers detail/edit pages). Longest match wins.
+                var best = null, bestLen = -1;
+                links.forEach(function (a) {
+                    var ap = pathOf(a);
+                    if (!ap || ap === '/') return;
+                    if (here === ap || here.indexOf(ap + '/') === 0) {
+                        if (ap.length > bestLen) { best = a; bestLen = ap.length; }
+                    }
+                });
+
+                // 2) Fallback for pages with no menu entry of their own (e.g. an
+                //    Edit screen): match by area/controller (first two path
+                //    segments) — but only if every candidate is in the SAME top
+                //    group, so we never highlight the wrong one.
+                if (!best) {
+                    var seg = here.split('/').filter(Boolean);
+                    if (seg.length >= 2) {
+                        var prefix = '/' + seg[0] + '/' + seg[1];
+                        var cands = links.filter(function (a) {
+                            var ap = pathOf(a);
+                            return ap === prefix || ap.indexOf(prefix + '/') === 0;
+                        });
+                        var groups = [];
+                        cands.forEach(function (a) {
+                            var g = a.closest('ul.menu-inner > li.menu-item');
+                            if (g && groups.indexOf(g) === -1) groups.push(g);
+                        });
+                        if (cands.length && groups.length === 1) best = cands[0];
+                    }
+                }
+
+                if (!best) return;
+
+                // Clear anything the server may have marked, then apply exactly one branch.
+                layoutMenu.querySelectorAll('.menu-item.active, .menu-item.open')
+                    .forEach(function (li) { li.classList.remove('active', 'open'); });
+
+                var p = best.parentElement;   // the <a>'s <li>
+                while (p && p !== layoutMenu) {
+                    if (p.tagName === 'LI' && p.classList.contains('menu-item')) {
+                        p.classList.add('active');
+                        if (p.querySelector(':scope > ul.menu-sub')) p.classList.add('open');
+                    }
+                    p = p.parentElement;
+                }
+
+                if (best.scrollIntoView) {
+                    try { best.scrollIntoView({ block: 'center' }); } catch (e) {}
+                }
+            })();
         }
 
         // --- Menu filter ------------------------------------------------------

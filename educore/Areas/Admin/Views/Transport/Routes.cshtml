@@ -1,0 +1,146 @@
+@{
+    ViewData["Title"] = "Transport Routes";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var routes = ViewBag.Routes as List<EduCoreDataAccessLayer.Models.Admin.TransportRoute>
+                 ?? new List<EduCoreDataAccessLayer.Models.Admin.TransportRoute>();
+}
+
+@section PageStyles {
+<style>
+.tr-page{--p:#ff8a00;--soft:#fff4e6;--border:#ececf5;--heading:#2b1b12;--muted:#8b8175;}
+.tr-page .btn-primary{background:linear-gradient(135deg,#ff8a00,#ff9f2f);border:0;border-radius:999px;font-weight:800;box-shadow:0 12px 24px rgba(255,138,0,.22);}
+.tr-card{border:1px solid var(--border);border-radius:16px;background:#fff;transition:.2s;}
+.tr-card:hover{border-color:rgba(255,138,0,.45);box-shadow:0 12px 28px rgba(43,27,18,.07);}
+.tr-name{font-weight:850;color:var(--heading);font-size:1.02rem;}
+.tr-meta{font-size:.8rem;color:var(--muted);font-weight:650;}
+.tr-fare{font-weight:800;color:var(--p);}
+.stop-row td{padding:.3rem .4rem;}
+.stop-row input{width:100%;border:1px solid var(--border);border-radius:8px;min-height:38px;padding:0 .55rem;font-weight:650;}
+.badge-off{background:#f1f0ee;color:#8b8175;border-radius:999px;padding:.15rem .6rem;font-size:.72rem;font-weight:800;}
+</style>
+}
+
+<div class="ec-page-shell tr-page">
+  <div class="ec-page-content">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center" style="background:var(--soft);color:var(--p);width:46px;height:46px"><i class="bx bx-map fs-4"></i></div>
+        <div>
+          <h4 class="mb-0" style="color:var(--heading);font-weight:900">Transport Routes</h4>
+          <div class="tr-meta">Configure routes and the monthly fare for each stop</div>
+        </div>
+      </div>
+      <button class="btn btn-primary px-3" id="addRouteBtn"><i class="bx bx-plus me-1"></i>Add Route</button>
+    </div>
+
+    <div class="row g-3" id="routeList">
+      @if (!routes.Any())
+      {
+        <div class="col-12"><div class="tr-card p-4 text-center tr-meta">No routes yet. Click <strong>Add Route</strong> to create one with its stops and fares.</div></div>
+      }
+      @foreach (var r in routes)
+      {
+        <div class="col-12 col-lg-6">
+          <div class="tr-card p-3 d-flex align-items-center gap-3">
+            <div class="flex-grow-1">
+              <div class="tr-name">@r.RouteName @(r.IsActive ? "" : Html.Raw("<span class='badge-off ms-1'>inactive</span>"))</div>
+              <div class="tr-meta">@r.StopCount stop(s)@(string.IsNullOrWhiteSpace(r.Description) ? "" : " · " + r.Description)</div>
+              <div class="tr-fare mt-1">
+                @if (r.StopCount > 0) { @($"₹{r.MinFare:0} – ₹{r.MaxFare:0} / month") } else { <span class="tr-meta">No stops</span> }
+              </div>
+            </div>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-secondary rounded-circle editRoute" data-id="@r.RouteId" data-name="@r.RouteName" data-desc="@r.Description" title="Edit"><i class="bx bx-edit"></i></button>
+              <button class="btn btn-sm btn-outline-secondary rounded-circle toggleRoute" data-id="@r.RouteId" title="Toggle active"><i class="bx bx-power-off"></i></button>
+              <button class="btn btn-sm btn-outline-danger rounded-circle delRoute" data-id="@r.RouteId" data-name="@r.RouteName" title="Delete"><i class="bx bx-trash"></i></button>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- Route modal -->
+<div class="modal fade" id="routeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="border-radius:18px">
+      <div class="modal-header"><h5 class="modal-title" id="routeModalTitle">Add Route</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="rRouteId" value="0">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6"><label class="form-label fw-bold">Route Name</label><input id="rName" class="form-control" placeholder="e.g. North Zone"></div>
+          <div class="col-md-6"><label class="form-label fw-bold">Description</label><input id="rDesc" class="form-control" placeholder="Optional"></div>
+        </div>
+        <label class="form-label fw-bold">Stops &amp; Monthly Fare</label>
+        <table class="table table-sm align-middle">
+          <thead><tr><th style="width:55%">Stop Name</th><th style="width:30%">Monthly Fare (₹)</th><th></th></tr></thead>
+          <tbody id="stopsBody"></tbody>
+        </table>
+        <button class="btn btn-sm btn-outline-secondary rounded-pill" id="addStopBtn"><i class="bx bx-plus"></i> Add Stop</button>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-primary" id="saveRouteBtn">Save Route</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function(){
+  'use strict';
+  var CSRF=$('input[name="__RequestVerificationToken"]').val();
+  var URL={ stops:'@Url.Action("GetStops")', save:'@Url.Action("SaveRoute")', del:'@Url.Action("DeleteRoute")', toggle:'@Url.Action("ToggleRouteStatus")' };
+  function notify(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
+  function post(url,data){ return $.ajax({url:url,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},data:JSON.stringify(data)}); }
+  function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
+
+  function stopRow(s){ s=s||{}; return '<tr class="stop-row">'+
+      '<td><input class="s-name" value="'+(s.stopName||'').replace(/"/g,"&quot;")+'" placeholder="Stop name"></td>'+
+      '<td><input type="number" class="s-fare" min="0" step="1" value="'+(s.monthlyFare||0)+'"></td>'+
+      '<td><input type="hidden" class="s-id" value="'+(s.stopId||0)+'"><button class="btn btn-sm btn-outline-danger rounded-circle rmStop"><i class="bx bx-x"></i></button></td></tr>'; }
+
+  $('#addRouteBtn').on('click',function(){
+    $('#routeModalTitle').text('Add Route'); $('#rRouteId').val(0); $('#rName').val(''); $('#rDesc').val('');
+    $('#stopsBody').html(stopRow()); new bootstrap.Modal('#routeModal').show();
+  });
+  $('#addStopBtn').on('click',function(){ $('#stopsBody').append(stopRow()); });
+  $('#stopsBody').on('click','.rmStop',function(){ $(this).closest('tr').remove(); });
+
+  $('.editRoute').on('click',function(){
+    var id=$(this).data('id');
+    $('#routeModalTitle').text('Edit Route'); $('#rRouteId').val(id);
+    $('#rName').val($(this).data('name')); $('#rDesc').val($(this).data('desc')||'');
+    $('#stopsBody').html('<tr><td colspan="3" class="text-muted small">Loading stops…</td></tr>');
+    new bootstrap.Modal('#routeModal').show();
+    $.getJSON(URL.stops,{routeId:id},function(rows){
+      $('#stopsBody').html((rows&&rows.length)? rows.map(function(s){return stopRow({stopId:s.stopId,stopName:s.stopName,monthlyFare:s.monthlyFare});}).join('') : stopRow());
+    });
+  });
+
+  $('#saveRouteBtn').on('click',function(){
+    var name=$('#rName').val().trim();
+    if(!name){ notify('warning','Enter a route name.'); return; }
+    var stops=[]; $('#stopsBody tr').each(function(i){
+      var nm=$(this).find('.s-name').val().trim(); if(!nm) return;
+      stops.push({ stopId:Number($(this).find('.s-id').val())||0, stopName:nm, monthlyFare:Number($(this).find('.s-fare').val())||0, displayOrder:i+1 });
+    });
+    post(URL.save,{ routeId:Number($('#rRouteId').val())||0, routeName:name, description:$('#rDesc').val().trim(), stops:stops })
+      .done(function(res){ if(res.success){ notify('success',res.message); setTimeout(function(){location.reload();},600);} else notify('error',res.message); })
+      .fail(function(){ notify('error','Could not save the route.'); });
+  });
+
+  $('.toggleRoute').on('click',function(){ postForm(URL.toggle,{id:$(this).data('id')}).done(function(res){ notify(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); }); });
+  $('.delRoute').on('click',function(){
+    if(!confirm('Delete route "'+$(this).data('name')+'"? Stops on it will be removed.')) return;
+    postForm(URL.del,{id:$(this).data('id')}).done(function(res){ notify(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); });
+  });
+
+  if(typeof toastr!=='undefined') toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
+});
+</script>
+}

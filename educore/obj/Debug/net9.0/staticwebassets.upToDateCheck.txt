@@ -1,4 +1,5 @@
 D:\Github\EduCoreLive\educore\wwwroot\vendor\css\pages\page-auth.css
+D:\Github\EduCoreLive\educore\wwwroot\js\fee-receipt.js
 D:\Github\EduCoreLive\educore\wwwroot\vendor\fonts\iconify-icons.css
 D:\Github\EduCoreLive\educore\wwwroot\js\ui-popover.js
 D:\Github\EduCoreLive\educore\wwwroot\js\inventory-catalog.js
@@ -88,6 +89,7 @@ wwwroot\img\illustrations\page-misc-error-light.png
 wwwroot\js\config.js
 wwwroot\js\dashboards-analytics.js
 wwwroot\js\extended-ui-perfect-scrollbar.js
+wwwroot\js\fee-receipt.js
 wwwroot\js\form-basic-inputs.js
 wwwroot\js\inventory-catalog.js
 wwwroot\js\main.js

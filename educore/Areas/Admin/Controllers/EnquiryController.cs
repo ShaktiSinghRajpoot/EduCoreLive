@@ -2,12 +2,14 @@ using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.Admin;
 using EduCoreDataAccessLayer.Services.Contract.Admin;
+using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace educore.Areas.Admin.Controllers
 {
     [Area("Admin")]
+    [HasPermission("enquiry.view")]
     public class EnquiryController : Controller
     {
         private readonly IEnquiryService _enquiryService;
@@ -209,6 +211,7 @@ namespace educore.Areas.Admin.Controllers
 
         // ── POST: /Admin/Enquiry/SaveEnquiry ─────────────────────
         [HttpPost]
+        [HasPermission("enquiry.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveEnquiry(EnquiryModel model)
         {
@@ -269,6 +272,7 @@ namespace educore.Areas.Admin.Controllers
 
         // ── POST: /Admin/Enquiry/LogFollowup (AJAX) ──────────────
         [HttpPost]
+        [HasPermission("enquiry.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> LogFollowup([FromBody] LogFollowupRequest req)
         {
@@ -311,6 +315,7 @@ namespace educore.Areas.Admin.Controllers
 
         // ── POST: /Admin/Enquiry/UpdateStatus (AJAX) ─────────────
         [HttpPost]
+        [HasPermission("enquiry.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateStatus([FromBody] UpdateStatusRequest req)
         {
@@ -338,6 +343,7 @@ namespace educore.Areas.Admin.Controllers
 
         // ── POST: /Admin/Enquiry/RegisterEnquiry (AJAX) ──────────
         [HttpPost]
+        [HasPermission("enquiry.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RegisterEnquiry([FromBody] RegisterEnquiryRequest req)
         {
@@ -419,6 +425,7 @@ namespace educore.Areas.Admin.Controllers
 
         // ── POST: /Admin/Enquiry/DeleteEnquiry (AJAX) ─────────────
         [HttpPost]
+        [HasPermission("enquiry.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteEnquiry([FromBody] DeleteEnquiryRequest req)
         {

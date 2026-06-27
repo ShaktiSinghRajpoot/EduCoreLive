@@ -250,6 +250,23 @@
                 <input class="form-check-input" type="checkbox" id="EnableSecurityFee" asp-for="EnableSecurityFee" />
               </div>
             </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Transport Module</div>
+                <div class="aw-row-desc">
+                  Turn on if this school runs buses. When on, the Transport menu (Routes,
+                  Vehicles &amp; Drivers, Assign Transport) and the "School Transport" panel
+                  on the admission form are available. Turn off for schools without transport
+                  to hide it everywhere. Per-stop bus fares are set in the Transport module,
+                  not here. Turning this off only hides the UI — it does not remove transport
+                  dues already billed to students.
+                </div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="EnableTransport" asp-for="EnableTransport" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -274,17 +291,6 @@ $(function () {
 
     if (typeof toastr !== 'undefined') {
         toastr.options = { closeButton: true, progressBar: true, positionClass: 'toast-top-right', timeOut: 3000 };
-    }
-
-    @if (TempData["Message"] != null)
-    {
-        <text>
-        (function () {
-            var r = '@TempData["Result"]';
-            var m = '@Html.Raw((TempData["Message"] ?? "").ToString().Replace("'", "\\'"))';
-            if (typeof toastr !== 'undefined') { r === '1' ? toastr.success(m) : toastr.error(m); }
-        })();
-        </text>
     }
 
     var $enable   = $('#EnableRegistration');

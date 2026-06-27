@@ -44,5 +44,16 @@ namespace EduCoreDataAccessLayer.Models.Admin
         /// Point = "Admission" in School Settings → Fee Head, not stored here.
         /// </summary>
         public bool EnableSecurityFee { get; set; }
+
+        // ── Transport module ────────────────────────────────────────────────
+
+        /// <summary>
+        /// Master switch for the Transport module. When false, the school sees no
+        /// transport UI at all — the Transport side-menu (Routes / Vehicles / Assign)
+        /// and the "School Transport" panel on the admission form are hidden. Defaults
+        /// to true so schools that already use buses are unaffected. Per-stop bus fares
+        /// live in the Transport module, not here.
+        /// </summary>
+        public bool EnableTransport { get; set; } = true;
     }
 }

@@ -1,0 +1,34 @@
+@*
+   Reusable fee-receipt modal. Drop @await Html.PartialAsync("_FeeReceiptModal")
+   onto any page and call EcReceipt.show(receiptNo) (see ~/js/fee-receipt.js).
+   Works for student fee, admission and registration receipts alike — the
+   server endpoint (/ERP/Fee/GetReceipt) resolves the payer.
+*@
+<div class="modal fade" id="ecReceiptModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:18px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Payment Receipt</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="ec-receipt-paper" id="ecReceiptPaper"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="ecReceiptPrintBtn"><i class="bx bx-printer me-1"></i>Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.ec-receipt-paper{font-family:'Segoe UI',sans-serif;color:#222;}
+.ec-receipt-paper .r-school{text-align:center;border-bottom:2px dashed #ddd;padding-bottom:.6rem;margin-bottom:.6rem;}
+.ec-receipt-paper .r-school h5{font-weight:900;margin:0;color:#2b1b12;}
+.ec-receipt-paper .r-school small{color:#888;}
+.ec-receipt-paper table{width:100%;border-collapse:collapse;font-size:.85rem;}
+.ec-receipt-paper td{padding:.25rem 0;}
+.ec-receipt-paper .r-line td{border-bottom:1px solid #eee;}
+.ec-receipt-paper .r-total{font-weight:900;font-size:1rem;border-top:2px solid #333;}
+</style>

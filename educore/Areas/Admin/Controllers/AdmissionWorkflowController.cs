@@ -1,6 +1,7 @@
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.Admin;
 using EduCoreDataAccessLayer.Services.Contract.Admin;
+using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
@@ -8,6 +9,7 @@ namespace educore.Areas.Admin.Controllers
 {
     [Area("Admin")]
     //[Authorize(Roles = AppRoles.SchoolAdmin)]
+    [HasPermission("admission_workflow.view")]
     public class AdmissionWorkflowController : Controller
     {
         private readonly IAdmissionWorkflowService _admissionWorkflowService;
@@ -32,6 +34,7 @@ namespace educore.Areas.Admin.Controllers
         }
 
         [HttpPost]
+        [HasPermission("admission_workflow.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveWorkflowSettings(AdmissionWorkflowModel model)
         {

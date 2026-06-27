@@ -211,7 +211,10 @@
   </div>
 </div>
 
+@await Html.PartialAsync("_FeeReceiptModal")
+
 @section PageScripts {
+<script src="~/js/fee-receipt.js" asp-append-version="true"></script>
 <script>
 $(function () {
     'use strict';
@@ -338,7 +341,13 @@ $(function () {
         var id = $(this).data('id');
         $.ajax({ url:'/Admin/Registration/MarkFeePaid', type:'POST', contentType:'application/json',
             headers:{ 'RequestVerificationToken':csrf }, data: JSON.stringify({ enquiryId:id }) })
-        .done(function(res){ if(res.success){ toastr.success(res.message); load(); } else toastr.error(res.message||'Failed.'); })
+        .done(function(res){
+            if(res.success){
+                toastr.success(res.message);
+                if (res.receiptNo && window.EcReceipt) EcReceipt.show(res.receiptNo);
+                load();
+            } else toastr.error(res.message||'Failed.');
+        })
         .fail(function(){ toastr.error('Something went wrong.'); });
     });
 

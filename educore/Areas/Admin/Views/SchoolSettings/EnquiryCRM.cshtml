@@ -1007,7 +1007,10 @@
     </div>
 </div>
 
+@await Html.PartialAsync("_FeeReceiptModal")
+
 @section PageScripts {
+<script src="~/js/fee-receipt.js" asp-append-version="true"></script>
 <script>
 $(document).ready(function () {
 
@@ -1016,17 +1019,6 @@ $(document).ready(function () {
         closeButton: true, progressBar: true, newestOnTop: true,
         positionClass: 'toast-top-right', preventDuplicates: true, timeOut: 3500
     };
-    @if (TempData["Message"] != null)
-    {
-        <text>
-        (function(){
-            var r = '@TempData["Result"]';
-            var m = '@Html.Raw((TempData["Message"] ?? "").ToString().Replace("'", "\\'").Replace("\r","").Replace("\n",""))';
-            if (r === '1') toastr.success(m); else toastr.error(m);
-        })();
-        </text>
-    }
-
     /* ── CSRF token (uses standalone token outside any form) ── */
     var csrf = $('input[name="__RequestVerificationToken"]').first().val();
     if (!csrf) {
@@ -1715,8 +1707,9 @@ $(document).ready(function () {
             if (res && res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('registerEnquiryModal')).hide();
                 toastr.success((res.message || 'Registration completed.') +
-                               (res.registrationNumber ? ' (' + res.registrationNumber + ')' : '') +
-                               (res.receiptNo ? ' · Receipt ' + res.receiptNo : ''));
+                               (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
+                // Show the printable registration-fee receipt when a fee was collected.
+                if (res.receiptNo && window.EcReceipt) EcReceipt.show(res.receiptNo);
                 fetchData(false);
             } else {
                 toastr.error((res && res.message) || 'Unable to complete registration.');

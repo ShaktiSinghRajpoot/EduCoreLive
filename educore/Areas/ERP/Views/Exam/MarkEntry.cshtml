@@ -1163,18 +1163,9 @@ document.getElementById('confirmFinalizeBtn').addEventListener('click', function
     showToast('Marks finalized and locked successfully.');
 });
 
-// ── Toast ─────────────────────────────────────────────────────────────────
-function showToast(msg) {
-    const t = document.getElementById('meToast');
-    document.getElementById('meToastMsg').textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 3500);
-}
-
-// ── TempData toast (post-redirect) ────────────────────────────────────────
-@if (TempData["SuccessMessage"] != null) {
-    <text>showToast("@TempData["SuccessMessage"]");</text>
-}
+// ── Toast (unified — routes through the app-wide ecToast/toastr) ────────────
+function showToast(msg) { window.ecToast('success', msg); }
+// Post-redirect flash messages are handled globally by _Scripts.cshtml.
 
 // ── Auto-load defaults so mock data shows immediately ─────────────────────
 (function autoLoad() {

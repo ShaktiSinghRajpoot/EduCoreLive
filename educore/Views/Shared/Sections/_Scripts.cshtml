@@ -30,6 +30,8 @@
 </environment>
 
 <script>
+    // ── Unified notifications (whole app) ───────────────────────────────
+    // toastr is the ONE toast for EduCore. Configure it once, here.
     toastr.options = {
         closeButton: true,
         progressBar: true,
@@ -38,4 +40,68 @@
         preventDuplicates: true,
         timeOut: 3500
     };
+
+    // Single notification API. Prefer ecToast(...) in new code.
+    // type: 'success' | 'error' | 'warning' | 'info'
+    window.ecToast = function (type, message) {
+        if (!message) return;
+        if (typeof toastr === 'undefined') { try { alert(message); } catch (e) {} return; }
+        var fn = (type && typeof toastr[type] === 'function') ? type : 'info';
+        toastr[fn](message);
+    };
+    // Back-compat alias: some pages call showToast('success', msg).
+    if (typeof window.showToast === 'undefined') { window.showToast = window.ecToast; }
+
+    // ── Global double-submit guard ──────────────────────────────────────
+    // Disables a form's submit button(s) on submit so a double/triple-click
+    // can't fire duplicate POSTs. Runs in the capture phase but defers the
+    // actual disable to a microtask: by then every other submit handler has
+    // run, so we can (a) keep the clicked button's name/value in the POST and
+    // (b) detect AJAX / failed-validation submits (defaultPrevented === true)
+    // and leave those buttons alone — otherwise an AJAX form, which never
+    // navigates away, would be stuck disabled forever.
+    // Opt out per-form with data-allow-multi-submit.
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form || form.tagName !== 'FORM' || form.hasAttribute('data-allow-multi-submit')) return;
+        var btns = form.querySelectorAll(
+            'button[type="submit"], input[type="submit"], input[type="image"], button:not([type])');
+        setTimeout(function () {
+            if (e.defaultPrevented) return; // AJAX or validation-stopped — don't touch
+            for (var i = 0; i < btns.length; i++) {
+                if (!btns[i].disabled) { btns[i].disabled = true; btns[i].classList.add('ec-submitting'); }
+            }
+        }, 0);
+    }, true);
+
+    // Re-enable on bfcache restore (back button can resurrect a disabled button).
+    window.addEventListener('pageshow', function () {
+        var stuck = document.querySelectorAll('.ec-submitting');
+        for (var i = 0; i < stuck.length; i++) { stuck[i].disabled = false; stuck[i].classList.remove('ec-submitting'); }
+    });
 </script>
+
+@{
+    // Server-side flash messages → one unified toast. Reads every legacy
+    // TempData convention so controllers need no changes.
+    var ecFlash = new List<(string Type, string Msg)>();
+    string ecS(object v) => v?.ToString() ?? "";
+    if (TempData["Message"] != null)
+        ecFlash.Add((TempData["Result"]?.ToString() == "1" ? "success" : "error", ecS(TempData["Message"])));
+    if (TempData["SuccessMessage"] != null) ecFlash.Add(("success", ecS(TempData["SuccessMessage"])));
+    if (TempData["ErrorMessage"]   != null) ecFlash.Add(("error",   ecS(TempData["ErrorMessage"])));
+    if (TempData["Success"] != null) ecFlash.Add(("success", ecS(TempData["Success"])));
+    if (TempData["Warning"] != null) ecFlash.Add(("warning", ecS(TempData["Warning"])));
+    if (TempData["Error"]   != null) ecFlash.Add(("error",   ecS(TempData["Error"])));
+}
+@if (ecFlash.Count > 0)
+{
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+        @foreach (var f in ecFlash)
+        {
+            @Html.Raw($"            window.ecToast('{f.Type}', {System.Text.Json.JsonSerializer.Serialize(f.Msg)});\n")
+        }
+        });
+    </script>
+}

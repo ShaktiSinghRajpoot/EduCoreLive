@@ -897,16 +897,7 @@
         });
     });
 
-    // ── Show success toast if redirected after save ───────────────────────
-    @if (TempData["SuccessMessage"] != null) {
-        <text>
-        (function () {
-            const t = document.getElementById("esSuccessToast");
-            t.classList.add("show");
-            setTimeout(() => t.classList.remove("show"), 4000);
-        })();
-        </text>
-    }
+    // Post-redirect success toast is handled globally by _Scripts.cshtml.
 
     // ── Unsaved changes warning ───────────────────────────────────────────
     let formDirty = false;

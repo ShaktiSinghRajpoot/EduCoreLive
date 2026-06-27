@@ -3,6 +3,7 @@ using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.Admin;
 using EduCoreDataAccessLayer.Services.Contract.Admin;
+using educore.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -27,6 +28,7 @@ namespace educore.Areas.Admin.Controllers
 
         #region BasicProfile
         [HttpGet]
+        [HasPermission("settings.view")]
         public async Task<IActionResult> BasicProfile()
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -44,6 +46,7 @@ namespace educore.Areas.Admin.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("settings.manage")]
         public async Task<IActionResult> BasicProfile(SchoolManageModel model, IFormFile? LogoImageFile)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -165,6 +168,7 @@ namespace educore.Areas.Admin.Controllers
 
 
         #region FeeHead
+        [HasPermission("fees.view")]
         public async Task<IActionResult> FeeHead()
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -181,6 +185,7 @@ namespace educore.Areas.Admin.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("fees.manage")]
         public async Task<IActionResult> SaveFeeHead(FeeHead model)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -215,6 +220,7 @@ namespace educore.Areas.Admin.Controllers
             return RedirectToAction(nameof(FeeHead));
         }
         [HttpGet]
+        [HasPermission("fees.view")]
         public async Task<IActionResult> GetFeeHeadById(int id)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -231,6 +237,7 @@ namespace educore.Areas.Admin.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("fees.manage")]
         public async Task<IActionResult> DeleteFeeHead(int id)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -249,6 +256,7 @@ namespace educore.Areas.Admin.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("fees.manage")]
         public async Task<IActionResult> ToggleFeeHeadStatus(int id)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -269,6 +277,7 @@ namespace educore.Areas.Admin.Controllers
         #region FeeStructure
 
         [HttpGet]
+        [HasPermission("fees.view")]
         public async Task<IActionResult> FeeStructure()
         {
             int tenantId     = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -337,6 +346,7 @@ namespace educore.Areas.Admin.Controllers
 
         // Called by JS edit handler — returns saved fee head amounts for a class+year
         [HttpGet]
+        [HasPermission("fees.view")]
         public async Task<IActionResult> GetFeeStructureByClass(string className, string academicYear)
         {
             int tenantId     = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -365,6 +375,7 @@ namespace educore.Areas.Admin.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("fees.manage")]
         public async Task<IActionResult> SaveFeeStructure(FeeStructureModel model)
         {
             int tenantId     = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value  ?? "0");
@@ -402,6 +413,7 @@ namespace educore.Areas.Admin.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("fees.manage")]
         public async Task<IActionResult> DeleteFeeStructure(int id)
         {
             int tenantId     = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -419,10 +431,12 @@ namespace educore.Areas.Admin.Controllers
         #endregion
         // Enquiry CRM is owned by EnquiryController (which loads the page model).
         // Kept here so the old SchoolSettings/EnquiryCRM URL keeps working.
+        [HasPermission("enquiry.view")]
         public IActionResult EnquiryCRM()
         {
             return RedirectToAction("EnquiryCRM", "Enquiry");
         }
+        [HasPermission("academics.view")]
         public IActionResult SubjectManagement()
         {
             ViewBag.Classes = new List<string>
@@ -442,6 +456,7 @@ namespace educore.Areas.Admin.Controllers
         // Classes & Sections — configured per academic year. This is the single
         // page for academic structure (replaces the old AcademicSetup page); it
         // reads/writes through the same academic-setup stored procedure.
+        [HasPermission("academics.view")]
         public async Task<IActionResult> ClassSection(int academicYearId = 0)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -484,6 +499,7 @@ namespace educore.Areas.Admin.Controllers
         // Persists the full structure for one academic year (replace-all),
         // matching the stored procedure's semantics.
         [HttpPost]
+        [HasPermission("academics.manage")]
         public async Task<IActionResult> SaveClassSection([FromBody] ClassSectionSaveDto dto)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -540,6 +556,7 @@ namespace educore.Areas.Admin.Controllers
 
         #region AcademicYear
         // Academic Year / Session management — create, edit, set-current, delete.
+        [HasPermission("settings.view")]
         public async Task<IActionResult> AcademicYears()
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -563,6 +580,7 @@ namespace educore.Areas.Admin.Controllers
         }
 
         [HttpPost]
+        [HasPermission("settings.manage")]
         public async Task<IActionResult> SaveAcademicYear([FromBody] AcademicYearSaveDto dto)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -593,6 +611,7 @@ namespace educore.Areas.Admin.Controllers
         }
 
         [HttpPost]
+        [HasPermission("settings.manage")]
         public async Task<IActionResult> SetCurrentAcademicYear([FromBody] AcademicYearIdDto dto)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -611,6 +630,7 @@ namespace educore.Areas.Admin.Controllers
         }
 
         [HttpPost]
+        [HasPermission("settings.manage")]
         public async Task<IActionResult> DeleteAcademicYear([FromBody] AcademicYearIdDto dto)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -632,16 +652,19 @@ namespace educore.Areas.Admin.Controllers
             DateTime.TryParse(s, out var d) ? d : (DateTime?)null;
         #endregion
 
+        [HasPermission("academics.view")]
         public IActionResult AssignClassTeacher()
         {
             return View();
         }
 
+        [HasPermission("academics.view")]
         public IActionResult Timetable()
         {
             return View();
         }
 
+        [HasPermission("academics.view")]
         public IActionResult PeriodStructure()
         {
             return View();

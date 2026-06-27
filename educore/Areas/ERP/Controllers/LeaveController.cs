@@ -1,8 +1,10 @@
+using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
+    [HasPermission("staff.view")]
     public class LeaveController : Controller
     {
         public IActionResult LeaveManagement()
@@ -11,6 +13,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
         public IActionResult ApplyLeave(IFormCollection form)
         {
@@ -21,6 +24,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
         public IActionResult Approve(int id)
         {
@@ -30,6 +34,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
         public IActionResult Reject(int id)
         {

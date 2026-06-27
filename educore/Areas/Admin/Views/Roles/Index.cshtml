@@ -1,0 +1,150 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model List<EduCoreDataAccessLayer.Models.RoleModel>
+@{
+    ViewData["Title"] = "Roles & Permissions";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+<link href="~/css/educore-theme.css" rel="stylesheet" />
+<style>
+.rl-badge{ display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .55rem; border-radius:999px; font-size:.68rem; font-weight:800; }
+.rl-builtin{ background:#eef0f6; color:#6b7280; }
+.rl-custom{ background:#fff3e6; color:#d97400; }
+.rl-count{ font-size:.78rem; font-weight:700; color:var(--ec-text-muted); }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-user-circle fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Roles &amp; Permissions</h4>
+            <div class="ec-page-subtitle">Define roles and control exactly what each one can see and do</div>
+          </div>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Staff" asp-action="StaffList">
+            <i class="bx bx-group"></i><span>People</span>
+          </a>
+          <button type="button" class="btn btn-primary d-flex align-items-center gap-1"
+                  data-bs-toggle="modal" data-bs-target="#roleModal" onclick="newRole()">
+            <i class="bx bx-plus"></i><span>New Role</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ec-card">
+      <div class="ec-card-body">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Role</th><th>Type</th><th>Users</th><th>Permissions</th><th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach (var r in Model)
+              {
+                <tr>
+                  <td>
+                    <div class="fw-bold">@r.RoleName</div>
+                    @if (!string.IsNullOrWhiteSpace(r.Description))
+                    {
+                        <div class="text-muted small">@r.Description</div>
+                    }
+                  </td>
+                  <td>
+                    @if (r.IsBuiltin)
+                    {
+                        <span class="rl-badge rl-builtin"><i class="bx bx-lock-alt"></i>Built-in</span>
+                    }
+                    else
+                    {
+                        <span class="rl-badge rl-custom"><i class="bx bx-customize"></i>Custom</span>
+                    }
+                  </td>
+                  <td><span class="rl-count">@r.UserCount</span></td>
+                  <td><span class="rl-count">@r.PermissionCount granted</span></td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary" asp-area="Admin" asp-controller="Roles" asp-action="Permissions" asp-route-id="@r.RoleId">
+                      <i class="bx bx-slider-alt me-1"></i>Permissions
+                    </a>
+                    @if (!r.IsBuiltin)
+                    {
+                      <button type="button" class="btn btn-sm btn-outline-secondary"
+                              onclick="editRole(@r.RoleId, '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(r.RoleName))', '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(r.Description ?? ""))')">
+                        <i class="bx bx-edit"></i>
+                      </button>
+                      <form asp-area="Admin" asp-controller="Roles" asp-action="Delete" method="post" class="d-inline"
+                            onsubmit="return confirm('Delete this role? Users must be reassigned first.');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@r.RoleId" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bx bx-trash"></i></button>
+                      </form>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Add / Edit role modal -->
+<div class="modal fade" id="roleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form asp-area="Admin" asp-controller="Roles" asp-action="Save" method="post" class="modal-content">
+      @Html.AntiForgeryToken()
+      <input type="hidden" name="RoleId" id="rmRoleId" value="0" />
+      <div class="modal-header">
+        <h5 class="modal-title" id="rmTitle">New Role</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Role Name <span class="text-danger">*</span></label>
+          <input type="text" name="RoleName" id="rmRoleName" class="form-control" maxlength="50" required placeholder="e.g. Librarian" />
+        </div>
+        <div class="mb-1">
+          <label class="form-label fw-bold">Description</label>
+          <textarea name="Description" id="rmDescription" class="form-control" rows="2" maxlength="250" placeholder="What this role is for (optional)"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+  function newRole(){
+    document.getElementById('rmTitle').textContent = 'New Role';
+    document.getElementById('rmRoleId').value = 0;
+    document.getElementById('rmRoleName').value = '';
+    document.getElementById('rmDescription').value = '';
+  }
+  function editRole(id, name, desc){
+    document.getElementById('rmTitle').textContent = 'Edit Role';
+    document.getElementById('rmRoleId').value = id;
+    document.getElementById('rmRoleName').value = name;
+    document.getElementById('rmDescription').value = desc;
+    var m = new bootstrap.Modal(document.getElementById('roleModal'));
+    m.show();
+  }
+</script>
+}

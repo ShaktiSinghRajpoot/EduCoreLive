@@ -1,9 +1,11 @@
-﻿using educore.Services;
+﻿using educore.Helpers;
+using educore.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
+    [HasPermission("students.view")]
     public class StudentController : Controller
     {
         private readonly IBaseService _baseService;
@@ -41,6 +43,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
         public IActionResult Reactivate(int id)
         {
@@ -50,6 +53,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
         public IActionResult Promotion(IFormCollection form)
         {
@@ -73,6 +77,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
         public IActionResult EditStudent(int id, IFormCollection form)
         {

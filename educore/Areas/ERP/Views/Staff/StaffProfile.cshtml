@@ -1,7 +1,18 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model EduCoreDataAccessLayer.Models.StaffModel
 @{
     ViewData["Title"] = "Staff Profile";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
-    int staffId = ViewBag.StaffId ?? 0;
+    int staffId = Model.StaffId;
+
+    string Dash(string? v) => string.IsNullOrWhiteSpace(v) ? "—" : v;
+    string initials = string.Concat(Model.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+        .Take(2).Select(w => w[0])).ToUpper();
+    if (string.IsNullOrEmpty(initials)) { initials = "—"; }
+    string statusClass = Model.Status == "Active" ? "b-active" : "b-active";
+    string dob = Model.DateOfBirth?.ToString("dd MMM yyyy") ?? "—";
+    string joinDate = Model.JoiningDate?.ToString("dd MMM yyyy") ?? "—";
+    string exp = Model.ExperienceYears.HasValue ? $"{Model.ExperienceYears} yrs" : "—";
 }
 
 @section PageStyles {
@@ -53,13 +64,17 @@
     </div>
 
     <div class="sp-hero">
-      <div class="sp-av bg-label-primary text-primary" id="spAv">—</div>
+      <div class="sp-av bg-label-primary text-primary">@initials</div>
       <div class="flex-grow-1">
-        <div class="sp-name" id="spName">Staff Member</div>
-        <div class="sp-sub" id="spSub">Designation · Department</div>
+        <div class="sp-name">@Model.FullName</div>
+        <div class="sp-sub">@Dash(Model.Designation) · @Dash(Model.Department)</div>
         <div class="mt-2 d-flex gap-2 flex-wrap">
-          <span class="sp-bdg b-active" id="spStatus">Active</span>
-          <span class="text-muted" style="font-size:.8rem;font-weight:700;" id="spEmp">EMP-000</span>
+          <span class="sp-bdg @statusClass">@Dash(Model.Status)</span>
+          <span class="text-muted" style="font-size:.8rem;font-weight:700;">@Dash(Model.EmployeeCode)</span>
+          @if (Model.UserId is not null)
+          {
+            <span class="sp-bdg b-active"><i class="bx bx-log-in-circle me-1"></i>Has Login</span>
+          }
         </div>
       </div>
       <div class="d-flex gap-2">
@@ -67,6 +82,17 @@
            asp-area="ERP" asp-controller="Staff" asp-action="EditStaff" asp-route-id="@staffId">
           <i class="bx bx-edit"></i><span>Edit Profile</span>
         </a>
+        @if (Model.Status != "Inactive")
+        {
+          <form asp-area="ERP" asp-controller="Staff" asp-action="Deactivate" method="post"
+                onsubmit="return confirm('Deactivate this staff member?');">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@staffId" />
+            <button type="submit" class="btn btn-outline-danger d-flex align-items-center gap-1">
+              <i class="bx bx-user-x"></i><span>Deactivate</span>
+            </button>
+          </form>
+        }
       </div>
     </div>
 
@@ -80,12 +106,12 @@
           </div>
           <div class="sp-card-body">
             <div class="row">
-              <div class="col-6 col-md-4 sp-field"><label>Gender</label><span id="spGender">—</span></div>
-              <div class="col-6 col-md-4 sp-field"><label>Date of Birth</label><span id="spDob">—</span></div>
-              <div class="col-6 col-md-4 sp-field"><label>Blood Group</label><span id="spBlood">—</span></div>
-              <div class="col-6 col-md-4 sp-field"><label>Mobile</label><span id="spPhone">—</span></div>
-              <div class="col-12 col-md-8 sp-field"><label>Email</label><span id="spEmail">—</span></div>
-              <div class="col-12 sp-field mb-0"><label>Address</label><span id="spAddr">—</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Gender</label><span>@Dash(Model.Gender)</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Date of Birth</label><span>@dob</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Blood Group</label><span>@Dash(Model.BloodGroup)</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Mobile</label><span>@Dash(Model.Mobile)</span></div>
+              <div class="col-12 col-md-8 sp-field"><label>Email</label><span>@Dash(Model.Email)</span></div>
+              <div class="col-12 sp-field mb-0"><label>Address</label><span>@Dash(Model.Address)</span></div>
             </div>
           </div>
         </div>
@@ -97,12 +123,12 @@
           </div>
           <div class="sp-card-body">
             <div class="row">
-              <div class="col-6 col-md-4 sp-field"><label>Designation</label><span id="spDesig">—</span></div>
-              <div class="col-6 col-md-4 sp-field"><label>Staff Type</label><span id="spType">—</span></div>
-              <div class="col-6 col-md-4 sp-field"><label>Department</label><span id="spDept">—</span></div>
-              <div class="col-6 col-md-4 sp-field"><label>Joining Date</label><span id="spJoin">—</span></div>
-              <div class="col-6 col-md-4 sp-field"><label>Qualification</label><span id="spQual">—</span></div>
-              <div class="col-6 col-md-4 sp-field mb-0"><label>Experience</label><span id="spExp">—</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Designation</label><span>@Dash(Model.Designation)</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Staff Type</label><span>@Dash(Model.StaffType)</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Department</label><span>@Dash(Model.Department)</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Joining Date</label><span>@joinDate</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Qualification</label><span>@Dash(Model.Qualification)</span></div>
+              <div class="col-6 col-md-4 sp-field mb-0"><label>Experience</label><span>@exp</span></div>
             </div>
           </div>
         </div>
@@ -156,26 +182,3 @@
   </div>
 </div>
 
-@section PageScripts {
-<script>
-(function(){
-  /* Mock data — replace with model binding once the SP is ready. */
-  var STAFF={
-    1:{name:'Sunita Rao',color:'primary',gender:'Female',dob:'12 Mar 1980',blood:'B+',phone:'9876500011',email:'sunita.rao@school.edu',addr:'12 MG Road, Pune',emp:'EMP-001',desig:'Principal',type:'Non-Teaching',dept:'Administration',join:'01 Jun 2015',qual:'M.A, B.Ed',exp:'18 yrs',status:'Active',attend:'97%',leaves:'4'},
-    3:{name:'Anita Desai',color:'success',gender:'Female',dob:'05 Aug 1985',blood:'O+',phone:'9876500013',email:'anita.desai@school.edu',addr:'8 Park Street, Pune',emp:'EMP-003',desig:'Senior Teacher',type:'Teaching',dept:'Teaching',join:'15 Jul 2017',qual:'M.Sc, B.Ed',exp:'12 yrs',status:'Active',attend:'94%',leaves:'7'},
-    4:{name:'Vikram Joshi',color:'warning',gender:'Male',dob:'22 Nov 1988',blood:'A+',phone:'9876500014',email:'vikram.joshi@school.edu',addr:'45 Lake View, Pune',emp:'EMP-004',desig:'Maths Teacher',type:'Teaching',dept:'Teaching',join:'20 Jun 2018',qual:'M.Sc, B.Ed',exp:'9 yrs',status:'Active',attend:'91%',leaves:'9'}
-  };
-  var id=@staffId;
-  var s=STAFF[id]||STAFF[1];
-  function set(elId,val){var el=document.getElementById(elId);if(el)el.textContent=val||'—';}
-  function ini(n){return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();}
-  var av=document.getElementById('spAv');
-  av.textContent=ini(s.name); av.className='sp-av bg-label-'+s.color+' text-'+s.color;
-  set('spName',s.name); set('spSub',s.desig+' · '+s.dept); set('spStatus',s.status); set('spEmp',s.emp);
-  set('spGender',s.gender); set('spDob',s.dob); set('spBlood',s.blood); set('spPhone',s.phone);
-  set('spEmail',s.email); set('spAddr',s.addr); set('spDesig',s.desig); set('spType',s.type);
-  set('spDept',s.dept); set('spJoin',s.join); set('spQual',s.qual); set('spExp',s.exp);
-  set('spAttend',s.attend); set('spLeaves',s.leaves);
-})();
-</script>
-}
