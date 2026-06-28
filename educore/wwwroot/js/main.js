@@ -56,14 +56,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const html = document.documentElement;
     const KEY = 'ec-tablet-menu-hidden';
 
-    // Restore the saved state without animating it closed on load.
+    // Hidden by default on tablets: start collapsed unless the user explicitly
+    // opened it before ('0'). Applied without animating on load.
     try {
-      if (tablet.matches && localStorage.getItem(KEY) === '1') {
+      if (tablet.matches && localStorage.getItem(KEY) !== '0') {
         html.classList.add('ec-no-anim', 'ec-menu-hidden');
         requestAnimationFrame(() => requestAnimationFrame(() => html.classList.remove('ec-no-anim')));
       }
     } catch (e) {}
 
+    // The chevron in the menu header (.layout-menu-toggle) collapses the sidebar.
     document.querySelectorAll('.layout-menu-toggle').forEach(toggle => {
       toggle.addEventListener('click', () => {
         if (!tablet.matches) return; // only act in the tablet band
@@ -71,6 +73,19 @@ document.addEventListener('DOMContentLoaded', function () {
         try { localStorage.setItem(KEY, hidden ? '1' : '0'); } catch (e) {}
       });
     });
+
+    // A floating chevron handle brings the sidebar back once it's hidden
+    // (the in-menu chevron slides away with the menu).
+    const reopen = document.createElement('button');
+    reopen.type = 'button';
+    reopen.className = 'ec-menu-reopen';
+    reopen.setAttribute('aria-label', 'Show menu');
+    reopen.innerHTML = '<i class="icon-base bx bx-chevron-right"></i>';
+    reopen.addEventListener('click', () => {
+      html.classList.remove('ec-menu-hidden');
+      try { localStorage.setItem(KEY, '0'); } catch (e) {}
+    });
+    document.body.appendChild(reopen);
 
     // Leaving the tablet band (rotate/resize) clears the override so desktop
     // and phone layouts behave normally.

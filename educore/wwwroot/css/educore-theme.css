@@ -651,10 +651,10 @@ textarea.form-control {
     }
 
     /* ── Pop in / out toggle ──────────────────────────────────────────────
-       The navbar hamburger stays visible so the sidebar can be hidden to
-       reclaim space and shown again. main.js toggles `.ec-menu-hidden` on
-       <html> in this band (the free template's own toggle is a no-op on
-       "large" screens). Hidden = slide the sidebar away + un-pad the content. */
+       The chevron in the menu header (and the floating handle below) toggle
+       `.ec-menu-hidden` on <html> via main.js — the free template's own toggle
+       is a no-op on "large" screens. Hidden = slide the sidebar away + un-pad
+       the content so it fills the width. */
     .ec-menu-hidden .layout-menu {
         transform: translateX(-100%) !important;
     }
@@ -668,13 +668,53 @@ textarea.form-control {
         inset-inline-start: 0 !important;
     }
 
-    /* Drop only the drawer-specific bits — dimmer overlay, edge drag-strip,
-       in-menu close chevron — but KEEP the navbar hamburger as the toggle. */
+    /* Drop the drawer-specific bits (dimmer overlay + edge drag-strip) AND the
+       navbar hamburger — the show/hide toggle is the chevron in the menu header
+       instead (the in-menu `<` collapses it; the floating `>` below reopens it). */
     .layout-overlay,
     .drag-target,
-    #layout-menu .app-brand .layout-menu-toggle { display: none !important; }
+    .layout-navbar .layout-menu-toggle { display: none !important; }
     .layout-menu-expanded body { overflow: auto !important; }
+
+    /* Make the menu-header chevron read as a tidy round button. */
+    #layout-menu .app-brand .layout-menu-toggle {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        inline-size: 32px;
+        block-size: 32px;
+        border-radius: 9px;
+        color: #8b93a7;
+    }
+    #layout-menu .app-brand .layout-menu-toggle:hover { background: #f4f5f9; color: #ff8a00; }
+
+    /* Floating chevron handle that re-opens the sidebar after it's hidden
+       (the in-menu chevron slides away with the menu, so this brings it back). */
+    .ec-menu-hidden .ec-menu-reopen {
+        display: flex;
+        position: fixed;
+        inset-block-start: 50%;
+        inset-inline-start: 0;
+        transform: translateY(-50%);
+        z-index: 1081;
+        align-items: center;
+        justify-content: center;
+        inline-size: 34px;
+        block-size: 48px;
+        padding: 0;
+        border: none;
+        border-start-end-radius: 12px;
+        border-end-end-radius: 12px;
+        background: linear-gradient(90deg, #ff8a00 0%, #ffa733 100%);
+        color: #fff;
+        box-shadow: 0 6px 16px -4px rgba(255, 138, 0, .5);
+        cursor: pointer;
+    }
+    .ec-menu-reopen i { font-size: 22px; line-height: 1; }
 }
+
+/* The floating re-open handle is hidden everywhere except a hidden tablet menu. */
+.ec-menu-reopen { display: none; }
 
 /* Suppress the show/hide transition while restoring the saved state on load,
    so a remembered "hidden" sidebar doesn't visibly slide closed on every page. */
