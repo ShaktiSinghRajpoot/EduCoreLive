@@ -729,4 +729,18 @@ textarea.form-control {
 @media (max-width: 767.98px) {
     .layout-menu,
     .layout-overlay { block-size: 100dvh !important; }
+
+    /* Kill the drawer "shake": no horizontal drag/jitter and no rubber-band
+       bounce. touch-action:pan-y restricts gestures to vertical scrolling;
+       overscroll-behavior stops the bounce from chaining to the page; and
+       overflow-x:hidden removes any sideways drift. */
+    #layout-menu {
+        touch-action:        pan-y;
+        overscroll-behavior: contain;
+        overflow-x:          hidden;
+    }
+    #layout-menu .menu-inner {
+        touch-action:          pan-y;
+        overscroll-behavior-y: contain;
+    }
 }
