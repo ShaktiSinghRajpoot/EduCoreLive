@@ -619,9 +619,10 @@ textarea.form-control {
    ============================================================ */
 @media (min-width: 768px) and (max-width: 1199.98px) {
 
-    /* Sidebar: fixed, full viewport height, always on-screen.
-       transform:none cancels the drawer's translateX(-100%);
-       100dvh is the iOS-Safari-correct full height. */
+    /* Sidebar: fixed, full viewport height, shown by default.
+       transform:none cancels the drawer's translateX(-100%); 100dvh is the
+       iOS-Safari-correct full height; the transition makes the show/hide
+       toggle glide instead of jump. */
     .layout-menu {
         position:            fixed !important;
         inset-block-start:   0 !important;
@@ -629,16 +630,19 @@ textarea.form-control {
         block-size:          100dvh !important;
         margin-inline:       0 !important;
         transform:           none !important;
+        transition:          transform .3s ease !important;
     }
 
     /* Content sits to the RIGHT of the sidebar, never under it. */
     .layout-wrapper:not(.layout-without-menu) .layout-page {
         padding-inline-start: var(--bs-menu-width) !important;
+        transition:           padding-inline-start .3s ease;
     }
 
     /* The fixed top navbar starts after the sidebar (matches desktop). */
     .layout-navbar-fixed .layout-content-navbar:not(.layout-without-menu) .layout-navbar {
         inset-inline-start: var(--bs-menu-width) !important;
+        transition:         inset-inline-start .3s ease;
     }
 
     /* A fixed footer, if enabled, aligns with the content column. */
@@ -646,15 +650,37 @@ textarea.form-control {
         inset-inline-start: var(--bs-menu-width) !important;
     }
 
-    /* Tear down the drawer machinery: dimmer overlay, edge drag-strip,
-       the navbar hamburger + in-menu close chevron (sidebar is always
-       visible now), and the body scroll-lock the drawer used. */
+    /* ── Pop in / out toggle ──────────────────────────────────────────────
+       The navbar hamburger stays visible so the sidebar can be hidden to
+       reclaim space and shown again. main.js toggles `.ec-menu-hidden` on
+       <html> in this band (the free template's own toggle is a no-op on
+       "large" screens). Hidden = slide the sidebar away + un-pad the content. */
+    .ec-menu-hidden .layout-menu {
+        transform: translateX(-100%) !important;
+    }
+    .ec-menu-hidden .layout-wrapper:not(.layout-without-menu) .layout-page {
+        padding-inline-start: 0 !important;
+    }
+    .ec-menu-hidden.layout-navbar-fixed .layout-content-navbar:not(.layout-without-menu) .layout-navbar {
+        inset-inline-start: 0 !important;
+    }
+    .ec-menu-hidden.layout-footer-fixed .layout-wrapper:not(.layout-without-menu) .content-footer {
+        inset-inline-start: 0 !important;
+    }
+
+    /* Drop only the drawer-specific bits — dimmer overlay, edge drag-strip,
+       in-menu close chevron — but KEEP the navbar hamburger as the toggle. */
     .layout-overlay,
     .drag-target,
-    .layout-navbar .layout-menu-toggle,
     #layout-menu .app-brand .layout-menu-toggle { display: none !important; }
     .layout-menu-expanded body { overflow: auto !important; }
 }
+
+/* Suppress the show/hide transition while restoring the saved state on load,
+   so a remembered "hidden" sidebar doesn't visibly slide closed on every page. */
+.ec-no-anim .layout-menu,
+.ec-no-anim .layout-page,
+.ec-no-anim .layout-navbar { transition: none !important; }
 
 /* Phones (<768px) can't fit a permanent sidebar, so they keep the slide-in
    drawer — but force it (and its dimmer) to the TRUE viewport height. Sneat

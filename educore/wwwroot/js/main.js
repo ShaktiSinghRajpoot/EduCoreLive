@@ -45,6 +45,40 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // Tablet pop-in/out sidebar (768–1199.98px).
+  // In this band the sidebar is pinned by CSS (educore-theme.css), and the
+  // free template's Helpers.toggleCollapsed() is a no-op on "large" screens —
+  // so wire the navbar hamburger to slide the pinned sidebar in/out and
+  // reclaim the content space, remembering the choice across page loads.
+  // Phones (<768px) and desktop (>=1200px) are untouched.
+  (function () {
+    const tablet = window.matchMedia('(min-width: 768px) and (max-width: 1199.98px)');
+    const html = document.documentElement;
+    const KEY = 'ec-tablet-menu-hidden';
+
+    // Restore the saved state without animating it closed on load.
+    try {
+      if (tablet.matches && localStorage.getItem(KEY) === '1') {
+        html.classList.add('ec-no-anim', 'ec-menu-hidden');
+        requestAnimationFrame(() => requestAnimationFrame(() => html.classList.remove('ec-no-anim')));
+      }
+    } catch (e) {}
+
+    document.querySelectorAll('.layout-menu-toggle').forEach(toggle => {
+      toggle.addEventListener('click', () => {
+        if (!tablet.matches) return; // only act in the tablet band
+        const hidden = html.classList.toggle('ec-menu-hidden');
+        try { localStorage.setItem(KEY, hidden ? '1' : '0'); } catch (e) {}
+      });
+    });
+
+    // Leaving the tablet band (rotate/resize) clears the override so desktop
+    // and phone layouts behave normally.
+    const onChange = () => { if (!tablet.matches) html.classList.remove('ec-menu-hidden'); };
+    if (tablet.addEventListener) tablet.addEventListener('change', onChange);
+    else if (tablet.addListener) tablet.addListener(onChange);
+  })();
+
   // Display menu toggle (layout-menu-toggle) on hover with delay
   let delay = function (elem, callback) {
     let timeout = null;
