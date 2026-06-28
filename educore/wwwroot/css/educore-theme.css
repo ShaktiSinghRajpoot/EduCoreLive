@@ -605,3 +605,62 @@ textarea.form-control {
     line-height: 1.2;
 }
 .ec-school-identity-addr i { font-size: .9rem; }
+
+/* ============================================================
+   TABLET = DESKTOP MENU
+   Sneat flips the left sidebar into a slide-in drawer below
+   1200px, so EVERY iPad (incl. landscape at 1024px) got the
+   mobile drawer: on iPad Safari it wasn't full-height (the
+   100dvh fix only ran on mobile Chrome) and felt loose/draggable.
+   For tablets (>=768px) we promote the layout back to the laptop
+   "pinned, fixed, full-height" sidebar. Phones (<768px) keep the
+   drawer. The JS half (Helpers.LAYOUT_BREAKPOINT = 768) lives in
+   wwwroot/js/main.js so script + CSS share the same breakpoint.
+   ============================================================ */
+@media (min-width: 768px) and (max-width: 1199.98px) {
+
+    /* Sidebar: fixed, full viewport height, always on-screen.
+       transform:none cancels the drawer's translateX(-100%);
+       100dvh is the iOS-Safari-correct full height. */
+    .layout-menu {
+        position:            fixed !important;
+        inset-block-start:   0 !important;
+        inset-inline-start:  0 !important;
+        block-size:          100dvh !important;
+        margin-inline:       0 !important;
+        transform:           none !important;
+    }
+
+    /* Content sits to the RIGHT of the sidebar, never under it. */
+    .layout-wrapper:not(.layout-without-menu) .layout-page {
+        padding-inline-start: var(--bs-menu-width) !important;
+    }
+
+    /* The fixed top navbar starts after the sidebar (matches desktop). */
+    .layout-navbar-fixed .layout-content-navbar:not(.layout-without-menu) .layout-navbar {
+        inset-inline-start: var(--bs-menu-width) !important;
+    }
+
+    /* A fixed footer, if enabled, aligns with the content column. */
+    .layout-footer-fixed .layout-wrapper:not(.layout-without-menu) .content-footer {
+        inset-inline-start: var(--bs-menu-width) !important;
+    }
+
+    /* Tear down the drawer machinery: dimmer overlay, edge drag-strip,
+       the navbar hamburger + in-menu close chevron (sidebar is always
+       visible now), and the body scroll-lock the drawer used. */
+    .layout-overlay,
+    .drag-target,
+    .layout-navbar .layout-menu-toggle,
+    #layout-menu .app-brand .layout-menu-toggle { display: none !important; }
+    .layout-menu-expanded body { overflow: auto !important; }
+}
+
+/* Phones (<768px) can't fit a permanent sidebar, so they keep the slide-in
+   drawer — but force it (and its dimmer) to the TRUE viewport height. Sneat
+   only applied this 100dvh fix on mobile Chrome, leaving iPhone Safari with a
+   short, half-filled panel. This covers every mobile browser. */
+@media (max-width: 767.98px) {
+    .layout-menu,
+    .layout-overlay { block-size: 100dvh !important; }
+}

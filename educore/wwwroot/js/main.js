@@ -4,6 +4,15 @@
 
 'use strict';
 
+// Treat tablets (incl. iPad landscape at 1024px) as large screens so the
+// left sidebar is the fixed, full-height pinned menu — not the slide-in
+// drawer. Must match the CSS breakpoint in css/educore-theme.css
+// (@media 768px–1199.98px). helpers.js loads before this file and reads
+// this value via `this.LAYOUT_BREAKPOINT`, so overriding it here is enough.
+if (window.Helpers) {
+  window.Helpers.LAYOUT_BREAKPOINT = 768;
+}
+
 let menu, animate;
 document.addEventListener('DOMContentLoaded', function () {
   // class for ios specific styles
