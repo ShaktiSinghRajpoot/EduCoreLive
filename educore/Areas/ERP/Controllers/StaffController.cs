@@ -160,10 +160,16 @@ namespace educore.Areas.ERP.Controllers
 
             if ((creating || hasLogin) && (model.RoleIds == null || model.RoleIds.Count == 0))
                 ModelState.AddModelError(nameof(model.RoleIds), "Select at least one role for the login.");
+
+            // Resetting the password of an existing login needs a valid new password.
+            if (hasLogin && model.ChangePassword
+                && (string.IsNullOrWhiteSpace(model.LoginPassword) || model.LoginPassword!.Length < 8))
+                ModelState.AddModelError(nameof(model.LoginPassword), "New password must be at least 8 characters.");
         }
 
+        // Hash the entered password when creating a new login OR resetting an existing one.
         private static string? HashIfLogin(StaffModel model)
-            => model.CreateLogin && !string.IsNullOrWhiteSpace(model.LoginPassword)
+            => (model.CreateLogin || model.ChangePassword) && !string.IsNullOrWhiteSpace(model.LoginPassword)
                 ? BCrypt.Net.BCrypt.HashPassword(model.LoginPassword)
                 : null;
 

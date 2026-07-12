@@ -50,7 +50,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                     StaffType    = NullStr(row, "staff_type"),
                     Department   = NullStr(row, "department"),
                     Designation  = NullStr(row, "designation"),
-                   // JoiningDate  = DateVal(row, "joining_date"),
+                    JoiningDate  = DateVal(row, "joining_date"),
                     Status       = Str(row, "status"),
                     HasLogin     = row.Table.Columns.Contains("user_id") && row["user_id"] != DBNull.Value
                 });
@@ -74,7 +74,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 EmployeeCode    = NullStr(row, "employee_code"),
                 FullName        = Str(row, "full_name"),
                 Gender          = NullStr(row, "gender"),
-               // DateOfBirth     = DateVal(row, "dob"),
+                DateOfBirth     = DateVal(row, "dob"),
                 Mobile          = NullStr(row, "mobile"),
                 AltMobile       = NullStr(row, "alt_mobile"),
                 Email           = NullStr(row, "email"),
@@ -83,7 +83,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
                 StaffType       = NullStr(row, "staff_type"),
                 Department      = NullStr(row, "department"),
                 Designation     = NullStr(row, "designation"),
-                //JoiningDate     = DateVal(row, "joining_date"),
+                JoiningDate     = DateVal(row, "joining_date"),
                 Qualification   = NullStr(row, "qualification"),
                 ExperienceYears = NullIntVal(row, "experience_years"),
                 Status          = Str(row, "status"),
@@ -258,8 +258,18 @@ namespace EduCoreDataAccessLayer.Services.Repository.Admin
         private static decimal? NullDecVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? Convert.ToDecimal(r[c]) : (decimal?)null;
         private static string Str(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
         private static string? NullStr(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
-        
-        //private static DateTime? DateVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? Convert.ToDateTime(r[c]) : (DateTime?)null;
+
+        // Npgsql maps a Postgres `date` column to DateOnly; coerce to the model's DateTime?.
+        private static DateTime? DateVal(DataRow r, string c)
+        {
+            if (!Has(r, c) || r[c] == DBNull.Value) return null;
+            return r[c] switch
+            {
+                DateOnly d  => d.ToDateTime(TimeOnly.MinValue),
+                DateTime dt => dt,
+                var v       => DateTime.TryParse(v.ToString(), out var p) ? p : (DateTime?)null
+            };
+        }
 
     }
 }
