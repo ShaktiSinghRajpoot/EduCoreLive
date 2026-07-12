@@ -560,7 +560,6 @@ D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\qzeg3ruweo-eak8i2nx8l.
 D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\pip7ejqmp3-twcxbycym9.gz
 D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\ikyqqrq24t-lvmfy8bedq.gz
 D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\so6a5vk08a-6p01latpr2.gz
-D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\jr3a95e2ai-a40btjfw6s.gz
 D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\tzsm3w38y9-8lahp35mjy.gz
 D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\d1dun7haqi-s5p3y0036b.gz
 D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\szcf1vod24-wigkb0yhay.gz
@@ -12031,7 +12030,6 @@ C:\Users\shakt\AppData\Local\Temp\ec_build_adv2\refs\System.Xml.XmlSerializer.dl
 C:\Users\shakt\AppData\Local\Temp\ec_build_adv2\refs\System.Xml.XPath.dll
 C:\Users\shakt\AppData\Local\Temp\ec_build_adv2\refs\System.Xml.XPath.XDocument.dll
 C:\Users\shakt\AppData\Local\Temp\ec_build_adv2\refs\WindowsBase.dll
-D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\1mbhzcku5c-9o1fq3pdz5.gz
 C:\Users\shakt\AppData\Local\Temp\ec_build_audit\appsettings.Development.json
 C:\Users\shakt\AppData\Local\Temp\ec_build_audit\appsettings.json
 C:\Users\shakt\AppData\Local\Temp\ec_build_audit\educore.staticwebassets.runtime.json
@@ -15143,3 +15141,5 @@ C:\Users\shakt\AppData\Local\Temp\ec_roleswitch_check\refs\System.Xml.XPath.dll
 C:\Users\shakt\AppData\Local\Temp\ec_roleswitch_check\refs\System.Xml.XPath.XDocument.dll
 C:\Users\shakt\AppData\Local\Temp\ec_roleswitch_check\refs\WindowsBase.dll
 D:\Github\EduCoreLive\educore\obj\Debug\net9.0\staticwebassets.upToDateCheck.txt
+D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\jr3a95e2ai-ecboe2u5rj.gz
+D:\Github\EduCoreLive\educore\obj\Debug\net9.0\compressed\1mbhzcku5c-pk4b9ukcb2.gz

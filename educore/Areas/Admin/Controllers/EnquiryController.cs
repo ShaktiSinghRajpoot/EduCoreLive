@@ -43,11 +43,11 @@ namespace educore.Areas.Admin.Controllers
             var model = await _enquiryService.GetEnquiryCrmPageAsync(tenantId, schoolId, actionUserId);
 
             // Dropdowns — same pattern as FeeStructure
-            model.AvailableSessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear");
-            model.AvailableClasses = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class");
+            model.AvailableSessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear" ,tenantId.ToString(), schoolId.ToString()); ;
+            model.AvailableClasses = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", tenantId.ToString(), schoolId.ToString());
 
             // Counsellors — try loading; empty list is acceptable if not configured
-            try { model.AvailableCounsellors = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Counsellor"); }
+            try { model.AvailableCounsellors = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Counsellor", tenantId.ToString(), schoolId.ToString()); }
             catch { model.AvailableCounsellors = new List<SelectListItem>(); }
 
             // Admission workflow settings — drive show/hide of the Registration stage.
