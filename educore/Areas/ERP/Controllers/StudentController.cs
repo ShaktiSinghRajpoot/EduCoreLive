@@ -1,5 +1,8 @@
 ﻿using educore.Helpers;
 using educore.Services;
+using EduCoreDataAccessLayer.Helpers;
+using EduCoreDataAccessLayer.Models.ERP;
+using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
 namespace educore.Areas.ERP.Controllers
@@ -9,10 +12,12 @@ namespace educore.Areas.ERP.Controllers
     public class StudentController : Controller
     {
         private readonly IBaseService _baseService;
+        private readonly IAdmissionService _admissionService;
 
-        public StudentController(IBaseService baseService)
+        public StudentController(IBaseService baseService, IAdmissionService admissionService)
         {
             _baseService = baseService;
+            _admissionService = admissionService;
         }
 
         public IActionResult StudentAttendance()
@@ -20,17 +25,25 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        public async Task<IActionResult> StudentList()
+        // One StudentListModel does it all: bound filters/sort/page come in via
+        // the query string; the service fills Items + TotalCount + summary tiles.
+        // Tenant/school/user are sourced from CLAIMS only (never model-bound).
+        public async Task<IActionResult> StudentList(StudentListModel query)
         {
             // Filter dropdowns share the same source as Admission / Enquiry.
-            try { ViewBag.Classes = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class"); }
-            catch { ViewBag.Classes = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+            try { query.ClassList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class"); }
+            catch { query.ClassList = new(); }
 
-            try { ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear"); }
-            catch { ViewBag.Sessions = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+            try { query.YearList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear"); }
+            catch { query.YearList = new(); }
 
-            return View();
+            await _admissionService.GetStudentListPageAsync(query, TenantId(), SchoolId(), UserId());
+            return View(query);
         }
+
+        private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+        private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+        private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
         public IActionResult Promotion()
         {

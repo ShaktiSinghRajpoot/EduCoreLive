@@ -1,15 +1,14 @@
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
-using EduCoreDataAccessLayer.Services.Contract.Admin;
+using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
-    // Fee counter + day-close + reports. The two Inventory stub pages
-    // (InventoryItem/PurchaseEntry) also live here for now, so the whole
-    // controller is gated by fees.view until Inventory gets its own module.
+    // Fee counter + day-close + reports. Inventory now lives in its own
+    // InventoryController (see Controllers/InventoryController.cs).
     [HasPermission("fees.view")]
     public class FeeController : Controller
     {
@@ -34,8 +33,6 @@ namespace educore.Areas.ERP.Controllers
         public IActionResult ManageFee() => View();
         public IActionResult DayClose() => View();
         public IActionResult Reports() => View();
-        public IActionResult InventoryItem() => View();
-        public IActionResult PurchaseEntry() => View();
 
         // ── GET: /ERP/Fee/GetSessions ────────────────────────────
         [HttpGet]
@@ -145,7 +142,7 @@ namespace educore.Areas.ERP.Controllers
             var dues = await _feePaymentService.GetStudentDuesAsync(studentId, TenantId(), SchoolId(), UserId());
             var today = DateOnly.FromDateTime(DateTime.Today);
 
-            object Map(IEnumerable<EduCoreDataAccessLayer.Models.Admin.StudentDueItem> items) =>
+            object Map(IEnumerable<EduCoreDataAccessLayer.Models.ERP.StudentDueItem> items) =>
                 items.Select(d => new
                 {
                     id       = d.LedgerId,
@@ -180,7 +177,7 @@ namespace educore.Areas.ERP.Controllers
 
             var items = req.Items
                 .Where(i => i.LedgerId > 0 && (i.Amount > 0 || i.Concession > 0))
-                .Select(i => new EduCoreDataAccessLayer.Models.Admin.FeeCollectItem
+                .Select(i => new EduCoreDataAccessLayer.Models.ERP.FeeCollectItem
                 {
                     LedgerId   = i.LedgerId,
                     Amount     = i.Amount,
@@ -189,7 +186,7 @@ namespace educore.Areas.ERP.Controllers
 
             var extras = (req.Extras ?? new List<ExtraCharge>())
                 .Where(e => e.Amount > 0 && !string.IsNullOrWhiteSpace(e.Label))
-                .Select(e => new EduCoreDataAccessLayer.Models.Admin.FeeExtraItem
+                .Select(e => new EduCoreDataAccessLayer.Models.ERP.FeeExtraItem
                 {
                     Label  = e.Label!.Trim(),
                     Amount = e.Amount
@@ -200,7 +197,7 @@ namespace educore.Areas.ERP.Controllers
 
             var tenders = (req.Tenders ?? new List<TenderLine>())
                 .Where(t => t.Amount > 0)
-                .Select(t => new EduCoreDataAccessLayer.Models.Admin.FeeTenderItem
+                .Select(t => new EduCoreDataAccessLayer.Models.ERP.FeeTenderItem
                 {
                     Mode      = NullIfEmpty(t.Mode) ?? "Cash",
                     Amount    = t.Amount,

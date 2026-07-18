@@ -1,0 +1,19 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+out/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local secrets — connection strings live here, never commit
+appsettings.Development.json
+
+# OS noise
+Thumbs.db
+.DS_Store

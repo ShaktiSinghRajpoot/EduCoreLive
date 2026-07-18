@@ -47,6 +47,9 @@ CREATE TABLE IF NOT EXISTS config.designations (
     tenant_id      integer NOT NULL,
     name           varchar(100) NOT NULL,
     staff_type     varchar(20)  NOT NULL DEFAULT 'Non-Teaching',
+    -- Suggested department for this title. Auto-selected on the staff form when
+    -- the designation is chosen (a snapshot name, like core.staff.department).
+    default_department varchar(100),
     sort_order     integer NOT NULL DEFAULT 0,
     is_active      boolean NOT NULL DEFAULT TRUE,
     created_by     integer NOT NULL DEFAULT 0,
@@ -59,6 +62,9 @@ CREATE TABLE IF NOT EXISTS config.designations (
     CONSTRAINT uq_designation_name UNIQUE (tenant_id, name)
 );
 CREATE INDEX IF NOT EXISTS idx_designations_tenant ON config.designations (tenant_id);
+
+-- Existing installs: add the designation -> default-department link.
+ALTER TABLE config.designations ADD COLUMN IF NOT EXISTS default_department varchar(100);
 
 -- ----------------------------------------------------------------------------
 -- 3) Staff / Employee master  (operational, tenant+school scoped like students)
@@ -190,3 +196,43 @@ CROSS JOIN (VALUES
     ('Security Guard',         'Support',      55)
 ) AS g(name, staff_type, ord)
 ON CONFLICT (tenant_id, name) DO NOTHING;
+
+-- Default department per designation. Runs after the inserts so it fills both
+-- freshly-seeded and pre-existing rows. Only sets rows still NULL, so a school's
+-- own customisation is never overwritten; re-runs stay idempotent.
+UPDATE config.designations d
+SET    default_department = m.dept
+FROM (VALUES
+    ('Principal',                 'Academics'),
+    ('Vice Principal',            'Academics'),
+    ('Headmaster / Headmistress', 'Academics'),
+    ('Academic Coordinator',      'Academics'),
+    ('PGT Teacher',               'Academics'),
+    ('TGT Teacher',               'Academics'),
+    ('PRT Teacher',               'Academics'),
+    ('Pre-Primary Teacher',       'Academics'),
+    ('Sports / PT Instructor',    'Sports'),
+    ('Music Teacher',             'Academics'),
+    ('Art Teacher',               'Academics'),
+    ('Office Administrator',      'Administration'),
+    ('Accountant',                'Accounts'),
+    ('Cashier',                   'Accounts'),
+    ('Receptionist',              'Front Office'),
+    ('Clerk',                     'Front Office'),
+    ('Data Entry Operator',       'Front Office'),
+    ('Computer Operator',         'IT / Computer Lab'),
+    ('Librarian',                 'Library'),
+    ('Lab Assistant',             'IT / Computer Lab'),
+    ('HR Manager',                'Administration'),
+    ('Nurse',                     'Administration'),
+    ('Driver',                    'Transport'),
+    ('Conductor / Bus Attendant', 'Transport'),
+    ('Peon',                      'Administration'),
+    ('Attendant / Helper',        'Housekeeping'),
+    ('Sweeper / Cleaner',         'Housekeeping'),
+    ('Gardener',                  'Housekeeping'),
+    ('Cook',                      'Housekeeping'),
+    ('Security Guard',            'Security')
+) AS m(name, dept)
+WHERE  d.default_department IS NULL
+  AND  LOWER(TRIM(d.name)) = LOWER(m.name);

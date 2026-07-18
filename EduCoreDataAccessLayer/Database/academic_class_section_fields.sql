@@ -8,8 +8,11 @@
 -- ============================================================================
 
 ALTER TABLE academic.academic_classes
-    ADD COLUMN IF NOT EXISTS stream      varchar(50),
-    ADD COLUMN IF NOT EXISTS coordinator varchar(150);
+    ADD COLUMN IF NOT EXISTS stream               varchar(50),
+    ADD COLUMN IF NOT EXISTS coordinator          varchar(150),
+    -- Coordinator is a staff member (core.staff); the coordinator text above is
+    -- kept as a name snapshot of the linked row.
+    ADD COLUMN IF NOT EXISTS coordinator_staff_id integer;
 
 ALTER TABLE academic.academic_class_sections
     ADD COLUMN IF NOT EXISTS capacity int,
@@ -41,10 +44,11 @@ DECLARE
     v_class_order   integer;
     v_section_order integer;
 
-    v_stream      text;
-    v_coordinator text;
-    v_capacity    integer;
-    v_room_no     text;
+    v_stream         text;
+    v_coordinator    text;
+    v_coord_staff_id integer;
+    v_capacity       integer;
+    v_room_no        text;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -65,6 +69,7 @@ BEGIN
             ac.display_order AS class_display_order,
             ac.stream,
             ac.coordinator,
+            ac.coordinator_staff_id,
             acs.academic_class_section_id,
             acs.section_name,
             acs.display_order AS section_display_order,
@@ -180,14 +185,26 @@ BEGIN
                 v_class_order := v_class_order + 1;
                 v_stream      := NULLIF(trim(COALESCE(v_class_item ->> 'stream',      v_class_item ->> 'Stream',      '')), '');
                 v_coordinator := NULLIF(trim(COALESCE(v_class_item ->> 'coordinator', v_class_item ->> 'Coordinator', '')), '');
+                v_coord_staff_id := NULLIF(COALESCE(v_class_item ->> 'coordinatorStaffId', v_class_item ->> 'CoordinatorStaffId', ''), '')::int;
+
+                -- Snapshot the coordinator's name from the linked staff row (single
+                -- source); keep any free text only when no staff is linked.
+                IF COALESCE(v_coord_staff_id, 0) > 0 THEN
+                    SELECT full_name INTO v_coordinator
+                    FROM   core.staff
+                    WHERE  staff_id = v_coord_staff_id
+                      AND  tenant_id = p_tenant_id AND school_id = p_school_id
+                      AND  COALESCE(is_deleted, FALSE) = FALSE;
+                END IF;
 
                 INSERT INTO academic.academic_classes
                     (tenant_id, school_id, academic_year_id, class_name, display_order,
-                     stream, coordinator, created_by, created_at, is_deleted, is_active)
+                     stream, coordinator, coordinator_staff_id, created_by, created_at, is_deleted, is_active)
                 VALUES
                     (p_tenant_id, p_school_id, v_academic_year_id, v_class_name,
                      COALESCE(NULLIF(v_class_item ->> 'displayOrder', '')::int, v_class_order),
-                     v_stream, v_coordinator, p_action_user_id, NOW(), FALSE, TRUE)
+                     v_stream, v_coordinator, NULLIF(COALESCE(v_coord_staff_id, 0), 0),
+                     p_action_user_id, NOW(), FALSE, TRUE)
                 RETURNING academic_class_id INTO v_academic_class_id;
 
                 v_section_order := 0;

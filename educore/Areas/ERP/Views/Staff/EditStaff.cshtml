@@ -1,36 +1,13 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model EduCoreDataAccessLayer.Models.StaffModel
 @{
     ViewData["Title"] = "Edit Staff";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     int staffId = Model.StaffId;
-    var dd = ViewBag.Dropdowns as EduCoreDataAccessLayer.Models.StaffDropdowns ?? new EduCoreDataAccessLayer.Models.StaffDropdowns();
 }
 
 @section PageStyles {
-<link href="~/css/educore-theme.css" rel="stylesheet" />
-<style>
-@@media (max-width:575.98px){
-    .es-sticky .btn{ width:100% !important; }
-    .es-sticky{ flex-direction:column; align-items:stretch !important; }
-}
-.es-page{ color:var(--ec-text); }
-.es-breadcrumb{ display:flex; align-items:center; gap:.4rem; font-size:.76rem; font-weight:700; color:var(--ec-text-muted); margin-bottom:.35rem; }
-.es-breadcrumb a{ color:var(--ec-text-muted); text-decoration:none; }
-.es-breadcrumb a:hover{ color:var(--ec-primary); }
-.es-breadcrumb span{ color:var(--ec-text-dark); }
-.es-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; margin-bottom:1.25rem; transition:var(--ec-transition); }
-.es-card-hdr{ display:flex; align-items:center; gap:.85rem; padding:1rem 1.25rem .75rem; border-bottom:1px solid var(--ec-border); }
-.es-sec-ic{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; background:var(--ec-primary-light); color:var(--ec-primary); display:flex; align-items:center; justify-content:center; font-size:1rem; }
-.es-sec-title{ font-size:.9rem; font-weight:900; color:var(--ec-text-dark); }
-.es-sec-sub{ font-size:.74rem; font-weight:650; color:var(--ec-text-muted); margin-top:.08rem; }
-.es-card-body{ padding:1.1rem 1.25rem; }
-.es-label{ font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--ec-text-muted); margin-bottom:.38rem; display:block; }
-.es-label.required::after{ content:" *"; color:#ea5455; }
-.es-page .form-control,.es-page .form-select{ border:1px solid var(--ec-border); border-radius:12px; min-height:46px; font-size:.88rem; font-weight:650; color:var(--ec-text); background:#fff; transition:border-color .2s,box-shadow .2s; }
-.es-page .form-control:focus,.es-page .form-select:focus{ border-color:rgba(255,138,0,.6); box-shadow:0 0 0 4px rgba(255,138,0,.11); }
-.es-sticky{ position:sticky; bottom:0; background:rgba(255,255,255,.95); backdrop-filter:blur(10px); border-top:1px solid var(--ec-border); padding:1rem 1.25rem; display:flex; justify-content:flex-end; gap:.75rem; border-radius:0 0 var(--ec-radius) var(--ec-radius); z-index:5; }
-.es-login-toggle{ display:flex; align-items:center; gap:.6rem; }
-</style>
+    <link rel="stylesheet" href="~/css/ERP/Staff/EditStaff.css" asp-append-version="true" />
 }
 
 <div class="ec-page-shell">
@@ -123,31 +100,30 @@
               <input asp-for="EmployeeCode" class="form-control">
             </div>
             <div class="col-12 col-md-4">
-              <label class="es-label required">Designation</label>
-              <select asp-for="Designation" class="form-select">
-                <option value="">Select designation</option>
-                @foreach (var g in dd.Designations)
-                {
-                    <option value="@g.Name">@g.Name</option>
-                }
+              <label class="es-label required">Department</label>
+              <select asp-for="Department" id="ddDepartment" class="form-select"
+                      asp-items="@(new SelectList(Model.DepartmentList, "Value", "Text"))">
+                <option value="">Select department</option>
               </select>
+              <div class="text-muted small mt-1">Pick the department first.</div>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="es-label required">Designation</label>
+              <select asp-for="Designation" id="ddDesignation" class="form-select" data-current="@Model.Designation">
+                <option value="">Select department first</option>
+              </select>
+              <div class="text-muted small mt-1">Shows only roles in the chosen department.</div>
             </div>
             <div class="col-12 col-md-4">
               <label class="es-label">Staff Type</label>
-              <select asp-for="StaffType" class="form-select">
-                <option value="">Select</option>
-                <option>Teaching</option><option>Non-Teaching</option><option>Transport</option><option>Support</option>
-              </select>
-            </div>
-            <div class="col-12 col-md-4">
-              <label class="es-label required">Department</label>
-              <select asp-for="Department" class="form-select">
-                <option value="">Select department</option>
-                @foreach (var d in dd.Departments)
+              <select id="ddStaffType" class="form-select" disabled>
+                <option value="">—</option>
+                @foreach (var t in new[] { "Teaching", "Non-Teaching", "Transport", "Support" })
                 {
-                    <option value="@d">@d</option>
+                    <option selected="@(Model.StaffType == t)">@t</option>
                 }
               </select>
+              <div class="text-muted small mt-1">Set automatically from the designation.</div>
             </div>
             <div class="col-12 col-md-4">
               <label class="es-label">Joining Date</label>
@@ -224,7 +200,7 @@
               <div class="col-12">
                 <label class="es-label required">Role(s)</label>
                 <div class="d-flex flex-wrap gap-3">
-                  @foreach (var r in dd.Roles)
+                  @foreach (var r in Model.RoleList)
                   {
                     <div class="form-check">
                       <input class="form-check-input" type="checkbox" name="RoleIds" value="@r.RoleId" id="role_@r.RoleId" checked="@Model.RoleIds.Contains(r.RoleId)">
@@ -249,7 +225,7 @@
           <div class="es-card-body">
             <label class="es-label required">Role(s)</label>
             <div class="d-flex flex-wrap gap-3">
-              @foreach (var r in dd.Roles)
+              @foreach (var r in Model.RoleList)
               {
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" name="RoleIds" value="@r.RoleId" id="role_@r.RoleId" checked="@Model.RoleIds.Contains(r.RoleId)">
@@ -275,11 +251,38 @@
 @section PageScripts {
 <partial name="_ValidationScriptsPartial" />
 <script>
-(function(){
-  var chk = document.getElementById('chkLogin');
-  var box = document.getElementById('loginFields');
-  function sync(){ if(box) box.style.display = chk && chk.checked ? 'flex' : 'none'; }
-  if (chk){ chk.addEventListener('change', sync); sync(); }
-})();
+    $(function () {
+
+        // Department → designations (cascade), same pattern as the CRM app.
+        $('#ddDepartment').change(function () {
+            $('#ddDesignation').empty().append(new Option('Select designation', ''));
+            $('#ddStaffType').val('');
+            var dept = $('#ddDepartment').val();
+            if (dept != '') BindDesignations(dept, '');
+        });
+
+        function BindDesignations(dept, keep) {
+            var url = '@Url.Action("GetDesignations", "Staff", new { area = "ERP" })';
+            $.post(url, { department: dept }, function (data) {
+                $.each(data, function (i, item) {
+                    var opt = $("<option></option>").val(item.value).html(item.text).attr('data-type', item.type);
+                    if (item.value === keep) opt.prop('selected', true);
+                    $('#ddDesignation').append(opt);
+                });
+                SyncStaffType();
+            });
+        }
+
+        function SyncStaffType() { $('#ddStaffType').val($('#ddDesignation :selected').data('type') || ''); }
+        $('#ddDesignation').change(SyncStaffType);
+
+        // Keep the staff member's current designation selected on load.
+        if ($('#ddDepartment').val() != '') BindDesignations($('#ddDepartment').val(), $('#ddDesignation').data('current') || '');
+
+        // Login fields toggle (only present when this person has no login yet).
+        $('#chkLogin').change(function () {
+            $('#loginFields').css('display', $(this).is(':checked') ? 'flex' : 'none');
+        }).trigger('change');
+    });
 </script>
 }

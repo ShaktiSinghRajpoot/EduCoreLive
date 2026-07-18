@@ -1,7 +1,5 @@
 ﻿using EduCoreDataAccessLayer.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 using Npgsql;
 using NpgsqlTypes;
 using System.Data;

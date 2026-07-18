@@ -1,3 +1,4 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Fee Reports";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -10,24 +11,7 @@
 *@
 
 @section PageStyles {
-<link href="~/css/educore-theme.css" rel="stylesheet" />
-<style>
-.fee-rep-page{ --suc:#28c76f;--suc-soft:#e8fadf;--dng:#ea5455;--dng-soft:#fdeceb;--amb:#ff9f43;--amb-soft:#fff1e0;--info:#00bad1;--info-soft:#dff7fa; color:var(--ec-text); }
-.fee-rep-page .view-tabs{ display:flex;gap:.4rem;border-bottom:1px solid var(--ec-border);margin-bottom:1rem; }
-.fee-rep-page .view-tab{ border:0;background:none;padding:.55rem .25rem;margin-right:1.2rem;font-size:.92rem;font-weight:850;color:var(--ec-text-muted);cursor:pointer;border-bottom:3px solid transparent; }
-.fee-rep-page .view-tab.active{ color:var(--ec-primary);border-bottom-color:var(--ec-primary); }
-.fee-rep-page .filter-bar{ background:linear-gradient(180deg,#fff,#fff7ed);border:1px solid rgba(255,138,0,.18);border-radius:14px; }
-.fee-rep-page .sumcard{ border:1px solid var(--ec-border);border-radius:13px;padding:.8rem 1rem;background:#fff;height:100%; }
-.fee-rep-page .sumcard .l{ font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ec-text-muted); }
-.fee-rep-page .sumcard .v{ font-size:1.3rem;font-weight:950;color:var(--ec-text-dark);font-variant-numeric:tabular-nums;margin-top:.15rem; }
-.fee-rep-page .sumcard.tot{ background:linear-gradient(135deg,var(--ec-primary-light),#fff);border-color:#ffc98a; } .fee-rep-page .sumcard.tot .v{ color:var(--ec-primary); }
-.fee-rep-page .chip{ display:inline-flex;gap:.4rem;align-items:center;border:1px solid var(--ec-border);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;font-weight:700;margin:0 .35rem .35rem 0; }
-.fee-rep-page .chip b{ font-variant-numeric:tabular-nums; }
-.fee-rep-page .num{ font-variant-numeric:tabular-nums;text-align:right; }
-.fee-rep-page .age0{ color:var(--ec-text-muted); } .fee-rep-page .age1{ color:var(--amb); } .fee-rep-page .age2{ color:#e07b39; } .fee-rep-page .age3{ color:var(--dng);font-weight:800; }
-.fee-rep-page .ec-table tbody tr td{ font-size:.85rem; }
-@@media print{ .no-print{ display:none!important; } .ec-page-shell{ box-shadow:none;border:0; } .view-tab{ display:none; } }
-</style>
+    <link rel="stylesheet" href="~/css/ERP/Fee/Reports.css" asp-append-version="true" />
 }
 
 <div class="ec-page-shell fee-rep-page">

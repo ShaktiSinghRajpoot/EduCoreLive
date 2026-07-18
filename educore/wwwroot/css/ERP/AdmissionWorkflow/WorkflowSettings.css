@@ -1,0 +1,77 @@
+/* WorkflowSettings page styles — extracted from Areas/ERP/Views/AdmissionWorkflow/WorkflowSettings.cshtml */
+    .aw-page .ec-page-shell {
+        min-height: 100vh;
+        background:
+            radial-gradient(circle at top left, rgba(255, 138, 0, .13), transparent 34rem),
+            radial-gradient(circle at bottom right, rgba(255, 173, 66, .10), transparent 32rem),
+            linear-gradient(135deg, #fff8ef 0%, #f8f7f5 48%, #ffffff 100%);
+    }
+    .aw-page .ec-card {
+        border: 1px solid rgba(236, 236, 245, .95);
+        border-radius: 1.35rem;
+        background: rgba(255, 255, 255, .92);
+        box-shadow: 0 14px 34px rgba(43, 44, 64, .07);
+    }
+    .aw-page .ec-card-header, .aw-page .ec-card-body { padding: 1.25rem; }
+    .aw-page .form-label {
+        color: #9a938b; font-size: .76rem; font-weight: 900;
+        letter-spacing: .03em; text-transform: uppercase;
+    }
+    .aw-page .form-control, .aw-page .form-select {
+        min-height: 46px; border-radius: .95rem; border-color: #ececf5;
+        color: #2b2c40; font-weight: 700; background-color: #fff;
+    }
+    .aw-page .form-control:focus, .aw-page .form-select:focus {
+        border-color: rgba(255, 138, 0, .65); box-shadow: 0 0 0 .25rem rgba(255, 138, 0, .12);
+    }
+    .aw-page .btn { border-radius: .95rem; font-weight: 900; min-height: 44px; transition: all .2s ease; }
+    .aw-page .btn-primary {
+        background: linear-gradient(135deg, #ff8a00, #ffad42); border-color: #ff8a00;
+        box-shadow: 0 10px 22px rgba(255, 138, 0, .22);
+    }
+    .aw-page .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 28px rgba(255, 138, 0, .28); }
+    .aw-page .btn-outline-secondary { border-color: #ececf5; color: #2b2c40; background: #fff; }
+    .aw-page .btn-outline-secondary:hover { background: #fff4e6; border-color: rgba(255, 138, 0, .25); color: #2b1b12; }
+
+    /* ── Setting row ── */
+    .aw-row {
+        display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+        padding: 1rem 1.1rem; border: 1px solid #f0edf8; border-radius: 1.1rem;
+        background: #fff; margin-bottom: .9rem; transition: border-color .2s ease, box-shadow .2s ease;
+    }
+    .aw-row:hover { border-color: rgba(255, 138, 0, .22); box-shadow: 0 8px 20px rgba(43,44,64,.05); }
+    .aw-row.is-child { margin-left: clamp(0px, 3vw, 2.25rem); background: #fffdf9; }
+    .aw-row-title { color: #2b1b12; font-weight: 900; font-size: .96rem; }
+    .aw-row-desc  { color: #9a938b; font-weight: 600; font-size: .82rem; margin-top: .2rem; }
+    .aw-row-extra { margin-top: .85rem; max-width: 320px; }
+
+    /* ── Bigger switch ── */
+    .aw-switch { padding-left: 3.25rem; min-height: 1.6rem; }
+    .aw-switch .form-check-input { width: 2.7rem; height: 1.5rem; margin-left: -3.25rem; cursor: pointer; }
+    .aw-switch .form-check-input:checked { background-color: #ff8a00; border-color: #ff8a00; }
+    .aw-switch .form-check-input:focus { border-color: rgba(255,138,0,.65); box-shadow: 0 0 0 .25rem rgba(255,138,0,.12); }
+
+    .aw-disabled { opacity: .45; pointer-events: none; }
+
+    /* ── Flow preview ── */
+    .aw-flow { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+    .aw-chip {
+        display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .85rem;
+        border-radius: 999px; font-weight: 800; font-size: .82rem; white-space: nowrap;
+        background: #fff7ed; color: #b35a00; border: 1px solid rgba(255,138,0,.22);
+    }
+    .aw-chip.aw-chip-reg { background: #eef6ff; color: #1d4ed8; border-color: rgba(29,78,216,.18); }
+    .aw-chip.aw-chip-end { background: #ecfdf3; color: #047857; border-color: rgba(4,120,87,.18); }
+    .aw-arrow { color: #c9c4bd; font-size: 1.1rem; }
+
+    .aw-page .ec-sticky-actions {
+        bottom: 1rem; padding: .85rem; border-radius: 1.2rem;
+        border: 1px solid rgba(236, 236, 245, .95); background: rgba(255, 255, 255, .9);
+        backdrop-filter: blur(12px); box-shadow: 0 14px 34px rgba(43, 44, 64, .10);
+    }
+    @media (max-width: 575.98px) {
+        .aw-row { flex-direction: column; }
+        .aw-row.is-child { margin-left: 0; }
+        .ec-sticky-actions { flex-direction: column; align-items: stretch; }
+        .ec-sticky-actions .btn { width: 100%; }
+    }

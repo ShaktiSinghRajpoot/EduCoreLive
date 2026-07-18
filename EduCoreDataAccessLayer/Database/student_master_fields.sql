@@ -125,13 +125,16 @@ BEGIN
         v_year     := COALESCE(p_academic_year, '');
         v_adm_date := COALESCE(p_admission_date, CURRENT_DATE);
 
-        -- Duplicate guard: same name + dob + mobile already admitted
+        -- Duplicate guard: same name + dob + mobile already admitted. Name is
+        -- whitespace-collapsed + lower-cased so trivial typos ("Rahul  Kumar" vs
+        -- "Rahul Kumar", different casing) no longer slip a duplicate through.
         SELECT COUNT(*) INTO v_dup
         FROM core.students
         WHERE tenant_id = p_tenant_id
           AND school_id = p_school_id
           AND is_active = TRUE
-          AND LOWER(student_name) = LOWER(COALESCE(p_student_name, ''))
+          AND regexp_replace(LOWER(TRIM(student_name)), '\s+', ' ', 'g')
+              = regexp_replace(LOWER(TRIM(COALESCE(p_student_name, ''))), '\s+', ' ', 'g')
           AND COALESCE(dob, DATE '1900-01-01') = COALESCE(p_dob, DATE '1900-01-01')
           AND COALESCE(mobile, '') = COALESCE(p_mobile, '');
         IF v_dup > 0 THEN

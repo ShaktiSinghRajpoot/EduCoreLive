@@ -2,8 +2,8 @@ using System.Text.Json;
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models;
-using EduCoreDataAccessLayer.Models.Admin;
-using EduCoreDataAccessLayer.Services.Contract.Admin;
+using EduCoreDataAccessLayer.Models.ERP;
+using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -39,9 +39,8 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> GetTransportRoutes()
         {
             var rows = await _transportService.GetRoutesDropdownAsync(TenantId(), SchoolId(), UserId());
-            var routes = rows.GroupBy(r => new { r.RouteId, r.RouteName })
-                .Select(g => new
-                {
+            var routes = rows.GroupBy(r => new { r.RouteId, r.RouteName }).Select(g => new
+            {
                     routeId   = g.Key.RouteId,
                     routeName = g.Key.RouteName,
                     stops     = g.Select(s => new { stopId = s.StopId, stopName = s.StopName, fare = s.MonthlyFare })
@@ -77,9 +76,7 @@ namespace educore.Areas.ERP.Controllers
             await LoadDropdownsAsync();
             if (enquiryId is > 0)
             {
-                var enquiry = await _enquiryService.GetEnquiryByIdAsync(
-                    enquiryId.Value, TenantId(), SchoolId(), UserId());
-
+                var enquiry = await _enquiryService.GetEnquiryByIdAsync(enquiryId.Value, TenantId(), SchoolId(), UserId());
                 if (enquiry != null)
                 {
                     // Server-side registration gate (mirrors the CRM client-side check).
@@ -87,22 +84,18 @@ namespace educore.Areas.ERP.Controllers
                     {
                         TempData["Result"] = "0";
                         TempData["Message"] = "Complete registration before converting this enquiry to admission.";
-                        return RedirectToAction("EnquiryCRM", "Enquiry", new { area = "Admin" });
+                        return RedirectToAction("EnquiryCRM", "Enquiry", new { area = "ERP" });
                     }
 
+                    // Prefill values rendered straight into the form fields (normal
+                    // binding) — no JSON blob for the client to parse.
                     ViewBag.PrefillEnquiryId = enquiry.EnquiryId;
-                    ViewBag.PrefillJson = JsonSerializer.Serialize(new
-                    {
-                        enquiryId    = enquiry.EnquiryId,
-                        studentName  = enquiry.StudentName,
-                        gender       = enquiry.Gender,
-                        className    = enquiry.ClassName,
-                        academicYear = enquiry.Session,
-                        guardianName = enquiry.FatherName ?? enquiry.ParentName,
-                        motherName   = enquiry.MotherName,
-                        mobile       = enquiry.Mobile,
-                        altMobile    = enquiry.AltMobile
-                    });
+                    ViewBag.PreStudentName   = enquiry.StudentName;
+                    ViewBag.PreGender        = enquiry.Gender;
+                    ViewBag.PreClassName     = enquiry.ClassName;
+                    ViewBag.PreAcademicYear  = enquiry.Session;
+                    ViewBag.PreGuardianName  = enquiry.FatherName ?? enquiry.MotherName;
+                    ViewBag.PreMobile        = enquiry.Mobile;
                 }
             }
             return View("Create");

@@ -1,0 +1,163 @@
+/* InventoryItem page styles — extracted from Areas/ERP/Views/Inventory/InventoryItem.cshtml */
+/* override global mobile btn-width only for this page's specific controls */
+@media (max-width:575.98px){
+    .iv-pg-btn,.iv-view-btn,.iv-fbar .btn,.dropdown-item{ width:auto !important; }
+}
+
+/* ── summary cards (mirrors StudentList) ───────────────────── */
+.iv-card{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius,14px);
+    background:#fff; padding:1.1rem 1.2rem;
+    display:flex; align-items:center; gap:.9rem;
+    transition:var(--ec-transition); height:100%;
+}
+.iv-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); border-color:rgba(255,138,0,.22); }
+.iv-card-ic{ width:46px; height:46px; flex:0 0 46px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; }
+.iv-card-val{ font-size:1.5rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.iv-card-lbl{ font-size:.71rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+/* ── Filter bar ────────────────────────────────────────────── */
+.iv-fbar{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+
+.iv-srch-wrap{ position:relative; flex:1 1 180px; max-width:260px; }
+.iv-srch-ic{ position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:var(--ec-text-muted); font-size:1rem; pointer-events:none; line-height:1; }
+.iv-srch-inp{
+    width:100%; height:34px; padding:0 .75rem 0 2rem;
+    border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.82rem; font-weight:600;
+    color:var(--ec-text); outline:none; transition:var(--ec-transition);
+}
+.iv-srch-inp::placeholder{ color:var(--ec-text-muted); }
+.iv-srch-inp:focus{ border-color:rgba(255,138,0,.55); background:#fff; box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+
+.iv-fbar-div{ width:1px; height:22px; background:var(--ec-border); flex-shrink:0; }
+
+.iv-chip{
+    height:34px; padding:0 .65rem;
+    border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; font-size:.78rem; font-weight:700;
+    color:var(--ec-text-muted); cursor:pointer; outline:none;
+    transition:var(--ec-transition); white-space:nowrap; flex-shrink:0;
+    appearance:auto; -webkit-appearance:auto;
+}
+.iv-chip:hover{ border-color:rgba(255,138,0,.4); background:#fff; color:var(--ec-text); }
+.iv-chip:focus{ border-color:var(--ec-primary); box-shadow:0 0 0 3px rgba(255,138,0,.1); background:#fff; }
+.iv-chip.active-filter{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.45); color:var(--ec-primary); }
+
+.iv-clear-btn{
+    height:34px; padding:0 .75rem;
+    border-radius:8px; border:1px solid #f5c2c7;
+    background:#fff0f0; color:#dc3545;
+    font-size:.76rem; font-weight:700; cursor:pointer; outline:none;
+    display:inline-flex; align-items:center; gap:.3rem;
+    transition:var(--ec-transition); flex-shrink:0;
+}
+.iv-clear-btn:hover{ background:#fde8e8; border-color:#dc3545; }
+
+.iv-export-btn{
+    height:34px; width:34px;
+    border-radius:8px; border:1px solid var(--ec-border);
+    background:#fafaf8; color:var(--ec-text-muted);
+    font-size:1rem; cursor:pointer; outline:none;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:var(--ec-transition); flex-shrink:0;
+}
+.iv-export-btn:hover{ background:#fff; color:var(--ec-primary); border-color:rgba(255,138,0,.4); }
+.iv-export-btn.xl:hover{ color:#198754; border-color:#198754; }
+.iv-export-btn.pdf:hover{ color:#dc3545; border-color:#dc3545; }
+
+@media (max-width:991.98px){ .iv-srch-wrap{ max-width:100%; } .iv-fbar-div{ display:none; } }
+@media (max-width:575.98px){
+    .iv-fbar{ gap:.4rem; }
+    .iv-srch-wrap{ flex:1 1 100%; max-width:100%; }
+    .iv-chip{ font-size:.75rem; height:32px; }
+    .iv-clear-btn{ height:32px; }
+    .iv-export-btn{ height:32px; width:32px; }
+}
+
+/* ── table ─────────────────────────────────────────────────── */
+.iv-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.iv-tbl{ min-width:920px; width:100%; }
+.iv-tbl thead th{
+    background:linear-gradient(180deg,#fffaf3,#fff6ea);
+    color:var(--ec-text-light); font-size:.7rem;
+    text-transform:uppercase; letter-spacing:.06em; font-weight:800;
+    padding:.8rem .9rem; border-bottom:1px solid var(--ec-border);
+    white-space:nowrap; user-select:none;
+}
+.iv-sortable{ cursor:pointer; }
+.iv-sortable:hover{ background:#fff0e0; color:var(--ec-primary); }
+.iv-si{ font-size:.85rem; opacity:.35; vertical-align:middle; margin-left:3px; }
+.iv-si-on{ opacity:1; color:var(--ec-primary); }
+.iv-tbl tbody td{
+    padding:.6rem .9rem; vertical-align:middle;
+    border-bottom:1px solid #f4f0eb;
+    font-size:.83rem; font-weight:600; color:var(--ec-text);
+}
+.iv-tbl tbody tr:hover td{ background:#fffaf3; }
+
+.iv-thumb{
+    width:34px; height:34px; flex:0 0 34px; border-radius:10px;
+    background:#fff4e6; color:#ff8a00;
+    display:inline-flex; align-items:center; justify-content:center; font-size:1.05rem;
+}
+.iv-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.86rem; line-height:1.2; }
+.iv-sub{ font-size:.72rem; color:var(--ec-text-muted); }
+.iv-sku{ background:#fff4e6; color:#ff8a00; border-radius:6px; padding:.2rem .5rem; font-size:.72rem; font-weight:800; white-space:nowrap; }
+
+/* badges */
+.iv-bdg{ display:inline-flex; align-items:center; gap:.28rem; padding:.26rem .65rem; border-radius:999px; font-size:.69rem; font-weight:800; white-space:nowrap; }
+.iv-bdg::before{ content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.b-avail   { background:#d1f0e0; color:#0a5a35; } .b-avail::before  { background:#198754; }
+.b-low     { background:#fff3cd; color:#664d03; } .b-low::before    { background:#ffc107; }
+.b-out     { background:#fde8e8; color:#842029; } .b-out::before    { background:#dc3545; }
+
+/* action buttons */
+.iv-act{
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fff; color:var(--ec-text-muted); font-size:.95rem;
+    display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:var(--ec-transition);
+}
+.iv-act:hover{ background:var(--ec-primary-light); color:var(--ec-primary); border-color:rgba(255,138,0,.4); }
+.iv-act.del:hover{ background:#fff0f0; color:#dc3545; border-color:#f5c2c7; }
+
+/* pagination (mirrors StudentList) */
+.iv-pg-wrap{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.65rem; padding-top:1rem; border-top:1px solid var(--ec-border); }
+.iv-pg-info{ font-size:.81rem; color:var(--ec-text-muted); font-weight:650; }
+.iv-pg-btn{
+    width:32px !important; height:32px; border-radius:7px; border:1px solid var(--ec-border);
+    background:#fff; color:var(--ec-text); font-size:.8rem; font-weight:700;
+    display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:var(--ec-transition); padding:0;
+}
+.iv-pg-btn:hover:not(:disabled){ background:var(--ec-primary-light); border-color:var(--ec-primary); color:var(--ec-primary); }
+.iv-pg-btn.active{ background:var(--ec-primary); border-color:var(--ec-primary); color:#fff; }
+.iv-pg-btn:disabled{ opacity:.35; cursor:not-allowed; }
+
+/* empty state */
+.iv-empty{ padding:3rem 1rem; text-align:center; }
+.iv-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }
+
+/* mobile cards */
+.iv-mob-list{ display:none; }
+.iv-mob-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius,14px); background:#fff; padding:.95rem; margin-bottom:.7rem; }
+.iv-mob-top{ display:flex; align-items:center; gap:.7rem; margin-bottom:.7rem; }
+.iv-mob-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.45rem .7rem; }
+.iv-mob-field label{ font-size:.67rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--ec-text-light); display:block; }
+.iv-mob-field span{ font-size:.82rem; font-weight:700; color:var(--ec-text); }
+
+@media (max-width:767.98px){
+    .iv-tbl-wrap{ display:none; }
+    .iv-mob-list{ display:block; }
+    .iv-pg-wrap{ justify-content:center; }
+    .iv-pg-info{ width:100%; text-align:center; }
+}
+@media (max-width:575.98px){
+    .iv-card{ padding:.85rem 1rem; }
+    .iv-card-val{ font-size:1.3rem; }
+    .iv-mob-grid{ grid-template-columns:1fr; }
+}
+
+/* modal form controls compact */
+.inventory-item-page .form-control,
+.inventory-item-page .form-select{ border-radius:10px; min-height:40px; font-size:.85rem; font-weight:650; }

@@ -1,0 +1,160 @@
+/* Dashboard page styles — extracted from Areas/ERP/Views/Student/Dashboard.cshtml */
+/* -- btn width override on mobile -- */
+@media (max-width:575.98px){
+    .sd-tab-btn,.sd-pg-btn,.sd-dash .btn,.dropdown-item{width:auto !important;}
+}
+.dropdown-toggle::after{display:none;} 
+
+/* ── Dashboard shell ────────────────────────── */
+.sd-shell{
+    border:1px solid var(--ec-border);border-radius:var(--ec-radius-lg);
+    background:#fff;overflow:hidden;
+}
+
+/* ── Sticky header ──────────────────────────── */
+.sd-hdr{
+    position:sticky;top:0;z-index:20;
+    background:linear-gradient(135deg,var(--ec-primary-soft) 0%,#fff 65%);
+    border-bottom:1px solid var(--ec-border);
+    padding:1rem 1.5rem;
+    display:flex;align-items:center;gap:1rem;flex-wrap:wrap;
+}
+.sd-hdr-av{
+    width:58px;height:58px;flex:0 0 58px;
+    border-radius:50%;border:2px solid rgba(255,138,0,.3);
+    display:flex;align-items:center;justify-content:center;
+    font-size:1.15rem;font-weight:800;
+}
+.sd-hdr-nm{font-size:1rem;font-weight:800;color:var(--ec-text-dark);margin-bottom:.15rem;}
+.sd-hdr-sub{font-size:.78rem;color:var(--ec-text-muted);}
+.sd-back-btn{
+    margin-left:auto;
+    display:inline-flex;align-items:center;gap:.3rem;
+    padding:.4rem .9rem;border-radius:8px;font-size:.8rem;font-weight:700;
+    background:#f5f5f5;border:1px solid var(--ec-border);color:var(--ec-text-muted);
+    cursor:pointer;transition:var(--ec-transition);text-decoration:none;
+    white-space:nowrap;
+}
+.sd-back-btn:hover{background:#fee2e2;color:#dc3545;border-color:#f5c2c7;}
+
+/* ── Loading overlay ────────────────────────── */
+.sd-loader{
+    position:absolute;inset:0;background:rgba(255,255,255,.85);
+    display:flex;align-items:center;justify-content:center;
+    z-index:30;backdrop-filter:blur(3px);border-radius:var(--ec-radius-lg);
+}
+
+/* ── Tab nav ────────────────────────────────── */
+.sd-tab-nav{
+    position:sticky;top:88px;z-index:19;
+    background:#fff;border-bottom:1px solid var(--ec-border);
+    display:flex;overflow-x:auto;scrollbar-width:none;
+}
+.sd-tab-nav::-webkit-scrollbar{display:none;}
+.sd-tab-btn{
+    flex-shrink:0;padding:.65rem 1.1rem;
+    font-size:.78rem;font-weight:700;color:var(--ec-text-muted);
+    border:0;border-bottom:2px solid transparent;
+    background:transparent;cursor:pointer;white-space:nowrap;
+    transition:var(--ec-transition);
+}
+.sd-tab-btn:hover{color:var(--ec-primary);background:var(--ec-primary-light);}
+.sd-tab-btn.active{color:var(--ec-primary);border-bottom-color:var(--ec-primary);background:var(--ec-primary-light);}
+
+/* ── Tab content ────────────────────────────── */
+.sd-tc{padding:1.25rem 1.5rem;}
+.sd-pane{display:none;}
+.sd-pane.active{display:block;}
+
+/* ── Metric cards ───────────────────────────── */
+.sd-metric{
+    border:1px solid var(--ec-border);border-radius:var(--ec-radius-sm);
+    padding:.85rem 1rem;text-align:center;
+    transition:var(--ec-transition);
+}
+.sd-metric:hover{border-color:rgba(255,138,0,.3);box-shadow:var(--ec-shadow-sm);}
+.sd-metric-val{font-size:1.4rem;font-weight:800;color:var(--ec-text-dark);line-height:1;}
+.sd-metric-lbl{font-size:.67rem;font-weight:800;color:var(--ec-text-muted);text-transform:uppercase;letter-spacing:.04em;margin-top:.3rem;}
+
+/* ── Subject bars ───────────────────────────── */
+.sd-subj-row{margin-bottom:.75rem;}
+.sd-subj-hd{display:flex;justify-content:space-between;font-size:.81rem;font-weight:700;color:var(--ec-text-dark);margin-bottom:.3rem;}
+.sd-bar-wrap{height:8px;background:#f0ebe5;border-radius:999px;overflow:hidden;}
+.sd-bar-fill{height:100%;border-radius:inherit;transition:width .6s ease;}
+
+/* ── Activity feed ──────────────────────────── */
+.sd-act-item{display:flex;gap:.75rem;padding:.6rem 0;border-bottom:1px dashed #eee3d8;}
+.sd-act-item:last-child{border-bottom:0;}
+.sd-act-ic{width:32px;height:32px;flex:0 0 32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.9rem;}
+.sd-act-title{font-size:.83rem;font-weight:700;color:var(--ec-text-dark);}
+.sd-act-time{font-size:.73rem;color:var(--ec-text-muted);}
+
+/* ── Info grid ──────────────────────────────── */
+.sd-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
+.sd-ic{background:#fafaf8;border:1px solid var(--ec-border);border-radius:var(--ec-radius-sm);padding:.6rem .8rem;}
+.sd-ic-lbl{font-size:.67rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:var(--ec-text-light);}
+.sd-ic-val{font-size:.84rem;font-weight:700;color:var(--ec-text-dark);margin-top:.15rem;}
+
+/* ── Attendance calendar ────────────────────── */
+.sd-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+.sd-day{height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.69rem;font-weight:700;}
+.aP{background:#d4edda;color:#155724;}
+.aA{background:#fde8e8;color:#842029;}
+.aH{background:#e2e3e5;color:#495057;}
+.aL{background:#fff3cd;color:#664d03;}
+.aX{background:#f5f5f5;color:#adb5bd;}
+.aW{background:transparent;color:#8b8175;font-weight:800;}
+
+/* ── Timetable ──────────────────────────────── */
+.sd-tt-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.sd-tt{min-width:700px;width:100%;}
+.sd-tt th{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:var(--ec-text-light);padding:.65rem .8rem;background:#fafaf8;border:1px solid var(--ec-border);text-align:center;white-space:nowrap;}
+.sd-tt td{padding:.6rem .7rem;border:1px solid var(--ec-border);text-align:center;font-size:.78rem;vertical-align:middle;}
+.sd-tt .today-col td{background:rgba(255,138,0,.06);}
+.sd-tt .today-col th{background:var(--ec-primary-light);color:var(--ec-primary);}
+.sd-subj-cell{border-radius:6px;padding:.3rem .5rem;font-size:.75rem;font-weight:700;display:inline-block;}
+
+/* ── Generic table style ────────────────────── */
+.sd-tbl th{font-size:.7rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:var(--ec-text-light);padding:.65rem .8rem;background:#fafaf8;border-bottom:1px solid var(--ec-border);white-space:nowrap;}
+.sd-tbl td{font-size:.82rem;font-weight:650;padding:.65rem .8rem;border-bottom:1px solid #f4f0eb;vertical-align:middle;}
+.sd-tbl tr:hover td{background:#fffaf3;}
+
+/* ── Grade badges ───────────────────────────── */
+.gA{background:#d4edda;color:#155724;} .gB{background:#cce5ff;color:#004085;}
+.gC{background:#fff3cd;color:#664d03;} .gD{background:#fde8e8;color:#842029;}
+
+/* ── Badges (reuse from list) ───────────────── */
+.sd-bdg{display:inline-flex;align-items:center;gap:.28rem;padding:.26rem .65rem;border-radius:999px;font-size:.69rem;font-weight:800;white-space:nowrap;}
+.sd-bdg::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.b-paid   {background:#d1f0e0;color:#0a5a35;} .b-paid::before   {background:#198754;}
+.b-partial{background:#fff3cd;color:#664d03;} .b-partial::before{background:#ffc107;}
+.b-pending{background:#fde8e8;color:#842029;} .b-pending::before{background:#dc3545;}
+.b-active {background:#d4edda;color:#155724;} .b-active::before {background:#28a745;}
+.b-inactive{background:#e2e3e5;color:#495057;} .b-inactive::before{background:#6c757d;}
+.b-transfer{background:#cfe2ff;color:#084298;} .b-transfer::before{background:#0d6efd;}
+
+/* ── Doc rows ───────────────────────────────── */
+.sd-doc-row{display:flex;align-items:center;gap:.75rem;padding:.75rem;border:1px solid var(--ec-border);border-radius:var(--ec-radius-sm);margin-bottom:.6rem;transition:var(--ec-transition);}
+.sd-doc-row:hover{border-color:rgba(255,138,0,.3);}
+.sd-doc-ic{width:38px;height:38px;flex:0 0 38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;}
+
+/* ── Profile grid ───────────────────────────── */
+.sd-prof-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
+.sd-pf{background:#fafaf8;border:1px solid var(--ec-border);border-radius:var(--ec-radius-sm);padding:.6rem .8rem;}
+.sd-pf label{font-size:.67rem;text-transform:uppercase;letter-spacing:.04em;font-weight:800;color:var(--ec-text-light);display:block;margin-bottom:.1rem;}
+.sd-pf span{font-size:.84rem;font-weight:700;color:var(--ec-text-dark);}
+
+/* ── Warning banner ─────────────────────────── */
+.sd-warn{background:#fde8e8;border:1px solid #f5c2c7;border-radius:var(--ec-radius-sm);padding:.75rem 1rem;color:#842029;font-size:.84rem;font-weight:700;}
+
+/* ── Responsive ─────────────────────────────── */
+@media (max-width:767.98px){
+    .sd-hdr{padding:.85rem 1rem;}
+    .sd-tc{padding:1rem;}
+    .sd-info-grid,.sd-prof-grid{grid-template-columns:1fr;}
+    .sd-tab-btn{padding:.6rem .8rem;font-size:.74rem;}
+}
+@media (max-width:575.98px){
+    .sd-hdr-av{width:48px;height:48px;font-size:.95rem;}
+    .sd-hdr-nm{font-size:.9rem;}
+}

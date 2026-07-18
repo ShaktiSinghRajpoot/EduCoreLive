@@ -1,6 +1,22 @@
 /* Allow flex children to shrink below their natural content width */
 .min-width-0 { min-width: 0; }
 
+/* ---------- Reusable server-side pager (_Pager.cshtml) ---------- */
+.ec-pager { display: inline-flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
+.ec-pager-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 32px; height: 32px; padding: 0 .5rem;
+    border: 1px solid #e0e3eb; border-radius: 8px;
+    background: #fff; color: #51566b; font-size: .82rem; font-weight: 600;
+    text-decoration: none; transition: all .15s ease;
+}
+.ec-pager-btn:hover { border-color: var(--bs-primary, #ff8a00); color: var(--bs-primary, #ff8a00); }
+.ec-pager-btn.active {
+    background: var(--bs-primary, #ff8a00); border-color: var(--bs-primary, #ff8a00); color: #fff;
+}
+.ec-pager-btn.disabled { opacity: .45; pointer-events: none; }
+.ec-pager-gap { padding: 0 .15rem; color: #9aa1b9; }
+
 /*
  * navbar-detached width fix for layout-menu-fixed + layout-navbar-fixed combo.
  *
@@ -16,3 +32,52 @@
         inline-size: calc(100% - var(--bs-menu-width) - 1.625rem * 2) !important;
     }
 }
+
+/*
+ * Stop the fixed navbar (and its right-aligned school name) from jumping right
+ * when a Bootstrap modal opens.
+ *
+ * The navbar's width is calc(100% - ...) where 100% = viewport width. When a
+ * modal opens, Bootstrap sets `overflow:hidden` on <body>, the vertical
+ * scrollbar disappears, the viewport grows by the scrollbar width, and the
+ * fixed navbar widens/shifts right by that amount.
+ *
+ * Fix: always reserve the scrollbar gutter so the viewport width never changes,
+ * and drop the compensation padding Bootstrap would otherwise add to <body>.
+ */
+html { overflow-y: scroll !important; scrollbar-gutter: stable; }
+body.modal-open { padding-right: 0 !important; }
+
+/*
+ * THE actual navbar-jump culprit.
+ *
+ * The vendor theme, when a modal (or SweetAlert) is open, re-offsets the fixed
+ * navbar to compensate for the vanishing scrollbar:
+ *     .modal-open ... .layout-navbar { inset-inline-start: calc(16.25rem - var(--bs-scrollbar-width)); }
+ * That variable is only ever set by the template's customizer JS, which this app
+ * doesn't run — so `var(--bs-scrollbar-width)` is undefined, the whole calc() is
+ * invalid, `inset-inline-start` falls back to `auto`, and the fixed navbar
+ * collapses to its content width and jumps to the right edge (school name ends up
+ * stuck next to the notification bell).
+ *
+ * Define the variable as 0 so the calc stays valid and evaluates to the normal
+ * offset. Combined with the always-on scrollbar above, no compensation is needed,
+ * so 0 is exactly right.
+ */
+:root { --bs-scrollbar-width: 0px !important; }
+
+/*
+ * Navbar turns "white" when a modal opens.
+ *
+ * In the fixed layout the navbar is transparent and sits above a frosted-glass
+ * pseudo-element, `.layout-page::before` (z-index 10). Normally the navbar is
+ * z-index 1075 (above the frost). But the vendor drops it to z-index 9 while a
+ * modal is open (`body:not(.modal-open) ... { z-index: 1075 }`) — now BELOW the
+ * frost, so the light frosted panel paints over the navbar and washes it out to
+ * white.
+ *
+ * Keep the navbar just above the frost (z 11) during a modal. It's still below
+ * the backdrop (1089) so it dims naturally with the page — it just no longer
+ * gets whitened by its own frosted layer.
+ */
+body.modal-open .layout-content-navbar .layout-navbar { z-index: 11 !important; }

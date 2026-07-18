@@ -15,7 +15,7 @@ namespace educore.Controllers
             return roleCode switch
             {
                 AppRoles.SuperAdmin => RedirectToAction("SchoolList", "Schools", new { area = "SuperAdmin" }),
-                AppRoles.SchoolAdmin => RedirectToAction("BasicProfile", "SchoolSettings", new { area = "Admin" }),
+                AppRoles.SchoolAdmin => RedirectToAction("BasicProfile", "SchoolSettings", new { area = "ERP" }),
                 _ => RedirectToAction("Login", "Account", new { area = "" })
             };
         }

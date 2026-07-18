@@ -1,0 +1,5 @@
+/* Index page styles — extracted from Areas/ERP/Views/Roles/Index.cshtml */
+.rl-badge{ display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .55rem; border-radius:999px; font-size:.68rem; font-weight:800; }
+.rl-builtin{ background:#eef0f6; color:#6b7280; }
+.rl-custom{ background:#fff3e6; color:#d97400; }
+.rl-count{ font-size:.78rem; font-weight:700; color:var(--ec-text-muted); }

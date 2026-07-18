@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace EduCoreDataAccessLayer.Models
 {
@@ -70,10 +71,22 @@ namespace EduCoreDataAccessLayer.Models
         /// pre-filled with the user's current roles; on POST it's the checked set.
         /// </summary>
         public List<int> RoleIds { get; set; } = new();
+
+        // ── Dropdown sources carried on the model (CRM-style Model.XList) ──
+        /// <summary>Department options for the form select (asp-items).</summary>
+        public List<SelectListItem> DepartmentList { get; set; } = new();
+        /// <summary>Assignable login roles for the checkbox group.</summary>
+        public List<RoleOption> RoleList { get; set; } = new();
     }
 
     /// <summary>Lightweight row for the staff list grid.</summary>
-    public class StaffListItem
+    // One model, many jobs (same fat-model pattern as FeeHead / StudentListModel):
+    //   • one grid row  → StaffId, FullName, Designation …
+    //   • the listing    → Items (current page of rows)
+    //   • list filters   → FilterDepartment/StaffType/Status + Search (base)
+    //   • paging + sort  → Page, PageSize, SortColumn … (from ListModelBase)
+    //   • dropdowns      → DepartmentList, StaffTypeList (filter-bar selects)
+    public class StaffListItem : ListModelBase
     {
         public int StaffId { get; set; }
         public string? EmployeeCode { get; set; }
@@ -87,6 +100,18 @@ namespace EduCoreDataAccessLayer.Models
         public DateTime? JoiningDate { get; set; }
         public string Status { get; set; } = "Active";
         public bool HasLogin { get; set; }
+
+        // ── Listing ──────────────────────────────────────────────
+        public List<StaffListItem> Items { get; set; } = new();
+
+        // ── List filters ─────────────────────────────────────────
+        public string? FilterDepartment { get; set; }
+        public string? FilterStaffType  { get; set; }
+        public string? FilterStatus     { get; set; }
+
+        // ── Filter-bar dropdowns ─────────────────────────────────
+        public List<SelectListItem> DepartmentList { get; set; } = new();
+        public List<SelectListItem> StaffTypeList  { get; set; } = new();
     }
 
     /// <summary>Form source lists for Add/Edit Staff.</summary>
@@ -101,11 +126,42 @@ namespace EduCoreDataAccessLayer.Models
     {
         public string Name { get; set; } = string.Empty;
         public string StaffType { get; set; } = string.Empty;
+        /// <summary>Suggested department, auto-selected on the form when this title is picked.</summary>
+        public string DefaultDepartment { get; set; } = string.Empty;
+        /// <summary>Suggested login role (RBAC) — pre-ticked when a login is created for this title.</summary>
+        public int? DefaultRoleId { get; set; }
     }
 
     public class RoleOption
     {
         public int RoleId { get; set; }
         public string RoleName { get; set; } = string.Empty;
+    }
+
+    // ── Staff reference masters (school-editable config) ──────────────────────
+    public class DepartmentMaster
+    {
+        public int    DepartmentId { get; set; }
+        public string Name         { get; set; } = string.Empty;
+        public int    SortOrder    { get; set; }
+        public bool   IsActive     { get; set; } = true;
+    }
+
+    public class DesignationMaster
+    {
+        public int     DesignationId     { get; set; }
+        public string  Name              { get; set; } = string.Empty;
+        public string  StaffType         { get; set; } = "Non-Teaching";
+        public string? DefaultDepartment { get; set; }
+        public int?    DefaultRoleId     { get; set; }
+        public int     SortOrder         { get; set; }
+        public bool    IsActive          { get; set; } = true;
+    }
+
+    /// <summary>Both masters for the Staff Setup screen.</summary>
+    public class StaffMasters
+    {
+        public List<DepartmentMaster>  Departments  { get; set; } = new();
+        public List<DesignationMaster> Designations { get; set; } = new();
     }
 }

@@ -1,0 +1,327 @@
+/* Index page styles — extracted from Views/Dashboards/Index.cshtml */
+        .dash {
+            font-family: "Public Sans", system-ui, sans-serif;
+        }
+
+        /* ---- generic card ---- */
+        .dash-card {
+            background: var(--ec-white);
+            border: 1px solid var(--ec-border);
+            border-radius: var(--ec-radius);
+            transition: var(--ec-transition);
+        }
+
+            .dash-card:hover {
+                box-shadow: var(--ec-shadow);
+            }
+
+        .dash-card-head {
+            padding: 1.1rem 1.25rem .35rem;
+        }
+
+        .dash-card-body {
+            padding: 1.25rem;
+        }
+
+        .dash-card-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--ec-text-dark);
+            margin: 0;
+        }
+
+        .dash-sub {
+            color: var(--ec-text-muted);
+            font-size: .8rem;
+        }
+
+        /* ---- entrance ---- */
+        @keyframes dashUp {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .dash-animate {
+            animation: dashUp .5s ease both;
+        }
+
+        /* ---- hero ---- */
+        .dash-hero {
+            position: relative;
+            overflow: hidden;
+            border-radius: var(--ec-radius-lg);
+            color: #fff;
+            background: linear-gradient(120deg,#ff8a00 0%,#ff6f00 48%,#ffa733 130%);
+            box-shadow: 0 .75rem 2rem rgba(255,138,0,.32);
+        }
+
+            .dash-hero::before {
+                content: "";
+                position: absolute;
+                width: 18rem;
+                height: 18rem;
+                top: -8rem;
+                right: -4rem;
+                border-radius: 50%;
+                background: radial-gradient(circle,rgba(255,255,255,.25),transparent 70%);
+            }
+
+        .dash-hero-body {
+            position: relative;
+            z-index: 1;
+            padding: 1.6rem 1.75rem;
+        }
+
+        .dash-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+            background: rgba(255,255,255,.18);
+            border: 1px solid rgba(255,255,255,.25);
+            border-radius: 999px;
+            padding: .3rem .8rem;
+            font-size: .76rem;
+            font-weight: 700;
+        }
+
+        /* ---- soft icon tints ---- */
+        .dash-icon {
+            width: 2.85rem;
+            height: 2.85rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 14px;
+            flex: 0 0 auto;
+            font-size: 1.35rem;
+        }
+
+        .soft-orange {
+            background: var(--ec-primary-light);
+            color: var(--ec-primary);
+        }
+
+        .soft-green {
+            background: #ecfdf3;
+            color: #16a34a;
+        }
+
+        .soft-red {
+            background: #fff1f0;
+            color: #dc2626;
+        }
+
+        .soft-amber {
+            background: #fff7e6;
+            color: #d97706;
+        }
+
+        .soft-blue {
+            background: #eff6ff;
+            color: #0284c7;
+        }
+
+        .soft-grey {
+            background: #f1f1f4;
+            color: #6b7280;
+        }
+
+        .dash-label {
+            color: var(--ec-text-light);
+            font-size: .72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .dash-value {
+            color: var(--ec-text-dark);
+            font-size: 1.55rem;
+            font-weight: 900;
+            line-height: 1.1;
+        }
+
+        /* ---- KPI ---- */
+        .dash-kpi {
+            position: relative;
+            overflow: hidden;
+            min-height: 9.5rem;
+            transition: var(--ec-transition);
+        }
+
+            .dash-kpi:hover {
+                transform: translateY(-3px);
+                box-shadow: var(--ec-shadow);
+            }
+
+            .dash-kpi .dash-spark {
+                position: absolute;
+                left: 0;
+                right: 0;
+                bottom: 0;
+            }
+
+        .dash-progress {
+            height: .4rem;
+            border-radius: 999px;
+            background: #f0eee9;
+            overflow: hidden;
+        }
+
+            .dash-progress span {
+                display: block;
+                height: 100%;
+                border-radius: inherit;
+            }
+
+        /* ---- widget rows ---- */
+        .dash-scroll {
+            max-height: 21rem;
+            overflow-y: auto;
+        }
+
+            .dash-scroll::-webkit-scrollbar {
+                width: 5px;
+            }
+
+            .dash-scroll::-webkit-scrollbar-thumb {
+                background: #e7d8c6;
+                border-radius: 999px;
+            }
+
+        .dash-row {
+            display: flex;
+            align-items: center;
+            gap: .85rem;
+            padding: .7rem 0;
+            border-bottom: 1px solid #f4eee7;
+        }
+
+            .dash-row:last-child {
+                border-bottom: 0;
+            }
+
+        .dash-avatar {
+            width: 2.4rem;
+            height: 2.4rem;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .8rem;
+            font-weight: 800;
+            flex: 0 0 auto;
+        }
+
+        .dash-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            padding: .28rem .6rem;
+            border-radius: 999px;
+            font-size: .72rem;
+            font-weight: 800;
+        }
+
+        /* ---- timeline ---- */
+        .dash-timeline {
+            position: relative;
+            padding-left: 1.4rem;
+            margin: 0;
+            list-style: none;
+        }
+
+            .dash-timeline::before {
+                content: "";
+                position: absolute;
+                left: .32rem;
+                top: .35rem;
+                bottom: .35rem;
+                width: 2px;
+                background: #f0e7db;
+            }
+
+            .dash-timeline li {
+                position: relative;
+                padding-bottom: 1.1rem;
+            }
+
+                .dash-timeline li:last-child {
+                    padding-bottom: 0;
+                }
+
+                .dash-timeline li::before {
+                    content: "";
+                    position: absolute;
+                    left: -1.4rem;
+                    top: .25rem;
+                    width: .7rem;
+                    height: .7rem;
+                    border-radius: 50%;
+                    background: var(--ec-primary);
+                    box-shadow: 0 0 0 3px rgba(255,138,0,.18);
+                }
+
+        /* ---- quick links ---- */
+        .dash-quick {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: .5rem;
+            padding: 1.1rem .5rem;
+            border-radius: 14px;
+            text-align: center;
+            text-decoration: none;
+            color: var(--ec-text-muted);
+            background: var(--ec-bg-soft);
+            transition: var(--ec-transition);
+            height: 100%;
+        }
+
+            .dash-quick:hover {
+                transform: translateY(-3px);
+                color: var(--ec-primary);
+                background: #fff;
+                box-shadow: var(--ec-shadow);
+            }
+
+            .dash-quick i {
+                font-size: 1.5rem;
+            }
+
+            .dash-quick span {
+                font-size: .78rem;
+                font-weight: 700;
+            }
+
+        /* ---- table ---- */
+        .dash-table tbody td {
+            padding: .85rem .9rem;
+            vertical-align: middle;
+            border-bottom: 1px solid #f4eee7;
+        }
+
+        .dash-table tbody tr:hover {
+            background: rgba(255,138,0,.04);
+        }
+
+        .dash-search {
+            max-width: 18rem;
+        }
+
+        .dash-chart {
+            min-height: 320px;
+        }
+
+        @media (max-width: 991.98px) {
+            .dash-search {
+                max-width: 100%;
+            }
+        }

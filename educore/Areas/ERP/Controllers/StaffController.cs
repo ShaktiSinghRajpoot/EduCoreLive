@@ -1,9 +1,10 @@
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models;
 using EduCoreDataAccessLayer.Services;
-using EduCoreDataAccessLayer.Services.Contract.Admin;
+using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace educore.Areas.ERP.Controllers
 {
@@ -21,17 +22,32 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── GET: /ERP/Staff/StaffList ────────────────────────────
-        public async Task<IActionResult> StaffList()
+        // One StaffListItem does it all: bound filters/sort/page in via the query
+        // string; the service fills Items + TotalCount. Tenant/school/user come
+        // from CLAIMS only (never model-bound). Filter dropdowns are sourced from
+        // the staff masters (not the current page) so they stay complete.
+        public async Task<IActionResult> StaffList(StaffListItem query)
         {
-            var staff = await _staffService.GetStaffAsync(TenantId(), SchoolId(), UserId());
-            return View(staff);
+            var dd = await _staffService.GetDropdownsAsync(TenantId(), SchoolId());
+            query.DepartmentList = dd.Departments
+                .Select(d => new SelectListItem { Text = d, Value = d }).ToList();
+            query.StaffTypeList = dd.Designations
+                .Select(x => x.StaffType)
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Distinct().OrderBy(t => t)
+                .Select(t => new SelectListItem { Text = t, Value = t }).ToList();
+
+            await _staffService.GetStaffListPageAsync(query, TenantId(), SchoolId(), UserId());
+            return View(query);
         }
 
         // ── GET: /ERP/Staff/Inactive ─────────────────────────────
-        public async Task<IActionResult> Inactive()
+        // Same fat-model list pattern as StaffList, but pinned to status=Inactive.
+        public async Task<IActionResult> Inactive(StaffListItem query)
         {
-            var staff = await _staffService.GetStaffAsync(TenantId(), SchoolId(), UserId(), statusFilter: "Inactive");
-            return View(staff);
+            query.FilterStatus = "Inactive";   // this page only ever shows inactive staff
+            await _staffService.GetStaffListPageAsync(query, TenantId(), SchoolId(), UserId());
+            return View(query);
         }
 
         [HttpPost]
@@ -40,8 +56,7 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> Reactivate(int id)
         {
             var (ok, message) = await _staffService.ReactivateAsync(id, TenantId(), SchoolId(), UserId());
-            TempData[ok > 0 ? "SuccessMessage" : "ErrorMessage"] =
-                ok > 0 ? "Staff member re-activated successfully." : message;
+            TempData[ok > 0 ? "SuccessMessage" : "ErrorMessage"] = ok > 0 ? "Staff member re-activated successfully." : message;
             return RedirectToAction("Inactive");
         }
 
@@ -59,8 +74,9 @@ namespace educore.Areas.ERP.Controllers
         // ── GET: /ERP/Staff/AddStaff ─────────────────────────────
         public async Task<IActionResult> AddStaff()
         {
-            await FillDropdownsAsync();
-            return View(new StaffModel());
+            var model = new StaffModel();
+            await FillDropdownsAsync(model);
+            return View(model);
         }
 
         [HttpPost]
@@ -71,7 +87,7 @@ namespace educore.Areas.ERP.Controllers
             ValidateLogin(model);
             if (!ModelState.IsValid)
             {
-                await FillDropdownsAsync();
+                await FillDropdownsAsync(model);
                 return View(model);
             }
 
@@ -81,7 +97,7 @@ namespace educore.Areas.ERP.Controllers
             if (id <= 0)
             {
                 ModelState.AddModelError("", message);
-                await FillDropdownsAsync();
+                await FillDropdownsAsync(model);
                 return View(model);
             }
 
@@ -94,7 +110,31 @@ namespace educore.Areas.ERP.Controllers
         {
             var model = await _staffService.GetStaffByIdAsync(id, TenantId(), SchoolId(), UserId());
             if (model == null) return RedirectToAction("StaffList");
+
+            // Resolve the person's role IDs into readable names for the profile.
+            if (model.UserId is not null && model.RoleIds.Count > 0)
+            {
+                var roles = (await _staffService.GetDropdownsAsync(TenantId(), SchoolId())).Roles;
+                ViewBag.RoleNames = roles.Where(r => model.RoleIds.Contains(r.RoleId))
+                                         .Select(r => r.RoleName).ToList();
+            }
             return View(model);
+        }
+
+        // ── AJAX: designations for a department (+ cross-department roles) ──
+        // POST + {value,text,...} mirrors the CRM cascade pattern; 'type' rides
+        // along so the form can auto-fill Staff Type from the picked designation.
+        [HttpPost]
+        public async Task<IActionResult> GetDesignations(string? department)
+        {
+            var all = (await _staffService.GetDropdownsAsync(TenantId(), SchoolId())).Designations;
+            var dept = (department ?? "").Trim();
+            var list = all
+                .Where(d => dept.Length == 0
+                         || string.IsNullOrWhiteSpace(d.DefaultDepartment)
+                         || string.Equals(d.DefaultDepartment, dept, StringComparison.OrdinalIgnoreCase))
+                .Select(d => new { value = d.Name, text = d.Name, type = d.StaffType });
+            return Json(list);
         }
 
         // ── GET: /ERP/Staff/EditStaff/{id} ───────────────────────
@@ -102,7 +142,7 @@ namespace educore.Areas.ERP.Controllers
         {
             var model = await _staffService.GetStaffByIdAsync(id, TenantId(), SchoolId(), UserId());
             if (model == null) return RedirectToAction("StaffList");
-            await FillDropdownsAsync();
+            await FillDropdownsAsync(model);
             return View(model);
         }
 
@@ -115,7 +155,7 @@ namespace educore.Areas.ERP.Controllers
             ValidateLogin(model);
             if (!ModelState.IsValid)
             {
-                await FillDropdownsAsync();
+                await FillDropdownsAsync(model);
                 return View(model);
             }
 
@@ -125,7 +165,7 @@ namespace educore.Areas.ERP.Controllers
             if (savedId <= 0)
             {
                 ModelState.AddModelError("", message);
-                await FillDropdownsAsync();
+                await FillDropdownsAsync(model);
                 return View(model);
             }
 
@@ -137,10 +177,17 @@ namespace educore.Areas.ERP.Controllers
             return RedirectToAction("StaffProfile", new { id });
         }
 
+        // Departments & Designations masters now live under Settings
+        // (Admin/SchoolSettings/StaffMasters).
+
         // ── helpers ──────────────────────────────────────────────
-        private async Task FillDropdownsAsync()
+        // Fill the model's dropdown sources (CRM-style Model.XList) so the view
+        // binds them with asp-items — no ViewBag, no JSON serialize.
+        private async Task FillDropdownsAsync(StaffModel model)
         {
-            ViewBag.Dropdowns = await _staffService.GetDropdownsAsync(TenantId(), SchoolId());
+            var dd = await _staffService.GetDropdownsAsync(TenantId(), SchoolId());
+            model.DepartmentList = dd.Departments.Select(d => new SelectListItem { Text = d, Value = d }).ToList();
+            model.RoleList = dd.Roles;
         }
 
         // Access validation. Creating a NEW login needs email + password + ≥1 role.

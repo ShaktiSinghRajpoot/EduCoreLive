@@ -1,0 +1,270 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model EduCoreDataAccessLayer.Models.ERP.AdmissionWorkflowModel
+@{
+    ViewData["Title"] = "Admission Workflow";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/AdmissionWorkflow/WorkflowSettings.css" asp-append-version="true" />
+}
+
+<div class="aw-page">
+  <div class="ec-page-shell">
+    <div class="ec-page-content">
+
+      <form asp-area="ERP" asp-controller="AdmissionWorkflow" asp-action="SaveWorkflowSettings"
+            method="post" id="awForm">
+        @Html.AntiForgeryToken()
+
+        <!-- ── Page header ── -->
+        <div class="ec-card mb-4">
+          <div class="ec-card-header">
+            <div class="ec-section-title-wrap d-flex align-items-start gap-3">
+              <div class="ec-section-icon"><i class="bx bx-git-branch"></i></div>
+              <div>
+                <h5 class="ec-section-title mb-1">Admission Workflow</h5>
+                <p class="ec-section-subtitle mb-0">
+                  Configure how this school moves a parent from enquiry to admission.
+                  Turn the Registration stage on or off to match your process.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Live flow preview ── -->
+        <div class="ec-card mb-4">
+          <div class="ec-card-body">
+            <div class="form-label mb-2">Resulting Journey</div>
+            <div class="aw-flow" id="awFlow"><!-- built by JS --></div>
+          </div>
+        </div>
+
+        <!-- ── Registration settings ── -->
+        <div class="ec-card mb-4">
+          <div class="ec-card-header">
+            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+              <div class="ec-section-icon"><i class="bx bx-clipboard"></i></div>
+              <div>
+                <h5 class="ec-section-title mb-0">Registration Stage</h5>
+                <p class="ec-section-subtitle mb-0">A paid, numbered step some schools require before admission.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="ec-card-body">
+
+            <!-- Master: Enable Registration -->
+            <div class="aw-row">
+              <div>
+                <div class="aw-row-title">Enable Registration</div>
+                <div class="aw-row-desc">
+                  When off, the school admits directly from enquiry and the Registration stage is hidden everywhere.
+                </div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="EnableRegistration" asp-for="EnableRegistration" />
+              </div>
+            </div>
+
+            <!-- Dependent block -->
+            <div id="regChildren">
+
+              <div class="aw-row is-child">
+                <div>
+                  <div class="aw-row-title">Registration Required Before Admission</div>
+                  <div class="aw-row-desc">
+                    When on, an enquiry cannot be converted to admission until registration is completed.
+                  </div>
+                </div>
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="RegistrationRequiredBeforeAdmission"
+                         asp-for="RegistrationRequiredBeforeAdmission" />
+                </div>
+              </div>
+
+              <div class="aw-row is-child">
+                <div class="flex-grow-1">
+                  <div class="aw-row-title">Auto-Generate Registration Number</div>
+                  <div class="aw-row-desc">
+                    Issue a sequential number automatically. Turn off to enter numbers manually.
+                  </div>
+                  <div class="aw-row-extra" id="prefixWrap">
+                    <label class="form-label">Registration Number Prefix</label>
+                    <input type="text" class="form-control" asp-for="RegistrationNumberPrefix"
+                           placeholder="e.g. REG-" maxlength="20" />
+                  </div>
+                </div>
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="AutoGenerateRegistrationNumber"
+                         asp-for="AutoGenerateRegistrationNumber" />
+                </div>
+              </div>
+
+              <div class="aw-row is-child">
+                <div class="flex-grow-1">
+                  <div class="aw-row-title">Enable Registration Fee</div>
+                  <div class="aw-row-desc">
+                    When on, a registration fee can be configured and collected at the registration step.
+                  </div>
+                  <div class="aw-row-extra" id="feeWrap">
+                    <div class="aw-row-desc">
+                      <i class="bx bx-info-circle"></i>
+                      Set the amount in
+                      <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeHead" target="_blank">
+                        School Settings → Fee Head</a>
+                      as a head with <strong>Collection Point = Registration</strong>.
+                    </div>
+                  </div>
+                </div>
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="EnableRegistrationFee"
+                         asp-for="EnableRegistrationFee" />
+                </div>
+              </div>
+
+            </div><!-- /regChildren -->
+          </div>
+        </div>
+
+        <!-- ── Admission settings ── -->
+        <div class="ec-card mb-4">
+          <div class="ec-card-header">
+            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+              <div class="ec-section-icon"><i class="bx bx-wallet"></i></div>
+              <div>
+                <h5 class="ec-section-title mb-0">Admission</h5>
+                <p class="ec-section-subtitle mb-0">How fees are handled when a student is admitted.</p>
+              </div>
+            </div>
+          </div>
+          <div class="ec-card-body">
+            <div class="aw-row">
+              <div>
+                <div class="aw-row-title">Collect Fee at Admission</div>
+                <div class="aw-row-desc">
+                  When on, the admission form can collect the fee on the spot and issue a receipt.
+                  When off, admission only creates the fee ledger and collection happens in the Fee module.
+                </div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="CollectFeeAtAdmission" asp-for="CollectFeeAtAdmission" />
+              </div>
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Security Deposit</div>
+                <div class="aw-row-desc">
+                  When on, a one-time security deposit is added to the admission's due-now charges and flows into the student's fee ledger.
+                </div>
+                <div class="aw-row-extra" id="secWrap">
+                  <div class="aw-row-desc">
+                    <i class="bx bx-info-circle"></i>
+                    Set the amount in
+                    <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeHead" target="_blank">
+                      School Settings → Fee Head</a>
+                    as a <strong>Refundable</strong> head with <strong>Collection Point = Admission</strong>.
+                  </div>
+                </div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="EnableSecurityFee" asp-for="EnableSecurityFee" />
+              </div>
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Transport Module</div>
+                <div class="aw-row-desc">
+                  Turn on if this school runs buses. When on, the Transport menu (Routes,
+                  Vehicles &amp; Drivers, Assign Transport) and the "School Transport" panel
+                  on the admission form are available. Turn off for schools without transport
+                  to hide it everywhere. Per-stop bus fares are set in the Transport module,
+                  not here. Turning this off only hides the UI — it does not remove transport
+                  dues already billed to students.
+                </div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="EnableTransport" asp-for="EnableTransport" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Sticky actions ── -->
+        <div class="ec-sticky-actions d-flex flex-column flex-sm-row justify-content-end gap-2">
+          <a asp-area="ERP" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings"
+             class="btn btn-outline-secondary">Cancel</a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bx bx-save me-1"></i> Save Settings
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    if (typeof toastr !== 'undefined') {
+        toastr.options = { closeButton: true, progressBar: true, positionClass: 'toast-top-right', timeOut: 3000 };
+    }
+
+    var $enable   = $('#EnableRegistration');
+    var $required = $('#RegistrationRequiredBeforeAdmission');
+    var $autoNum  = $('#AutoGenerateRegistrationNumber');
+    var $fee      = $('#EnableRegistrationFee');
+    var $children = $('#regChildren');
+    var $secFee   = $('#EnableSecurityFee');
+
+    /* ── enable/disable dependent settings ── */
+    function syncDependents() {
+        var on = $enable.is(':checked');
+        $children.toggleClass('aw-disabled', !on);
+
+        // prefix only relevant when auto-generate is on
+        $('#prefixWrap').toggle($autoNum.is(':checked'));
+        // fee amount only relevant when fee is on
+        $('#feeWrap').toggle($fee.is(':checked'));
+        // security deposit amount only relevant when enabled
+        $('#secWrap').toggle($secFee.is(':checked'));
+
+        renderFlow();
+    }
+
+    /* ── live journey preview ── */
+    function chip(text, cls) { return '<span class="aw-chip ' + (cls || '') + '">' + text + '</span>'; }
+    function arrow() { return '<i class="bx bx-right-arrow-alt aw-arrow"></i>'; }
+
+    function renderFlow() {
+        var parts = [chip('<i class="bx bx-message-square-detail"></i> Enquiry'), arrow(),
+                     chip('Follow-up'), arrow(), chip('Interested')];
+
+        if ($enable.is(':checked')) {
+            var regLabel = 'Registration';
+            if ($fee.is(':checked')) regLabel += ' + Fee';
+            parts.push(arrow());
+            parts.push(chip('<i class="bx bx-clipboard"></i> ' + regLabel +
+                            ($required.is(':checked') ? ' (required)' : ''), 'aw-chip-reg'));
+        }
+
+        parts.push(arrow());
+        parts.push(chip('<i class="bx bx-user-check"></i> Admission'));
+        parts.push(arrow());
+        parts.push(chip('Student Created', 'aw-chip-end'));
+
+        $('#awFlow').html(parts.join(''));
+    }
+
+    $enable.add($required).add($autoNum).add($fee).add($secFee).on('change', syncDependents);
+
+    syncDependents();
+});
+</script>
+}

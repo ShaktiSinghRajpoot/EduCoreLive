@@ -1,257 +1,51 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @using System.Linq
+@using Microsoft.AspNetCore.Http
 @using Microsoft.AspNetCore.Mvc.Rendering
+@using Microsoft.AspNetCore.Mvc.ViewFeatures
+@model EduCoreDataAccessLayer.Models.ERP.StudentListModel
 @{
     ViewData["Title"] = "All Students";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var colors = new[] { "primary", "info", "success", "warning", "danger", "secondary" };
+
+    // Sort header link: preserves filters, drops Page (back to page 1), toggles
+    // direction when the same column is clicked again. Server-side + whitelisted.
+    string SortUrl(string col)
+    {
+        var q = Context.Request.Query
+            .Where(k => !new[] { "SortColumn", "SortDir", "Page" }.Contains(k.Key, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(k => k.Key, k => k.Value.ToString());
+        q["SortColumn"] = col;
+        q["SortDir"] = (string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase) && !Model.Desc) ? "desc" : "asc";
+        return Context.Request.Path + QueryString.Create(q);
+    }
+    string SortIcon(string col)
+    {
+        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-sort sl-si";
+        return "bx " + (Model.Desc ? "bx-sort-down" : "bx-sort-up") + " sl-si sl-si-on";
+    }
+
+    string Initials(string n)
+    {
+        var parts = (n ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 0 ? "?" : string.Concat(parts.Take(2).Select(p => char.ToUpper(p[0])));
+    }
+    string FeeBadgeClass(string f) => f switch { "Paid" => "b-paid", "Partial" => "b-partial", _ => "b-pending" };
+    string StatBadgeClass(string s) => s switch { "Active" => "b-active", "Transfer" => "b-transfer", _ => "b-inactive" };
+    (string cls, string ic) GenderMeta(string? g) => g switch
+    {
+        "Male" => ("gm", "bx-male"),
+        "Female" => ("gf", "bx-female"),
+        _ => ("go", "bx-user")
+    };
+
+    bool Sel(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 }
 
 @section PageStyles {
-<link href="~/css/educore-theme.css" rel="stylesheet" />
-<style>
-/* -- override global mobile btn-width only for this page's specific controls -- */
-@@media (max-width:575.98px){
-    .sl-pg-btn,.sl-view-btn,.sl-filter-row .btn,.dropdown-item{ width:auto !important; }
-}
-.dropdown-toggle::after{ display:none; }
-
-/* summary cards */ 
-.sl-card{
-    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
-    background:#fff; padding:1.1rem 1.2rem;
-    display:flex; align-items:center; gap:.9rem;
-    transition:var(--ec-transition); height:100%;
-}
-.sl-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); border-color:rgba(255,138,0,.22); }
-.sl-card-ic{ width:46px; height:46px; flex:0 0 46px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; }
-.sl-card-val{ font-size:1.5rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
-.sl-card-lbl{ font-size:.71rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
-
-/* ── Filter bar ─────────────────────────────── */
-.sl-fbar{
-    display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
-}
-
-/* Search input with icon */
-.sl-srch-wrap{
-    position:relative; flex:1 1 180px; max-width:260px;
-}
-.sl-srch-ic{
-    position:absolute; left:.65rem; top:50%; transform:translateY(-50%);
-    color:var(--ec-text-muted); font-size:1rem; pointer-events:none; line-height:1;
-}
-.sl-srch-inp{
-    width:100%; height:34px;
-    padding:0 .75rem 0 2rem;
-    border-radius:8px; border:1px solid var(--ec-border);
-    background:#fafaf8; font-size:.82rem; font-weight:600;
-    color:var(--ec-text); outline:none;
-    transition:var(--ec-transition);
-}
-.sl-srch-inp::placeholder{ color:var(--ec-text-muted); }
-.sl-srch-inp:focus{
-    border-color:rgba(255,138,0,.55); background:#fff;
-    box-shadow:0 0 0 3px rgba(255,138,0,.1);
-}
-
-/* Thin divider between search and chips */
-.sl-fbar-div{
-    width:1px; height:22px; background:var(--ec-border);
-    flex-shrink:0;
-}
-
-/* Chip-style select */
-.sl-chip{
-    height:34px; padding:0 .65rem;
-    border-radius:8px; border:1px solid var(--ec-border);
-    background:#fafaf8; font-size:.78rem; font-weight:700;
-    color:var(--ec-text-muted); cursor:pointer;
-    outline:none; transition:var(--ec-transition);
-    white-space:nowrap; flex-shrink:0;
-    appearance:auto; -webkit-appearance:auto;
-}
-.sl-chip:hover{
-    border-color:rgba(255,138,0,.4); background:#fff;
-    color:var(--ec-text);
-}
-.sl-chip:focus{
-    border-color:var(--ec-primary);
-    box-shadow:0 0 0 3px rgba(255,138,0,.1);
-    background:#fff;
-}
-.sl-chip.active-filter{
-    background:var(--ec-primary-light);
-    border-color:rgba(255,138,0,.45);
-    color:var(--ec-primary);
-}
-
-/* Clear filters btn */
-.sl-clear-btn{
-    height:34px; padding:0 .75rem;
-    border-radius:8px; border:1px solid #f5c2c7;
-    background:#fff0f0; color:#dc3545;
-    font-size:.76rem; font-weight:700;
-    cursor:pointer; outline:none;
-    display:inline-flex; align-items:center; gap:.3rem;
-    transition:var(--ec-transition); flex-shrink:0;
-}
-.sl-clear-btn:hover{ background:#fde8e8; border-color:#dc3545; }
-
-/* Export icon buttons */
-.sl-export-btn{
-    height:34px; width:34px;
-    border-radius:8px; border:1px solid var(--ec-border);
-    background:#fafaf8; color:var(--ec-text-muted);
-    font-size:1rem; cursor:pointer; outline:none;
-    display:inline-flex; align-items:center; justify-content:center;
-    transition:var(--ec-transition); flex-shrink:0;
-}
-.sl-export-btn:hover{ background:#fff; color:var(--ec-primary); border-color:rgba(255,138,0,.4); }
-.sl-export-btn.xl:hover{ color:#198754; border-color:#198754; }
-.sl-export-btn.pdf:hover{ color:#dc3545; border-color:#dc3545; }
-
-/* Active filter count bubble */
-.sl-filter-count{
-    display:inline-flex; align-items:center; justify-content:center;
-    width:18px; height:18px; border-radius:50%;
-    background:var(--ec-primary); color:#fff;
-    font-size:.65rem; font-weight:800;
-    margin-left:.2rem; flex-shrink:0;
-}
-
-@@media (max-width:991.98px){
-    .sl-srch-wrap{ max-width:100%; }
-    .sl-fbar-div{ display:none; }
-}
-@@media (max-width:575.98px){
-    .sl-fbar{ gap:.4rem; }
-    .sl-srch-wrap{ flex:1 1 100%; max-width:100%; }
-    .sl-chip{ font-size:.75rem; height:32px; }
-    .sl-clear-btn{ height:32px; }
-    .sl-export-btn{ height:32px; width:32px; }
-}
-
-/* table */
-.sl-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
-.sl-tbl{ min-width:920px; width:100%; }
-.sl-tbl thead th{
-    background:linear-gradient(180deg,#fffaf3,#fff6ea);
-    color:var(--ec-text-light); font-size:.7rem;
-    text-transform:uppercase; letter-spacing:.06em; font-weight:800;
-    padding:.8rem .9rem; border-bottom:1px solid var(--ec-border);
-    white-space:nowrap; user-select:none;
-}
-.sl-sortable{ cursor:pointer; }
-.sl-sortable:hover{ background:#fff0e0; color:var(--ec-primary); }
-.sl-si{ font-size:.85rem; opacity:.35; vertical-align:middle; margin-left:3px; }
-.sl-si-on{ opacity:1; color:var(--ec-primary); }
-.sl-tbl tbody td{
-    padding:.78rem .9rem; vertical-align:middle;
-    border-bottom:1px solid #f4f0eb;
-    font-size:.84rem; font-weight:600; color:var(--ec-text);
-}
-.sl-tbl tbody tr:hover td{ background:#fffaf3; cursor:pointer; }
-.sl-tbl tbody tr.sl-row-active td{ background:#fff4e6; }
-
-/* student cell */
-.sl-av{
-    width:36px; height:36px; flex:0 0 36px;
-    border-radius:50%;
-    display:inline-flex; align-items:center; justify-content:center;
-    font-size:.72rem; font-weight:800;
-}
-.sl-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.87rem; line-height:1.2; white-space:nowrap; }
-.sl-rl{ font-size:.72rem; color:var(--ec-text-muted); white-space:nowrap; }
-
-/* gender */
-.sl-gen{ display:inline-flex; align-items:center; gap:.3rem; font-size:.82rem; }
-.sl-gen i{ font-size:.95rem; }
-.gm{ color:#2196f3; } .gf{ color:#e83e8c; } .go{ color:#8592a3; }
-
-/* attendance bar */
-.sl-att{ display:flex; align-items:center; gap:.4rem; }
-.sl-att-b{ width:52px; height:5px; background:#ede8e3; border-radius:999px; overflow:hidden; flex-shrink:0; }
-.sl-att-f{ height:100%; border-radius:inherit; }
-.att-hi .sl-att-f{ background:#28c76f; } .att-hi .sl-att-p{ color:#155724; font-weight:800; font-size:.8rem; }
-.att-mi .sl-att-f{ background:#ff9f43; } .att-mi .sl-att-p{ color:#856404; font-weight:800; font-size:.8rem; }
-.att-lo .sl-att-f{ background:#ea5455; } .att-lo .sl-att-p{ color:#842029; font-weight:800; font-size:.8rem; }
-
-/* badges */
-.sl-bdg{
-    display:inline-flex; align-items:center; gap:.28rem;
-    padding:.26rem .65rem; border-radius:999px;
-    font-size:.69rem; font-weight:800; white-space:nowrap;
-}
-.sl-bdg::before{ content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0; }
-.b-active  { background:#d4edda; color:#155724; } .b-active::before  { background:#28a745; }
-.b-inactive{ background:#e2e3e5; color:#495057; } .b-inactive::before{ background:#6c757d; }
-.b-transfer{ background:#cfe2ff; color:#084298; } .b-transfer::before{ background:#0d6efd; }
-.b-paid    { background:#d1f0e0; color:#0a5a35; } .b-paid::before    { background:#198754; }
-.b-partial { background:#fff3cd; color:#664d03; } .b-partial::before { background:#ffc107; }
-.b-pending { background:#fde8e8; color:#842029; } .b-pending::before { background:#dc3545; }
-
-/* view dashboard btn */
-.sl-view-btn{
-    display:inline-flex; align-items:center; gap:.28rem;
-    padding:.28rem .7rem; border-radius:8px; font-size:.77rem; font-weight:700;
-    background:var(--ec-primary-light); color:var(--ec-primary);
-    border:1px solid rgba(255,138,0,.2);
-    cursor:pointer; transition:var(--ec-transition); white-space:nowrap;
-    text-decoration:none;
-}
-.sl-view-btn:hover{ background:#ffe0b2; color:#e65c00; }
-
-/* pagination */
-.sl-pg-wrap{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.65rem; padding-top:1rem; border-top:1px solid var(--ec-border); }
-.sl-pg-info{ font-size:.81rem; color:var(--ec-text-muted); font-weight:650; }
-.sl-pg-btn{
-    width:32px !important; height:32px;
-    border-radius:7px; border:1px solid var(--ec-border);
-    background:#fff; color:var(--ec-text); font-size:.8rem; font-weight:700;
-    display:inline-flex; align-items:center; justify-content:center;
-    cursor:pointer; transition:var(--ec-transition); padding:0;
-}
-.sl-pg-btn:hover:not(:disabled){ background:var(--ec-primary-light); border-color:var(--ec-primary); color:var(--ec-primary); }
-.sl-pg-btn.active{ background:var(--ec-primary); border-color:var(--ec-primary); color:#fff; }
-.sl-pg-btn:disabled{ opacity:.35; cursor:not-allowed; }
-
-/* empty state */
-.sl-empty{ padding:3rem 1rem; text-align:center; }
-.sl-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }
-@@media (min-width:768px){ #emptyMob{ display:none !important; } }
-
-/* mobile cards */
-.sl-mob-list{ display:none; }
-.sl-mob-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; padding:.95rem; margin-bottom:.7rem; }
-.sl-mob-top{ display:flex; align-items:center; gap:.7rem; margin-bottom:.7rem; }
-.sl-mob-av{ width:42px; height:42px; flex:0 0 42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.82rem; font-weight:800; }
-.sl-mob-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.45rem .7rem; margin-bottom:.7rem; }
-.sl-mob-field label{ font-size:.67rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--ec-text-light); display:block; }
-.sl-mob-field span { font-size:.82rem; font-weight:700; color:var(--ec-text); }
-
-/* print */
-@@media print{
-    .layout-menu,.layout-navbar,.ec-page-header,
-    .sl-filter-section,.sl-pg-wrap,.sl-sum-section,
-    .sl-view-btn{ display:none !important; }
-    .sl-tbl-wrap{ overflow:visible !important; }
-    .sl-tbl{ min-width:100% !important; font-size:.75rem; }
-    .ec-page-shell{ box-shadow:none !important; border:none !important; }
-}
-
-/* responsive */
-@@media (max-width:767.98px){
-    .sl-tbl-wrap{ display:none; }
-    .sl-mob-list{ display:block; }
-    .sl-pg-wrap{ justify-content:center; }
-    .sl-pg-info{ width:100%; text-align:center; }
-}
-@@media (max-width:575.98px){
-    .sl-card{ padding:.85rem 1rem; }
-    .sl-card-val{ font-size:1.3rem; }
-    .sl-mob-grid{ grid-template-columns:1fr; }
-}
-</style>
+    <link rel="stylesheet" href="~/css/ERP/Student/StudentList.css" asp-append-version="true" />
 }
 
 <div class="ec-page-shell">
@@ -279,25 +73,25 @@
       <div class="col-6 col-lg-3">
         <div class="sl-card">
           <div class="sl-card-ic bg-label-primary text-primary"><i class="bx bx-group"></i></div>
-          <div><div class="sl-card-val" id="sumTotal">—</div><div class="sl-card-lbl">Total Students</div></div>
+          <div><div class="sl-card-val">@Model.TotalCount</div><div class="sl-card-lbl">Total Students</div></div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="sl-card">
           <div class="sl-card-ic bg-label-info text-info"><i class="bx bx-male"></i></div>
-          <div><div class="sl-card-val" id="sumMale">—</div><div class="sl-card-lbl">Male</div></div>
+          <div><div class="sl-card-val">@Model.MaleCount</div><div class="sl-card-lbl">Male</div></div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="sl-card">
           <div class="sl-card-ic bg-label-danger" style="color:#e83e8c;"><i class="bx bx-female"></i></div>
-          <div><div class="sl-card-val" id="sumFemale">—</div><div class="sl-card-lbl">Female</div></div>
+          <div><div class="sl-card-val">@Model.FemaleCount</div><div class="sl-card-lbl">Female</div></div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="sl-card">
           <div class="sl-card-ic bg-label-success text-success"><i class="bx bx-user-check"></i></div>
-          <div><div class="sl-card-val" id="sumActive">—</div><div class="sl-card-lbl">Active</div></div>
+          <div><div class="sl-card-val">@Model.ActiveCount</div><div class="sl-card-lbl">Active</div></div>
         </div>
       </div>
     </div>
@@ -310,66 +104,88 @@
             <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
             <div>
               <div class="ec-section-title">Student Records</div>
-              <div class="ec-section-subtitle" id="resultText">Loading…</div>
+              <div class="ec-section-subtitle">
+                @if (Model.TotalCount > 0)
+                {
+                    <text>Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount students</text>
+                }
+                else
+                {
+                    <text>No students found</text>
+                }
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="sl-fbar">
+        @* All filtering/sorting/paging is server-side: this GET form round-trips
+           the query string. Omitting Page here means any filter change resets to
+           page 1. Sort is carried in hidden fields so it survives a filter change. *@
+        <form id="slFilterForm" method="get" asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="sl-fbar">
+          <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+          <input type="hidden" name="SortDir" value="@Model.SortDirection" />
 
           <div class="sl-srch-wrap">
             <i class="bx bx-search sl-srch-ic"></i>
-            <input type="search" class="sl-srch-inp" id="slSearch" placeholder="Search name, roll no, class…">
+            <input type="search" class="sl-srch-inp" name="Search" value="@Model.Search"
+                   placeholder="Search name, adm no, guardian, mobile…" onchange="this.form.submit()">
           </div>
 
           <div class="sl-fbar-div"></div>
 
-          <select class="sl-chip" id="fClass">
+          <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterClass) ? "" : "active-filter")"
+                  name="FilterClass" onchange="this.form.submit()">
             <option value="">Class</option>
-            @foreach (var c in (ViewBag.Classes as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
+            @foreach (var c in Model.ClassList)
             {
-                <option value="@c.Text">@c.Text</option>
+                <option value="@c.Text" selected="@Sel(c.Text, Model.FilterClass)">@c.Text</option>
             }
           </select>
 
-          <select class="sl-chip" id="fGender">
+          <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterGender) ? "" : "active-filter")"
+                  name="FilterGender" onchange="this.form.submit()">
             <option value="">Gender</option>
-            <option>Male</option><option>Female</option><option>Other</option>
+            <option value="Male" selected="@Sel("Male", Model.FilterGender)">Male</option>
+            <option value="Female" selected="@Sel("Female", Model.FilterGender)">Female</option>
+            <option value="Other" selected="@Sel("Other", Model.FilterGender)">Other</option>
           </select>
 
-          <select class="sl-chip" id="fFee">
+          <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterFee) ? "" : "active-filter")"
+                  name="FilterFee" onchange="this.form.submit()">
             <option value="">Fee</option>
-            <option>Paid</option><option>Partial</option><option>Pending</option>
+            <option value="Paid" selected="@Sel("Paid", Model.FilterFee)">Paid</option>
+            <option value="Partial" selected="@Sel("Partial", Model.FilterFee)">Partial</option>
+            <option value="Pending" selected="@Sel("Pending", Model.FilterFee)">Pending</option>
           </select>
 
-          <select class="sl-chip" id="fYear">
+          <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterYear) ? "" : "active-filter")"
+                  name="FilterYear" onchange="this.form.submit()">
             <option value="">Year</option>
-            @foreach (var s in (ViewBag.Sessions as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
+            @foreach (var y in Model.YearList)
             {
-                <option value="@s.Text">@s.Text</option>
+                <option value="@y.Text" selected="@Sel(y.Text, Model.FilterYear)">@y.Text</option>
             }
           </select>
 
-          <select class="sl-chip" id="perPage" title="Rows per page">
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-          </select>
-
-          <button class="sl-clear-btn d-none" id="clearBtn" title="Clear all filters">
-            <i class="bx bx-x"></i>Clear
-          </button>
+          @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.FilterClass)
+               || !string.IsNullOrEmpty(Model.FilterGender) || !string.IsNullOrEmpty(Model.FilterFee)
+               || !string.IsNullOrEmpty(Model.FilterYear))
+          {
+              <a asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="sl-clear-btn" title="Clear all filters">
+                <i class="bx bx-x"></i>Clear
+              </a>
+          }
 
           <div class="ms-auto d-flex gap-1 align-items-center">
-            <button class="sl-export-btn xl" id="btnExcel" title="Export to Excel">
+            <button type="button" class="sl-export-btn xl" id="btnExcel" title="Export to Excel">
               <i class="bx bx-spreadsheet"></i>
             </button>
-            <button class="sl-export-btn pdf" id="btnPdf" title="Export to PDF">
+            <button type="button" class="sl-export-btn pdf" id="btnPdf" title="Export to PDF">
               <i class="bxs-file-pdf bx"></i>
             </button>
           </div>
 
-        </div>
+        </form>
       </div>
 
       <div class="ec-card-body pt-2">
@@ -378,46 +194,105 @@
           <table class="table sl-tbl align-middle mb-0">
             <thead>
               <tr>
-                <th class="sl-sortable" data-col="name">
-                  Student <i class="bx bx-sort sl-si" id="si-name"></i>
-                </th>
-                <th>Class &amp; Section</th>
+                <th><a class="sl-sortable text-reset text-decoration-none" href="@SortUrl("name")">
+                  Student <i class="@SortIcon("name")"></i></a></th>
+                <th><a class="sl-sortable text-reset text-decoration-none" href="@SortUrl("class")">
+                  Class &amp; Section <i class="@SortIcon("class")"></i></a></th>
                 <th>Gender</th>
-                <th class="sl-sortable" data-col="admDate">
-                  Admission Date <i class="bx bx-sort sl-si" id="si-admDate"></i>
-                </th>
+                <th><a class="sl-sortable text-reset text-decoration-none" href="@SortUrl("admdate")">
+                  Admission Date <i class="@SortIcon("admdate")"></i></a></th>
                 <th>Parent / Guardian</th>
                 <th>Contact</th>
                 <th>Fee Status</th>
-                <th class="sl-sortable" data-col="attend">
-                  Attendance <i class="bx bx-sort sl-si" id="si-attend"></i>
-                </th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody id="tblBody"></tbody>
+            <tbody>
+              @foreach (var s in Model.Items)
+              {
+                  var color = colors[s.StudentId % colors.Length];
+                  var roll = string.IsNullOrEmpty(s.RollNo) ? s.AdmissionNo : s.RollNo;
+                  var gm = GenderMeta(s.Gender);
+                  var dashUrl = Url.Action("Dashboard", "Student", new { area = "ERP", id = s.StudentId });
+                  <tr>
+                    <td>
+                      <a href="@dashUrl" class="d-flex align-items-center gap-2 text-decoration-none" style="cursor:pointer;">
+                        <span class="sl-av bg-label-@color text-@color">@Initials(s.StudentName)</span>
+                        <div><div class="sl-nm">@s.StudentName</div><div class="sl-rl">@roll</div></div>
+                      </a>
+                    </td>
+                    <td><span class="fw-bold">@s.ClassName</span> <span class="text-muted">– @s.Section</span></td>
+                    <td><span class="sl-gen @gm.cls"><i class="bx @gm.ic"></i>@s.Gender</span></td>
+                    <td>@(s.AdmissionDate?.ToString("dd MMM yyyy") ?? "—")</td>
+                    <td>@(string.IsNullOrEmpty(s.GuardianName) ? "—" : s.GuardianName)</td>
+                    <td>@(string.IsNullOrEmpty(s.Mobile) ? "—" : s.Mobile)</td>
+                    <td><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></td>
+                    <td><span class="sl-bdg @StatBadgeClass(s.Status)">@s.Status</span></td>
+                    <td><a href="@dashUrl" class="sl-view-btn"><i class="bx bx-layout"></i>Dashboard</a></td>
+                  </tr>
+              }
+            </tbody>
           </table>
-          <div class="sl-empty d-none" id="emptyDesk">
-            <div class="sl-empty-ic"><i class="bx bx-search-alt"></i></div>
-            <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No students found</h6>
-            <p class="text-muted small mb-3">Try adjusting your search or filters.</p>
-            <button class="btn btn-sm btn-outline-primary" id="clearBtn">
-              <i class="bx bx-filter-alt me-1"></i>Clear All Filters
-            </button>
+
+          @if (Model.Items.Count == 0)
+          {
+              <div class="sl-empty">
+                <div class="sl-empty-ic"><i class="bx bx-search-alt"></i></div>
+                <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No students found</h6>
+                <p class="text-muted small mb-3">Try adjusting your search or filters.</p>
+                <a asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="btn btn-sm btn-outline-primary">
+                  <i class="bx bx-filter-alt me-1"></i>Clear All Filters
+                </a>
+              </div>
+          }
+        </div>
+
+        <div class="sl-mob-list">
+          @foreach (var s in Model.Items)
+          {
+              var color = colors[s.StudentId % colors.Length];
+              var roll = string.IsNullOrEmpty(s.RollNo) ? s.AdmissionNo : s.RollNo;
+              var dashUrl = Url.Action("Dashboard", "Student", new { area = "ERP", id = s.StudentId });
+              <div class="sl-mob-card">
+                <div class="sl-mob-top">
+                  <span class="sl-mob-av bg-label-@color text-@color">@Initials(s.StudentName)</span>
+                  <div class="flex-grow-1">
+                    <div class="sl-nm">@s.StudentName</div>
+                    <div class="sl-rl">@roll · @s.ClassName @s.Section</div>
+                  </div>
+                  <span class="sl-bdg @StatBadgeClass(s.Status)">@s.Status</span>
+                </div>
+                <div class="sl-mob-grid">
+                  <div class="sl-mob-field"><label>Guardian</label><span>@(string.IsNullOrEmpty(s.GuardianName) ? "—" : s.GuardianName)</span></div>
+                  <div class="sl-mob-field"><label>Contact</label><span>@(string.IsNullOrEmpty(s.Mobile) ? "—" : s.Mobile)</span></div>
+                  <div class="sl-mob-field"><label>Admitted</label><span>@(s.AdmissionDate?.ToString("dd MMM yyyy") ?? "—")</span></div>
+                  <div class="sl-mob-field"><label>Gender</label><span>@s.Gender</span></div>
+                  <div class="sl-mob-field"><label>Fee Status</label><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></div>
+                  <div class="sl-mob-field"><label>Class</label><span>@s.ClassName @s.Section</span></div>
+                </div>
+                <a href="@dashUrl" class="btn btn-sm btn-primary w-100"><i class="bx bx-layout me-1"></i>View Dashboard</a>
+              </div>
+          }
+          @if (Model.Items.Count == 0)
+          {
+              <div class="sl-empty">
+                <div class="sl-empty-ic"><i class="bx bx-search-alt"></i></div>
+                <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No students found</h6>
+                <p class="text-muted small mb-3">Try adjusting filters.</p>
+              </div>
+          }
+        </div>
+
+        <div class="sl-pg-wrap">
+          <div class="sl-pg-info d-flex align-items-center gap-2">
+            <partial name="_PageSize" model="Model" view-data='@(new ViewDataDictionary(ViewData) { { "FormId", "slFilterForm" } })' />
+            @if (Model.TotalCount > 0)
+            {
+                <span class="ms-1">Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount students</span>
+            }
           </div>
-        </div>
-
-        <div class="sl-mob-list" id="mobList"></div>
-        <div class="sl-empty d-none" id="emptyMob">
-          <div class="sl-empty-ic"><i class="bx bx-search-alt"></i></div>
-          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No students found</h6>
-          <p class="text-muted small mb-3">Try adjusting filters.</p>
-        </div>
-
-        <div class="sl-pg-wrap" id="pgWrap">
-          <div class="sl-pg-info" id="pgInfo">—</div>
-          <div class="d-flex gap-1 flex-wrap justify-content-end" id="pgBtns"></div>
+          <partial name="_Pager" model="Model" />
         </div>
 
       </div>
@@ -430,237 +305,39 @@
 <script>
 (function(){
 'use strict';
+/* Listing/filtering/paging is server-side. This block only handles the two
+   export buttons: Excel pulls the CURRENT filtered set from the JSON endpoint,
+   PDF uses the browser print dialog. */
+var EXPORT_URL='@Url.Action("GetStudentsData","Admission",new{area="ERP"})';
+var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDate(d){if(!d)return'';var x=new Date(d);if(isNaN(x))return d;return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]+' '+x.getFullYear();}
+function val(n){var el=document.querySelector('[name="'+n+'"]');return el?el.value:'';}
+function toast(t,m){if(typeof toastr!=='undefined')toastr[t](m);}
 
-/* ── Config ─────────────────────────────────── */
-var PAGE=1, PER=10, sortCol=null, sortDir='asc', filtered=[];
-var URL_STUDENTS='@Url.Action("GetStudentsData","Admission",new{area="ERP"})';
-
-/* ── Live data (loaded from the server) ──────── */
-var students=[];
-
-function loadStudents(){
-  var colors=['primary','info','success','warning','danger','secondary'];
-  document.getElementById('resultText').textContent='Loading…';
-  fetch(URL_STUDENTS+'?pageSize=1000',{headers:{'X-Requested-With':'XMLHttpRequest'}})
+document.getElementById('btnExcel').addEventListener('click',function(){
+  var qs='?pageSize=10000&page=1'
+    +'&search='+encodeURIComponent(val('Search'))
+    +'&className='+encodeURIComponent(val('FilterClass'))
+    +'&gender='+encodeURIComponent(val('FilterGender'))
+    +'&year='+encodeURIComponent(val('FilterYear'));
+  fetch(EXPORT_URL+qs,{headers:{'X-Requested-With':'XMLHttpRequest'}})
     .then(function(r){return r.json();})
     .then(function(res){
       var rows=(res&&res.success&&res.rows)?res.rows:[];
-      students=rows.map(function(s){
-        return {
-          id:      s.studentId,
-          name:    s.studentName,
-          roll:    s.rollNo||s.admissionNo||'',
-          cls:     s.className||'',
-          sec:     s.section||'',
-          gender:  s.gender||'',
-          admDate: s.admissionDate||'',
-          guardian:s.guardianName||'—',
-          phone:   s.mobile||'—',
-          feeSt:   s.feeStatus||'Pending',
-          feeDue:  s.feeDue||0,
-          attend:  0,
-          status:  s.status||'Active',
-          admYear: parseInt(String(s.academicYear||'0').slice(0,4))||0,
-          color:   colors[(s.studentId||0)%colors.length]
-        };
-      });
-      applyFilters();
+      var hdr=['Adm No','Roll','Name','Class','Sec','Gender','Adm Date','Guardian','Phone','Fee','Status'];
+      var body=rows.map(function(s){return[s.admissionNo,s.rollNo||'',s.studentName,s.className,s.section||'',s.gender||'',fmtDate(s.admissionDate),s.guardianName||'',s.mobile||'',s.feeStatus||'',s.status||''];});
+      var csv='﻿'+[hdr].concat(body).map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
+      var a=document.createElement('a');
+      a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+      a.download='students_'+new Date().toISOString().slice(0,10)+'.csv';
+      a.click();
+      toast('success',body.length+' students exported.');
     })
-    .catch(function(){ students=[]; applyFilters(); });
-}
-
-/* ── Helpers ─────────────────────────────────── */
-var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function fmtDate(d){var x=new Date(d);return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]+' '+x.getFullYear();}
-function ini(n){return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();}
-function attCls(p){return p>=75?'att-hi':p>=50?'att-mi':'att-lo';}
-function feeB(f){var m={Paid:'b-paid',Partial:'b-partial',Pending:'b-pending'};return '<span class="sl-bdg '+(m[f]||'b-pending')+'">'+f+'</span>';}
-function statB(s){var m={Active:'b-active',Inactive:'b-inactive',Transfer:'b-transfer'};return '<span class="sl-bdg '+(m[s]||'b-inactive')+'">'+s+'</span>';}
-function gHtml(g){
-  var m={Male:['gm','bx-male'],Female:['gf','bx-female'],Other:['go','bx-user']},c=m[g]||m.Other;
-  return '<span class="sl-gen '+c[0]+'"><i class="bx '+c[1]+'"></i>'+g+'</span>';
-}
-function attHtml(p){
-  var c=attCls(p);
-  return '<div class="sl-att '+c+'"><div class="sl-att-b"><div class="sl-att-f" style="width:'+p+'%"></div></div><span class="sl-att-p">'+p+'%</span></div>';
-}
-function inr(n){return n===0?'₹ 0':'₹ '+n.toLocaleString('en-IN');}
-function toast(t,m){if(typeof toastr!=='undefined')toastr[t](m);}
-
-/* ── Sort ────────────────────────────────────── */
-function doSort(list){
-  if(!sortCol)return list;
-  return list.slice().sort(function(a,b){
-    var va=a[sortCol],vb=b[sortCol];
-    if(sortCol==='admDate'){va=new Date(va);vb=new Date(vb);}
-    return sortDir==='asc'?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0);
-  });
-}
-function updateSortIcons(){
-  ['name','admDate','attend'].forEach(function(c){
-    var el=document.getElementById('si-'+c);
-    if(!el)return;
-    el.className='bx bx-sort sl-si';
-    if(c===sortCol) el.className='bx '+(sortDir==='asc'?'bx-sort-up':'bx-sort-down')+' sl-si sl-si-on';
-  });
-}
-
-/* ── Filter ──────────────────────────────────── */
-function applyFilters(){
-  var q=document.getElementById('slSearch').value.toLowerCase().trim(),
-      cls=document.getElementById('fClass').value,
-      gen=document.getElementById('fGender').value,
-      fee=document.getElementById('fFee').value,
-      yr=document.getElementById('fYear').value;
-
-  filtered=students.filter(function(s){
-    return(!q||s.name.toLowerCase().includes(q)||s.roll.toLowerCase().includes(q)||s.cls.toLowerCase().includes(q))
-      &&(!cls||s.cls===cls)&&(!gen||s.gender===gen)
-      &&(!fee||s.feeSt===fee)&&(!yr||s.admYear===parseInt(yr));
-  });
-
-  /* highlight active chips */
-  ['fClass','fGender','fFee','fYear'].forEach(function(id){
-    var el=document.getElementById(id);
-    if(el) el.classList.toggle('active-filter', el.value!=='');
-  });
-
-  /* show/hide clear button */
-  var hasFilter=cls||gen||fee||yr||q;
-  var cb=document.getElementById('clearBtn');
-  if(cb) cb.classList.toggle('d-none',!hasFilter);
-
-  updateCards();PAGE=1;render();
-}
-function updateCards(){
-  var src=filtered.length?filtered:students;
-  document.getElementById('sumTotal').textContent=src.length;
-  document.getElementById('sumMale').textContent=src.filter(function(s){return s.gender==='Male';}).length;
-  document.getElementById('sumFemale').textContent=src.filter(function(s){return s.gender==='Female';}).length;
-  document.getElementById('sumActive').textContent=src.filter(function(s){return s.status==='Active';}).length;
-}
-
-/* ── Render ──────────────────────────────────── */
-function render(){
-  var sorted=doSort(filtered),total=sorted.length;
-  PER=parseInt(document.getElementById('perPage').value);
-  var pages=Math.ceil(total/PER)||1;
-  if(PAGE>pages)PAGE=pages;
-  var start=(PAGE-1)*PER,end=Math.min(start+PER,total),slice=sorted.slice(start,end);
-  renderDesk(slice,total,start,end);
-  renderMob(slice);
-  renderPag(pages,total,start,end);
-  document.getElementById('resultText').textContent=total?'Showing '+(start+1)+'–'+end+' of '+total+' students':'No students found';
-}
-
-function dashUrl(id){
-  return '@Url.Action("Dashboard","Student",new{area="ERP"})' + '/' + id;
-}
-
-function renderDesk(slice,total,start,end){
-  var tb=document.getElementById('tblBody'),em=document.getElementById('emptyDesk');
-  if(!slice.length){tb.innerHTML='';em.classList.remove('d-none');document.getElementById('pgWrap').classList.add('d-none');return;}
-  em.classList.add('d-none');document.getElementById('pgWrap').classList.remove('d-none');
-  tb.innerHTML=slice.map(function(s){
-    return '<tr>'
-      +'<td>'
-      +  '<a href="'+dashUrl(s.id)+'" class="d-flex align-items-center gap-2 text-decoration-none" style="cursor:pointer;">'
-      +    '<span class="sl-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
-      +    '<div><div class="sl-nm">'+s.name+'</div><div class="sl-rl">'+s.roll+'</div></div>'
-      +  '</a>'
-      +'</td>'
-      +'<td><span class="fw-bold">'+s.cls+'</span> <span class="text-muted">– '+s.sec+'</span></td>'
-      +'<td>'+gHtml(s.gender)+'</td>'
-      +'<td>'+fmtDate(s.admDate)+'</td>'
-      +'<td>'+s.guardian+'</td>'
-      +'<td>'+s.phone+'</td>'
-      +'<td>'+feeB(s.feeSt)+'</td>'
-      +'<td>'+attHtml(s.attend)+'</td>'
-      +'<td>'+statB(s.status)+'</td>'
-      +'<td><a href="'+dashUrl(s.id)+'" class="sl-view-btn"><i class="bx bx-layout"></i>Dashboard</a></td>'
-      +'</tr>';
-  }).join('');
-}
-
-function renderMob(slice){
-  var list=document.getElementById('mobList'),em=document.getElementById('emptyMob');
-  if(!slice.length){list.innerHTML='';em.classList.remove('d-none');return;}
-  em.classList.add('d-none');
-  list.innerHTML=slice.map(function(s){
-    return '<div class="sl-mob-card">'
-      +'<div class="sl-mob-top">'
-      +  '<span class="sl-mob-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
-      +  '<div class="flex-grow-1"><div class="sl-nm">'+s.name+'</div><div class="sl-rl">'+s.roll+' · '+s.cls+' '+s.sec+'</div></div>'
-      +  statB(s.status)
-      +'</div>'
-      +'<div class="sl-mob-grid">'
-      +  '<div class="sl-mob-field"><label>Guardian</label><span>'+s.guardian+'</span></div>'
-      +  '<div class="sl-mob-field"><label>Contact</label><span>'+s.phone+'</span></div>'
-      +  '<div class="sl-mob-field"><label>Admitted</label><span>'+fmtDate(s.admDate)+'</span></div>'
-      +  '<div class="sl-mob-field"><label>Gender</label><span>'+s.gender+'</span></div>'
-      +  '<div class="sl-mob-field"><label>Fee Status</label>'+feeB(s.feeSt)+'</div>'
-      +  '<div class="sl-mob-field"><label>Attendance</label>'+attHtml(s.attend)+'</div>'
-      +'</div>'
-      +'<a href="'+dashUrl(s.id)+'" class="btn btn-sm btn-primary w-100"><i class="bx bx-layout me-1"></i>View Dashboard</a>'
-      +'</div>';
-  }).join('');
-}
-
-function renderPag(pages,total,start,end){
-  var info=document.getElementById('pgInfo'),btns=document.getElementById('pgBtns');
-  info.textContent='Showing '+(start+1)+'–'+end+' of '+total+' students';
-  if(pages<=1){btns.innerHTML='';return;}
-  var h='<button class="sl-pg-btn" id="pPrev" '+(PAGE===1?'disabled':'')+'><i class="bx bx-chevron-left"></i></button>';
-  var fr=Math.max(1,PAGE-2),to=Math.min(pages,fr+4);fr=Math.max(1,to-4);
-  if(fr>1)h+='<button class="sl-pg-btn" data-p="1">1</button>'+(fr>2?'<span class="sl-pg-info px-1">…</span>':'');
-  for(var i=fr;i<=to;i++)h+='<button class="sl-pg-btn'+(i===PAGE?' active':'')+'" data-p="'+i+'">'+i+'</button>';
-  if(to<pages)h+=(to<pages-1?'<span class="sl-pg-info px-1">…</span>':'')+'<button class="sl-pg-btn" data-p="'+pages+'">'+pages+'</button>';
-  h+='<button class="sl-pg-btn" id="pNext" '+(PAGE===pages?'disabled':'')+'><i class="bx bx-chevron-right"></i></button>';
-  btns.innerHTML=h;
-  btns.querySelectorAll('[data-p]').forEach(function(b){b.addEventListener('click',function(){PAGE=parseInt(this.dataset.p);render();});});
-  var pv=btns.querySelector('#pPrev'),nx=btns.querySelector('#pNext');
-  if(pv)pv.addEventListener('click',function(){if(PAGE>1){PAGE--;render();}});
-  if(nx)nx.addEventListener('click',function(){if(PAGE<pages){PAGE++;render();}});
-}
-
-/* ── Export ──────────────────────────────────── */
-document.getElementById('btnExcel').addEventListener('click',function(){
-  var hdr=['Roll','Name','Class','Sec','Gender','Adm Date','Guardian','Phone','Fee','Attendance','Status'];
-  var rows=filtered.map(function(s){return[s.roll,s.name,s.cls,s.sec,s.gender,fmtDate(s.admDate),s.guardian,s.phone,s.feeSt,s.attend+'%',s.status];});
-  var csv='﻿'+[hdr].concat(rows).map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
-  var a=document.createElement('a');
-  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
-  a.download='students_'+new Date().toISOString().slice(0,10)+'.csv';
-  a.click();
-  toast('success',filtered.length+' students exported.');
+    .catch(function(){toast('error','Export failed.');});
 });
 document.getElementById('btnPdf').addEventListener('click',function(){window.print();});
 
-/* ── Wire filters & sort ─────────────────────── */
-['slSearch','fClass','fGender','fFee','fYear','perPage'].forEach(function(id){
-  var el=document.getElementById(id);
-  if(el) el.addEventListener(id==='slSearch'?'input':'change', applyFilters);
-});
-document.getElementById('clearBtn').addEventListener('click',function(){
-  document.getElementById('slSearch').value='';
-  ['fClass','fGender','fFee','fYear'].forEach(function(id){
-    var el=document.getElementById(id);
-    if(el){el.value='';el.classList.remove('active-filter');}
-  });
-  applyFilters();
-});
-document.querySelectorAll('.sl-sortable').forEach(function(th){
-  th.addEventListener('click',function(){
-    var c=this.dataset.col;
-    if(sortCol===c)sortDir=sortDir==='asc'?'desc':'asc';
-    else{sortCol=c;sortDir='asc';}
-    updateSortIcons();render();
-  });
-});
-
-/* ── toastr ──────────────────────────────────── */
 if(typeof toastr!=='undefined')toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
-loadStudents();
 })();
 </script>
 }

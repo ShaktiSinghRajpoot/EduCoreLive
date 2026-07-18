@@ -1,0 +1,11 @@
+/* Routes page styles — extracted from Areas/ERP/Views/Transport/Routes.cshtml */
+.tr-page{--p:#ff8a00;--soft:#fff4e6;--border:#ececf5;--heading:#2b1b12;--muted:#8b8175;}
+.tr-page .btn-primary{background:linear-gradient(135deg,#ff8a00,#ff9f2f);border:0;border-radius:999px;font-weight:800;box-shadow:0 12px 24px rgba(255,138,0,.22);}
+.tr-card{border:1px solid var(--border);border-radius:16px;background:#fff;transition:.2s;}
+.tr-card:hover{border-color:rgba(255,138,0,.45);box-shadow:0 12px 28px rgba(43,27,18,.07);}
+.tr-name{font-weight:850;color:var(--heading);font-size:1.02rem;}
+.tr-meta{font-size:.8rem;color:var(--muted);font-weight:650;}
+.tr-fare{font-weight:800;color:var(--p);}
+.stop-row td{padding:.3rem .4rem;}
+.stop-row input{width:100%;border:1px solid var(--border);border-radius:8px;min-height:38px;padding:0 .55rem;font-weight:650;}
+.badge-off{background:#f1f0ee;color:#8b8175;border-radius:999px;padding:.15rem .6rem;font-size:.72rem;font-weight:800;}

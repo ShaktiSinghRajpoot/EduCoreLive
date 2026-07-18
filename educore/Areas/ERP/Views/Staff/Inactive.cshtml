@@ -1,11 +1,28 @@
-@model List<EduCoreDataAccessLayer.Models.StaffListItem>
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using System.Linq
+@using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Mvc.Rendering
+@using Microsoft.AspNetCore.Mvc.ViewFeatures
+@model EduCoreDataAccessLayer.Models.StaffListItem
 @{
     ViewData["Title"] = "Inactive Staff";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
-}
 
-@section PageStyles {
-<link href="~/css/educore-theme.css" rel="stylesheet" />
+    // Whitelisted server-side sort header link (preserves filters, drops Page).
+    string SortUrl(string col)
+    {
+        var q = Context.Request.Query
+            .Where(k => !new[] { "SortColumn", "SortDir", "Page" }.Contains(k.Key, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(k => k.Key, k => k.Value.ToString());
+        q["SortColumn"] = col;
+        q["SortDir"] = (string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase) && !Model.Desc) ? "desc" : "asc";
+        return Context.Request.Path + QueryString.Create(q);
+    }
+    string SortIcon(string col)
+    {
+        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-sort";
+        return "bx " + (Model.Desc ? "bx-sort-down" : "bx-sort-up") + " text-primary";
+    }
 }
 
 <div class="ec-page-shell">
@@ -31,11 +48,27 @@
 
     <div class="ec-card">
       <div class="ec-card-body">
-        @if (!Model.Any())
+
+        <form id="inactiveFilterForm" method="get" asp-area="ERP" asp-controller="Staff" asp-action="Inactive"
+              class="d-flex align-items-center gap-2 mb-3">
+          <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+          <input type="hidden" name="SortDir" value="@Model.SortDirection" />
+          <div class="input-group" style="max-width:320px">
+            <span class="input-group-text"><i class="bx bx-search"></i></span>
+            <input type="search" name="Search" value="@Model.Search" class="form-control"
+                   placeholder="Search name, ID or designation…" onchange="this.form.submit()">
+          </div>
+          @if (!string.IsNullOrEmpty(Model.Search))
+          {
+              <a asp-area="ERP" asp-controller="Staff" asp-action="Inactive" class="btn btn-outline-secondary"><i class="bx bx-x"></i> Clear</a>
+          }
+        </form>
+
+        @if (!Model.Items.Any())
         {
             <div class="text-center text-muted py-5">
               <i class="bx bx-user-check" style="font-size:2.5rem;"></i>
-              <p class="mt-2 mb-0">No inactive staff. Everyone is active.</p>
+              <p class="mt-2 mb-0">No inactive staff match your search.</p>
             </div>
         }
         else
@@ -44,18 +77,22 @@
               <table class="table align-middle mb-0">
                 <thead>
                   <tr>
-                    <th>Name</th><th>Emp ID</th><th>Designation</th><th>Department</th><th>Contact</th><th class="text-end">Action</th>
+                    <th><a class="text-reset text-decoration-none" href="@SortUrl("name")">Name <i class="@SortIcon("name")"></i></a></th>
+                    <th>Emp ID</th>
+                    <th><a class="text-reset text-decoration-none" href="@SortUrl("designation")">Designation <i class="@SortIcon("designation")"></i></a></th>
+                    <th><a class="text-reset text-decoration-none" href="@SortUrl("department")">Department <i class="@SortIcon("department")"></i></a></th>
+                    <th>Contact</th><th class="text-end">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @foreach (var s in Model)
+                  @foreach (var s in Model.Items)
                   {
                     <tr>
                       <td class="fw-bold">@s.FullName</td>
-                      <td>@s.EmployeeCode</td>
-                      <td>@s.Designation</td>
-                      <td>@s.Department</td>
-                      <td>@s.Mobile</td>
+                      <td>@(string.IsNullOrWhiteSpace(s.EmployeeCode) ? "—" : s.EmployeeCode)</td>
+                      <td>@(string.IsNullOrWhiteSpace(s.Designation) ? "—" : s.Designation)</td>
+                      <td>@(string.IsNullOrWhiteSpace(s.Department) ? "—" : s.Department)</td>
+                      <td>@(string.IsNullOrWhiteSpace(s.Mobile) ? "—" : s.Mobile)</td>
                       <td class="text-end">
                         <form asp-area="ERP" asp-controller="Staff" asp-action="Reactivate" method="post" class="d-inline">
                           @Html.AntiForgeryToken()
@@ -69,6 +106,14 @@
                   }
                 </tbody>
               </table>
+            </div>
+
+            <div class="sl-pg-wrap d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3 pt-3 border-top">
+              <div class="d-flex align-items-center gap-2 text-muted" style="font-size:.81rem">
+                <partial name="_PageSize" model="Model" view-data='@(new ViewDataDictionary(ViewData) { { "FormId", "inactiveFilterForm" } })' />
+                <span class="ms-1">Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount inactive staff</span>
+              </div>
+              <partial name="_Pager" model="Model" />
             </div>
         }
       </div>

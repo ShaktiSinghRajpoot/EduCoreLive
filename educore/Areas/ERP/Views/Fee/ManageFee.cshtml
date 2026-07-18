@@ -1,3 +1,4 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Fee Collection";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -18,122 +19,7 @@
 *@
 
 @section PageStyles {
-<link href="~/css/educore-theme.css" rel="stylesheet" />
-<style>
-.fee-collect-page{ --ec-suc:#28c76f;--ec-suc-soft:#e8fadf;--ec-dng:#ea5455;--ec-amb:#ff9f43;--ec-amb-soft:#fff1e0; color:var(--ec-text); }
-
-/* command bar */
-.fee-collect-page .cmd{ display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;background:linear-gradient(135deg,var(--ec-primary-soft),#fff 65%);border:1px solid #f4e3cf;border-radius:16px;padding:.85rem 1.1rem;margin-bottom:1.1rem; }
-.fee-collect-page .cmd .ec-page-icon{ width:42px;height:42px;font-size:20px; }
-.fee-collect-page .cmd .title{ font-weight:800;color:var(--ec-text-dark);font-size:1.05rem;line-height:1.1; }
-.fee-collect-page .cmd .sub{ font-size:.72rem;color:var(--ec-text-muted);font-weight:650; }
-.fee-collect-page .today{ margin-left:auto;display:flex;align-items:center;gap:.6rem;background:#fff;border:1px solid var(--ec-border);border-radius:12px;padding:.45rem .85rem; }
-.fee-collect-page .today .n{ font-weight:900;color:var(--ec-text-dark);font-size:1.05rem;line-height:1; }
-.fee-collect-page .today .l{ font-size:.62rem;font-weight:800;text-transform:uppercase;color:var(--ec-text-muted);letter-spacing:.04em; }
-.fee-collect-page .today .dot{ width:34px;height:34px;border-radius:10px;background:var(--ec-suc-soft);color:var(--ec-suc);display:flex;align-items:center;justify-content:center;font-size:1.1rem; }
-
-/* filter bar (same cascade as before) */
-.fee-collect-page .filter-bar{ background:linear-gradient(180deg,#fff,#fff7ed);border:1px solid rgba(255,138,0,.18);border-radius:16px; }
-.fee-collect-page .adm-search{ display:flex;gap:.4rem; }
-.fee-collect-page .adm-search .form-control{ flex:1;min-width:0; }
-.fee-collect-page .adm-search button{ flex:none;width:44px;border:1px solid var(--ec-border);background:var(--ec-primary-light);color:var(--ec-primary);border-radius:9px;font-size:1.1rem; }
-.fee-collect-page .adm-search button:hover{ background:var(--ec-primary);color:#fff; }
-
-/* student strip */
-.fee-collect-page .stu-strip{ display:flex;align-items:center;gap:1rem;flex-wrap:wrap; }
-.fee-collect-page .stu-av{ width:50px;height:50px;border-radius:13px;background:var(--ec-primary-light);color:var(--ec-primary);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.15rem;flex:none; }
-.fee-collect-page .stu-name{ font-weight:800;color:var(--ec-text-dark);font-size:1.02rem;line-height:1.15; }
-.fee-collect-page .stu-sub{ font-size:.76rem;color:var(--ec-text-muted);font-weight:650; }
-.fee-collect-page .stu-out{ margin-left:auto;text-align:right; }
-.fee-collect-page .stu-out .amt{ font-size:1.6rem;font-weight:950;color:var(--ec-text-dark);letter-spacing:-.03em;line-height:1; }
-.fee-collect-page .stu-out .lbl{ font-size:.68rem;font-weight:800;text-transform:uppercase;color:var(--ec-text-muted);letter-spacing:.04em; }
-
-/* view tabs */
-.fee-collect-page .view-tabs{ display:flex;gap:.4rem;border-bottom:1px solid var(--ec-border);margin-bottom:1rem; }
-.fee-collect-page .view-tab{ border:0;background:none;padding:.55rem .25rem;margin-right:1rem;font-size:.9rem;font-weight:850;color:var(--ec-text-muted);cursor:pointer;border-bottom:3px solid transparent; }
-.fee-collect-page .view-tab.active{ color:var(--ec-primary);border-bottom-color:var(--ec-primary); }
-
-/* dues */
-.fee-collect-page .period{ display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:.9rem;align-items:center; }
-.fee-collect-page .period .l{ font-size:.7rem;font-weight:800;text-transform:uppercase;color:var(--ec-text-light); }
-.fee-collect-page .chip{ border:1.5px solid var(--ec-border);background:#fff;border-radius:999px;padding:.4rem 1rem;font-size:.82rem;font-weight:800;color:var(--ec-text);cursor:pointer;transition:.15s; }
-.fee-collect-page .chip:hover{ border-color:#ffc98a; }
-.fee-collect-page .chip.active{ background:var(--ec-primary);border-color:var(--ec-primary);color:#fff;box-shadow:0 5px 12px rgba(255,138,0,.25); }
-.fee-collect-page .period-clear{ margin-left:auto;border:0;background:none;color:var(--ec-text-muted);font-weight:800;font-size:.78rem;cursor:pointer;text-decoration:underline; }
-
-.fee-collect-page .grp{ font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;font-weight:900;color:var(--ec-text-light);margin:.9rem 0 .45rem;display:flex;align-items:center;gap:.4rem; }
-.fee-collect-page .due{ border:1px solid var(--ec-border);border-radius:12px;padding:.6rem .8rem;margin-bottom:.45rem;background:#fff;cursor:pointer;transition:.12s; }
-.fee-collect-page .due:hover{ border-color:#ffc98a; }
-.fee-collect-page .due.sel{ border-color:var(--ec-primary);background:var(--ec-primary-soft); }
-.fee-collect-page .due-main{ display:flex;align-items:center;gap:.75rem;margin:0; }
-.fee-collect-page .due .form-check-input{ margin:0;flex:none;width:1.15rem;height:1.15rem; }
-.fee-collect-page .due .form-check-input:checked{ background-color:var(--ec-primary);border-color:var(--ec-primary); }
-.fee-collect-page .due-info{ flex:1;min-width:0; }
-.fee-collect-page .due-label{ font-weight:750;color:var(--ec-text-dark);font-size:.87rem; }
-.fee-collect-page .due-meta{ font-size:.72rem;color:var(--ec-text-muted);font-weight:650; }
-.fee-collect-page .due-amt{ font-weight:800;color:var(--ec-text-dark);white-space:nowrap;font-size:.88rem; }
-.fee-collect-page .overdue{ color:var(--ec-dng);font-weight:800; }
-.fee-collect-page .deposit-tag{ font-size:.62rem;font-weight:800;color:var(--ec-suc);background:var(--ec-suc-soft);padding:1px 7px;border-radius:6px;margin-left:.4rem; }
-
-/* read-only line items (extras added via modal) */
-.fee-collect-page .li{ display:flex;align-items:center;gap:.7rem;border:1px solid var(--ec-border);border-radius:11px;padding:.55rem .8rem;margin-bottom:.45rem;background:#fff; }
-.fee-collect-page .li-info{ flex:1;min-width:0; }
-.fee-collect-page .li-label{ font-weight:750;color:var(--ec-text-dark);font-size:.86rem; }
-.fee-collect-page .li-sub{ font-size:.7rem;color:var(--ec-text-muted);font-weight:650; }
-.fee-collect-page .li-amt{ font-weight:800;white-space:nowrap;font-size:.88rem; }
-.fee-collect-page .li-rm{ border:0;background:none;color:var(--ec-text-muted);cursor:pointer;font-size:1.15rem;line-height:1; }
-.fee-collect-page .li-rm:hover{ color:var(--ec-dng); }
-.fee-collect-page .empty-line{ font-size:.78rem;color:var(--ec-text-light);font-weight:650;padding:.2rem 0 .4rem; }
-
-/* settlement */
-.fee-collect-page .settle{ position:sticky;top:16px; }
-.fee-collect-page .settle .ec-card-body{ padding:1.15rem 1.25rem; }
-.fee-collect-page .s-scope-lbl{ font-size:.7rem;color:var(--ec-text-light);font-weight:800;text-transform:uppercase;letter-spacing:.04em; }
-.fee-collect-page .s-scope{ font-weight:800;color:var(--ec-text-dark);font-size:.92rem;margin-bottom:.9rem; }
-.fee-collect-page .s-line{ display:flex;justify-content:space-between;align-items:center;padding:.42rem 0;font-size:.88rem;font-weight:700; }
-.fee-collect-page .s-line.muted{ color:var(--ec-text-muted); } .fee-collect-page .s-line .v{ font-variant-numeric:tabular-nums; }
-.fee-collect-page .s-line.suc .v{ color:var(--ec-suc); }
-.fee-collect-page .s-pay{ display:flex;justify-content:space-between;align-items:center;background:var(--ec-primary-light);border-radius:13px;padding:.8rem 1rem;margin:.55rem 0 .9rem; }
-.fee-collect-page .s-pay .k{ font-size:.7rem;font-weight:900;text-transform:uppercase;color:var(--ec-primary);letter-spacing:.05em; }
-.fee-collect-page .s-pay .v{ font-size:1.75rem;font-weight:950;color:var(--ec-primary);letter-spacing:-.03em;font-variant-numeric:tabular-nums; }
-
-.fee-collect-page .tender-head{ display:flex;justify-content:space-between;align-items:center;font-size:.68rem;font-weight:900;text-transform:uppercase;color:var(--ec-text-light);margin:.2rem 0 .5rem; }
-.fee-collect-page .tender-row{ display:flex;gap:.45rem;align-items:center;margin-bottom:.45rem; }
-.fee-collect-page .tender-row select{ width:42%; } .fee-collect-page .tender-row .t-amt{ flex:1; }
-.fee-collect-page .add-tender{ font-size:.76rem;font-weight:800;color:var(--ec-primary);background:none;border:0;cursor:pointer;padding:.1rem 0; }
-
-.fee-collect-page .s-foot{ border-top:1px dashed var(--ec-border);margin-top:.6rem;padding-top:.6rem; }
-.fee-collect-page .s-foot .row1{ display:flex;justify-content:space-between;font-size:.84rem;font-weight:800;padding:.12rem 0; }
-.fee-collect-page .s-adv{ font-size:.74rem;font-weight:800;color:var(--ec-suc);margin-top:.25rem;display:none; }
-.fee-collect-page .collect-cta{ width:100%;padding:.8rem;font-size:1rem;font-weight:800;border-radius:12px;margin-top:.7rem; }
-
-/* discount cell */
-.fee-collect-page .add-link{ border:1px dashed #ffc98a;background:var(--ec-primary-soft);color:var(--ec-primary);border-radius:8px;padding:.15rem .6rem;font-size:.76rem;font-weight:800;cursor:pointer; }
-.fee-collect-page .add-link:hover{ background:var(--ec-primary-light); }
-.fee-collect-page .disc-set{ display:inline-flex;align-items:center;gap:.5rem; }
-.fee-collect-page .disc-set .e{ color:var(--ec-text-muted);cursor:pointer;font-size:.95rem; } .fee-collect-page .disc-set .e:hover{ color:var(--ec-primary); }
-.fee-collect-page .disc-set .x{ color:var(--ec-text-muted);cursor:pointer;font-size:1rem; } .fee-collect-page .disc-set .x:hover{ color:var(--ec-dng); }
-
-/* history */
-.fee-collect-page .hist-row{ display:flex;align-items:center;gap:.85rem;border:1px solid var(--ec-border);border-radius:14px;padding:.75rem .9rem;margin-bottom:.55rem;background:#fff; }
-.fee-collect-page .hist-info{ flex:1;min-width:0; }
-.fee-collect-page .hist-rcp{ font-weight:850;color:var(--ec-text-dark);font-size:.9rem; }
-.fee-collect-page .hist-meta{ font-size:.76rem;color:var(--ec-text-muted);font-weight:650; }
-.fee-collect-page .hist-amt{ font-weight:900;color:var(--ec-text-dark);white-space:nowrap; }
-.fee-collect-page .hist-row.cancelled{ background:#fcfbfa;opacity:.75; }
-.fee-collect-page .strike{ text-decoration:line-through;color:var(--ec-text-muted)!important; }
-
-.fee-collect-page .empty-pane{ min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--ec-text-muted);padding:2rem 1.5rem; }
-.fee-collect-page .empty-pane i{ font-size:3rem;color:var(--ec-primary);margin-bottom:.6rem; }
-.fee-collect-page .empty-pane h6{ color:var(--ec-text-dark);font-weight:900;margin-bottom:.25rem; }
-
-/* modals (segmented toggle) */
-.fc-seg-toggle{ display:flex;gap:.5rem; }
-.fc-seg{ flex:1;border:1.5px solid var(--ec-border);background:#fff;border-radius:10px;padding:.55rem;font-weight:800;cursor:pointer;font-size:.85rem;color:#2b2c40; }
-.fc-seg.active{ background:#fff4e6;border-color:#ffc98a;color:#ff8a00; }
-
-@@media (max-width:991.98px){ .fee-collect-page .settle{ position:static; } }
-</style>
+    <link rel="stylesheet" href="~/css/ERP/Fee/ManageFee.css" asp-append-version="true" />
 }
 
 <div class="ec-page-shell fee-collect-page">
