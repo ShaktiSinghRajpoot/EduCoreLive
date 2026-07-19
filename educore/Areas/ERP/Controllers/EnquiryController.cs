@@ -260,13 +260,17 @@ namespace educore.Areas.ERP.Controllers
                 return RedirectToAction(nameof(EnquiryCRM));
             }
 
+            bool isNewEnquiry = model.EnquiryId <= 0;
             var result = await _enquiryService.SaveEnquiryAsync(model, tenantId, schoolId, actionUserId);
 
             TempData["Result"] = result > 0 ? "1" : "0";
             TempData["Message"] = result > 0
-                ? (model.EnquiryId > 0 ? "Enquiry updated successfully." : "New enquiry added successfully.")
+                ? (isNewEnquiry ? "New enquiry added successfully." : "Enquiry updated successfully.")
                 : "Unable to save enquiry. Please try again.";
 
+            // Adding an enquiry is lead capture only — registration is a deliberate,
+            // separate step (per-card Register action, or the Register Walk-in form on
+            // the Registrations page). We do NOT auto-open registration here.
             return RedirectToAction(nameof(EnquiryCRM));
         }
 
@@ -359,31 +363,112 @@ namespace educore.Areas.ERP.Controllers
             if (!workflow.EnableRegistration)
                 return Json(new { success = false, message = "Registration is not enabled for this school." });
 
+            var (ok, message, regNo, receiptNo) = await RegisterCoreAsync(
+                req.EnquiryId, req.RegistrationNumber, req.RegistrationDate,
+                req.RegistrationFeePaid, req.PaymentMode, req.PaymentReference,
+                req.DiscountType, req.DiscountValue, req.DiscountReason,
+                workflow, tenantId, schoolId, actionUserId);
+
+            return Json(new { success = ok, message, registrationNumber = regNo, receiptNo });
+        }
+
+        // ── POST: /ERP/Enquiry/RegisterWalkin (AJAX) ───────────
+        // A parent who comes ONLY to register (admission is a separate, later visit):
+        // create the intake (enquiry) record AND register it in one submit. The
+        // enquiry is invisible plumbing so the user never does a separate enquiry step.
+        [HttpPost]
+        [HasPermission("registration.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RegisterWalkin([FromBody] RegisterWalkinRequest req)
+        {
+            int tenantId = TenantId(), schoolId = SchoolId(), actionUserId = UserId();
+
+            if (req == null)
+                return Json(new { success = false, message = "Invalid request." });
+
+            var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, actionUserId);
+            if (!workflow.EnableRegistration)
+                return Json(new { success = false, message = "Registration is not enabled for this school." });
+
+            // Primary mobile falls back to father's mobile (mirrors SaveEnquiry).
+            var mobile = NullIfEmpty(req.Mobile) ?? NullIfEmpty(req.FatherMobile);
+            if (string.IsNullOrWhiteSpace(req.StudentName) || string.IsNullOrWhiteSpace(mobile) ||
+                string.IsNullOrWhiteSpace(req.ClassName) || string.IsNullOrWhiteSpace(req.Session))
+                return Json(new { success = false, message = "Student name, mobile, class and session are required." });
+
+            // 1) Create the intake record behind the scenes.
+            var enquiry = new EnquiryModel
+            {
+                StudentName  = req.StudentName!.Trim(),
+                Gender       = NullIfEmpty(req.Gender),
+                ClassName    = req.ClassName!,
+                Session      = req.Session!,
+                FatherName   = NullIfEmpty(req.FatherName),
+                FatherMobile = NullIfEmpty(req.FatherMobile),
+                MotherName   = NullIfEmpty(req.MotherName),
+                Mobile       = mobile!,
+                ParentEmail  = NullIfEmpty(req.ParentEmail),
+                LeadSource   = "Walk-in",
+                Status       = "New"
+            };
+            var newId = await _enquiryService.SaveEnquiryAsync(enquiry, tenantId, schoolId, actionUserId);
+            if (newId <= 0)
+                return Json(new { success = false, message = "Could not create the registration record." });
+
+            // 2) Register it in the same step (admission stays a later action).
+            var (ok, message, regNo, receiptNo) = await RegisterCoreAsync(
+                newId, req.RegistrationNumber, req.RegistrationDate,
+                req.RegistrationFeePaid, req.PaymentMode, req.PaymentReference,
+                req.DiscountType, req.DiscountValue, req.DiscountReason,
+                workflow, tenantId, schoolId, actionUserId);
+
+            return Json(new
+            {
+                success = ok,
+                message = ok ? "Walk-in registered successfully." : message,
+                registrationNumber = regNo,
+                receiptNo,
+                enquiryId = newId
+            });
+        }
+
+        // Shared registration core: issue the number + (optionally) record the fee
+        // receipt. Used by the per-enquiry Register action AND the walk-in 1-step form.
+        private async Task<(bool ok, string message, string? regNo, string? receiptNo)> RegisterCoreAsync(
+            int enquiryId, string? registrationNumber, string? registrationDate,
+            bool registrationFeePaid, string? paymentMode, string? paymentReference,
+            string? discountType, decimal discountValue, string? discountReason,
+            AdmissionWorkflowModel workflow, int tenantId, int schoolId, int actionUserId)
+        {
             // Manual number is required only when auto-generate is off.
-            if (!workflow.AutoGenerateRegistrationNumber && string.IsNullOrWhiteSpace(req.RegistrationNumber))
-                return Json(new { success = false, message = "Please enter a registration number." });
+            if (!workflow.AutoGenerateRegistrationNumber && string.IsNullOrWhiteSpace(registrationNumber))
+                return (false, "Please enter a registration number.", null, null);
+
+            // A discount needs a reason (audit) — checked before any mutation.
+            if (registrationFeePaid && discountValue > 0 && string.IsNullOrWhiteSpace(discountReason))
+                return (false, "Please provide a reason for the registration discount.", null, null);
 
             DateOnly? regDate = null;
-            if (!string.IsNullOrWhiteSpace(req.RegistrationDate) &&
-                DateOnly.TryParse(req.RegistrationDate, out var parsed))
+            if (!string.IsNullOrWhiteSpace(registrationDate) &&
+                DateOnly.TryParse(registrationDate, out var parsed))
                 regDate = parsed;
 
             var (success, message, regNo) = await _enquiryService.RegisterEnquiryAsync(
-                req.EnquiryId,
-                NullIfEmpty(req.RegistrationNumber),
+                enquiryId,
+                NullIfEmpty(registrationNumber),
                 regDate,
-                req.RegistrationFeePaid,
+                registrationFeePaid,
                 workflow.AutoGenerateRegistrationNumber,
                 workflow.RegistrationNumberPrefix,
                 tenantId, schoolId, actionUserId);
 
-            // When the registration fee was collected, record a real payment + receipt
-            // against the enquiry. The amount is master data — the sum of Registration-
-            // point Fee Heads for the enquiry's class — never trusted from the client.
+            // When the registration fee was collected, record a real payment + receipt.
+            // The amount is master data — the sum of Registration-point Fee Heads for the
+            // enquiry's class — never trusted from the client.
             string? receiptNo = null;
-            if (success > 0 && req.RegistrationFeePaid && workflow.EnableRegistration && workflow.EnableRegistrationFee)
+            if (success > 0 && registrationFeePaid && workflow.EnableRegistration && workflow.EnableRegistrationFee)
             {
-                var enquiry = await _enquiryService.GetEnquiryByIdAsync(req.EnquiryId, tenantId, schoolId, actionUserId);
+                var enquiry = await _enquiryService.GetEnquiryByIdAsync(enquiryId, tenantId, schoolId, actionUserId);
                 if (enquiry != null)
                 {
                     decimal regFee = await _schoolSettingsService.GetCollectionPointTotalAsync(
@@ -392,20 +477,39 @@ namespace educore.Areas.ERP.Controllers
 
                     if (regFee > 0)
                     {
+                        // Discount amount is computed HERE from the chosen type + value —
+                        // the client only picks type/value/reason, never the amount. Capped
+                        // at the fee (a 100% / over-value discount = full waiver, net 0).
+                        decimal discountAmount = 0m;
+                        string? discType = null;
+                        if (discountValue > 0 && !string.IsNullOrWhiteSpace(discountType))
+                        {
+                            discType = string.Equals(discountType, "Percentage", StringComparison.OrdinalIgnoreCase)
+                                ? "Percentage" : "Fixed";
+                            discountAmount = discType == "Percentage"
+                                ? Math.Round(regFee * discountValue / 100m, 2)
+                                : discountValue;
+                            if (discountAmount > regFee) discountAmount = regFee;
+                            if (discountAmount < 0) discountAmount = 0m;
+                        }
+
+                        decimal net = regFee - discountAmount;
+
                         var (paid, _, rcp) = await _feePaymentService.RecordRegistrationPaymentAsync(
-                            req.EnquiryId, regFee,
-                            NullIfEmpty(req.PaymentMode) ?? "Cash",
-                            NullIfEmpty(req.PaymentReference),
+                            enquiryId, net,
+                            NullIfEmpty(paymentMode) ?? "Cash",
+                            NullIfEmpty(paymentReference),
                             "Registration fee",
                             enquiry.Session,
-                            tenantId, schoolId, actionUserId);
+                            tenantId, schoolId, actionUserId,
+                            discountAmount, discType, NullIfEmpty(discountReason));
 
                         if (paid) receiptNo = rcp;
                     }
                 }
             }
 
-            return Json(new { success = success > 0, message, registrationNumber = regNo, receiptNo });
+            return (success > 0, message, regNo, receiptNo);
         }
 
         // ── GET: /ERP/Enquiry/GetRegistrationFee (AJAX) ────────

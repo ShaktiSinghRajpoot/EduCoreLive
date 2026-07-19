@@ -787,6 +787,25 @@
                         </div>
                         <!-- Payment details — shown only when fee is collected; issues a receipt -->
                         <div class="row g-2 mt-1 d-none" id="regPaymentRow">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Discount</label>
+                                <select class="form-select" id="regDiscountType">
+                                    <option value="">No discount</option>
+                                    <option value="Percentage">% Percentage</option>
+                                    <option value="Fixed">₹ Fixed amount</option>
+                                </select>
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="form-label">Value</label>
+                                <input type="number" min="0" step="0.01" class="form-control" id="regDiscountValue" placeholder="0" />
+                            </div>
+                            <div class="col-6 col-md-4">
+                                <label class="form-label">Reason</label>
+                                <input type="text" class="form-control" id="regDiscountReason" maxlength="200" placeholder="Required if discount" />
+                            </div>
+                            <div class="col-12">
+                                <div class="alert alert-light border mb-0 py-2" id="regNetLine" style="font-size:.83rem">Fee ₹0</div>
+                            </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Payment Mode</label>
                                 <select class="form-select" id="regPaymentMode">
@@ -1466,13 +1485,15 @@ $(document).ready(function () {
     });
 
     /* ── Register Enquiry ───────────────────────────────── */
-    $(document).on('click', '.btn-register-enquiry', function () {
-        var $btn = $(this);
-        $('#regEnquiryId').val($btn.data('id'));
-        $('#regStudentName').text($btn.data('name'));
-        $('#regParentName').text($btn.data('parent') || '—');
-        $('#regClassName').text($btn.data('class')   || '—');
-        $('#regSession').text($btn.data('session')   || '—');
+    // Populate + open the Register modal. Shared by the per-card Register button
+    // and the guided quick-path (add enquiry → register → admit). `d` = {id, name,
+    // parent, className, session}.
+    function openRegisterModal(d) {
+        $('#regEnquiryId').val(d.id);
+        $('#regStudentName').text(d.name || '—');
+        $('#regParentName').text(d.parent || '—');
+        $('#regClassName').text(d.className || '—');
+        $('#regSession').text(d.session || '—');
 
         // Registration number: auto-generated on save, or manual entry.
         var $num = $('#regNumber');
@@ -1495,22 +1516,51 @@ $(document).ready(function () {
             $('#regFeePaid').prop('checked', false);
             $('#regPaymentReference').val('');
             $('#regPaymentMode').val('Cash');
+            $('#regDiscountType').val(''); $('#regDiscountValue').val(''); $('#regDiscountReason').val('');
             $('#regFeeAmountLabel').text('Loading…');
-            REG_FEE_AMOUNT = 0;
+            REG_FEE_AMOUNT = 0; regUpdateNet();
             $.getJSON('/ERP/Enquiry/GetRegistrationFee',
-                      { className: $btn.data('class') || '', academicYear: $btn.data('session') || '' })
+                      { className: d.className || '', academicYear: d.session || '' })
                 .done(function (res) {
                     REG_FEE_AMOUNT = (res && res.amount) ? Number(res.amount) : 0;
                     $('#regFeeAmountLabel').text('₹' + REG_FEE_AMOUNT.toLocaleString('en-IN') +
                         (REG_FEE_AMOUNT === 0 ? ' — configure a Registration-point Fee Head' : ''));
+                    regUpdateNet();
                 })
-                .fail(function () { $('#regFeeAmountLabel').text('₹0'); });
+                .fail(function () { $('#regFeeAmountLabel').text('₹0'); REG_FEE_AMOUNT = 0; regUpdateNet(); });
         } else {
             $('#regFeeRow').addClass('d-none');
         }
 
         new bootstrap.Modal(document.getElementById('registerEnquiryModal')).show();
+    }
+
+    $(document).on('click', '.btn-register-enquiry', function () {
+        var $btn = $(this);
+        openRegisterModal({
+            id:        $btn.data('id'),
+            name:      $btn.data('name'),
+            parent:    $btn.data('parent'),
+            className: $btn.data('class'),
+            session:   $btn.data('session')
+        });
     });
+
+    // Live "Fee − Discount = Collect" preview (server recomputes the amount).
+    function regUpdateNet() {
+        var fee = REG_FEE_AMOUNT || 0;
+        var type = $('#regDiscountType').val();
+        var val  = parseFloat($('#regDiscountValue').val()) || 0;
+        var disc = 0;
+        if (type && val > 0) { disc = (type === 'Percentage') ? (fee * val / 100) : val; if (disc > fee) disc = fee; }
+        disc = Math.round(disc * 100) / 100;
+        var net = fee - disc;
+        $('#regNetLine').html('Fee ₹' + fee.toLocaleString('en-IN') +
+            (disc > 0 ? ' − Discount ₹' + disc.toLocaleString('en-IN') : '') +
+            ' = <strong>Collect ₹' + net.toLocaleString('en-IN') + '</strong>');
+    }
+    $('#regDiscountType, #regDiscountValue').on('input change', regUpdateNet);
+
 
     // Payment details appear only when the registration fee is marked collected.
     $(document).on('change', '#regFeePaid', function () {
@@ -1541,7 +1591,10 @@ $(document).ready(function () {
                 registrationDate:    $('#regDate').val(),
                 registrationFeePaid: REG_FEE_ENABLED && $('#regFeePaid').is(':checked'),
                 paymentMode:         $('#regPaymentMode').val(),
-                paymentReference:    $.trim($('#regPaymentReference').val())
+                paymentReference:    $.trim($('#regPaymentReference').val()),
+                discountType:        $('#regDiscountType').val(),
+                discountValue:       parseFloat($('#regDiscountValue').val()) || 0,
+                discountReason:      $.trim($('#regDiscountReason').val())
             })
         })
         .done(function (res) {

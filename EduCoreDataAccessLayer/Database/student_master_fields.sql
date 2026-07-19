@@ -29,13 +29,23 @@ ALTER TABLE core.students
     ADD COLUMN IF NOT EXISTS documents            jsonb;         -- [{name,status}]
 
 -- ── 2. Replace the admission proc with the extended signature ──
---  Drop the old signature first (CREATE OR REPLACE cannot widen
---  the parameter list in place).
-DROP PROCEDURE IF EXISTS core.sp_admission_manage(
-    text, integer, integer, integer, integer, text, text, text, text, date,
-    text, text, text, date, text, text, text, text, text,
-    numeric, numeric, numeric, numeric, text, numeric, numeric, text, numeric,
-    jsonb, integer, integer, integer, text, text, text, text, text, text, refcursor);
+--  Widening the parameter list is a NEW signature, so CREATE OR REPLACE alone
+--  would leave the OLD overload behind and calls fail with "procedure is not
+--  unique". A hard-coded DROP-by-signature goes stale every time a param is
+--  added (that is exactly what bit us), so instead drop ANY overload that
+--  predates the current parameter set — identified by the absence of
+--  p_apaar_id. After the CREATE below there is always exactly one.
+DO $$
+DECLARE r record;
+BEGIN
+    FOR r IN
+        SELECT oid FROM pg_proc
+        WHERE proname = 'sp_admission_manage'
+          AND pg_get_function_identity_arguments(oid) NOT ILIKE '%p_apaar_id%'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.oid::regprocedure;
+    END LOOP;
+END $$;
 
 CREATE OR REPLACE PROCEDURE core.sp_admission_manage(
     IN p_operation text,
@@ -64,6 +74,8 @@ CREATE OR REPLACE PROCEDURE core.sp_admission_manage(
     IN p_nationality text DEFAULT NULL::text,
     IN p_mother_tongue text DEFAULT NULL::text,
     IN p_id_proof_no text DEFAULT NULL::text,
+    IN p_apaar_id text DEFAULT NULL::text,
+    IN p_udise_student_id text DEFAULT NULL::text,
     IN p_prev_school_name text DEFAULT NULL::text,
     IN p_prev_board text DEFAULT NULL::text,
     IN p_prev_class text DEFAULT NULL::text,
@@ -178,6 +190,7 @@ BEGIN
             class_name, section, academic_year, admission_date,
             guardian_name, mother_name, mobile, alt_mobile, address,
             blood_group, religion, category, nationality, mother_tongue, id_proof_no,
+            apaar_id, udise_student_id,
             prev_school_name, prev_board, prev_class, prev_tc_no,
             father_occupation, father_qualification, father_email,
             mother_occupation, mother_qualification, mother_email,
@@ -192,6 +205,7 @@ BEGIN
             p_class_name, p_section, v_year, v_adm_date,
             p_guardian_name, p_mother_name, p_mobile, p_alt_mobile, p_address,
             p_blood_group, p_religion, p_category, p_nationality, p_mother_tongue, p_id_proof_no,
+            p_apaar_id, p_udise_student_id,
             p_prev_school_name, p_prev_board, p_prev_class, p_prev_tc_no,
             p_father_occupation, p_father_qualification, p_father_email,
             p_mother_occupation, p_mother_qualification, p_mother_email,

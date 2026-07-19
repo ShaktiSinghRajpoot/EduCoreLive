@@ -109,12 +109,20 @@
                     When on, a registration fee can be configured and collected at the registration step.
                   </div>
                   <div class="aw-row-extra" id="feeWrap">
-                    <div class="aw-row-desc">
-                      <i class="bx bx-info-circle"></i>
-                      Set the amount in
-                      <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeHead" target="_blank">
-                        School Settings → Fee Head</a>
-                      as a head with <strong>Collection Point = Registration</strong>.
+                    <div class="aw-setup d-flex gap-2 align-items-end flex-wrap">
+                      <div style="flex:1 1 150px">
+                        <label class="form-label mb-1" style="font-size:.72rem">Fee name</label>
+                        <input type="text" class="form-control form-control-sm" id="regFeeName" value="Registration Fee" maxlength="80" />
+                      </div>
+                      <div style="width:130px">
+                        <label class="form-label mb-1" style="font-size:.72rem">Amount ₹</label>
+                        <input type="number" class="form-control form-control-sm" id="regFeeAmount" min="0" step="0.01" placeholder="0" />
+                      </div>
+                      <button type="button" class="btn btn-sm btn-primary" id="regFeeSave"><i class="bx bx-save"></i> Save</button>
+                      <button type="button" class="btn btn-sm btn-outline-danger d-none" id="regFeeRemove" title="Remove"><i class="bx bx-trash"></i></button>
+                    </div>
+                    <div class="aw-row-desc mt-1" style="font-size:.72rem">
+                      <i class="bx bx-info-circle"></i> <span id="regFeeHint">Saved as a fee head automatically.</span>
                     </div>
                   </div>
                 </div>
@@ -160,12 +168,20 @@
                   When on, a one-time security deposit is added to the admission's due-now charges and flows into the student's fee ledger.
                 </div>
                 <div class="aw-row-extra" id="secWrap">
-                  <div class="aw-row-desc">
-                    <i class="bx bx-info-circle"></i>
-                    Set the amount in
-                    <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeHead" target="_blank">
-                      School Settings → Fee Head</a>
-                    as a <strong>Refundable</strong> head with <strong>Collection Point = Admission</strong>.
+                  <div class="aw-setup d-flex gap-2 align-items-end flex-wrap">
+                    <div style="flex:1 1 150px">
+                      <label class="form-label mb-1" style="font-size:.72rem">Deposit name</label>
+                      <input type="text" class="form-control form-control-sm" id="secFeeName" value="Security Deposit" maxlength="80" />
+                    </div>
+                    <div style="width:130px">
+                      <label class="form-label mb-1" style="font-size:.72rem">Amount ₹</label>
+                      <input type="number" class="form-control form-control-sm" id="secFeeAmount" min="0" step="0.01" placeholder="0" />
+                    </div>
+                    <button type="button" class="btn btn-sm btn-primary" id="secFeeSave"><i class="bx bx-save"></i> Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-danger d-none" id="secFeeRemove" title="Remove"><i class="bx bx-trash"></i></button>
+                  </div>
+                  <div class="aw-row-desc mt-1" style="font-size:.72rem">
+                    <i class="bx bx-info-circle"></i> <span id="secFeeHint">Saved as a refundable fee head automatically.</span>
                   </div>
                 </div>
               </div>
@@ -263,6 +279,65 @@ $(function () {
     }
 
     $enable.add($required).add($autoNum).add($fee).add($secFee).on('change', syncDependents);
+
+    /* ── Inline fee setup: Registration fee + Security deposit ──
+       Amounts are saved as normal Fee Heads (correct Collection Point / refundable
+       flag preset by the server) — the school never opens the Fee Head master. */
+    var awCsrf  = $('input[name="__RequestVerificationToken"]').val() || '';
+    var REG_FEE = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((object?)ViewBag.RegistrationFee));
+    var SEC_FEE = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((object?)ViewBag.SecurityFee));
+
+    function fillFee(fee, nameSel, amtSel, removeSel, hintSel, defName) {
+        if (fee) {
+            $(nameSel).val(fee.name);
+            $(amtSel).val(fee.amount);
+            $(removeSel).removeClass('d-none').data('id', fee.id);
+            $(hintSel).text('Current: ₹' + (Number(fee.amount)||0).toLocaleString('en-IN') + ' — editing updates it.');
+        } else {
+            $(nameSel).val(defName);
+            $(amtSel).val('');
+            $(removeSel).addClass('d-none').data('id', 0);
+            $(hintSel).text('No amount set yet.');
+        }
+    }
+    function renderFees() {
+        fillFee(REG_FEE, '#regFeeName', '#regFeeAmount', '#regFeeRemove', '#regFeeHint', 'Registration Fee');
+        fillFee(SEC_FEE, '#secFeeName', '#secFeeAmount', '#secFeeRemove', '#secFeeHint', 'Security Deposit');
+    }
+
+    // Server keeps exactly ONE head per kind (reuses the existing one) — client just
+    // sends the amount; no "add another".
+    function saveFee(kind, name, amount, $btn) {
+        if (!(amount > 0)) { toastr.error('Enter an amount greater than 0.'); return; }
+        $btn.prop('disabled', true);
+        $.ajax({ url: '/ERP/AdmissionWorkflow/SaveSetupFee', type: 'POST', contentType: 'application/json',
+            headers: { 'RequestVerificationToken': awCsrf },
+            data: JSON.stringify({ kind: kind, feeHeadId: 0, name: name, amount: amount }) })
+        .done(function (res) {
+            if (res && res.success) { REG_FEE = res.registration; SEC_FEE = res.security; renderFees(); toastr.success('Saved.'); }
+            else { toastr.error((res && res.message) || 'Unable to save.'); }
+        })
+        .fail(function () { toastr.error('Something went wrong.'); })
+        .always(function () { $btn.prop('disabled', false); });
+    }
+
+    $('#regFeeSave').on('click', function () { saveFee('Registration', $.trim($('#regFeeName').val()), parseFloat($('#regFeeAmount').val()) || 0, $(this)); });
+    $('#secFeeSave').on('click', function () { saveFee('Security',     $.trim($('#secFeeName').val()), parseFloat($('#secFeeAmount').val()) || 0, $(this)); });
+
+    $('#regFeeRemove, #secFeeRemove').on('click', function () {
+        var id = $(this).data('id');
+        if (!id || !confirm('Remove this amount?')) return;
+        $.ajax({ url: '/ERP/AdmissionWorkflow/DeleteSetupFee', type: 'POST', contentType: 'application/json',
+            headers: { 'RequestVerificationToken': awCsrf },
+            data: JSON.stringify({ id: id }) })
+        .done(function (res) {
+            if (res && res.success) { REG_FEE = res.registration; SEC_FEE = res.security; renderFees(); toastr.success('Removed.'); }
+            else { toastr.error((res && res.message) || 'Unable to remove.'); }
+        })
+        .fail(function () { toastr.error('Something went wrong.'); });
+    });
+
+    renderFees();
 
     syncDependents();
 });

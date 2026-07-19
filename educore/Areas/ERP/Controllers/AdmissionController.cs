@@ -50,12 +50,23 @@ namespace educore.Areas.ERP.Controllers
 
         // Registration gate: when the school requires registration before admission,
         // an enquiry must be "Registration Done" before it can be converted.
-        private async Task<bool> RegistrationSatisfiedAsync(EnquiryModel enquiry, int tenantId, int schoolId, int userId)
+        // True when the workflow makes registration MANDATORY before any admission.
+        private async Task<bool> RegistrationRequiredAsync(int tenantId, int schoolId, int userId)
         {
             var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
-            if (!workflow.EnableRegistration || !workflow.RegistrationRequiredBeforeAdmission)
+            return workflow.EnableRegistration && workflow.RegistrationRequiredBeforeAdmission;
+        }
+
+        // True when this admission satisfies the registration policy. When
+        // registration is mandatory EVERY student must be registered first, so a
+        // direct/walk-in admission (no enquiry) never satisfies it — only an
+        // enquiry that has completed registration does.
+        private async Task<bool> RegistrationSatisfiedAsync(EnquiryModel? enquiry, int tenantId, int schoolId, int userId)
+        {
+            if (!await RegistrationRequiredAsync(tenantId, schoolId, userId))
                 return true;
-            return string.Equals(enquiry.Status, "Registration Done", StringComparison.OrdinalIgnoreCase);
+            return enquiry != null
+                && string.Equals(enquiry.Status, "Registration Done", StringComparison.OrdinalIgnoreCase);
         }
 
         // ── Pages ────────────────────────────────────────────────
@@ -73,6 +84,16 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> Create(int? enquiryId)
         {
+            // Direct / walk-in admission (no enquiry) is blocked when registration
+            // is mandatory — every student must be registered first. Send them to
+            // the Enquiry CRM where an enquiry is created and registered.
+            if (enquiryId is not > 0 && await RegistrationRequiredAsync(TenantId(), SchoolId(), UserId()))
+            {
+                TempData["Result"] = "0";
+                TempData["Message"] = "Registration is mandatory before admission. Create an enquiry and complete registration first.";
+                return RedirectToAction("EnquiryCRM", "Enquiry", new { area = "ERP" });
+            }
+
             await LoadDropdownsAsync();
             if (enquiryId is > 0)
             {
@@ -136,11 +157,14 @@ namespace educore.Areas.ERP.Controllers
                 return Json(new { success = false, message = string.Join(" ", errors) });
 
             // Registration gate — enforce on the actual mutation, not just the UI.
-            if (form.EnquiryId is > 0)
+            // Covers BOTH paths: an enquiry that hasn't completed registration, and
+            // a direct/walk-in admission (no enquiry) when registration is mandatory.
             {
-                var enquiry = await _enquiryService.GetEnquiryByIdAsync(form.EnquiryId.Value, tenantId, schoolId, userId);
-                if (enquiry != null && !await RegistrationSatisfiedAsync(enquiry, tenantId, schoolId, userId))
-                    return Json(new { success = false, message = "Complete registration before admitting this enquiry." });
+                var enquiry = form.EnquiryId is > 0
+                    ? await _enquiryService.GetEnquiryByIdAsync(form.EnquiryId.Value, tenantId, schoolId, userId)
+                    : null;
+                if (!await RegistrationSatisfiedAsync(enquiry, tenantId, schoolId, userId))
+                    return Json(new { success = false, message = "Registration is mandatory before admission. Please register the student first." });
             }
 
             var model = new AdmissionModel
@@ -420,10 +444,10 @@ namespace educore.Areas.ERP.Controllers
         // ── Dropdowns from Academic Setup (same source as Enquiry) ─
         private async Task LoadDropdownsAsync()
         {
-            try { ViewBag.Classes = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class"); }
+            try { ViewBag.Classes = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
             catch { ViewBag.Classes = new List<SelectListItem>(); }
 
-            try { ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear"); }
+            try { ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }
             catch { ViewBag.Sessions = new List<SelectListItem>(); }
             // Sections are class-dependent → loaded dynamically via GetSections.
 

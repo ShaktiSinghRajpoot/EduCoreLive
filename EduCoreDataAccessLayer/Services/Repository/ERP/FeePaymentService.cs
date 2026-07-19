@@ -43,12 +43,15 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         public async Task<(bool Success, string Message, string? ReceiptNo)> RecordRegistrationPaymentAsync(
             int enquiryId, decimal amount, string paymentMode, string? referenceNo,
-            string? remarks, string? finYear, int tenantId, int schoolId, int actionUserId)
+            string? remarks, string? finYear, int tenantId, int schoolId, int actionUserId,
+            decimal discountAmount = 0, string? discountType = null, string? discountReason = null)
         {
             if (tenantId <= 1 || schoolId <= 0 || enquiryId <= 0)
                 return (false, "Invalid request.", null);
-            if (amount <= 0)
-                return (false, "Payment amount must be greater than zero.", null);
+            // `amount` is the NET collected; a 100% discount makes it 0, so only reject
+            // a negative net or a zero gross (net + discount).
+            if (amount < 0 || amount + discountAmount <= 0)
+                return (false, "Registration fee amount is invalid.", null);
 
             var parameters = new NpgsqlParameter[]
             {
@@ -61,7 +64,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_reference_no",   NpgsqlDbType.Text)    { Value = (object?)referenceNo ?? DBNull.Value },
                 new("p_remarks",        NpgsqlDbType.Text)    { Value = (object?)remarks ?? DBNull.Value },
                 new("p_payment_date",   NpgsqlDbType.Date)    { Value = DBNull.Value },
-                new("p_fin_year",       NpgsqlDbType.Text)    { Value = (object?)finYear ?? DBNull.Value },
+                new("p_fin_year",        NpgsqlDbType.Text)    { Value = (object?)finYear ?? DBNull.Value },
+                new("p_discount_amount", NpgsqlDbType.Numeric) { Value = discountAmount },
+                new("p_discount_type",   NpgsqlDbType.Text)    { Value = (object?)discountType ?? DBNull.Value },
+                new("p_discount_reason", NpgsqlDbType.Text)    { Value = (object?)discountReason ?? DBNull.Value },
                 new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
             };
 

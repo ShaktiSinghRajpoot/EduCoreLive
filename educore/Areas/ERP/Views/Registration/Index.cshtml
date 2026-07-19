@@ -23,7 +23,10 @@
             <p class="ec-page-subtitle mb-0">All registered students with their registration numbers &amp; details.</p>
           </div>
         </div>
-        <button type="button" class="btn btn-outline-secondary" id="btnExport"><i class="bx bx-export me-1"></i> Export</button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary" id="btnExport"><i class="bx bx-export me-1"></i> Export</button>
+          <button type="button" class="btn btn-primary" id="btnRegisterWalkin"><i class="bx bx-user-plus me-1"></i> Register Walk-in</button>
+        </div>
       </div>
     </div>
 
@@ -178,6 +181,141 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Keep</button>
         <button type="button" class="btn btn-danger btn-sm" id="confirmCancelReg"><i class="bx bx-x me-1"></i> Mark Withdrawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ REGISTER WALK-IN (1-step: create intake + register) ═══ -->
+<div class="modal fade" id="registerWalkinModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-0">Register Walk-in</h5>
+          <small class="text-muted">Register a student directly — admission can be done later.</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="fw-bold text-muted text-uppercase mb-2" style="font-size:.72rem;letter-spacing:.05em">Student</div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Student Name <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="rwName" maxlength="80" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Gender</label>
+            <select class="form-select" id="rwGender">
+              <option value="">Select</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Class <span class="text-danger">*</span></label>
+            <select class="form-select" id="rwClass">
+              <option value="">Select class</option>
+              @foreach (var c in Model.AvailableClasses) { <option value="@c.Text">@c.Text</option> }
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Session <span class="text-danger">*</span></label>
+            <select class="form-select" id="rwSession">
+              <option value="">Select session</option>
+              @foreach (var s in Model.AvailableSessions) { <option value="@s.Text">@s.Text</option> }
+            </select>
+          </div>
+        </div>
+
+        <div class="fw-bold text-muted text-uppercase mb-2" style="font-size:.72rem;letter-spacing:.05em">Parent / Guardian</div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Father Name</label>
+            <input type="text" class="form-control" id="rwFatherName" maxlength="80" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Mobile <span class="text-danger">*</span></label>
+            <input type="tel" class="form-control" id="rwMobile" maxlength="10" placeholder="10-digit mobile" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Mother Name</label>
+            <input type="text" class="form-control" id="rwMotherName" maxlength="80" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Parent Email</label>
+            <input type="email" class="form-control" id="rwEmail" maxlength="120" />
+          </div>
+        </div>
+
+        <div class="fw-bold text-muted text-uppercase mb-2" style="font-size:.72rem;letter-spacing:.05em">Registration</div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Registration Number</label>
+            <input type="text" class="form-control" id="rwRegNumber" maxlength="40" />
+            <small class="text-muted" id="rwRegNumberHint">Leave blank to auto-generate.</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Registration Date</label>
+            <input type="date" class="form-control" id="rwRegDate" />
+          </div>
+        </div>
+
+        @if (Model.RegistrationFeeEnabled)
+        {
+          <div class="border rounded-3 p-3 mt-3" style="background:#fafaf8">
+            <div class="d-flex justify-content-between align-items-center">
+              <div>
+                <div class="fw-bold" style="font-size:.88rem">Registration Fee</div>
+                <div class="text-muted" id="rwFeeAmountLabel" style="font-size:.8rem">Select class &amp; session</div>
+              </div>
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="rwFeePaid" />
+                <label class="form-check-label" for="rwFeePaid">Collected now</label>
+              </div>
+            </div>
+            <div class="row g-3 mt-1 d-none" id="rwPaymentRow">
+              <div class="col-md-4">
+                <label class="form-label">Discount</label>
+                <select class="form-select" id="rwDiscountType">
+                  <option value="">No discount</option>
+                  <option value="Percentage">% Percentage</option>
+                  <option value="Fixed">₹ Fixed amount</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Value</label>
+                <input type="number" min="0" step="0.01" class="form-control" id="rwDiscountValue" placeholder="0" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Reason</label>
+                <input type="text" class="form-control" id="rwDiscountReason" maxlength="200" placeholder="Required if discount given" />
+              </div>
+              <div class="col-12">
+                <div class="alert alert-light border mb-0 py-2" id="rwNetLine" style="font-size:.85rem">Select class &amp; session to see the fee.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Payment Mode</label>
+                <select class="form-select" id="rwPaymentMode">
+                  <option value="Cash">Cash</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Card">Card</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Reference</label>
+                <input type="text" class="form-control" id="rwPaymentReference" maxlength="60" placeholder="Txn / cheque no (optional)" />
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="rwSubmit"><i class="bx bx-check me-1"></i> Register</button>
       </div>
     </div>
   </div>
@@ -362,6 +500,101 @@ $(function () {
         }).join('\r\n');
         var a = $('<a>').attr({ href:'data:text/csv;charset=utf-8,'+encodeURIComponent(csv), download:'registrations_'+new Date().toISOString().slice(0,10)+'.csv' }).appendTo('body');
         a[0].click(); a.remove();
+    });
+
+    /* ── Register Walk-in: create intake + register in one step ── */
+    var RW_FEE_AMOUNT = 0;
+    function inr(n){ return '₹' + (Number(n)||0).toLocaleString('en-IN'); }
+    // Live "Fee − Discount = Collect" line (client preview only; server recomputes).
+    function rwUpdateNet() {
+        var fee = RW_FEE_AMOUNT || 0;
+        var type = $('#rwDiscountType').val();
+        var val  = parseFloat($('#rwDiscountValue').val()) || 0;
+        var disc = 0;
+        if (type && val > 0) { disc = (type === 'Percentage') ? (fee * val / 100) : val; if (disc > fee) disc = fee; }
+        disc = Math.round(disc * 100) / 100;
+        var net = fee - disc;
+        $('#rwNetLine').html('Fee ' + inr(fee) + (disc > 0 ? ' − Discount ' + inr(disc) : '') +
+            ' = <strong>Collect ' + inr(net) + '</strong>');
+    }
+    function rwLoadFee() {
+        if (!FEE_ENABLED) return;
+        var cls = $('#rwClass').val(), ses = $('#rwSession').val();
+        if (!cls || !ses) { $('#rwFeeAmountLabel').text('Select class & session'); RW_FEE_AMOUNT = 0; rwUpdateNet(); return; }
+        $('#rwFeeAmountLabel').text('Loading…');
+        $.getJSON('/ERP/Enquiry/GetRegistrationFee', { className: cls, academicYear: ses })
+            .done(function (res) {
+                RW_FEE_AMOUNT = (res && res.amount) ? Number(res.amount) : 0;
+                $('#rwFeeAmountLabel').text('₹' + RW_FEE_AMOUNT.toLocaleString('en-IN') +
+                    (RW_FEE_AMOUNT === 0 ? ' — configure a Registration-point Fee Head' : ''));
+                rwUpdateNet();
+            })
+            .fail(function () { $('#rwFeeAmountLabel').text('₹0'); RW_FEE_AMOUNT = 0; rwUpdateNet(); });
+    }
+    $('#rwDiscountType, #rwDiscountValue').on('input change', rwUpdateNet);
+
+    $('#btnRegisterWalkin').on('click', function () {
+        $('#rwName,#rwFatherName,#rwMotherName,#rwEmail,#rwMobile,#rwRegNumber,#rwPaymentReference').val('');
+        $('#rwGender,#rwClass,#rwSession').val('');
+        $('#rwPaymentMode').val('Cash');
+        $('#rwFeePaid').prop('checked', false);
+        $('#rwPaymentRow').addClass('d-none');
+        $('#rwDiscountType').val(''); $('#rwDiscountValue').val(''); $('#rwDiscountReason').val('');
+        $('#rwFeeAmountLabel').text('Select class & session');
+        RW_FEE_AMOUNT = 0; rwUpdateNet();
+        $('#rwRegDate').val(new Date().toISOString().slice(0, 10));
+        new bootstrap.Modal(document.getElementById('registerWalkinModal')).show();
+    });
+
+    $('#rwClass, #rwSession').on('change', rwLoadFee);
+    $('#rwFeePaid').on('change', function () { $('#rwPaymentRow').toggleClass('d-none', !$(this).is(':checked')); });
+
+    $('#rwSubmit').on('click', function () {
+        var name = $.trim($('#rwName').val());
+        var cls  = $('#rwClass').val(), ses = $('#rwSession').val();
+        var mob  = $.trim($('#rwMobile').val());
+        if (!name) { toastr.error('Student name is required.'); return; }
+        if (!cls)  { toastr.error('Please select a class.'); return; }
+        if (!ses)  { toastr.error('Please select a session.'); return; }
+        if (!/^\d{10}$/.test(mob)) { toastr.error('Enter a valid 10-digit mobile.'); return; }
+
+        var $b = $(this).prop('disabled', true).html('<i class="bx bx-loader-circle bx-spin me-1"></i> Registering…');
+        $.ajax({
+            url: '/ERP/Enquiry/RegisterWalkin', type: 'POST', contentType: 'application/json',
+            headers: { 'RequestVerificationToken': csrf },
+            data: JSON.stringify({
+                studentName:  name,
+                gender:       $('#rwGender').val(),
+                className:    cls,
+                session:      ses,
+                fatherName:   $.trim($('#rwFatherName').val()),
+                fatherMobile: mob,
+                mobile:       mob,
+                motherName:   $.trim($('#rwMotherName').val()),
+                parentEmail:  $.trim($('#rwEmail').val()),
+                registrationNumber:  $.trim($('#rwRegNumber').val()),
+                registrationDate:    $('#rwRegDate').val(),
+                registrationFeePaid: FEE_ENABLED && $('#rwFeePaid').is(':checked'),
+                paymentMode:         $('#rwPaymentMode').val(),
+                paymentReference:    $.trim($('#rwPaymentReference').val()),
+                discountType:        $('#rwDiscountType').val(),
+                discountValue:       parseFloat($('#rwDiscountValue').val()) || 0,
+                discountReason:      $.trim($('#rwDiscountReason').val())
+            })
+        })
+        .done(function (res) {
+            if (res && res.success) {
+                bootstrap.Modal.getInstance(document.getElementById('registerWalkinModal')).hide();
+                toastr.success((res.message || 'Walk-in registered.') +
+                               (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
+                if (res.receiptNo && window.EcReceipt) EcReceipt.show(res.receiptNo);
+                load();
+            } else {
+                toastr.error((res && res.message) || 'Unable to register.');
+            }
+        })
+        .fail(function () { toastr.error('Something went wrong.'); })
+        .always(function () { $b.prop('disabled', false).html('<i class="bx bx-check me-1"></i> Register'); });
     });
 
     load();

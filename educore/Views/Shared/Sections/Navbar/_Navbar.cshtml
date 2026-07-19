@@ -1,5 +1,8 @@
 @{
-  TempData.Keep();
+  // Keep ONLY long-lived display values — a blanket Keep() re-retained one-shot
+  // flash messages, making toasts repeat on every page.
+  TempData.Keep("appName");
+  TempData.Keep("description");
   @* ViewData["navbarDetached"] = (ViewData["navbarDetached"] ?? "navbar-detached"); *@
   ViewData["navbarDetached"] = (ViewData["navbarDetached"] ??= null);
   ViewData["containerNav"] = (ViewData["containerNav"] ??= "container-fluid");

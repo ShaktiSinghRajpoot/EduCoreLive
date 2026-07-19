@@ -50,10 +50,10 @@ namespace educore.Areas.ERP.Controllers
             };
 
             try {
-                model.AvailableSessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear");
+                model.AvailableSessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
             }
             catch { /* empty is acceptable */ }
-            try { model.AvailableClasses = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class"); }
+            try { model.AvailableClasses = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
             catch { /* empty is acceptable */ }
 
             return View(model);

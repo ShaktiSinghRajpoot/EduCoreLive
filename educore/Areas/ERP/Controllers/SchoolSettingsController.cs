@@ -288,7 +288,7 @@ namespace educore.Areas.ERP.Controllers
             int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value   ?? "0");
 
             // ── Academic years from DB (same source as AcademicSetup page) ──
-            var ayItems = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear");
+            var ayItems = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", tenantId.ToString(), schoolId.ToString());
             var academicYears = ayItems.Select(x => x.Text).ToList();
 
             // ── Classes from DB: configured via Academic Setup ───────────────

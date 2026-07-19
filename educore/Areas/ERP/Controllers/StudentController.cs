@@ -13,11 +13,16 @@ namespace educore.Areas.ERP.Controllers
     {
         private readonly IBaseService _baseService;
         private readonly IAdmissionService _admissionService;
+        private readonly IAdmissionWorkflowService _admissionWorkflowService;
 
-        public StudentController(IBaseService baseService, IAdmissionService admissionService)
+        public StudentController(
+            IBaseService baseService,
+            IAdmissionService admissionService,
+            IAdmissionWorkflowService admissionWorkflowService)
         {
             _baseService = baseService;
             _admissionService = admissionService;
+            _admissionWorkflowService = admissionWorkflowService;
         }
 
         public IActionResult StudentAttendance()
@@ -31,11 +36,17 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> StudentList(StudentListModel query)
         {
             // Filter dropdowns share the same source as Admission / Enquiry.
-            try { query.ClassList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class"); }
+            try { query.ClassList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
             catch { query.ClassList = new(); }
 
-            try { query.YearList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear"); }
+            try { query.YearList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }
             catch { query.YearList = new(); }
+
+            // When registration is mandatory before admission, direct admission is
+            // blocked — so hide the "New Admission" shortcut and steer users through
+            // the Enquiry → Registration flow instead.
+            var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
+            ViewBag.RegistrationRequired = workflow.EnableRegistration && workflow.RegistrationRequiredBeforeAdmission;
 
             await _admissionService.GetStudentListPageAsync(query, TenantId(), SchoolId(), UserId());
             return View(query);

@@ -38,7 +38,7 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> GetSessions()
         {
-            var items = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear");
+            var items = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
             return Json(items.Select(x => x.Text).ToList());
         }
 
@@ -46,7 +46,7 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> GetClasses(string? session = null)
         {
-            var items = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class");
+            var items = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString());
             return Json(items.Select(x => x.Text).ToList());
         }
 
@@ -555,7 +555,7 @@ namespace educore.Areas.ERP.Controllers
 
         private async Task<int> ResolveAcademicYearIdAsync(string session)
         {
-            var ayItems = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear");
+            var ayItems = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
             var ay = ayItems.FirstOrDefault(x => string.Equals(x.Text, session, StringComparison.OrdinalIgnoreCase));
             return ay != null && int.TryParse(ay.Value, out var id) ? id : 0;
         }

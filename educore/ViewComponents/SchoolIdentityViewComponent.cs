@@ -1,8 +1,6 @@
-using System.Security.Claims;
-using System.Threading.Tasks;
 using educore.Models;
 using EduCoreDataAccessLayer.Helpers;
-using EduCoreDataAccessLayer.Services.Contract.Admin;
+using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
 namespace educore.ViewComponents
@@ -23,7 +21,7 @@ namespace educore.ViewComponents
         {
             int tenantId = ToInt(UserClaimsPrincipal.FindFirst(Common.SK_TenantId)?.Value);
             int schoolId = ToInt(UserClaimsPrincipal.FindFirst(Common.SK_SchoolId)?.Value);
-            int userId   = ToInt(UserClaimsPrincipal.FindFirst(Common.SK_UserId)?.Value);
+            int userId = ToInt(UserClaimsPrincipal.FindFirst(Common.SK_UserId)?.Value);
 
             SchoolManageModel? model = null;
             if (schoolId > 0)

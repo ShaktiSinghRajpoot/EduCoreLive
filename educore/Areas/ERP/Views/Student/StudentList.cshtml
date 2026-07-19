@@ -62,10 +62,22 @@
             <div class="ec-page-subtitle">Click a student row or View Dashboard to open the full student panel</div>
           </div>
         </div>
-        <a asp-area="ERP" asp-controller="Admission" asp-action="Create"
-           class="btn btn-primary d-flex align-items-center gap-1">
-          <i class="bx bx-user-plus"></i><span>New Admission</span>
-        </a>
+        @if (ViewBag.RegistrationRequired == true)
+        {
+            @* Registration is mandatory before admission — direct admission is
+               blocked, so route users to the Enquiry → Registration flow instead. *@
+            <a asp-area="ERP" asp-controller="Enquiry" asp-action="EnquiryCRM"
+               class="btn btn-primary d-flex align-items-center gap-1">
+              <i class="bx bx-user-plus"></i><span>New Enquiry</span>
+            </a>
+        }
+        else
+        {
+            <a asp-area="ERP" asp-controller="Admission" asp-action="Create"
+               class="btn btn-primary d-flex align-items-center gap-1">
+              <i class="bx bx-user-plus"></i><span>New Admission</span>
+            </a>
+        }
       </div>
     </div>
 

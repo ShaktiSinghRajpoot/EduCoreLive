@@ -152,6 +152,7 @@ builder.Services.AddSingleton<INotificationChannel, WhatsAppChannel>();
 builder.Services.AddSingleton<INotificationService, NotificationService>();
 
 builder.Services.AddScoped<IBaseService, BaseService>();
+builder.Services.AddScoped<IReferenceDataService, ReferenceDataService>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<ISchoolSettingsService, SchoolSettingsService>();
 builder.Services.AddScoped<ISchoolService, SchoolService>();

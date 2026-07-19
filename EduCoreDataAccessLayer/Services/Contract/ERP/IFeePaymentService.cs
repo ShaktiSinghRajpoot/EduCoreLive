@@ -16,14 +16,17 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// </summary>
         Task<(bool Success, string Message, string? ReceiptNo)> RecordRegistrationPaymentAsync(
             int      enquiryId,
-            decimal  amount,
+            decimal  amount,               // NET collected (gross fee − discount)
             string   paymentMode,
             string?  referenceNo,
             string?  remarks,
             string?  finYear,
             int      tenantId,
             int      schoolId,
-            int      actionUserId);
+            int      actionUserId,
+            decimal  discountAmount = 0,   // server-computed from type + value
+            string?  discountType   = null,
+            string?  discountReason = null);
 
         /// <summary>A student's outstanding ledger installments (amount due &gt; amount paid + concession).</summary>
         Task<List<StudentDueItem>> GetStudentDuesAsync(

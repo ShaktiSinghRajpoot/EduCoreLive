@@ -342,5 +342,36 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public bool    RegistrationFeePaid { get; set; }
         public string? PaymentMode         { get; set; }   // Cash / UPI / Card / … (when fee collected)
         public string? PaymentReference    { get; set; }   // txn / cheque no (optional)
+        // Optional discount on the registration fee. Amount is computed server-side
+        // from (fee, type, value) — the client only chooses the type + value + reason.
+        public string?  DiscountType   { get; set; }       // "Percentage" | "Fixed"
+        public decimal  DiscountValue  { get; set; }       // 10 (=10%) or 100 (=₹100)
+        public string?  DiscountReason { get; set; }
+    }
+
+    // Walk-in 1-step registration: creates the intake (enquiry) record AND registers
+    // it in a single submit, so a parent who comes only to register never has to go
+    // through a separate enquiry step. Admission stays a later, separate action.
+    public class RegisterWalkinRequest
+    {
+        // Student + parent basics — the minimum to create the intake record.
+        public string? StudentName  { get; set; }
+        public string? Gender       { get; set; }
+        public string? ClassName    { get; set; }
+        public string? Session      { get; set; }
+        public string? FatherName   { get; set; }
+        public string? FatherMobile { get; set; }
+        public string? MotherName   { get; set; }
+        public string? Mobile       { get; set; }
+        public string? ParentEmail  { get; set; }
+        // Registration details — same shape as RegisterEnquiryRequest.
+        public string? RegistrationNumber  { get; set; }   // blank => auto-generate
+        public string? RegistrationDate    { get; set; }   // blank => today
+        public bool    RegistrationFeePaid { get; set; }
+        public string? PaymentMode         { get; set; }
+        public string? PaymentReference    { get; set; }
+        public string?  DiscountType   { get; set; }       // "Percentage" | "Fixed"
+        public decimal  DiscountValue  { get; set; }
+        public string?  DiscountReason { get; set; }
     }
 }
