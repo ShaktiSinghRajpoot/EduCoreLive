@@ -29,6 +29,27 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             string?  discountReason = null);
 
         /// <summary>A student's outstanding ledger installments (amount due &gt; amount paid + concession).</summary>
+        /// <summary>
+        /// School-wide defaulter list for the Fee Due Reminders screen — one row per
+        /// student who still owes money, paged/filtered/sorted server-side. Fills
+        /// <c>query.Items</c>, <c>TotalCount</c> and <c>SumOutstanding</c>.
+        /// </summary>
+        Task<FeeDueItem> GetFeeDueListAsync(
+            FeeDueItem query, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>
+        /// Audit one reminder attempt. <paramref name="channelsDelivered"/> is what
+        /// ACTUALLY delivered (empty when nothing did), so the history stays honest.
+        /// </summary>
+        Task<int> RecordFeeReminderAsync(
+            int studentId, string channelsRequested, string channelsDelivered,
+            string? toEmail, string? toPhone, string? message, decimal outstanding,
+            string status, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Recent reminder attempts + today's delivered count.</summary>
+        Task<(List<FeeReminderLogItem> Rows, int SentToday)> GetFeeReminderHistoryAsync(
+            int take, int tenantId, int schoolId, int actionUserId);
+
         Task<List<StudentDueItem>> GetStudentDuesAsync(
             int studentId, int tenantId, int schoolId, int actionUserId);
 

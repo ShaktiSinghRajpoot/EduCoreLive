@@ -156,12 +156,16 @@ var editId = null;
 
 function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 
+// jQuery AJAX (app standard). $.ajax returns a thenable and parses the JSON
+// response, so callers keep using .then(res => ...) unchanged.
 function post(url, body){
-  return fetch(url,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-    body:JSON.stringify(body)
-  }).then(function(r){return r.json();});
+  return $.ajax({
+    url:         url,
+    type:        'POST',
+    contentType: 'application/json',
+    headers:     { 'X-Requested-With': 'XMLHttpRequest' },
+    data:        JSON.stringify(body)
+  });
 }
 
 // Rows are server-rendered; edit reads the row's data-* attributes.

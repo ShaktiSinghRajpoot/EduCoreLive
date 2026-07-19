@@ -252,20 +252,21 @@ function persist(okMsg){
       };
     })
   };
-  fetch(URL_SAVE,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'},
-    body:JSON.stringify(payload)
+  $.ajax({
+    url:         URL_SAVE,
+    type:        'POST',
+    contentType: 'application/json',
+    headers:     { 'X-Requested-With': 'XMLHttpRequest' },
+    data:        JSON.stringify(payload)
   })
-  .then(function(r){return r.json();})
-  .then(function(res){
+  .done(function(res){
     if(res && res.success){ if(okMsg) toast('success', okMsg); }
     else {
       toast('error',(res && res.message) || 'Save failed.');
       setTimeout(function(){ window.location.reload(); }, 1200); /* resync from server */
     }
   })
-  .catch(function(){ toast('error','Save failed. Check your connection.'); });
+  .fail(function(){ toast('error','Save failed. Check your connection.'); });
 }
 
 /* Summary */

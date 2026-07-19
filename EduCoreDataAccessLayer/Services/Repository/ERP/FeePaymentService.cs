@@ -17,6 +17,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     {
         private const string SpRegistrationRecord = "core.sp_registration_fee_record";
         private const string SpStudentDues = "core.sp_student_dues_get";
+        private const string SpFeeDueList = "core.sp_fee_due_list";
+        private const string SpReminderRecord = "core.sp_fee_reminder_record";
+        private const string SpReminderHistory = "core.sp_fee_reminder_history";
         private const string SpCollect = "core.sp_fee_payment_collect";
         private const string SpHistory = "core.sp_fee_payment_history_get";
         private const string SpReceipt = "core.sp_fee_receipt_get";
@@ -101,6 +104,144 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 _logger.LogError(ex, "Unexpected error recording registration fee for enquiry {EnquiryId}, school {SchoolId}.", enquiryId, schoolId);
                 return (false, "Unable to record the registration fee.", null);
             }
+        }
+
+        public async Task<FeeDueItem> GetFeeDueListAsync(
+            FeeDueItem query, int tenantId, int schoolId, int actionUserId)
+        {
+            query.Items = new List<FeeDueItem>();
+            query.TotalCount = 0;
+            query.SumOutstanding = 0m;
+            if (tenantId <= 1 || schoolId <= 0) return query;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_search",         NpgsqlDbType.Text)    { Value = (object?)query.Search ?? DBNull.Value },
+                new("p_class",          NpgsqlDbType.Text)    { Value = (object?)query.FilterClass ?? DBNull.Value },
+                new("p_bucket",         NpgsqlDbType.Text)    { Value = (object?)query.FilterBucket ?? DBNull.Value },
+                new("p_page_no",        NpgsqlDbType.Integer) { Value = query.Page },
+                new("p_page_size",      NpgsqlDbType.Integer) { Value = query.PageSize },
+                new("p_sort_column",    NpgsqlDbType.Text)    { Value = (object?)query.SortColumn ?? DBNull.Value },
+                new("p_sort_dir",       NpgsqlDbType.Text)    { Value = query.SortDirection },
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "fee_due_cursor" }
+            };
+
+            await _db.ExecuteCursorsAsync(SpFeeDueList, parameters, async reader =>
+            {
+                var cols = reader.Columns();
+                bool first = true;
+                while (await reader.ReadAsync())
+                {
+                    if (first)
+                    {
+                        // Window aggregates repeat on every row — read them once.
+                        query.TotalCount     = DbRead.Int(reader, cols, "total_count");
+                        query.SumOutstanding = DbRead.Dec(reader, cols, "sum_outstanding");
+                        first = false;
+                    }
+
+                    query.Items.Add(new FeeDueItem
+                    {
+                        StudentId        = DbRead.Int(reader, cols, "student_id"),
+                        StudentName      = DbRead.Str(reader, cols, "student_name"),
+                        AdmissionNo      = DbRead.NStr(reader, cols, "admission_no"),
+                        ClassName        = DbRead.NStr(reader, cols, "class_name"),
+                        Section          = DbRead.NStr(reader, cols, "section"),
+                        RollNo           = DbRead.NStr(reader, cols, "roll_no"),
+                        Mobile           = DbRead.NStr(reader, cols, "mobile"),
+                        ParentEmail      = DbRead.NStr(reader, cols, "parent_email"),
+                        TotalOutstanding = DbRead.Dec(reader, cols, "total_outstanding"),
+                        OverdueDays      = DbRead.Int(reader, cols, "overdue_days"),
+                        Bucket           = DbRead.Str(reader, cols, "bucket"),
+                        LastReminderAt   = DbRead.DateTimeN(reader, cols, "last_reminder_at")
+                    });
+                }
+            });
+
+            return query;
+        }
+
+        public async Task<int> RecordFeeReminderAsync(
+            int studentId, string channelsRequested, string channelsDelivered,
+            string? toEmail, string? toPhone, string? message, decimal outstanding,
+            string status, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0) return 0;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",          NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",          NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id",     NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",         NpgsqlDbType.Integer) { Value = studentId },
+                new("p_channels_requested", NpgsqlDbType.Text)    { Value = channelsRequested ?? string.Empty },
+                new("p_channels_delivered", NpgsqlDbType.Text)    { Value = channelsDelivered ?? string.Empty },
+                new("p_to_email",           NpgsqlDbType.Text)    { Value = (object?)toEmail ?? DBNull.Value },
+                new("p_to_phone",           NpgsqlDbType.Text)    { Value = (object?)toPhone ?? DBNull.Value },
+                new("p_message",            NpgsqlDbType.Text)    { Value = (object?)message ?? DBNull.Value },
+                new("p_outstanding",        NpgsqlDbType.Numeric) { Value = outstanding },
+                new("p_status",             NpgsqlDbType.Text)    { Value = status ?? "Failed" },
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "reminder_record_cursor" }
+            };
+
+            int id = 0;
+            await _db.ExecuteCursorsAsync(SpReminderRecord, parameters, async reader =>
+            {
+                var cols = reader.Columns();
+                if (await reader.ReadAsync()) id = DbRead.Int(reader, cols, "reminder_id");
+            });
+            return id;
+        }
+
+        public async Task<(List<FeeReminderLogItem> Rows, int SentToday)> GetFeeReminderHistoryAsync(
+            int take, int tenantId, int schoolId, int actionUserId)
+        {
+            var rows = new List<FeeReminderLogItem>();
+            int sentToday = 0;
+            if (tenantId <= 1 || schoolId <= 0) return (rows, sentToday);
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_take",           NpgsqlDbType.Integer) { Value = take },
+                new("p_rows",  NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "reminder_rows_cursor" },
+                new("p_stats", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "reminder_stats_cursor" }
+            };
+
+            await _db.ExecuteCursorsAsync(SpReminderHistory, parameters,
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                    {
+                        rows.Add(new FeeReminderLogItem
+                        {
+                            ReminderId        = DbRead.Int(reader, cols, "reminder_id"),
+                            StudentId         = DbRead.Int(reader, cols, "student_id"),
+                            StudentName       = DbRead.NStr(reader, cols, "student_name"),
+                            ClassName         = DbRead.NStr(reader, cols, "class_name"),
+                            ChannelsRequested = DbRead.NStr(reader, cols, "channels_requested"),
+                            ChannelsDelivered = DbRead.NStr(reader, cols, "channels_delivered"),
+                            ToEmail           = DbRead.NStr(reader, cols, "to_email"),
+                            ToPhone           = DbRead.NStr(reader, cols, "to_phone"),
+                            Outstanding       = DbRead.Dec(reader, cols, "outstanding"),
+                            Status            = DbRead.NStr(reader, cols, "status"),
+                            SentAt            = DbRead.DateTimeN(reader, cols, "sent_at")
+                        });
+                    }
+                },
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    if (await reader.ReadAsync()) sentToday = DbRead.Int(reader, cols, "sent_today");
+                });
+
+            return (rows, sentToday);
         }
 
         public async Task<List<StudentDueItem>> GetStudentDuesAsync(

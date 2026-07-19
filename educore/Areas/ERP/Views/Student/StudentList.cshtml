@@ -332,9 +332,12 @@ document.getElementById('btnExcel').addEventListener('click',function(){
     +'&className='+encodeURIComponent(val('FilterClass'))
     +'&gender='+encodeURIComponent(val('FilterGender'))
     +'&year='+encodeURIComponent(val('FilterYear'));
-  fetch(EXPORT_URL+qs,{headers:{'X-Requested-With':'XMLHttpRequest'}})
-    .then(function(r){return r.json();})
-    .then(function(res){
+  $.ajax({
+    url:     EXPORT_URL+qs,
+    type:    'GET',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+    .done(function(res){
       var rows=(res&&res.success&&res.rows)?res.rows:[];
       var hdr=['Adm No','Roll','Name','Class','Sec','Gender','Adm Date','Guardian','Phone','Fee','Status'];
       var body=rows.map(function(s){return[s.admissionNo,s.rollNo||'',s.studentName,s.className,s.section||'',s.gender||'',fmtDate(s.admissionDate),s.guardianName||'',s.mobile||'',s.feeStatus||'',s.status||''];});
@@ -345,7 +348,7 @@ document.getElementById('btnExcel').addEventListener('click',function(){
       a.click();
       toast('success',body.length+' students exported.');
     })
-    .catch(function(){toast('error','Export failed.');});
+    .fail(function(){toast('error','Export failed.');});
 });
 document.getElementById('btnPdf').addEventListener('click',function(){window.print();});
 
