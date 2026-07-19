@@ -155,7 +155,7 @@ BEGIN
                 p_action_user_id,
                 NOW()
             )
-            ON CONFLICT (tenant_id, school_id, fee_head_name)
+            ON CONFLICT (tenant_id, school_id, fee_head_name) WHERE COALESCE(is_deleted, FALSE) = FALSE
             DO UPDATE SET
                 frequency        = EXCLUDED.frequency,
                 default_amount   = EXCLUDED.default_amount,
