@@ -471,7 +471,7 @@ namespace educore.Areas.ERP.Controllers
                 var enquiry = await _enquiryService.GetEnquiryByIdAsync(enquiryId, tenantId, schoolId, actionUserId);
                 if (enquiry != null)
                 {
-                    decimal regFee = await _schoolSettingsService.GetCollectionPointTotalAsync(
+                    decimal regFee = await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
                         enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
                         "Registration", tenantId, schoolId, actionUserId);
 
@@ -521,7 +521,7 @@ namespace educore.Areas.ERP.Controllers
             if (string.IsNullOrWhiteSpace(className) || string.IsNullOrWhiteSpace(academicYear))
                 return Json(new { success = false, amount = 0m });
 
-            decimal amount = await _schoolSettingsService.GetCollectionPointTotalAsync(
+            decimal amount = await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
                 className, academicYear, "Registration", TenantId(), SchoolId(), UserId());
 
             return Json(new { success = true, amount });

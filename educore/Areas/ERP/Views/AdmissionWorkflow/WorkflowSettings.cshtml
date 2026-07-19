@@ -192,6 +192,22 @@
 
             <div class="aw-row">
               <div class="flex-grow-1">
+                <div class="aw-row-title">Charge recurring fees from</div>
+                <div class="aw-row-desc">
+                  For a mid-session admission, when do monthly / quarterly fees start?
+                  <strong>Admission month</strong> bills only the enrolled months (up to the
+                  session end) — the usual practice. <strong>Session start</strong> bills the
+                  full session from April regardless of the join date.
+                </div>
+              </div>
+              <select asp-for="ChargeFeesFrom" class="form-select" style="max-width:210px">
+                <option value="AdmissionMonth">Admission month</option>
+                <option value="SessionStart">Session start (April)</option>
+              </select>
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
                 <div class="aw-row-title">Transport Module</div>
                 <div class="aw-row-desc">
                   Turn on if this school runs buses. When on, the Transport menu (Routes,

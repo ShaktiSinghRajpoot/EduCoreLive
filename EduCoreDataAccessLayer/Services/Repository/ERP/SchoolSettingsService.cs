@@ -927,6 +927,36 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 .Sum(d => d.Amount);
         }
 
+        public async Task<decimal> GetCollectionPointResolvedTotalAsync(
+            string className, string academicYear, string collectionPoint,
+            int tenantId, int schoolId, int actionUserId, bool refundableOnly = false)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return 0m;
+
+            // Prefer a class-wise amount from the Fee Structure if the class defines one.
+            // (Computed here rather than via GetCollectionPointTotalAsync so the refundable
+            // filter also applies — the Admission point holds both the admission fee and the
+            // refundable security deposit, and security must only count the refundable head.)
+            if (!string.IsNullOrWhiteSpace(className) && !string.IsNullOrWhiteSpace(academicYear))
+            {
+                var details = await GetFeeStructureDetailsAsync(className, academicYear, tenantId, schoolId, actionUserId);
+                var classWise = details
+                    .Where(d => d.IsSelected
+                             && string.Equals(d.CollectionPoint, collectionPoint, StringComparison.OrdinalIgnoreCase)
+                             && (!refundableOnly || d.IsRefundable))
+                    .Sum(d => d.Amount);
+                if (classWise > 0) return classWise;
+            }
+
+            // Fall back to the flat fee-head DefaultAmount (the simple / inline setup).
+            var heads = await GetFeeHeadAsync(tenantId, schoolId, actionUserId);
+            return heads
+                .Where(h => h.IsActive
+                         && string.Equals(h.CollectionPoint, collectionPoint, StringComparison.OrdinalIgnoreCase)
+                         && (!refundableOnly || h.IsRefundable))
+                .Sum(h => h.DefaultAmount);
+        }
+
         public async Task<int> SaveFeeStructureAsync(FeeStructureModel model, int tenantId, int schoolId, int actionUserId)
         {
             if (tenantId <= 1 || schoolId <= 0) return 0;

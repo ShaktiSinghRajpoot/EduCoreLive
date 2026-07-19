@@ -45,6 +45,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_collect_fee_at_admission", DBNull.Value),
                 new NpgsqlParameter("p_enable_security_fee", DBNull.Value),
                 new NpgsqlParameter("p_enable_transport", DBNull.Value),
+                new NpgsqlParameter("p_charge_fees_from", DBNull.Value),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
             };
 
@@ -67,6 +68,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 // Default true: a school with no saved row, or a backend missing the
                 // column, still sees Transport (matches pre-toggle behaviour).
                 model.EnableTransport = GetBool(row, "enable_transport", true);
+                if (row.Table.Columns.Contains("charge_fees_from") && row["charge_fees_from"] != DBNull.Value)
+                    model.ChargeFeesFrom = row["charge_fees_from"].ToString() ?? "AdmissionMonth";
 
                 if (row.Table.Columns.Contains("registration_number_prefix") && row["registration_number_prefix"] != DBNull.Value)
                     model.RegistrationNumberPrefix = row["registration_number_prefix"].ToString() ?? "REG-";
@@ -112,6 +115,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_collect_fee_at_admission", model.CollectFeeAtAdmission),
                 new NpgsqlParameter("p_enable_security_fee", enableSec),
                 new NpgsqlParameter("p_enable_transport", model.EnableTransport),
+                new NpgsqlParameter("p_charge_fees_from",
+                    model.ChargeFeesFrom == "SessionStart" ? "SessionStart" : "AdmissionMonth"),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "admission_workflow_save_cursor" }
             };
 

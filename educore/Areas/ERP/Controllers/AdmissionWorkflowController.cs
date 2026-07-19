@@ -35,8 +35,8 @@ namespace educore.Areas.ERP.Controllers
             // right on this page so a school never has to open the Fee Head master and
             // reason about the "Collection Point" dimension just to set an amount.
             var (reg, sec) = await LoadSetupFeesAsync();
-            ViewBag.RegistrationFees = reg;
-            ViewBag.SecurityFees = sec;
+            ViewBag.RegistrationFee = reg;
+            ViewBag.SecurityFee = sec;
 
             return View(model);
         }

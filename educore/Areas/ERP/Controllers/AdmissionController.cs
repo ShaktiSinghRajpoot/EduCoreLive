@@ -374,24 +374,48 @@ namespace educore.Areas.ERP.Controllers
                 !string.Equals(d.CollectionPoint, "Registration", StringComparison.OrdinalIgnoreCase) &&
                 (!(IsAdmissionPoint(d.CollectionPoint) && d.IsRefundable) || workflow.EnableSecurityFee));
 
-            return Json(new
+            var fees = visible.Select(d => new
             {
-                success = true,
-                fees = visible.Select(d => new
+                feeHeadId       = d.FeeHeadId,
+                feeHeadName     = d.FeeHeadName,
+                frequency       = string.IsNullOrWhiteSpace(d.Frequency) ? "Yearly" : d.Frequency,
+                amount          = d.Amount,
+                collectionPoint = string.IsNullOrWhiteSpace(d.CollectionPoint) ? "Recurring" : d.CollectionPoint,
+                isRefundable    = d.IsRefundable,
+                group           = IsAdmissionPoint(d.CollectionPoint) ? "One Time Payable Now" : GroupForFrequency(d.Frequency),
+                // Due-now vs scheduled is driven by the Collection Point, not the billing cycle.
+                stage           = IsAdmissionPoint(d.CollectionPoint) ? "Admission" : StageForFrequency(d.Frequency),
+                // All configured heads are part of the class structure → mandatory by default.
+                mandatory       = true
+            }).ToList();
+
+            // Security deposit: enabled but the class Fee Structure has no refundable
+            // Admission head → add it from the flat fee-head amount (the simple / inline
+            // Workflow-Settings setup). It stays REFUNDABLE (isRefundable = true), so it
+            // flows to the ledger as a returnable deposit, not a normal charge.
+            if (workflow.EnableSecurityFee &&
+                !fees.Any(f => IsAdmissionPoint(f.collectionPoint) && f.isRefundable))
+            {
+                decimal secAmount = await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
+                    className, academicYear, "Admission", tenantId, schoolId, userId, refundableOnly: true);
+                if (secAmount > 0)
                 {
-                    feeHeadId       = d.FeeHeadId,
-                    feeHeadName     = d.FeeHeadName,
-                    frequency       = string.IsNullOrWhiteSpace(d.Frequency) ? "Yearly" : d.Frequency,
-                    amount          = d.Amount,
-                    collectionPoint = string.IsNullOrWhiteSpace(d.CollectionPoint) ? "Recurring" : d.CollectionPoint,
-                    isRefundable    = d.IsRefundable,
-                    group           = IsAdmissionPoint(d.CollectionPoint) ? "One Time Payable Now" : GroupForFrequency(d.Frequency),
-                    // Due-now vs scheduled is driven by the Collection Point, not the billing cycle.
-                    stage           = IsAdmissionPoint(d.CollectionPoint) ? "Admission" : StageForFrequency(d.Frequency),
-                    // All configured heads are part of the class structure → mandatory by default.
-                    mandatory       = true
-                })
-            });
+                    fees.Add(new
+                    {
+                        feeHeadId       = 0,
+                        feeHeadName     = "Security Deposit",
+                        frequency       = "One Time",
+                        amount          = secAmount,
+                        collectionPoint = "Admission",
+                        isRefundable    = true,
+                        group           = "One Time Payable Now",
+                        stage           = "Admission",
+                        mandatory       = true
+                    });
+                }
+            }
+
+            return Json(new { success = true, fees });
         }
 
         private static bool IsAdmissionPoint(string? collectionPoint) =>

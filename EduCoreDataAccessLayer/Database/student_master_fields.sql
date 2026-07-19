@@ -122,7 +122,12 @@ DECLARE
     v_dup           INTEGER;
     v_item          JSONB;
     v_month_start   DATE;
+    v_month_end     DATE;
+    v_m             DATE;
     v_i             INTEGER;
+    v_sess_start    DATE;
+    v_sess_end      DATE;
+    v_charge_from   VARCHAR(20);
 BEGIN
 
     -- ── SaveAdmission ────────────────────────────────────────
@@ -136,6 +141,25 @@ BEGIN
 
         v_year     := COALESCE(p_academic_year, '');
         v_adm_date := COALESCE(p_admission_date, CURRENT_DATE);
+
+        -- Session window for this academic year — drives session-end-aware billing
+        -- (a mid-session joiner is billed only up to the session's end month).
+        SELECT start_date, end_date
+          INTO v_sess_start, v_sess_end
+        FROM academic.academic_years
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+          AND academic_year_name = v_year
+          AND COALESCE(is_deleted, FALSE) = FALSE
+        LIMIT 1;
+
+        -- "Charge recurring fees from" policy: AdmissionMonth (default, real-world
+        -- norm — pay only enrolled months) or SessionStart (full session from April).
+        SELECT COALESCE(NULLIF(TRIM(charge_fees_from), ''), 'AdmissionMonth')
+          INTO v_charge_from
+        FROM core.school_admission_workflow_settings
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+        LIMIT 1;
+        v_charge_from := COALESCE(v_charge_from, 'AdmissionMonth');
 
         -- Duplicate guard: same name + dob + mobile already admitted. Name is
         -- whitespace-collapsed + lower-cased so trivial typos ("Rahul  Kumar" vs
@@ -237,9 +261,26 @@ BEGIN
 
                 -- Ledger generation
                 IF COALESCE(v_item->>'frequency', 'Yearly') = 'Monthly' THEN
-                    -- 12 monthly installments from admission month
-                    v_month_start := DATE_TRUNC('month', v_adm_date)::DATE;
-                    FOR v_i IN 0..11 LOOP
+                    -- Monthly tuition: one installment per month from the first billing
+                    -- month up to the SESSION END month (not a fixed 12 that spills into
+                    -- the next session). First month = admission month (default) or the
+                    -- session start when the school bills the full session.
+                    IF v_charge_from = 'SessionStart' AND v_sess_start IS NOT NULL THEN
+                        v_month_start := DATE_TRUNC('month', v_sess_start)::DATE;
+                    ELSE
+                        v_month_start := DATE_TRUNC('month', v_adm_date)::DATE;
+                    END IF;
+
+                    -- Last billing month = session end month; fall back to 11 months on
+                    -- (a full year) if the academic year has no end date configured.
+                    IF v_sess_end IS NOT NULL THEN
+                        v_month_end := DATE_TRUNC('month', v_sess_end)::DATE;
+                    ELSE
+                        v_month_end := (v_month_start + INTERVAL '11 months')::DATE;
+                    END IF;
+
+                    v_m := v_month_start;
+                    WHILE v_m <= v_month_end LOOP
                         INSERT INTO core.student_ledger (
                             tenant_id, school_id, student_id,
                             fee_head_name, frequency, installment_label,
@@ -247,10 +288,11 @@ BEGIN
                         ) VALUES (
                             p_tenant_id, p_school_id, v_student_id,
                             COALESCE(v_item->>'feeHeadName', 'Fee'), 'Monthly',
-                            TO_CHAR(v_month_start + (v_i || ' month')::INTERVAL, 'Mon YYYY'),
-                            (v_month_start + (v_i || ' month')::INTERVAL)::DATE,
+                            TO_CHAR(v_m, 'Mon YYYY'),
+                            v_m,
                             COALESCE((v_item->>'amount')::NUMERIC, 0), 'Pending'
                         );
+                        v_m := (v_m + INTERVAL '1 month')::DATE;
                     END LOOP;
                 ELSE
                     INSERT INTO core.student_ledger (

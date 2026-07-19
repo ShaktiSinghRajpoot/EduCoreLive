@@ -55,5 +55,15 @@ namespace EduCoreDataAccessLayer.Models.ERP
         /// live in the Transport module, not here.
         /// </summary>
         public bool EnableTransport { get; set; } = true;
+
+        // ── Fee billing policy ──────────────────────────────────────────────
+
+        /// <summary>
+        /// When recurring (monthly / quarterly) fees start for a mid-session joiner:
+        /// "AdmissionMonth" (default, real-world norm — billed from the admission month
+        /// up to the session end, i.e. only enrolled months) or "SessionStart" (billed
+        /// the full session from April regardless of join date).
+        /// </summary>
+        public string ChargeFeesFrom { get; set; } = "AdmissionMonth";
     }
 }

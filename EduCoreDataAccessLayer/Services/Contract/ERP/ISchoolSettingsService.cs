@@ -77,6 +77,23 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             int actionUserId
         );
 
+        /// <summary>
+        /// Total for a one-time collection point (Registration / Admission deposit),
+        /// resolved for real use: a class-wise amount from the Fee Structure if the
+        /// class defines one, else the flat fee-head DefaultAmount (how the simple /
+        /// Workflow-Settings inline setup configures these). Registration especially is
+        /// usually a flat school-level charge, set before a class is even final.
+        /// </summary>
+        Task<decimal> GetCollectionPointResolvedTotalAsync(
+            string className,
+            string academicYear,
+            string collectionPoint,
+            int tenantId,
+            int schoolId,
+            int actionUserId,
+            bool refundableOnly = false
+        );
+
         Task<int> SaveFeeStructureAsync(
             FeeStructureModel model,
             int tenantId,
