@@ -84,6 +84,16 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// Workflow-Settings inline setup configures these). Registration especially is
         /// usually a flat school-level charge, set before a class is even final.
         /// </summary>
+        /// <summary>
+        /// The school's fee-receipt print format: "A4" (full page + letterhead),
+        /// "A5" (compact, two per sheet) or "Thermal" (80mm counter printer).
+        /// Defaults to A4 when never set.
+        /// </summary>
+        Task<string> GetReceiptFormatAsync(int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Saves the school's fee-receipt print format.</summary>
+        Task<bool> SaveReceiptFormatAsync(string format, int tenantId, int schoolId, int actionUserId);
+
         Task<decimal> GetCollectionPointResolvedTotalAsync(
             string className,
             string academicYear,

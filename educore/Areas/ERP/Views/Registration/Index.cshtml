@@ -354,8 +354,12 @@ $(function () {
         // Edit (correct details) — opens the enquiry form in the CRM; hidden once admitted
         if (!r.isAdmitted)
             actions += '<a href="'+ENQUIRY_EDIT_URL+'?editId='+r.enquiryId+'" class="btn btn-sm btn-icon btn-outline-primary reg-act-btn" title="Edit details"><i class="bx bx-edit"></i></a>';
-        // Re-print slip (always available — audit record)
-        actions += '<button class="btn btn-sm btn-icon btn-outline-secondary reg-act-btn btn-slip" title="Print slip" data-id="'+r.enquiryId+'"><i class="bx bx-printer"></i></button>';
+        // Registration SLIP — "you are registered, here is your number". Always available.
+        actions += '<button class="btn btn-sm btn-icon btn-outline-secondary reg-act-btn btn-slip" title="Print registration slip" data-id="'+r.enquiryId+'"><i class="bx bx-receipt"></i></button>';
+        // Fee RECEIPT — "we received your money". A different document, and this list is
+        // the only place it can be re-printed (it is filed against the enquiry, not a student).
+        if (r.receiptNo)
+            actions += '<button class="btn btn-sm btn-icon btn-outline-secondary reg-act-btn btn-receipt" title="Print fee receipt" data-rcp="'+esc(r.receiptNo)+'"><i class="bx bx-printer"></i></button>';
         // Mark fee paid
         if (FEE_ENABLED && !r.registrationFeePaid && active)
             actions += '<button class="btn btn-sm btn-icon btn-outline-success reg-act-btn btn-fee" title="Mark fee collected" data-id="'+r.enquiryId+'"><i class="bx bx-rupee"></i></button>';
@@ -446,6 +450,11 @@ $(function () {
     });
     $('#btnPrintSlip').on('click', function(){ window.print(); });
 
+    /* ── print the registration fee receipt ── */
+    $('#regBody').on('click', '.btn-receipt', function(){
+        EcReceipt.show($(this).data('rcp'));
+    });
+
     /* ── mark fee paid ── */
     $('#regBody').on('click', '.btn-fee', function(){
         var id = $(this).data('id');
@@ -453,8 +462,8 @@ $(function () {
             headers:{ 'RequestVerificationToken':csrf }, data: JSON.stringify({ enquiryId:id }) })
         .done(function(res){
             if(res.success){
-                toastr.success(res.message);
-                if (res.receiptNo && window.EcReceipt) EcReceipt.show(res.receiptNo);
+                toastr.success(res.message + (res.receiptNo ? ' Receipt ' + res.receiptNo + '.' : ''));
+                // Not auto-opened — print from the list when needed.
                 load();
             } else toastr.error(res.message||'Failed.');
         })
@@ -587,7 +596,6 @@ $(function () {
                 bootstrap.Modal.getInstance(document.getElementById('registerWalkinModal')).hide();
                 toastr.success((res.message || 'Walk-in registered.') +
                                (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
-                if (res.receiptNo && window.EcReceipt) EcReceipt.show(res.receiptNo);
                 load();
             } else {
                 toastr.error((res && res.message) || 'Unable to register.');

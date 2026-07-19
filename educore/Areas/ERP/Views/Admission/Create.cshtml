@@ -781,7 +781,7 @@ $(function () {
                 if (res.receiptNo && window.EcReceipt) {
                     var modalEl = document.getElementById('ecReceiptModal');
                     if (modalEl) modalEl.addEventListener('hidden.bs.modal', function () { window.location.href = URL_LIST; }, { once: true });
-                    EcReceipt.show(res.receiptNo);
+                    // Receipt not auto-opened; print it from the fee history / list.
                 } else {
                     setTimeout(function () { window.location.href = URL_LIST; }, 900);
                 }

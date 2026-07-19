@@ -53,8 +53,23 @@ BEGIN
             e.mobile,
             e.status,
             e.admission_id,
+            rc.receipt_no,
             COUNT(*) OVER() AS total_count
         FROM core.enquiries e
+        -- The registration fee receipt hangs off enquiry_id, not student_id, so it
+        -- never appears in a student's payment history — this list is the only place
+        -- the counter can re-print it.
+        LEFT JOIN LATERAL (
+            SELECT p.receipt_no
+            FROM core.fee_payments p
+            WHERE p.tenant_id    = e.tenant_id
+              AND p.school_id    = e.school_id
+              AND p.enquiry_id   = e.enquiry_id
+              AND p.payment_type = 'Registration'
+              AND p.is_cancelled = FALSE
+            ORDER BY p.payment_id DESC
+            LIMIT 1
+        ) rc ON TRUE
         WHERE e.tenant_id = p_tenant_id
           AND e.school_id = p_school_id
           AND e.is_active = TRUE

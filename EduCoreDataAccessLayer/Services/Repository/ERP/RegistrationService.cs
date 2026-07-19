@@ -70,7 +70,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         Mobile              = NullStr(row, "mobile"),
                         Status              = Str(row, "status"),
                         AdmissionId         = Has(row, "admission_id") && row["admission_id"] != DBNull.Value
-                                                ? Convert.ToInt32(row["admission_id"]) : null
+                                                ? Convert.ToInt32(row["admission_id"]) : null,
+                        ReceiptNo           = NullStr(row, "receipt_no")
                     });
                     if (total == 0) total = IntVal(row, "total_count");
                 }

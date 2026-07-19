@@ -169,6 +169,30 @@ namespace educore.Areas.ERP.Controllers
         #endregion
 
 
+        #region Documents
+        // Print formats for everything the school hands out (fee receipt today; TC and
+        // ID card once those documents exist). The school profile holds identity data —
+        // how a document prints belongs here, not there.
+        [HttpGet]
+        [HasPermission("settings.view")]
+        public async Task<IActionResult> Documents()
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            // The letterhead (name, address, logo) so the preview looks like the real print.
+            var model = await _schoolSettingsService.GetBasicProfileAsync(tenantId, schoolId, actionUserId);
+
+            if (model == null) return RedirectToAction("AccessDenied", "Account", new { area = "" });
+
+            ViewBag.ReceiptFormat = await _schoolSettingsService.GetReceiptFormatAsync(tenantId, schoolId, actionUserId);
+
+            return View(model);
+        }
+        #endregion
+
+
         #region FeeHead
         [HasPermission("fees.view")]
         public async Task<IActionResult> FeeHead(FeeHead query)

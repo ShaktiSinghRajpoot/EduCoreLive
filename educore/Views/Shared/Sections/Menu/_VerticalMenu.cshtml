@@ -229,7 +229,7 @@
         @* ---- Fees ---- *@
         @if (gFees)
         {
-        <li class='menu-item @Open("ManageFee","PaymentVerification","FeeDueReminders")'>
+        <li class='menu-item @Open("ManageFee","PaymentVerification","FeeDueReminders","Fee/Reports")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-wallet ic-fees"></i>
                 <div class="text-truncate">Fees &amp; Collection</div>
@@ -239,7 +239,7 @@
                 <li class='menu-item @On("ManageFee")'><a asp-area="ERP" asp-controller="Fee" asp-action="ManageFee" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Collect Fees</div></a></li>
                 <li class='menu-item @On("PaymentVerification")'><a asp-area="ERP" asp-controller="PaymentVerification" asp-action="Index" class="menu-link"><i class="bx bx-check-shield submenu-icon c-indigo"></i><div class="text-truncate">Payment Verification</div></a></li>
                 <li class='menu-item @On("FeeDueReminders")'><a asp-area="ERP" asp-controller="FeeDueReminders" asp-action="Index" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Due Reminders</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-bar-chart-alt-2 submenu-icon c-blue"></i><div class="text-truncate">Fee Reports</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("Fee/Reports")'><a asp-area="ERP" asp-controller="Fee" asp-action="Reports" class="menu-link"><i class="bx bx-bar-chart-alt-2 submenu-icon c-blue"></i><div class="text-truncate">Fee Reports</div></a></li>
             </ul>
         </li>
         }
@@ -409,7 +409,7 @@
         @* ---- Settings ---- *@
         @if (gSettings)
         {
-        <li class='menu-item @Open("BasicProfile","AcademicYears","ClassSection","SubjectManagement","AssignClassTeacher","PeriodStructure","FeeHead","FeeStructure","WorkflowSettings","StaffMasters","Roles")'>
+        <li class='menu-item @Open("BasicProfile","Documents","AcademicYears","ClassSection","SubjectManagement","AssignClassTeacher","PeriodStructure","FeeHead","FeeStructure","WorkflowSettings","StaffMasters","Roles")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-cog ic-settings"></i>
                 <div class="text-truncate">School Settings</div>
@@ -421,6 +421,7 @@
                 @if (Can("settings.view"))
                 {
                 <li class='menu-item @On("BasicProfile")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="BasicProfile" class="menu-link"><i class="bx bx-buildings submenu-icon c-blue"></i><div class="text-truncate">School Profile</div></a></li>
+                <li class='menu-item @On("Documents")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="Documents" class="menu-link"><i class="bx bx-printer submenu-icon c-blue"></i><div class="text-truncate">Documents &amp; Formats</div></a></li>
                 <li class='menu-item @On("AcademicYears")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AcademicYears" class="menu-link"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Academic Year / Session</div></a></li>
                 }
                 @if (Can("academics.view"))

@@ -1603,7 +1603,7 @@ $(document).ready(function () {
                 toastr.success((res.message || 'Registration completed.') +
                                (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
                 // Show the printable registration-fee receipt when a fee was collected.
-                if (res.receiptNo && window.EcReceipt) EcReceipt.show(res.receiptNo);
+                // Receipt not auto-opened; print it from the Registrations list.
                 fetchData(false);
             } else {
                 toastr.error((res && res.message) || 'Unable to complete registration.');

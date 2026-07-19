@@ -102,7 +102,8 @@ namespace educore.Areas.ERP.Controllers
                     parentName          = r.ParentName,
                     mobile              = r.Mobile,
                     status              = r.Status,
-                    isAdmitted          = r.IsAdmitted
+                    isAdmitted          = r.IsAdmitted,
+                    receiptNo           = r.ReceiptNo
                 })
             });
         }

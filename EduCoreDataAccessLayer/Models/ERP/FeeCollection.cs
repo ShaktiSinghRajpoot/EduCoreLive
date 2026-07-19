@@ -96,6 +96,46 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string    AdmissionNo { get; set; } = string.Empty;
         public string?   ClassName   { get; set; }
         public string?   Section     { get; set; }
+
+        /// <summary>"Registration" (taken against an enquiry) or "Fee" (against a student).</summary>
+        public string    PaymentType { get; set; } = "Fee";
+
+        /// <summary>Which fee heads this receipt covered — what the money was actually for.</summary>
+        public string?   FeeHeads    { get; set; }
+
+        /// <summary>Cheque / UPI reference, needed for bank reconciliation.</summary>
+        public string?   ReferenceNo { get; set; }
+
+        /// <summary>Concession + discount granted on this receipt.</summary>
+        public decimal   DiscountTotal { get; set; }
+    }
+
+    /// <summary>
+    /// One refund (money OUT). Reported alongside collections so the screen can show
+    /// a NET figure — a register that only counts money in overstates what the school
+    /// actually holds.
+    /// </summary>
+    public class RefundRegisterRow
+    {
+        public string    RefundNo         { get; set; } = string.Empty;
+        public DateTime? RefundedAt       { get; set; }
+        public decimal   Amount           { get; set; }
+        public string?   Mode             { get; set; }
+        public string?   Reason           { get; set; }
+        public string?   AuthorizedBy     { get; set; }
+        public string    StudentName      { get; set; } = string.Empty;
+        public string    AdmissionNo      { get; set; } = string.Empty;
+        public string?   ClassName        { get; set; }
+        public string?   Section          { get; set; }
+        public string?   FeeHeadName      { get; set; }
+        public string?   InstallmentLabel { get; set; }
+    }
+
+    public class RefundRegister
+    {
+        public List<RefundRegisterRow> Rows  { get; set; } = new();
+        public List<DayModeRow>        Modes { get; set; } = new();
+        public decimal Total => Rows.Sum(r => r.Amount);
     }
 
     public class HeadCollectRow

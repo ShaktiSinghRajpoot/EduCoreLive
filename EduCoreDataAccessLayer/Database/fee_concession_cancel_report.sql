@@ -26,10 +26,14 @@ BEGIN
     OPEN p_concessions FOR
     SELECT p.receipt_no, p.payment_date, p.concession_total,
            p.discount_type, p.discount_value, p.discount_reason,
-           COALESCE(s.student_name, '—') AS student_name,
-           COALESCE(s.admission_no, '—') AS admission_no
+           COALESCE(s.student_name, e.student_name, '—') AS student_name,
+           COALESCE(s.admission_no,
+                    CASE WHEN e.enquiry_id IS NOT NULL
+                         THEN COALESCE(NULLIF(e.registration_number, ''), 'Registration') END,
+                    '—') AS admission_no
     FROM core.fee_payments p
-    LEFT JOIN core.students s ON s.student_id = p.student_id
+    LEFT JOIN core.students  s ON s.student_id = p.student_id
+    LEFT JOIN core.enquiries e ON e.enquiry_id = p.enquiry_id
     WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
       AND p.is_cancelled = FALSE AND p.concession_total > 0
       AND p.payment_date BETWEEN v_from AND v_to
@@ -38,10 +42,14 @@ BEGIN
     OPEN p_cancels FOR
     SELECT p.receipt_no, p.payment_date, p.amount,
            p.cancel_reason, p.cancel_authorized_by, p.cancelled_at,
-           COALESCE(s.student_name, '—') AS student_name,
-           COALESCE(s.admission_no, '—') AS admission_no
+           COALESCE(s.student_name, e.student_name, '—') AS student_name,
+           COALESCE(s.admission_no,
+                    CASE WHEN e.enquiry_id IS NOT NULL
+                         THEN COALESCE(NULLIF(e.registration_number, ''), 'Registration') END,
+                    '—') AS admission_no
     FROM core.fee_payments p
-    LEFT JOIN core.students s ON s.student_id = p.student_id
+    LEFT JOIN core.students  s ON s.student_id = p.student_id
+    LEFT JOIN core.enquiries e ON e.enquiry_id = p.enquiry_id
     WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
       AND p.is_cancelled = TRUE
       AND p.cancelled_at::date BETWEEN v_from AND v_to

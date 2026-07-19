@@ -14,13 +14,31 @@
       <div class="modal-body">
         <div class="ec-receipt-paper" id="ecReceiptPaper"></div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" id="ecReceiptPrintBtn"><i class="bx bx-printer me-1"></i>Print</button>
+      <div class="modal-footer justify-content-between">
+        @* The school's saved format opens by default. These buttons re-draw the
+           receipt for a one-off print (e.g. parent wants an A4 copy of a thermal
+           slip) — they do not change the setting. *@
+        <div class="btn-group btn-group-sm" id="ecReceiptFormats">
+          <button type="button" class="btn btn-outline-secondary" data-fmt="A4">A4</button>
+          <button type="button" class="btn btn-outline-secondary" data-fmt="A5">A5</button>
+          <button type="button" class="btn btn-outline-secondary" data-fmt="Thermal">Thermal</button>
+        </div>
+        <div>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" id="ecReceiptPrintBtn"><i class="bx bx-printer me-1"></i>Print</button>
+        </div>
       </div>
     </div>
   </div>
 </div>
+
+<script>
+    $(function () {
+        $('#ecReceiptFormats button').on('click', function () {
+            EcReceipt.setFormat($(this).data('fmt'));
+        });
+    });
+</script>
 
 <style>
 .ec-receipt-paper{font-family:'Segoe UI',sans-serif;color:#222;}

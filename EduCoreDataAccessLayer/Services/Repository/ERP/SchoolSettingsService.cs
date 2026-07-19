@@ -15,6 +15,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private readonly PgExec _db;
         private readonly AppCache _cache;
         private const string SpBasicProfileManage = "core.sp_school_admin_basic_profile_manage";
+        private const string SpReceiptFormatManage = "core.sp_school_receipt_format_manage";
         private const string SpSchoolDropdowns = "config.sp_school_dropdowns";
         private const string SpAcademicSetupManage = "academic.sp_school_admin_academic_setup_manage";
         private const string SpFeeHeadManage = "core.sp_school_admin_fee_head_manage";
@@ -925,6 +926,54 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 .Where(d => d.IsSelected &&
                             string.Equals(d.CollectionPoint, collectionPoint, StringComparison.OrdinalIgnoreCase))
                 .Sum(d => d.Amount);
+        }
+
+        // Receipt format is read on every receipt print, but changes almost never —
+        // cache it per tenant/school and bust on save (same pattern as fee heads).
+        private static string ReceiptFormatKey(int tenantId, int schoolId) => AppCache.Key("receiptformat", tenantId, schoolId);
+
+        public async Task<string> GetReceiptFormatAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return "A4";
+
+            return await _cache.GetOrCreateAsync(ReceiptFormatKey(tenantId, schoolId), async () =>
+            {
+                var parameters = new NpgsqlParameter[]
+                {
+                    new NpgsqlParameter("p_operation",      "Get"),
+                    new NpgsqlParameter("p_tenant_id",      tenantId),
+                    new NpgsqlParameter("p_school_id",      schoolId),
+                    new NpgsqlParameter("p_action_user_id", actionUserId),
+                    new NpgsqlParameter("p_receipt_format", DBNull.Value),
+                    new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "receipt_format_cursor" }
+                };
+
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpReceiptFormatManage, parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return "A4";
+
+                var v = ds.Tables[0].Rows[0]["receipt_format"];
+                return v == DBNull.Value ? "A4" : (v.ToString() ?? "A4");
+            });
+        }
+
+        public async Task<bool> SaveReceiptFormatAsync(string format, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return false;
+            if (format is not ("A4" or "A5" or "Thermal")) format = "A4";
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation",      "Save"),
+                new NpgsqlParameter("p_tenant_id",      tenantId),
+                new NpgsqlParameter("p_school_id",      schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_receipt_format", format),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "receipt_format_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpReceiptFormatManage, parameters);
+            _cache.Remove(ReceiptFormatKey(tenantId, schoolId));   // next read picks up the change
+            return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0;
         }
 
         public async Task<decimal> GetCollectionPointResolvedTotalAsync(

@@ -17,6 +17,9 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string    Status              { get; set; } = string.Empty;
         public int?      AdmissionId         { get; set; }
 
+        /// <summary>Registration fee receipt, if one was issued (null when unpaid or cancelled).</summary>
+        public string?   ReceiptNo           { get; set; }
+
         // Convenience flags for the UI.
         public bool IsAdmitted => AdmissionId.HasValue;
         public string RegistrationDateDisplay =>

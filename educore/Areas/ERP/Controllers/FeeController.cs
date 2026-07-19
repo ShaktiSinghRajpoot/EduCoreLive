@@ -404,6 +404,23 @@ namespace educore.Areas.ERP.Controllers
             public string?  Remarks     { get; set; }
         }
 
+        // ── POST: /ERP/Fee/SaveReceiptFormat (AJAX) ──────────────
+        // The school picks how receipts print: A4 (letterhead) / A5 (compact) /
+        // Thermal (80mm counter roll). Stored per school, applied to every receipt.
+        [HttpPost]
+        [HasPermission("fees.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveReceiptFormat([FromBody] ReceiptFormatRequest req)
+        {
+            if (req == null || string.IsNullOrWhiteSpace(req.Format))
+                return Json(new { success = false, message = "Choose a format." });
+
+            var ok = await _schoolSettingsService.SaveReceiptFormatAsync(
+                req.Format!.Trim(), TenantId(), SchoolId(), UserId());
+
+            return Json(new { success = ok, message = ok ? "Receipt format saved." : "Could not save the format." });
+        }
+
         // ── GET: /ERP/Fee/GetCollectionRegister ──────────────────
         [HttpGet]
         public async Task<IActionResult> GetCollectionRegister(string? from = null, string? to = null)
@@ -411,11 +428,32 @@ namespace educore.Areas.ERP.Controllers
             DateOnly? f = DateOnly.TryParse(from, out var pf) ? pf : null;
             DateOnly? t = DateOnly.TryParse(to,   out var pt) ? pt : null;
             var reg = await _feePaymentService.GetCollectionRegisterAsync(f, t, TenantId(), SchoolId(), UserId());
+
+            // Money OUT for the same range. A register that only counts money in
+            // overstates what the school actually holds, so report NET as well.
+            var refunds = await _feePaymentService.GetRefundRegisterAsync(f, t, TenantId(), SchoolId(), UserId());
+
             return Json(new
             {
                 from  = reg.From.ToString("yyyy-MM-dd"),
                 to    = reg.To.ToString("yyyy-MM-dd"),
                 total = reg.Total,
+                refundTotal = refunds.Total,
+                net         = reg.Total - refunds.Total,
+                refunds = refunds.Rows.Select(r => new
+                {
+                    refundNo   = r.RefundNo,
+                    date       = r.RefundedAt?.ToString("yyyy-MM-dd"),
+                    student    = r.StudentName,
+                    admNo      = r.AdmissionNo,
+                    cls        = string.IsNullOrWhiteSpace(r.ClassName) ? "" : $"{r.ClassName}{(string.IsNullOrWhiteSpace(r.Section) ? "" : " - " + r.Section)}",
+                    against    = string.IsNullOrWhiteSpace(r.FeeHeadName) ? "—" : $"{r.FeeHeadName}{(string.IsNullOrWhiteSpace(r.InstallmentLabel) ? "" : " (" + r.InstallmentLabel + ")")}",
+                    mode       = r.Mode,
+                    reason     = r.Reason,
+                    authorised = r.AuthorizedBy,
+                    amount     = r.Amount
+                }),
+                refundModes = refunds.Modes.Select(m => new { mode = m.Mode, count = m.Count, amount = m.Amount }),
                 receipts = reg.Receipts.Select(r => new
                 {
                     receiptNo = r.ReceiptNo,
@@ -424,6 +462,10 @@ namespace educore.Areas.ERP.Controllers
                     admNo     = r.AdmissionNo,
                     cls       = string.IsNullOrWhiteSpace(r.ClassName) ? "" : $"{r.ClassName}{(string.IsNullOrWhiteSpace(r.Section) ? "" : " - " + r.Section)}",
                     mode      = r.Mode,
+                    type      = r.PaymentType,
+                    heads     = r.FeeHeads,
+                    reference = r.ReferenceNo,
+                    discount  = r.DiscountTotal,
                     amount    = r.Amount
                 }),
                 modes = reg.Modes.Select(m => new { mode = m.Mode, count = m.Count, amount = m.Amount }),
@@ -507,9 +549,13 @@ namespace educore.Areas.ERP.Controllers
             if (lines.Count == 0)
                 lines.Add(new { label = r.PaymentType == "Registration" ? "Registration Fee" : "Fee", amount = r.Amount, concession = 0m, lineType = "Due" });
 
+            // The school's chosen print format drives which template renders.
+            var format = await _schoolSettingsService.GetReceiptFormatAsync(TenantId(), SchoolId(), UserId());
+
             return Json(new
             {
                 school,
+                format,
                 receiptNo   = r.ReceiptNo,
                 date        = r.PaymentDate?.ToString("yyyy-MM-dd"),
                 amount      = r.Amount,
@@ -538,10 +584,24 @@ namespace educore.Areas.ERP.Controllers
             var profile = await _schoolSettingsService.GetBasicProfileAsync(TenantId(), SchoolId(), UserId());
             var addressParts = new[] { profile?.AddressLine1, profile?.City, profile?.State }
                 .Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!.Trim());
+
+            // The receipt prints from a blank popup window, where a relative path like
+            // "/uploads/..." cannot resolve — so hand the client an ABSOLUTE url or the
+            // letterhead logo silently breaks on every print.
+            string? logo = null;
+            var stored = profile?.LogoUrl;
+            if (!string.IsNullOrWhiteSpace(stored))
+            {
+                logo = stored!.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                    ? stored
+                    : $"{Request.Scheme}://{Request.Host}{(stored.StartsWith('/') ? "" : "/")}{stored}";
+            }
+
             return new
             {
                 name    = string.IsNullOrWhiteSpace(profile?.SchoolName) ? "Your School" : profile!.SchoolName.Trim(),
-                address = string.Join(", ", addressParts)
+                address = string.Join(", ", addressParts),
+                logo
             };
         }
 
@@ -564,5 +624,10 @@ namespace educore.Areas.ERP.Controllers
         private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
         private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
         private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    }
+
+    public class ReceiptFormatRequest
+    {
+        public string? Format { get; set; }   // A4 | A5 | Thermal
     }
 }

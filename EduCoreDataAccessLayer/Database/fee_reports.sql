@@ -36,16 +36,36 @@ BEGIN
     v_to   := COALESCE(p_to,   CURRENT_DATE);
 
     OPEN p_receipts FOR
+    -- A payment belongs to either a STUDENT (fee collection / admission) or an
+    -- ENQUIRY (registration fee, taken before the student record exists). Resolve
+    -- the name/class from whichever applies, else the register shows blank rows
+    -- for every registration receipt.
     SELECT p.receipt_no,
            p.payment_date,
            p.amount,
            p.payment_mode,
-           COALESCE(s.student_name, '—')  AS student_name,
-           COALESCE(s.admission_no, '—')  AS admission_no,
-           s.class_name,
-           s.section
+           COALESCE(NULLIF(TRIM(p.payment_type), ''), 'Fee')      AS payment_type,
+           COALESCE(s.student_name, e.student_name, '—')          AS student_name,
+           COALESCE(s.admission_no,
+                    CASE WHEN e.enquiry_id IS NOT NULL
+                         THEN COALESCE(NULLIF(e.registration_number, ''), 'Registration')
+                    END,
+                    '—')                                          AS admission_no,
+           COALESCE(s.class_name, e.class_name)                   AS class_name,
+           s.section,
+           p.reference_no,
+           COALESCE(p.concession_total, 0) + COALESCE(p.discount_amount, 0) AS discount_total,
+           -- WHAT the receipt was for. Fee receipts have detail lines; a registration
+           -- fee has none (it is taken before any ledger exists), so label it directly.
+           COALESCE(
+               (SELECT string_agg(DISTINCT d.fee_head_name, ', ' ORDER BY d.fee_head_name)
+                FROM core.fee_payment_details d
+                WHERE d.payment_id = p.payment_id),
+               CASE WHEN p.payment_type = 'Registration' THEN 'Registration Fee' END,
+               '—')                                               AS fee_heads
     FROM core.fee_payments p
-    LEFT JOIN core.students s ON s.student_id = p.student_id
+    LEFT JOIN core.students  s ON s.student_id  = p.student_id
+    LEFT JOIN core.enquiries e ON e.enquiry_id  = p.enquiry_id
     WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
       AND p.is_cancelled = FALSE
       AND p.payment_date BETWEEN v_from AND v_to
@@ -60,15 +80,32 @@ BEGIN
     GROUP BY payment_mode
     ORDER BY payment_mode;
 
+    -- Head-wise split. Registration fees have NO detail lines (they are taken before
+    -- any ledger exists), so they are unioned in as their own head — otherwise this
+    -- panel silently totals LESS than the receipts above and the report won't reconcile.
     OPEN p_heads FOR
-    SELECT d.fee_head_name, COUNT(*) AS cnt, SUM(d.amount) AS amount
-    FROM core.fee_payment_details d
-    JOIN core.fee_payments p ON p.payment_id = d.payment_id
-    WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
-      AND p.is_cancelled = FALSE
-      AND p.payment_date BETWEEN v_from AND v_to
-    GROUP BY d.fee_head_name
-    ORDER BY SUM(d.amount) DESC;
+    SELECT fee_head_name, SUM(cnt)::int AS cnt, SUM(amount) AS amount
+    FROM (
+        SELECT d.fee_head_name, COUNT(*) AS cnt, SUM(d.amount) AS amount
+        FROM core.fee_payment_details d
+        JOIN core.fee_payments p ON p.payment_id = d.payment_id
+        WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
+          AND p.is_cancelled = FALSE
+          AND p.payment_date BETWEEN v_from AND v_to
+        GROUP BY d.fee_head_name
+
+        UNION ALL
+
+        SELECT 'Registration Fee' AS fee_head_name, COUNT(*) AS cnt, SUM(p.amount) AS amount
+        FROM core.fee_payments p
+        WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
+          AND p.is_cancelled = FALSE
+          AND p.payment_type = 'Registration'
+          AND p.payment_date BETWEEN v_from AND v_to
+        HAVING COUNT(*) > 0
+    ) x
+    GROUP BY fee_head_name
+    ORDER BY SUM(amount) DESC;
 END;
 $procedure$;
 

@@ -250,7 +250,7 @@
 @Html.AntiForgeryToken()
 
 @section PageScripts {
-<script src="~/js/fee-receipt.js"></script>
+<script src="~/js/fee-receipt.js" asp-append-version="true"></script>
 <script>
 $(function () {
     'use strict';
@@ -579,7 +579,8 @@ $(function () {
             notify('success','Collected '+money(res.amount)+'. Receipt '+res.receiptNo+'.');
             today.n+=num(res.amount); today.c++; $('#todayN').text(money(today.n)); $('#todayC').text(today.c);
             $('#pRemarks').val('');
-            if(window.EcReceipt) EcReceipt.show(res.receiptNo);
+            // Receipt is NOT force-opened — the cashier may be mid-queue. It is
+            // available from the payment history list ("Print") whenever needed.
             api.dues(currentStudent.id).done(openStudent);
         })
         .fail(function(){ $btn.prop('disabled',false).html(old); notify('error','Could not record payment.'); });
@@ -606,7 +607,9 @@ $(function () {
             $('#histList').html(h);
         });
     }
-    $('#histList').on('click','.hist-print', function(){ if(window.EcReceipt) EcReceipt.show($(this).data('rcp')); });
+    $('#histList').on('click', '.hist-print', function () {
+        EcReceipt.show($(this).data('rcp'));
+    });
 
     /* ── cancel receipt ── */
     var cancelModal=new bootstrap.Modal(document.getElementById('cancelModal'));

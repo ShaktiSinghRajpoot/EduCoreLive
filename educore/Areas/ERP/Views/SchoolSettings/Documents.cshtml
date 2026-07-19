@@ -1,0 +1,139 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@model educore.Models.SchoolManageModel
+@{
+    ViewData["Title"] = "Documents & Formats";
+    var rcFmt = (ViewBag.ReceiptFormat as string) ?? "A4";
+}
+
+<div class="container-fluid">
+
+    <div class="ec-page-head mb-4">
+        <h4 class="mb-1">Documents &amp; Formats</h4>
+        <p class="text-muted mb-0">Choose how the documents this school hands out are printed. Preview before you save.</p>
+    </div>
+
+    @Html.AntiForgeryToken()
+
+    @* ── Fee receipt ─────────────────────────────────────────────── *@
+    <div class="ec-card">
+        <div class="ec-card-header">
+            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                <span class="ec-section-icon"><i class="bx bx-printer"></i></span>
+                <div>
+                    <h5 class="mb-0">Fee Receipt</h5>
+                    <p class="ec-section-subtitle mb-0">Used for registration, admission and regular fee receipts.</p>
+                </div>
+            </div>
+        </div>
+        <div class="ec-card-body">
+            <div class="row g-3">
+                @{
+                    var rcOpts = new[]
+                    {
+                        new { Key = "A4",      Icon = "bx-file",    Title = "A4 — Full page", Desc = "Letterhead + full fee breakdown. Prints School and Parent copy on one sheet." },
+                        new { Key = "A5",      Icon = "bx-note",    Title = "A5 — Compact",   Desc = "Half page, two fit on an A4 sheet. The usual day-to-day counter print." },
+                        new { Key = "Thermal", Icon = "bx-receipt", Title = "Thermal — 80mm", Desc = "Roll printer at the fee counter. Narrow, monospaced." }
+                    };
+                }
+                @foreach (var o in rcOpts)
+                {
+                    <div class="col-12 col-md-4">
+                        <label class="ec-detail-box h-100 d-block" style="cursor:pointer">
+                            <div class="d-flex align-items-start gap-2">
+                                <input class="form-check-input mt-1 rc-fmt" type="radio" name="ReceiptFormat"
+                                       value="@o.Key" @(rcFmt == o.Key ? "checked" : "") />
+                                <div>
+                                    <div class="fw-bold"><i class="bx @o.Icon me-1"></i>@o.Title</div>
+                                    <small class="text-muted">@o.Desc</small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                }
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary" id="rcFormatPreview"><i class="bx bx-show me-1"></i>Preview</button>
+                <button type="button" class="btn btn-primary" id="rcFormatSave"><i class="bx bx-save me-1"></i>Save format</button>
+                <span class="text-muted" style="font-size:.8rem">Applies to every fee receipt printed from any screen.</span>
+            </div>
+        </div>
+    </div>
+
+    @* ── Documents that do not exist yet. The format picker is deliberately not
+         built until the document itself is, otherwise the setting controls nothing. *@
+    <div class="ec-card mt-4">
+        <div class="ec-card-header">
+            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                <span class="ec-section-icon"><i class="bx bx-transfer"></i></span>
+                <div>
+                    <h5 class="mb-0">Transfer Certificate <span class="ec-badge ec-badge-soon">soon</span></h5>
+                    <p class="ec-section-subtitle mb-0">Formats appear here once the TC module is built.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ec-card mt-4">
+        <div class="ec-card-header">
+            <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                <span class="ec-section-icon"><i class="bx bx-id-card"></i></span>
+                <div>
+                    <h5 class="mb-0">Student ID Card <span class="ec-badge ec-badge-soon">soon</span></h5>
+                    <p class="ec-section-subtitle mb-0">Formats appear here once ID card printing is built.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@await Html.PartialAsync("_FeeReceiptModal")
+
+@section PageScripts {
+    <script src="~/js/fee-receipt.js" asp-append-version="true"></script>
+    <script>
+        $(function () {
+
+            // Preview uses THIS school's letterhead, so what you see is what prints.
+            // The logo is absolute because printing opens about:blank, which has no
+            // base to resolve a relative path against.
+            var school = {
+                name: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.SchoolName ?? "Your School")),
+                address: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                    string.Join(", ", new[] { Model.AddressLine1, Model.City, Model.State }
+                        .Where(p => !string.IsNullOrWhiteSpace(p))))),
+                logo: @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                    string.IsNullOrWhiteSpace(Model.LogoUrl)
+                        ? null
+                        : (Model.LogoUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                            ? Model.LogoUrl
+                            : $"{Context.Request.Scheme}://{Context.Request.Host}{(Model.LogoUrl.StartsWith('/') ? "" : "/")}{Model.LogoUrl}")))
+            };
+
+            $('#rcFormatPreview').on('click', function () {
+                EcReceipt.preview($('.rc-fmt:checked').val() || 'A4', school);
+            });
+
+            $('#rcFormatSave').on('click', function () {
+                var fmt = $('.rc-fmt:checked').val();
+                if (!fmt) { toastr.error('Choose a format.'); return; }
+
+                var $btn = $(this).prop('disabled', true);
+                $.ajax({
+                    url: '@Url.Action("SaveReceiptFormat", "Fee", new { area = "ERP" })',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+                    data: JSON.stringify({ format: fmt })
+                })
+                .done(function (res) {
+                    if (res && res.success) toastr.success(res.message || 'Saved.');
+                    else toastr.error((res && res.message) || 'Could not save.');
+                })
+                .fail(function () { toastr.error('Something went wrong.'); })
+                .always(function () { $btn.prop('disabled', false); });
+            });
+
+        });
+    </script>
+}

@@ -136,6 +136,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<List<DefaulterRow>> GetDefaultersAsync(
             string? className, string? section, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>
+        /// Refund register for a date range (money OUT), with mode-wise totals. Paired
+        /// with the collection register so the screen can report NET = collected − refunded.
+        /// </summary>
+        Task<RefundRegister> GetRefundRegisterAsync(
+            DateOnly? from, DateOnly? to, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>Audit register: concessions given + receipts cancelled, in a date range.</summary>
         Task<(List<ConcessionRow> Concessions, List<CancellationRow> Cancellations)> GetConcessionCancelRegisterAsync(
             DateOnly? from, DateOnly? to, int tenantId, int schoolId, int actionUserId);

@@ -32,6 +32,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpDefaulters = "core.sp_fee_defaulters_get";
         private const string SpAdvanceGet = "core.sp_student_advance_get";
         private const string SpConcessionCancel = "core.sp_fee_concession_cancel_register";
+        private const string SpRefundRegister = "core.sp_fee_refund_register";
 
         private readonly PgExec _db;
         // WHY: ILogger lets us record WHY a financial operation failed before we map it to a
@@ -689,7 +690,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             StudentName = DbRead.Str(reader, cols, "student_name"),
                             AdmissionNo = DbRead.Str(reader, cols, "admission_no"),
                             ClassName   = DbRead.NStr(reader, cols, "class_name"),
-                            Section     = DbRead.NStr(reader, cols, "section")
+                            Section     = DbRead.NStr(reader, cols, "section"),
+                            PaymentType = DbRead.Str(reader, cols, "payment_type"),
+                            FeeHeads    = DbRead.NStr(reader, cols, "fee_heads"),
+                            ReferenceNo = DbRead.NStr(reader, cols, "reference_no"),
+                            DiscountTotal = DbRead.Dec(reader, cols, "discount_total")
                         });
                     }
                 },
@@ -718,6 +723,59 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             Amount = DbRead.Dec(reader, cols, "amount")
                         });
                     }
+                });
+
+            return reg;
+        }
+
+        public async Task<RefundRegister> GetRefundRegisterAsync(
+            DateOnly? from, DateOnly? to, int tenantId, int schoolId, int actionUserId)
+        {
+            var reg = new RefundRegister();
+            if (tenantId <= 1 || schoolId <= 0) return reg;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_from",           NpgsqlDbType.Date)    { Value = (object?)from ?? DBNull.Value },
+                new("p_to",             NpgsqlDbType.Date)    { Value = (object?)to   ?? DBNull.Value },
+                new("p_rows",  NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "refund_rows_cursor" },
+                new("p_modes", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "refund_modes_cursor" }
+            };
+
+            await _db.ExecuteCursorsAsync(SpRefundRegister, parameters,
+                async reader =>   // cursor 0: refund rows
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                        reg.Rows.Add(new RefundRegisterRow
+                        {
+                            RefundNo         = DbRead.Str(reader, cols, "refund_no"),
+                            RefundedAt       = DbRead.DateTimeN(reader, cols, "refunded_at"),
+                            Amount           = DbRead.Dec(reader, cols, "amount"),
+                            Mode             = DbRead.NStr(reader, cols, "refund_mode"),
+                            Reason           = DbRead.NStr(reader, cols, "reason"),
+                            AuthorizedBy     = DbRead.NStr(reader, cols, "authorized_by"),
+                            StudentName      = DbRead.Str(reader, cols, "student_name"),
+                            AdmissionNo      = DbRead.Str(reader, cols, "admission_no"),
+                            ClassName        = DbRead.NStr(reader, cols, "class_name"),
+                            Section          = DbRead.NStr(reader, cols, "section"),
+                            FeeHeadName      = DbRead.NStr(reader, cols, "fee_head_name"),
+                            InstallmentLabel = DbRead.NStr(reader, cols, "installment_label")
+                        });
+                },
+                async reader =>   // cursor 1: mode-wise refund totals
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                        reg.Modes.Add(new DayModeRow
+                        {
+                            Mode   = DbRead.Str(reader, cols, "refund_mode"),
+                            Count  = DbRead.Int(reader, cols, "cnt"),
+                            Amount = DbRead.Dec(reader, cols, "amount")
+                        });
                 });
 
             return reg;
