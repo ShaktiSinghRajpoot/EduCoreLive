@@ -1,6 +1,40 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using System.Linq
+@using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Mvc.ViewFeatures
+@model EduCoreDataAccessLayer.Models.ERP.StudentExitListModel
 @{
     ViewData["Title"] = "Inactive / Left Students";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    // Same server-side sort pattern as StudentList: preserve filters, drop Page,
+    // toggle direction on a repeat click. The proc whitelists the column names.
+    string SortUrl(string col)
+    {
+        var q = Context.Request.Query
+            .Where(k => !new[] { "SortColumn", "SortDir", "Page" }.Contains(k.Key, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(k => k.Key, k => k.Value.ToString());
+        q["SortColumn"] = col;
+        q["SortDir"] = (string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase) && !Model.Desc) ? "desc" : "asc";
+        return Context.Request.Path + QueryString.Create(q);
+    }
+    string SortIcon(string col)
+    {
+        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-sort sl-si";
+        return "bx " + (Model.Desc ? "bx-sort-down" : "bx-sort-up") + " sl-si sl-si-on";
+    }
+
+    string StatusBadge(string s) => s switch
+    {
+        "Transfer"   => "bg-label-info text-info",
+        "Passout"    => "bg-label-success text-success",
+        "Struck Off" => "bg-label-danger text-danger",
+        _            => "bg-label-secondary text-secondary"
+    };
+
+    var hasFilter = !string.IsNullOrWhiteSpace(Model.Search)
+                 || !string.IsNullOrWhiteSpace(Model.FilterStatus)
+                 || !string.IsNullOrWhiteSpace(Model.FilterDues);
 }
 
 @section PageStyles {
@@ -19,123 +53,162 @@
           </div>
           <div>
             <h4 class="ec-page-title mb-1">Inactive / Left Students</h4>
-            <div class="ec-page-subtitle">Archived records — re-admit, issue certificates or follow up on dues</div>
+            <div class="ec-page-subtitle">Students who have left — re-admit, follow up on dues, or issue a certificate</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Summary cards -->
+    <!-- Counts are window aggregates over the WHOLE filtered set, so they stay
+         accurate as you page through. -->
     <div class="row g-3 mb-4">
       <div class="col-6 col-lg-3">
         <div class="in-card">
           <div class="in-card-ic bg-label-secondary" style="color:#6c757d;"><i class="bx bx-archive"></i></div>
-          <div><div class="in-card-val" id="cTotal">—</div><div class="in-card-lbl">Total Archived</div></div>
+          <div><div class="in-card-val">@Model.TotalCount</div><div class="in-card-lbl">Total Left</div></div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="in-card">
           <div class="in-card-ic bg-label-info text-info"><i class="bx bx-transfer"></i></div>
-          <div><div class="in-card-val" id="cTransfer">—</div><div class="in-card-lbl">Transferred</div></div>
+          <div><div class="in-card-val">@Model.TransferCount</div><div class="in-card-lbl">Transferred</div></div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="in-card">
           <div class="in-card-ic bg-label-success text-success"><i class="bx bx-graduation"></i></div>
-          <div><div class="in-card-val" id="cPassout">—</div><div class="in-card-lbl">Passed Out</div></div>
+          <div><div class="in-card-val">@Model.PassoutCount</div><div class="in-card-lbl">Passed Out</div></div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="in-card">
           <div class="in-card-ic bg-label-danger text-danger"><i class="bx bx-wallet"></i></div>
-          <div><div class="in-card-val" id="cDues">—</div><div class="in-card-lbl">With Pending Dues</div></div>
+          <div><div class="in-card-val">@Model.DuesCount</div><div class="in-card-lbl">With Pending Dues</div></div>
         </div>
       </div>
     </div>
 
-    <!-- Roster -->
     <div class="ec-card mb-0">
       <div class="ec-card-header">
         <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
           <div class="ec-section-title-wrap">
             <span class="ec-section-icon"><i class="bx bx-archive-in"></i></span>
             <div>
-              <div class="ec-section-title">Archived Records</div>
-              <div class="ec-section-subtitle" id="resultText">Loading…</div>
+              <div class="ec-section-title">Left Students</div>
+              <div class="ec-section-subtitle">
+                @if (Model.TotalCount > 0)
+                {
+                    <text>Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount</text>
+                }
+                else
+                {
+                    <text>No records</text>
+                }
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="in-fbar">
+        <form id="inFilterForm" method="get" asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="in-fbar">
+          <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+          <input type="hidden" name="SortDir" value="@Model.SortDir" />
+
           <div class="in-srch-wrap">
             <i class="bx bx-search in-srch-ic"></i>
-            <input type="search" class="in-srch-inp" id="inSearch" placeholder="Search name, roll no, class…">
+            <input type="search" class="in-srch-inp" name="Search" value="@Model.Search"
+                   placeholder="Search name, admission no, mobile…" />
           </div>
 
-          <select class="in-chip" id="fReason">
+          <select class="in-chip" name="FilterStatus" onchange="this.form.submit()">
             <option value="">All Reasons</option>
-            <option value="Left">Left / Withdrawn</option>
-            <option value="Transfer">Transferred (TC)</option>
-            <option value="Passout">Passed Out</option>
-            <option value="Struck">Struck Off</option>
-            <option value="Suspend">Suspended</option>
+            <option value="Transfer"   selected="@(Model.FilterStatus == "Transfer")">Transferred</option>
+            <option value="Passout"    selected="@(Model.FilterStatus == "Passout")">Passed Out</option>
+            <option value="Struck Off" selected="@(Model.FilterStatus == "Struck Off")">Struck Off</option>
+            <option value="Withdrawn"  selected="@(Model.FilterStatus == "Withdrawn")">Withdrawn</option>
           </select>
 
-          <select class="in-chip" id="fYear">
-            <option value="">All Years</option>
-            <option value="2025-26">2025–26</option>
-            <option value="2024-25">2024–25</option>
-            <option value="2023-24">2023–24</option>
-          </select>
-
-          <select class="in-chip" id="fDues">
+          <select class="in-chip" name="FilterDues" onchange="this.form.submit()">
             <option value="">Dues: Any</option>
-            <option value="has">With Dues</option>
-            <option value="clear">Cleared</option>
+            <option value="pending" selected="@(Model.FilterDues == "pending")">With Dues</option>
+            <option value="clear"   selected="@(Model.FilterDues == "clear")">Cleared</option>
           </select>
 
-          <button class="in-clear-btn d-none" id="clearBtn"><i class="bx bx-x"></i>Clear</button>
+          <button type="submit" class="btn btn-sm btn-primary"><i class="bx bx-search me-1"></i>Search</button>
 
-          <div class="ms-auto">
-            <button class="in-export-btn" id="btnExcel" title="Export list"><i class="bx bx-spreadsheet"></i></button>
-          </div>
-        </div>
+          @if (hasFilter)
+          {
+              <a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="in-clear-btn"><i class="bx bx-x"></i>Clear</a>
+          }
+        </form>
       </div>
 
       <div class="ec-card-body pt-2">
 
-        <!-- Desktop -->
         <div class="in-tbl-wrap">
           <table class="table in-tbl align-middle mb-0">
             <thead>
               <tr>
-                <th>Student</th>
+                <th><a href="@SortUrl("name")" class="text-decoration-none text-reset">Student <i class="@SortIcon("name")"></i></a></th>
                 <th>Last Class</th>
                 <th>Reason</th>
-                <th>Date Left</th>
-                <th>Pending Dues</th>
-                <th>TC Status</th>
-                <th>Actions</th>
+                <th><a href="@SortUrl("left")" class="text-decoration-none text-reset">Date Left <i class="@SortIcon("left")"></i></a></th>
+                <th><a href="@SortUrl("dues")" class="text-decoration-none text-reset">Pending Dues <i class="@SortIcon("dues")"></i></a></th>
+                <th class="text-end">Actions</th>
               </tr>
             </thead>
-            <tbody id="tblBody"></tbody>
+            <tbody>
+              @foreach (var s in Model.Items)
+              {
+                  <tr>
+                    <td>
+                      <div class="fw-bold">@s.StudentName</div>
+                      <div class="text-muted" style="font-size:.76rem">@s.AdmissionNo</div>
+                    </td>
+                    <td>@s.ClassDisplay<div class="text-muted" style="font-size:.76rem">@s.AcademicYear</div></td>
+                    <td>
+                      <span class="ec-badge @StatusBadge(s.Status)">@s.Status</span>
+                      @if (!string.IsNullOrWhiteSpace(s.LeavingReason))
+                      {
+                          <div class="text-muted" style="font-size:.76rem">@s.LeavingReason</div>
+                      }
+                    </td>
+                    <td>@s.DateOfLeavingDisplay</td>
+                    <td>
+                      @if (s.DuesPending)
+                      {
+                          <span class="fw-bold text-danger">@s.Outstanding.ToString("N2")</span>
+                      }
+                      else
+                      {
+                          <span class="text-success">Cleared</span>
+                      }
+                    </td>
+                    <td class="text-end">
+                      <button type="button" class="btn btn-sm btn-outline-primary btn-readmit"
+                              data-id="@s.StudentId" data-name="@s.StudentName">
+                        <i class="bx bx-user-check me-1"></i>Re-admit
+                      </button>
+                    </td>
+                  </tr>
+              }
+            </tbody>
           </table>
         </div>
 
-        <!-- Mobile -->
-        <div class="in-mob" id="mobList"></div>
+        @if (Model.TotalCount == 0)
+        {
+            <div class="in-empty">
+              <div class="in-empty-ic"><i class="bx bx-search-alt"></i></div>
+              <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No records found</h6>
+              <p class="text-muted small mb-0">Students appear here once they are marked as left.</p>
+            </div>
+        }
 
-        <!-- Empty -->
-        <div class="in-empty d-none" id="emptyState">
-          <div class="in-empty-ic"><i class="bx bx-search-alt"></i></div>
-          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No records found</h6>
-          <p class="text-muted small mb-0">Try adjusting your search or filters.</p>
-        </div>
-
-        <!-- Pagination -->
-        <div class="in-pg-wrap" id="pgWrap">
-          <div class="in-pg-info" id="pgInfo">—</div>
-          <div class="d-flex gap-1 flex-wrap justify-content-end" id="pgBtns"></div>
+        <div class="in-pg-wrap">
+          <div class="in-pg-info d-flex align-items-center gap-2">
+            <partial name="_PageSize" model="Model" view-data='@(new ViewDataDictionary(ViewData) { { "FormId", "inFilterForm" } })' />
+          </div>
+          <partial name="_Pager" model="Model" />
         </div>
 
       </div>
@@ -144,245 +217,35 @@
   </div>
 </div>
 
-<!-- Reactivate confirm modal -->
-<div class="modal fade" id="reactModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="border:0;border-radius:20px;overflow:hidden;">
-      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
-        <div class="ec-section-title-wrap">
-          <span class="ec-section-icon"><i class="bx bx-user-check"></i></span>
-          <div>
-            <div class="ec-section-title">Re-admit Student</div>
-            <div class="ec-section-subtitle">Restore this student to the active roster</div>
-          </div>
-        </div>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="ec-card-body p-3 p-lg-4">
-        <p class="mb-2" style="font-size:.9rem;">You are about to re-activate <strong id="reactName">—</strong>.</p>
-        <div class="row g-3">
-          <div class="col-12 col-sm-6">
-            <label class="form-label" style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--ec-text-muted);">Admit into Class</label>
-            <select class="form-select" id="reactClass"></select>
-          </div>
-          <div class="col-12 col-sm-6">
-            <label class="form-label" style="font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--ec-text-muted);">Section</label>
-            <select class="form-select" id="reactSection"><option>A</option><option>B</option><option>C</option></select>
-          </div>
-        </div>
-        <div class="alert alert-info d-flex align-items-start gap-2 mt-3 mb-0" style="border-radius:12px;font-size:.82rem;">
-          <i class="bx bx-info-circle fs-5"></i>
-          <span>The student's full history (fees, attendance, exams) is preserved and re-linked.</span>
-        </div>
-      </div>
-      <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
-        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary px-4" id="reactConfirm"><i class="bx bx-check me-1"></i>Re-admit</button>
-      </div>
-    </div>
-  </div>
-</div>
+@Html.AntiForgeryToken()
 
 @section PageScripts {
 <script>
-(function(){
-'use strict';
+    $(function () {
 
-var LADDER=['Grade UKG','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
-var PAGE=1, PER=10, filtered=[], reactId=null;
+        $('.btn-readmit').on('click', function () {
+            var name = $(this).data('name');
+            if (!confirm('Re-admit ' + name + ' to the active roll?')) return;
 
-/* Mock archived students (would come from SP) */
-var DATA=[
-  {id:101,name:'Sourav Das',    roll:'R-201',cls:'Grade 9', reason:'Left',    date:'2025-08-12',dues:6500, tc:false,year:'2025-26',color:'secondary'},
-  {id:102,name:'Meena Kumari',  roll:'R-202',cls:'Grade 10',reason:'Transfer',date:'2025-07-03',dues:0,    tc:true, year:'2025-26',color:'info'},
-  {id:103,name:'Arjun Nair',    roll:'R-203',cls:'Grade 12',reason:'Passout', date:'2025-03-31',dues:0,    tc:true, year:'2024-25',color:'success'},
-  {id:104,name:'Farah Khan',    roll:'R-204',cls:'Grade 12',reason:'Passout', date:'2025-03-31',dues:1200, tc:false,year:'2024-25',color:'primary'},
-  {id:105,name:'Rohit Sinha',   roll:'R-205',cls:'Grade 7', reason:'Struck',  date:'2025-09-20',dues:14200,tc:false,year:'2025-26',color:'danger'},
-  {id:106,name:'Aisha Begum',   roll:'R-206',cls:'Grade 6', reason:'Transfer',date:'2025-06-15',dues:0,    tc:true, year:'2025-26',color:'warning'},
-  {id:107,name:'Naveen Reddy',  roll:'R-207',cls:'Grade 11',reason:'Suspend', date:'2025-10-01',dues:3800, tc:false,year:'2025-26',color:'info'},
-  {id:108,name:'Komal Joshi',   roll:'R-208',cls:'Grade 8', reason:'Left',    date:'2024-12-10',dues:0,    tc:false,year:'2024-25',color:'primary'},
-  {id:109,name:'Imran Sheikh',  roll:'R-209',cls:'Grade 12',reason:'Passout', date:'2024-03-31',dues:0,    tc:true, year:'2023-24',color:'success'},
-  {id:110,name:'Sneha Pillai',  roll:'R-210',cls:'Grade 5', reason:'Transfer',date:'2025-05-22',dues:2400, tc:true, year:'2025-26',color:'danger'},
-  {id:111,name:'Karan Malhotra',roll:'R-211',cls:'Grade 9', reason:'Left',    date:'2024-11-05',dues:9100, tc:false,year:'2024-25',color:'warning'},
-  {id:112,name:'Pooja Iyer',    roll:'R-212',cls:'Grade 10',reason:'Struck',  date:'2025-09-28',dues:16750,tc:false,year:'2025-26',color:'secondary'}
-];
+            var id = $(this).data('id');
+            $.ajax({
+                url: '@Url.Action("Reactivate", "Student", new { area = "ERP" })',
+                type: 'POST',
+                contentType: 'application/json',
+                headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+                data: JSON.stringify({ studentId: id })
+            })
+            .done(function (res) {
+                if (res && res.success) {
+                    toastr.success(res.message);
+                    location.reload();
+                } else {
+                    toastr.error((res && res.message) || 'Could not re-admit.');
+                }
+            })
+            .fail(function () { toastr.error('Something went wrong.'); });
+        });
 
-var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function fmtDate(d){ var x=new Date(d); return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]+' '+x.getFullYear(); }
-function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
-function inr(n){ return n>0?'₹'+n.toLocaleString('en-IN'):'₹0'; }
-function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
-
-var REASON={
-  Left:    {cls:'r-left',    txt:'Left'},
-  Transfer:{cls:'r-transfer',txt:'Transferred'},
-  Passout: {cls:'r-passout', txt:'Passed Out'},
-  Struck:  {cls:'r-struck',  txt:'Struck Off'},
-  Suspend: {cls:'r-suspend', txt:'Suspended'}
-};
-function reasonBdg(r){ var m=REASON[r]||REASON.Left; return '<span class="in-bdg '+m.cls+'">'+m.txt+'</span>'; }
-function tcHtml(t){ return t ? '<span class="in-tc issued"><i class="bx bx-check-circle"></i>Issued</span>' : '<span class="in-tc no"><i class="bx bx-minus-circle"></i>Not issued</span>'; }
-
-/* Populate reactivate class dropdown */
-(function(){ var s=document.getElementById('reactClass'); LADDER.forEach(function(c){ var o=document.createElement('option'); o.value=c; o.textContent=c; s.appendChild(o); }); })();
-
-/* Cards reflect full dataset */
-function updateCards(){
-  document.getElementById('cTotal').textContent=DATA.length;
-  document.getElementById('cTransfer').textContent=DATA.filter(function(s){return s.reason==='Transfer';}).length;
-  document.getElementById('cPassout').textContent=DATA.filter(function(s){return s.reason==='Passout';}).length;
-  document.getElementById('cDues').textContent=DATA.filter(function(s){return s.dues>0;}).length;
-}
-
-/* Filters */
-function applyFilters(){
-  var q=document.getElementById('inSearch').value.toLowerCase().trim(),
-      reason=document.getElementById('fReason').value,
-      year=document.getElementById('fYear').value,
-      dues=document.getElementById('fDues').value;
-
-  filtered=DATA.filter(function(s){
-    var dueOk = !dues || (dues==='has'? s.dues>0 : s.dues===0);
-    return (!q || s.name.toLowerCase().includes(q) || s.roll.toLowerCase().includes(q) || s.cls.toLowerCase().includes(q))
-      && (!reason || s.reason===reason) && (!year || s.year===year) && dueOk;
-  });
-
-  ['fReason','fYear','fDues'].forEach(function(id){ var el=document.getElementById(id); el.classList.toggle('active-filter', el.value!==''); });
-  var has=q||reason||year||dues;
-  document.getElementById('clearBtn').classList.toggle('d-none',!has);
-
-  PAGE=1; render();
-}
-
-/* Render */
-function render(){
-  var total=filtered.length;
-  PER=10;
-  var pages=Math.ceil(total/PER)||1;
-  if(PAGE>pages)PAGE=pages;
-  var start=(PAGE-1)*PER, end=Math.min(start+PER,total), slice=filtered.slice(start,end);
-
-  var tb=document.getElementById('tblBody'), mob=document.getElementById('mobList'), empty=document.getElementById('emptyState');
-
-  if(!total){
-    tb.innerHTML=''; mob.innerHTML=''; empty.classList.remove('d-none');
-    document.getElementById('pgWrap').classList.add('d-none');
-    document.getElementById('resultText').textContent='No records found';
-    return;
-  }
-  empty.classList.add('d-none'); document.getElementById('pgWrap').classList.remove('d-none');
-
-  tb.innerHTML=slice.map(function(s){
-    return '<tr>'
-      +'<td><div class="d-flex align-items-center gap-2">'
-      +   '<span class="in-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
-      +   '<div><div class="in-nm">'+esc(s.name)+'</div><div class="in-rl">'+esc(s.roll)+'</div></div>'
-      +'</div></td>'
-      +'<td>'+esc(s.cls)+'</td>'
-      +'<td>'+reasonBdg(s.reason)+'</td>'
-      +'<td>'+fmtDate(s.date)+'</td>'
-      +'<td><span class="in-due '+(s.dues>0?'has':'clear')+'">'+inr(s.dues)+'</span></td>'
-      +'<td>'+tcHtml(s.tc)+'</td>'
-      +'<td><div class="d-flex gap-1">'
-      +   '<button class="in-act-btn js-react" data-id="'+s.id+'"><i class="bx bx-user-check"></i>Re-admit</button>'
-      +   '<button class="in-act-btn tc js-tc" data-id="'+s.id+'"><i class="bx bx-file"></i>TC</button>'
-      +'</div></td>'
-      +'</tr>';
-  }).join('');
-
-  mob.innerHTML=slice.map(function(s){
-    return '<div class="in-mob-card">'
-      +'<div class="in-mob-top">'
-      +   '<span class="in-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
-      +   '<div class="flex-grow-1"><div class="in-nm">'+esc(s.name)+'</div><div class="in-rl">'+esc(s.roll)+' · '+esc(s.cls)+'</div></div>'
-      +   reasonBdg(s.reason)
-      +'</div>'
-      +'<div class="in-mob-grid">'
-      +   '<div><label>Date Left</label><span>'+fmtDate(s.date)+'</span></div>'
-      +   '<div><label>Pending Dues</label><span class="in-due '+(s.dues>0?'has':'clear')+'">'+inr(s.dues)+'</span></div>'
-      +   '<div><label>TC Status</label><span>'+tcHtml(s.tc)+'</span></div>'
-      +   '<div><label>Year</label><span>'+esc(s.year)+'</span></div>'
-      +'</div>'
-      +'<div class="d-flex gap-1">'
-      +   '<button class="in-act-btn js-react flex-grow-1 justify-content-center" data-id="'+s.id+'"><i class="bx bx-user-check"></i>Re-admit</button>'
-      +   '<button class="in-act-btn tc js-tc flex-grow-1 justify-content-center" data-id="'+s.id+'"><i class="bx bx-file"></i>Issue TC</button>'
-      +'</div>'
-      +'</div>';
-  }).join('');
-
-  bindRowActions();
-  renderPag(pages,total,start,end);
-  document.getElementById('resultText').textContent='Showing '+(start+1)+'–'+end+' of '+total+' archived students';
-}
-
-function renderPag(pages,total,start,end){
-  document.getElementById('pgInfo').textContent='Showing '+(start+1)+'–'+end+' of '+total;
-  var box=document.getElementById('pgBtns'); box.innerHTML='';
-  function btn(lbl,pg,dis,act){
-    var b=document.createElement('button');
-    b.className='in-pg-btn'+(act?' active':''); b.innerHTML=lbl; b.disabled=dis;
-    b.addEventListener('click',function(){ PAGE=pg; render(); });
-    box.appendChild(b);
-  }
-  btn('<i class="bx bx-chevron-left"></i>',PAGE-1,PAGE===1,false);
-  for(var i=1;i<=pages;i++) btn(i,i,false,i===PAGE);
-  btn('<i class="bx bx-chevron-right"></i>',PAGE+1,PAGE===pages,false);
-}
-
-/* Row actions */
-function bindRowActions(){
-  document.querySelectorAll('.js-react').forEach(function(b){
-    b.addEventListener('click',function(){
-      reactId=parseInt(this.dataset.id,10);
-      var s=DATA.find(function(x){return x.id===reactId;});
-      document.getElementById('reactName').textContent=s.name+' ('+s.roll+')';
-      document.getElementById('reactClass').value=s.cls;
-      new bootstrap.Modal(document.getElementById('reactModal')).show();
     });
-  });
-  document.querySelectorAll('.js-tc').forEach(function(b){
-    b.addEventListener('click',function(){
-      var s=DATA.find(function(x){return x.id===parseInt(b.dataset.id,10);});
-      toast('info','Opening certificate generator for '+s.name+'… (Transfer Certificates module)');
-    });
-  });
-}
-
-/* Confirm reactivate */
-document.getElementById('reactConfirm').addEventListener('click',function(){
-  var s=DATA.find(function(x){return x.id===reactId;});
-  if(!s) return;
-  var cls=document.getElementById('reactClass').value, sec=document.getElementById('reactSection').value;
-  // Wire to: @Url.Action("Reactivate","Student",new{area="ERP"})  (POST id, cls, sec)
-  var i=DATA.indexOf(s); DATA.splice(i,1);
-  bootstrap.Modal.getInstance(document.getElementById('reactModal')).hide();
-  updateCards(); applyFilters();
-  toast('success',s.name+' re-admitted into '+cls+' – '+sec+'.');
-});
-
-/* Export stub */
-document.getElementById('btnExcel').addEventListener('click',function(){ toast('info','Exporting '+filtered.length+' records…'); });
-
-/* Clear */
-document.getElementById('clearBtn').addEventListener('click',function(){
-  document.getElementById('inSearch').value='';
-  document.getElementById('fReason').value='';
-  document.getElementById('fYear').value='';
-  document.getElementById('fDues').value='';
-  applyFilters();
-});
-
-/* Listeners */
-['inSearch','fReason','fYear','fDues'].forEach(function(id){
-  document.getElementById(id).addEventListener('input',applyFilters);
-  document.getElementById(id).addEventListener('change',applyFilters);
-});
-
-/* Init */
-updateCards();
-applyFilters();
-
-})();
 </script>
 }

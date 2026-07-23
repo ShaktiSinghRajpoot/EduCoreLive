@@ -14,6 +14,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private readonly PgExec _db;
         private const string SpMain = "core.sp_admission_manage";
         private const string SpStudentList = "core.sp_student_list";
+        private const string SpStudentExit = "core.sp_student_exit";
+        private const string SpStudentExitList = "core.sp_student_exit_list";
 
         public AdmissionService(PgExec db)
         {
@@ -266,6 +268,133 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
             return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0 ? 1 : 0;
+        }
+
+        // ── Student exit ─────────────────────────────────────────
+        // A student who leaves keeps their record (ledger, receipts and the TC
+        // register all point at the same student_id); only is_active/status change.
+        public async Task<StudentExitResult> ExitStudentAsync(
+            StudentExitRequest request, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || request.StudentId <= 0)
+                return new StudentExitResult { Message = "Invalid student context." };
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_operation",       NpgsqlDbType.Text)    { Value = "Exit" },
+                new("p_tenant_id",       NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",       NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id",  NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",      NpgsqlDbType.Integer) { Value = request.StudentId },
+                new("p_status",          NpgsqlDbType.Text)    { Value = (object?)request.Status ?? DBNull.Value },
+                new("p_date_of_leaving", NpgsqlDbType.Date)    { Value = (object?)request.DateOfLeaving ?? DBNull.Value },
+                new("p_reason",          NpgsqlDbType.Text)    { Value = (object?)request.Reason ?? DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "student_exit_cursor" }
+            };
+
+            return await RunExitAsync(parameters);
+        }
+
+        public async Task<StudentExitResult> UndoStudentExitAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0)
+                return new StudentExitResult { Message = "Invalid student context." };
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_operation",       NpgsqlDbType.Text)    { Value = "Undo" },
+                new("p_tenant_id",       NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",       NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id",  NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",      NpgsqlDbType.Integer) { Value = studentId },
+                new("p_status",          NpgsqlDbType.Text)    { Value = DBNull.Value },
+                new("p_date_of_leaving", NpgsqlDbType.Date)    { Value = DBNull.Value },
+                new("p_reason",          NpgsqlDbType.Text)    { Value = DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "student_exit_cursor" }
+            };
+
+            return await RunExitAsync(parameters);
+        }
+
+        // The proc RAISEs its business rules ("already left", "date required"),
+        // so the message the office sees comes straight from there.
+        private async Task<StudentExitResult> RunExitAsync(NpgsqlParameter[] parameters)
+        {
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpStudentExit, parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return new StudentExitResult { Message = "Nothing was changed." };
+
+                var row = ds.Tables[0].Rows[0];
+                return new StudentExitResult
+                {
+                    Success     = true,
+                    Message     = Str(row, "message"),
+                    Outstanding = DecVal(row, "outstanding")
+                };
+            }
+            catch (PostgresException ex)
+            {
+                return new StudentExitResult { Message = ex.MessageText };
+            }
+        }
+
+        public async Task<StudentExitListModel> GetStudentExitListAsync(
+            StudentExitListModel query, int tenantId, int schoolId, int actionUserId)
+        {
+            query.Items = new List<StudentExitListModel>();
+            if (tenantId <= 1 || schoolId <= 0) { query.TotalCount = 0; return query; }
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_search",         NpgsqlDbType.Text)    { Value = (object?)query.Search       ?? DBNull.Value },
+                new("p_filter_status",  NpgsqlDbType.Text)    { Value = (object?)query.FilterStatus ?? DBNull.Value },
+                new("p_filter_dues",    NpgsqlDbType.Text)    { Value = (object?)query.FilterDues   ?? DBNull.Value },
+                new("p_page_no",        NpgsqlDbType.Integer) { Value = query.Page },
+                new("p_page_size",      NpgsqlDbType.Integer) { Value = query.PageSize },
+                new("p_sort_column",    NpgsqlDbType.Text)    { Value = (object?)query.SortColumn   ?? DBNull.Value },
+                new("p_sort_dir",       NpgsqlDbType.Text)    { Value = query.SortDirection },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "student_exit_list_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpStudentExitList, parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) { query.TotalCount = 0; return query; }
+
+            var first = ds.Tables[0].Rows[0];
+            query.TotalCount    = IntVal(first, "total_count");
+            query.TransferCount = IntVal(first, "transfer_count");
+            query.PassoutCount  = IntVal(first, "passout_count");
+            query.DuesCount     = IntVal(first, "dues_count");
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                query.Items.Add(new StudentExitListModel
+                {
+                    StudentId     = IntVal(row, "student_id"),
+                    AdmissionNo   = NullStr(row, "admission_no"),
+                    StudentName   = Str(row, "student_name"),
+                    ClassName     = NullStr(row, "class_name"),
+                    Section       = NullStr(row, "section"),
+                    AcademicYear  = NullStr(row, "academic_year"),
+                    GuardianName  = NullStr(row, "guardian_name"),
+                    Mobile        = NullStr(row, "mobile"),
+                    AdmissionDate = DateVal(row, "admission_date"),
+                    DateOfLeaving = DateVal(row, "date_of_leaving"),
+                    Status        = Str(row, "status"),
+                    LeavingReason = NullStr(row, "leaving_reason"),
+                    Outstanding   = DecVal(row, "outstanding")
+                });
+            }
+
+            return query;
         }
 
         // ── Mapper ───────────────────────────────────────────────

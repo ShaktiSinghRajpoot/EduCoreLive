@@ -241,7 +241,15 @@
                     <td>@(string.IsNullOrEmpty(s.Mobile) ? "—" : s.Mobile)</td>
                     <td><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></td>
                     <td><span class="sl-bdg @StatBadgeClass(s.Status)">@s.Status</span></td>
-                    <td><a href="@dashUrl" class="sl-view-btn"><i class="bx bx-layout"></i>Dashboard</a></td>
+                    <td>
+                      <div class="d-inline-flex gap-1 align-items-center">
+                        <a href="@dashUrl" class="sl-view-btn"><i class="bx bx-layout"></i>Dashboard</a>
+                        <button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-exit"
+                                title="Mark as left" data-id="@s.StudentId" data-name="@s.StudentName">
+                          <i class="bx bx-user-x"></i>
+                        </button>
+                      </div>
+                    </td>
                   </tr>
               }
             </tbody>
@@ -313,6 +321,45 @@
   </div>
 </div>
 
+@Html.AntiForgeryToken()
+
+@* Marking a student as left is what makes them eligible for a Transfer
+   Certificate, so the reason and date are captured here rather than guessed. *@
+<div class="modal fade" id="exitModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:18px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Mark student as left</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Marking <strong id="exitName">—</strong> as left. Their fees, receipts and history are kept.</p>
+        <div class="mb-3">
+          <label class="form-label">How did they leave?</label>
+          <select class="form-select" id="exitStatus">
+            <option value="Transfer">Transferred to another school</option>
+            <option value="Passout">Passed out (completed final class)</option>
+            <option value="Withdrawn">Withdrawn by parents</option>
+            <option value="Struck Off">Struck off by the school</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Date of leaving</label>
+          <input type="date" class="form-control" id="exitDate" />
+        </div>
+        <div class="mb-0">
+          <label class="form-label">Reason <span class="text-muted">(optional)</span></label>
+          <input type="text" class="form-control" id="exitReason" maxlength="300" placeholder="e.g. Father transferred to Pune" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="exitConfirm">Mark as left</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 @section PageScripts {
 <script>
 (function(){
@@ -354,5 +401,52 @@ document.getElementById('btnPdf').addEventListener('click',function(){window.pri
 
 if(typeof toastr!=='undefined')toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
 })();
+</script>
+
+<script>
+    $(function () {
+        var exitId = null;
+
+        $('.btn-exit').on('click', function () {
+            exitId = $(this).data('id');
+            $('#exitName').text($(this).data('name'));
+            $('#exitDate').val(new Date().toISOString().slice(0, 10));
+            $('#exitReason').val('');
+            new bootstrap.Modal(document.getElementById('exitModal')).show();
+        });
+
+        $('#exitConfirm').on('click', function () {
+            var $btn = $(this).prop('disabled', true);
+            $.ajax({
+                url: '@Url.Action("Exit", "Student", new { area = "ERP" })',
+                type: 'POST',
+                contentType: 'application/json',
+                headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+                data: JSON.stringify({
+                    studentId: exitId,
+                    status: $('#exitStatus').val(),
+                    dateOfLeaving: $('#exitDate').val(),
+                    reason: $('#exitReason').val()
+                })
+            })
+            .done(function (res) {
+                if (res && res.success) {
+                    toastr.success(res.message);
+                    // Dues do not block the exit, but the office needs to know.
+                    if (res.outstanding > 0) {
+                        toastr.warning('Outstanding dues of ' + Number(res.outstanding).toFixed(2) + ' remain.');
+                    }
+                    setTimeout(function () { location.reload(); }, 1200);
+                } else {
+                    toastr.error((res && res.message) || 'Could not mark as left.');
+                    $btn.prop('disabled', false);
+                }
+            })
+            .fail(function () {
+                toastr.error('Something went wrong.');
+                $btn.prop('disabled', false);
+            });
+        });
+    });
 </script>
 }

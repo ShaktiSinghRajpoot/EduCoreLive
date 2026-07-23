@@ -61,19 +61,32 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        public IActionResult Inactive()
+        // Students who have left. Same fat-model shape as StudentList: filters and
+        // paging come in on the query string, the service fills Items + tiles.
+        public async Task<IActionResult> Inactive(StudentExitListModel query)
         {
-            return View();
+            await _admissionService.GetStudentExitListAsync(query, TenantId(), SchoolId(), UserId());
+            return View(query);
+        }
+
+        // Mark a student as having left. Outstanding dues are reported back, not
+        // blocked — the student has left either way, and the TC step checks again.
+        [HttpPost]
+        [HasPermission("students.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Exit([FromBody] StudentExitRequest request)
+        {
+            var result = await _admissionService.ExitStudentAsync(request, TenantId(), SchoolId(), UserId());
+            return Json(new { success = result.Success, message = result.Message, outstanding = result.Outstanding });
         }
 
         [HttpPost]
         [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
-        public IActionResult Reactivate(int id)
+        public async Task<IActionResult> Reactivate([FromBody] StudentExitRequest request)
         {
-            // Replace with real service call once the SP is ready.
-            TempData["SuccessMessage"] = "Student re-activated successfully.";
-            return RedirectToAction("Inactive");
+            var result = await _admissionService.UndoStudentExitAsync(request.StudentId, TenantId(), SchoolId(), UserId());
+            return Json(new { success = result.Success, message = result.Message });
         }
 
         [HttpPost]

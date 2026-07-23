@@ -33,5 +33,18 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<AdmissionModel?> GetStudentByIdAsync(int studentId, int tenantId, int schoolId, int actionUserId);
 
         Task<int> DeleteStudentAsync(int studentId, int tenantId, int schoolId, int actionUserId);
+
+        // ── Student exit (backs Student/Inactive, and the TC module on top of it) ──
+
+        /// <summary>Marks a student as having left. Dues do not block it — they are reported.</summary>
+        Task<StudentExitResult> ExitStudentAsync(
+            StudentExitRequest request, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Undoes an exit and puts the student back on the active roll.</summary>
+        Task<StudentExitResult> UndoStudentExitAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId);
+
+        Task<StudentExitListModel> GetStudentExitListAsync(
+            StudentExitListModel query, int tenantId, int schoolId, int actionUserId);
     }
 }
