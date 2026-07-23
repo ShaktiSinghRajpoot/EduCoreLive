@@ -2,6 +2,10 @@
 @model educore.Models.SchoolManageModel
 @{
     ViewData["Title"] = "Documents & Formats";
+    // ERP area views get no layout from the root _ViewStart — set it explicitly,
+    // like every other page here. Without this the page renders raw (no theme
+    // CSS, no vendor JS), which looks like "CSS and JS not working".
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var rcFmt = (ViewBag.ReceiptFormat as string) ?? "A4";
 }
 
@@ -59,28 +63,92 @@
         </div>
     </div>
 
-    @* ── Documents that do not exist yet. The format picker is deliberately not
-         built until the document itself is, otherwise the setting controls nothing. *@
+    @* ── Transfer Certificate ─────────────────────────────────────── *@
+    @{
+        var tcFmt = (ViewBag.TcFormat as string) ?? "Basic";
+        var tcOpts = new[]
+        {
+            new { Key = "Basic", Icon = "bx-file",     Title = "Basic TC (Default)",  Desc = "The everyday certificate — suits most private schools. Name, parentage, class, dates, conduct and reason for leaving." },
+            new { Key = "Board", Icon = "bx-buildings", Title = "Board Format TC",    Desc = "Adds the fields CBSE / ICSE / State boards require: exam & result, subjects, attendance, fees-paid-upto, activities and date of application." }
+        };
+    }
     <div class="ec-card mt-4">
         <div class="ec-card-header">
             <div class="ec-section-title-wrap d-flex align-items-center gap-3">
                 <span class="ec-section-icon"><i class="bx bx-transfer"></i></span>
                 <div>
-                    <h5 class="mb-0">Transfer Certificate <span class="ec-badge ec-badge-soon">soon</span></h5>
-                    <p class="ec-section-subtitle mb-0">Formats appear here once the TC module is built.</p>
+                    <h5 class="mb-0">Transfer Certificate</h5>
+                    <p class="ec-section-subtitle mb-0">The default format for a new TC. You can still pick a format when you issue one.</p>
                 </div>
+            </div>
+        </div>
+        <div class="ec-card-body">
+            <div class="row g-3">
+                @foreach (var o in tcOpts)
+                {
+                    <div class="col-12 col-md-6">
+                        <label class="ec-detail-box h-100 d-block" style="cursor:pointer">
+                            <div class="d-flex align-items-start gap-2">
+                                <input class="form-check-input mt-1 tc-fmt" type="radio" name="TcFormat"
+                                       value="@o.Key" @(tcFmt == o.Key ? "checked" : "") />
+                                <div>
+                                    <div class="fw-bold"><i class="bx @o.Icon me-1"></i>@o.Title</div>
+                                    <small class="text-muted">@o.Desc</small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                }
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary" id="tcFormatPreview"><i class="bx bx-show me-1"></i>Preview</button>
+                <button type="button" class="btn btn-primary" id="tcFormatSave"><i class="bx bx-save me-1"></i>Save format</button>
+                <span class="text-muted" style="font-size:.8rem">Preview opens a sample certificate in a new tab.</span>
             </div>
         </div>
     </div>
 
+    @* ── Student ID Card ──────────────────────────────────────────── *@
+    @{
+        var idFmt = (ViewBag.IdCardFormat as string) ?? "Portrait";
+        var idOpts = new[]
+        {
+            new { Key = "Portrait",  Icon = "bx-rectangle", Title = "Portrait", Desc = "Tall card (photo on top, details below). The usual student ID card." },
+            new { Key = "Landscape", Icon = "bx-square",    Title = "Landscape", Desc = "Wide card (photo on the left, details on the right)." }
+        };
+    }
     <div class="ec-card mt-4">
         <div class="ec-card-header">
             <div class="ec-section-title-wrap d-flex align-items-center gap-3">
                 <span class="ec-section-icon"><i class="bx bx-id-card"></i></span>
                 <div>
-                    <h5 class="mb-0">Student ID Card <span class="ec-badge ec-badge-soon">soon</span></h5>
-                    <p class="ec-section-subtitle mb-0">Formats appear here once ID card printing is built.</p>
+                    <h5 class="mb-0">Student ID Card</h5>
+                    <p class="ec-section-subtitle mb-0">The default layout for printing ID cards. Print a whole class from Students → ID Cards.</p>
                 </div>
+            </div>
+        </div>
+        <div class="ec-card-body">
+            <div class="row g-3">
+                @foreach (var o in idOpts)
+                {
+                    <div class="col-12 col-md-6">
+                        <label class="ec-detail-box h-100 d-block" style="cursor:pointer">
+                            <div class="d-flex align-items-start gap-2">
+                                <input class="form-check-input mt-1 id-fmt" type="radio" name="IdCardFormat"
+                                       value="@o.Key" @(idFmt == o.Key ? "checked" : "") />
+                                <div>
+                                    <div class="fw-bold"><i class="bx @o.Icon me-1"></i>@o.Title</div>
+                                    <small class="text-muted">@o.Desc</small>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                }
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-3 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary" id="idFormatPreview"><i class="bx bx-show me-1"></i>Preview</button>
+                <button type="button" class="btn btn-primary" id="idFormatSave"><i class="bx bx-save me-1"></i>Save layout</button>
+                <span class="text-muted" style="font-size:.8rem">Preview opens sample cards in a new tab.</span>
             </div>
         </div>
     </div>
@@ -121,6 +189,59 @@
                 var $btn = $(this).prop('disabled', true);
                 $.ajax({
                     url: '@Url.Action("SaveReceiptFormat", "Fee", new { area = "ERP" })',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+                    data: JSON.stringify({ format: fmt })
+                })
+                .done(function (res) {
+                    if (res && res.success) toastr.success(res.message || 'Saved.');
+                    else toastr.error((res && res.message) || 'Could not save.');
+                })
+                .fail(function () { toastr.error('Something went wrong.'); })
+                .always(function () { $btn.prop('disabled', false); });
+            });
+
+            // ── Transfer Certificate ──
+            // Preview is a server-rendered sample page — just open it in a new tab.
+            $('#tcFormatPreview').on('click', function () {
+                var fmt = $('.tc-fmt:checked').val() || 'Basic';
+                window.open('@Url.Action("Preview", "Tc", new { area = "ERP" })?format=' + fmt, '_blank');
+            });
+
+            $('#tcFormatSave').on('click', function () {
+                var fmt = $('.tc-fmt:checked').val();
+                if (!fmt) { toastr.error('Choose a format.'); return; }
+
+                var $btn = $(this).prop('disabled', true);
+                $.ajax({
+                    url: '@Url.Action("SaveTcFormat", "SchoolSettings", new { area = "ERP" })',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+                    data: JSON.stringify({ format: fmt })
+                })
+                .done(function (res) {
+                    if (res && res.success) toastr.success(res.message || 'Saved.');
+                    else toastr.error((res && res.message) || 'Could not save.');
+                })
+                .fail(function () { toastr.error('Something went wrong.'); })
+                .always(function () { $btn.prop('disabled', false); });
+            });
+
+            // ── Student ID Card ──
+            $('#idFormatPreview').on('click', function () {
+                var fmt = $('.id-fmt:checked').val() || 'Portrait';
+                window.open('@Url.Action("Preview", "IdCard", new { area = "ERP" })?format=' + fmt, '_blank');
+            });
+
+            $('#idFormatSave').on('click', function () {
+                var fmt = $('.id-fmt:checked').val();
+                if (!fmt) { toastr.error('Choose a layout.'); return; }
+
+                var $btn = $(this).prop('disabled', true);
+                $.ajax({
+                    url: '@Url.Action("SaveIdCardFormat", "SchoolSettings", new { area = "ERP" })',
                     type: 'POST',
                     contentType: 'application/json',
                     headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },

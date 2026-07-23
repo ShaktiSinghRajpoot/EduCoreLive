@@ -94,6 +94,20 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Saves the school's fee-receipt print format.</summary>
         Task<bool> SaveReceiptFormatAsync(string format, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>The school's default Transfer Certificate format: "Standard" or
+        /// "Simple". Defaults to Standard when never set.</summary>
+        Task<string> GetTcFormatAsync(int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Saves the school's default Transfer Certificate format.</summary>
+        Task<bool> SaveTcFormatAsync(string format, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>The school's default student ID-card layout: "Portrait" or
+        /// "Landscape". Defaults to Portrait when never set.</summary>
+        Task<string> GetIdCardFormatAsync(int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Saves the school's default student ID-card layout.</summary>
+        Task<bool> SaveIdCardFormatAsync(string format, int tenantId, int schoolId, int actionUserId);
+
         Task<decimal> GetCollectionPointResolvedTotalAsync(
             string className,
             string academicYear,

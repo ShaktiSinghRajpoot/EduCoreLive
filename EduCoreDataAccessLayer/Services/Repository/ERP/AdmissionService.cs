@@ -397,6 +397,38 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return query;
         }
 
+        public async Task<(bool Success, string Message, string? PhotoUrl)> SetStudentPhotoAsync(
+            int studentId, string? photoUrl, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0)
+                return (false, "Invalid student context.", null);
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",     NpgsqlDbType.Integer) { Value = studentId },
+                new("p_photo_url",      NpgsqlDbType.Varchar) { Value = (object?)photoUrl ?? DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "student_photo_cursor" }
+            };
+
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_student_set_photo", parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return (false, "Nothing was changed.", null);
+
+                var row = ds.Tables[0].Rows[0];
+                return (true, Str(row, "message"), NullStr(row, "photo_url"));
+            }
+            catch (PostgresException ex)
+            {
+                return (false, ex.MessageText, null);
+            }
+        }
+
         // ── Mapper ───────────────────────────────────────────────
         private static StudentListModel MapListRow(DataRow row) => new()
         {
@@ -416,7 +448,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             ApprovalStatus = Has(row, "approval_status") && row["approval_status"] != DBNull.Value ? row["approval_status"].ToString()! : "Approved",
             FeeStatus      = Has(row, "fee_status") && row["fee_status"] != DBNull.Value ? row["fee_status"].ToString()! : "Pending",
             FeeDue         = DecVal(row, "fee_due"),
-            EnquiryId      = Has(row, "enquiry_id") && row["enquiry_id"] != DBNull.Value ? Convert.ToInt32(row["enquiry_id"]) : null
+            EnquiryId      = Has(row, "enquiry_id") && row["enquiry_id"] != DBNull.Value ? Convert.ToInt32(row["enquiry_id"]) : null,
+            PhotoUrl       = NullStr(row, "photo_url")
         };
 
         // ── Tiny helpers (same style as EnquiryService) ──────────

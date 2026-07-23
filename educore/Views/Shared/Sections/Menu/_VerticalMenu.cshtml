@@ -151,7 +151,7 @@
         @* ---- Students ---- *@
         @if (gStudents)
         {
-        <li class='menu-item @Open("StudentList","Admission/Create","EditStudent")'>
+        <li class='menu-item @Open("StudentList","Admission/Create","EditStudent","Inactive","Register","IdCard")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-plus ic-students"></i>
                 <div class="text-truncate">Students</div>
@@ -162,6 +162,8 @@
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-category submenu-icon c-purple"></i><div class="text-truncate">Student Categories</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class='menu-item @On("Promotion")'><a asp-area="ERP" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
                 <li class='menu-item @On("Inactive")'><a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
+                <li class='menu-item @On("Register")'><a asp-area="ERP" asp-controller="Tc" asp-action="Register" class="menu-link"><i class="bx bx-award submenu-icon c-teal"></i><div class="text-truncate">TC Register</div></a></li>
+                <li class='menu-item @On("IdCard")'><a asp-area="ERP" asp-controller="IdCard" asp-action="Index" class="menu-link"><i class="bx bx-id-card submenu-icon c-purple"></i><div class="text-truncate">ID Cards</div></a></li>
             </ul>
         </li>
         }

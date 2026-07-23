@@ -230,7 +230,14 @@
                   <tr>
                     <td>
                       <a href="@dashUrl" class="d-flex align-items-center gap-2 text-decoration-none" style="cursor:pointer;">
-                        <span class="sl-av bg-label-@color text-@color">@Initials(s.StudentName)</span>
+                        @if (!string.IsNullOrWhiteSpace(s.PhotoUrl))
+                        {
+                            <img src="@s.PhotoUrl" class="sl-av" style="object-fit:cover;padding:0;" alt="" />
+                        }
+                        else
+                        {
+                            <span class="sl-av bg-label-@color text-@color">@Initials(s.StudentName)</span>
+                        }
                         <div><div class="sl-nm">@s.StudentName</div><div class="sl-rl">@roll</div></div>
                       </a>
                     </td>
@@ -244,6 +251,10 @@
                     <td>
                       <div class="d-inline-flex gap-1 align-items-center">
                         <a href="@dashUrl" class="sl-view-btn"><i class="bx bx-layout"></i>Dashboard</a>
+                        <button type="button" class="btn btn-sm btn-icon btn-outline-secondary btn-photo"
+                                title="Upload photo" data-id="@s.StudentId" data-name="@s.StudentName">
+                          <i class="bx bx-camera"></i>
+                        </button>
                         <button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-exit"
                                 title="Mark as left" data-id="@s.StudentId" data-name="@s.StudentName">
                           <i class="bx bx-user-x"></i>
@@ -276,7 +287,14 @@
               var dashUrl = Url.Action("Dashboard", "Student", new { area = "ERP", id = s.StudentId });
               <div class="sl-mob-card">
                 <div class="sl-mob-top">
-                  <span class="sl-mob-av bg-label-@color text-@color">@Initials(s.StudentName)</span>
+                  @if (!string.IsNullOrWhiteSpace(s.PhotoUrl))
+                  {
+                      <img src="@s.PhotoUrl" class="sl-mob-av" style="object-fit:cover;padding:0;" alt="" />
+                  }
+                  else
+                  {
+                      <span class="sl-mob-av bg-label-@color text-@color">@Initials(s.StudentName)</span>
+                  }
                   <div class="flex-grow-1">
                     <div class="sl-nm">@s.StudentName</div>
                     <div class="sl-rl">@roll · @s.ClassName @s.Section</div>
@@ -355,6 +373,27 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-danger" id="exitConfirm">Mark as left</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@* Student photo — shows on the directory avatar and the ID card. *@
+<div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:18px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Upload photo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="mb-3">Photo for <strong id="photoName">—</strong>. JPG, PNG or WEBP, up to 2 MB.</p>
+        <img id="photoPreview" src="" alt="" style="display:none;width:120px;height:150px;object-fit:cover;border:1px solid #ccc;border-radius:8px;margin-bottom:12px;" />
+        <input type="file" class="form-control" id="photoFile" accept="image/jpeg,image/png,image/webp" />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="photoUpload">Upload</button>
       </div>
     </div>
   </div>
@@ -446,6 +485,54 @@ if(typeof toastr!=='undefined')toastr.options={closeButton:true,progressBar:true
                 toastr.error('Something went wrong.');
                 $btn.prop('disabled', false);
             });
+        });
+
+        // ── Upload photo ──
+        var photoId = null;
+        var photoModal = new bootstrap.Modal(document.getElementById('photoModal'));
+
+        $('.btn-photo').on('click', function () {
+            photoId = $(this).data('id');
+            $('#photoName').text($(this).data('name'));
+            $('#photoFile').val('');
+            $('#photoPreview').hide().attr('src', '');
+            photoModal.show();
+        });
+
+        // Show the picked image before uploading.
+        $('#photoFile').on('change', function () {
+            var f = this.files && this.files[0];
+            if (!f) { $('#photoPreview').hide(); return; }
+            $('#photoPreview').attr('src', URL.createObjectURL(f)).show();
+        });
+
+        $('#photoUpload').on('click', function () {
+            var files = $('#photoFile')[0].files;
+            if (!files || !files.length) { toastr.error('Choose an image.'); return; }
+
+            var fd = new FormData();
+            fd.append('id', photoId);
+            fd.append('photo', files[0]);
+            fd.append('__RequestVerificationToken', $('input[name="__RequestVerificationToken"]').first().val());
+
+            var $btn = $(this).prop('disabled', true);
+            $.ajax({
+                url: '@Url.Action("UploadPhoto", "Student", new { area = "ERP" })',
+                type: 'POST',
+                data: fd,
+                processData: false,
+                contentType: false
+            })
+            .done(function (res) {
+                if (res && res.success) {
+                    toastr.success(res.message || 'Photo updated.');
+                    setTimeout(function () { location.reload(); }, 800);
+                } else {
+                    toastr.error((res && res.message) || 'Could not upload.');
+                    $btn.prop('disabled', false);
+                }
+            })
+            .fail(function () { toastr.error('Something went wrong.'); $btn.prop('disabled', false); });
         });
     });
 </script>

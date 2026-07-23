@@ -16,6 +16,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private readonly AppCache _cache;
         private const string SpBasicProfileManage = "core.sp_school_admin_basic_profile_manage";
         private const string SpReceiptFormatManage = "core.sp_school_receipt_format_manage";
+        private const string SpTcFormatManage = "core.sp_school_tc_format_manage";
+        private const string SpIdCardFormatManage = "core.sp_school_id_card_format_manage";
         private const string SpSchoolDropdowns = "config.sp_school_dropdowns";
         private const string SpAcademicSetupManage = "academic.sp_school_admin_academic_setup_manage";
         private const string SpFeeHeadManage = "core.sp_school_admin_fee_head_manage";
@@ -973,6 +975,100 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
             var ds = await _db.ExecuteProcedureWithCursorsAsync(SpReceiptFormatManage, parameters);
             _cache.Remove(ReceiptFormatKey(tenantId, schoolId));   // next read picks up the change
+            return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0;
+        }
+
+        // TC format — same read-mostly/cache-and-bust pattern as the receipt format.
+        private static string TcFormatKey(int tenantId, int schoolId) => AppCache.Key("tcformat", tenantId, schoolId);
+
+        public async Task<string> GetTcFormatAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return "Basic";
+
+            return await _cache.GetOrCreateAsync(TcFormatKey(tenantId, schoolId), async () =>
+            {
+                var parameters = new NpgsqlParameter[]
+                {
+                    new NpgsqlParameter("p_operation",      "Get"),
+                    new NpgsqlParameter("p_tenant_id",      tenantId),
+                    new NpgsqlParameter("p_school_id",      schoolId),
+                    new NpgsqlParameter("p_action_user_id", actionUserId),
+                    new NpgsqlParameter("p_tc_format",      DBNull.Value),
+                    new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "tc_format_cursor" }
+                };
+
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpTcFormatManage, parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return "Basic";
+
+                var v = ds.Tables[0].Rows[0]["tc_format"];
+                return v == DBNull.Value ? "Basic" : (v.ToString() ?? "Basic");
+            });
+        }
+
+        public async Task<bool> SaveTcFormatAsync(string format, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return false;
+            if (format is not ("Basic" or "Board")) format = "Basic";
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation",      "Save"),
+                new NpgsqlParameter("p_tenant_id",      tenantId),
+                new NpgsqlParameter("p_school_id",      schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_tc_format",      format),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "tc_format_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpTcFormatManage, parameters);
+            _cache.Remove(TcFormatKey(tenantId, schoolId));
+            return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0;
+        }
+
+        // ID-card format — same cache-and-bust pattern as the receipt / TC format.
+        private static string IdCardFormatKey(int tenantId, int schoolId) => AppCache.Key("idcardformat", tenantId, schoolId);
+
+        public async Task<string> GetIdCardFormatAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return "Portrait";
+
+            return await _cache.GetOrCreateAsync(IdCardFormatKey(tenantId, schoolId), async () =>
+            {
+                var parameters = new NpgsqlParameter[]
+                {
+                    new NpgsqlParameter("p_operation",      "Get"),
+                    new NpgsqlParameter("p_tenant_id",      tenantId),
+                    new NpgsqlParameter("p_school_id",      schoolId),
+                    new NpgsqlParameter("p_action_user_id", actionUserId),
+                    new NpgsqlParameter("p_format",         DBNull.Value),
+                    new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "id_card_format_cursor" }
+                };
+
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpIdCardFormatManage, parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return "Portrait";
+
+                var v = ds.Tables[0].Rows[0]["id_card_format"];
+                return v == DBNull.Value ? "Portrait" : (v.ToString() ?? "Portrait");
+            });
+        }
+
+        public async Task<bool> SaveIdCardFormatAsync(string format, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return false;
+            if (format is not ("Portrait" or "Landscape")) format = "Portrait";
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation",      "Save"),
+                new NpgsqlParameter("p_tenant_id",      tenantId),
+                new NpgsqlParameter("p_school_id",      schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_format",         format),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "id_card_format_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpIdCardFormatManage, parameters);
+            _cache.Remove(IdCardFormatKey(tenantId, schoolId));
             return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0;
         }
 

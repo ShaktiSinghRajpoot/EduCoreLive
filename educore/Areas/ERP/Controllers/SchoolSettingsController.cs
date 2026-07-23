@@ -187,8 +187,40 @@ namespace educore.Areas.ERP.Controllers
             if (model == null) return RedirectToAction("AccessDenied", "Account", new { area = "" });
 
             ViewBag.ReceiptFormat = await _schoolSettingsService.GetReceiptFormatAsync(tenantId, schoolId, actionUserId);
+            ViewBag.TcFormat      = await _schoolSettingsService.GetTcFormatAsync(tenantId, schoolId, actionUserId);
+            ViewBag.IdCardFormat  = await _schoolSettingsService.GetIdCardFormatAsync(tenantId, schoolId, actionUserId);
 
             return View(model);
+        }
+
+        // Save the default Transfer Certificate format (Documents & Formats page).
+        public class TcFormatDto { public string? Format { get; set; } }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("settings.manage")]
+        public async Task<IActionResult> SaveTcFormat([FromBody] TcFormatDto dto)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var ok = await _schoolSettingsService.SaveTcFormatAsync(dto?.Format ?? "Basic", tenantId, schoolId, actionUserId);
+            return Json(new { success = ok, message = ok ? "Transfer Certificate format saved." : "Could not save the format." });
+        }
+
+        // Save the default student ID-card layout (Documents & Formats page).
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("settings.manage")]
+        public async Task<IActionResult> SaveIdCardFormat([FromBody] TcFormatDto dto)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var ok = await _schoolSettingsService.SaveIdCardFormatAsync(dto?.Format ?? "Portrait", tenantId, schoolId, actionUserId);
+            return Json(new { success = ok, message = ok ? "ID card layout saved." : "Could not save the layout." });
         }
         #endregion
 

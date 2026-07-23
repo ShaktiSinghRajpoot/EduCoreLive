@@ -46,5 +46,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         Task<StudentExitListModel> GetStudentExitListAsync(
             StudentExitListModel query, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Sets (or clears) a student's photo URL after the file is saved.</summary>
+        Task<(bool Success, string Message, string? PhotoUrl)> SetStudentPhotoAsync(
+            int studentId, string? photoUrl, int tenantId, int schoolId, int actionUserId);
     }
 }

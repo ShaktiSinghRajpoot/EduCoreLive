@@ -1,0 +1,129 @@
+@model educore.Models.IdCardPrintModel
+@{
+    Layout = null;
+    var sc = Model.School;
+    var land = Model.IsLandscape;
+
+    var addr = string.Join(", ", new[] { sc.AddressLine1, sc.City, sc.State }
+        .Where(p => !string.IsNullOrWhiteSpace(p)));
+
+    string V(string? s) => string.IsNullOrWhiteSpace(s) ? "—" : s;
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Student ID Cards</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111; background: #eceff3; }
+
+        .id-toolbar { text-align: center; padding: 10px; }
+        .id-toolbar button { padding: 8px 18px; font-size: 14px; cursor: pointer; }
+        .id-note { text-align: center; color: #667; font-size: 12px; padding: 0 10px 8px; }
+
+        /* Sheet: cards flow and wrap; each is a fixed CR80 size so print is true. */
+        .id-sheet { display: flex; flex-wrap: wrap; gap: 6mm; justify-content: flex-start;
+                    padding: 10mm; max-width: 210mm; margin: 0 auto; }
+
+        .id-card { border: 1px solid #26426b; border-radius: 10px; overflow: hidden;
+                   background: #fff; display: flex; flex-direction: column; }
+        .id-portrait  { width: 54mm;   height: 85.6mm; }
+        .id-landscape { width: 85.6mm; height: 54mm; }
+
+        .id-head { background: #26426b; color: #fff; text-align: center; padding: 4px 5px; }
+        .id-head .id-logo { max-height: 9mm; max-width: 18mm; object-fit: contain; margin-bottom: 2px; }
+        .id-school { font-size: 9.5px; font-weight: 700; line-height: 1.15; }
+        .id-sub { font-size: 6.5px; opacity: .9; letter-spacing: .5px; }
+
+        .id-body { flex: 1; display: flex; }
+        .id-portrait  .id-body { flex-direction: column; align-items: center; padding: 4px 5px; }
+        .id-landscape .id-body { flex-direction: row; gap: 5px; padding: 5px 6px; }
+
+        .id-photo { border: 1px solid #9bb0cc; border-radius: 4px; background: #f2f5f9;
+                    display: flex; align-items: center; justify-content: center;
+                    color: #9bb0cc; font-size: 7px; letter-spacing: 1px; flex: 0 0 auto; }
+        .id-portrait  .id-photo { width: 22mm; height: 26mm; margin: 3px 0; }
+        .id-landscape .id-photo { width: 20mm; height: 25mm; }
+
+        .id-name { font-size: 11px; font-weight: 700; text-align: center; color: #26426b; }
+        .id-landscape .id-name { text-align: left; }
+
+        .id-rows { width: 100%; font-size: 8px; border-collapse: collapse; margin-top: 2px; }
+        .id-rows td { padding: 1px 2px; vertical-align: top; }
+        .id-rows .k { color: #667; width: 40%; }
+        .id-rows .v { font-weight: 600; }
+
+        .id-foot { border-top: 1px dashed #9bb0cc; text-align: center; font-size: 6.5px; color: #667; padding: 2px; }
+
+        @@media print {
+            body { background: #fff; }
+            .id-toolbar, .id-note { display: none; }
+            .id-sheet { padding: 6mm; gap: 5mm; }
+            @@page { size: A4; margin: 6mm; }
+            .id-card { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="id-toolbar">
+        <button type="button" onclick="window.print()">Print @Model.Students.Count card(s)</button>
+    </div>
+    <div class="id-note">Photos are blank — paste or print them separately until student-photo upload is enabled.</div>
+
+    @if (!Model.Students.Any())
+    {
+        <div class="id-note">No students found for this class / section / year.</div>
+    }
+
+    <div class="id-sheet">
+        @foreach (var s in Model.Students)
+        {
+            <div class="id-card @(land ? "id-landscape" : "id-portrait")">
+                <div class="id-head">
+                    @if (!string.IsNullOrWhiteSpace(Model.LogoUrl))
+                    {
+                        <img class="id-logo" src="@Model.LogoUrl" alt="" onerror="this.style.display='none'" />
+                    }
+                    <div class="id-school">@V(sc.SchoolName)</div>
+                    <div class="id-sub">STUDENT IDENTITY CARD@(string.IsNullOrWhiteSpace(s.AcademicYear) ? "" : " · " + s.AcademicYear)</div>
+                </div>
+
+                <div class="id-body">
+                    @if (!string.IsNullOrWhiteSpace(s.PhotoUrl))
+                    {
+                        <img class="id-photo" src="@s.PhotoUrl" alt="PHOTO" style="object-fit:cover;" />
+                    }
+                    else
+                    {
+                        <div class="id-photo">PHOTO</div>
+                    }
+
+                    <div style="flex:1; min-width:0;">
+                        <div class="id-name">@s.StudentName</div>
+                        <table class="id-rows">
+                            <tr><td class="k">Class</td><td class="v">@s.ClassDisplay</td></tr>
+                            <tr><td class="k">Adm No</td><td class="v">@V(s.AdmissionNo)</td></tr>
+                            <tr><td class="k">Roll No</td><td class="v">@V(s.RollNo)</td></tr>
+                            <tr><td class="k">DOB</td><td class="v">@s.DobDisplay</td></tr>
+                            <tr><td class="k">Blood</td><td class="v">@V(s.BloodGroup)</td></tr>
+                            <tr><td class="k">Father</td><td class="v">@V(s.GuardianName)</td></tr>
+                            <tr><td class="k">Mobile</td><td class="v">@V(s.Mobile)</td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="id-foot">@(string.IsNullOrWhiteSpace(addr) ? "Signature of Principal" : addr)</div>
+            </div>
+        }
+    </div>
+
+    @if (!Model.IsPreview && Model.Students.Any())
+    {
+        <script>
+            window.addEventListener('load', function () { window.print(); });
+        </script>
+    }
+</body>
+</html>

@@ -52,6 +52,7 @@ BEGIN
                 s.gender, s.class_name, s.section, s.academic_year,
                 s.admission_date, s.guardian_name, s.mobile,
                 s.annual_total, s.status, s.approval_status, s.enquiry_id,
+                s.photo_url,
                 COALESCE((
                     SELECT CASE
                         WHEN SUM(l.amount_due) = 0 THEN 'Paid'
@@ -91,7 +92,7 @@ BEGIN
             student_id, admission_no, roll_no, student_name, gender,
             class_name, section, academic_year, admission_date,
             guardian_name, mobile, annual_total, status, approval_status,
-            enquiry_id, fee_status, fee_due,
+            enquiry_id, fee_status, fee_due, photo_url,
             COUNT(*)                                                    OVER() AS total_count,
             COUNT(*) FILTER (WHERE UPPER(COALESCE(gender,'')) = 'MALE')   OVER() AS male_count,
             COUNT(*) FILTER (WHERE UPPER(COALESCE(gender,'')) = 'FEMALE') OVER() AS female_count,

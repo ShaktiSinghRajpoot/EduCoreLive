@@ -1,0 +1,213 @@
+@model educore.Models.TcPrintModel
+@{
+    Layout = null;
+    var tc = Model.Tc;
+    var sc = Model.School;
+    var board = tc.IsBoard;
+
+    var addr = string.Join(", ", new[] { sc.AddressLine1, sc.AddressLine2, sc.City, sc.District, sc.State, sc.Pincode }
+        .Where(p => !string.IsNullOrWhiteSpace(p)));
+
+    string D(DateOnly? d) => d?.ToString("dd MMM yyyy") ?? "—";
+    string V(string? s)   => string.IsNullOrWhiteSpace(s) ? "—" : s;
+    string N(int? n)      => n?.ToString() ?? "—";
+
+    // The certificate particulars, in order. The Board template adds the fields
+    // CBSE / ICSE / State boards ask for; Basic keeps the common set.
+    var rows = new List<(string Label, string Value)>
+    {
+        ("Admission No.",       V(tc.AdmissionNo)),
+        ("Student's Name",      V(tc.StudentName)),
+        ("Father's Name",       V(tc.FatherName)),
+        ("Mother's Name",       V(tc.MotherName)),
+        ("Date of Birth (fig.)", D(tc.Dob))
+    };
+    if (board)
+    {
+        rows.Add(("Date of Birth (words)", tc.Dob.HasValue ? DobInWords(tc.Dob.Value) : "—"));
+    }
+    rows.Add(("Gender",              V(tc.Gender)));
+    rows.Add(("Nationality",         V(tc.Nationality)));
+    rows.Add(("Religion / Category", $"{V(tc.Religion)} / {V(tc.Category)}"));
+    if (board)
+    {
+        rows.Add(("UDISE / PEN No.",  V(tc.UdiseNo)));
+    }
+    rows.Add(("Date of Admission",   D(tc.AdmissionDate)));
+    rows.Add(("Class Last Studied",  tc.ClassDisplay));
+    rows.Add(("Academic Year",       V(tc.AcademicYear)));
+    if (board)
+    {
+        rows.Add(("Last Exam & Result",       V(tc.ExamResult)));
+        rows.Add(("Whether Failed Before",    V(tc.FailedStatus)));
+        rows.Add(("Subjects Studied",         V(tc.SubjectsStudied)));
+    }
+    rows.Add(("Qualified for Promotion", V(tc.Result)));
+    if (board)
+    {
+        rows.Add(("Fees Paid Up To",          V(tc.FeesPaidUpto)));
+        rows.Add(("Total Working Days",       N(tc.WorkingDays)));
+        rows.Add(("Days Present",             N(tc.DaysPresent)));
+        rows.Add(("Games / Co-curricular",    V(tc.Activities)));
+    }
+    rows.Add(("Date of Leaving",     D(tc.DateOfLeaving)));
+    rows.Add(("Reason for Leaving",  V(tc.ReasonForLeaving)));
+    rows.Add(("General Conduct",     V(tc.Conduct)));
+    if (board)
+    {
+        rows.Add(("Date of Application", D(tc.ApplicationDate)));
+    }
+    rows.Add(("Date of Issue",       D(tc.IssueDate)));
+}
+@functions {
+    static readonly string[] Ones = { "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+        "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen" };
+    static readonly string[] Tens = { "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety" };
+    static readonly string[] DayOrd = { "", "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth",
+        "Ninth", "Tenth", "Eleventh", "Twelfth", "Thirteenth", "Fourteenth", "Fifteenth", "Sixteenth", "Seventeenth",
+        "Eighteenth", "Nineteenth", "Twentieth", "Twenty-First", "Twenty-Second", "Twenty-Third", "Twenty-Fourth",
+        "Twenty-Fifth", "Twenty-Sixth", "Twenty-Seventh", "Twenty-Eighth", "Twenty-Ninth", "Thirtieth", "Thirty-First" };
+
+    static string TwoDigits(int n) => n < 20 ? Ones[n] : (Tens[n / 10] + (n % 10 > 0 ? " " + Ones[n % 10] : ""));
+
+    static string YearWords(int y)
+    {
+        if (y >= 2000) { int r = y - 2000; return "Two Thousand" + (r > 0 ? " " + TwoDigits(r) : ""); }
+        return TwoDigits(y / 100) + " " + TwoDigits(y % 100);   // 19xx → "Nineteen Ninety Nine"
+    }
+
+    // "Twelfth April, Two Thousand Thirteen"
+    static string DobInWords(DateOnly d) =>
+        $"{DayOrd[d.Day]} {d:MMMM}, {YearWords(d.Year)}";
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>@tc.TcNo — Transfer Certificate</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111; background: #f4f4f4; }
+
+        .tc-sheet { background: #fff; width: 210mm; min-height: 297mm; margin: 16px auto;
+                    padding: 18mm 16mm; position: relative; }
+
+        .tc-head { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .tc-head .tc-logo { max-height: 22mm; max-width: 40mm; object-fit: contain; margin-bottom: 6px; }
+        .tc-school { font-size: 24px; font-weight: 700; letter-spacing: .3px; }
+        .tc-addr { font-size: 12px; color: #444; margin-top: 2px; }
+        .tc-affil { font-size: 11px; color: #666; margin-top: 2px; }
+
+        .tc-title { text-align: center; font-size: 16px; font-weight: 700; letter-spacing: 3px;
+                    margin: 16px 0 4px; text-decoration: underline; }
+        .tc-sub { text-align: center; font-size: 11px; color: #666; margin-bottom: 10px; }
+
+        .tc-meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 12px; }
+        .tc-meta b { font-weight: 700; }
+
+        .tc-rows { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .tc-rows td { padding: 6px 4px; vertical-align: top; border-bottom: 1px dotted #ccc; }
+        .tc-sn    { width: 26px; color: #666; }
+        .tc-label { width: 36%; color: #555; }
+        .tc-val   { font-weight: 600; }
+
+        .tc-remarks { margin-top: 12px; font-size: 12px; }
+        .tc-remarks span { color: #555; }
+
+        .tc-sign { margin-top: 40px; display: flex; justify-content: space-between; }
+        .tc-sign-box { text-align: center; font-size: 11px; color: #444; }
+        .tc-line { width: 150px; border-top: 1px solid #000; margin-bottom: 3px; }
+
+        .tc-foot { margin-top: 16px; text-align: center; font-size: 10px; color: #888; }
+
+        .tc-dup { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg);
+                  font-size: 90px; font-weight: 800; color: rgba(200,0,0,.10); letter-spacing: 8px;
+                  pointer-events: none; user-select: none; }
+
+        .tc-toolbar { text-align: center; padding: 10px; }
+        .tc-toolbar button { padding: 8px 18px; font-size: 14px; cursor: pointer; }
+
+        @@media print {
+            body { background: #fff; }
+            .tc-toolbar { display: none; }
+            .tc-sheet { margin: 0; width: auto; box-shadow: none; }
+            @@page { size: A4; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="tc-toolbar">
+        <button type="button" onclick="window.print()">Print this certificate</button>
+    </div>
+
+    <div class="tc-sheet">
+
+        @if (Model.ShowDuplicate)
+        {
+            <div class="tc-dup">DUPLICATE</div>
+        }
+
+        <div class="tc-head">
+            @if (!string.IsNullOrWhiteSpace(Model.LogoUrl))
+            {
+                <img class="tc-logo" src="@Model.LogoUrl" alt="" onerror="this.style.display='none'" />
+            }
+            <div class="tc-school">@V(sc.SchoolName)</div>
+            @if (!string.IsNullOrWhiteSpace(addr))
+            {
+                <div class="tc-addr">@addr</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(sc.AffiliationNumber))
+            {
+                <div class="tc-affil">Affiliation No: @sc.AffiliationNumber</div>
+            }
+        </div>
+
+        <div class="tc-title">TRANSFER CERTIFICATE</div>
+        @if (board)
+        {
+            <div class="tc-sub">(Board Format)</div>
+        }
+
+        <div class="tc-meta">
+            <div>TC No: <b>@tc.TcNo</b></div>
+            <div>Date: <b>@D(tc.IssueDate)</b></div>
+        </div>
+
+        <table class="tc-rows">
+            @for (int i = 0; i < rows.Count; i++)
+            {
+                <tr>
+                    <td class="tc-sn">@(i + 1).</td>
+                    <td class="tc-label">@rows[i].Label</td>
+                    <td class="tc-val">@rows[i].Value</td>
+                </tr>
+            }
+        </table>
+
+        @if (!string.IsNullOrWhiteSpace(tc.Remarks))
+        {
+            <div class="tc-remarks"><span>Remarks:</span> @tc.Remarks</div>
+        }
+
+        <div class="tc-sign">
+            <div class="tc-sign-box"><div class="tc-line"></div>Class Teacher</div>
+            <div class="tc-sign-box"><div class="tc-line"></div>Checked By</div>
+            <div class="tc-sign-box"><div class="tc-line"></div>Principal</div>
+        </div>
+
+        <div class="tc-foot">
+            This is a system-generated certificate. Any alteration renders it invalid.
+        </div>
+    </div>
+
+    @if (!Model.IsPreview)
+    {
+        <script>
+            // Real certificate: open straight into the print dialog. Preview does not.
+            window.addEventListener('load', function () { window.print(); });
+        </script>
+    }
+</body>
+</html>

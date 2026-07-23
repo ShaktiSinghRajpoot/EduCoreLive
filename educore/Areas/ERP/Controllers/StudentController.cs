@@ -14,15 +14,18 @@ namespace educore.Areas.ERP.Controllers
         private readonly IBaseService _baseService;
         private readonly IAdmissionService _admissionService;
         private readonly IAdmissionWorkflowService _admissionWorkflowService;
+        private readonly IWebHostEnvironment _env;
 
         public StudentController(
             IBaseService baseService,
             IAdmissionService admissionService,
-            IAdmissionWorkflowService admissionWorkflowService)
+            IAdmissionWorkflowService admissionWorkflowService,
+            IWebHostEnvironment env)
         {
             _baseService = baseService;
             _admissionService = admissionService;
             _admissionWorkflowService = admissionWorkflowService;
+            _env = env;
         }
 
         public IActionResult StudentAttendance()
@@ -78,6 +81,42 @@ namespace educore.Areas.ERP.Controllers
         {
             var result = await _admissionService.ExitStudentAsync(request, TenantId(), SchoolId(), UserId());
             return Json(new { success = result.Success, message = result.Message, outstanding = result.Outstanding });
+        }
+
+        // Upload a student photo. Saved under wwwroot/uploads/students/... (same
+        // pattern as the school logo); the URL is stored on the student row and shows
+        // on the directory avatar and the ID card.
+        [HttpPost]
+        [HasPermission("students.manage")]
+        [ValidateAntiForgeryToken]
+        [RequestSizeLimit(3 * 1024 * 1024)]
+        public async Task<IActionResult> UploadPhoto(int id, IFormFile? photo)
+        {
+            if (id <= 0) return Json(new { success = false, message = "Unknown student." });
+            if (photo == null || photo.Length == 0) return Json(new { success = false, message = "Choose an image." });
+
+            var ext = Path.GetExtension(photo.FileName).ToLowerInvariant();
+            string[] allowed = { ".jpg", ".jpeg", ".png", ".webp" };
+            if (!allowed.Contains(ext)) return Json(new { success = false, message = "Only JPG, PNG or WEBP images are allowed." });
+            if (photo.Length > 2 * 1024 * 1024) return Json(new { success = false, message = "Image must be under 2 MB." });
+
+            var folder = Path.Combine(_env.WebRootPath, "uploads", "students", TenantId().ToString(), SchoolId().ToString());
+            Directory.CreateDirectory(folder);
+
+            var fileName = $"student_{id}_{DateTime.Now:yyyyMMddHHmmssfff}{ext}";
+            var fullPath = Path.Combine(folder, fileName);
+            using (var stream = new FileStream(fullPath, FileMode.Create))
+            {
+                await photo.CopyToAsync(stream);
+            }
+
+            var url = $"/uploads/students/{TenantId()}/{SchoolId()}/{fileName}";
+            var (ok, message, photoUrl) = await _admissionService.SetStudentPhotoAsync(id, url, TenantId(), SchoolId(), UserId());
+
+            // If the DB update failed, don't leave an orphan file behind.
+            if (!ok) { try { System.IO.File.Delete(fullPath); } catch { } }
+
+            return Json(new { success = ok, message, photoUrl });
         }
 
         [HttpPost]

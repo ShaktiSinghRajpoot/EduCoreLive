@@ -108,6 +108,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string    FeeStatus      { get; set; } = "Pending";
         public decimal   FeeDue         { get; set; }
         public int?      EnquiryId      { get; set; }
+        public string?   PhotoUrl       { get; set; }
 
         // ── Listing ──────────────────────────────────────────────
         public List<StudentListModel> Items { get; set; } = new();
