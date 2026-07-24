@@ -19,13 +19,15 @@ namespace educore.Areas.ERP.Controllers
         private readonly IBaseService _baseService;
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IStaffService _staffService;
+        private readonly IClassTeacherService _classTeacherService;
 
-        public SchoolSettingsController(ISchoolSettingsService schoolSettingsService, IBaseService BaseService, IWebHostEnvironment webHostEnvironment, IStaffService staffService)
+        public SchoolSettingsController(ISchoolSettingsService schoolSettingsService, IBaseService BaseService, IWebHostEnvironment webHostEnvironment, IStaffService staffService, IClassTeacherService classTeacherService)
         {
             _schoolSettingsService = schoolSettingsService;
             _baseService = BaseService;
             _webHostEnvironment = webHostEnvironment;
             _staffService = staffService;
+            _classTeacherService = classTeacherService;
         }
 
         #region BasicProfile
@@ -545,7 +547,8 @@ namespace educore.Areas.ERP.Controllers
                     name     = s.SectionName,
                     capacity = s.Capacity,
                     room     = s.RoomNo,
-                    strength = s.Strength
+                    strength = s.Strength,
+                    teacher  = s.ClassTeacher
                 })
             });
 
@@ -772,10 +775,39 @@ namespace educore.Areas.ERP.Controllers
         private int SmUser()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
         #endregion
 
+        [HttpGet]
         [HasPermission("academics.view")]
         public IActionResult AssignClassTeacher()
         {
             return View();
+        }
+
+        // ── Assign Class Teacher: real data for the grid ──
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> ClassTeacherGrid()
+        {
+            var grid = await _classTeacherService.GetGridAsync(SmTenant(), SmSchool(), SmUser());
+            return Json(grid);
+        }
+
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> ClassTeacherPool()
+        {
+            var teachers = await _classTeacherService.GetTeachersAsync(SmTenant(), SmSchool(), SmUser());
+            return Json(teachers);
+        }
+
+        public class AssignClassTeacherDto { public int SectionId { get; set; } public int? StaffId { get; set; } }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> AssignClassTeacher([FromBody] AssignClassTeacherDto dto)
+        {
+            var (ok, message) = await _classTeacherService.AssignAsync(dto.SectionId, dto.StaffId, SmTenant(), SmSchool(), SmUser());
+            return Json(new { success = ok, message });
         }
 
         [HasPermission("academics.view")]

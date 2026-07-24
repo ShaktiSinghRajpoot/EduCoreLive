@@ -48,6 +48,9 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int? Capacity { get; set; }
         public string? RoomNo { get; set; }
         public int Strength { get; set; }
+        // Section-level class teacher (assigned on the Assign Class Teacher page).
+        public int?    ClassTeacherStaffId { get; set; }
+        public string? ClassTeacher        { get; set; }
     }
 
     public class AcademicClassJsonModel

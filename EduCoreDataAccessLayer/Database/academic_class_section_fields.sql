@@ -16,7 +16,11 @@ ALTER TABLE academic.academic_classes
 
 ALTER TABLE academic.academic_class_sections
     ADD COLUMN IF NOT EXISTS capacity int,
-    ADD COLUMN IF NOT EXISTS room_no  varchar(50);
+    ADD COLUMN IF NOT EXISTS room_no  varchar(50),
+    -- Class teacher is section-level; assigned on the Assign Class Teacher page.
+    -- Declared here too (idempotent) so this proc can read/preserve it regardless
+    -- of script apply order.
+    ADD COLUMN IF NOT EXISTS class_teacher_staff_id integer;
 
 CREATE OR REPLACE PROCEDURE academic.sp_school_admin_academic_setup_manage(
     IN p_operation          character varying,
@@ -49,6 +53,7 @@ DECLARE
     v_coord_staff_id integer;
     v_capacity       integer;
     v_room_no        text;
+    v_ct_staff_id    integer;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -75,6 +80,8 @@ BEGIN
             acs.display_order AS section_display_order,
             acs.capacity,
             acs.room_no,
+            acs.class_teacher_staff_id,
+            cts.full_name AS class_teacher,
             COALESCE((
                 SELECT COUNT(*)
                 FROM core.students st
@@ -97,6 +104,11 @@ BEGIN
            AND acs.tenant_id = p_tenant_id
            AND acs.school_id = p_school_id
            AND COALESCE(acs.is_deleted, FALSE) = FALSE
+        LEFT JOIN core.staff cts
+            ON cts.staff_id = acs.class_teacher_staff_id
+           AND cts.tenant_id = p_tenant_id
+           AND cts.school_id = p_school_id
+           AND COALESCE(cts.is_deleted, FALSE) = FALSE
         WHERE ay.academic_year_id = p_academic_year_id
           AND COALESCE(ay.is_deleted, FALSE) = FALSE
           AND COALESCE(ay.is_active, TRUE) = TRUE
@@ -155,6 +167,21 @@ BEGIN
         ) THEN
             RAISE EXCEPTION 'Cannot remove a class or section that still has enrolled students. Move or promote those students first.';
         END IF;
+
+        -- This save replaces the whole structure (delete-all + re-insert), so the
+        -- section-level class-teacher assignment would be lost. Snapshot it by
+        -- class + section name and restore it after the rebuild. (This page does
+        -- not edit the class teacher; it's assigned on the Assign Class Teacher page.)
+        CREATE TEMP TABLE _ct_snap ON COMMIT DROP AS
+        SELECT ac.class_name, acs.section_name, acs.class_teacher_staff_id
+        FROM   academic.academic_class_sections acs
+        JOIN   academic.academic_classes ac
+               ON ac.academic_class_id = acs.academic_class_id
+        WHERE  acs.tenant_id = p_tenant_id
+          AND  acs.school_id = p_school_id
+          AND  acs.academic_year_id = v_academic_year_id
+          AND  COALESCE(acs.is_deleted, FALSE) = FALSE
+          AND  acs.class_teacher_staff_id IS NOT NULL;
 
         UPDATE academic.academic_class_sections
         SET is_deleted = TRUE, is_active = FALSE,
@@ -226,12 +253,21 @@ BEGIN
                     IF v_section_name <> '' THEN
                         v_section_order := v_section_order + 1;
 
+                        -- Restore the class teacher captured before the rebuild.
+                        SELECT class_teacher_staff_id INTO v_ct_staff_id
+                        FROM   _ct_snap
+                        WHERE  class_name = v_class_name
+                          AND  section_name = v_section_name
+                        LIMIT 1;
+
                         INSERT INTO academic.academic_class_sections
                             (tenant_id, school_id, academic_year_id, academic_class_id, section_name,
-                             display_order, capacity, room_no, created_by, created_at, is_deleted, is_active)
+                             display_order, capacity, room_no, class_teacher_staff_id,
+                             created_by, created_at, is_deleted, is_active)
                         VALUES
                             (p_tenant_id, p_school_id, v_academic_year_id, v_academic_class_id, v_section_name,
-                             v_section_order, v_capacity, v_room_no, p_action_user_id, NOW(), FALSE, TRUE);
+                             v_section_order, v_capacity, v_room_no, v_ct_staff_id,
+                             p_action_user_id, NOW(), FALSE, TRUE);
                     END IF;
                 END LOOP;
             END IF;

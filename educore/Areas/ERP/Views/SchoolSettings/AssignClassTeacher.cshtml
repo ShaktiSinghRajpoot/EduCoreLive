@@ -91,47 +91,21 @@
   </div>
 </div>
 
+@Html.AntiForgeryToken()
+
 @section PageScripts {
 <script>
 (function(){
 'use strict';
 
-/* Mock teacher pool (would come from Staff module) */
-var TEACHERS=[
-  {id:1,name:'Mrs. Rao'},      {id:2,name:'Ms. Dsouza'},   {id:3,name:'Mr. Khanna'},
-  {id:4,name:'Mrs. Iyer'},     {id:5,name:'Mrs. Sharma'},  {id:6,name:'Mr. Banerjee'},
-  {id:7,name:'Ms. Fernandes'}, {id:8,name:'Mr. Mehta'},    {id:9,name:'Mrs. Pillai'},
-  {id:10,name:'Dr. Nair'},     {id:11,name:'Mr. Gupta'},   {id:12,name:'Ms. Verma'},
-  {id:13,name:'Mr. Saxena'}
-];
+var GRID_URL   = '@Url.Action("ClassTeacherGrid", "SchoolSettings", new { area = "ERP" })';
+var POOL_URL   = '@Url.Action("ClassTeacherPool", "SchoolSettings", new { area = "ERP" })';
+var ASSIGN_URL = '@Url.Action("AssignClassTeacher", "SchoolSettings", new { area = "ERP" })';
+var TOKEN      = $('input[name="__RequestVerificationToken"]').first().val();
 
-/* Mock class/section structure (would come from Classes & Sections SP).
-   teacherId = currently assigned class teacher (0 = none). */
-var DATA=[
-  {cls:'Class 1', rank:1,  sections:[
-    {id:11,name:'A',room:'101',teacherId:1},
-    {id:12,name:'B',room:'102',teacherId:2}
-  ]},
-  {cls:'Class 2', rank:2,  sections:[
-    {id:21,name:'A',room:'103',teacherId:3},
-    {id:22,name:'B',room:'104',teacherId:0}
-  ]},
-  {cls:'Class 5', rank:5,  sections:[
-    {id:31,name:'A',room:'201',teacherId:5},
-    {id:32,name:'B',room:'202',teacherId:6},
-    {id:33,name:'C',room:'203',teacherId:0}
-  ]},
-  {cls:'Class 10',rank:10, sections:[
-    {id:41,name:'A',room:'301',teacherId:8},
-    {id:42,name:'B',room:'302',teacherId:1}   /* Mrs. Rao deliberately double-booked → conflict demo */
-  ]},
-  {cls:'Class 11',rank:11, sections:[
-    {id:51,name:'A',room:'401',teacherId:0}
-  ]},
-  {cls:'Class 12',rank:12, sections:[
-    {id:61,name:'A',room:'402',teacherId:11}
-  ]}
-];
+// Loaded from the server: the staff pool and the class/section grid.
+var TEACHERS=[];   // { id: staffId, name: fullName }
+var DATA=[];       // [{ cls, rank, sections:[{ id, name, room, teacherId }] }]
 
 var showUnassignedOnly=false;
 
@@ -153,13 +127,35 @@ function loadMap(){
 }
 function loadCls(n){ return n>=3?'over':(n===2?'busy':'ok'); }
 
-/* Populate class filter */
-(function(){
+/* Populate class filter from whatever classes were loaded */
+function populateClassFilter(){
   var f=document.getElementById('fClass');
+  f.innerHTML='<option value="">All Classes</option>';
   DATA.slice().sort(function(a,b){return a.rank-b.rank;}).forEach(function(c){
     var o=document.createElement('option'); o.value=c.cls; o.textContent=c.cls; f.appendChild(o);
   });
-})();
+}
+
+/* Load the staff pool + the class/section grid, then render. */
+function loadAll(){
+  $.when($.getJSON(POOL_URL), $.getJSON(GRID_URL))
+    .done(function(poolRes, gridRes){
+      TEACHERS = (poolRes[0]||[]).map(function(t){ return { id:t.staffId, name:t.fullName }; });
+
+      // Group the flat section grid into class → sections.
+      var map={}, order=[];
+      (gridRes[0]||[]).forEach(function(r){
+        if(!map[r.className]){ map[r.className]={ cls:r.className, rank:r.classRank, sections:[] }; order.push(r.className); }
+        map[r.className].sections.push({ id:r.sectionId, name:r.sectionName, room:r.roomNo, teacherId:r.teacherId||0 });
+      });
+      DATA = order.map(function(k){ return map[k]; });
+
+      populateClassFilter();
+      updateCards();
+      render();
+    })
+    .fail(function(){ toast('error','Could not load class teachers.'); });
+}
 
 /* Summary */
 function updateCards(){
@@ -242,17 +238,30 @@ function render(){
   bindRows();
 }
 
+// Save one assignment to the server.
+function saveAssign(sectionId, staffId, done){
+  $.ajax({
+    url: ASSIGN_URL, type:'POST', contentType:'application/json',
+    headers:{ 'RequestVerificationToken': TOKEN },
+    data: JSON.stringify({ sectionId: sectionId, staffId: staffId || null })
+  })
+  .done(function(res){ done(!!(res && res.success), res && res.message); })
+  .fail(function(){ done(false, 'Something went wrong.'); });
+}
+
 function bindRows(){
   document.querySelectorAll('.js-assign').forEach(function(sel){
     sel.addEventListener('change',function(){
       var secId=parseInt(this.dataset.sec,10), tid=parseInt(this.value,10);
       var sec=allSecs().find(function(r){return r.sec.id===secId;});
       if(!sec) return;
+      var prev=sec.sec.teacherId;
       sec.sec.teacherId=tid;
-      // Wire to SP: save assignment (sectionId, teacherId, effectiveFrom)
-      var msg = tid ? (teacherName(tid)+' assigned to '+sec.cls+' – '+sec.sec.name) : ('Class teacher cleared for '+sec.cls+' – '+sec.sec.name);
-      toast(tid?'success':'info', msg);
       updateCards(); render();
+      saveAssign(secId, tid, function(ok, msg){
+        if(ok){ toast(tid?'success':'info', tid ? (teacherName(tid)+' assigned to '+sec.cls+' – '+sec.sec.name) : ('Class teacher cleared for '+sec.cls+' – '+sec.sec.name)); }
+        else { sec.sec.teacherId=prev; updateCards(); render(); toast('error', msg||'Could not save.'); }
+      });
     });
   });
 }
@@ -271,15 +280,27 @@ document.getElementById('unassignedCard').addEventListener('click',function(){
 document.getElementById('btnAuto').addEventListener('click',function(){
   var empties=allSecs().filter(function(r){return !r.sec.teacherId;});
   if(!empties.length){ toast('info','Every section already has a class teacher.'); return; }
-  empties.forEach(function(r){
+  if(!TEACHERS.length){ toast('error','No teachers available to assign.'); return; }
+
+  // Assign each empty section to the least-loaded teacher, saving as we go.
+  var picks=empties.map(function(r){
     var lm=loadMap();
-    /* pick teacher with the fewest sections */
     var best=TEACHERS.slice().sort(function(a,b){return (lm[a.id]||0)-(lm[b.id]||0);})[0];
-    r.sec.teacherId=best.id;
+    r.sec.teacherId=best.id;   // update local load so the next pick balances
+    return { sectionId:r.sec.id, staffId:best.id };
   });
-  // Wire to SP: bulk-save auto assignments
-  toast('success','Auto-balanced '+empties.length+' unassigned section'+(empties.length>1?'s':'')+'.');
   updateCards(); render();
+
+  var done=0, failed=0;
+  picks.forEach(function(p){
+    saveAssign(p.sectionId, p.staffId, function(ok){
+      done++; if(!ok) failed++;
+      if(done===picks.length){
+        if(failed){ toast('warning', (picks.length-failed)+' saved, '+failed+' failed.'); loadAll(); }
+        else toast('success','Auto-balanced '+picks.length+' section'+(picks.length>1?'s':'')+'.');
+      }
+    });
+  });
 });
 document.getElementById('fClass').addEventListener('change',function(){
   this.classList.toggle('active-filter', this.value!=='');
@@ -288,8 +309,7 @@ document.getElementById('fClass').addEventListener('change',function(){
 document.getElementById('actSearch').addEventListener('input',render);
 
 /* Init */
-updateCards();
-render();
+loadAll();
 
 })();
 </script>

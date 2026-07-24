@@ -228,7 +228,7 @@ var DATA=(seed||[]).map(function(c,i){
     coord:c.coordinator||'',
     coordStaffId:c.coordinatorStaffId||null,
     sections:(c.sections||[]).map(function(s){
-      return {id:++nextSecId, name:s.name, cap:(s.capacity||0), str:(s.strength||0), room:(s.room||''), teacher:''};
+      return {id:++nextSecId, name:s.name, cap:(s.capacity||0), str:(s.strength||0), room:(s.room||''), teacher:(s.teacher||'')};
     })
   };
 });

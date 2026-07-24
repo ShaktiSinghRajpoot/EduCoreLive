@@ -320,7 +320,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                                     DisplayOrder           = AsInt(row, "section_display_order"),
                                     Capacity               = AsNullableInt(row, "capacity"),
                                     RoomNo                 = AsStr(row, "room_no"),
-                                    Strength               = AsInt(row, "strength")
+                                    Strength               = AsInt(row, "strength"),
+                                    ClassTeacherStaffId    = AsNullableInt(row, "class_teacher_staff_id"),
+                                    ClassTeacher           = AsStr(row, "class_teacher")
                                 });
                             }
                         }

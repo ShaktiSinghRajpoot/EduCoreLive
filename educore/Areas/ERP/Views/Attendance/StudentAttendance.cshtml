@@ -1,6 +1,8 @@
+@using Microsoft.AspNetCore.Mvc.Rendering
 @{
     ViewData["Title"] = "Student Attendance";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var classList = ViewBag.ClassList as List<SelectListItem> ?? new();
 }
 
 @section PageStyles {
@@ -26,15 +28,17 @@
                 <div class="col-6 col-md-3">
                     <div class="att-field-label">CLASS</div>
                     <select class="form-select" id="filterClass">
-                        <option>1st</option><option>2nd</option><option>3rd</option><option>4th</option>
-                        <option>5th</option><option>6th</option><option>7th</option><option>8th</option>
-                        <option selected>9th</option><option>10th</option><option>11th</option><option>12th</option>
+                        <option value="">Select class</option>
+                        @foreach (var c in classList)
+                        {
+                            <option value="@c.Text">@c.Text</option>
+                        }
                     </select>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="att-field-label">SECTION</div>
                     <select class="form-select" id="filterSection">
-                        <option selected>A</option><option>B</option><option>C</option>
+                        <option value="">Select section</option>
                     </select>
                 </div>
                 <div class="col-12 col-md-6">
@@ -123,6 +127,8 @@
     </div>
 </div>
 
+@Html.AntiForgeryToken()
+
 @section PageScripts {
 <script>
 $(document).ready(function () {
@@ -130,25 +136,27 @@ $(document).ready(function () {
     if (typeof toastr !== 'undefined') toastr.options = { closeButton: true, progressBar: true, timeOut: '3000', positionClass: 'toast-top-right' };
     function toast(t, m) { if (typeof toastr !== 'undefined') toastr[t](m); }
 
-    const students = [
-        { id:1,  name:'Akash Verma',     roll:'01', parent:'Bhukal Verma',    phone:'9876543210', av:'AV' },
-        { id:2,  name:'Priya Singh',     roll:'02', parent:'Rakesh Singh',    phone:'9876543211', av:'PS' },
-        { id:3,  name:'Ravi Kumar',      roll:'03', parent:'Suresh Kumar',    phone:'9876543212', av:'RK' },
-        { id:4,  name:'Neha Gupta',      roll:'04', parent:'Mahesh Gupta',    phone:'9876543213', av:'NG' },
-        { id:5,  name:'Arjun Patel',     roll:'05', parent:'Vijay Patel',     phone:'9876543214', av:'AP' },
-        { id:6,  name:'Sunita Yadav',    roll:'06', parent:'Ramesh Yadav',    phone:'9876543215', av:'SY' },
-        { id:7,  name:'Mohit Sharma',    roll:'07', parent:'Dinesh Sharma',   phone:'9876543216', av:'MS' },
-        { id:8,  name:'Kavita Joshi',    roll:'08', parent:'Naresh Joshi',    phone:'9876543217', av:'KJ' },
-        { id:9,  name:'Rahul Tiwari',    roll:'09', parent:'Anil Tiwari',     phone:'9876543218', av:'RT' },
-        { id:10, name:'Pooja Mishra',    roll:'10', parent:'Sanjay Mishra',   phone:'9876543219', av:'PM' },
-        { id:11, name:'Amit Rajput',     roll:'11', parent:'Govind Rajput',   phone:'9876543220', av:'AR' },
-        { id:12, name:'Anjali Dubey',    roll:'12', parent:'Rakesh Dubey',    phone:'9876543221', av:'AD' }
-    ];
+    var ROSTER_URL   = '@Url.Action("Roster",   "Attendance", new { area = "ERP" })';
+    var SECTIONS_URL = '@Url.Action("Sections", "Attendance", new { area = "ERP" })';
+    var SAVE_URL     = '@Url.Action("Save",     "Attendance", new { area = "ERP" })';
 
+    // The roster is loaded from the server for the chosen class/section/date.
+    let students = [];
     const status = {}, notified = {};
-    students.forEach(s => { status[s.id] = 'present'; notified[s.id] = false; });
-
     let touched = false; // true once teacher interacts with any toggle
+    let canMark = true;  // false when this user isn't the section's class teacher
+
+    // Only the class teacher (or an admin) may save; others get a read-only roster.
+    function applyCanMark() {
+        $('#saveBtn').prop('disabled', !canMark);
+        if (!canMark && students.length) {
+            toast('warning', 'You are not the class teacher of this section — view only.');
+        }
+    }
+
+    function initials(name) {
+        return String(name || '').trim().split(/\s+/).map(function (w) { return w.charAt(0); }).slice(0, 2).join('').toUpperCase();
+    }
 
     function updateSaveBtn() {
         if (touched) {
@@ -159,13 +167,6 @@ $(document).ready(function () {
             }
         }
     }
-
-    function resetSession() {
-        touched = false;
-        students.forEach(s => { status[s.id] = 'present'; notified[s.id] = false; });
-        updateSaveBtn();
-        render();
-    };
 
     const today = new Date(), iso = today.toISOString().slice(0,10);
     $('#attendanceDate').val(iso).attr('max', iso);
@@ -187,11 +188,14 @@ $(document).ready(function () {
             .attr('class', 'db-status ' + (isToday ? 'today' : 'past'))
             .html('<span class="db-dot"></span>' + (isToday ? 'Today' : 'Back-dated'));
     }
-    $('#attendanceDate').on('change', function () { updateDateBanner(); renderStats(); });
     updateDateBanner();
     function classStr() { return $('#filterClass').val() + '-' + $('#filterSection').val(); }
 
     function renderList() {
+        if (!students.length) {
+            $('#list').html('<p class="text-muted text-center py-4 mb-0">Pick a class, section and date to load the roster.</p>');
+            return;
+        }
         $('#list').html(students.map(function (s) {
             const ab = status[s.id] === 'absent';
             const notify = ab
@@ -204,7 +208,7 @@ $(document).ready(function () {
             return (
                 '<div class="att-row ' + (ab?'absent':'') + '">' +
                     '<div class="att-av">' + s.av + '</div>' +
-                    '<div class="att-info"><div class="att-name">' + s.name + '</div><div class="att-roll">Roll No. ' + s.roll + '</div></div>' +
+                    '<div class="att-info"><div class="att-name">' + s.name + '</div><div class="att-roll">Roll No. ' + (s.roll || '—') + '</div></div>' +
                     '<div class="att-toggle">' +
                         '<button class="seg-p ' + (ab?'':'on') + '" data-id="' + s.id + '" data-set="present"><i class="bx bx-check"></i>Present</button>' +
                         '<button class="seg-a ' + (ab?'on':'') + '" data-id="' + s.id + '" data-set="absent"><i class="bx bx-x"></i>Absent</button>' +
@@ -221,12 +225,32 @@ $(document).ready(function () {
         const absent = total - present;
         const rate = total ? Math.round(present/total*100) : 0;
         $('#sumPresent').text(present); $('#sumAbsent').text(absent); $('#sumTotal').text(total); $('#sumRate').text(rate + '%');
-        $('#barLabelText').text('Class ' + $('#filterClass').val() + ' - ' + $('#filterSection').val() + ' · ' + dateStr());
+        $('#barLabelText').text(($('#filterClass').val() || 'Class') + ' - ' + ($('#filterSection').val() || '—') + ' · ' + dateStr());
         $('#notifyCount').text(absent);
         absent > 0 ? $('#notifyBtn').show() : $('#notifyBtn').hide();
     }
 
     function render() { renderList(); renderStats(); }
+
+    // Load the real roster for the current class/section/date.
+    function loadRoster() {
+        const cls = $('#filterClass').val(), sec = $('#filterSection').val(), date = $('#attendanceDate').val();
+        touched = false; updateSaveBtn();
+        if (!cls || !sec) { students = []; render(); return; }
+
+        $.getJSON(ROSTER_URL, { "class": cls, section: sec, date: date })
+            .done(function (res) {
+                var rows = (res && res.students) || [];
+                students = rows.map(function (r) {
+                    return { id:r.id, name:r.name, roll:r.roll, parent:r.parent, phone:r.phone, av:initials(r.name) };
+                });
+                students.forEach(function (s, i) { status[s.id] = (rows[i].status === 'absent') ? 'absent' : 'present'; notified[s.id] = false; });
+                canMark = !res || res.canMark !== false;
+                render();
+                applyCanMark();
+            })
+            .fail(function () { toast('error', 'Could not load the roster.'); });
+    }
 
     $(document).on('click', '.att-toggle button', function () {
         const id = Number($(this).data('id')), set = $(this).data('set');
@@ -237,34 +261,59 @@ $(document).ready(function () {
         render();
     });
 
-    // Reset session when class/section/date changes — it's a new attendance sheet
-    $('#filterClass, #filterSection, #attendanceDate').on('change', function () {
-        resetSession();
-        renderStats();
+    // Class change → load that class's sections, then wait for a section pick.
+    $('#filterClass').on('change', function () {
+        var cls = $(this).val();
+        var $sec = $('#filterSection').html('<option value="">Select section</option>');
+        students = []; render();
+        if (!cls) return;
+        $.getJSON(SECTIONS_URL, { "class": cls }).done(function (list) {
+            $.each(list || [], function (i, s) { $sec.append($('<option>').val(s).text(s)); });
+        });
     });
 
+    // Section or date change → it's a fresh sheet, reload the roster.
+    $('#filterSection, #attendanceDate').on('change', function () { updateDateBanner(); loadRoster(); });
+
     $('#saveBtn').on('click', function () {
+        if (!students.length) { toast('warning', 'Load a class roster first.'); return; }
+        if (!canMark) { toast('error', 'You are not the class teacher of this section.'); return; }
         if (!touched) {
             toast('warning', 'Please review the roster first. Tap at least one student to confirm attendance before saving.');
             $('#list').find('.att-row:first').css('box-shadow','0 0 0 3px rgba(255,138,0,.4)');
             setTimeout(function () { $('#list').find('.att-row:first').css('box-shadow',''); }, 1800);
             return;
         }
-        const present = students.filter(s => status[s.id]==='present').length;
-        const absent  = students.length - present;
-        // TODO: POST { class, section, date, records:[{id,status}] } to AttendanceController
-        toast('success', 'Attendance saved — Present: ' + present + ', Absent: ' + absent + '.');
+        // Send the whole roster; map present/absent → Present/Absent for the server.
+        var items = students.map(function (s) {
+            return { studentId: s.id, status: (status[s.id] === 'absent') ? 'Absent' : 'Present', remarks: '' };
+        });
+        var $btn = $(this).prop('disabled', true);
+        $.ajax({
+            url: SAVE_URL,
+            type: 'POST',
+            contentType: 'application/json',
+            headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+            data: JSON.stringify({ date: $('#attendanceDate').val(), "class": $('#filterClass').val(), section: $('#filterSection').val(), items: items })
+        })
+        .done(function (res) {
+            if (res && res.success) toast('success', res.message);
+            else toast('error', (res && res.message) || 'Could not save.');
+        })
+        .fail(function () { toast('error', 'Something went wrong.'); })
+        .always(function () { $btn.prop('disabled', false); });
     });
 
     function template() { return 'Dear {parent}, your ward {student} (Class {class}) was marked absent on {date}. Kindly inform the school if this is unexpected.'; }
     function buildMsg(s) {
         return ($('#msgTemplate').val() || template())
-            .replace(/{parent}/g, s.parent).replace(/{student}/g, s.name)
+            .replace(/{parent}/g, s.parent || 'Parent').replace(/{student}/g, s.name)
             .replace(/{class}/g, classStr()).replace(/{date}/g, dateStr());
     }
     function sendWA(id) {
         const s = students.find(x => x.id === id); if (!s) return;
-        window.open('https://wa.me/91' + s.phone.replace(/\D/g,'') + '?text=' + encodeURIComponent(buildMsg(s)), '_blank');
+        if (!s.phone) { toast('warning', 'No mobile number on record for ' + s.name + '.'); return; }
+        window.open('https://wa.me/91' + String(s.phone).replace(/\D/g,'') + '?text=' + encodeURIComponent(buildMsg(s)), '_blank');
         notified[id] = true; render(); refreshModal();
     }
     $(document).on('click', '.wa-one', function () { sendWA(Number($(this).data('id'))); });
@@ -278,7 +327,7 @@ $(document).ready(function () {
             return '<div class="modal-row">' +
                 '<div class="att-av" style="width:36px;height:36px;border-radius:10px;font-size:.7rem;background:#fee2e2;color:var(--ec-danger);">' + s.av + '</div>' +
                 '<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:.83rem;color:var(--ec-heading);">' + s.name + '</div>' +
-                '<div style="font-size:.71rem;font-weight:700;color:var(--ec-muted);">' + s.parent + ' · +91 ' + s.phone + '</div></div>' +
+                '<div style="font-size:.71rem;font-weight:700;color:var(--ec-muted);">' + (s.parent || 'Parent') + ' · +91 ' + (s.phone || '—') + '</div></div>' +
                 '<span class="notify-chip ' + (notified[s.id]?'sent':'pending') + '" style="flex:0 0 auto;"><i class="bx ' + (notified[s.id]?'bx-check-circle':'bx-time-five') + '"></i>' + (notified[s.id]?'Sent':'Pending') + '</span>' +
                 '<button class="btn-wa wa-modal" data-id="' + s.id + '"><i class="bx bxl-whatsapp"></i></button></div>';
         }).join(''));

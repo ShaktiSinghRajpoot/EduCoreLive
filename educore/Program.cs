@@ -160,6 +160,8 @@ builder.Services.AddScoped<IEnquiryService, EnquiryService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
 builder.Services.AddScoped<ITransferCertificateService, TransferCertificateService>();
 builder.Services.AddScoped<IIdCardService, IdCardService>();
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
+builder.Services.AddScoped<IClassTeacherService, ClassTeacherService>();
 builder.Services.AddScoped<IAdmissionWorkflowService, AdmissionWorkflowService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<IFeePaymentService, FeePaymentService>();
