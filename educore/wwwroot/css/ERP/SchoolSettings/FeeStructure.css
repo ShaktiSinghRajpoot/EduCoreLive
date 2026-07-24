@@ -1,0 +1,226 @@
+/* FeeStructure page styles — extracted from Areas/ERP/Views/SchoolSettings/FeeStructure.cshtml */
+        .class-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .75rem;
+        }
+
+        .class-chip-card {
+            border: 1px solid #ececf5;
+            border-radius: 999px;
+            background: #ffffff;
+            padding: .65rem 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .55rem;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+
+            .class-chip-card:hover,
+            .class-chip-card.active {
+                border-color: rgba(255,138,0,.45);
+                background: #fff4e6;
+                box-shadow: 0 10px 20px rgba(43,27,18,.06);
+            }
+
+            .class-chip-card.has-existing {
+                border-color: rgba(255,138,0,.55);
+                background: #fff7ed;
+            }
+
+            .class-chip-card span {
+                font-weight: 700;
+                color: #2b1b12;
+                font-size: .88rem;
+            }
+
+        .fee-head-row {
+            border: 1px solid #ececf5;
+            border-radius: 18px;
+            background: #ffffff;
+            padding: 1rem;
+            transition: all .2s ease;
+        }
+
+            .fee-head-row + .fee-head-row {
+                margin-top: .85rem;
+            }
+
+            .fee-head-row:hover {
+                border-color: rgba(255,138,0,.45);
+                box-shadow: 0 12px 28px rgba(43,27,18,.06);
+                transform: translateY(-1px);
+            }
+
+            .fee-head-row.disabled {
+                opacity: .55;
+            }
+
+        .fee-head-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
+            background: #fff4e6;
+            color: #ff8a00;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .fee-head-title {
+            font-weight: 800;
+            color: #2b1b12;
+            margin-bottom: .2rem;
+        }
+
+        .fee-group-title {
+            font-size: 1rem;
+            font-weight: 800;
+            color: #2b1b12;
+        }
+
+        .fee-group-subtitle {
+            color: #8b8175;
+            font-size: .82rem;
+            font-weight: 600;
+        }
+
+        .fee-amount-input {
+            max-width: 170px;
+            text-align: right;
+            font-weight: 800;
+        }
+
+        .fee-summary-card {
+            position: sticky;
+            top: 90px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .summary-label {
+            color: #8b8175;
+            font-weight: 700;
+        }
+
+        .summary-value {
+            color: #2b1b12;
+            font-weight: 800;
+            text-align: right;
+        }
+
+        .summary-total-box {
+            border-radius: 20px;
+            border: 1px solid #ececf5;
+            background: linear-gradient(135deg, #fff7ed, #ffffff);
+            padding: 1rem;
+        }
+
+            .summary-total-box h3 {
+                margin: 0;
+                color: #ff8a00;
+                font-weight: 900;
+            }
+
+        .selected-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+        }
+
+        .summary-chip {
+            background: #fff4e6;
+            color: #2b1b12;
+            border-radius: 999px;
+            padding: .45rem .8rem;
+            font-size: .76rem;
+            font-weight: 700;
+        }
+
+        .warning-box {
+            border: 1px solid #ffe0a6;
+            background: #fff7ed;
+            color: #6b4b16;
+            border-radius: 18px;
+            padding: 1rem;
+        }
+
+        .success-box {
+            border: 1px solid #d8f3dc;
+            background: #f0fff4;
+            color: #276749;
+            border-radius: 18px;
+            padding: 1rem;
+        }
+
+        .fee-action-btn {
+            border-radius: 999px;
+            font-weight: 800;
+        }
+
+        .config-table th {
+            color: #9a938b;
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            font-weight: 800;
+            border-bottom: 1px solid #ececf5;
+        }
+
+        .config-table td {
+            vertical-align: middle;
+            font-weight: 700;
+            color: #2b2c40;
+        }
+
+        .saved-head-list {
+            max-width: 320px;
+            color: #8b8175;
+            font-size: .82rem;
+            font-weight: 600;
+            line-height: 1.45;
+        }
+
+        @media (max-width: 991.98px) {
+            .fee-summary-card {
+                position: relative;
+                top: auto;
+            }
+
+            .fee-structure-page .ec-sticky-actions {
+                padding: 1rem;
+                margin: 1rem -1rem -1rem;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .fee-amount-input {
+                max-width: 100%;
+            }
+
+            .fee-head-row {
+                padding: .9rem;
+            }
+
+            .fee-head-icon {
+                width: 40px;
+                height: 40px;
+            }
+
+            .fee-action-btn,
+            .ec-sticky-actions .btn {
+                width: 100%;
+            }
+
+            .summary-row {
+                font-size: .92rem;
+            }
+        }

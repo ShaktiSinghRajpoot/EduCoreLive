@@ -1,0 +1,109 @@
+/* FeeHead page styles — extracted from Areas/ERP/Views/SchoolSettings/FeeHead.cshtml */
+        .fee-head-type-card,
+        .fee-head-row {
+            border: 1px solid #ececf5;
+            border-radius: 18px;
+            background: #ffffff; 
+            transition: all .2s ease;
+        }
+
+        .fee-head-type-card {
+            padding: 1rem;
+            cursor: pointer;
+        }
+
+            .fee-head-type-card:hover,
+            .fee-head-row:hover {
+                border-color: rgba(255, 138, 0, .45);
+                box-shadow: 0 12px 28px rgba(43, 27, 18, .07);
+                transform: translateY(-1px);
+            }
+
+            .fee-head-type-card input:checked + .fee-choice-content {
+                color: #ff8a00;
+            }
+
+        .fee-choice-title {
+            font-weight: 800;
+            color: #2b1b12;
+        }
+
+        .fee-head-row {
+            padding: 1rem;
+        }
+
+            .fee-head-row + .fee-head-row {
+                margin-top: .85rem;
+            }
+
+        .fee-head-name {
+            font-weight: 800;
+            color: #2b1b12;
+            margin-bottom: .2rem;
+        }
+
+        .fee-head-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff4e6;
+            color: #ff8a00;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+        }
+
+        .fee-action-btn {
+            border-radius: 999px;
+            font-weight: 800;
+            transition: all .2s ease;
+        }
+
+            .fee-action-btn:hover {
+                transform: translateY(-1px);
+            }
+
+        .fee-filter-bar {
+            max-width: 520px;
+        }
+
+        @media (max-width: 991.98px) {
+            .fee-filter-bar {
+                max-width: 100%;
+                width: 100%;
+            }
+
+            .fee-head-page .ec-sticky-actions {
+                padding: 1rem;
+                margin: 1rem -1rem -1rem;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .ec-page-title {
+                font-size: clamp(1.35rem, 6vw, 1.75rem);
+            }
+
+            .fee-head-row {
+                padding: .9rem;
+            }
+
+            .fee-head-icon {
+                width: 40px;
+                height: 40px;
+            }
+
+            .fee-action-btn,
+            .ec-sticky-actions .btn {
+                width: 100%;
+            }
+
+            .fee-row-actions {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: .5rem;
+                width: 100%;
+            }
+        }

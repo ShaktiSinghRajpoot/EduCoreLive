@@ -1,0 +1,356 @@
+/* Index page styles — extracted from Areas/ERP/Views/PaymentVerification/Index.cshtml */
+        .pv-page {
+            font-family: "Public Sans", system-ui, sans-serif;
+        }
+
+            .pv-page .ec-page-content {
+                padding: 1.25rem;
+            }
+
+            .pv-page .ec-page-header {
+                padding: 1rem 1.15rem;
+                margin-bottom: 1rem;
+            }
+
+            .pv-page .ec-page-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 20px;
+            }
+
+            .pv-page .ec-page-title {
+                font-size: 1.2rem;
+            }
+
+            .pv-page .ec-card {
+                margin-bottom: 0;
+            }
+
+            .pv-page .ec-card-header {
+                padding: .85rem 1rem;
+            }
+
+            .pv-page .ec-section-icon {
+                width: 34px;
+                height: 34px;
+                font-size: 15px;
+            }
+
+            .pv-page .ec-section-title {
+                font-size: .92rem;
+            }
+
+        .soft-orange {
+            background: var(--ec-primary-light);
+            color: var(--ec-primary);
+        }
+
+        .soft-green {
+            background: #ecfdf3;
+            color: #16a34a;
+        }
+
+        .soft-red {
+            background: #fff1f0;
+            color: #dc2626;
+        }
+
+        .soft-amber {
+            background: #fff7e6;
+            color: #d97706;
+        }
+
+        .soft-blue {
+            background: #eff6ff;
+            color: #0284c7;
+        }
+
+        .soft-grey {
+            background: #f1f1f4;
+            color: #6b7280;
+        }
+
+        /* stat strip */
+        .pv-stat {
+            display: flex;
+            align-items: center;
+            gap: .7rem;
+            background: var(--ec-white);
+            border: 1px solid var(--ec-border);
+            border-radius: var(--ec-radius-sm);
+            padding: .7rem .85rem;
+            height: 100%;
+        }
+
+        .pv-stat-ic {
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex: 0 0 auto;
+        }
+
+        .pv-stat-label {
+            color: var(--ec-text-light);
+            font-size: .68rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+        }
+
+        .pv-stat-value {
+            color: var(--ec-text-dark);
+            font-size: 1.2rem;
+            font-weight: 900;
+            line-height: 1.15;
+        }
+
+        /* tabs */
+        .pv-tabs {
+            display: flex;
+            gap: .35rem;
+            flex-wrap: wrap;
+        }
+
+        .pv-tab {
+            border: 1px solid var(--ec-border);
+            background: #fff;
+            color: var(--ec-text-muted);
+            border-radius: 999px;
+            padding: .3rem .85rem;
+            font-size: .8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--ec-transition);
+            display: inline-flex;
+            align-items: center;
+            gap: .4rem;
+        }
+
+            .pv-tab:hover {
+                border-color: #ffce99;
+            }
+
+            .pv-tab.active {
+                background: var(--ec-primary);
+                border-color: var(--ec-primary);
+                color: #fff;
+            }
+
+            .pv-tab .pv-tab-n {
+                background: rgba(0,0,0,.08);
+                border-radius: 999px;
+                padding: 0 .4rem;
+                font-size: .72rem;
+            }
+
+            .pv-tab.active .pv-tab-n {
+                background: rgba(255,255,255,.25);
+            }
+
+        /* table */
+        .pv-table {
+            font-size: .84rem;
+        }
+
+            .pv-table thead th {
+                padding: .55rem .7rem;
+                white-space: nowrap;
+                font-size: .68rem;
+                text-transform: uppercase;
+                letter-spacing: .03em;
+                user-select: none;
+            }
+
+            .pv-table tbody td {
+                padding: .5rem .7rem;
+                vertical-align: middle;
+                border-bottom: 1px solid #f4eee7;
+            }
+
+            .pv-table tbody tr.pv-selected {
+                background: rgba(255,138,0,.06);
+            }
+
+        .pv-sort {
+            cursor: pointer;
+        }
+
+            .pv-sort:hover {
+                color: var(--ec-primary);
+            }
+
+            .pv-sort i {
+                font-size: .9rem;
+                opacity: .35;
+                vertical-align: middle;
+            }
+
+            .pv-sort.asc i, .pv-sort.desc i {
+                opacity: 1;
+                color: var(--ec-primary);
+            }
+
+        .pv-avatar {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: .72rem;
+            font-weight: 800;
+            flex: 0 0 auto;
+        }
+
+        .pv-mode {
+            display: inline-flex;
+            align-items: center;
+            gap: .3rem;
+            padding: .18rem .5rem;
+            border-radius: 7px;
+            font-size: .72rem;
+            font-weight: 800;
+        }
+
+        /* pagination */
+        .pv-pager {
+            display: flex;
+            gap: .25rem;
+        }
+
+        .pv-pg {
+            min-width: 28px;
+            height: 28px;
+            border: 1px solid var(--ec-border);
+            background: #fff;
+            border-radius: 8px;
+            font-size: .8rem;
+            font-weight: 700;
+            color: var(--ec-text-muted);
+            cursor: pointer;
+            transition: var(--ec-transition);
+        }
+
+            .pv-pg:hover:not(:disabled) {
+                border-color: #ffce99;
+                color: var(--ec-primary);
+            }
+
+            .pv-pg.active {
+                background: var(--ec-primary);
+                border-color: var(--ec-primary);
+                color: #fff;
+            }
+
+            .pv-pg:disabled {
+                opacity: .45;
+                cursor: default;
+            }
+
+        /* proof receipt mock */
+        .pv-receipt {
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--ec-border);
+        }
+
+        .pv-receipt-top {
+            background: linear-gradient(135deg,#16a34a,#15803d);
+            color: #fff;
+            text-align: center;
+            padding: 1.4rem 1rem 1.1rem;
+        }
+
+        .pv-receipt-check {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: rgba(255,255,255,.2);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            margin-bottom: .5rem;
+        }
+
+        .pv-receipt-amt {
+            font-size: 1.8rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+
+        .pv-receipt-body {
+            background: #fff;
+            padding: 1rem 1.1rem;
+        }
+
+        .pv-rrow {
+            display: flex;
+            justify-content: space-between;
+            padding: .45rem 0;
+            border-bottom: 1px dashed #eee3d8;
+            font-size: .85rem;
+        }
+
+            .pv-rrow:last-child {
+                border-bottom: 0;
+            }
+
+            .pv-rrow .k {
+                color: var(--ec-text-muted);
+                font-weight: 600;
+            }
+
+            .pv-rrow .v {
+                font-weight: 800;
+                color: var(--ec-text-dark);
+            }
+
+        .pv-toast-wrap {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1090;
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+        }
+
+        .pv-toast {
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            background: #fff;
+            border-left: 4px solid #16a34a;
+            border-radius: 10px;
+            box-shadow: var(--ec-shadow-lg);
+            padding: .6rem .9rem;
+            min-width: 15rem;
+            font-size: .82rem;
+            font-weight: 600;
+            color: var(--ec-text);
+            animation: pvIn .25s ease;
+        }
+
+        @keyframes pvIn {
+            from {
+                opacity: 0;
+                transform: translateX(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .pv-empty {
+            color: var(--ec-text-muted);
+            text-align: center;
+            padding: 2.5rem 1rem;
+            display: none;
+        }

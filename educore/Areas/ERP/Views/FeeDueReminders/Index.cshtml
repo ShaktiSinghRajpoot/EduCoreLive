@@ -1,0 +1,507 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using System.Linq
+@using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Mvc.Rendering
+@using Microsoft.AspNetCore.Mvc.ViewFeatures
+@model EduCoreDataAccessLayer.Models.ERP.FeeDueItem
+@{
+    ViewData["Title"] = "Fee Due Reminders";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var palette = new[] { "primary", "info", "success", "warning", "danger", "secondary" };
+
+    string Initials(string name)
+    {
+        var parts = (name ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 0 ? "?" : string.Concat(parts.Take(2).Select(w => char.ToUpper(w[0])));
+    }
+
+    // Ageing badge from days overdue (0 = nothing overdue yet).
+    (string cls, string txt) DaysBadge(int d) =>
+        d == 0 ? ("fdr-od-a", "—") : d <= 30 ? ("fdr-od-a", d + "d") : d <= 60 ? ("fdr-od-b", d + "d") : ("fdr-od-c", d + "d");
+
+    // Server-side sort header link: keeps filters, drops Page, toggles direction.
+    string SortUrl(string col)
+    {
+        var q = Context.Request.Query
+            .Where(k => !new[] { "SortColumn", "SortDir", "Page" }.Contains(k.Key, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(k => k.Key, k => k.Value.ToString());
+        q["SortColumn"] = col;
+        q["SortDir"] = (string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase) && !Model.Desc) ? "desc" : "asc";
+        return Context.Request.Path + QueryString.Create(q);
+    }
+    string SortIcon(string col)
+    {
+        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-chevron-down";
+        return Model.Desc ? "bx bx-chevron-down text-primary" : "bx bx-chevron-up text-primary";
+    }
+    bool Sel(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/FeeDueReminders/Index.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell fdr-page">
+    <div class="ec-page-content">
+
+        @* ===== Header ===== *@
+        <div class="ec-page-header">
+            <div class="ec-page-header-inner d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
+                <div class="ec-page-title-wrap d-flex align-items-center gap-3">
+                    <div class="ec-page-icon"><i class="bx bx-bell-plus"></i></div>
+                    <div>
+                        <h3 class="ec-page-title mb-0">Fee Due Reminders</h3>
+                        <p class="ec-page-subtitle mb-0">Remind parents in their language via WhatsApp, SMS or Email.</p>
+                    </div>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-secondary" id="fdrExport"><i class="bx bx-download me-1"></i>Export</button>
+                    <a href="/ERP/Fee/ManageFee" class="btn btn-sm btn-primary"><i class="bx bx-wallet me-1"></i>Collect Fee</a>
+                </div>
+            </div>
+        </div>
+
+        @* ===== Compact stat strip ===== *@
+        <div class="row g-2 mb-3">
+            <div class="col-6 col-xl-3">
+                <div class="fdr-stat">
+                    <span class="fdr-stat-ic soft-red"><i class="bx bx-error-circle"></i></span>
+                    <div><div class="fdr-stat-label mb-1">Outstanding</div><div class="fdr-stat-value">₹@Model.SumOutstanding.ToString("N0")</div></div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="fdr-stat">
+                    <span class="fdr-stat-ic soft-amber"><i class="bx bx-user-x"></i></span>
+                    <div><div class="fdr-stat-label mb-1">With Due</div><div class="fdr-stat-value">@Model.TotalCount</div></div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="fdr-stat">
+                    <span class="fdr-stat-ic soft-green"><i class="bx bx-bell"></i></span>
+                    <div><div class="fdr-stat-label mb-1">Sent Today</div><div class="fdr-stat-value" id="fdrSentToday">@Model.SentToday</div></div>
+                </div>
+            </div>
+            <div class="col-6 col-xl-3">
+                <div class="fdr-stat">
+                    <span class="fdr-stat-ic soft-orange"><i class="bx bx-calculator"></i></span>
+                    <div><div class="fdr-stat-label mb-1">Avg / Student</div><div class="fdr-stat-value">₹@Model.AvgPerStudent.ToString("N0")</div></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3">
+
+            @* ===== Defaulters ===== *@
+            <div class="col-12 col-xl-8">
+                <div class="ec-card">
+                    <div class="ec-card-header">
+                        <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                            <div class="ec-section-title-wrap">
+                                <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
+                                <div>
+                                    <h5 class="ec-section-title mb-0">Defaulters</h5>
+                                    <p class="ec-section-subtitle mb-0">Select students to remind</p>
+                                </div>
+                            </div>
+                            @* All filtering/sorting/paging is server-side: this GET form
+                               round-trips the query string. Omitting Page resets to page 1;
+                               sort rides along in hidden fields so it survives a filter change. *@
+                            <form id="fdrFilterForm" method="get" asp-area="ERP" asp-controller="FeeDueReminders" asp-action="Index" class="d-flex gap-2">
+                                <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+                                <input type="hidden" name="SortDir" value="@Model.SortDirection" />
+                                <input type="search" name="Search" value="@Model.Search" class="form-control form-control-sm"
+                                       placeholder="Search name, adm no, mobile…" style="min-width:8rem" onchange="this.form.submit()">
+                                <select name="FilterClass" class="form-select form-select-sm" style="min-width:6.5rem" onchange="this.form.submit()">
+                                    <option value="">Class</option>
+                                    @foreach (var c in Model.ClassList)
+                                    {
+                                        <option value="@c.Text" selected="@Sel(c.Text, Model.FilterClass)">@c.Text</option>
+                                    }
+                                </select>
+                                <select name="FilterBucket" class="form-select form-select-sm" style="min-width:7rem" onchange="this.form.submit()">
+                                    <option value="">Overdue</option>
+                                    <option value="NotDue" selected="@Sel("NotDue", Model.FilterBucket)">Not due yet</option>
+                                    <option value="0-30"   selected="@Sel("0-30", Model.FilterBucket)">0–30 d</option>
+                                    <option value="31-60"  selected="@Sel("31-60", Model.FilterBucket)">31–60 d</option>
+                                    <option value="60+"    selected="@Sel("60+", Model.FilterBucket)">60+ d</option>
+                                </select>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table fdr-table mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width:2rem"><input class="form-check-input" type="checkbox" id="fdrSelectAll"></th>
+                                    <th><a class="text-reset text-decoration-none" href="@SortUrl("name")">Student <i class="@SortIcon("name")"></i></a></th>
+                                    <th><a class="text-reset text-decoration-none" href="@SortUrl("class")">Class <i class="@SortIcon("class")"></i></a></th>
+                                    <th><a class="text-reset text-decoration-none" href="@SortUrl("due")">Due <i class="@SortIcon("due")"></i></a></th>
+                                    <th><a class="text-reset text-decoration-none" href="@SortUrl("days")">Overdue <i class="@SortIcon("days")"></i></a></th>
+                                    <th>Last</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="fdrBody">
+                                @{ int rowIx = 0; }
+                                @foreach (var d in Model.Items)
+                                {
+                                    var badge = DaysBadge(d.OverdueDays);
+                                    var color = palette[rowIx % palette.Length];
+                                    rowIx++;
+                                    <tr>
+                                        <td><input class="form-check-input fdr-check" type="checkbox"
+                                                   data-name="@d.StudentName" data-id="@d.StudentId" data-mobile="@d.Mobile"
+                                                   data-class="@d.ClassName" data-due="@d.TotalOutstanding.ToString("N0")" data-days="@d.OverdueDays"></td>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="fdr-avatar bg-label-@color text-@color">@Initials(d.StudentName)</span>
+                                                <div class="lh-sm">
+                                                    <div class="fw-semibold">@d.StudentName</div>
+                                                    <small class="text-muted">@(string.IsNullOrWhiteSpace(d.AdmissionNo) ? "—" : d.AdmissionNo)@(string.IsNullOrWhiteSpace(d.Mobile) ? "" : " · " + d.Mobile)</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>@d.ClassName @(string.IsNullOrWhiteSpace(d.Section) ? "" : "· " + d.Section)</td>
+                                        <td><span class="fw-bold" style="color:#dc2626">₹@d.TotalOutstanding.ToString("N0")</span></td>
+                                        <td><span class="@badge.cls">@badge.txt</span></td>
+                                        <td class="fdr-last"><small class="text-muted">@(d.LastReminderAt.HasValue ? d.LastReminderAt.Value.ToString("dd MMM") : "Never")</small></td>
+                                        <td class="text-end"><button type="button" class="btn btn-icon btn-sm btn-outline-primary fdr-remind-one" title="Remind"><i class="bx bx-bell"></i></button></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                        @if (!Model.Items.Any())
+                        {
+                            <div class="fdr-empty"><i class="bx bx-search-alt fs-4 d-block mb-1"></i>No students match your filters.</div>
+                        }
+                    </div>
+                    <div class="ec-card-header border-top">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="d-flex align-items-center gap-2 text-muted" style="font-size:.81rem">
+                                <partial name="_PageSize" model="Model" view-data='@(new ViewDataDictionary(ViewData) { { "FormId", "fdrFilterForm" } })' />
+                                @if (Model.TotalCount > 0)
+                                {
+                                    <span class="ms-1">Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount students</span>
+                                }
+                            </div>
+                            <partial name="_Pager" model="Model" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ===== Compose ===== *@
+            <div class="col-12 col-xl-4">
+                <div class="ec-card fdr-compose">
+                    <div class="ec-card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="ec-section-title-wrap">
+                                <span class="ec-section-icon"><i class="bx bx-message-rounded-dots"></i></span>
+                                <div>
+                                    <h5 class="ec-section-title mb-0">Compose</h5>
+                                    <p class="ec-section-subtitle mb-0">Multi-language</p>
+                                </div>
+                            </div>
+                            <span class="badge bg-label-warning"><span id="fdrSelCount">0</span> selected</span>
+                        </div>
+                    </div>
+                    <div class="ec-card-body">
+
+                        <label class="fdr-label">Language</label>
+                        <div class="fdr-langs mb-2">
+                            <button type="button" class="fdr-lang active" data-lang="en">English</button>
+                            <button type="button" class="fdr-lang" data-lang="hi">हिन्दी</button>
+                            <button type="button" class="fdr-lang" data-lang="enhi">EN + हिन्दी</button>
+                            <button type="button" class="fdr-lang" data-lang="mr">मराठी</button>
+                            <button type="button" class="fdr-lang" data-lang="gu">ગુજરાતી</button>
+                            <button type="button" class="fdr-lang" data-lang="bn">বাংলা</button>
+                            <button type="button" class="fdr-lang" data-lang="pa">ਪੰਜਾਬੀ</button>
+                            <button type="button" class="fdr-lang" data-lang="ta">தமிழ்</button>
+                            <button type="button" class="fdr-lang" data-lang="te">తెలుగు</button>
+                        </div>
+
+                        <label class="fdr-label">Channels</label>
+                        <div class="d-flex gap-2 mb-2">
+                            <div class="fdr-channel ch-wa active" data-ch="WhatsApp"><i class="bx bxl-whatsapp"></i>WhatsApp</div>
+                            <div class="fdr-channel ch-sms active" data-ch="SMS"><i class="bx bx-message-dots"></i>SMS</div>
+                            <div class="fdr-channel ch-email" data-ch="Email"><i class="bx bx-envelope"></i>Email</div>
+                        </div>
+
+                        <label class="fdr-label">Tone</label>
+                        <select id="fdrTone" class="form-select form-select-sm mb-2">
+                            <option value="polite">Polite reminder</option>
+                            <option value="firm">Firm reminder</option>
+                            <option value="final">Final notice</option>
+                        </select>
+
+                        <label class="fdr-label">Insert Field</label>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            <button type="button" class="fdr-tag" data-tag="{student_name}">Student</button>
+                            <button type="button" class="fdr-tag" data-tag="{class}">Class</button>
+                            <button type="button" class="fdr-tag" data-tag="{due_amount}">Due ₹</button>
+                            <button type="button" class="fdr-tag" data-tag="{days}">Days</button>
+                            <button type="button" class="fdr-tag" data-tag="{school_name}">School</button>
+                        </div>
+
+                        <textarea id="fdrMessage" class="form-control fdr-msg mb-1"></textarea>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="fdr-meter"><span id="fdrChars">0</span> chars · <span id="fdrParts">1</span> SMS</span>
+                            <span class="fdr-meter" id="fdrScript">Latin</span>
+                        </div>
+
+                        <label class="fdr-label">Preview</label>
+                        <div class="fdr-preview mb-2">
+                            <div class="fdr-bubble"><span id="fdrPreviewText"></span><span class="fdr-time">12:30 PM ✓✓</span></div>
+                        </div>
+
+                        @Html.AntiForgeryToken()
+
+                        <button type="button" class="btn btn-primary w-100 btn-sm" id="fdrSend" disabled>
+                            <i class="bx bx-paper-plane me-1"></i>Send to <span id="fdrSendCount">0</span>
+                        </button>
+                        @* Honest channel status: only Email has a provider wired today.
+                           SMS / WhatsApp record as "not delivered" until one is configured. *@
+                        <small class="text-muted d-block text-center mt-1" style="font-size:.72rem">
+                            Sends immediately. Email is delivered; SMS / WhatsApp need a provider configured.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ===== History ===== *@
+        <div class="ec-card mt-3">
+            <div class="ec-card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="ec-section-title-wrap">
+                        <span class="ec-section-icon"><i class="bx bx-history"></i></span>
+                        <div>
+                            <h5 class="ec-section-title mb-0">Recent Reminder History</h5>
+                            <p class="ec-section-subtitle mb-0">Last 7 days</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary">View All</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table fdr-table mb-0">
+                    <thead><tr><th>Student</th><th>Class</th><th>Channel</th><th>Outstanding</th><th>Sent</th><th>Status</th></tr></thead>
+                    <tbody id="fdrHistBody">
+                        @foreach (var h in Model.History)
+                        {
+                            var chan = string.IsNullOrWhiteSpace(h.ChannelsDelivered) ? h.ChannelsRequested : h.ChannelsDelivered;
+                            var stCl = h.Status switch { "Sent" => "success", "Partial" => "warning", _ => "danger" };
+                            <tr>
+                                <td class="fw-semibold">@h.StudentName</td>
+                                <td><small class="text-muted">@h.ClassName</small></td>
+                                <td><span class="badge bg-label-info">@(string.IsNullOrWhiteSpace(chan) ? "—" : chan)</span></td>
+                                <td>₹@h.Outstanding.ToString("N0")</td>
+                                <td><small class="text-muted">@(h.SentAt.HasValue ? h.SentAt.Value.ToString("dd MMM, hh:mm tt") : "—")</small></td>
+                                <td><span class="badge bg-label-@stCl">@h.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="fdr-toast-wrap" id="fdrToastWrap"></div>
+
+@section PageScripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Preview uses a REAL row (first selected, else the first on the page) so
+            // what you see is what a parent gets. Server re-fills these per student on send.
+            const SCHOOL_NAME = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.SchoolName as string ?? ""));
+            function sampleRow() {
+                const c = document.querySelector('.fdr-check:checked') || document.querySelector('.fdr-check');
+                return c
+                    ? { name: c.dataset.name || '', cls: c.dataset.class || '', due: c.dataset.due || '0', days: c.dataset.days || '0', school: SCHOOL_NAME }
+                    : { name: 'Student', cls: '-', due: '0', days: '0', school: SCHOOL_NAME };
+            }
+
+            const T = {
+                en: {
+                    polite: 'Dear Parent, gentle reminder: the fee of ₹{due_amount} for {student_name} ({class}) is still pending. Kindly clear it at your convenience. Thank you! – {school_name}',
+                    firm: 'Dear Parent, the fee of ₹{due_amount} for {student_name} ({class}) is overdue by {days} days. Please pay immediately to avoid late charges. – {school_name}',
+                    final: 'FINAL NOTICE: The fee of ₹{due_amount} for {student_name} ({class}) is overdue by {days} days. Immediate payment is required. – {school_name}'
+                },
+                hi: {
+                    polite: 'प्रिय अभिभावक, सादर सूचना: {student_name} ({class}) की ₹{due_amount} फीस अभी बाकी है। कृपया सुविधानुसार जमा करें। धन्यवाद! – {school_name}',
+                    firm: 'प्रिय अभिभावक, {student_name} ({class}) की ₹{due_amount} फीस {days} दिनों से बकाया है। कृपया विलंब शुल्क से बचने हेतु शीघ्र भुगतान करें। – {school_name}',
+                    final: 'अंतिम सूचना: {student_name} ({class}) की ₹{due_amount} फीस {days} दिनों से बकाया है। कृपया तुरंत भुगतान करें। – {school_name}'
+                },
+                mr: { polite: 'प्रिय पालक, नम्र स्मरण: {student_name} ({class}) यांची ₹{due_amount} फी अद्याप बाकी आहे. कृपया सोयीनुसार भरावी. धन्यवाद! – {school_name}' },
+                gu: { polite: 'પ્રિય વાલી, નમ્ર યાદ: {student_name} ({class}) ની ₹{due_amount} ફી હજુ બાકી છે. કૃપા કરી અનુકૂળતાએ ભરો. આભાર! – {school_name}' },
+                bn: { polite: 'প্রিয় অভিভাবক, বিনীত স্মরণ: {student_name} ({class})-এর ₹{due_amount} ফি এখনও বাকি আছে। অনুগ্রহ করে সুবিধামতো পরিশোধ করুন। ধন্যবাদ! – {school_name}' },
+                pa: { polite: 'ਪਿਆਰੇ ਮਾਪੇ, ਨਿਮਰ ਯਾਦ: {student_name} ({class}) ਦੀ ₹{due_amount} ਫੀਸ ਅਜੇ ਬਾਕੀ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਸਹੂਲਤ ਅਨੁਸਾਰ ਜਮ੍ਹਾਂ ਕਰੋ। ਧੰਨਵਾਦ! – {school_name}' },
+                ta: { polite: 'அன்புள்ள பெற்றோரே, அன்பான நினைவூட்டல்: {student_name} ({class}) இன் ₹{due_amount} கட்டணம் இன்னும் நிலுவையில் உள்ளது. தயவுசெய்து வசதியான நேரத்தில் செலுத்தவும். நன்றி! – {school_name}' },
+                te: { polite: 'ప్రియమైన తల్లిదండ్రులారా, మృదువైన గుర్తుచేయుట: {student_name} ({class}) యొక్క ₹{due_amount} ఫీజు ఇంకా బాకీ ఉంది. దయచేసి అనుకూల సమయంలో చెల్లించండి. ధన్యవాదాలు! – {school_name}' }
+            };
+            const LANG_NAME = { en: 'English', hi: 'हिन्दी', enhi: 'EN + हिन्दी', mr: 'मराठी', gu: 'ગુજરાતી', bn: 'বাংলা', pa: 'ਪੰਜਾਬੀ', ta: 'தமிழ்', te: 'తెలుగు' };
+
+            let lang = 'en', tone = 'polite';
+
+            const $ = s => document.querySelector(s);
+            const tbody = $('#fdrBody');
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+            const checks = () => Array.from(document.querySelectorAll('.fdr-check'));
+            const msg = $('#fdrMessage');
+
+            // ---------- compose ----------
+            function buildTemplate() {
+                if (lang === 'enhi') return T.en[tone] + '\n\n' + (T.hi[tone] || T.hi.polite);
+                const l = T[lang] || T.en;
+                return l[tone] || l.polite || T.en[tone];
+            }
+            function loadTemplate() { msg.value = buildTemplate(); renderPreview(); updateMeter(); }
+            function fillTags(t) {
+                const s = sampleRow();
+                return t.replace(/{student_name}/g, s.name).replace(/{class}/g, s.cls)
+                        .replace(/{due_amount}/g, s.due).replace(/{days}/g, s.days).replace(/{school_name}/g, s.school);
+            }
+            function renderPreview() { $('#fdrPreviewText').textContent = fillTags(msg.value); }
+            function updateMeter() {
+                const text = fillTags(msg.value);
+                const unicode = /[^\x00-\x7F]/.test(text.replace(/[₹–✓]/g, ''));
+                const len = text.length, limit = unicode ? 70 : 160;
+                const parts = Math.max(1, Math.ceil(len / limit));
+                $('#fdrChars').textContent = len;
+                $('#fdrParts').textContent = parts;
+                $('#fdrScript').textContent = unicode ? 'Unicode' : 'Latin';
+                return parts;
+            }
+            function activeChannels() { return Array.from(document.querySelectorAll('.fdr-channel.active')).map(c => c.dataset.ch); }
+            function refreshCompose() {
+                const n = checks().filter(c => c.checked).length;
+                $('#fdrSelCount').textContent = n;
+                $('#fdrSendCount').textContent = n;
+                const ch = activeChannels();
+                if (ch.includes('SMS')) updateMeter();   // keeps the SMS segment counter live
+                $('#fdrSend').disabled = n === 0 || ch.length === 0;
+                allRows.forEach(tr => tr.classList.toggle('fdr-selected', tr.querySelector('.fdr-check').checked));
+            }
+
+            // Filtering, sorting and paging are SERVER-SIDE (the GET filter form +
+            // sortable header links + shared _Pager/_PageSize partials). The rows on
+            // screen are already the current page, so there is no client-side
+            // filter/sort/paginate here — only selection + the compose panel.
+
+            // ---------- interactions ----------
+            document.querySelectorAll('.fdr-lang').forEach(b => b.addEventListener('click', function () {
+                document.querySelectorAll('.fdr-lang').forEach(x => x.classList.remove('active'));
+                this.classList.add('active'); lang = this.dataset.lang; loadTemplate(); refreshCompose();
+            }));
+            $('#fdrTone').addEventListener('change', function () { tone = this.value; loadTemplate(); refreshCompose(); });
+            msg.addEventListener('input', function () { renderPreview(); refreshCompose(); });
+            document.querySelectorAll('.fdr-tag').forEach(btn => btn.addEventListener('click', function () {
+                const tag = this.dataset.tag, s = msg.selectionStart, e = msg.selectionEnd;
+                msg.value = msg.value.slice(0, s) + tag + msg.value.slice(e);
+                msg.focus(); msg.selectionStart = msg.selectionEnd = s + tag.length;
+                renderPreview(); refreshCompose();
+            }));
+            document.querySelectorAll('.fdr-channel').forEach(c => c.addEventListener('click', function () { this.classList.toggle('active'); refreshCompose(); }));
+            $('#fdrSelectAll').addEventListener('change', function () {
+                // Rows on screen ARE the current page (server-side paging), so select all of them.
+                allRows.forEach(tr => { tr.querySelector('.fdr-check').checked = this.checked; });
+                refreshCompose();
+            });
+            checks().forEach(c => c.addEventListener('change', refreshCompose));
+
+            // Unified: route through the app-wide ecToast/toastr (maps legacy colors to a toast type).
+            function toast(text, color) {
+                const map = { '#dc2626': 'error', '#ff8a00': 'warning', '#0284c7': 'info' };
+                window.ecToast(color ? (map[String(color).toLowerCase()] || 'success') : 'success', text);
+            }
+
+            document.querySelectorAll('.fdr-remind-one').forEach(btn => btn.addEventListener('click', function () {
+                const tr = this.closest('tr'), name = tr.querySelector('.fw-semibold').textContent, ch = activeChannels();
+                if (!ch.length) { toast('Select at least one channel first', '#dc2626'); return; }
+                tr.querySelector('.fdr-last').innerHTML = '<small class="fw-semibold" style="color:#16a34a"><i class="bx bx-check"></i> Just now</small>';
+                tr.dataset.last = '0';
+                toast('Reminder sent to ' + name + ' in ' + LANG_NAME[lang] + ' via ' + ch.join(' + '));
+            }));
+            // ---------- send (real) ----------
+            // Posts the selected student ids + channels + message. The server re-reads
+            // each student's dues and contact details itself, sends via the notification
+            // service, and records every attempt — so what you see here is what happened.
+            const csrf = $('input[name="__RequestVerificationToken"]')
+                ? $('input[name="__RequestVerificationToken"]').value : '';
+
+            $('#fdrSend').addEventListener('click', function () {
+                const sel = checks().filter(c => c.checked), ch = activeChannels();
+                if (!sel.length || !ch.length) return;
+
+                const btn = this;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bx bx-loader-circle bx-spin me-1"></i>Sending…';
+
+                $.ajax({
+                    url: '@Url.Action("SendReminders", "FeeDueReminders", new { area = "ERP" })',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    headers: { 'RequestVerificationToken': csrf },
+                    data: JSON.stringify({
+                        studentIds: sel.map(c => parseInt(c.dataset.id, 10)).filter(Boolean),
+                        channels:   ch,
+                        message:    $('#fdrMessage').value
+                    })
+                })
+                .done(function (res) {
+                    if (res && res.success) {
+                        toast(res.message || 'Reminders sent.');
+                        sel.forEach(c => {
+                            const tr = c.closest('tr');
+                            tr.querySelector('.fdr-last').innerHTML =
+                                '<small class="fw-semibold" style="color:#16a34a"><i class="bx bx-check"></i> Just now</small>';
+                            c.checked = false;
+                        });
+                        $('#fdrSelectAll').checked = false;
+                    } else {
+                        // Not an error state we hide: e.g. SMS has no provider wired yet.
+                        toast((res && res.message) || 'Could not send reminders.', '#dc2626');
+                    }
+                    if (res && typeof res.sentToday !== 'undefined') $('#fdrSentToday').textContent = res.sentToday;
+                    if (res && res.history) renderHistory(res.history);
+                    refreshCompose();
+                })
+                .fail(function () { toast('Something went wrong while sending.', '#dc2626'); })
+                .always(function () {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bx bx-paper-plane me-1"></i>Send to <span id="fdrSendCount">0</span>';
+                    refreshCompose();
+                });
+            });
+
+            function esc(s){ return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => (
+                { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+            function renderHistory(rows) {
+                const body = $('#fdrHistBody');
+                if (!body) return;
+                body.innerHTML = rows.map(function (h) {
+                    const st = h.status === 'Sent' ? 'success' : (h.status === 'Partial' ? 'warning' : 'danger');
+                    return '<tr><td class="fw-semibold">' + esc(h.studentName) + '</td>'
+                         + '<td><small class="text-muted">' + esc(h.className) + '</small></td>'
+                         + '<td><span class="badge bg-label-info">' + (esc(h.channels) || '—') + '</span></td>'
+                         + '<td>₹' + Number(h.outstanding || 0).toLocaleString('en-IN') + '</td>'
+                         + '<td><small class="text-muted">' + esc(h.sentAt) + '</small></td>'
+                         + '<td><span class="badge bg-label-' + st + '">' + esc(h.status) + '</span></td></tr>';
+                }).join('');
+            }
+
+            // Export the CURRENT filter (server-side CSV), not just the visible page.
+            $('#fdrExport').addEventListener('click', function () {
+                var qs = window.location.search || '';
+                window.location.href = '@Url.Action("Export", "FeeDueReminders", new { area = "ERP" })' + qs;
+            });
+
+            loadTemplate();
+            refreshCompose();
+        });
+    </script>
+}

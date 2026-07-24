@@ -1,0 +1,14 @@
+/* StaffList page styles — extracted from Areas/ERP/Views/Staff/StaffList.cshtml */
+.st-page{ color:var(--ec-text); }
+.st-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; }
+.st-bar{ display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+.st-bar .form-control,.st-bar .form-select{ height:38px; font-size:.85rem; border-radius:9px; }
+.st-search{ position:relative; flex:1 1 220px; max-width:300px; }
+.st-search i{ position:absolute; left:.7rem; top:50%; transform:translateY(-50%); color:var(--ec-text-muted); }
+.st-search input{ padding-left:2rem; }
+.st-page table{ font-size:.88rem; }
+.st-page th{ color:var(--ec-text-muted); font-size:.72rem; text-transform:uppercase; font-weight:800; letter-spacing:.03em; }
+.st-av{ width:38px; height:38px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-weight:800; font-size:.8rem; }
+.st-type{ display:inline-block; padding:.12rem .5rem; border-radius:999px; font-size:.68rem; font-weight:800; background:var(--ec-primary-light); color:var(--ec-primary); }
+.st-bdg{ padding:.15rem .6rem; border-radius:999px; font-size:.7rem; font-weight:800; }
+.b-Active{ background:#d4edda; color:#155724; } .b-Inactive{ background:#f8d7da; color:#842029; } .b-OnLeave{ background:#fff3cd; color:#664d03; }

@@ -8,12 +8,19 @@
 -- ============================================================================
 
 ALTER TABLE academic.academic_classes
-    ADD COLUMN IF NOT EXISTS stream      varchar(50),
-    ADD COLUMN IF NOT EXISTS coordinator varchar(150);
+    ADD COLUMN IF NOT EXISTS stream               varchar(50),
+    ADD COLUMN IF NOT EXISTS coordinator          varchar(150),
+    -- Coordinator is a staff member (core.staff); the coordinator text above is
+    -- kept as a name snapshot of the linked row.
+    ADD COLUMN IF NOT EXISTS coordinator_staff_id integer;
 
 ALTER TABLE academic.academic_class_sections
     ADD COLUMN IF NOT EXISTS capacity int,
-    ADD COLUMN IF NOT EXISTS room_no  varchar(50);
+    ADD COLUMN IF NOT EXISTS room_no  varchar(50),
+    -- Class teacher is section-level; assigned on the Assign Class Teacher page.
+    -- Declared here too (idempotent) so this proc can read/preserve it regardless
+    -- of script apply order.
+    ADD COLUMN IF NOT EXISTS class_teacher_staff_id integer;
 
 CREATE OR REPLACE PROCEDURE academic.sp_school_admin_academic_setup_manage(
     IN p_operation          character varying,
@@ -41,10 +48,12 @@ DECLARE
     v_class_order   integer;
     v_section_order integer;
 
-    v_stream      text;
-    v_coordinator text;
-    v_capacity    integer;
-    v_room_no     text;
+    v_stream         text;
+    v_coordinator    text;
+    v_coord_staff_id integer;
+    v_capacity       integer;
+    v_room_no        text;
+    v_ct_staff_id    integer;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -65,11 +74,14 @@ BEGIN
             ac.display_order AS class_display_order,
             ac.stream,
             ac.coordinator,
+            ac.coordinator_staff_id,
             acs.academic_class_section_id,
             acs.section_name,
             acs.display_order AS section_display_order,
             acs.capacity,
             acs.room_no,
+            acs.class_teacher_staff_id,
+            cts.full_name AS class_teacher,
             COALESCE((
                 SELECT COUNT(*)
                 FROM core.students st
@@ -92,6 +104,11 @@ BEGIN
            AND acs.tenant_id = p_tenant_id
            AND acs.school_id = p_school_id
            AND COALESCE(acs.is_deleted, FALSE) = FALSE
+        LEFT JOIN core.staff cts
+            ON cts.staff_id = acs.class_teacher_staff_id
+           AND cts.tenant_id = p_tenant_id
+           AND cts.school_id = p_school_id
+           AND COALESCE(cts.is_deleted, FALSE) = FALSE
         WHERE ay.academic_year_id = p_academic_year_id
           AND COALESCE(ay.is_deleted, FALSE) = FALSE
           AND COALESCE(ay.is_active, TRUE) = TRUE
@@ -151,6 +168,21 @@ BEGIN
             RAISE EXCEPTION 'Cannot remove a class or section that still has enrolled students. Move or promote those students first.';
         END IF;
 
+        -- This save replaces the whole structure (delete-all + re-insert), so the
+        -- section-level class-teacher assignment would be lost. Snapshot it by
+        -- class + section name and restore it after the rebuild. (This page does
+        -- not edit the class teacher; it's assigned on the Assign Class Teacher page.)
+        CREATE TEMP TABLE _ct_snap ON COMMIT DROP AS
+        SELECT ac.class_name, acs.section_name, acs.class_teacher_staff_id
+        FROM   academic.academic_class_sections acs
+        JOIN   academic.academic_classes ac
+               ON ac.academic_class_id = acs.academic_class_id
+        WHERE  acs.tenant_id = p_tenant_id
+          AND  acs.school_id = p_school_id
+          AND  acs.academic_year_id = v_academic_year_id
+          AND  COALESCE(acs.is_deleted, FALSE) = FALSE
+          AND  acs.class_teacher_staff_id IS NOT NULL;
+
         UPDATE academic.academic_class_sections
         SET is_deleted = TRUE, is_active = FALSE,
             deleted_by = p_action_user_id, deleted_at = NOW(),
@@ -180,14 +212,26 @@ BEGIN
                 v_class_order := v_class_order + 1;
                 v_stream      := NULLIF(trim(COALESCE(v_class_item ->> 'stream',      v_class_item ->> 'Stream',      '')), '');
                 v_coordinator := NULLIF(trim(COALESCE(v_class_item ->> 'coordinator', v_class_item ->> 'Coordinator', '')), '');
+                v_coord_staff_id := NULLIF(COALESCE(v_class_item ->> 'coordinatorStaffId', v_class_item ->> 'CoordinatorStaffId', ''), '')::int;
+
+                -- Snapshot the coordinator's name from the linked staff row (single
+                -- source); keep any free text only when no staff is linked.
+                IF COALESCE(v_coord_staff_id, 0) > 0 THEN
+                    SELECT full_name INTO v_coordinator
+                    FROM   core.staff
+                    WHERE  staff_id = v_coord_staff_id
+                      AND  tenant_id = p_tenant_id AND school_id = p_school_id
+                      AND  COALESCE(is_deleted, FALSE) = FALSE;
+                END IF;
 
                 INSERT INTO academic.academic_classes
                     (tenant_id, school_id, academic_year_id, class_name, display_order,
-                     stream, coordinator, created_by, created_at, is_deleted, is_active)
+                     stream, coordinator, coordinator_staff_id, created_by, created_at, is_deleted, is_active)
                 VALUES
                     (p_tenant_id, p_school_id, v_academic_year_id, v_class_name,
                      COALESCE(NULLIF(v_class_item ->> 'displayOrder', '')::int, v_class_order),
-                     v_stream, v_coordinator, p_action_user_id, NOW(), FALSE, TRUE)
+                     v_stream, v_coordinator, NULLIF(COALESCE(v_coord_staff_id, 0), 0),
+                     p_action_user_id, NOW(), FALSE, TRUE)
                 RETURNING academic_class_id INTO v_academic_class_id;
 
                 v_section_order := 0;
@@ -209,12 +253,21 @@ BEGIN
                     IF v_section_name <> '' THEN
                         v_section_order := v_section_order + 1;
 
+                        -- Restore the class teacher captured before the rebuild.
+                        SELECT class_teacher_staff_id INTO v_ct_staff_id
+                        FROM   _ct_snap
+                        WHERE  class_name = v_class_name
+                          AND  section_name = v_section_name
+                        LIMIT 1;
+
                         INSERT INTO academic.academic_class_sections
                             (tenant_id, school_id, academic_year_id, academic_class_id, section_name,
-                             display_order, capacity, room_no, created_by, created_at, is_deleted, is_active)
+                             display_order, capacity, room_no, class_teacher_staff_id,
+                             created_by, created_at, is_deleted, is_active)
                         VALUES
                             (p_tenant_id, p_school_id, v_academic_year_id, v_academic_class_id, v_section_name,
-                             v_section_order, v_capacity, v_room_no, p_action_user_id, NOW(), FALSE, TRUE);
+                             v_section_order, v_capacity, v_room_no, v_ct_staff_id,
+                             p_action_user_id, NOW(), FALSE, TRUE);
                     END IF;
                 END LOOP;
             END IF;

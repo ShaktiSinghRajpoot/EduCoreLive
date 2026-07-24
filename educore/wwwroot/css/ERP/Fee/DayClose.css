@@ -1,0 +1,16 @@
+/* DayClose page styles — extracted from Areas/ERP/Views/Fee/DayClose.cshtml */
+.fee-day-page{ --suc:#28c76f;--suc-soft:#e8fadf;--dng:#ea5455;--dng-soft:#fdeceb;--amb:#ff9f43;--amb-soft:#fff1e0;--info:#00bad1;--info-soft:#dff7fa; color:var(--ec-text); }
+.fee-day-page .kpis{ display:grid;grid-template-columns:repeat(4,1fr);gap:.85rem;margin-bottom:1.25rem; }
+.fee-day-page .kpi{ border:1px solid var(--ec-border);border-radius:14px;padding:.9rem 1rem;background:#fff; }
+.fee-day-page .kpi .l{ font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ec-text-muted);display:flex;align-items:center;gap:.35rem; }
+.fee-day-page .kpi .v{ font-size:1.35rem;font-weight:950;color:var(--ec-text-dark);letter-spacing:-.02em;margin-top:.25rem;font-variant-numeric:tabular-nums; }
+.fee-day-page .kpi.cash{ background:linear-gradient(135deg,var(--ec-primary-light),#fff);border-color:#ffc98a; } .fee-day-page .kpi.cash .v{ color:var(--ec-primary); }
+.fee-day-page .kpi .ic{ width:24px;height:24px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;font-size:.85rem; }
+.fee-day-page .mode-amt{ font-variant-numeric:tabular-nums;font-weight:800; }
+.fee-day-page .recon-line{ display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;font-weight:700; }
+.fee-day-page .recon-line .v{ font-variant-numeric:tabular-nums; }
+.fee-day-page .diff{ display:flex;justify-content:space-between;align-items:center;border-radius:12px;padding:.75rem 1rem;margin-top:.4rem;font-weight:900; }
+.fee-day-page .diff.ok{ background:var(--suc-soft);color:#1f9254; } .fee-day-page .diff.short{ background:var(--dng-soft);color:#c4332f; } .fee-day-page .diff.over{ background:var(--amb-soft);color:#cc7a1f; }
+.fee-day-page .closed-badge{ font-size:.7rem;font-weight:800;color:#1f9254;background:var(--suc-soft);padding:3px 10px;border-radius:999px; }
+@media (max-width:767.98px){ .fee-day-page .kpis{ grid-template-columns:repeat(2,1fr); } }
+@media print{ .no-print{ display:none!important; } .ec-page-shell{ box-shadow:none;border:0; } }

@@ -1,0 +1,159 @@
+/* EnquiryCRM page styles — extracted from Areas/ERP/Views/SchoolSettings/EnquiryCRM.cshtml */
+    /* ── Top progress loader ── */
+    #crmTopLoader {
+        position: fixed; top: 0; left: 0; width: 0%; height: 3px;
+        background: var(--ec-primary); z-index: 99999;
+        opacity: 1; pointer-events: none; border-radius: 0 2px 2px 0;
+    }
+
+    /* ── KPI Cards ── */
+    .crm-kpi-card {
+        background: var(--ec-white); border: 1px solid var(--ec-border);
+        border-radius: 12px; padding: .9rem 1.1rem;
+        transition: box-shadow .18s; height: 100%;
+    }
+    .crm-kpi-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,.07); }
+    .crm-kpi-card .kpi-icon {
+        width: 42px; height: 42px; border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.2rem; flex-shrink: 0;
+    }
+    .crm-kpi-card .kpi-value  { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+    .crm-kpi-card .kpi-label  { font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--ec-text-muted); }
+    .crm-kpi-card .kpi-sub    { font-size: .72rem; color: var(--ec-text-muted); margin-top: .15rem; }
+
+    /* ── Pipeline Tabs ── */
+    .crm-pipeline { display: flex; gap: .4rem; overflow-x: auto; padding-bottom: .2rem; }
+    .crm-pipeline::-webkit-scrollbar { height: 3px; }
+    .crm-pipeline::-webkit-scrollbar-thumb { background: var(--ec-border); border-radius: 3px; }
+    .pipeline-tab {
+        display: inline-flex; flex-direction: column; align-items: center;
+        padding: .38rem .8rem; border-radius: 9px;
+        border: 1.5px solid var(--ec-border); background: var(--ec-white);
+        cursor: pointer; white-space: nowrap; transition: all .14s;
+        text-decoration: none; min-width: 74px; user-select: none;
+    }
+    .pipeline-tab:hover, .pipeline-tab.active {
+        border-color: var(--ec-primary); background: var(--ec-primary-light);
+    }
+    .pipeline-tab .ptab-count { font-size: 1rem; font-weight: 700; color: var(--ec-text-dark); line-height: 1.15; }
+    .pipeline-tab .ptab-label { font-size: .65rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ec-text-muted); margin-top: .1rem; }
+    .pipeline-tab.active .ptab-count, .pipeline-tab.active .ptab-label { color: var(--ec-primary); }
+
+    /* ── Table helpers ── */
+    .lead-name { font-weight: 700; color: var(--ec-text-dark); font-size: .87rem; }
+    .lead-meta { font-size: .76rem; color: var(--ec-text-muted); }
+    .student-avatar {
+        width: 34px; height: 34px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700; font-size: .74rem; flex-shrink: 0;
+    }
+    .fee-pill {
+        display: inline-flex; align-items: center;
+        border: 1.5px solid var(--ec-border); border-radius: 999px;
+        padding: .22rem .6rem; font-weight: 700; font-size: .76rem;
+        background: var(--ec-primary-light); color: var(--ec-primary);
+    }
+    .source-pill {
+        display: inline-flex; align-items: center; gap: .2rem;
+        font-size: .71rem; font-weight: 600; padding: .16rem .44rem;
+        border-radius: 6px; background: rgba(0,0,0,.04); color: var(--ec-text-muted);
+    }
+    .crm-action-btn { width: 31px; height: 31px; padding: 0; border-radius: 7px; }
+    .lead-row { cursor: pointer; }
+    .lead-row:hover { background-color: #fafbff !important; }
+    .overdue-row td:first-child { border-left: 3px solid #ef4444; }
+    .followup-overdue  { color: #ef4444; font-weight: 700; font-size: .78rem; }
+    .followup-today    { color: #f59e0b; font-weight: 700; font-size: .78rem; }
+    .followup-upcoming { color: var(--ec-text-dark); font-size: .8rem; font-weight: 600; }
+    .followup-done     { color: #22c55e; font-size: .8rem; font-weight: 600; }
+    .followup-count-badge {
+        display: inline-flex; align-items: center; gap: .2rem;
+        font-size: .7rem; color: var(--ec-text-muted);
+        background: rgba(0,0,0,.04); border-radius: 4px; padding: .1rem .35rem;
+    }
+
+    /* ── Status dropdown ── */
+    .status-badge-toggle { cursor: pointer; user-select: none; }
+    .status-badge-toggle:hover { opacity: .85; }
+    .dropdown-item.status-opt { display: flex; align-items: center; gap: .4rem; }
+    .dropdown-item.status-opt.active { background: var(--ec-primary-light) !important; color: var(--ec-primary) !important; }
+    .dropdown-item.status-opt.disabled-opt { opacity: .45; pointer-events: none; }
+    .status-opt .check-icon { margin-left: auto; color: var(--ec-primary); font-size: .85rem; }
+
+    /* ── Quick filter pills ── */
+    .qf-btn {
+        display: inline-flex; align-items: center; gap: .28rem;
+        padding: .28rem .7rem; border-radius: 999px;
+        border: 1.5px solid var(--ec-border); background: var(--ec-white);
+        font-size: .77rem; font-weight: 600; color: var(--ec-text-muted);
+        cursor: pointer; transition: all .14s; white-space: nowrap;
+    }
+    .qf-btn:hover { border-color: var(--ec-primary); color: var(--ec-primary); background: var(--ec-primary-light); }
+    .qf-btn.active-warning { border-color: #f59e0b; color: #92400e; background: #fffbeb; }
+    .qf-btn.active-danger  { border-color: #ef4444; color: #991b1b; background: #fef2f2; }
+
+    /* ── Pagination ── */
+    .crm-pg-bar {
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: .5rem; padding: .6rem 1rem;
+        border-top: 1px solid var(--ec-border);
+    }
+    .crm-pg-bar .pagination { margin-bottom: 0; }
+
+    /* ── Mobile card view ── */
+    .crm-card { background: var(--ec-white); border: 1px solid var(--ec-border); border-radius: 11px; padding: .9rem; margin-bottom: .6rem; }
+    .crm-card.overdue-card { border-left: 3px solid #ef4444; }
+
+    /* ── Follow-up timeline ── */
+    .followup-timeline { list-style: none; padding: 0; margin: 0; }
+    .followup-timeline li {
+        position: relative; padding: 0 0 1.2rem 2rem;
+        border-left: 2px solid var(--ec-border);
+    }
+    .followup-timeline li:last-child { border-left: 2px solid transparent; padding-bottom: 0; }
+    .followup-timeline li::before {
+        content: ''; position: absolute; left: -6px; top: 4px;
+        width: 10px; height: 10px; border-radius: 50%;
+        background: var(--ec-primary); border: 2px solid var(--ec-white);
+        box-shadow: 0 0 0 2px var(--ec-primary);
+    }
+    .tl-time  { font-size: .72rem; color: var(--ec-text-muted); margin-bottom: .25rem; }
+    .tl-title { font-weight: 700; font-size: .84rem; color: var(--ec-text-dark); }
+    .tl-note  { font-size: .79rem; color: var(--ec-text-muted); margin-top: .15rem; }
+
+    /* ── Modal scroll fix (form breaks flex chain) ── */
+    #addEnquiryModal .modal-content,
+    #addEnquiryModal .modal-content > form,
+    #logFollowupModal .modal-content {
+        max-height: calc(100dvh - 3.5rem);
+        display: flex; flex-direction: column;
+        overflow: hidden; flex: 1 1 auto; min-height: 0;
+    }
+    #addEnquiryModal .modal-header,  #addEnquiryModal .modal-footer,
+    #logFollowupModal .modal-header, #logFollowupModal .modal-footer { flex-shrink: 0; }
+    #addEnquiryModal .modal-body,
+    #logFollowupModal .modal-body {
+        flex: 1 1 auto; min-height: 0;
+        overflow-y: auto; overflow-x: hidden;
+        overscroll-behavior-y: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+    @media (max-width: 575.98px) {
+        #addEnquiryModal .modal-content,
+        #addEnquiryModal .modal-content > form,
+        #logFollowupModal .modal-content { max-height: calc(100dvh - 1rem); }
+        #addEnquiryModal .modal-dialog,
+        #logFollowupModal .modal-dialog  { margin: .5rem; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 767.98px) {
+        .crm-table-wrap { display: none !important; }
+        .crm-card-list  { display: block; }
+        .crm-pg-bar     { justify-content: center; }
+    }
+    @media (min-width: 768px) {
+        .crm-card-list  { display: none !important; }
+        .crm-table-wrap { display: block; }
+    }

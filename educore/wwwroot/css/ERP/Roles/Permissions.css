@@ -1,0 +1,12 @@
+/* Permissions page styles — extracted from Areas/ERP/Views/Roles/Permissions.cshtml */
+.pm-group{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; margin-bottom:1.1rem; overflow:hidden; }
+.pm-group-hdr{ display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding:.7rem 1.1rem; background:var(--ec-primary-soft); border-bottom:1px solid var(--ec-border); }
+.pm-group-title{ font-size:.82rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; color:var(--ec-text-dark); }
+.pm-row{ display:grid; grid-template-columns:1fr 110px 110px; align-items:center; padding:.6rem 1.1rem; border-bottom:1px solid var(--ec-border); }
+.pm-row:last-child{ border-bottom:none; }
+.pm-feat{ font-size:.9rem; font-weight:700; color:var(--ec-text-dark); }
+.pm-col-hdr{ font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--ec-text-light); text-align:center; }
+.pm-cell{ text-align:center; }
+.pm-cell input{ width:1.25rem; height:1.25rem; cursor:pointer; }
+.pm-cell .muted{ color:var(--ec-text-light); font-size:.8rem; }
+.pm-sticky{ position:sticky; bottom:0; background:rgba(255,255,255,.96); backdrop-filter:blur(8px); border-top:1px solid var(--ec-border); padding:.9rem 1.1rem; display:flex; justify-content:space-between; align-items:center; gap:.75rem; border-radius:0 0 var(--ec-radius) var(--ec-radius); z-index:5; }

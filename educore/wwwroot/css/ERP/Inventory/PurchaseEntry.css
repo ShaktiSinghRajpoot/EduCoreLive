@@ -1,0 +1,61 @@
+/* PurchaseEntry page styles — extracted from Areas/ERP/Views/Inventory/PurchaseEntry.cshtml */
+@media (max-width:575.98px){ .purchase-footer-actions .btn{ width:auto !important; } }
+
+/* ── summary cards (mirrors StudentList / Inventory) ───────── */
+.iv-card{
+    border:1px solid var(--ec-border); border-radius:14px; background:#fff;
+    padding:1.1rem 1.2rem; display:flex; align-items:center; gap:.9rem;
+    transition:var(--ec-transition); height:100%;
+}
+.iv-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); border-color:rgba(255,138,0,.22); }
+.iv-card-ic{ width:46px; height:46px; flex:0 0 46px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; }
+.iv-card-val{ font-size:1.5rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.iv-card-lbl{ font-size:.71rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+/* ── compact form controls (match Inventory) ───────────────── */
+.purchase-page .form-control,
+.purchase-page .form-select{ min-height:40px; border-radius:10px; border-color:#ececf5; font-weight:650; font-size:.85rem; }
+.purchase-page .form-control:focus,
+.purchase-page .form-select:focus{ border-color:#ff8a00; box-shadow:0 0 0 3px rgba(255,138,0,.12); }
+
+/* ── items grid ────────────────────────────────────────────── */
+.purchase-page .purchase-grid-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.purchase-page .purchase-grid{ min-width:980px; margin-bottom:0; }
+.purchase-page .purchase-grid thead th{
+    background:linear-gradient(180deg,#fffaf3,#fff6ea);
+    color:var(--ec-text-light); font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; font-weight:800;
+    padding:.7rem .9rem; border-bottom:1px solid var(--ec-border); white-space:nowrap;
+}
+.purchase-page .purchase-grid td{ vertical-align:middle; border-bottom:1px solid #f4f0eb; padding:.55rem .9rem; }
+.purchase-page .purchase-grid tbody tr:hover{ background:#fffaf3; }
+
+.purchase-page .purchase-item-thumb{
+    width:34px; height:34px; flex:0 0 34px; border-radius:10px; background:#fff4e6; color:#ff8a00;
+    display:inline-flex; align-items:center; justify-content:center; font-size:1.05rem;
+}
+.purchase-page .grid-remove-btn{
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fff; color:var(--ec-text-muted); font-size:.95rem;
+    display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:var(--ec-transition);
+}
+.purchase-page .grid-remove-btn:hover{ background:#fff0f0; color:#dc3545; border-color:#f5c2c7; }
+
+/* ── totals box ────────────────────────────────────────────── */
+.purchase-page .purchase-total-box{ border-radius:16px; border:1px solid var(--ec-border); background:linear-gradient(180deg,#fff,#fffaf5); }
+.purchase-page .purchase-total-row{
+    display:flex; justify-content:space-between; align-items:center; gap:1rem;
+    padding:.65rem 0; border-bottom:1px solid #f1f1f5; font-weight:800;
+}
+.purchase-page .purchase-total-row:last-child{ border-bottom:0; }
+.purchase-page .purchase-total-row span{ color:var(--ec-text-muted); }
+.purchase-page .purchase-total-row strong{ color:var(--ec-text-dark); }
+
+.purchase-page .purchase-sticky-footer{
+    position:sticky; bottom:0; z-index:15; background:rgba(255,255,255,.95);
+    backdrop-filter:blur(12px); border-top:1px solid var(--ec-border);
+}
+@media (max-width:575.98px){
+    .purchase-page .ec-page-header-inner{ align-items:stretch !important; }
+    .purchase-page .header-actions{ width:100%; }
+    .purchase-page .header-actions .btn{ flex:1; }
+}

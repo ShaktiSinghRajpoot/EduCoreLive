@@ -65,6 +65,12 @@ CREATE TABLE IF NOT EXISTS core.transport_vehicles
     CONSTRAINT chk_transport_vehicles_scope CHECK ((tenant_id > 1) AND (school_id > 0))
 );
 
+-- Driver is an EMPLOYEE (core.staff, designation "Driver"), not free text. The
+-- name/phone columns above are kept as a snapshot of the linked staff at save
+-- time (like other snapshots in this schema); driver_staff_id is the real link.
+ALTER TABLE core.transport_vehicles
+    ADD COLUMN IF NOT EXISTS driver_staff_id integer REFERENCES core.staff(staff_id) ON DELETE SET NULL;
+
 -- One active assignment per student. stop_id/route_id are stored by value (no hard
 -- FK) and the fare is snapshotted, so editing/removing a stop never corrupts a
 -- student's billed history.
@@ -204,21 +210,31 @@ END;
 $procedure$;
 
 -- ── Vehicles manage ─────────────────────────────────────────────────────────
+-- Old signature (free-text driver only) is dropped so the driver_staff_id param
+-- can be added without creating an ambiguous overload.
+DROP PROCEDURE IF EXISTS core.sp_transport_vehicle_manage(
+    varchar, integer, integer, integer, integer, varchar, integer,
+    varchar, varchar, integer, refcursor);
+
 CREATE OR REPLACE PROCEDURE core.sp_transport_vehicle_manage(
-    IN    p_operation      varchar,
-    IN    p_tenant_id      integer,
-    IN    p_school_id      integer,
-    IN    p_action_user_id integer,
-    IN    p_vehicle_id     integer  DEFAULT NULL,
-    IN    p_vehicle_no     varchar  DEFAULT NULL,
-    IN    p_capacity       integer  DEFAULT NULL,
-    IN    p_driver_name    varchar  DEFAULT NULL,
-    IN    p_driver_phone   varchar  DEFAULT NULL,
-    IN    p_route_id       integer  DEFAULT NULL,
-    INOUT p_result         refcursor DEFAULT 'result_cursor'::refcursor
+    IN    p_operation       varchar,
+    IN    p_tenant_id       integer,
+    IN    p_school_id       integer,
+    IN    p_action_user_id  integer,
+    IN    p_vehicle_id      integer  DEFAULT NULL,
+    IN    p_vehicle_no      varchar  DEFAULT NULL,
+    IN    p_capacity        integer  DEFAULT NULL,
+    IN    p_driver_name     varchar  DEFAULT NULL,
+    IN    p_driver_phone    varchar  DEFAULT NULL,
+    IN    p_route_id        integer  DEFAULT NULL,
+    IN    p_driver_staff_id integer  DEFAULT NULL,
+    INOUT p_result          refcursor DEFAULT 'result_cursor'::refcursor
 )
 LANGUAGE plpgsql
 AS $procedure$
+DECLARE
+    v_dname  varchar(100);
+    v_dphone varchar(20);
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -227,30 +243,56 @@ BEGIN
     IF p_operation = 'GetVehicles' THEN
         OPEN p_result FOR
         SELECT v.vehicle_id, v.vehicle_no, v.capacity, v.driver_name, v.driver_phone,
-               v.route_id, r.route_name, v.is_active
+               v.route_id, r.route_name, v.is_active, v.driver_staff_id
         FROM core.transport_vehicles v
         LEFT JOIN core.transport_routes r ON r.route_id = v.route_id
         WHERE v.tenant_id = p_tenant_id AND v.school_id = p_school_id
           AND COALESCE(v.is_deleted, FALSE) = FALSE
         ORDER BY v.vehicle_no;
 
+    ELSIF p_operation = 'GetDrivers' THEN
+        -- Transport-type staff (drivers/conductors) for the vehicle dropdown.
+        OPEN p_result FOR
+        SELECT staff_id, full_name, mobile, designation
+        FROM   core.staff
+        WHERE  tenant_id = p_tenant_id AND school_id = p_school_id
+          AND  COALESCE(is_deleted, FALSE) = FALSE
+          AND  COALESCE(status, 'Active') <> 'Inactive'
+          AND  (staff_type = 'Transport' OR designation ILIKE '%driver%' OR designation ILIKE '%conductor%')
+        ORDER BY full_name;
+
     ELSIF p_operation = 'SaveVehicle' THEN
         IF COALESCE(NULLIF(trim(p_vehicle_no), ''), '') = '' THEN
             RAISE EXCEPTION 'Vehicle number is required.';
         END IF;
+
+        -- Snapshot driver name/phone from the linked staff row (single source);
+        -- fall back to any free-text passed in when no staff is linked.
+        IF COALESCE(p_driver_staff_id, 0) > 0 THEN
+            SELECT full_name, mobile INTO v_dname, v_dphone
+            FROM   core.staff
+            WHERE  staff_id = p_driver_staff_id
+              AND  tenant_id = p_tenant_id AND school_id = p_school_id
+              AND  COALESCE(is_deleted, FALSE) = FALSE;
+        END IF;
+        v_dname  := COALESCE(v_dname,  p_driver_name);
+        v_dphone := COALESCE(v_dphone, p_driver_phone);
+
         IF COALESCE(p_vehicle_id, 0) > 0 THEN
             UPDATE core.transport_vehicles
             SET vehicle_no = p_vehicle_no, capacity = p_capacity,
-                driver_name = p_driver_name, driver_phone = p_driver_phone,
+                driver_name = v_dname, driver_phone = v_dphone,
+                driver_staff_id = NULLIF(COALESCE(p_driver_staff_id, 0), 0),
                 route_id = NULLIF(COALESCE(p_route_id, 0), 0),
                 updated_by = p_action_user_id, updated_at = NOW()
             WHERE vehicle_id = p_vehicle_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
         ELSE
             INSERT INTO core.transport_vehicles
-                (tenant_id, school_id, vehicle_no, capacity, driver_name, driver_phone, route_id, created_by)
+                (tenant_id, school_id, vehicle_no, capacity, driver_name, driver_phone,
+                 driver_staff_id, route_id, created_by)
             VALUES
-                (p_tenant_id, p_school_id, p_vehicle_no, p_capacity, p_driver_name, p_driver_phone,
-                 NULLIF(COALESCE(p_route_id, 0), 0), p_action_user_id);
+                (p_tenant_id, p_school_id, p_vehicle_no, p_capacity, v_dname, v_dphone,
+                 NULLIF(COALESCE(p_driver_staff_id, 0), 0), NULLIF(COALESCE(p_route_id, 0), 0), p_action_user_id);
         END IF;
         OPEN p_result FOR SELECT TRUE AS success, 'Vehicle saved.' AS message;
 

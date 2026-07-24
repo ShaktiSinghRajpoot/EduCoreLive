@@ -2,8 +2,8 @@ using System.Text.Json;
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models;
-using EduCoreDataAccessLayer.Models.Admin;
-using EduCoreDataAccessLayer.Services.Contract.Admin;
+using EduCoreDataAccessLayer.Models.ERP;
+using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -39,9 +39,8 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> GetTransportRoutes()
         {
             var rows = await _transportService.GetRoutesDropdownAsync(TenantId(), SchoolId(), UserId());
-            var routes = rows.GroupBy(r => new { r.RouteId, r.RouteName })
-                .Select(g => new
-                {
+            var routes = rows.GroupBy(r => new { r.RouteId, r.RouteName }).Select(g => new
+            {
                     routeId   = g.Key.RouteId,
                     routeName = g.Key.RouteName,
                     stops     = g.Select(s => new { stopId = s.StopId, stopName = s.StopName, fare = s.MonthlyFare })
@@ -51,12 +50,23 @@ namespace educore.Areas.ERP.Controllers
 
         // Registration gate: when the school requires registration before admission,
         // an enquiry must be "Registration Done" before it can be converted.
-        private async Task<bool> RegistrationSatisfiedAsync(EnquiryModel enquiry, int tenantId, int schoolId, int userId)
+        // True when the workflow makes registration MANDATORY before any admission.
+        private async Task<bool> RegistrationRequiredAsync(int tenantId, int schoolId, int userId)
         {
             var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
-            if (!workflow.EnableRegistration || !workflow.RegistrationRequiredBeforeAdmission)
+            return workflow.EnableRegistration && workflow.RegistrationRequiredBeforeAdmission;
+        }
+
+        // True when this admission satisfies the registration policy. When
+        // registration is mandatory EVERY student must be registered first, so a
+        // direct/walk-in admission (no enquiry) never satisfies it — only an
+        // enquiry that has completed registration does.
+        private async Task<bool> RegistrationSatisfiedAsync(EnquiryModel? enquiry, int tenantId, int schoolId, int userId)
+        {
+            if (!await RegistrationRequiredAsync(tenantId, schoolId, userId))
                 return true;
-            return string.Equals(enquiry.Status, "Registration Done", StringComparison.OrdinalIgnoreCase);
+            return enquiry != null
+                && string.Equals(enquiry.Status, "Registration Done", StringComparison.OrdinalIgnoreCase);
         }
 
         // ── Pages ────────────────────────────────────────────────
@@ -74,12 +84,20 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> Create(int? enquiryId)
         {
+            // Direct / walk-in admission (no enquiry) is blocked when registration
+            // is mandatory — every student must be registered first. Send them to
+            // the Enquiry CRM where an enquiry is created and registered.
+            if (enquiryId is not > 0 && await RegistrationRequiredAsync(TenantId(), SchoolId(), UserId()))
+            {
+                TempData["Result"] = "0";
+                TempData["Message"] = "Registration is mandatory before admission. Create an enquiry and complete registration first.";
+                return RedirectToAction("EnquiryCRM", "Enquiry", new { area = "ERP" });
+            }
+
             await LoadDropdownsAsync();
             if (enquiryId is > 0)
             {
-                var enquiry = await _enquiryService.GetEnquiryByIdAsync(
-                    enquiryId.Value, TenantId(), SchoolId(), UserId());
-
+                var enquiry = await _enquiryService.GetEnquiryByIdAsync(enquiryId.Value, TenantId(), SchoolId(), UserId());
                 if (enquiry != null)
                 {
                     // Server-side registration gate (mirrors the CRM client-side check).
@@ -87,22 +105,18 @@ namespace educore.Areas.ERP.Controllers
                     {
                         TempData["Result"] = "0";
                         TempData["Message"] = "Complete registration before converting this enquiry to admission.";
-                        return RedirectToAction("EnquiryCRM", "Enquiry", new { area = "Admin" });
+                        return RedirectToAction("EnquiryCRM", "Enquiry", new { area = "ERP" });
                     }
 
+                    // Prefill values rendered straight into the form fields (normal
+                    // binding) — no JSON blob for the client to parse.
                     ViewBag.PrefillEnquiryId = enquiry.EnquiryId;
-                    ViewBag.PrefillJson = JsonSerializer.Serialize(new
-                    {
-                        enquiryId    = enquiry.EnquiryId,
-                        studentName  = enquiry.StudentName,
-                        gender       = enquiry.Gender,
-                        className    = enquiry.ClassName,
-                        academicYear = enquiry.Session,
-                        guardianName = enquiry.FatherName ?? enquiry.ParentName,
-                        motherName   = enquiry.MotherName,
-                        mobile       = enquiry.Mobile,
-                        altMobile    = enquiry.AltMobile
-                    });
+                    ViewBag.PreStudentName   = enquiry.StudentName;
+                    ViewBag.PreGender        = enquiry.Gender;
+                    ViewBag.PreClassName     = enquiry.ClassName;
+                    ViewBag.PreAcademicYear  = enquiry.Session;
+                    ViewBag.PreGuardianName  = enquiry.FatherName ?? enquiry.MotherName;
+                    ViewBag.PreMobile        = enquiry.Mobile;
                 }
             }
             return View("Create");
@@ -143,11 +157,14 @@ namespace educore.Areas.ERP.Controllers
                 return Json(new { success = false, message = string.Join(" ", errors) });
 
             // Registration gate — enforce on the actual mutation, not just the UI.
-            if (form.EnquiryId is > 0)
+            // Covers BOTH paths: an enquiry that hasn't completed registration, and
+            // a direct/walk-in admission (no enquiry) when registration is mandatory.
             {
-                var enquiry = await _enquiryService.GetEnquiryByIdAsync(form.EnquiryId.Value, tenantId, schoolId, userId);
-                if (enquiry != null && !await RegistrationSatisfiedAsync(enquiry, tenantId, schoolId, userId))
-                    return Json(new { success = false, message = "Complete registration before admitting this enquiry." });
+                var enquiry = form.EnquiryId is > 0
+                    ? await _enquiryService.GetEnquiryByIdAsync(form.EnquiryId.Value, tenantId, schoolId, userId)
+                    : null;
+                if (!await RegistrationSatisfiedAsync(enquiry, tenantId, schoolId, userId))
+                    return Json(new { success = false, message = "Registration is mandatory before admission. Please register the student first." });
             }
 
             var model = new AdmissionModel
@@ -357,24 +374,48 @@ namespace educore.Areas.ERP.Controllers
                 !string.Equals(d.CollectionPoint, "Registration", StringComparison.OrdinalIgnoreCase) &&
                 (!(IsAdmissionPoint(d.CollectionPoint) && d.IsRefundable) || workflow.EnableSecurityFee));
 
-            return Json(new
+            var fees = visible.Select(d => new
             {
-                success = true,
-                fees = visible.Select(d => new
+                feeHeadId       = d.FeeHeadId,
+                feeHeadName     = d.FeeHeadName,
+                frequency       = string.IsNullOrWhiteSpace(d.Frequency) ? "Yearly" : d.Frequency,
+                amount          = d.Amount,
+                collectionPoint = string.IsNullOrWhiteSpace(d.CollectionPoint) ? "Recurring" : d.CollectionPoint,
+                isRefundable    = d.IsRefundable,
+                group           = IsAdmissionPoint(d.CollectionPoint) ? "One Time Payable Now" : GroupForFrequency(d.Frequency),
+                // Due-now vs scheduled is driven by the Collection Point, not the billing cycle.
+                stage           = IsAdmissionPoint(d.CollectionPoint) ? "Admission" : StageForFrequency(d.Frequency),
+                // All configured heads are part of the class structure → mandatory by default.
+                mandatory       = true
+            }).ToList();
+
+            // Security deposit: enabled but the class Fee Structure has no refundable
+            // Admission head → add it from the flat fee-head amount (the simple / inline
+            // Workflow-Settings setup). It stays REFUNDABLE (isRefundable = true), so it
+            // flows to the ledger as a returnable deposit, not a normal charge.
+            if (workflow.EnableSecurityFee &&
+                !fees.Any(f => IsAdmissionPoint(f.collectionPoint) && f.isRefundable))
+            {
+                decimal secAmount = await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
+                    className, academicYear, "Admission", tenantId, schoolId, userId, refundableOnly: true);
+                if (secAmount > 0)
                 {
-                    feeHeadId       = d.FeeHeadId,
-                    feeHeadName     = d.FeeHeadName,
-                    frequency       = string.IsNullOrWhiteSpace(d.Frequency) ? "Yearly" : d.Frequency,
-                    amount          = d.Amount,
-                    collectionPoint = string.IsNullOrWhiteSpace(d.CollectionPoint) ? "Recurring" : d.CollectionPoint,
-                    isRefundable    = d.IsRefundable,
-                    group           = IsAdmissionPoint(d.CollectionPoint) ? "One Time Payable Now" : GroupForFrequency(d.Frequency),
-                    // Due-now vs scheduled is driven by the Collection Point, not the billing cycle.
-                    stage           = IsAdmissionPoint(d.CollectionPoint) ? "Admission" : StageForFrequency(d.Frequency),
-                    // All configured heads are part of the class structure → mandatory by default.
-                    mandatory       = true
-                })
-            });
+                    fees.Add(new
+                    {
+                        feeHeadId       = 0,
+                        feeHeadName     = "Security Deposit",
+                        frequency       = "One Time",
+                        amount          = secAmount,
+                        collectionPoint = "Admission",
+                        isRefundable    = true,
+                        group           = "One Time Payable Now",
+                        stage           = "Admission",
+                        mandatory       = true
+                    });
+                }
+            }
+
+            return Json(new { success = true, fees });
         }
 
         private static bool IsAdmissionPoint(string? collectionPoint) =>
@@ -427,10 +468,10 @@ namespace educore.Areas.ERP.Controllers
         // ── Dropdowns from Academic Setup (same source as Enquiry) ─
         private async Task LoadDropdownsAsync()
         {
-            try { ViewBag.Classes = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class"); }
+            try { ViewBag.Classes = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
             catch { ViewBag.Classes = new List<SelectListItem>(); }
 
-            try { ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear"); }
+            try { ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }
             catch { ViewBag.Sessions = new List<SelectListItem>(); }
             // Sections are class-dependent → loaded dynamically via GetSections.
 

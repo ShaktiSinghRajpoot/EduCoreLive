@@ -1,15 +1,14 @@
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
-using EduCoreDataAccessLayer.Services.Contract.Admin;
+using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
-    // Fee counter + day-close + reports. The two Inventory stub pages
-    // (InventoryItem/PurchaseEntry) also live here for now, so the whole
-    // controller is gated by fees.view until Inventory gets its own module.
+    // Fee counter + day-close + reports. Inventory now lives in its own
+    // InventoryController (see Controllers/InventoryController.cs).
     [HasPermission("fees.view")]
     public class FeeController : Controller
     {
@@ -34,14 +33,12 @@ namespace educore.Areas.ERP.Controllers
         public IActionResult ManageFee() => View();
         public IActionResult DayClose() => View();
         public IActionResult Reports() => View();
-        public IActionResult InventoryItem() => View();
-        public IActionResult PurchaseEntry() => View();
 
         // ── GET: /ERP/Fee/GetSessions ────────────────────────────
         [HttpGet]
         public async Task<IActionResult> GetSessions()
         {
-            var items = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear");
+            var items = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
             return Json(items.Select(x => x.Text).ToList());
         }
 
@@ -49,7 +46,7 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> GetClasses(string? session = null)
         {
-            var items = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class");
+            var items = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString());
             return Json(items.Select(x => x.Text).ToList());
         }
 
@@ -145,7 +142,7 @@ namespace educore.Areas.ERP.Controllers
             var dues = await _feePaymentService.GetStudentDuesAsync(studentId, TenantId(), SchoolId(), UserId());
             var today = DateOnly.FromDateTime(DateTime.Today);
 
-            object Map(IEnumerable<EduCoreDataAccessLayer.Models.Admin.StudentDueItem> items) =>
+            object Map(IEnumerable<EduCoreDataAccessLayer.Models.ERP.StudentDueItem> items) =>
                 items.Select(d => new
                 {
                     id       = d.LedgerId,
@@ -180,7 +177,7 @@ namespace educore.Areas.ERP.Controllers
 
             var items = req.Items
                 .Where(i => i.LedgerId > 0 && (i.Amount > 0 || i.Concession > 0))
-                .Select(i => new EduCoreDataAccessLayer.Models.Admin.FeeCollectItem
+                .Select(i => new EduCoreDataAccessLayer.Models.ERP.FeeCollectItem
                 {
                     LedgerId   = i.LedgerId,
                     Amount     = i.Amount,
@@ -189,7 +186,7 @@ namespace educore.Areas.ERP.Controllers
 
             var extras = (req.Extras ?? new List<ExtraCharge>())
                 .Where(e => e.Amount > 0 && !string.IsNullOrWhiteSpace(e.Label))
-                .Select(e => new EduCoreDataAccessLayer.Models.Admin.FeeExtraItem
+                .Select(e => new EduCoreDataAccessLayer.Models.ERP.FeeExtraItem
                 {
                     Label  = e.Label!.Trim(),
                     Amount = e.Amount
@@ -200,7 +197,7 @@ namespace educore.Areas.ERP.Controllers
 
             var tenders = (req.Tenders ?? new List<TenderLine>())
                 .Where(t => t.Amount > 0)
-                .Select(t => new EduCoreDataAccessLayer.Models.Admin.FeeTenderItem
+                .Select(t => new EduCoreDataAccessLayer.Models.ERP.FeeTenderItem
                 {
                     Mode      = NullIfEmpty(t.Mode) ?? "Cash",
                     Amount    = t.Amount,
@@ -407,6 +404,23 @@ namespace educore.Areas.ERP.Controllers
             public string?  Remarks     { get; set; }
         }
 
+        // ── POST: /ERP/Fee/SaveReceiptFormat (AJAX) ──────────────
+        // The school picks how receipts print: A4 (letterhead) / A5 (compact) /
+        // Thermal (80mm counter roll). Stored per school, applied to every receipt.
+        [HttpPost]
+        [HasPermission("fees.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveReceiptFormat([FromBody] ReceiptFormatRequest req)
+        {
+            if (req == null || string.IsNullOrWhiteSpace(req.Format))
+                return Json(new { success = false, message = "Choose a format." });
+
+            var ok = await _schoolSettingsService.SaveReceiptFormatAsync(
+                req.Format!.Trim(), TenantId(), SchoolId(), UserId());
+
+            return Json(new { success = ok, message = ok ? "Receipt format saved." : "Could not save the format." });
+        }
+
         // ── GET: /ERP/Fee/GetCollectionRegister ──────────────────
         [HttpGet]
         public async Task<IActionResult> GetCollectionRegister(string? from = null, string? to = null)
@@ -414,11 +428,32 @@ namespace educore.Areas.ERP.Controllers
             DateOnly? f = DateOnly.TryParse(from, out var pf) ? pf : null;
             DateOnly? t = DateOnly.TryParse(to,   out var pt) ? pt : null;
             var reg = await _feePaymentService.GetCollectionRegisterAsync(f, t, TenantId(), SchoolId(), UserId());
+
+            // Money OUT for the same range. A register that only counts money in
+            // overstates what the school actually holds, so report NET as well.
+            var refunds = await _feePaymentService.GetRefundRegisterAsync(f, t, TenantId(), SchoolId(), UserId());
+
             return Json(new
             {
                 from  = reg.From.ToString("yyyy-MM-dd"),
                 to    = reg.To.ToString("yyyy-MM-dd"),
                 total = reg.Total,
+                refundTotal = refunds.Total,
+                net         = reg.Total - refunds.Total,
+                refunds = refunds.Rows.Select(r => new
+                {
+                    refundNo   = r.RefundNo,
+                    date       = r.RefundedAt?.ToString("yyyy-MM-dd"),
+                    student    = r.StudentName,
+                    admNo      = r.AdmissionNo,
+                    cls        = string.IsNullOrWhiteSpace(r.ClassName) ? "" : $"{r.ClassName}{(string.IsNullOrWhiteSpace(r.Section) ? "" : " - " + r.Section)}",
+                    against    = string.IsNullOrWhiteSpace(r.FeeHeadName) ? "—" : $"{r.FeeHeadName}{(string.IsNullOrWhiteSpace(r.InstallmentLabel) ? "" : " (" + r.InstallmentLabel + ")")}",
+                    mode       = r.Mode,
+                    reason     = r.Reason,
+                    authorised = r.AuthorizedBy,
+                    amount     = r.Amount
+                }),
+                refundModes = refunds.Modes.Select(m => new { mode = m.Mode, count = m.Count, amount = m.Amount }),
                 receipts = reg.Receipts.Select(r => new
                 {
                     receiptNo = r.ReceiptNo,
@@ -427,6 +462,10 @@ namespace educore.Areas.ERP.Controllers
                     admNo     = r.AdmissionNo,
                     cls       = string.IsNullOrWhiteSpace(r.ClassName) ? "" : $"{r.ClassName}{(string.IsNullOrWhiteSpace(r.Section) ? "" : " - " + r.Section)}",
                     mode      = r.Mode,
+                    type      = r.PaymentType,
+                    heads     = r.FeeHeads,
+                    reference = r.ReferenceNo,
+                    discount  = r.DiscountTotal,
                     amount    = r.Amount
                 }),
                 modes = reg.Modes.Select(m => new { mode = m.Mode, count = m.Count, amount = m.Amount }),
@@ -510,9 +549,13 @@ namespace educore.Areas.ERP.Controllers
             if (lines.Count == 0)
                 lines.Add(new { label = r.PaymentType == "Registration" ? "Registration Fee" : "Fee", amount = r.Amount, concession = 0m, lineType = "Due" });
 
+            // The school's chosen print format drives which template renders.
+            var format = await _schoolSettingsService.GetReceiptFormatAsync(TenantId(), SchoolId(), UserId());
+
             return Json(new
             {
                 school,
+                format,
                 receiptNo   = r.ReceiptNo,
                 date        = r.PaymentDate?.ToString("yyyy-MM-dd"),
                 amount      = r.Amount,
@@ -541,10 +584,24 @@ namespace educore.Areas.ERP.Controllers
             var profile = await _schoolSettingsService.GetBasicProfileAsync(TenantId(), SchoolId(), UserId());
             var addressParts = new[] { profile?.AddressLine1, profile?.City, profile?.State }
                 .Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => p!.Trim());
+
+            // The receipt prints from a blank popup window, where a relative path like
+            // "/uploads/..." cannot resolve — so hand the client an ABSOLUTE url or the
+            // letterhead logo silently breaks on every print.
+            string? logo = null;
+            var stored = profile?.LogoUrl;
+            if (!string.IsNullOrWhiteSpace(stored))
+            {
+                logo = stored!.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                    ? stored
+                    : $"{Request.Scheme}://{Request.Host}{(stored.StartsWith('/') ? "" : "/")}{stored}";
+            }
+
             return new
             {
                 name    = string.IsNullOrWhiteSpace(profile?.SchoolName) ? "Your School" : profile!.SchoolName.Trim(),
-                address = string.Join(", ", addressParts)
+                address = string.Join(", ", addressParts),
+                logo
             };
         }
 
@@ -558,7 +615,7 @@ namespace educore.Areas.ERP.Controllers
 
         private async Task<int> ResolveAcademicYearIdAsync(string session)
         {
-            var ayItems = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear");
+            var ayItems = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
             var ay = ayItems.FirstOrDefault(x => string.Equals(x.Text, session, StringComparison.OrdinalIgnoreCase));
             return ay != null && int.TryParse(ay.Value, out var id) ? id : 0;
         }
@@ -567,5 +624,10 @@ namespace educore.Areas.ERP.Controllers
         private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
         private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
         private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+    }
+
+    public class ReceiptFormatRequest
+    {
+        public string? Format { get; set; }   // A4 | A5 | Thermal
     }
 }

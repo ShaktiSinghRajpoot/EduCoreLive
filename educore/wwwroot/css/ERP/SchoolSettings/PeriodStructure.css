@@ -1,0 +1,112 @@
+/* PeriodStructure page styles — extracted from Areas/ERP/Views/SchoolSettings/PeriodStructure.cshtml */
+/* ===== Period Structure (ps-*) ===== */
+
+/* summary cards */
+.ps-card{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
+    background:#fff; padding:1rem 1.1rem;
+    display:flex; align-items:center; gap:.85rem; height:100%; 
+    transition:var(--ec-transition);
+}
+.ps-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); }
+.ps-card-ic{ width:44px; height:44px; flex:0 0 44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; }
+.ps-card-val{ font-size:1.3rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.ps-card-lbl{ font-size:.68rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+/* toolbar */
+.ps-shift{
+    height:38px; min-width:180px; padding:0 .7rem; border-radius:9px; border:1px solid var(--ec-border);
+    background:#fff; font-size:.83rem; font-weight:700; color:var(--ec-text,#2b2c40); outline:none; transition:var(--ec-transition);
+}
+.ps-shift:focus{ border-color:rgba(255,138,0,.55); box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+
+/* day-at-a-glance bar */
+.ps-glance{ display:flex; gap:3px; border-radius:11px; overflow:hidden; height:40px; }
+.ps-g-seg{ display:flex; align-items:center; justify-content:center; font-size:.6rem; font-weight:800; color:#fff; white-space:nowrap; overflow:hidden; min-width:6px; transition:var(--ec-transition); }
+.ps-g-class{ background:linear-gradient(135deg,#ff8a00,#ffad42); }
+.ps-g-break{ background:repeating-linear-gradient(45deg,#b9b3aa,#b9b3aa 6px,#a9a399 6px,#a9a399 12px); }
+.ps-g-lunch{ background:linear-gradient(135deg,#3b82f6,#60a5fa); }
+.ps-legend{ display:flex; gap:1rem; flex-wrap:wrap; align-items:center; font-size:.72rem; font-weight:700; color:var(--ec-text-muted); }
+.ps-legend span{ display:inline-flex; align-items:center; gap:.35rem; }
+.ps-l-dot{ width:12px; height:12px; border-radius:4px; }
+
+/* ---- vertical timeline ---- */
+.ps-tl{ position:relative; }
+.ps-item{ display:grid; grid-template-columns:58px 26px 1fr; align-items:stretch; }
+.ps-time{
+    text-align:right; padding-top:.85rem; padding-right:.1rem;
+    font-size:.8rem; font-weight:800; color:var(--ec-text-dark); white-space:nowrap; line-height:1.1;
+}
+.ps-time small{ display:block; font-size:.62rem; font-weight:700; color:var(--ec-text-muted); margin-top:1px; }
+
+.ps-line{ position:relative; }
+.ps-line::before{ content:''; position:absolute; left:50%; top:0; bottom:0; width:2px; background:var(--ec-border); transform:translateX(-50%); }
+.ps-item:first-child .ps-line::before{ top:18px; }
+.ps-item:last-child .ps-line::before{ bottom:auto; height:18px; }
+.ps-dot{ position:absolute; left:50%; top:18px; transform:translate(-50%,-50%); width:15px; height:15px; border-radius:50%; background:#fff; border:3px solid var(--ec-border); z-index:1; }
+
+.ps-block{
+    border:1px solid var(--ec-border); border-left-width:4px; border-radius:13px; background:#fff;
+    margin:.3rem 0 .55rem .35rem; padding:.7rem .85rem;
+    display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;
+    transition:var(--ec-transition);
+}
+.ps-block:hover{ box-shadow:var(--ec-shadow); transform:translateX(2px); }
+.ps-blk-ic{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; }
+.ps-blk-info{ flex:1 1 130px; min-width:0; }
+.ps-blk-name{ font-weight:800; color:var(--ec-text-dark); font-size:.92rem; line-height:1.2; }
+.ps-blk-meta{ font-size:.72rem; color:var(--ec-text-muted); font-weight:650; }
+.ps-dur{ font-size:.74rem; font-weight:800; color:var(--ec-text-muted); padding:.2rem .5rem; border-radius:7px; background:#faf9f7; white-space:nowrap; }
+
+.ps-type{ display:inline-flex; align-items:center; gap:.3rem; padding:.26rem .6rem; border-radius:999px; font-size:.68rem; font-weight:800; white-space:nowrap; }
+.ps-type.class{ background:#fff4e6; color:#c2410c; }
+.ps-type.break{ background:#e9e6e1; color:#6b6258; }
+.ps-type.lunch{ background:#dbeafe; color:#1e40af; }
+
+/* type accents */
+.ps-t-class .ps-block{ border-left-color:#ff8a00; }
+.ps-t-class .ps-blk-ic{ background:#fff4e6; color:#ff8a00; }
+.ps-t-class .ps-dot{ border-color:#ff8a00; }
+.ps-t-break .ps-block{ border-left-color:#b9b3aa; }
+.ps-t-break .ps-blk-ic{ background:#efece7; color:#8b8175; }
+.ps-t-break .ps-dot{ border-color:#b9b3aa; }
+.ps-t-lunch .ps-block{ border-left-color:#3b82f6; }
+.ps-t-lunch .ps-blk-ic{ background:#dbeafe; color:#3b82f6; }
+.ps-t-lunch .ps-dot{ border-color:#3b82f6; }
+
+/* actions */
+.ps-acts{ display:inline-flex; gap:.3rem; align-items:center; }
+.ps-ord{ display:inline-flex; flex-direction:column; }
+.ps-ord-btn{ width:22px; height:16px; border:0; background:transparent; color:var(--ec-text-muted); cursor:pointer; padding:0; line-height:1; border-radius:4px; transition:var(--ec-transition); }
+.ps-ord-btn:hover:not(:disabled){ color:var(--ec-primary); background:var(--ec-primary-light); }
+.ps-ord-btn:disabled{ opacity:.25; cursor:not-allowed; }
+.ps-icon-btn{
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--ec-border);
+    background:#fff; color:var(--ec-text-muted); font-size:1rem; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; transition:var(--ec-transition); padding:0;
+}
+.ps-icon-btn:hover{ background:var(--ec-primary-light); border-color:var(--ec-primary); color:var(--ec-primary); }
+.ps-icon-btn.danger:hover{ background:#fff0f0; border-color:#dc3545; color:#dc3545; }
+
+/* warning */
+.ps-warn{ display:flex; align-items:center; gap:.4rem; font-size:.78rem; font-weight:700; color:#b02a37; background:#fff0f0; border:1px solid #f5c2c7; border-radius:11px; padding:.6rem .8rem; }
+
+.ps-note{ font-size:.78rem; color:var(--ec-text-muted); font-weight:650; }
+.ps-modal-lbl{ font-size:.72rem; font-weight:800; text-transform:uppercase; color:var(--ec-text-muted); }
+
+/* ---- responsive ---- */
+@media (max-width:767.98px){
+    .ps-blk-info{ flex:1 1 100%; order:1; }
+    .ps-blk-ic{ order:0; }
+    .ps-type{ order:2; }
+    .ps-dur{ order:2; }
+    .ps-acts{ order:3; margin-left:auto; }
+}
+@media (max-width:575.98px){
+    .ps-card{ padding:.8rem .9rem; }
+    .ps-card-val{ font-size:1.15rem; }
+    .ps-item{ grid-template-columns:46px 20px 1fr; }
+    .ps-time{ font-size:.72rem; }
+    .ps-block{ padding:.6rem .65rem; gap:.5rem; }
+    .ps-blk-ic{ width:34px; height:34px; flex:0 0 34px; }
+}

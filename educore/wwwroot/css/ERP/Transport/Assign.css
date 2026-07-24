@@ -1,0 +1,13 @@
+/* Assign page styles — extracted from Areas/ERP/Views/Transport/Assign.cshtml */
+.ta-page{--p:#ff8a00;--soft:#fff4e6;--border:#ececf5;--heading:#2b1b12;--muted:#8b8175;}
+.ta-page .form-label{color:#9a938b;font-size:.74rem;font-weight:800;text-transform:uppercase;margin-bottom:.35rem;}
+.ta-page .form-select,.ta-page .form-control{border:1px solid var(--border);border-radius:12px;min-height:46px;font-weight:650;}
+.ta-page .btn-primary{background:linear-gradient(135deg,#ff8a00,#ff9f2f);border:0;border-radius:999px;font-weight:800;box-shadow:0 12px 24px rgba(255,138,0,.22);}
+.ta-card{border:1px solid var(--border);border-radius:16px;background:#fff;}
+.filter-bar{background:linear-gradient(180deg,#fff,#fff7ed);border:1px solid rgba(255,138,0,.18);border-radius:18px;}
+.fare-box{background:var(--soft);border-radius:14px;padding:1rem 1.2rem;text-align:center;}
+.fare-box .amt{font-size:1.6rem;font-weight:950;color:var(--p);line-height:1;}
+.fare-box .lbl{font-size:.72rem;font-weight:800;text-transform:uppercase;color:var(--muted);}
+.cur-assign{background:#f0fbf4;border:1px solid #b6e9c9;border-radius:14px;padding:.8rem 1rem;}
+.empty{min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);}
+.empty i{font-size:2.6rem;color:var(--p);margin-bottom:.5rem;}

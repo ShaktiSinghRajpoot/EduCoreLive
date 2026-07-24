@@ -3,8 +3,8 @@
    ------------------------------------------------------------
    All inventory-aware screens read items from here instead of
    keeping their own hard-coded copies:
-     • Inventory Item Master  (ERP/Fee/InventoryItem)
-     • Purchase Entry         (ERP/Fee/PurchaseEntry)
+     • Inventory Item Master  (ERP/Inventory/InventoryItem)
+     • Purchase Entry         (ERP/Inventory/PurchaseEntry)
      • New Admission kit      (ERP/Student/StudentList)
 
    This is the prototype seed. When a backend exists, replace the

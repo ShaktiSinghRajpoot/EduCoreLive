@@ -69,8 +69,9 @@ CREATE OR REPLACE PROCEDURE core.sp_staff_manage(
 LANGUAGE plpgsql
 AS $procedure$
 DECLARE
-    v_staff_id integer;
-    v_user_id  integer;
+    v_staff_id    integer;
+    v_user_id     integer;
+    v_staff_type  text;
 BEGIN
     -- Multi-tenancy guard (tenant 1 = platform; real schools are tenant > 1).
     IF p_tenant_id IS NULL OR p_tenant_id <= 1 OR p_school_id IS NULL OR p_school_id <= 0 THEN
@@ -154,6 +155,19 @@ BEGIN
            ) THEN
             RAISE EXCEPTION 'Employee code already exists.';
         END IF;
+
+        -- Staff Type is DERIVED from the chosen Designation (single source of
+        -- truth) so it can never contradict the title, even if the form is
+        -- bypassed. Falls back to whatever the caller sent if the designation
+        -- has no bucket set.
+        IF p_designation IS NOT NULL AND TRIM(p_designation) <> '' THEN
+            SELECT staff_type INTO v_staff_type
+            FROM   config.designations
+            WHERE  tenant_id = p_tenant_id AND is_deleted = FALSE
+              AND  LOWER(TRIM(name)) = LOWER(TRIM(p_designation))
+            LIMIT 1;
+        END IF;
+        v_staff_type := COALESCE(v_staff_type, NULLIF(TRIM(p_staff_type), ''));
 
         -- Resolve which staff row we are creating the login for.
         IF p_operation = 'UPDATE' THEN
@@ -255,7 +269,7 @@ BEGIN
             VALUES
                 (p_tenant_id, p_school_id, NULLIF(TRIM(p_employee_code), ''), TRIM(p_full_name), p_gender, p_dob,
                  NULLIF(TRIM(p_mobile), ''), NULLIF(TRIM(p_alt_mobile), ''), NULLIF(TRIM(p_email), ''), p_blood_group, p_address,
-                 p_staff_type, p_department, p_designation, p_joining_date, p_qualification,
+                 v_staff_type, p_department, p_designation, p_joining_date, p_qualification,
                  p_experience_years, COALESCE(NULLIF(TRIM(p_status), ''), 'Active'), p_monthly_salary, p_bank_account_no, p_ifsc_code,
                  p_pan, p_aadhaar, v_user_id, p_action_user_id, p_action_user_id)
             RETURNING staff_id INTO v_staff_id;
@@ -270,7 +284,7 @@ BEGIN
                 email           = NULLIF(TRIM(p_email), ''),
                 blood_group     = p_blood_group,
                 address         = p_address,
-                staff_type      = p_staff_type,
+                staff_type      = v_staff_type,
                 department      = p_department,
                 designation     = p_designation,
                 joining_date    = p_joining_date,
@@ -322,7 +336,7 @@ BEGIN
     ORDER BY sort_order, name;
 
     OPEN p_designations FOR
-    SELECT name, staff_type
+    SELECT name, staff_type, default_department, default_role_id
     FROM   config.designations
     WHERE  tenant_id = p_tenant_id AND is_deleted = FALSE AND is_active = TRUE
     ORDER BY sort_order, name;

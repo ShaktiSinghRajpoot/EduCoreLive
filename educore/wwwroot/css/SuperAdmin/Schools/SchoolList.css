@@ -1,0 +1,40 @@
+/* SchoolList page styles — extracted from Areas/SuperAdmin/Views/Schools/SchoolList.cshtml */
+    .scl-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; padding:1.1rem 1.2rem; display:flex; align-items:center; gap:.9rem; height:100%; transition:var(--ec-transition); }
+    .scl-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); border-color:rgba(255,138,0,.22); }
+    .scl-card-ic{ width:46px; height:46px; flex:0 0 46px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.3rem; }
+    .scl-card-val{ font-size:1.5rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+    .scl-card-lbl{ font-size:.71rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+    .scl-srch-wrap{ position:relative; flex:1 1 220px; max-width:340px; }
+    .scl-srch-ic{ position:absolute; left:.65rem; top:50%; transform:translateY(-50%); color:var(--ec-text-muted); font-size:1rem; pointer-events:none; }
+    .scl-srch-inp{ width:100%; height:36px; padding:0 .75rem 0 2rem; border-radius:8px; border:1px solid var(--ec-border); background:#fafaf8; font-size:.84rem; font-weight:600; color:var(--ec-text); outline:none; transition:var(--ec-transition); }
+    .scl-srch-inp:focus{ border-color:rgba(255,138,0,.55); background:#fff; box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+    .scl-chip{ height:36px; padding:0 .65rem; border-radius:8px; border:1px solid var(--ec-border); background:#fafaf8; font-size:.8rem; font-weight:700; color:var(--ec-text-muted); cursor:pointer; outline:none; }
+
+    .scl-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .scl-tbl{ min-width:1000px; width:100%; }
+    .scl-tbl thead th{ background:linear-gradient(180deg,#fffaf3,#fff6ea); color:var(--ec-text-light); font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; font-weight:800; padding:.8rem .9rem; border-bottom:1px solid var(--ec-border); white-space:nowrap; }
+    .scl-tbl tbody td{ padding:.78rem .9rem; vertical-align:middle; border-bottom:1px solid #f4f0eb; font-size:.84rem; font-weight:600; color:var(--ec-text); }
+    .scl-tbl tbody tr:hover td{ background:#fffaf3; }
+    .scl-av{ width:38px; height:38px; flex:0 0 38px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:800; }
+    .scl-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.87rem; line-height:1.2; }
+    .scl-sub{ font-size:.72rem; color:var(--ec-text-muted); }
+
+    .scl-bdg{ display:inline-flex; align-items:center; gap:.28rem; padding:.26rem .65rem; border-radius:999px; font-size:.69rem; font-weight:800; white-space:nowrap; }
+    .scl-bdg::before{ content:''; width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+    .b-active{ background:#d4edda; color:#155724; } .b-active::before{ background:#28a745; }
+    .b-inactive{ background:#e2e3e5; color:#495057; } .b-inactive::before{ background:#6c757d; }
+
+    .scl-act{ width:32px; height:32px; border-radius:7px; border:1px solid var(--ec-border); background:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:1rem; cursor:pointer; transition:var(--ec-transition); text-decoration:none; padding:0; }
+    .scl-act.edit{ color:#ff8a00; } .scl-act.edit:hover{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.4); }
+    .scl-act.del{ color:#dc3545; } .scl-act.del:hover{ background:#fde8e8; border-color:#dc3545; }
+
+    .scl-pg-wrap{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.65rem; padding-top:1rem; border-top:1px solid var(--ec-border); }
+    .scl-pg-info{ font-size:.81rem; color:var(--ec-text-muted); font-weight:650; }
+    .scl-pg-btn{ min-width:32px; height:32px; padding:0 .4rem; border-radius:7px; border:1px solid var(--ec-border); background:#fff; color:var(--ec-text); font-size:.8rem; font-weight:700; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:var(--ec-transition); text-decoration:none; }
+    .scl-pg-btn:hover{ background:var(--ec-primary-light); border-color:var(--ec-primary); color:var(--ec-primary); }
+    .scl-pg-btn.active{ background:var(--ec-primary); border-color:var(--ec-primary); color:#fff; }
+    .scl-pg-btn.disabled{ opacity:.35; pointer-events:none; }
+
+    .scl-empty{ padding:3rem 1rem; text-align:center; }
+    .scl-empty-ic{ width:64px; height:64px; border-radius:18px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.8rem; margin-bottom:.9rem; }

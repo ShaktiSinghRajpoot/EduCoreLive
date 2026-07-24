@@ -1,0 +1,35 @@
+/* StaffProfile page styles — extracted from Areas/ERP/Views/Staff/StaffProfile.cshtml */
+.sp-page{ color:var(--ec-text); }
+.sp-breadcrumb{ display:flex; align-items:center; gap:.4rem; font-size:.76rem; font-weight:700; color:var(--ec-text-muted); margin-bottom:.35rem; }
+.sp-breadcrumb a{ color:var(--ec-text-muted); text-decoration:none; }
+.sp-breadcrumb a:hover{ color:var(--ec-primary); }
+.sp-breadcrumb span{ color:var(--ec-text-dark); }
+
+.sp-hero{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:linear-gradient(135deg,var(--ec-primary-soft) 0%,#fff 65%); padding:1.5rem; display:flex; align-items:center; gap:1.25rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+.sp-av{ width:84px; height:84px; flex:0 0 84px; border-radius:22px; display:flex; align-items:center; justify-content:center; font-size:1.9rem; font-weight:900; }
+.sp-name{ font-size:1.35rem; font-weight:900; color:var(--ec-text-dark); line-height:1.2; }
+.sp-sub{ font-size:.85rem; font-weight:700; color:var(--ec-text-muted); }
+.sp-bdg{ display:inline-flex; align-items:center; gap:.28rem; padding:.26rem .65rem; border-radius:999px; font-size:.69rem; font-weight:800; }
+.sp-bdg::before{ content:''; width:5px; height:5px; border-radius:50%; }
+.b-active{ background:#d4edda; color:#155724; } .b-active::before{ background:#28a745; }
+
+.sp-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; margin-bottom:1.25rem; }
+.sp-card-hdr{ display:flex; align-items:center; gap:.85rem; padding:1rem 1.25rem .75rem; border-bottom:1px solid var(--ec-border); }
+.sp-sec-ic{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; background:var(--ec-primary-light); color:var(--ec-primary); display:flex; align-items:center; justify-content:center; font-size:1rem; }
+.sp-sec-title{ font-size:.9rem; font-weight:900; color:var(--ec-text-dark); }
+.sp-card-body{ padding:1.1rem 1.25rem; }
+.sp-field{ margin-bottom:1rem; }
+.sp-field label{ font-size:.68rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--ec-text-light); display:block; margin-bottom:.2rem; }
+.sp-field span{ font-size:.9rem; font-weight:700; color:var(--ec-text-dark); }
+
+.sp-stat{ border:1px solid var(--ec-border); border-radius:14px; padding:1rem; text-align:center; height:100%; }
+.sp-stat-val{ font-size:1.4rem; font-weight:900; color:var(--ec-text-dark); }
+.sp-stat-lbl{ font-size:.7rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--ec-text-muted); }
+.sp-link{ display:flex; align-items:center; gap:.75rem; padding:.6rem .7rem; border:1px solid var(--ec-border); border-radius:13px; text-decoration:none; transition:all .16s ease; background:#fff; }
+.sp-link:hover{ border-color:rgba(255,138,0,.4); background:#fffaf3; transform:translateX(2px); }
+.sp-link-ic{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:1.15rem; }
+.sp-link-txt{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
+.sp-link-t{ font-size:.86rem; font-weight:800; color:var(--ec-text-dark); }
+.sp-link-s{ font-size:.72rem; font-weight:600; color:var(--ec-text-muted); }
+.sp-link-go{ font-size:1.2rem; color:var(--ec-text-muted); transition:color .16s; }
+.sp-link:hover .sp-link-go{ color:var(--ec-primary); }

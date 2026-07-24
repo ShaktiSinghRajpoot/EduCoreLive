@@ -1,3 +1,4 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Fee Reports";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -10,24 +11,7 @@
 *@
 
 @section PageStyles {
-<link href="~/css/educore-theme.css" rel="stylesheet" />
-<style>
-.fee-rep-page{ --suc:#28c76f;--suc-soft:#e8fadf;--dng:#ea5455;--dng-soft:#fdeceb;--amb:#ff9f43;--amb-soft:#fff1e0;--info:#00bad1;--info-soft:#dff7fa; color:var(--ec-text); }
-.fee-rep-page .view-tabs{ display:flex;gap:.4rem;border-bottom:1px solid var(--ec-border);margin-bottom:1rem; }
-.fee-rep-page .view-tab{ border:0;background:none;padding:.55rem .25rem;margin-right:1.2rem;font-size:.92rem;font-weight:850;color:var(--ec-text-muted);cursor:pointer;border-bottom:3px solid transparent; }
-.fee-rep-page .view-tab.active{ color:var(--ec-primary);border-bottom-color:var(--ec-primary); }
-.fee-rep-page .filter-bar{ background:linear-gradient(180deg,#fff,#fff7ed);border:1px solid rgba(255,138,0,.18);border-radius:14px; }
-.fee-rep-page .sumcard{ border:1px solid var(--ec-border);border-radius:13px;padding:.8rem 1rem;background:#fff;height:100%; }
-.fee-rep-page .sumcard .l{ font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ec-text-muted); }
-.fee-rep-page .sumcard .v{ font-size:1.3rem;font-weight:950;color:var(--ec-text-dark);font-variant-numeric:tabular-nums;margin-top:.15rem; }
-.fee-rep-page .sumcard.tot{ background:linear-gradient(135deg,var(--ec-primary-light),#fff);border-color:#ffc98a; } .fee-rep-page .sumcard.tot .v{ color:var(--ec-primary); }
-.fee-rep-page .chip{ display:inline-flex;gap:.4rem;align-items:center;border:1px solid var(--ec-border);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;font-weight:700;margin:0 .35rem .35rem 0; }
-.fee-rep-page .chip b{ font-variant-numeric:tabular-nums; }
-.fee-rep-page .num{ font-variant-numeric:tabular-nums;text-align:right; }
-.fee-rep-page .age0{ color:var(--ec-text-muted); } .fee-rep-page .age1{ color:var(--amb); } .fee-rep-page .age2{ color:#e07b39; } .fee-rep-page .age3{ color:var(--dng);font-weight:800; }
-.fee-rep-page .ec-table tbody tr td{ font-size:.85rem; }
-@@media print{ .no-print{ display:none!important; } .ec-page-shell{ box-shadow:none;border:0; } .view-tab{ display:none; } }
-</style>
+    <link rel="stylesheet" href="~/css/ERP/Fee/Reports.css" asp-append-version="true" />
 }
 
 <div class="ec-page-shell fee-rep-page">
@@ -63,17 +47,21 @@
         </div>
       </div>
 
+      @* Collected is money IN; refunds are money OUT. NET is what the school
+         actually kept for the range — the figure that must tie to the books. *@
       <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Total collected</div><div class="v" id="rTotal">₹0</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Collected</div><div class="v" id="rTotal">₹0</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Refunded</div><div class="v" id="rRefund" style="color:var(--dng)">₹0</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Net collection</div><div class="v" id="rNet">₹0</div></div></div>
         <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Receipts</div><div class="v" id="rCount">0</div></div></div>
-        <div class="col-12 col-md-6"><div class="sumcard"><div class="l">By mode</div><div class="mt-1" id="rModes">—</div></div></div>
+        <div class="col-12"><div class="sumcard"><div class="l">By mode</div><div class="mt-1" id="rModes">—</div></div></div>
       </div>
 
       <div class="row g-3">
         <div class="col-12 col-lg-8">
           <div class="ec-card"><div class="ec-card-body p-0">
             <div class="table-responsive" style="max-height:560px;overflow:auto">
-              <table class="table ec-table mb-0"><thead><tr><th>Date</th><th>Receipt</th><th>Student</th><th>Class</th><th>Mode</th><th class="text-end">Amount</th></tr></thead>
+              <table class="table ec-table mb-0"><thead><tr><th>Date</th><th>Receipt</th><th>Type</th><th>Student</th><th>Class</th><th>For (fee heads)</th><th>Mode</th><th class="text-end">Discount</th><th class="text-end">Amount</th><th></th></tr></thead>
               <tbody id="rRows"></tbody></table>
             </div>
           </div></div>
@@ -81,6 +69,27 @@
         <div class="col-12 col-lg-4">
           <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap"><div class="ec-section-icon"><i class="bx bx-purchase-tag"></i></div><h6 class="ec-section-title mb-0">By fee head</h6></div></div>
             <div class="ec-card-body p-0"><div class="table-responsive"><table class="table ec-table mb-0"><thead><tr><th>Head</th><th class="text-end">Amount</th></tr></thead><tbody id="rHeads"></tbody></table></div></div>
+          </div>
+        </div>
+      </div>
+
+      @* Money OUT for the same range. Hidden when there are no refunds so the
+         common case stays clean. *@
+      <div class="row g-3 mt-1 d-none" id="rRefundWrap">
+        <div class="col-12">
+          <div class="ec-card">
+            <div class="ec-card-header d-flex justify-content-between align-items-center">
+              <div class="ec-section-title-wrap"><div class="ec-section-icon"><i class="bx bx-undo"></i></div><h6 class="ec-section-title mb-0">Refunds (money out)</h6></div>
+              <button id="rRefundCsv" class="btn btn-sm btn-outline-secondary"><i class="bx bx-download me-1"></i>CSV</button>
+            </div>
+            <div class="ec-card-body p-0">
+              <div class="table-responsive">
+                <table class="table ec-table mb-0">
+                  <thead><tr><th>Date</th><th>Refund No</th><th>Student</th><th>Class</th><th>Against</th><th>Mode</th><th>Reason</th><th>Authorised</th><th class="text-end">Amount</th></tr></thead>
+                  <tbody id="rRefundRows"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -149,7 +158,12 @@
   </div>
 </div>
 
+@* Receipts are viewed/printed from the register rows, so this page needs the
+   shared receipt modal + renderer. *@
+@await Html.PartialAsync("_FeeReceiptModal")
+
 @section PageScripts {
+<script src="~/js/fee-receipt.js" asp-append-version="true"></script>
 <script>
 $(function () {
     'use strict';
@@ -177,18 +191,55 @@ $(function () {
         $.getJSON(URL.reg,{from:$('#rFrom').val(),to:$('#rTo').val()}).done(function(d){
             regData=d;
             $('#rTotal').text(money(d.total)); $('#rCount').text((d.receipts||[]).length);
+            $('#rRefund').text(money(d.refundTotal)); $('#rNet').text(money(d.net));
+
+            // Refunds panel: only shown when there is money out in this range.
+            var refunds = d.refunds||[];
+            $('#rRefundWrap').toggleClass('d-none', refunds.length===0);
+            $('#rRefundRows').html(refunds.map(function(r){
+                return '<tr><td class="text-muted">'+esc(r.date||'—')+'</td>'
+                     + '<td class="fw-semibold">'+esc(r.refundNo)+'</td>'
+                     + '<td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td>'
+                     + '<td>'+esc(r.cls)+'</td>'
+                     + '<td class="text-muted" style="font-size:.78rem">'+esc(r.against)+'</td>'
+                     + '<td>'+esc(r.mode)+'</td>'
+                     + '<td class="text-muted" style="font-size:.78rem">'+esc(r.reason||'—')+'</td>'
+                     + '<td class="text-muted" style="font-size:.78rem">'+esc(r.authorised||'—')+'</td>'
+                     + '<td class="num fw-bold" style="color:var(--dng)">-'+money(r.amount)+'</td></tr>';
+            }).join(''));
             $('#rModes').html((d.modes||[]).length? d.modes.map(function(m){ return '<span class="chip">'+esc(m.mode)+' <b>'+money(m.amount)+'</b></span>'; }).join('') : '<span class="text-muted">—</span>');
             $('#rHeads').html((d.heads||[]).length? d.heads.map(function(h){ return '<tr><td>'+esc(h.head)+'</td><td class="num">'+money(h.amount)+'</td></tr>'; }).join('') : '<tr><td colspan="2" class="text-muted text-center py-3">—</td></tr>');
             $('#rRows').html((d.receipts||[]).length? d.receipts.map(function(r){
-                return '<tr><td class="text-muted">'+esc(r.date||'—')+'</td><td class="fw-semibold">'+esc(r.receiptNo)+'</td><td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td><td>'+esc(r.cls)+'</td><td>'+esc(r.mode)+'</td><td class="num fw-bold">'+money(r.amount)+'</td></tr>';
-            }).join('') : '<tr><td colspan="6" class="text-muted text-center py-4">No receipts in this range.</td></tr>');
+                var typeCls = r.type === 'Registration' ? 'bg-label-warning' : 'bg-label-info';
+                return '<tr><td class="text-muted">'+esc(r.date||'—')+'</td>'
+                     + '<td class="fw-semibold">'+esc(r.receiptNo)
+                     + (r.reference ? '<div class="text-muted" style="font-size:.72rem">Ref '+esc(r.reference)+'</div>' : '')+'</td>'
+                     + '<td><span class="badge '+typeCls+'">'+esc(r.type||'Fee')+'</span></td>'
+                     + '<td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td>'
+                     + '<td>'+esc(r.cls)+'</td>'
+                     + '<td class="text-muted" style="font-size:.78rem">'+esc(r.heads||'—')+'</td>'
+                     + '<td>'+esc(r.mode)+'</td>'
+                     + '<td class="num">'+(Number(r.discount)>0 ? money(r.discount) : '—')+'</td>'
+                     + '<td class="num fw-bold">'+money(r.amount)+'</td>'
+                     + '<td class="text-end"><button class="btn btn-sm btn-icon btn-outline-secondary rc-print" data-rcp="'+esc(r.receiptNo)+'" title="View / print receipt"><i class="bx bx-printer"></i></button></td></tr>';
+            }).join('') : '<tr><td colspan="10" class="text-muted text-center py-4">No receipts in this range.</td></tr>');
         }).fail(function(){ notify('error','Could not load the register.'); });
     }
+    // Receipts are printed FROM the list (they are no longer forced open after payment).
+    $('#rRows').on('click', '.rc-print', function () {
+        EcReceipt.show($(this).data('rcp'));
+    });
+
+    $('#rRefundCsv').on('click', function(){
+        var rows=[['Date','Refund No','Student','Adm No','Class','Against','Mode','Reason','Authorised','Amount']];
+        (regData.refunds||[]).forEach(function(r){ rows.push([r.date,r.refundNo,r.student,r.admNo,r.cls,r.against,r.mode,r.reason,r.authorised,r.amount]); });
+        csv(rows,'refunds.csv');
+    });
     $('#rLoad').on('click', loadReg);
     $('#rPrint').on('click', function(){ window.print(); });
     $('#rCsv').on('click', function(){
-        var rows=[['Date','Receipt','Student','Adm No','Class','Mode','Amount']];
-        (regData.receipts||[]).forEach(function(r){ rows.push([r.date,r.receiptNo,r.student,r.admNo,r.cls,r.mode,r.amount]); });
+        var rows=[['Date','Receipt','Type','Student','Adm/Reg No','Class','For (fee heads)','Mode','Reference','Discount','Amount']];
+        (regData.receipts||[]).forEach(function(r){ rows.push([r.date,r.receiptNo,r.type,r.student,r.admNo,r.cls,r.heads,r.mode,r.reference,r.discount,r.amount]); });
         csv(rows,'collection-register.csv');
     });
 

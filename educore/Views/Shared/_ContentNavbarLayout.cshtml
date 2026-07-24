@@ -1,6 +1,9 @@
 @await Html.PartialAsync("Sections/_Variables")
 @{
-  TempData.Keep();
+  // Keep ONLY long-lived display values — a blanket Keep() re-retained one-shot
+  // flash messages, making toasts repeat on every page.
+  TempData.Keep("appName");
+  TempData.Keep("description");
   Layout = "_CommonMasterLayout";
 
   ViewData["contentNavbar"] = true;

@@ -29,13 +29,23 @@ ALTER TABLE core.students
     ADD COLUMN IF NOT EXISTS documents            jsonb;         -- [{name,status}]
 
 -- ── 2. Replace the admission proc with the extended signature ──
---  Drop the old signature first (CREATE OR REPLACE cannot widen
---  the parameter list in place).
-DROP PROCEDURE IF EXISTS core.sp_admission_manage(
-    text, integer, integer, integer, integer, text, text, text, text, date,
-    text, text, text, date, text, text, text, text, text,
-    numeric, numeric, numeric, numeric, text, numeric, numeric, text, numeric,
-    jsonb, integer, integer, integer, text, text, text, text, text, text, refcursor);
+--  Widening the parameter list is a NEW signature, so CREATE OR REPLACE alone
+--  would leave the OLD overload behind and calls fail with "procedure is not
+--  unique". A hard-coded DROP-by-signature goes stale every time a param is
+--  added (that is exactly what bit us), so instead drop ANY overload that
+--  predates the current parameter set — identified by the absence of
+--  p_apaar_id. After the CREATE below there is always exactly one.
+DO $$
+DECLARE r record;
+BEGIN
+    FOR r IN
+        SELECT oid FROM pg_proc
+        WHERE proname = 'sp_admission_manage'
+          AND pg_get_function_identity_arguments(oid) NOT ILIKE '%p_apaar_id%'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.oid::regprocedure;
+    END LOOP;
+END $$;
 
 CREATE OR REPLACE PROCEDURE core.sp_admission_manage(
     IN p_operation text,
@@ -64,6 +74,8 @@ CREATE OR REPLACE PROCEDURE core.sp_admission_manage(
     IN p_nationality text DEFAULT NULL::text,
     IN p_mother_tongue text DEFAULT NULL::text,
     IN p_id_proof_no text DEFAULT NULL::text,
+    IN p_apaar_id text DEFAULT NULL::text,
+    IN p_udise_student_id text DEFAULT NULL::text,
     IN p_prev_school_name text DEFAULT NULL::text,
     IN p_prev_board text DEFAULT NULL::text,
     IN p_prev_class text DEFAULT NULL::text,
@@ -110,7 +122,12 @@ DECLARE
     v_dup           INTEGER;
     v_item          JSONB;
     v_month_start   DATE;
+    v_month_end     DATE;
+    v_m             DATE;
     v_i             INTEGER;
+    v_sess_start    DATE;
+    v_sess_end      DATE;
+    v_charge_from   VARCHAR(20);
 BEGIN
 
     -- ── SaveAdmission ────────────────────────────────────────
@@ -125,13 +142,35 @@ BEGIN
         v_year     := COALESCE(p_academic_year, '');
         v_adm_date := COALESCE(p_admission_date, CURRENT_DATE);
 
-        -- Duplicate guard: same name + dob + mobile already admitted
+        -- Session window for this academic year — drives session-end-aware billing
+        -- (a mid-session joiner is billed only up to the session's end month).
+        SELECT start_date, end_date
+          INTO v_sess_start, v_sess_end
+        FROM academic.academic_years
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+          AND academic_year_name = v_year
+          AND COALESCE(is_deleted, FALSE) = FALSE
+        LIMIT 1;
+
+        -- "Charge recurring fees from" policy: AdmissionMonth (default, real-world
+        -- norm — pay only enrolled months) or SessionStart (full session from April).
+        SELECT COALESCE(NULLIF(TRIM(charge_fees_from), ''), 'AdmissionMonth')
+          INTO v_charge_from
+        FROM core.school_admission_workflow_settings
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+        LIMIT 1;
+        v_charge_from := COALESCE(v_charge_from, 'AdmissionMonth');
+
+        -- Duplicate guard: same name + dob + mobile already admitted. Name is
+        -- whitespace-collapsed + lower-cased so trivial typos ("Rahul  Kumar" vs
+        -- "Rahul Kumar", different casing) no longer slip a duplicate through.
         SELECT COUNT(*) INTO v_dup
         FROM core.students
         WHERE tenant_id = p_tenant_id
           AND school_id = p_school_id
           AND is_active = TRUE
-          AND LOWER(student_name) = LOWER(COALESCE(p_student_name, ''))
+          AND regexp_replace(LOWER(TRIM(student_name)), '\s+', ' ', 'g')
+              = regexp_replace(LOWER(TRIM(COALESCE(p_student_name, ''))), '\s+', ' ', 'g')
           AND COALESCE(dob, DATE '1900-01-01') = COALESCE(p_dob, DATE '1900-01-01')
           AND COALESCE(mobile, '') = COALESCE(p_mobile, '');
         IF v_dup > 0 THEN
@@ -175,6 +214,7 @@ BEGIN
             class_name, section, academic_year, admission_date,
             guardian_name, mother_name, mobile, alt_mobile, address,
             blood_group, religion, category, nationality, mother_tongue, id_proof_no,
+            apaar_id, udise_student_id,
             prev_school_name, prev_board, prev_class, prev_tc_no,
             father_occupation, father_qualification, father_email,
             mother_occupation, mother_qualification, mother_email,
@@ -189,6 +229,7 @@ BEGIN
             p_class_name, p_section, v_year, v_adm_date,
             p_guardian_name, p_mother_name, p_mobile, p_alt_mobile, p_address,
             p_blood_group, p_religion, p_category, p_nationality, p_mother_tongue, p_id_proof_no,
+            p_apaar_id, p_udise_student_id,
             p_prev_school_name, p_prev_board, p_prev_class, p_prev_tc_no,
             p_father_occupation, p_father_qualification, p_father_email,
             p_mother_occupation, p_mother_qualification, p_mother_email,
@@ -220,9 +261,26 @@ BEGIN
 
                 -- Ledger generation
                 IF COALESCE(v_item->>'frequency', 'Yearly') = 'Monthly' THEN
-                    -- 12 monthly installments from admission month
-                    v_month_start := DATE_TRUNC('month', v_adm_date)::DATE;
-                    FOR v_i IN 0..11 LOOP
+                    -- Monthly tuition: one installment per month from the first billing
+                    -- month up to the SESSION END month (not a fixed 12 that spills into
+                    -- the next session). First month = admission month (default) or the
+                    -- session start when the school bills the full session.
+                    IF v_charge_from = 'SessionStart' AND v_sess_start IS NOT NULL THEN
+                        v_month_start := DATE_TRUNC('month', v_sess_start)::DATE;
+                    ELSE
+                        v_month_start := DATE_TRUNC('month', v_adm_date)::DATE;
+                    END IF;
+
+                    -- Last billing month = session end month; fall back to 11 months on
+                    -- (a full year) if the academic year has no end date configured.
+                    IF v_sess_end IS NOT NULL THEN
+                        v_month_end := DATE_TRUNC('month', v_sess_end)::DATE;
+                    ELSE
+                        v_month_end := (v_month_start + INTERVAL '11 months')::DATE;
+                    END IF;
+
+                    v_m := v_month_start;
+                    WHILE v_m <= v_month_end LOOP
                         INSERT INTO core.student_ledger (
                             tenant_id, school_id, student_id,
                             fee_head_name, frequency, installment_label,
@@ -230,10 +288,11 @@ BEGIN
                         ) VALUES (
                             p_tenant_id, p_school_id, v_student_id,
                             COALESCE(v_item->>'feeHeadName', 'Fee'), 'Monthly',
-                            TO_CHAR(v_month_start + (v_i || ' month')::INTERVAL, 'Mon YYYY'),
-                            (v_month_start + (v_i || ' month')::INTERVAL)::DATE,
+                            TO_CHAR(v_m, 'Mon YYYY'),
+                            v_m,
                             COALESCE((v_item->>'amount')::NUMERIC, 0), 'Pending'
                         );
+                        v_m := (v_m + INTERVAL '1 month')::DATE;
                     END LOOP;
                 ELSE
                     INSERT INTO core.student_ledger (

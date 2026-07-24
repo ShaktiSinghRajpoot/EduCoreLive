@@ -1,5 +1,9 @@
 @{
-  TempData.Keep();
+  // Keep ONLY the long-lived display values across requests. A blanket
+  // TempData.Keep() also re-retained one-shot flash messages (Message/Result/
+  // SuccessMessage…) so toasts repeated on every page — keep them consumable.
+  TempData.Keep("appName");
+  TempData.Keep("description");
   ViewData["containerNav"] = (ViewData["containerNav"] ??= "container-fluid");
   var appName = TempData.Peek("appName") as string ?? "EduCore";
 }

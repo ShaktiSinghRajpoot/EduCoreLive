@@ -7,57 +7,7 @@
 }
 
 @section PageStyles {
-<link href="~/css/educore-theme.css" rel="stylesheet" />
-<style>
-.student-admission-page{
-    --ec-primary:#ff8a00;--ec-primary-soft:#fff4e6;--ec-cream:#fff7ed;
-    --ec-soft-bg:#f8f7f5;--ec-panel:#ffffff;--ec-border:#ececf5;
-    --ec-heading:#2b1b12;--ec-text:#2b2c40;--ec-muted:#8b8175;--ec-label:#9a938b;
-    color:var(--ec-text);
-}
-.student-admission-page .ec-card,.student-admission-page .ec-detail-box{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;}
-.student-admission-page .ec-card:hover,.student-admission-page .ec-detail-box:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(43,27,18,.08);border-color:rgba(255,138,0,.22);}
-.student-admission-page .ec-page-icon,.student-admission-page .ec-section-icon,.student-admission-page .ec-detail-icon{background:var(--ec-primary-soft);color:var(--ec-primary);}
-.student-admission-page .btn-primary{background:linear-gradient(135deg,#ff8a00,#ff9f2f);border:0;color:#fff;border-radius:999px;font-weight:800;box-shadow:0 12px 24px rgba(255,138,0,.22);transition:transform .2s ease,box-shadow .2s ease;}
-.student-admission-page .btn-primary:hover{color:#fff;transform:translateY(-1px);box-shadow:0 16px 30px rgba(255,138,0,.28);}
-.student-admission-page .btn-outline-secondary{border-color:rgba(43,27,18,.14);color:var(--ec-text);background:#fff;border-radius:999px;font-weight:800;transition:all .2s ease;}
-.student-admission-page .btn-outline-secondary:hover{background:var(--ec-primary-soft);border-color:rgba(255,138,0,.35);color:var(--ec-heading);}
-.student-admission-page .form-label{color:var(--ec-label);font-size:.76rem;font-weight:800;letter-spacing:.01em;margin-bottom:.4rem;}
-.student-admission-page .required::after{content:" *";color:#ea5455;}
-.student-admission-page .form-control,.student-admission-page .form-select{border:1px solid var(--ec-border);border-radius:14px;min-height:46px;color:var(--ec-text);font-weight:650;font-size:.9rem;background-color:#fff;transition:border-color .2s ease,box-shadow .2s ease;}
-.student-admission-page textarea.form-control{min-height:96px;}
-.student-admission-page .form-control:focus,.student-admission-page .form-select:focus{border-color:rgba(255,138,0,.65);box-shadow:0 0 0 4px rgba(255,138,0,.13);}
-
-.fee-preview-sidebar{position:sticky;top:1rem;background:linear-gradient(180deg,#ffffff,#fff7ed 100%);border:1px solid rgba(255,138,0,.18);border-radius:20px;box-shadow:0 18px 40px rgba(43,27,18,.08);}
-.fee-total{font-size:clamp(1.8rem,4vw,2.45rem);line-height:1.1;font-weight:950;letter-spacing:-.04em;color:var(--ec-heading);}
-.fee-empty{min-height:280px;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;color:var(--ec-muted);border:1px dashed rgba(255,138,0,.28);border-radius:20px;background:rgba(255,255,255,.72);padding:1.5rem;}
-.fee-empty i{font-size:3rem;color:var(--ec-primary);margin-bottom:.75rem;}
-.fee-empty h6{color:var(--ec-heading);font-weight:950;margin-bottom:.3rem;}
-.adm-steps{list-style:none;margin:.6rem 0 0;padding:0;text-align:left;width:100%;max-width:300px;}
-.adm-steps li{display:flex;gap:.5rem;align-items:flex-start;font-size:.8rem;font-weight:650;color:var(--ec-text);margin-bottom:.5rem;}
-.adm-steps li:last-child{margin-bottom:0;}
-.adm-steps li i{color:var(--ec-primary);font-size:1.05rem;flex:none;margin-top:.02rem;}
-.sidebar-explainer{background:var(--ec-primary-soft);border:1px solid rgba(255,138,0,.18);border-radius:16px;padding:.85rem 1rem;margin-bottom:1rem;}
-.sidebar-explainer .t{font-weight:900;color:var(--ec-heading);font-size:.85rem;margin-bottom:.25rem;display:flex;align-items:center;gap:.4rem;}
-.sidebar-explainer .t i{color:var(--ec-primary);font-size:1rem;}
-.sidebar-explainer .d{color:var(--ec-muted);font-size:.78rem;font-weight:600;line-height:1.45;}
-.fee-group-title{color:var(--ec-label);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;font-weight:950;margin:1rem 0 .55rem;}
-.fee-row,.fee-check-row{border:1px solid var(--ec-border);border-radius:16px;background:rgba(255,255,255,.86);padding:.85rem;margin-bottom:.7rem;display:flex;justify-content:space-between;align-items:center;gap:.75rem;}
-.fee-row small,.fee-check-row small{color:var(--ec-muted);font-weight:650;}
-.fee-summary{background:#fff;border:1px solid rgba(255,138,0,.16);border-radius:18px;padding:1rem;margin-top:1rem;}
-.summary-line{display:flex;justify-content:space-between;gap:1rem;font-size:.86rem;margin-bottom:.75rem;color:var(--ec-muted);}
-.summary-line:last-child{margin-bottom:0;}
-.summary-line strong{color:var(--ec-heading);font-weight:950;white-space:nowrap;}
-.kit-meta{color:var(--ec-muted);font-size:.76rem;font-weight:650;}
-.optional-chip{background:#e8f4fd;color:#0d6efd;border-radius:999px;font-size:.68rem;font-weight:800;padding:.2rem .6rem;}
-.admission-footer-hint{color:var(--ec-muted);font-size:.8rem;font-weight:650;}
-.adm-actions{padding:1rem 1.25rem;border-top:1px solid var(--ec-border);background:rgba(255,255,255,.92);}
-@@media (max-width:991.98px){ .fee-preview-sidebar{position:static;} }
-@@media (max-width:575.98px){
-    .adm-actions{flex-direction:column;align-items:stretch !important;}
-    .adm-actions .btn{width:100% !important;}
-}
-</style>
+    <link rel="stylesheet" href="~/css/ERP/Admission/Create.css" asp-append-version="true" />
 }
 
 <div class="ec-page-shell student-admission-page">
@@ -106,7 +56,7 @@
                             </div>
                             <div class="col-12">
                                 <label class="form-label required">Student Full Name</label>
-                                <input type="text" name="StudentName" id="adm_StudentName" class="form-control" placeholder="Enter full name" required>
+                                <input type="text" name="StudentName" id="adm_StudentName" class="form-control" placeholder="Enter full name" value="@ViewBag.PreStudentName" required>
                             </div>
                             <div class="col-12 col-md-4">
                                 <label class="form-label required">Academic Year</label>
@@ -114,7 +64,7 @@
                                     <option value="">Select Year</option>
                                     @foreach (var s in (ViewBag.Sessions as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
                                     {
-                                        <option value="@s.Text" data-ayid="@s.Value" selected="@s.Selected">@s.Text</option>
+                                        <option value="@s.Text" data-ayid="@s.Value" selected="@(s.Selected || s.Text == Convert.ToString(ViewBag.PreAcademicYear))">@s.Text</option>
                                     }
                                 </select>
                             </div>
@@ -124,7 +74,7 @@
                                     <option value="">Select Class</option>
                                     @foreach (var c in (ViewBag.Classes as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
                                     {
-                                        <option value="@c.Text">@c.Text</option>
+                                        <option value="@c.Text" selected="@(c.Text == Convert.ToString(ViewBag.PreClassName))">@c.Text</option>
                                     }
                                 </select>
                             </div>
@@ -136,9 +86,12 @@
                             </div>
                             <div class="col-12 col-md-4">
                                 <label class="form-label required">Gender</label>
+                                @{ var preG = Convert.ToString(ViewBag.PreGender); }
                                 <select name="Gender" id="adm_Gender" class="form-select" required>
                                     <option value="">Select</option>
-                                    <option>Male</option><option>Female</option><option>Other</option>
+                                    <option selected="@(preG == "Male")">Male</option>
+                                    <option selected="@(preG == "Female")">Female</option>
+                                    <option selected="@(preG == "Other")">Other</option>
                                 </select>
                             </div>
                             <div class="col-12 col-md-4">
@@ -219,7 +172,7 @@
                         <div class="row g-3">
                             <div class="col-12 col-md-6">
                                 <label class="form-label required">Father / Guardian Name</label>
-                                <input type="text" name="GuardianName" id="adm_GuardianName" class="form-control" placeholder="Enter parent name" required>
+                                <input type="text" name="GuardianName" id="adm_GuardianName" class="form-control" placeholder="Enter parent name" value="@ViewBag.PreGuardianName" required>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Mother Name</label>
@@ -227,7 +180,7 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label required">Mobile Number</label>
-                                <input type="tel" name="MobileNumber" id="adm_MobileNumber" maxlength="10" pattern="[0-9]{10}" class="form-control" placeholder="10 digit mobile" required>
+                                <input type="tel" name="MobileNumber" id="adm_MobileNumber" maxlength="10" pattern="[0-9]{10}" class="form-control" placeholder="10 digit mobile" value="@ViewBag.PreMobile" required>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Alternate Mobile</label>
@@ -828,7 +781,7 @@ $(function () {
                 if (res.receiptNo && window.EcReceipt) {
                     var modalEl = document.getElementById('ecReceiptModal');
                     if (modalEl) modalEl.addEventListener('hidden.bs.modal', function () { window.location.href = URL_LIST; }, { once: true });
-                    EcReceipt.show(res.receiptNo);
+                    // Receipt not auto-opened; print it from the fee history / list.
                 } else {
                     setTimeout(function () { window.location.href = URL_LIST; }, 900);
                 }
@@ -849,22 +802,14 @@ $(function () {
 
     showEmptyFees();
 
-    /* ── prefill from a converted enquiry ────────────── */
-@if (ViewBag.PrefillJson != null)
+    /* ── prefill from a converted enquiry ──────────────
+       Fields are already filled server-side (normal binding); here we only
+       fire the dependent loads for the pre-selected year + class. */
+@if (ViewBag.PrefillEnquiryId != null)
 {
     <text>
     (function () {
-        try {
-            var p = @Html.Raw(ViewBag.PrefillJson);
-            $('#adm_StudentName').val(p.studentName || '');
-            $('#adm_GuardianName').val(p.guardianName || '');
-            $('#adm_MobileNumber').val(p.mobile || '');
-            if (p.gender) $('#adm_Gender').val(p.gender);
-            if (p.className) $class.val(p.className);
-            if (p.academicYear) $year.val(p.academicYear);
-            if (p.enquiryId) $('#adm_EnquiryId').val(p.enquiryId);
-            if ($class.val() && $year.val()) { loadFees(); loadSections(); }
-        } catch (e) { }
+        if ($class.val() && $year.val()) { loadFees(); loadSections(); }
     })();
     </text>
 }

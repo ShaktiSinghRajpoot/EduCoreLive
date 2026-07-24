@@ -1,0 +1,23 @@
+@using Microsoft.AspNetCore.Mvc.Rendering
+@model EduCoreDataAccessLayer.Models.ListModelBase
+@{
+    // Reusable "Rows per page" selector. Works for ANY list whose model derives
+    // from ListModelBase and whose filters live in a GET <form>. The select sits
+    // OUTSIDE that form in the footer, so it's wired back to it via the HTML5
+    // form="<id>" attribute — changing it re-submits all filters + sort with the
+    // new page size (Page resets to 1 because the form omits Page).
+    //
+    // Pass the filter form's id via ViewData["FormId"]; optionally override the
+    // sizes with ViewData["Sizes"] (int[]) or the label with ViewData["Label"].
+    var formId = ViewData["FormId"] as string ?? "";
+    var label  = ViewData["Label"]  as string ?? "Rows per page";
+    var sizes  = ViewData["Sizes"]  as int[]  ?? new[] { 10, 25, 50 };
+}
+<label class="mb-0 text-muted" style="white-space:nowrap;font-size:.81rem">@label</label>
+<select name="PageSize" form="@formId" class="form-select form-select-sm" style="width:auto"
+        title="@label" onchange="this.form.submit()">
+    @foreach (var n in sizes)
+    {
+        <option value="@n" selected="@(Model.PageSize == n)">@n</option>
+    }
+</select>

@@ -1,90 +1,12 @@
+@using System.Linq
+@using Microsoft.AspNetCore.Mvc.Rendering
 @{
     ViewData["Title"] = "Attendance Report";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 }
 
 @section PageStyles {
-<link href="~/css/educore-theme.css" rel="stylesheet" />
-<style>
-/* ===== Attendance Register / Report (ar-*) ===== */
-
-/* summary cards */
-.ar-card{
-    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
-    background:#fff; padding:1rem 1.1rem; display:flex; align-items:center; gap:.85rem; height:100%;
-    transition:var(--ec-transition);
-} 
-.ar-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); }
-.ar-card-ic{ width:44px; height:44px; flex:0 0 44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; }
-.ar-card-val{ font-size:1.4rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
-.ar-card-lbl{ font-size:.68rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
-.ar-card.alert-card{ border-color:rgba(234,84,85,.3); background:#fff6f6; }
-
-/* toolbar */
-.ar-fbar{ display:flex; align-items:center; gap:.55rem; flex-wrap:wrap; }
-.ar-select{ height:38px; min-width:120px; padding:0 .65rem; border-radius:9px; border:1px solid var(--ec-border); background:#fff; font-size:.83rem; font-weight:700; color:var(--ec-text,#2b2c40); outline:none; transition:var(--ec-transition); }
-.ar-select:focus{ border-color:rgba(255,138,0,.55); box-shadow:0 0 0 3px rgba(255,138,0,.1); }
-.ar-btn{ height:38px; padding:0 .85rem; border-radius:9px; border:1px solid var(--ec-border); background:#fafaf8; font-size:.79rem; font-weight:700; color:var(--ec-text-muted); cursor:pointer; outline:none; display:inline-flex; align-items:center; gap:.35rem; transition:var(--ec-transition); white-space:nowrap; }
-.ar-btn:hover{ background:#fff; border-color:rgba(255,138,0,.4); color:var(--ec-text,#2b2c40); }
-
-/* segmented view toggle */
-.ar-seg{ display:inline-flex; border:1px solid var(--ec-border); border-radius:9px; overflow:hidden; background:#fafaf8; }
-.ar-seg button{ border:0; background:transparent; padding:0 .85rem; height:38px; font-size:.79rem; font-weight:700; color:var(--ec-text-muted); cursor:pointer; transition:var(--ec-transition); display:inline-flex; align-items:center; gap:.35rem; }
-.ar-seg button.on{ background:var(--ec-primary); color:#fff; }
-
-/* legend */
-.ar-legend{ display:flex; gap:.9rem; flex-wrap:wrap; align-items:center; font-size:.73rem; font-weight:700; color:var(--ec-text-muted); }
-.ar-legend span{ display:inline-flex; align-items:center; gap:.35rem; }
-.ar-key{ width:16px; height:16px; border-radius:5px; display:inline-flex; align-items:center; justify-content:center; font-size:.6rem; font-weight:800; }
-
-/* mark colors */
-.m-P{ background:#d4edda; color:#155724; }
-.m-A{ background:#fde8e8; color:#b02a37; }
-.m-L{ background:#fff3cd; color:#856404; }
-.m-H{ background:#eceff5; color:#9aa1b9; }
-.m-x{ background:#fafafa; color:#cfcfcf; }
-
-/* register grid */
-.ar-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
-.ar-reg{ border-collapse:separate; border-spacing:0; width:100%; min-width:780px; font-size:.78rem; }
-.ar-reg th, .ar-reg td{ padding:.3rem; text-align:center; white-space:nowrap; }
-.ar-reg thead th{ background:linear-gradient(180deg,#fffaf3,#fff6ea); color:var(--ec-text-light,#9a938b); font-size:.66rem; font-weight:800; border-bottom:1px solid var(--ec-border); position:sticky; top:0; }
-.ar-reg th.ar-stick, .ar-reg td.ar-stick{ position:sticky; left:0; z-index:2; background:#fff; text-align:left; min-width:160px; box-shadow:1px 0 0 var(--ec-border); }
-.ar-reg thead th.ar-stick{ z-index:3; background:#fff6ea; }
-.ar-reg th.wknd{ color:#c2410c; }
-.ar-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.8rem; line-height:1.15; }
-.ar-rl{ font-size:.68rem; color:var(--ec-text-muted); font-weight:650; }
-.ar-mark{ width:24px; height:24px; line-height:24px; border-radius:6px; display:inline-block; font-weight:800; font-size:.68rem; }
-.ar-reg tbody tr:hover td:not(.ar-stick){ background:#fffaf3; }
-.ar-totcol{ font-weight:800; }
-.ar-pct{ font-weight:800; padding:.15rem .45rem; border-radius:7px; font-size:.74rem; display:inline-block; }
-.ar-pct.good{ background:#d4edda; color:#155724; }
-.ar-pct.warn{ background:#fff3cd; color:#856404; }
-.ar-pct.bad{ background:#fde8e8; color:#b02a37; }
-
-/* defaulter cards */
-.ar-def{ border:1px solid var(--ec-border); border-radius:13px; background:#fff; padding:.75rem .85rem; display:flex; align-items:center; gap:.7rem; transition:var(--ec-transition); }
-.ar-def:hover{ box-shadow:var(--ec-shadow); }
-.ar-def-av{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; background:#fde8e8; color:#b02a37; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.75rem; }
-.ar-def-bar{ height:6px; border-radius:99px; background:#eceff5; overflow:hidden; margin-top:.3rem; }
-.ar-def-fill{ height:100%; border-radius:99px; background:linear-gradient(90deg,#ea5455,#ff7674); }
-
-/* student-history rows (mobile-friendly list view) */
-.ar-hist{ display:flex; flex-direction:column; gap:.5rem; }
-.ar-hrow{ display:flex; align-items:center; gap:.7rem; border:1px solid var(--ec-border); border-radius:13px; background:#fff; padding:.7rem .85rem; }
-.ar-hrow-av{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; background:var(--ec-primary-light); color:var(--ec-primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.75rem; }
-.ar-hrow-mini{ display:flex; gap:.7rem; flex-wrap:wrap; font-size:.72rem; font-weight:700; color:var(--ec-text-muted); }
-.ar-hrow-mini b{ color:var(--ec-text-dark); }
-
-.ar-empty{ padding:2.5rem 1rem; text-align:center; }
-.ar-empty-ic{ width:60px; height:60px; border-radius:17px; background:var(--ec-primary-light); color:var(--ec-primary); display:inline-flex; align-items:center; justify-content:center; font-size:1.7rem; margin-bottom:.8rem; }
-
-@@media (max-width:575.98px){
-    .ar-card{ padding:.8rem .9rem; }
-    .ar-card-val{ font-size:1.2rem; }
-    .ar-reg th.ar-stick, .ar-reg td.ar-stick{ min-width:130px; }
-}
-</style>
+    <link rel="stylesheet" href="~/css/ERP/Attendance/AttendanceReport.css" asp-append-version="true" />
 }
 
 <div class="ec-page-shell">
@@ -153,11 +75,14 @@
 
         <div class="ar-fbar mb-2">
           <select class="ar-select" id="fClass">
-            <option>Class 5</option><option selected>Class 9</option><option>Class 10</option><option>Class 12</option>
+            @foreach (var c in ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+            {
+                <option value="@c.Text">@c.Text</option>
+            }
           </select>
-          <select class="ar-select" id="fSection"><option selected>A</option><option>B</option><option>C</option></select>
+          <select class="ar-select" id="fSection"></select>
           <select class="ar-select" id="fMonth"></select>
-          <select class="ar-select" id="fYear"><option>2026</option><option selected>2025</option></select>
+          <select class="ar-select" id="fYear"></select>
           <button class="ar-btn" id="btnPrint"><i class="bx bx-printer"></i>Print</button>
           <button class="ar-btn" id="btnExport"><i class="bx bx-spreadsheet"></i>Export</button>
         </div>
@@ -207,50 +132,78 @@ var MONTHS=['January','February','March','April','May','June','July','August','S
 var THRESHOLD=75;
 var view='register';
 
-/* Mock roster (would come from Classes & Sections roster) */
-var STUDENTS=[
-  {id:1,name:'Akash Verma',roll:'01'},{id:2,name:'Priya Singh',roll:'02'},{id:3,name:'Ravi Kumar',roll:'03'},
-  {id:4,name:'Neha Gupta',roll:'04'},{id:5,name:'Arjun Patel',roll:'05'},{id:6,name:'Sunita Yadav',roll:'06'},
-  {id:7,name:'Mohit Sharma',roll:'07'},{id:8,name:'Kavita Joshi',roll:'08'},{id:9,name:'Rahul Tiwari',roll:'09'},
-  {id:10,name:'Pooja Mishra',roll:'10'},{id:11,name:'Amit Rajput',roll:'11'},{id:12,name:'Anjali Dubey',roll:'12'}
-];
+var SECTIONS_URL='@Url.Action("Sections","Attendance",new{area="ERP"})';
+var MONTH_URL   ='@Url.Action("MonthRegister","Attendance",new{area="ERP"})';
+
+/* The roster + marks for the selected month come from the server. */
+var STUDENTS=[];        // [{id,name,roll}]
+var SERVER_MARKS={};    // studentId -> { dayNumber: 'P'|'A'|'L' }
+var SCHOOL_DAYS=0;      // distinct days a register was actually taken this month
+
+function el(id){ return document.getElementById(id); }
 
 var avatarColors=['primary','success','info','warning','danger','secondary'];
 function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 
-/* deterministic pseudo-random so the same student+day is stable across re-renders */
-function seeded(n){ var x=Math.sin(n)*10000; return x-Math.floor(x); }
-
-/* Build the month's daily marks per student (mock; would come from saved daily attendance SP) */
-var DATA={};   // studentId -> array of marks per day ['P','A','L','H',...]
-var daysInMonth=0, schoolDays=0, monthIdx=0, year=2025;
+/* Build each student's per-day marks for the month from the server data.
+   Sundays render as H; a non-Sunday day with no register shows blank. */
+var DATA={};   // studentId -> array of marks per day ['P','A','L','H','',...]
+var daysInMonth=0, schoolDays=0, monthIdx=0, year=0;
 
 function buildMonth(){
-  monthIdx=parseInt(document.getElementById('fMonth').value,10);
-  year=parseInt(document.getElementById('fYear').value,10);
+  monthIdx=parseInt(el('fMonth').value,10);
+  year=parseInt(el('fYear').value,10);
   daysInMonth=new Date(year,monthIdx+1,0).getDate();
-  DATA={}; schoolDays=0;
-  /* mark Sundays as holiday for everyone */
-  var holiday=[];
-  for(var d=1; d<=daysInMonth; d++){ holiday[d]=(new Date(year,monthIdx,d).getDay()===0); }
-  for(var d2=1; d2<=daysInMonth; d2++){ if(!holiday[d2]) schoolDays++; }
-
+  schoolDays=SCHOOL_DAYS;
+  DATA={};
   STUDENTS.forEach(function(s){
+    var marks=SERVER_MARKS[s.id]||{};
     var arr=[];
     for(var d=1; d<=daysInMonth; d++){
-      if(holiday[d]){ arr.push('H'); continue; }
-      var r=seeded(s.id*100+d+monthIdx*7);
-      /* most present; a few students absent more often to create defaulters */
-      var absentBias=(s.id%5===0)?0.30:(s.id%4===0?0.18:0.07);
-      var leaveBias=0.04;
-      if(r<absentBias) arr.push('A');
-      else if(r<absentBias+leaveBias) arr.push('L');
-      else arr.push('P');
+      if(new Date(year,monthIdx,d).getDay()===0){ arr.push('H'); }
+      else { arr.push(marks[d]||''); }   // '' = no register taken that day
     }
     DATA[s.id]=arr;
   });
+}
+
+/* Fetch the roster + month's marks for the current filters, then render. */
+function loadData(){
+  var cls=el('fClass').value;
+  if(!cls){ STUDENTS=[]; SERVER_MARKS={}; SCHOOL_DAYS=0; render(); return; }
+  $.getJSON(MONTH_URL,{
+    'class':  cls,
+    section:  el('fSection').value,
+    month:    parseInt(el('fMonth').value,10)+1,   // server months are 1..12
+    year:     parseInt(el('fYear').value,10)
+  })
+  .done(function(res){
+    STUDENTS=(res.students||[]).map(function(s){ return {id:s.id,name:s.name,roll:s.roll||''}; });
+    SERVER_MARKS={};
+    (res.marks||[]).forEach(function(m){
+      (SERVER_MARKS[m.studentId]=SERVER_MARKS[m.studentId]||{})[m.day]=m.mark;
+    });
+    SCHOOL_DAYS=res.schoolDays||0;
+    render();
+  })
+  .fail(function(){ toast('error','Could not load the attendance register.'); });
+}
+
+/* Fill the Section dropdown for the chosen class, then (optionally) load data. */
+function loadSections(thenLoad){
+  var cls=el('fClass').value, sel=el('fSection');
+  if(!cls){ sel.innerHTML=''; if(thenLoad) loadData(); return; }
+  $.getJSON(SECTIONS_URL,{ 'class':cls })
+  .done(function(list){
+    sel.innerHTML='';
+    (list||[]).forEach(function(x){
+      var o=document.createElement('option'); o.value=x; o.textContent=x; sel.appendChild(o);
+    });
+    if(thenLoad) loadData();
+  })
+  .fail(function(){ if(thenLoad) loadData(); });
 }
 
 function statsFor(id){
@@ -261,8 +214,11 @@ function statsFor(id){
 }
 function pctCls(pct){ return pct>=THRESHOLD?'good':(pct>=60?'warn':'bad'); }
 
-/* month dropdown */
-(function(){ var m=document.getElementById('fMonth'); MONTHS.forEach(function(n,i){ var o=document.createElement('option'); o.value=i; o.textContent=n; if(i===10)o.selected=true; m.appendChild(o); }); })();
+/* month dropdown — default to the current month */
+(function(){ var m=el('fMonth'), cur=new Date().getMonth(); MONTHS.forEach(function(n,i){ var o=document.createElement('option'); o.value=i; o.textContent=n; if(i===cur)o.selected=true; m.appendChild(o); }); })();
+
+/* year dropdown — current year and the two before it */
+(function(){ var y=el('fYear'), now=new Date().getFullYear(); for(var k=0;k<3;k++){ var v=now-k, o=document.createElement('option'); o.value=v; o.textContent=v; if(k===0)o.selected=true; y.appendChild(o); } })();
 
 function updateCards(){
   var totPct=0, defs=0;
@@ -276,6 +232,10 @@ function updateCards(){
 
 function renderRegister(){
   var t=document.getElementById('regTable');
+  if(!STUDENTS.length){
+    t.innerHTML='<tbody><tr><td class="text-muted small py-4 text-center">No students found for this class / section.</td></tr></tbody>';
+    return;
+  }
   var head='<thead><tr><th class="ar-stick">Student</th>';
   for(var d=1; d<=daysInMonth; d++){
     var wknd=(new Date(year,monthIdx,d).getDay()===0);
@@ -287,7 +247,10 @@ function renderRegister(){
   STUDENTS.forEach(function(s){
     var arr=DATA[s.id], st=statsFor(s.id);
     body+='<tr><td class="ar-stick"><div class="ar-nm">'+esc(s.name)+'</div><div class="ar-rl">Roll '+esc(s.roll)+'</div></td>';
-    for(var d=0; d<arr.length; d++){ body+='<td><span class="ar-mark m-'+arr[d]+'">'+arr[d]+'</span></td>'; }
+    for(var d=0; d<arr.length; d++){
+      var mk=arr[d];
+      body += mk ? '<td><span class="ar-mark m-'+mk+'">'+mk+'</span></td>' : '<td></td>';
+    }
     body+='<td class="ar-totcol" style="color:#157347;">'+st.p+'</td><td class="ar-totcol" style="color:#b02a37;">'+st.a+'</td>'
        +'<td><span class="ar-pct '+pctCls(st.pct)+'">'+st.pct+'%</span></td></tr>';
   });
@@ -341,20 +304,37 @@ function render(){
     +' · '+MONTHS[monthIdx]+' '+year+' · '+schoolDays+' school days';
 }
 
+/* Export the current month's per-student summary as a CSV. */
+function exportCsv(){
+  if(!STUDENTS.length){ toast('info','Nothing to export.'); return; }
+  var rows=[['Roll','Student','Present','Absent','Leave','Percent']];
+  STUDENTS.forEach(function(s){
+    var st=statsFor(s.id);
+    rows.push([s.roll, s.name, st.p, st.a, st.l, st.pct+'%']);
+  });
+  var csv=rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\r\n');
+  var name='attendance_'+el('fClass').value+'_'+el('fSection').value+'_'+MONTHS[monthIdx]+'_'+year+'.csv';
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=name.replace(/\s+/g,'');
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
 /* listeners */
 document.querySelectorAll('#viewSeg button').forEach(function(b){
   b.addEventListener('click',function(){
     view=this.dataset.v;
     document.querySelectorAll('#viewSeg button').forEach(function(x){ x.classList.toggle('on',x===b); });
-    render();
+    render();   /* data already loaded — just switch view */
   });
 });
-['fClass','fSection','fMonth','fYear'].forEach(function(id){ document.getElementById(id).addEventListener('change',render); });
-document.getElementById('btnPrint').addEventListener('click',function(){ window.print(); });
-document.getElementById('btnExport').addEventListener('click',function(){ toast('info','Exporting '+MONTHS[monthIdx]+' register for '+document.getElementById('fClass').value+' – '+document.getElementById('fSection').value+'…'); });
+el('fClass').addEventListener('change',function(){ loadSections(true); });   /* class → reload sections then data */
+['fSection','fMonth','fYear'].forEach(function(id){ el(id).addEventListener('change',loadData); });
+el('btnPrint').addEventListener('click',function(){ window.print(); });
+el('btnExport').addEventListener('click',exportCsv);
 
-/* init */
-render();
+/* init — load sections for the first class, then its register */
+loadSections(true);
 
 })();
 </script>

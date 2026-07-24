@@ -1,0 +1,22 @@
+/* EditStaff page styles — extracted from Areas/ERP/Views/Staff/EditStaff.cshtml */
+@media (max-width:575.98px){
+    .es-sticky .btn{ width:100% !important; }
+    .es-sticky{ flex-direction:column; align-items:stretch !important; }
+}
+.es-page{ color:var(--ec-text); }
+.es-breadcrumb{ display:flex; align-items:center; gap:.4rem; font-size:.76rem; font-weight:700; color:var(--ec-text-muted); margin-bottom:.35rem; }
+.es-breadcrumb a{ color:var(--ec-text-muted); text-decoration:none; }
+.es-breadcrumb a:hover{ color:var(--ec-primary); }
+.es-breadcrumb span{ color:var(--ec-text-dark); }
+.es-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; margin-bottom:1.25rem; transition:var(--ec-transition); }
+.es-card-hdr{ display:flex; align-items:center; gap:.85rem; padding:1rem 1.25rem .75rem; border-bottom:1px solid var(--ec-border); }
+.es-sec-ic{ width:38px; height:38px; flex:0 0 38px; border-radius:11px; background:var(--ec-primary-light); color:var(--ec-primary); display:flex; align-items:center; justify-content:center; font-size:1rem; }
+.es-sec-title{ font-size:.9rem; font-weight:900; color:var(--ec-text-dark); }
+.es-sec-sub{ font-size:.74rem; font-weight:650; color:var(--ec-text-muted); margin-top:.08rem; }
+.es-card-body{ padding:1.1rem 1.25rem; }
+.es-label{ font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--ec-text-muted); margin-bottom:.38rem; display:block; }
+.es-label.required::after{ content:" *"; color:#ea5455; }
+.es-page .form-control,.es-page .form-select{ border:1px solid var(--ec-border); border-radius:12px; min-height:46px; font-size:.88rem; font-weight:650; color:var(--ec-text); background:#fff; transition:border-color .2s,box-shadow .2s; }
+.es-page .form-control:focus,.es-page .form-select:focus{ border-color:rgba(255,138,0,.6); box-shadow:0 0 0 4px rgba(255,138,0,.11); }
+.es-sticky{ position:sticky; bottom:0; background:rgba(255,255,255,.95); backdrop-filter:blur(10px); border-top:1px solid var(--ec-border); padding:1rem 1.25rem; display:flex; justify-content:flex-end; gap:.75rem; border-radius:0 0 var(--ec-radius) var(--ec-radius); z-index:5; }
+.es-login-toggle{ display:flex; align-items:center; gap:.6rem; }

@@ -1,0 +1,28 @@
+/* Index page styles — extracted from Areas/ERP/Views/Registration/Index.cshtml */
+    .reg-kpi { border:1px solid var(--ec-border); border-radius:14px; background:#fff; padding:1rem 1.1rem; height:100%; display:flex; align-items:center; gap:.9rem; transition:box-shadow .18s; }
+    .reg-kpi:hover { box-shadow:0 6px 18px rgba(0,0,0,.06); }
+    .reg-kpi .ic { width:44px; height:44px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0; }
+    .reg-kpi .val { font-size:1.55rem; font-weight:800; line-height:1; }
+    .reg-kpi .lbl { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--ec-text-muted); }
+    .reg-tbl thead th { background:linear-gradient(180deg,#fffaf3,#fff6ea); color:var(--ec-text-light); font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; padding:.75rem .9rem; white-space:nowrap; }
+    .reg-tbl tbody td { padding:.7rem .9rem; vertical-align:middle; font-size:.84rem; font-weight:600; border-bottom:1px solid #f4f0eb; }
+    .reg-tbl tbody tr:hover td { background:#fffaf3; }
+    .reg-no { font-weight:800; color:var(--ec-primary); font-size:.85rem; }
+    .reg-bdg { display:inline-flex; align-items:center; gap:.28rem; padding:.24rem .6rem; border-radius:999px; font-size:.69rem; font-weight:800; white-space:nowrap; }
+    .b-paid    { background:#d1f0e0; color:#0a5a35; }
+    .b-unpaid  { background:#fde8e8; color:#842029; }
+    .b-regdone { background:#e2e3e5; color:#495057; }
+    .b-admitted{ background:#d4edda; color:#155724; }
+    .reg-act-btn { width:31px; height:31px; padding:0; border-radius:7px; }
+    /* ── Print slip ── */
+    .reg-slip { font-family:'Segoe UI',sans-serif; color:#222; }
+    .reg-slip h4 { font-weight:800; margin-bottom:.15rem; }
+    .reg-slip .slip-row { display:flex; justify-content:space-between; padding:.45rem 0; border-bottom:1px dashed #ddd; font-size:.9rem; }
+    .reg-slip .slip-row span:first-child { color:#666; font-weight:600; }
+    .reg-slip .slip-row span:last-child { font-weight:700; }
+    @media print {
+        body * { visibility:hidden !important; }
+        #regSlipPrintArea, #regSlipPrintArea * { visibility:visible !important; }
+        #regSlipPrintArea { position:absolute; left:0; top:0; width:100%; padding:24px; }
+        .modal-footer, .btn-close { display:none !important; }
+    }

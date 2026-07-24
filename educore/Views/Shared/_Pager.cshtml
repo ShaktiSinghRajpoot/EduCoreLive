@@ -1,0 +1,50 @@
+@using System.Linq
+@model EduCoreDataAccessLayer.Models.ListModelBase
+@{
+    // Reusable server-side pager. Works for ANY list whose model derives from
+    // ListModelBase and whose filters live in the query string — it rebuilds the
+    // current URL with only "Page" swapped, preserving search / sort / filters.
+    if (Model == null || Model.TotalPages <= 1) { return; }
+
+    string PageUrl(int p)
+    {
+        var q = Context.Request.Query
+            .Where(k => !string.Equals(k.Key, "Page", StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(k => k.Key, k => k.Value.ToString());
+        q["Page"] = p.ToString();
+        return Context.Request.Path + Microsoft.AspNetCore.Http.QueryString.Create(q);
+    }
+
+    int window = 2;
+    int start = Math.Max(1, Model.Page - window);
+    int end = Math.Min(Model.TotalPages, Model.Page + window);
+}
+
+<nav class="ec-pager" aria-label="Pagination">
+    <a class="ec-pager-btn @(Model.HasPrev ? "" : "disabled")"
+       href="@(Model.HasPrev ? PageUrl(Model.Page - 1) : "#")" aria-label="Previous">
+        <i class="bx bx-chevron-left"></i>
+    </a>
+
+    @if (start > 1)
+    {
+        <a class="ec-pager-btn" href="@PageUrl(1)">1</a>
+        if (start > 2) { <span class="ec-pager-gap">…</span> }
+    }
+
+    @for (int i = start; i <= end; i++)
+    {
+        <a class="ec-pager-btn @(i == Model.Page ? "active" : "")" href="@PageUrl(i)">@i</a>
+    }
+
+    @if (end < Model.TotalPages)
+    {
+        if (end < Model.TotalPages - 1) { <span class="ec-pager-gap">…</span> }
+        <a class="ec-pager-btn" href="@PageUrl(Model.TotalPages)">@Model.TotalPages</a>
+    }
+
+    <a class="ec-pager-btn @(Model.HasNext ? "" : "disabled")"
+       href="@(Model.HasNext ? PageUrl(Model.Page + 1) : "#")" aria-label="Next">
+        <i class="bx bx-chevron-right"></i>
+    </a>
+</nav>
