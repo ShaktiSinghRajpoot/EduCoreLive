@@ -2,6 +2,7 @@ D:\Github\EduCoreLive\educore\wwwroot\css\ERP\Roles\Index.css
 D:\Github\EduCoreLive\educore\wwwroot\vendor\css\pages\page-auth.css
 D:\Github\EduCoreLive\educore\wwwroot\css\Dashboards\Index.css
 D:\Github\EduCoreLive\educore\wwwroot\css\Account\ChangePassword.css
+D:\Github\EduCoreLive\educore\wwwroot\css\ERP\SchoolSettings\SmartBell.css
 D:\Github\EduCoreLive\educore\wwwroot\js\fee-receipt.js
 D:\Github\EduCoreLive\educore\wwwroot\css\ERP\SchoolSettings\StaffMasters.css
 D:\Github\EduCoreLive\educore\wwwroot\css\ERP\Attendance\StudentAttendance.css
@@ -123,6 +124,7 @@ wwwroot\css\ERP\SchoolSettings\EnquiryCRM.css
 wwwroot\css\ERP\SchoolSettings\FeeHead.css
 wwwroot\css\ERP\SchoolSettings\FeeStructure.css
 wwwroot\css\ERP\SchoolSettings\PeriodStructure.css
+wwwroot\css\ERP\SchoolSettings\SmartBell.css
 wwwroot\css\ERP\SchoolSettings\StaffMasters.css
 wwwroot\css\ERP\SchoolSettings\SubjectManagement.css
 wwwroot\css\ERP\SchoolSettings\Timetable.css
@@ -208,6 +210,10 @@ wwwroot\uploads\schools\11\13\logo_20260722213027810.jpg
 wwwroot\uploads\schools\13\15\logo_20260719104446406.jpg
 wwwroot\uploads\schools\2\1\logo_20260509212707834.jpg
 wwwroot\uploads\schools\2\1\logo_20260610221750291.png
+wwwroot\uploads\students\13\15\student_46_20260723214346158.jpg
+wwwroot\uploads\students\13\15\student_47_20260723214359853.jpeg
+wwwroot\uploads\students\13\15\student_48_20260723214324135.jpg
+wwwroot\uploads\students\13\15\student_49_20260723214301792.png
 wwwroot\vendor\css\core.css
 wwwroot\vendor\css\pages\page-auth.css
 wwwroot\vendor\css\pages\page-icons.css

@@ -148,6 +148,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFNjaG9vbFNldHRpbmdzXFBlcmlvZFN0cnVjdHVyZS5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/Github/EduCoreLive/educore/Areas/ERP/Views/SchoolSettings/SmartBell.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFNjaG9vbFNldHRpbmdzXFNtYXJ0QmVsbC5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/Github/EduCoreLive/educore/Areas/ERP/Views/SchoolSettings/StaffMasters.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFNjaG9vbFNldHRpbmdzXFN0YWZmTWFzdGVycy5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 

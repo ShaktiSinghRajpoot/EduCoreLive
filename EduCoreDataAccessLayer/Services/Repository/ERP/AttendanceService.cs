@@ -14,6 +14,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpSections = "core.sp_class_active_sections";
         private const string SpRoster   = "core.sp_attendance_roster";
         private const string SpSave     = "core.sp_attendance_save";
+        private const string SpMonth    = "core.sp_attendance_month_register";
 
         public AttendanceService(PgExec db)
         {
@@ -129,6 +130,52 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             {
                 return new AttendanceSaveResult { Message = ex.MessageText };
             }
+        }
+
+        public async Task<AttendanceMonthRegister> GetMonthRegisterAsync(
+            string className, string? section, int month, int year, int tenantId, int schoolId, int actionUserId)
+        {
+            var result = new AttendanceMonthRegister();
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(className)) return result;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_class",          NpgsqlDbType.Varchar) { Value = className },
+                new("p_section",        NpgsqlDbType.Varchar) { Value = (object?)section ?? DBNull.Value },
+                new("p_month",          NpgsqlDbType.Integer) { Value = month },
+                new("p_year",           NpgsqlDbType.Integer) { Value = year },
+                new("p_meta",     NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "ar_meta" },
+                new("p_students", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "ar_students" },
+                new("p_marks",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "ar_marks" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpMonth, parameters);
+
+            if (ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                result.SchoolDays = IntVal(ds.Tables[0].Rows[0], "school_days");
+
+            if (ds.Tables.Count > 1)
+                foreach (DataRow row in ds.Tables[1].Rows)
+                    result.Students.Add(new AttendanceRosterEntry
+                    {
+                        Id   = IntVal(row, "student_id"),
+                        Roll = NullStr(row, "roll_no"),
+                        Name = Str(row, "student_name")
+                    });
+
+            if (ds.Tables.Count > 2)
+                foreach (DataRow row in ds.Tables[2].Rows)
+                    result.Marks.Add(new AttendanceDayMark
+                    {
+                        StudentId = IntVal(row, "student_id"),
+                        Day       = IntVal(row, "day"),
+                        Mark      = Str(row, "mark")
+                    });
+
+            return result;
         }
 
         // ── tolerant readers ──

@@ -50,5 +50,8 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Sets (or clears) a student's photo URL after the file is saved.</summary>
         Task<(bool Success, string Message, string? PhotoUrl)> SetStudentPhotoAsync(
             int studentId, string? photoUrl, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Sections that have active students in a class (for cascading dropdowns).</summary>
+        Task<List<string>> GetClassSectionsAsync(string className, int tenantId, int schoolId, int actionUserId);
     }
 }

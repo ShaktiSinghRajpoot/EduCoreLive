@@ -21,6 +21,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<int> SaveAcademicSetupAsync(AcademicSetupModel model, int tenantId, int schoolId, int actionUserId);
         #endregion
 
+        #region Period Structure
+        /// <summary>The school's daily bell schedule, in order.</summary>
+        Task<List<PeriodStructureItem>> GetPeriodStructureAsync(int tenantId, int schoolId, int actionUserId);
+        /// <summary>Replace-all save of the school's bell schedule.</summary>
+        Task<PeriodStructureSaveResult> SavePeriodStructureAsync(List<PeriodStructureItem> items, int tenantId, int schoolId, int actionUserId);
+        #endregion
+
         #region Academic Year
         Task<List<AcademicYearModel>> GetAcademicYearsAsync(int tenantId, int schoolId, int actionUserId);
         Task<(bool Success, string Message, int Id)> SaveAcademicYearAsync(AcademicYearModel model, int tenantId, int schoolId, int actionUserId);

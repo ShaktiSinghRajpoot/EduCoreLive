@@ -99,10 +99,27 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = result.Success, message = result.Message, saved = result.Saved });
         }
 
+        // The monthly report screen. Class list feeds the selector; sections and
+        // the register load over AJAX as the filters change.
         [HttpGet]
-        public IActionResult AttendanceReport()
+        public async Task<IActionResult> AttendanceReport()
         {
+            try { ViewBag.ClassList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
+            catch { ViewBag.ClassList = new List<SelectListItem>(); }
             return View();
+        }
+
+        // A class/section's whole month of attendance — feeds all three report views.
+        [HttpGet]
+        public async Task<IActionResult> MonthRegister(string @class, string? section, int month, int year)
+        {
+            var reg = await _attendance.GetMonthRegisterAsync(@class, section, month, year, TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                schoolDays = reg.SchoolDays,
+                students   = reg.Students.Select(s => new { id = s.Id, name = s.Name, roll = s.Roll }),
+                marks      = reg.Marks.Select(m => new { studentId = m.StudentId, day = m.Day, mark = m.Mark })
+            });
         }
     }
 }

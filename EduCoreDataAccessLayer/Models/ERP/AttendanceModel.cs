@@ -39,4 +39,27 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string Message { get; set; } = string.Empty;
         public int    Saved   { get; set; }
     }
+
+    /// <summary>A month's attendance for one class/section — feeds the report views.</summary>
+    public class AttendanceMonthRegister
+    {
+        /// <summary>Distinct non-Sunday days that actually had a register this month.</summary>
+        public int SchoolDays { get; set; }
+        public List<AttendanceRosterEntry> Students { get; set; } = new();
+        public List<AttendanceDayMark>     Marks    { get; set; } = new();
+    }
+
+    public class AttendanceRosterEntry
+    {
+        public int     Id   { get; set; }
+        public string? Roll { get; set; }
+        public string  Name { get; set; } = string.Empty;
+    }
+
+    public class AttendanceDayMark
+    {
+        public int    StudentId { get; set; }
+        public int    Day       { get; set; }   // day-of-month 1..31
+        public string Mark      { get; set; } = "P";  // P | A | L
+    }
 }

@@ -429,6 +429,31 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
         }
 
+        public async Task<List<string>> GetClassSectionsAsync(string className, int tenantId, int schoolId, int actionUserId)
+        {
+            var sections = new List<string>();
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(className)) return sections;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id", NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id", NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_class",     NpgsqlDbType.Varchar) { Value = className },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "class_sections_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_class_active_sections", parameters);
+            if (ds.Tables.Count == 0) return sections;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                var sec = NullStr(row, "section");
+                if (!string.IsNullOrWhiteSpace(sec)) sections.Add(sec!);
+            }
+            return sections;
+        }
+
         // ── Mapper ───────────────────────────────────────────────
         private static StudentListModel MapListRow(DataRow row) => new()
         {

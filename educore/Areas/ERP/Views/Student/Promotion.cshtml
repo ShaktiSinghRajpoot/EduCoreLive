@@ -1,6 +1,11 @@
+@using System.Linq
 @{
     ViewData["Title"] = "Promote Students";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var _classItems = ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                      ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+    var _classOrderJson = System.Text.Json.JsonSerializer.Serialize(_classItems.Select(c => c.Text));
 }
 
 @section PageStyles {
@@ -35,21 +40,26 @@
             <div class="pr-field">
               <label>Academic Year</label>
               <select class="pr-sel" id="srcYear">
-                <option value="2025-26">2025–26</option>
-                <option value="2024-25">2024–25</option>
+                @foreach (var y in ViewBag.YearList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@y.Text" selected="@y.Selected">@y.Text</option>
+                }
               </select>
             </div>
             <div class="pr-field">
               <label>Class</label>
               <select class="pr-sel" id="srcClass">
                 <option value="">Select class</option>
+                @foreach (var c in ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@c.Text">@c.Text</option>
+                }
               </select>
             </div>
             <div class="pr-field">
               <label>Section</label>
               <select class="pr-sel" id="srcSection">
                 <option value="">All sections</option>
-                <option>A</option><option>B</option><option>C</option>
               </select>
             </div>
           </div>
@@ -61,8 +71,10 @@
             <div class="pr-field">
               <label>Academic Year</label>
               <select class="pr-sel" id="tgtYear">
-                <option value="2026-27">2026–27</option>
-                <option value="2027-28">2027–28</option>
+                @foreach (var y in ViewBag.YearList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@y.Text">@y.Text</option>
+                }
               </select>
             </div>
             <div class="pr-field">
@@ -75,7 +87,6 @@
               <label>Section</label>
               <select class="pr-sel" id="tgtSection">
                 <option value="keep">Keep same section</option>
-                <option>A</option><option>B</option><option>C</option>
               </select>
             </div>
           </div>
@@ -138,7 +149,7 @@
             <button class="pr-bulk-btn" data-all="promote"><i class="bx bx-check-circle"></i>Promote</button>
             <button class="pr-bulk-btn" data-all="retain"><i class="bx bx-revision"></i>Retain</button>
             <button class="pr-bulk-btn" data-all="passout"><i class="bx bx-graduation"></i>Pass Out</button>
-            <button class="pr-bulk-btn" id="promoteFailed" title="Retain students below 33%"><i class="bx bx-filter-alt"></i>Auto by result</button>
+            <button class="pr-bulk-btn" id="promoteFailed" disabled title="Needs the exam results module (not available yet)"><i class="bx bx-filter-alt"></i>Auto by result</button>
           </div>
         </div>
       </div>
@@ -227,28 +238,15 @@
 (function(){
 'use strict';
 
-/* ── Class ladder (source → next) ─────────────── */
-var LADDER=['Grade UKG','Grade 1','Grade 2','Grade 3','Grade 4','Grade 5','Grade 6','Grade 7','Grade 8','Grade 9','Grade 10','Grade 11','Grade 12'];
+/* ── Class ladder from the school's real classes (display order) ── */
+var LADDER=@Html.Raw(_classOrderJson);
 function nextClass(c){ var i=LADDER.indexOf(c); return (i<0||i===LADDER.length-1)?null:LADDER[i+1]; }
 
-/* ── Mock roster (would come from SP by class+section) ─ */
-var ALL=[
-  {id:1, name:'Akash Verma',  roll:'R-001',cls:'Grade 10',sec:'A',pct:74,due:8500, color:'primary'},
-  {id:2, name:'Priya Sharma', roll:'R-002',cls:'Grade 10',sec:'A',pct:91,due:0,    color:'info'},
-  {id:3, name:'Rahul Singh',  roll:'R-003',cls:'Grade 10',sec:'A',pct:28,due:18500,color:'success'},
-  {id:4, name:'Anjali Patel', roll:'R-004',cls:'Grade 10',sec:'B',pct:88,due:0,    color:'warning'},
-  {id:5, name:'Mohan Lal',    roll:'R-005',cls:'Grade 10',sec:'B',pct:31,due:20750,color:'danger'},
-  {id:6, name:'Deepak Sharma',roll:'R-006',cls:'Grade 10',sec:'A',pct:67,due:5200, color:'secondary'},
-  {id:7, name:'Saloni Verma', roll:'R-007',cls:'Grade 12',sec:'A',pct:90,due:0,    color:'primary'},
-  {id:8, name:'Yash Kumar',   roll:'R-008',cls:'Grade 12',sec:'B',pct:55,due:20750,color:'danger'},
-  {id:9, name:'Neha Singh',   roll:'R-009',cls:'Grade 9', sec:'A',pct:85,due:0,    color:'info'},
-  {id:10,name:'Vikash Jha',   roll:'R-010',cls:'Grade 9', sec:'A',pct:93,due:1200, color:'success'},
-  {id:11,name:'Pooja Mishra', roll:'R-011',cls:'Grade 9', sec:'B',pct:30,due:4500, color:'warning'},
-  {id:12,name:'Ravi Tiwari',  roll:'R-012',cls:'Grade 8', sec:'A',pct:72,due:0,    color:'primary'}
-];
+var SEC_URL='@Url.Action("PromotionSections","Student",new{area="ERP"})';
+var ROSTER_URL='@Url.Action("PromotionRoster","Student",new{area="ERP"})';
+var PALETTE=['primary','info','success','warning','danger','secondary'];
 
-var PASS=33;            // pass mark %
-var roster=[];          // currently loaded students
+var roster=[];          // currently loaded students (from the server)
 var outcome={};         // id -> 'promote' | 'retain' | 'passout'
 var carry=true;
 
@@ -258,43 +256,63 @@ function inr(n){ return n>0 ? '₹'+n.toLocaleString('en-IN') : '₹0'; }
 function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 
-/* ── Populate source class dropdown ──────────── */
-(function initClasses(){
-  var sel=document.getElementById('srcClass');
-  LADDER.forEach(function(c){
-    var has=ALL.some(function(s){return s.cls===c;});
-    if(!has) return;
-    var o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o);
+/* ── Section dropdowns cascade from the chosen class ── */
+function fillSelect(sel, list, firstLabel, firstVal){
+  sel.innerHTML='';
+  var o0=document.createElement('option'); o0.value=firstVal; o0.textContent=firstLabel; sel.appendChild(o0);
+  (list||[]).forEach(function(x){ var o=document.createElement('option'); o.value=x; o.textContent=x; sel.appendChild(o); });
+}
+document.getElementById('srcClass').addEventListener('change', function(){
+  var cls=this.value, nc=nextClass(cls);
+  if(!cls){
+    fillSelect(document.getElementById('srcSection'), [], 'All sections', '');
+    fillSelect(document.getElementById('tgtSection'), [], 'Keep same section', 'keep');
+    return;
+  }
+  $.getJSON(SEC_URL, { 'class':cls }).done(function(list){
+    fillSelect(document.getElementById('srcSection'), list, 'All sections', '');
   });
-})();
+  // Target sections come from the next class (blank on the final class).
+  if(nc){ $.getJSON(SEC_URL, { 'class':nc }).done(function(list){ fillSelect(document.getElementById('tgtSection'), list, 'Keep same section', 'keep'); }); }
+  else  { fillSelect(document.getElementById('tgtSection'), [], 'Keep same section', 'keep'); }
+});
 
-/* ── Default outcome per student (by result) ─── */
+/* ── Default outcome: graduate the final class, otherwise promote.
+      (Retain-by-result needs the exam module, which isn't wired yet.) ── */
 function defaultOutcome(s){
-  if(nextClass(s.cls)===null) return 'passout';   // final class → graduate
-  return s.pct>=PASS ? 'promote' : 'retain';       // failed → retain
+  return nextClass(s.cls)===null ? 'passout' : 'promote';
 }
 
 /* ── Load button ─────────────────────────────── */
 document.getElementById('loadBtn').addEventListener('click', function(){
   var cls=document.getElementById('srcClass').value,
-      sec=document.getElementById('srcSection').value;
+      sec=document.getElementById('srcSection').value,
+      yr =document.getElementById('srcYear').value;
   if(!cls){ toast('warning','Please select a class first.'); return; }
 
-  roster=ALL.filter(function(s){ return s.cls===cls && (!sec||s.sec===sec); });
-  outcome={};
-  roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
+  var btn=this; btn.disabled=true;
+  $.getJSON(ROSTER_URL, { 'class':cls, section:sec, year:yr })
+  .done(function(list){
+    roster=(list||[]).map(function(s,i){
+      return {id:s.id, name:s.name, roll:s.roll||'', cls:s.cls, sec:s.sec||'', due:s.due||0, color:PALETTE[i%PALETTE.length]};
+    });
+    outcome={};
+    roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
 
-  document.getElementById('sumSection').style.display='';
-  document.getElementById('rosterCard').style.display='';
-  document.getElementById('selAll').checked=true;
+    document.getElementById('sumSection').style.display='';
+    document.getElementById('rosterCard').style.display='';
+    document.getElementById('selAll').checked=true;
 
-  var nc=nextClass(cls);
-  document.getElementById('rosterSub').textContent=
-    roster.length+' student'+(roster.length!==1?'s':'')+' in '+cls+(sec?' – '+sec:'')+
-    (nc?(' → promoting to '+nc):' (final class)');
+    var nc=nextClass(cls);
+    document.getElementById('rosterSub').textContent=
+      roster.length+' student'+(roster.length!==1?'s':'')+' in '+cls+(sec?' – '+sec:'')+
+      (nc?(' → promoting to '+nc):' (final class)');
 
-  render();
-  if(roster.length) document.getElementById('rosterCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+    render();
+    if(roster.length) document.getElementById('rosterCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+  })
+  .fail(function(){ toast('error','Could not load students for this class.'); })
+  .always(function(){ btn.disabled=false; });
 });
 
 /* ── Outcome segmented control markup ────────── */
@@ -325,15 +343,14 @@ function render(){
     var ncTxt = oc==='passout' ? '<span class="text-info fw-bold">Graduate</span>'
               : oc==='retain'  ? '<span class="text-muted">Stays in '+esc(s.cls)+'</span>'
               : (nc? '<span class="fw-bold">'+esc(nc)+'</span>' : '<span class="text-muted">—</span>');
-    var pass=s.pct>=PASS;
     return '<tr class="'+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input pr-pick" data-id="'+s.id+'" checked></td>'
       +'<td><div class="d-flex align-items-center gap-2">'
       +   '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
       +   '<div><div class="pr-nm">'+esc(s.name)+'</div><div class="pr-rl">'+esc(s.cls)+' – '+esc(s.sec)+'</div></div>'
       +'</div></td>'
-      +'<td>'+esc(s.roll)+'</td>'
-      +'<td><span class="pr-res '+(pass?'pass':'fail')+'"><i class="bx '+(pass?'bx-check-circle':'bx-x-circle')+'"></i>'+s.pct+'%</span></td>'
+      +'<td>'+esc(s.roll||'—')+'</td>'
+      +'<td><span class="text-muted small" title="Exam results module not wired yet">—</span></td>'
       +'<td><span class="pr-due '+(s.due>0?'has':'clear')+'">'+inr(s.due)+'</span></td>'
       +'<td>'+ncTxt+'</td>'
       +'<td>'+seg(s.id, oc)+'</td>'
@@ -341,16 +358,16 @@ function render(){
   }).join('');
 
   mob.innerHTML=roster.map(function(s){
-    var nc=nextClass(s.cls), oc=outcome[s.id], pass=s.pct>=PASS;
+    var nc=nextClass(s.cls), oc=outcome[s.id];
     var ncTxt = oc==='passout'?'Graduate':oc==='retain'?'Stays in '+esc(s.cls):(nc?esc(nc):'—');
     return '<div class="pr-mob-card '+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<div class="pr-mob-top">'
       +  '<input type="checkbox" class="form-check-input pr-pick mt-0" data-id="'+s.id+'" checked>'
       +  '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
-      +  '<div><div class="pr-nm">'+esc(s.name)+'</div><div class="pr-rl">'+esc(s.roll)+' · '+esc(s.cls)+' – '+esc(s.sec)+'</div></div>'
+      +  '<div><div class="pr-nm">'+esc(s.name)+'</div><div class="pr-rl">'+esc(s.roll||'—')+' · '+esc(s.cls)+' – '+esc(s.sec)+'</div></div>'
       +'</div>'
       +'<div class="pr-mob-meta">'
-      +  '<span class="pr-res '+(pass?'pass':'fail')+'"><i class="bx '+(pass?'bx-check-circle':'bx-x-circle')+'"></i> Result '+s.pct+'%</span>'
+      +  '<span class="text-muted small">Result —</span>'
       +  '<span class="pr-due '+(s.due>0?'has':'clear')+'">Dues '+inr(s.due)+'</span>'
       +'</div>'
       +'<div class="text-muted small fw-bold mb-2"><i class="bx bx-right-arrow-alt"></i> '+ncTxt+'</div>'
@@ -444,28 +461,17 @@ document.getElementById('reviewBtn').addEventListener('click', function(){
   document.getElementById('mDues').textContent=document.getElementById('carryDues').checked?'Yes':'No';
 });
 
-/* ── Commit (would POST to controller) ───────── */
+/* ── Commit — the actual promote (write) step isn't wired yet ── */
 document.getElementById('commitBtn').addEventListener('click', function(){
   var sel=picked();
   if(!sel.length){ toast('warning','No students selected.'); return; }
 
-  // Build payload — wire to: @Url.Action("Promotion","Student",new{area="ERP"})
-  var payload={
-    srcYear:document.getElementById('srcYear').value,
-    tgtYear:document.getElementById('tgtYear').value,
-    srcClass:document.getElementById('srcClass').value,
-    srcSection:document.getElementById('srcSection').value,
-    tgtSection:document.getElementById('tgtSection').value,
-    carryDues:document.getElementById('carryDues').checked,
-    students:sel.map(function(s){ return {id:s.id, outcome:outcome[s.id]}; })
-  };
-  console.log('Promotion payload →', payload);
-
   var modalEl=document.getElementById('confirmModal');
   var inst=bootstrap.Modal.getInstance(modalEl); if(inst) inst.hide();
 
-  toast('success', sel.length+' student'+(sel.length!==1?'s':'')+' promoted successfully.');
-  document.getElementById('resetBtn').click();
+  // The selection is real; executing the promotion (moving students to the next
+  // session, carrying dues) needs a dedicated stored procedure — not built yet.
+  toast('info', 'Selection ready for '+sel.length+' student'+(sel.length!==1?'s':'')+'. The promote step isn’t enabled yet.');
 });
 
 })();

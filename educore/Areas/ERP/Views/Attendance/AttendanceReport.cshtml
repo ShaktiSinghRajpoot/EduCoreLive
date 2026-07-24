@@ -1,3 +1,5 @@
+@using System.Linq
+@using Microsoft.AspNetCore.Mvc.Rendering
 @{
     ViewData["Title"] = "Attendance Report";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -73,11 +75,14 @@
 
         <div class="ar-fbar mb-2">
           <select class="ar-select" id="fClass">
-            <option>Class 5</option><option selected>Class 9</option><option>Class 10</option><option>Class 12</option>
+            @foreach (var c in ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+            {
+                <option value="@c.Text">@c.Text</option>
+            }
           </select>
-          <select class="ar-select" id="fSection"><option selected>A</option><option>B</option><option>C</option></select>
+          <select class="ar-select" id="fSection"></select>
           <select class="ar-select" id="fMonth"></select>
-          <select class="ar-select" id="fYear"><option>2026</option><option selected>2025</option></select>
+          <select class="ar-select" id="fYear"></select>
           <button class="ar-btn" id="btnPrint"><i class="bx bx-printer"></i>Print</button>
           <button class="ar-btn" id="btnExport"><i class="bx bx-spreadsheet"></i>Export</button>
         </div>
@@ -127,50 +132,78 @@ var MONTHS=['January','February','March','April','May','June','July','August','S
 var THRESHOLD=75;
 var view='register';
 
-/* Mock roster (would come from Classes & Sections roster) */
-var STUDENTS=[
-  {id:1,name:'Akash Verma',roll:'01'},{id:2,name:'Priya Singh',roll:'02'},{id:3,name:'Ravi Kumar',roll:'03'},
-  {id:4,name:'Neha Gupta',roll:'04'},{id:5,name:'Arjun Patel',roll:'05'},{id:6,name:'Sunita Yadav',roll:'06'},
-  {id:7,name:'Mohit Sharma',roll:'07'},{id:8,name:'Kavita Joshi',roll:'08'},{id:9,name:'Rahul Tiwari',roll:'09'},
-  {id:10,name:'Pooja Mishra',roll:'10'},{id:11,name:'Amit Rajput',roll:'11'},{id:12,name:'Anjali Dubey',roll:'12'}
-];
+var SECTIONS_URL='@Url.Action("Sections","Attendance",new{area="ERP"})';
+var MONTH_URL   ='@Url.Action("MonthRegister","Attendance",new{area="ERP"})';
+
+/* The roster + marks for the selected month come from the server. */
+var STUDENTS=[];        // [{id,name,roll}]
+var SERVER_MARKS={};    // studentId -> { dayNumber: 'P'|'A'|'L' }
+var SCHOOL_DAYS=0;      // distinct days a register was actually taken this month
+
+function el(id){ return document.getElementById(id); }
 
 var avatarColors=['primary','success','info','warning','danger','secondary'];
 function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
 function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 
-/* deterministic pseudo-random so the same student+day is stable across re-renders */
-function seeded(n){ var x=Math.sin(n)*10000; return x-Math.floor(x); }
-
-/* Build the month's daily marks per student (mock; would come from saved daily attendance SP) */
-var DATA={};   // studentId -> array of marks per day ['P','A','L','H',...]
-var daysInMonth=0, schoolDays=0, monthIdx=0, year=2025;
+/* Build each student's per-day marks for the month from the server data.
+   Sundays render as H; a non-Sunday day with no register shows blank. */
+var DATA={};   // studentId -> array of marks per day ['P','A','L','H','',...]
+var daysInMonth=0, schoolDays=0, monthIdx=0, year=0;
 
 function buildMonth(){
-  monthIdx=parseInt(document.getElementById('fMonth').value,10);
-  year=parseInt(document.getElementById('fYear').value,10);
+  monthIdx=parseInt(el('fMonth').value,10);
+  year=parseInt(el('fYear').value,10);
   daysInMonth=new Date(year,monthIdx+1,0).getDate();
-  DATA={}; schoolDays=0;
-  /* mark Sundays as holiday for everyone */
-  var holiday=[];
-  for(var d=1; d<=daysInMonth; d++){ holiday[d]=(new Date(year,monthIdx,d).getDay()===0); }
-  for(var d2=1; d2<=daysInMonth; d2++){ if(!holiday[d2]) schoolDays++; }
-
+  schoolDays=SCHOOL_DAYS;
+  DATA={};
   STUDENTS.forEach(function(s){
+    var marks=SERVER_MARKS[s.id]||{};
     var arr=[];
     for(var d=1; d<=daysInMonth; d++){
-      if(holiday[d]){ arr.push('H'); continue; }
-      var r=seeded(s.id*100+d+monthIdx*7);
-      /* most present; a few students absent more often to create defaulters */
-      var absentBias=(s.id%5===0)?0.30:(s.id%4===0?0.18:0.07);
-      var leaveBias=0.04;
-      if(r<absentBias) arr.push('A');
-      else if(r<absentBias+leaveBias) arr.push('L');
-      else arr.push('P');
+      if(new Date(year,monthIdx,d).getDay()===0){ arr.push('H'); }
+      else { arr.push(marks[d]||''); }   // '' = no register taken that day
     }
     DATA[s.id]=arr;
   });
+}
+
+/* Fetch the roster + month's marks for the current filters, then render. */
+function loadData(){
+  var cls=el('fClass').value;
+  if(!cls){ STUDENTS=[]; SERVER_MARKS={}; SCHOOL_DAYS=0; render(); return; }
+  $.getJSON(MONTH_URL,{
+    'class':  cls,
+    section:  el('fSection').value,
+    month:    parseInt(el('fMonth').value,10)+1,   // server months are 1..12
+    year:     parseInt(el('fYear').value,10)
+  })
+  .done(function(res){
+    STUDENTS=(res.students||[]).map(function(s){ return {id:s.id,name:s.name,roll:s.roll||''}; });
+    SERVER_MARKS={};
+    (res.marks||[]).forEach(function(m){
+      (SERVER_MARKS[m.studentId]=SERVER_MARKS[m.studentId]||{})[m.day]=m.mark;
+    });
+    SCHOOL_DAYS=res.schoolDays||0;
+    render();
+  })
+  .fail(function(){ toast('error','Could not load the attendance register.'); });
+}
+
+/* Fill the Section dropdown for the chosen class, then (optionally) load data. */
+function loadSections(thenLoad){
+  var cls=el('fClass').value, sel=el('fSection');
+  if(!cls){ sel.innerHTML=''; if(thenLoad) loadData(); return; }
+  $.getJSON(SECTIONS_URL,{ 'class':cls })
+  .done(function(list){
+    sel.innerHTML='';
+    (list||[]).forEach(function(x){
+      var o=document.createElement('option'); o.value=x; o.textContent=x; sel.appendChild(o);
+    });
+    if(thenLoad) loadData();
+  })
+  .fail(function(){ if(thenLoad) loadData(); });
 }
 
 function statsFor(id){
@@ -181,8 +214,11 @@ function statsFor(id){
 }
 function pctCls(pct){ return pct>=THRESHOLD?'good':(pct>=60?'warn':'bad'); }
 
-/* month dropdown */
-(function(){ var m=document.getElementById('fMonth'); MONTHS.forEach(function(n,i){ var o=document.createElement('option'); o.value=i; o.textContent=n; if(i===10)o.selected=true; m.appendChild(o); }); })();
+/* month dropdown — default to the current month */
+(function(){ var m=el('fMonth'), cur=new Date().getMonth(); MONTHS.forEach(function(n,i){ var o=document.createElement('option'); o.value=i; o.textContent=n; if(i===cur)o.selected=true; m.appendChild(o); }); })();
+
+/* year dropdown — current year and the two before it */
+(function(){ var y=el('fYear'), now=new Date().getFullYear(); for(var k=0;k<3;k++){ var v=now-k, o=document.createElement('option'); o.value=v; o.textContent=v; if(k===0)o.selected=true; y.appendChild(o); } })();
 
 function updateCards(){
   var totPct=0, defs=0;
@@ -196,6 +232,10 @@ function updateCards(){
 
 function renderRegister(){
   var t=document.getElementById('regTable');
+  if(!STUDENTS.length){
+    t.innerHTML='<tbody><tr><td class="text-muted small py-4 text-center">No students found for this class / section.</td></tr></tbody>';
+    return;
+  }
   var head='<thead><tr><th class="ar-stick">Student</th>';
   for(var d=1; d<=daysInMonth; d++){
     var wknd=(new Date(year,monthIdx,d).getDay()===0);
@@ -207,7 +247,10 @@ function renderRegister(){
   STUDENTS.forEach(function(s){
     var arr=DATA[s.id], st=statsFor(s.id);
     body+='<tr><td class="ar-stick"><div class="ar-nm">'+esc(s.name)+'</div><div class="ar-rl">Roll '+esc(s.roll)+'</div></td>';
-    for(var d=0; d<arr.length; d++){ body+='<td><span class="ar-mark m-'+arr[d]+'">'+arr[d]+'</span></td>'; }
+    for(var d=0; d<arr.length; d++){
+      var mk=arr[d];
+      body += mk ? '<td><span class="ar-mark m-'+mk+'">'+mk+'</span></td>' : '<td></td>';
+    }
     body+='<td class="ar-totcol" style="color:#157347;">'+st.p+'</td><td class="ar-totcol" style="color:#b02a37;">'+st.a+'</td>'
        +'<td><span class="ar-pct '+pctCls(st.pct)+'">'+st.pct+'%</span></td></tr>';
   });
@@ -261,20 +304,37 @@ function render(){
     +' · '+MONTHS[monthIdx]+' '+year+' · '+schoolDays+' school days';
 }
 
+/* Export the current month's per-student summary as a CSV. */
+function exportCsv(){
+  if(!STUDENTS.length){ toast('info','Nothing to export.'); return; }
+  var rows=[['Roll','Student','Present','Absent','Leave','Percent']];
+  STUDENTS.forEach(function(s){
+    var st=statsFor(s.id);
+    rows.push([s.roll, s.name, st.p, st.a, st.l, st.pct+'%']);
+  });
+  var csv=rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\r\n');
+  var name='attendance_'+el('fClass').value+'_'+el('fSection').value+'_'+MONTHS[monthIdx]+'_'+year+'.csv';
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=name.replace(/\s+/g,'');
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
 /* listeners */
 document.querySelectorAll('#viewSeg button').forEach(function(b){
   b.addEventListener('click',function(){
     view=this.dataset.v;
     document.querySelectorAll('#viewSeg button').forEach(function(x){ x.classList.toggle('on',x===b); });
-    render();
+    render();   /* data already loaded — just switch view */
   });
 });
-['fClass','fSection','fMonth','fYear'].forEach(function(id){ document.getElementById(id).addEventListener('change',render); });
-document.getElementById('btnPrint').addEventListener('click',function(){ window.print(); });
-document.getElementById('btnExport').addEventListener('click',function(){ toast('info','Exporting '+MONTHS[monthIdx]+' register for '+document.getElementById('fClass').value+' – '+document.getElementById('fSection').value+'…'); });
+el('fClass').addEventListener('change',function(){ loadSections(true); });   /* class → reload sections then data */
+['fSection','fMonth','fYear'].forEach(function(id){ el(id).addEventListener('change',loadData); });
+el('btnPrint').addEventListener('click',function(){ window.print(); });
+el('btnExport').addEventListener('click',exportCsv);
 
-/* init */
-render();
+/* init — load sections for the first class, then its register */
+loadSections(true);
 
 })();
 </script>

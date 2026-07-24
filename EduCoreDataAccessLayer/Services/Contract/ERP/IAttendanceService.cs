@@ -15,5 +15,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Upsert the whole class's marks for the date.</summary>
         Task<AttendanceSaveResult> SaveAsync(
             DateOnly date, List<AttendanceMark> marks, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>A class/section's full month of attendance for the report views.</summary>
+        Task<AttendanceMonthRegister> GetMonthRegisterAsync(
+            string className, string? section, int month, int year, int tenantId, int schoolId, int actionUserId);
     }
 }

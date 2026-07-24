@@ -59,9 +59,50 @@ namespace educore.Areas.ERP.Controllers
         private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
         private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
-        public IActionResult Promotion()
+        // Bulk promotion. The session (academic year) and class selectors are seeded
+        // from real reference data; sections and the roster load over AJAX.
+        public async Task<IActionResult> Promotion()
         {
+            try { ViewBag.ClassList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
+            catch { ViewBag.ClassList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+
+            try { ViewBag.YearList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }
+            catch { ViewBag.YearList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+
             return View();
+        }
+
+        // Sections that have active students in a class — fills the Section dropdown.
+        public async Task<IActionResult> PromotionSections(string @class)
+        {
+            var sections = await _admissionService.GetClassSectionsAsync(@class, TenantId(), SchoolId(), UserId());
+            return Json(sections);
+        }
+
+        // The roster for the chosen class/section/year, with real pending dues.
+        // Result % has no source yet (no exam module) — returned as null.
+        public async Task<IActionResult> PromotionRoster(string @class, string? section, string? year)
+        {
+            if (string.IsNullOrWhiteSpace(@class)) return Json(Array.Empty<object>());
+
+            var (items, _) = await _admissionService.GetStudentsAsync(
+                TenantId(), SchoolId(), UserId(),
+                pageNumber: 1, pageSize: 1000,
+                filterClass: @class,
+                filterSection: string.IsNullOrWhiteSpace(section) ? null : section,
+                filterYear: string.IsNullOrWhiteSpace(year) ? null : year,
+                filterStatus: "Active");
+
+            var roster = items.Select(s => new
+            {
+                id      = s.StudentId,
+                name    = s.StudentName,
+                roll    = s.RollNo,
+                cls     = s.ClassName,
+                sec     = s.Section,
+                due     = s.FeeDue
+            });
+            return Json(roster);
         }
 
         // Students who have left. Same fat-model shape as StudentList: filters and

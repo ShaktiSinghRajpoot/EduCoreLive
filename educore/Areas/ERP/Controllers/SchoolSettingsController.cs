@@ -816,11 +816,73 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
+        #region PeriodStructure
+        // The daily bell schedule — one schedule per school. The list seeds the
+        // page; Save posts the whole schedule back (replace-all).
         [HasPermission("academics.view")]
-        public IActionResult PeriodStructure()
+        public async Task<IActionResult> PeriodStructure()
         {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var periods = await _schoolSettingsService.GetPeriodStructureAsync(tenantId, schoolId, actionUserId);
+
+            // Shape the page's JS consumes: name / start / end / type.
+            var shaped = periods.Select(p => new
+            {
+                id    = p.PeriodId,
+                name  = p.Label,
+                start = p.StartTime,
+                end   = p.EndTime,
+                type  = p.PeriodType
+            });
+            ViewBag.PeriodJson = System.Text.Json.JsonSerializer.Serialize(shaped);
+
             return View();
         }
+
+        // Smart Bell — a live kiosk display driven by the same schedule. Read-only:
+        // it just needs the periods; the countdown + bell run in the browser.
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> SmartBell()
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var periods = await _schoolSettingsService.GetPeriodStructureAsync(tenantId, schoolId, actionUserId);
+            var shaped = periods.Select(p => new
+            {
+                name  = p.Label,
+                start = p.StartTime,
+                end   = p.EndTime,
+                type  = p.PeriodType
+            });
+            ViewBag.PeriodJson = System.Text.Json.JsonSerializer.Serialize(shaped);
+            return View();
+        }
+
+        [HttpPost]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> SavePeriodStructure([FromBody] PeriodStructureSaveDto dto)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var items = (dto?.Periods ?? new List<PeriodItemDto>()).Select(p => new PeriodStructureItem
+            {
+                Label      = (p.Name ?? string.Empty).Trim(),
+                StartTime  = p.Start ?? string.Empty,
+                EndTime    = p.End ?? string.Empty,
+                PeriodType = string.IsNullOrWhiteSpace(p.Type) ? "class" : p.Type!.Trim().ToLowerInvariant()
+            }).ToList();
+
+            var result = await _schoolSettingsService.SavePeriodStructureAsync(items, tenantId, schoolId, actionUserId);
+            return Json(new { success = result.Success, message = result.Message });
+        }
+        #endregion
     }
 
     // ── Payload for the Classes & Sections save (per academic year) ──
@@ -845,6 +907,20 @@ namespace educore.Areas.ERP.Controllers
         public string? Name { get; set; }
         public int? Capacity { get; set; }
         public string? Room { get; set; }
+    }
+
+    // ── Payload for the Period Structure save (whole schedule, replace-all) ──
+    public class PeriodStructureSaveDto
+    {
+        public List<PeriodItemDto> Periods { get; set; } = new();
+    }
+
+    public class PeriodItemDto
+    {
+        public string? Name  { get; set; }
+        public string? Start { get; set; }   // HH:mm
+        public string? End   { get; set; }   // HH:mm
+        public string? Type  { get; set; }   // class | break | lunch
     }
 
     // ── Payload for Academic Year / Session save ──

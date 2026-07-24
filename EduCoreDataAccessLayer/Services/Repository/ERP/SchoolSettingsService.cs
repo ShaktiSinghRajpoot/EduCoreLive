@@ -20,6 +20,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpIdCardFormatManage = "core.sp_school_id_card_format_manage";
         private const string SpSchoolDropdowns = "config.sp_school_dropdowns";
         private const string SpAcademicSetupManage = "academic.sp_school_admin_academic_setup_manage";
+        private const string SpPeriodStructureManage = "academic.sp_school_admin_period_structure_manage";
         private const string SpFeeHeadManage = "core.sp_school_admin_fee_head_manage";
         private const string SpFeeStructureManage = "core.sp_school_admin_fee_structure_manage";
 
@@ -369,6 +370,88 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
             return row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]) ? 1 : 0;
         }
+
+        #region Period Structure
+
+        public async Task<List<PeriodStructureItem>> GetPeriodStructureAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            var items = new List<PeriodStructureItem>();
+            if (tenantId <= 1 || schoolId <= 0) return items;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation", "GetPeriodStructure"),
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_items", DBNull.Value),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "period_structure_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpPeriodStructureManage, parameters);
+            if (ds.Tables.Count == 0) return items;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                items.Add(new PeriodStructureItem
+                {
+                    PeriodId   = AsInt(row, "period_id"),
+                    Seq        = AsInt(row, "seq"),
+                    PeriodType = AsStr(row, "period_type") ?? "class",
+                    Label      = AsStr(row, "label") ?? string.Empty,
+                    StartTime  = AsStr(row, "start_time") ?? string.Empty,
+                    EndTime    = AsStr(row, "end_time") ?? string.Empty
+                });
+            }
+            return items;
+        }
+
+        public async Task<PeriodStructureSaveResult> SavePeriodStructureAsync(
+            List<PeriodStructureItem> items, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new PeriodStructureSaveResult { Message = "Invalid school context." };
+
+            // camelCase keys the proc reads: name / start / end / type.
+            var itemsJson = JsonSerializer.Serialize((items ?? new List<PeriodStructureItem>()).Select(p => new
+            {
+                name  = (p.Label ?? string.Empty).Trim(),
+                start = p.StartTime,
+                end   = p.EndTime,
+                type  = string.IsNullOrWhiteSpace(p.PeriodType) ? "class" : p.PeriodType.Trim().ToLowerInvariant()
+            }));
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation", "SavePeriodStructure"),
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_items", NpgsqlDbType.Text) { Value = itemsJson },
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "period_structure_save_cursor" }
+            };
+
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpPeriodStructureManage, parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return new PeriodStructureSaveResult { Message = "Nothing was saved." };
+
+                var row = ds.Tables[0].Rows[0];
+                return new PeriodStructureSaveResult
+                {
+                    Success = row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]),
+                    Message = AsStr(row, "message") ?? "Schedule saved."
+                };
+            }
+            catch (PostgresException ex)
+            {
+                // Proc RAISE (e.g. overlapping periods) — surface the friendly text.
+                return new PeriodStructureSaveResult { Message = ex.MessageText };
+            }
+        }
+
+        #endregion
 
         private string BuildAcademicSetupJson(AcademicSetupModel model)
         {
