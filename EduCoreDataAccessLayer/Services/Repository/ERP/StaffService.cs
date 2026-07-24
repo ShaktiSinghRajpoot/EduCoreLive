@@ -409,21 +409,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static decimal? NullDecVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? Convert.ToDecimal(r[c]) : (decimal?)null;
         private static string Str(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
         private static string? NullStr(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
-<<<<<<< HEAD:EduCoreDataAccessLayer/Services/Repository/Admin/StaffService.cs
-
-        // Npgsql maps a Postgres `date` column to DateOnly; coerce to the model's DateTime?.
-        private static DateTime? DateVal(DataRow r, string c)
-        {
-            if (!Has(r, c) || r[c] == DBNull.Value) return null;
-            return r[c] switch
-            {
-                DateOnly d  => d.ToDateTime(TimeOnly.MinValue),
-                DateTime dt => dt,
-                var v       => DateTime.TryParse(v.ToString(), out var p) ? p : (DateTime?)null
-            };
-        }
-=======
->>>>>>> July_Branch:EduCoreDataAccessLayer/Services/Repository/ERP/StaffService.cs
 
         // Postgres `date` comes back as DateOnly (Npgsql) or DateTime depending on
         // the path — handle both so DOB / joining date read back correctly.
