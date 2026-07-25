@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "6CPxQsUSWno=",
+  "dgSpecHash": "oP7RT+1xrcM=",
   "success": true,
-  "projectFilePath": "D:\\Github\\EduCoreLive\\educore\\educore.csproj",
+  "projectFilePath": "D:\\AnmolGithub\\EduCoreLiveV1\\educore\\educore.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\shakt\\.nuget\\packages\\bcrypt.net-next\\4.1.0\\bcrypt.net-next.4.1.0.nupkg.sha512",
     "C:\\Users\\shakt\\.nuget\\packages\\humanizer\\2.14.1\\humanizer.2.14.1.nupkg.sha512",

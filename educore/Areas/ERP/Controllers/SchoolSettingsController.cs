@@ -20,14 +20,20 @@ namespace educore.Areas.ERP.Controllers
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IStaffService _staffService;
         private readonly IClassTeacherService _classTeacherService;
+        private readonly ISchoolCalendarService _schoolCalendarService;
+        private readonly ISubjectService _subjectService;
+        private readonly ITimetableService _timetableService;
 
-        public SchoolSettingsController(ISchoolSettingsService schoolSettingsService, IBaseService BaseService, IWebHostEnvironment webHostEnvironment, IStaffService staffService, IClassTeacherService classTeacherService)
+        public SchoolSettingsController(ISchoolSettingsService schoolSettingsService, IBaseService BaseService, IWebHostEnvironment webHostEnvironment, IStaffService staffService, IClassTeacherService classTeacherService, ISchoolCalendarService schoolCalendarService, ISubjectService subjectService, ITimetableService timetableService)
         {
             _schoolSettingsService = schoolSettingsService;
             _baseService = BaseService;
             _webHostEnvironment = webHostEnvironment;
             _staffService = staffService;
             _classTeacherService = classTeacherService;
+            _schoolCalendarService = schoolCalendarService;
+            _subjectService = subjectService;
+            _timetableService = timetableService;
         }
 
         #region BasicProfile
@@ -498,19 +504,37 @@ namespace educore.Areas.ERP.Controllers
             return RedirectToAction("EnquiryCRM", "Enquiry");
         }
         [HasPermission("academics.view")]
-        public IActionResult SubjectManagement()
+        public async Task<IActionResult> SubjectManagement()
         {
-            ViewBag.Classes = new List<string>
-            {
-                "Nursery","LKG","UKG",
-                "Class 1","Class 2","Class 3","Class 4","Class 5",
-                "Class 6","Class 7","Class 8",
-                "Class 9","Class 10",
-                "Class 11 Science","Class 11 Commerce",
-                "Class 12 Science","Class 12 Commerce"
-            };
-
+            // The school's real classes for the current year, each with its saved
+            // subject count. The page then loads/saves one class at a time.
+            ViewBag.Classes = await _subjectService.GetClassesAsync(SmTenant(), SmSchool(), SmUser());
             return View();
+        }
+
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> ClassSubjects(int classId)
+        {
+            var subjects = await _subjectService.GetClassSubjectsAsync(classId, SmTenant(), SmSchool(), SmUser());
+            return Json(subjects.Select(s => s.SubjectName));
+        }
+
+        public class ClassSubjectsDto
+        {
+            public int ClassId { get; set; }
+            public List<string> Subjects { get; set; } = new();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> SaveClassSubjects([FromBody] ClassSubjectsDto dto)
+        {
+            var result = await _subjectService.SaveClassSubjectsAsync(
+                dto?.ClassId ?? 0, dto?.Subjects ?? new List<string>(), SmTenant(), SmSchool(), SmUser());
+
+            return Json(new { success = result.Success, count = result.SubjectCount, message = result.Message });
         }
 
         #region ClassSection
@@ -810,11 +834,85 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = ok, message });
         }
 
+        #region Timetable
+        // The weekly grid. Periods come from Period Structure, day columns from the
+        // School Calendar's weekly offs, sections/subjects/teachers from their own
+        // masters — the page holds no data of its own.
         [HasPermission("academics.view")]
         public IActionResult Timetable()
         {
             return View();
         }
+
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> TimetableSetup()
+        {
+            var setup = await _timetableService.GetSetupAsync(SmTenant(), SmSchool(), SmUser());
+            return Json(setup);
+        }
+
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> TimetableGrid(int sectionId)
+        {
+            var grid = await _timetableService.GetGridAsync(sectionId, SmTenant(), SmSchool(), SmUser());
+            return Json(grid);
+        }
+
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> TimetableTeacherGrid(int staffId)
+        {
+            var rows = await _timetableService.GetTeacherGridAsync(staffId, SmTenant(), SmSchool(), SmUser());
+            return Json(rows);
+        }
+
+        public class TimetableCellDto
+        {
+            public int     SectionId { get; set; }
+            public int     Day       { get; set; }
+            public int     PeriodSeq { get; set; }
+            public int     SubjectId { get; set; }
+            public int?    StaffId   { get; set; }
+            public string? Room      { get; set; }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> SaveTimetableCell([FromBody] TimetableCellDto dto)
+        {
+            var result = await _timetableService.SaveCellAsync(
+                dto?.SectionId ?? 0, dto?.Day ?? 0, dto?.PeriodSeq ?? 0,
+                dto?.SubjectId ?? 0, dto?.StaffId, dto?.Room,
+                SmTenant(), SmSchool(), SmUser());
+
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> ClearTimetableCell([FromBody] TimetableCellDto dto)
+        {
+            var result = await _timetableService.ClearCellAsync(
+                dto?.SectionId ?? 0, dto?.Day ?? 0, dto?.PeriodSeq ?? 0, SmTenant(), SmSchool(), SmUser());
+
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> CopyTimetableDay([FromBody] TimetableCellDto dto)
+        {
+            var result = await _timetableService.CopyDayAsync(
+                dto?.SectionId ?? 0, dto?.Day ?? 0, SmTenant(), SmSchool(), SmUser());
+
+            return Json(new { success = result.Success, message = result.Message, copied = result.Copied, skipped = result.Skipped });
+        }
+        #endregion
 
         #region PeriodStructure
         // The daily bell schedule — one schedule per school. The list seeds the
@@ -843,24 +941,53 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // Smart Bell — a live kiosk display driven by the same schedule. Read-only:
-        // it just needs the periods; the countdown + bell run in the browser.
+        // it just needs the periods, the SERVER clock and today's calendar status;
+        // the countdown + bell run in the browser off that seed.
         [HasPermission("academics.view")]
         public async Task<IActionResult> SmartBell()
         {
-            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
-            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
-            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
-
-            var periods = await _schoolSettingsService.GetPeriodStructureAsync(tenantId, schoolId, actionUserId);
-            var shaped = periods.Select(p => new
-            {
-                name  = p.Label,
-                start = p.StartTime,
-                end   = p.EndTime,
-                type  = p.PeriodType
-            });
-            ViewBag.PeriodJson = System.Text.Json.JsonSerializer.Serialize(shaped);
+            ViewBag.BellStateJson = System.Text.Json.JsonSerializer.Serialize(await BuildBellStateAsync());
             return View();
+        }
+
+        // Re-sync endpoint. The kiosk calls this every few minutes, on midnight
+        // rollover and whenever the tab wakes up, so a drifting/wrong PC clock,
+        // a schedule edit or a newly-declared holiday can never ring the wrong bell.
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> SmartBellState()
+        {
+            return Json(await BuildBellStateAsync());
+        }
+
+        // One payload for both the page seed and the re-sync: server wall clock,
+        // today's resolved day status, and the schedule.
+        private async Task<object> BuildBellStateAsync()
+        {
+            int tenantId = SmTenant(), schoolId = SmSchool(), actionUserId = SmUser();
+
+            var now     = DateTime.Now;                    // server wall clock — the single source of truth
+            var periods = await _schoolSettingsService.GetPeriodStructureAsync(tenantId, schoolId, actionUserId);
+            var day     = await _schoolCalendarService.GetDayStatusAsync(now.Date, tenantId, schoolId, actionUserId);
+
+            return new
+            {
+                date       = now.ToString("yyyy-MM-dd"),
+                dateLabel  = now.ToString("ddd, d MMM yyyy"),
+                dow        = (int)now.DayOfWeek,
+                sec        = now.Hour * 3600 + now.Minute * 60 + now.Second,   // seconds since midnight
+                dayType    = day.DayType,                                      // working | weekly_off | holiday | half_day
+                title      = day.Title,
+                isWorking  = day.IsWorking,
+                halfDayEnd = day.HalfDayEnd,
+                periods    = periods.Select(p => new
+                {
+                    name  = p.Label,
+                    start = p.StartTime,
+                    end   = p.EndTime,
+                    type  = p.PeriodType
+                })
+            };
         }
 
         [HttpPost]
@@ -882,6 +1009,77 @@ namespace educore.Areas.ERP.Controllers
             var result = await _schoolSettingsService.SavePeriodStructureAsync(items, tenantId, schoolId, actionUserId);
             return Json(new { success = result.Success, message = result.Message });
         }
+        #endregion
+
+        #region School Calendar
+        // Working-day calendar: weekly off pattern + dated holiday / half-day /
+        // working-day overrides. Feeds the Smart Bell and anything else that needs
+        // to know whether the school is open.
+        [HasPermission("academics.view")]
+        public IActionResult SchoolCalendar()
+        {
+            return View();
+        }
+
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> SchoolCalendarData(int? year)
+        {
+            var y    = year is >= 2000 and <= 2100 ? year.Value : DateTime.Now.Year;
+            var from = new DateTime(y, 1, 1);
+            var data = await _schoolCalendarService.GetCalendarAsync(
+                from, from.AddYears(1).AddDays(-1), SmTenant(), SmSchool(), SmUser());
+
+            return Json(new { year = y, weeklyOffDays = data.WeeklyOffDays, entries = data.Entries });
+        }
+
+        public class CalendarEntryDto
+        {
+            public string  Date       { get; set; } = string.Empty;   // yyyy-MM-dd
+            public string  DayType    { get; set; } = "holiday";
+            public string  Title      { get; set; } = string.Empty;
+            public string? HalfDayEnd { get; set; }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> SaveCalendarEntry([FromBody] CalendarEntryDto dto)
+        {
+            var result = await _schoolCalendarService.SaveEntryAsync(new SchoolCalendarEntry
+            {
+                Date       = dto?.Date ?? string.Empty,
+                DayType    = dto?.DayType ?? "holiday",
+                Title      = dto?.Title ?? string.Empty,
+                HalfDayEnd = dto?.HalfDayEnd
+            }, SmTenant(), SmSchool(), SmUser());
+
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> DeleteCalendarEntry([FromBody] IdDto dto)
+        {
+            var result = await _schoolCalendarService.DeleteEntryAsync(dto?.Id ?? 0, SmTenant(), SmSchool(), SmUser());
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        public class IdDto { public int Id { get; set; } }
+        public class WeeklyOffDto { public List<int> Days { get; set; } = new(); }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> SaveWeeklyOff([FromBody] WeeklyOffDto dto)
+        {
+            var result = await _schoolCalendarService.SaveWeeklyOffAsync(
+                dto?.Days ?? new List<int>(), SmTenant(), SmSchool(), SmUser());
+
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
         #endregion
     }
 

@@ -3,6 +3,17 @@
 .sb-topbar{ display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; }
 .sb-clock{ font-size:1.15rem; font-weight:800; color:var(--ec-text-dark); font-variant-numeric:tabular-nums; letter-spacing:.02em; }
 .sb-clock small{ font-size:.72rem; font-weight:700; color:var(--ec-text-muted); margin-left:.35rem; }
+/* the clock is anchored to the server, not the kiosk PC — say so */
+.sb-clock-src{ font-size:.62rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:#2e7d32; display:flex; align-items:center; gap:.25rem; margin-top:1px; }
+.sb-clock-src.stale{ color:#e53935; }
+
+/* today's calendar status, next to the page title */
+.sb-chip{ display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .6rem; border-radius:999px; font-size:.68rem; font-weight:800; vertical-align:middle; text-transform:uppercase; letter-spacing:.04em; }
+.sb-chip.holiday{ background:#fdecea; color:#c62828; }
+.sb-chip.half{ background:#fff4e6; color:#c2410c; }
+.sb-chip.off{ background:#eceff1; color:#546e7a; }
+
+.sb-stale{ display:flex; align-items:center; gap:.5rem; margin-top:1rem; padding:.6rem .9rem; border-radius:12px; background:#fdecea; color:#c62828; font-size:.8rem; font-weight:700; }
 
 .sb-btn{
     height:40px; padding:0 1rem; border-radius:10px; border:1px solid var(--ec-border);

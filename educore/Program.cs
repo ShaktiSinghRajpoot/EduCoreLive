@@ -162,6 +162,9 @@ builder.Services.AddScoped<ITransferCertificateService, TransferCertificateServi
 builder.Services.AddScoped<IIdCardService, IdCardService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IClassTeacherService, ClassTeacherService>();
+builder.Services.AddScoped<ISchoolCalendarService, SchoolCalendarService>();
+builder.Services.AddScoped<ISubjectService, SubjectService>();
+builder.Services.AddScoped<ITimetableService, TimetableService>();
 builder.Services.AddScoped<IAdmissionWorkflowService, AdmissionWorkflowService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<IFeePaymentService, FeePaymentService>();

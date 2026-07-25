@@ -19,13 +19,16 @@
               <i class="bx bx-bell fs-4"></i>
             </div>
             <div>
-              <h4 class="ec-page-title mb-1">Smart Bell</h4>
-              <div class="ec-page-subtitle">Live period display — auto-rings the bell at every transition</div>
+              <h4 class="ec-page-title mb-1">Smart Bell <span class="sb-chip d-none" id="sbDayChip"></span></h4>
+              <div class="ec-page-subtitle">Live period display — announces every transition in Hindi &amp; English, then rings, repeating for 1 minute</div>
             </div>
           </div>
           <div class="sb-topbar">
-            <div class="sb-clock" id="sbClock">--:--:--<small id="sbDate"></small></div>
+            <div class="sb-clock" id="sbClock">--:--:--<small id="sbDate"></small>
+              <div class="sb-clock-src" id="sbClockSrc"><i class="bx bx-server"></i> Server time</div>
+            </div>
             <button class="sb-btn" id="sbBellBtn"><i class="bx bx-bell-off"></i><span>Enable Bell</span></button>
+            <button class="sb-btn" id="sbTestBtn" title="Play a sample announcement"><i class="bx bx-broadcast"></i><span>Test</span></button>
             <button class="sb-btn" id="sbFsBtn" title="Fullscreen"><i class="bx bx-fullscreen"></i></button>
           </div>
         </div>
@@ -104,6 +107,11 @@
       </div>
     </div>
 
+    <div class="sb-stale d-none" id="sbStale">
+      <i class="bx bx-wifi-off"></i>
+      <span>Can't reach the server — running on the last known schedule and clock.</span>
+    </div>
+
   </div>
 </div>
 
@@ -112,26 +120,60 @@
 (function(){
 'use strict';
 
-var seed=@Html.Raw(ViewBag.PeriodJson ?? "[]");
+/* Seed = server wall clock + today's calendar status + the schedule. The browser
+   clock is never trusted: it only supplies elapsed time between server syncs. */
+var SEED=@Html.Raw(ViewBag.BellStateJson ?? "{}");
+var SYNC_URL='@Url.Action("SmartBellState","SchoolSettings",new{area="ERP"})';
 var PERIOD_URL='@Url.Action("PeriodStructure","SchoolSettings",new{area="ERP"})';
+var CAL_URL='@Url.Action("SchoolCalendar","SchoolSettings",new{area="ERP"})';
+
+var SYNC_EVERY_MS=5*60*1000;   // routine drift correction
+var SYNC_MIN_GAP_MS=20*1000;   // don't hammer the endpoint
 
 function toMin(t){ if(!t) return 0; var p=String(t).split(':'); return parseInt(p[0],10)*60+parseInt(p[1],10); }
+function toHHMM(min){ return two(Math.floor(min/60))+':'+two(min%60); }
 function two(n){ return (n<10?'0':'')+n; }
 function fmt12(t){ if(!t) return '—'; var p=String(t).split(':'),h=parseInt(p[0],10),m=p[1]; var ap=h>=12?'PM':'AM'; var hh=h%12||12; return hh+':'+m+' '+ap; }
 function typeIcon(t){ return {'class':'bx-book','break':'bx-coffee','lunch':'bx-restaurant'}[t]||'bx-book'; }
 function typeLabel(t){ return {'class':'Class','break':'Break','lunch':'Lunch'}[t]||'Class'; }
-function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 function el(id){ return document.getElementById(id); }
 
-/* Periods sorted chronologically; each carries start/end in minutes. */
-var PERIODS=(seed||[]).map(function(p){
-  return {name:p.name, type:(p.type||'class'), start:p.start, end:p.end, s:toMin(p.start), e:toMin(p.end)};
-}).sort(function(a,b){ return a.s-b.s; });
+/* ---------------- server-anchored clock ----------------
+   clockBase = seconds since midnight ON THE SERVER at the last sync.
+   clockMark = a monotonic browser reading taken at the same instant.
+   Everything on screen is (clockBase + elapsed), so a kiosk PC with a wrong
+   clock or a wrong timezone still rings at the school's real time. */
+var mono=(window.performance && performance.now)
+  ? function(){ return performance.now(); }
+  : function(){ return Date.now(); };
+
+var clockBase=0, clockMark=0, synced=false, rolledOver=false;
+function serverSec(){ return clockBase + (mono()-clockMark)/1000; }
+
+/* ---------------- day state ---------------- */
+var DAY={}, PERIODS=[], BOUNDARIES=[], prevSec=null;
+
+/* Periods sorted chronologically, clamped to the closing time on a half day:
+   anything starting after it is dropped, anything spanning it ends there. */
+function buildPeriods(list, halfEnd){
+  var cut=halfEnd?toMin(halfEnd):null, out=[];
+  (list||[]).forEach(function(p){
+    var s=toMin(p.start), e=toMin(p.end);
+    if(cut!==null){
+      if(s>=cut) return;
+      if(e>cut) e=cut;
+    }
+    if(e<=s) return;
+    out.push({name:p.name, type:(p.type||'class'), start:toHHMM(s), end:toHHMM(e), s:s, e:e});
+  });
+  return out.sort(function(a,b){ return a.s-b.s; });
+}
 
 /* Boundaries (seconds since midnight) where a bell should ring: every start and
    end. Each boundary knows the period that STARTS there (for the ring pattern). */
-var BOUNDARIES=(function(){
+function buildBoundaries(){
   var map={};
   PERIODS.forEach(function(p){
     map[p.s]=map[p.s]||{sec:p.s*60, starts:null, ends:null};
@@ -140,10 +182,56 @@ var BOUNDARIES=(function(){
     map[p.e].ends=p;
   });
   return Object.keys(map).map(function(k){ return map[k]; }).sort(function(a,b){ return a.sec-b.sec; });
-})();
+}
+
+function applyState(s){
+  s=s||{};
+  var wasDate=DAY.date, expected=synced?serverSec():null;
+
+  clockBase=(typeof s.sec==='number')?s.sec:0;
+  clockMark=mono();
+  synced=true; rolledOver=false;
+
+  DAY={
+    date:    s.date||'',
+    label:   s.dateLabel||'',
+    dow:     (typeof s.dow==='number')?s.dow:-1,
+    type:    s.dayType||'working',       // working | weekly_off | holiday | half_day
+    title:   s.title||'',
+    working: s.isWorking!==false,
+    halfEnd: s.halfDayEnd||null
+  };
+  PERIODS=buildPeriods(s.periods, DAY.halfEnd);
+  BOUNDARIES=buildBoundaries();
+
+  /* Keep boundary detection continuous across a routine re-sync. Reset it when
+     the date rolled over or the clock jumped, so a correction never replays a
+     burst of bells that already rang (or should never have). */
+  if(!(wasDate===DAY.date && expected!==null && Math.abs(clockBase-expected)<2)) prevSec=null;
+
+  renderDayChip();
+}
+
+/* ---------------- sync ---------------- */
+var lastSyncAt=0, syncing=false, syncFails=0;
+function sync(){
+  var t=Date.now();
+  if(syncing || t-lastSyncAt<SYNC_MIN_GAP_MS) return;
+  syncing=true; lastSyncAt=t;
+  $.ajax({ url:SYNC_URL, type:'GET', cache:false, headers:{'X-Requested-With':'XMLHttpRequest'} })
+    .done(function(res){ if(res && typeof res.sec==='number'){ applyState(res); syncFails=0; setStale(false); } })
+    .fail(function(){ syncFails++; if(syncFails>=2) setStale(true); })
+    .always(function(){ syncing=false; });
+}
+function setStale(on){ el('sbStale').classList.toggle('d-none', !on); el('sbClockSrc').classList.toggle('stale', !!on); }
+
+setInterval(sync, SYNC_EVERY_MS);
+/* A kiosk that slept, or a tab that was backgrounded, re-anchors the moment it wakes. */
+document.addEventListener('visibilitychange', function(){ if(!document.hidden) sync(); });
+window.addEventListener('online', sync);
 
 /* ---------------- bell audio (Web Audio, no asset needed) ---------------- */
-var audioCtx=null, armed=false, prevSec=null;
+var audioCtx=null, armed=false;
 
 function ensureAudio(){
   if(!audioCtx){
@@ -162,9 +250,78 @@ function ding(at,dur){
   g.gain.exponentialRampToValueAtTime(0.0001,at+dur);
   o.start(at); o.stop(at+dur+0.03);
 }
-/* pattern: class=1, break=2, lunch=3, day-end=long single */
-function ring(boundary){
-  if(!armed || !ensureAudio()) return;
+/* ---------------- spoken announcement (Web Speech API, bilingual) ---------------- */
+/* English PA line for the transition we just crossed. */
+function announceEn(boundary){
+  var s=boundary.starts, e=boundary.ends;
+  if(s){
+    switch(s.type){
+      case 'break':
+        return 'Attention please. It is now break time. '+s.name+' has begun. Students may relax and be back before the next bell.';
+      case 'lunch':
+        return 'Attention please. It is now the lunch break. Please proceed to the dining area in an orderly manner.';
+      default:
+        return 'Attention please. '+s.name+' is now beginning. Everyone, please move to your scheduled class.';
+    }
+  }
+  if(e){
+    return DAY.type==='half_day'
+      ? 'Attention please. Today is a half day and the school day has now ended. Please move out of your classrooms and have a safe journey home.'
+      : 'Attention please. The school day has now ended. Please move out of your classrooms and have a safe journey home.';
+  }
+  return '';
+}
+/* Hindi PA line for the same transition. */
+function announceHi(boundary){
+  var s=boundary.starts, e=boundary.ends;
+  if(s){
+    switch(s.type){
+      case 'break':
+        return 'कृपया ध्यान दें। अब विश्राम का समय है। छात्र आराम कर सकते हैं और अगली घंटी से पहले वापस आ जाएँ।';
+      case 'lunch':
+        return 'कृपया ध्यान दें। अब भोजन अवकाश है। कृपया व्यवस्थित रूप से भोजन कक्ष में जाएँ।';
+      default:
+        return 'कृपया ध्यान दें। '+s.name+' अब शुरू हो रहा है। सभी छात्र कृपया अपनी निर्धारित कक्षा में जाएँ।';
+    }
+  }
+  if(e){
+    return DAY.type==='half_day'
+      ? 'कृपया ध्यान दें। आज आधे दिन का विद्यालय है और छुट्टी हो गई है। कृपया अपनी कक्षाओं से बाहर निकलें और सुरक्षित घर जाएँ।'
+      : 'कृपया ध्यान दें। विद्यालय का समय समाप्त हो गया है। कृपया अपनी कक्षाओं से बाहर निकलें और सुरक्षित घर जाएँ।';
+  }
+  return '';
+}
+
+/* voices load async in some browsers — warm the list up */
+if('speechSynthesis' in window){ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=function(){ speechSynthesis.getVoices(); }; }
+
+function pickVoice(lang){
+  var vs=speechSynthesis.getVoices()||[];
+  var exact=vs.filter(function(x){ return x.lang && x.lang.toLowerCase()===lang.toLowerCase(); })[0];
+  if(exact) return exact;
+  var pre=lang.split('-')[0].toLowerCase();
+  return vs.filter(function(x){ return x.lang && x.lang.toLowerCase().indexOf(pre)===0; })[0]||null;
+}
+/* Speak a list of {text,lang} lines back-to-back, then call done().
+   Optional alive() is polled between lines; return false to stop early. */
+function speakSeq(items, done, alive){
+  if(!('speechSynthesis' in window)){ if(done) done(); return; }
+  var i=0;
+  (function next(){
+    if((alive && !alive()) || i>=items.length){ if(done) done(); return; }
+    var it=items[i++];
+    if(!it.text){ next(); return; }
+    var u=new SpeechSynthesisUtterance(it.text);
+    u.lang=it.lang; u.rate=0.95; u.pitch=1; u.volume=1;
+    var v=pickVoice(it.lang); if(v) u.voice=v;
+    u.onend=next; u.onerror=next;
+    speechSynthesis.speak(u);
+  })();
+}
+
+/* The chime: pattern class=1, break=2, lunch=3, day-end=long single. */
+function chime(boundary){
+  if(!ensureAudio()) return;
   var count=1, longEnd=false;
   if(boundary.starts){ count={'class':1,'break':2,'lunch':3}[boundary.starts.type]||1; }
   else { longEnd=true; }                 // nothing starts here → end of day
@@ -172,6 +329,39 @@ function ring(boundary){
   if(longEnd){ ding(t,1.1); }
   else { for(var i=0;i<count;i++){ ding(t,0.35); t+=0.5; } }
   flash();
+}
+
+/* One transition = announce (Hindi → English) then ring the bell,
+   repeated continuously for ~1 minute. A token cancels a running cycle
+   if the bell is muted or a new transition supersedes it. */
+var announceToken=0;
+function ring(boundary){
+  if(!armed || !DAY.working) return;           // closed today → stay silent
+  var token=++announceToken;
+  var stopAt=Date.now()+60000;                 // keep repeating for 1 minute
+  var hi=announceHi(boundary), en=announceEn(boundary);
+
+  (function cycle(){
+    if(token!==announceToken || !armed) return;   // superseded or muted
+    speakSeq([{text:hi,lang:'hi-IN'},{text:en,lang:'en-IN'}], function(){
+      if(token!==announceToken || !armed) return;
+      chime(boundary);                            // bell ring after the announcement
+      if(Date.now()<stopAt){ setTimeout(cycle, 1500); }  // short gap, then repeat
+    }, function(){ return token===announceToken && armed; });
+  })();
+}
+
+/* Preview: one Hindi → English → bell cycle, on demand (no 1-minute repeat).
+   Uses the live class period if one is running, else a sample "Period 1". */
+function testAnnounce(){
+  ensureAudio();
+  announceToken++;                              // stop any running live cycle first
+  var live=null, nowMin=serverSec()/60;
+  for(var i=0;i<PERIODS.length;i++){ if(nowMin>=PERIODS[i].s && nowMin<PERIODS[i].e){ live=PERIODS[i]; break; } }
+  var boundary={ starts: live || {name:'Period 1', type:'class'}, ends:null, sec:0 };
+  speakSeq([{text:announceHi(boundary),lang:'hi-IN'},{text:announceEn(boundary),lang:'en-IN'}], function(){
+    chime(boundary);
+  });
 }
 function flash(){
   var h=el('sbHero'); h.classList.remove('sb-flash'); void h.offsetWidth; h.classList.add('sb-flash');
@@ -187,6 +377,14 @@ function setOff(icon,title,sub){
 }
 function setLive(){ el('sbOffCard').classList.add('d-none'); el('sbLive').classList.remove('d-none'); }
 
+function renderDayChip(){
+  var c=el('sbDayChip');
+  if(DAY.type==='holiday'){      c.className='sb-chip holiday'; c.innerHTML='<i class="bx bx-calendar-star"></i>'+esc(DAY.title||'Holiday'); }
+  else if(DAY.type==='half_day'){ c.className='sb-chip half';    c.innerHTML='<i class="bx bx-time-five"></i>Half day · closes '+fmt12(DAY.halfEnd); }
+  else if(DAY.type==='weekly_off'){ c.className='sb-chip off';   c.innerHTML='<i class="bx bx-calendar-x"></i>'+esc(DAY.title||'Weekly off'); }
+  else { c.className='sb-chip d-none'; c.innerHTML=''; }
+}
+
 function renderStrip(nowMin){
   var span=(PERIODS[PERIODS.length-1].e-PERIODS[0].s)||1;
   el('sbStrip').innerHTML=PERIODS.map(function(p){
@@ -197,9 +395,33 @@ function renderStrip(nowMin){
 }
 
 function tick(){
-  var now=new Date();
-  el('sbClock').innerHTML=two(now.getHours())+':'+two(now.getMinutes())+':'+two(now.getSeconds())
-    +'<small>'+now.toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})+'</small>';
+  var nowSec=serverSec();
+
+  /* Past midnight on the server clock — the calendar day changed, so pull a
+     fresh day status (today's holiday may not be tomorrow's). Until that sync
+     lands we hold the bells: yesterday's day type must not ring today. */
+  if(nowSec>=86400){ rolledOver=true; sync(); nowSec=nowSec%86400; }
+
+  el('sbClock').firstChild.nodeValue=two(Math.floor(nowSec/3600))+':'+two(Math.floor(nowSec/60)%60)+':'+two(Math.floor(nowSec)%60);
+  el('sbDate').textContent=DAY.label||'';
+
+  /* Ring for any boundary we just crossed (works even if a tick was missed). */
+  if(prevSec!==null && DAY.working && !rolledOver){
+    BOUNDARIES.forEach(function(b){ if(b.sec>prevSec && b.sec<=nowSec) ring(b); });
+  }
+  prevSec=nowSec;
+
+  /* Closed today — weekly off or a declared holiday. */
+  if(!DAY.working){
+    if(DAY.type==='holiday'){
+      setOff('bx-calendar-star', DAY.title||'School holiday',
+        'The school is closed today, so the Smart Bell stays silent. Managed in the <a href="'+CAL_URL+'">School Calendar</a>.');
+    } else {
+      setOff('bx-calendar-x', (DAY.title||'Weekly off')+' — no bells today',
+        'This weekday is a weekly off. Change it in the <a href="'+CAL_URL+'">School Calendar</a>.');
+    }
+    return;
+  }
 
   if(!PERIODS.length){
     setOff('bx-bell-off','No schedule configured',
@@ -207,21 +429,7 @@ function tick(){
     return;
   }
 
-  var nowSec=now.getHours()*3600+now.getMinutes()*60+now.getSeconds();
-  var nowMin=now.getHours()*60+now.getMinutes();
-
-  /* Ring for any boundary we just crossed (works even if a tick was missed). */
-  if(prevSec!==null){
-    BOUNDARIES.forEach(function(b){ if(b.sec>prevSec && b.sec<=nowSec) ring(b); });
-  }
-  prevSec=nowSec;
-
-  /* Sunday — non-working day. */
-  if(now.getDay()===0){
-    setOff('bx-calendar-x','Sunday — no bells today','The Smart Bell stays silent on Sundays.');
-    return;
-  }
-
+  var nowMin=nowSec/60;
   var dayStart=PERIODS[0].s, dayEnd=PERIODS[PERIODS.length-1].e;
   if(nowMin<dayStart){
     setLive();
@@ -229,7 +437,8 @@ function tick(){
     return;
   }
   if(nowMin>=dayEnd){
-    setOff('bx-moon','School day has ended','See you tomorrow. The last bell rang at '+fmt12(PERIODS[PERIODS.length-1].end)+'.');
+    setOff('bx-moon', DAY.type==='half_day' ? 'Half day over — school has closed' : 'School day has ended',
+      'See you tomorrow. The last bell rang at '+fmt12(PERIODS[PERIODS.length-1].end)+'.');
     return;
   }
 
@@ -245,9 +454,10 @@ function tick(){
 
   renderStrip(nowMin);
   el('sbSummary').textContent=PERIODS.length+' periods · '+fmt12(PERIODS[0].start)+' – '+fmt12(PERIODS[PERIODS.length-1].end);
+  el('sbNote').textContent=DAY.type==='half_day' ? 'Half day — closing at '+fmt12(DAY.halfEnd) : '';
 }
 
-function countdownText(sec){ var m=Math.floor(sec/60), s=sec%60; return two(m)+':'+two(s); }
+function countdownText(sec){ sec=Math.max(Math.round(sec),0); var m=Math.floor(sec/60), s=sec%60; return two(m)+':'+two(s); }
 
 function showCurrent(cur,next,nowSec){
   var hero=el('sbHero');
@@ -293,14 +503,24 @@ el('sbBellBtn').addEventListener('click',function(){
   if(armed){
     ensureAudio();
     ding(audioCtx.currentTime+0.02,0.35);   /* confirm chime + satisfies autoplay gesture */
+    /* captures the speech gesture too, in both languages */
+    speakSeq([{text:'स्मार्ट बेल घोषणाएँ अब चालू हैं।',lang:'hi-IN'},{text:'Smart bell announcements are now enabled.',lang:'en-IN'}]);
     this.classList.add('armed');
     this.innerHTML='<i class="bx bx-bell"></i><span>Bell On</span>';
-    toast('success','Bell enabled — it will ring at each transition.');
+    if(!DAY.working) toast('info','Bell enabled — but the school is closed today ('+(DAY.title||'non-working day')+'), so nothing will ring.');
+    else toast('success','Bell enabled — Hindi + English announcements will repeat for 1 minute at each transition.');
   } else {
+    announceToken++;                                           /* cancel any repeating cycle */
+    if('speechSynthesis' in window) speechSynthesis.cancel();  /* stop any announcement in progress */
     this.classList.remove('armed');
     this.innerHTML='<i class="bx bx-bell-off"></i><span>Enable Bell</span>';
     toast('info','Bell muted.');
   }
+});
+
+el('sbTestBtn').addEventListener('click',function(){
+  testAnnounce();
+  toast('info','Playing a sample announcement (Hindi → English → bell).');
 });
 
 el('sbFsBtn').addEventListener('click',function(){
@@ -310,6 +530,7 @@ el('sbFsBtn').addEventListener('click',function(){
 });
 
 /* ---------------- run ---------------- */
+applyState(SEED);
 tick();
 setInterval(tick,1000);
 

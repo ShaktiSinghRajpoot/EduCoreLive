@@ -8693,11 +8693,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Github\\EduCoreLive\\educore\\educore.csproj",
+      "projectUniqueName": "D:\\AnmolGithub\\EduCoreLiveV1\\educore\\educore.csproj",
       "projectName": "educore",
-      "projectPath": "D:\\Github\\EduCoreLive\\educore\\educore.csproj",
+      "projectPath": "D:\\AnmolGithub\\EduCoreLiveV1\\educore\\educore.csproj",
       "packagesPath": "C:\\Users\\shakt\\.nuget\\packages\\",
-      "outputPath": "D:\\Github\\EduCoreLive\\educore\\obj\\",
+      "outputPath": "D:\\AnmolGithub\\EduCoreLiveV1\\educore\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -8718,8 +8718,8 @@
         "net9.0": {
           "targetAlias": "net9.0",
           "projectReferences": {
-            "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj": {
-              "projectPath": "D:\\Github\\EduCoreLive\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj"
+            "D:\\AnmolGithub\\EduCoreLiveV1\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj": {
+              "projectPath": "D:\\AnmolGithub\\EduCoreLiveV1\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj"
             }
           }
         }
