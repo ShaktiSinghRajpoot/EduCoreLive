@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -84,7 +85,7 @@ namespace educore.Controllers
             {
                 await _loginService.SaveLoginAttemptAsync(model.Email ?? string.Empty, false, "Invalid email");
                 TempData["Result"] = "0";
-                TempData["Message"] = "email and password are required";
+                TempData["Message"] = "Email/mobile number and password are required.";
                 return View(model);
             }
 
@@ -94,7 +95,7 @@ namespace educore.Controllers
             {
                 await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid email");
                 TempData["Result"] = "0";
-                TempData["Message"] = "Invalid email or password.";
+                TempData["Message"] = "Invalid email/mobile number or password.";
                 return View(model);
             }
 
@@ -112,8 +113,27 @@ namespace educore.Controllers
             {
                 await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid password");
                 TempData["Result"] = "0";
-                TempData["Message"] = "Invalid email or password.";
+                TempData["Message"] = "Invalid email/mobile number or password.";
                 return View(model);
+            }
+
+            // School gate — deliberately AFTER the password check. The credentials are
+            // correct at this point, so telling them "your school is suspended" reveals
+            // nothing they don't already know. Checking earlier would let anyone probe
+            // which emails exist and which schools are suspended.
+            if (!user.SchoolAllowsLogin)
+            {
+                await _loginService.SaveLoginAttemptAsync(
+                    model.Email, false, $"School not active ({user.SchoolStatusCode})");
+
+                // A full page, not a toast: a toast disappears in 3.5s and leaves the
+                // user with no way to act on it. SchoolUnavailable explains the state
+                // and carries real support contacts.
+                // Carried in TempData, NOT the query string — the status must not be
+                // linkable or guessable from a URL.
+                TempData["BlockedStatusCode"] = user.SchoolStatusCode;
+                TempData["BlockedMessage"] = user.SchoolLoginMessage;
+                return RedirectToAction(nameof(SchoolUnavailable));
             }
 
             var roles = await _loginService.GetUserRolesAsync(user.UserId);
@@ -333,6 +353,27 @@ namespace educore.Controllers
         public IActionResult AccessDenied()
         {
             return View();
+        }
+
+        /// <summary>
+        /// Shown when the credentials were correct but the school's status blocks
+        /// sign-in (Inactive / Suspended / Closed / Pending), or the school was deleted.
+        ///
+        /// Reads TempData set by the Login POST. Reaching this URL directly (no
+        /// TempData) is harmless: it renders the generic wording with the same support
+        /// contacts and reveals nothing about any account or school.
+        /// </summary>
+        [HttpGet]
+        public IActionResult SchoolUnavailable([FromServices] IOptions<SupportSettings> support)
+        {
+            var model = new SchoolUnavailableViewModel
+            {
+                StatusCode = TempData["BlockedStatusCode"] as string,
+                Message = TempData["BlockedMessage"] as string,
+                Support = support.Value
+            };
+
+            return View(model);
         }
 
         public IActionResult Error()

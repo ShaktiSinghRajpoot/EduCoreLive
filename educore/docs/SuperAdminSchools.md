@@ -41,9 +41,12 @@ Trimmed to the essentials a super admin needs at provisioning. Optional/branding
 for the School Admin to complete later in their own **Basic Profile** screen.
 
 1. **Organization & School** — tenant (pick existing / create new) + School Name, Display, Status, Board, Type
-2. **Address & Contact** — Address line 1, City, State, Pincode + Contact name, Phone, Email
+2. **Address & Contact** — Address line 1, State/District/City, Pincode + Contact name, Phone, Email
 3. **School Admin** — create the first login (name, email, phone, password)
 4. **Review & Save**
+
+> On **Edit** the tenant is read-only: `sp_school_manage` resolves the tenant from the school
+> row on UPDATE and ignores whatever is posted, so an editable dropdown there was a lie.
 
 Required fields are marked with a **red `*`**. Required set (enforced by the proc + model
 `[Required]`): tenant choice, school name, status, board, type, address line 1, city, state,
@@ -129,6 +132,185 @@ Returns the page of rows plus `total_count` and `active_count` as `COUNT(*) OVER
 
 > **Editing a proc:** `pg_get_functiondef` is dumped into `Database/*.sql`, edited, and re-applied
 > with `psql -f`. Update the `.sql` **and** the consuming C# together.
+
+---
+
+## 5a. School code — SCH1, SCH2, SCH3 …
+
+`core.schools.school_code` is a **gap-free running sequence**, drawn from
+`core.school_code_counters` (`Database/school_code_sequence.sql`).
+
+It got there in three steps, and the middle one is the interesting bit:
+
+| | Generator | Problem |
+|---|---|---|
+| 1 | `'SCH' \|\| YYYYMMDDHH24MISS` | Only unique to the **second** — two schools created in the same second on one tenant collided on `uq_school_code (tenant_id, school_code)` and the second save died with a raw constraint error |
+| 2 | `'SCH' \|\| LPAD(school_id,5)` | Collision-proof, but `school_id` is an identity column and **advances on rolled-back inserts**, so codes jumped (SCH00019 → SCH00024) |
+| 3 | **counter row** | Sequential *and* gap-free |
+
+**Why a counter row and not a `SEQUENCE`:** `nextval()` does not roll back, so a failed save burns
+a number and leaves a hole — the exact thing being fixed. `UPDATE … RETURNING` on a counter row
+rolls back with the transaction, and its row lock makes concurrent creates queue rather than race.
+Same pattern the codebase already uses for receipt / admission / registration / TC numbers
+(`core.*_counters`).
+
+Codes are **global**, not per tenant: a super admin works across tenants, and one `SCH7` that means
+exactly one school beats a `SCH7` in every tenant.
+
+> **Caveat — text sorting.** Unpadded numbers sort as text: `SCH1, SCH10, SCH11, SCH2, …`.
+> Harmless today: the live list (`sp_school_list`) orders by `school_id DESC`, and the only proc
+> that can sort by code, `sp_school_list1`, is **not called from any C#**. If a sort-by-code column
+> is ever added, order by `NULLIF(regexp_replace(school_code,'\D','','g'),'')::int` instead.
+
+Existing schools were renumbered to `SCH1..SCH13` in creation order. Safe because `school_code` is
+display-only — it appears in `sp_school_list` / `sp_school_list1` /
+`sp_school_admin_basic_profile_manage` as a selected column, an `ILIKE` search target and a sort
+key, **never as a lookup key**, and no C# generates or matches on it.
+
+---
+
+## 5b. Admin email uniqueness — one rule, one guard
+
+Creating a school admin with an email held by a **deactivated** user used to fail with a raw
+Postgres error instead of a message:
+
+```
+ERROR: duplicate key value violates unique constraint "uq_user_email"
+```
+
+`sp_school_manage` checked `is_active = TRUE` (so it never saw the deactivated row and allowed
+the save), while `uq_user_email (tenant_id, email)` covered **every** row including deactivated
+and soft-deleted ones. The guard and the constraint disagreed — guard passed, INSERT exploded.
+
+**The invariant the app actually relies on.** Both `sp_login_management` and `sp_password_reset`
+resolve a user by email with **no tenant filter**:
+
+```sql
+WHERE LOWER(u.email) = LOWER(p_email) AND u.is_deleted = FALSE AND u.is_active = TRUE
+```
+
+So: *an email identifies at most one active, non-deleted user — globally.* `uq_user_email` was
+both **too weak** (two tenants could hold the same live email, making login ambiguous — it picked
+one via `ORDER BY role_code`) and **too strong** (a deactivated user burned that email for its
+tenant forever).
+
+`Database/user_email_unique.sql`:
+- drops `uq_user_email`,
+- adds `uq_user_email_active` — `UNIQUE (LOWER(TRIM(email))) WHERE is_active AND NOT is_deleted`,
+  case- and whitespace-insensitive, matching the login predicate exactly,
+- adds **`core.fn_user_email_taken(email, exclude_user_id)`** — the one guard, so the app-side
+  check can never drift from the index again.
+
+All three procs that create a login now call it, replacing three *different* inline rules:
+
+| Proc | Old check | Was wrong because |
+|---|---|---|
+| `sp_school_manage` | global, `is_active` only | missed `is_deleted` → raw constraint error |
+| `sp_staff_manage` | global, `is_active` only | same |
+| `sp_school_user_management` | **tenant + school scoped**, `is_deleted` only | an email live in another tenant passed, then hit the index |
+
+> Verified before running: 0 duplicate emails among active users, 0 deactivated/soft-deleted users,
+> 0 emails differing only by case. Nothing used `ON CONFLICT (tenant_id, email)`.
+> After: deactivated user's email is reusable; a cross-tenant duplicate is refused with
+> *"This email is already registered to another user."*; different casing is still caught;
+> editing an admin and keeping their own email does not complain; and a direct duplicate INSERT
+> is still blocked by the index as a safety net.
+
+### Live availability in the wizard
+
+`GET /SuperAdmin/Schools/CheckEmail?email=…&userId=…` → `{ ok, message }`. The wizard calls it on
+**blur** of Admin Email and shows *Available* / the reason inline, so a clash surfaces at step 3
+instead of after filling all four steps and pressing Save. `validateStep` also refuses to advance
+while the address is known-taken.
+
+- Goes through `ISchoolService.IsEmailTakenAsync` → `core.sp_user_email_check` → the **same**
+  `fn_user_email_taken`, so the hint and the save can never disagree.
+- Convenience only: a failed lookup never blocks the user — the proc and the index still enforce.
+- `userId` excludes the admin being edited (the wizard passes `Model.AdminUserId`, `0` on Create),
+  so re-saving an admin with their own address doesn't flag.
+- An "does this email exist?" endpoint is an **enumeration vector**, so it sits behind the
+  controller's `[Authorize(Roles = SuperAdmin)]` — anonymous callers get a 302 to login.
+
+---
+
+## 6a. Board — which State Board?
+
+"State Board" was a single row in `config.boards`, so a school could say it follows a state board
+but never **which state's**. MSBSHSE, UP Board and RBSE differ in syllabus, exam pattern, result
+format and TC rules — nothing board-specific was possible while that was missing.
+
+`Database/board_state.sql` keeps `config.boards` as board **types** (a short dropdown) and adds
+**`core.school_profiles.board_state_id`** → `config.states` (the master `geo_master.sql` seeded).
+The alternative — 36 per-state board rows — meant a 43-item dropdown and a second copy of the
+state list in the database.
+
+- **Which boards need a state is data**: `config.boards.requires_state`. Currently `State Board`
+  and `Madrasah Board`. Flag a new board in SQL and the wizard follows — **never** hardcode
+  `board_id = 3`, and branch on `board_code` (added here), not `name`.
+- The wizard reveals the **State Board** picker only for flagged boards, and clears it on switch
+  away. The proc does the same (`CASE WHEN ... requires_state THEN p_board_state_id ELSE NULL`),
+  so State Board → CBSE can never leave a stale state behind.
+- Validated in **three** places: client JS, `ValidateBoardStateAsync` in the controller (turns a
+  proc `RAISE` into a field-level error), and the proc itself.
+- **`sp_school_list` renders `State Board (Uttar Pradesh)`** — the plain label is useless on a
+  list spanning states. The review step matches.
+- **Backfill**: existing State Board schools took their board state from their own address state,
+  which is right in the overwhelming majority of cases and far better than NULL.
+
+### Cambridge duplicate — merged
+
+`Database/board_cambridge_merge.sql` folded `Cambridge (IGCSE)` (10) into `Cambridge` (5) and
+renamed the survivor **"Cambridge International (CAIE / IGCSE)"**.
+
+They were never two boards: the board is Cambridge Assessment International Education, and IGCSE
+is one qualification level inside it (Cambridge Upper Secondary), alongside Primary, Lower
+Secondary and AS/A Level. Two rows split the same schools into two buckets and made the board
+filter on the school list undercount. IGCSE stays in the name so the merge doesn't read as
+"IGCSE support was removed".
+
+- Rows are resolved by **`board_code`**, not id — ids differ per environment.
+- **Soft delete**, not `DELETE`: the retired row still resolves for any historical join, while
+  every board join in the app filters `is_deleted = FALSE`, so it vanishes from dropdowns and
+  filters at once.
+- **Idempotent** — a second run reports "already merged" and updates 0 rows.
+- The migration also **renumbers `display_order` to a gap-free 1..n** (retiring IGCSE left
+  1,2,3,4,5,7,8). It renumbers by *current* order, so it preserves the sequence rather than
+  imposing one, is partitioned by tenant, and is self-healing — safe to re-run after any future
+  board is added or retired.
+- Checked before running: 0 schools on either row, no FK constraints on `config.boards`,
+  `core.school_profiles.board_id` is the only referencing column, and `core.students.prev_board`
+  is free text and empty. Active boards: **8 → 7**.
+
+---
+
+## 6b. Address geography (app-wide, not just this module)
+
+State and City used to be free-text boxes here, which is how `core.school_addresses` ended up
+holding `UP`, `uttarpradesh`, `Uttar Pradesh`, `delhi`, `Haryanafff` and `TEST` — breaking the
+state filter on the list screen and any state-wise report.
+
+They now bind to a **platform geography master** — `config.countries` / `config.states` /
+`config.districts`, seeded by **`Database/geo_master.sql`** (16 countries, 36 states + UTs,
+769 districts).
+
+- **Not tenant-scoped, on purpose.** "Maharashtra" is identical for every tenant, so these tables
+  have no `tenant_id` and `GeoService` caches on **global** keys — the one deliberate exception to
+  the tenant-scoped-cache-key rule in `CLAUDE.md`. Don't "fix" it.
+- **District, not city.** ~800 districts stay maintainable; ~4,000 towns don't. City remains free
+  text with the district list as typeahead suggestions, so an unlisted town can still be entered.
+- **Reuse anywhere** (student / staff / enquiry / transport addresses):
+  ```cshtml
+  @await Html.PartialAsync("_StateDistrictCity", new GeoPickerModel { StateId = ..., City = ... })
+  <script src="~/js/geo-cascade.js"></script>   @* once per page *@
+  ```
+  Field names, which levels to show, and `InstanceId` (for two pickers on one page) are all
+  options on `GeoPickerModel`. Cascading options come from `GeoController` (`/Geo/States`,
+  `/Geo/Districts`) via `IGeoService` → `config.sp_geo_lookup`.
+- **Adoption is additive.** `school_addresses` keeps its `city`/`state` varchar columns (every
+  existing proc, filter and report reads them) and gained nullable `country_id`/`state_id`/
+  `district_id`. A save writes **both**. Rows whose old text mapped cleanly were backfilled;
+  the rest kept their text and show a "please re-select the state" hint on Edit.
+  Find them with: `SELECT school_address_id, state, city FROM core.school_addresses WHERE state_id IS NULL;`
 
 ---
 

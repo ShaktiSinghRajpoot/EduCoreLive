@@ -1,4 +1,21 @@
-CREATE OR REPLACE PROCEDURE core.sp_school_manage(IN p_operation character varying, IN p_tenant_id integer, IN p_action_user_id integer, IN p_tenant_mode character varying DEFAULT NULL::character varying, IN p_selected_tenant_id integer DEFAULT NULL::integer, IN p_tenant_name character varying DEFAULT NULL::character varying, IN p_tenant_code character varying DEFAULT NULL::character varying, IN p_tenant_email character varying DEFAULT NULL::character varying, IN p_tenant_phone character varying DEFAULT NULL::character varying, IN p_school_id integer DEFAULT NULL::integer, IN p_school_name character varying DEFAULT NULL::character varying, IN p_display_name character varying DEFAULT NULL::character varying, IN p_status_id integer DEFAULT NULL::integer, IN p_registration_number character varying DEFAULT NULL::character varying, IN p_affiliation_number character varying DEFAULT NULL::character varying, IN p_board_id integer DEFAULT NULL::integer, IN p_school_type_id integer DEFAULT NULL::integer, IN p_ownership_type_id integer DEFAULT NULL::integer, IN p_medium_id integer DEFAULT NULL::integer, IN p_established_year integer DEFAULT NULL::integer, IN p_website character varying DEFAULT NULL::character varying, IN p_address_type_id integer DEFAULT NULL::integer, IN p_address_line1 character varying DEFAULT NULL::character varying, IN p_address_line2 character varying DEFAULT NULL::character varying, IN p_city character varying DEFAULT NULL::character varying, IN p_district character varying DEFAULT NULL::character varying, IN p_state character varying DEFAULT NULL::character varying, IN p_pincode character varying DEFAULT NULL::character varying, IN p_contact_type_id integer DEFAULT NULL::integer, IN p_contact_name character varying DEFAULT NULL::character varying, IN p_designation character varying DEFAULT NULL::character varying, IN p_contact_email character varying DEFAULT NULL::character varying, IN p_phone character varying DEFAULT NULL::character varying, IN p_alternate_phone character varying DEFAULT NULL::character varying, IN p_academic_year_id integer DEFAULT NULL::integer, IN p_date_format_id integer DEFAULT NULL::integer, IN p_time_format_id integer DEFAULT NULL::integer, IN p_enable_sms boolean DEFAULT false, IN p_enable_email boolean DEFAULT false, IN p_enable_whatsapp boolean DEFAULT false, IN p_create_school_admin boolean DEFAULT false, IN p_admin_full_name character varying DEFAULT NULL::character varying, IN p_admin_email character varying DEFAULT NULL::character varying, IN p_admin_phone character varying DEFAULT NULL::character varying, IN p_password_hash character varying DEFAULT NULL::character varying, INOUT p_result refcursor DEFAULT 'school_cursor'::refcursor)
+-- Adding p_country_id / p_state_id / p_district_id changes the signature, and in
+-- Postgres CREATE OR REPLACE would then create a SECOND overload instead of
+-- replacing — every CALL afterwards fails as ambiguous. Drop all overloads first.
+DO $drop$
+DECLARE r record;
+BEGIN
+    FOR r IN
+        SELECT p.oid::regprocedure AS sig
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'core' AND p.proname = 'sp_school_manage'
+    LOOP
+        EXECUTE 'DROP PROCEDURE ' || r.sig;
+    END LOOP;
+END
+$drop$;
+
+CREATE OR REPLACE PROCEDURE core.sp_school_manage(IN p_operation character varying, IN p_tenant_id integer, IN p_action_user_id integer, IN p_tenant_mode character varying DEFAULT NULL::character varying, IN p_selected_tenant_id integer DEFAULT NULL::integer, IN p_tenant_name character varying DEFAULT NULL::character varying, IN p_tenant_code character varying DEFAULT NULL::character varying, IN p_tenant_email character varying DEFAULT NULL::character varying, IN p_tenant_phone character varying DEFAULT NULL::character varying, IN p_school_id integer DEFAULT NULL::integer, IN p_school_name character varying DEFAULT NULL::character varying, IN p_display_name character varying DEFAULT NULL::character varying, IN p_status_id integer DEFAULT NULL::integer, IN p_registration_number character varying DEFAULT NULL::character varying, IN p_affiliation_number character varying DEFAULT NULL::character varying, IN p_board_id integer DEFAULT NULL::integer, IN p_school_type_id integer DEFAULT NULL::integer, IN p_ownership_type_id integer DEFAULT NULL::integer, IN p_medium_id integer DEFAULT NULL::integer, IN p_established_year integer DEFAULT NULL::integer, IN p_website character varying DEFAULT NULL::character varying, IN p_address_type_id integer DEFAULT NULL::integer, IN p_address_line1 character varying DEFAULT NULL::character varying, IN p_address_line2 character varying DEFAULT NULL::character varying, IN p_city character varying DEFAULT NULL::character varying, IN p_district character varying DEFAULT NULL::character varying, IN p_state character varying DEFAULT NULL::character varying, IN p_pincode character varying DEFAULT NULL::character varying, IN p_contact_type_id integer DEFAULT NULL::integer, IN p_contact_name character varying DEFAULT NULL::character varying, IN p_designation character varying DEFAULT NULL::character varying, IN p_contact_email character varying DEFAULT NULL::character varying, IN p_phone character varying DEFAULT NULL::character varying, IN p_alternate_phone character varying DEFAULT NULL::character varying, IN p_academic_year_id integer DEFAULT NULL::integer, IN p_date_format_id integer DEFAULT NULL::integer, IN p_time_format_id integer DEFAULT NULL::integer, IN p_enable_sms boolean DEFAULT false, IN p_enable_email boolean DEFAULT false, IN p_enable_whatsapp boolean DEFAULT false, IN p_create_school_admin boolean DEFAULT false, IN p_admin_full_name character varying DEFAULT NULL::character varying, IN p_admin_email character varying DEFAULT NULL::character varying, IN p_admin_phone character varying DEFAULT NULL::character varying, IN p_password_hash character varying DEFAULT NULL::character varying, IN p_country_id integer DEFAULT NULL::integer, IN p_state_id integer DEFAULT NULL::integer, IN p_district_id integer DEFAULT NULL::integer, IN p_board_state_id integer DEFAULT NULL::integer, INOUT p_result refcursor DEFAULT 'school_cursor'::refcursor)
  LANGUAGE plpgsql
 AS $procedure$
 DECLARE
@@ -6,6 +23,7 @@ DECLARE
     v_tenant_id integer;
     v_school_code character varying;
     v_user_id integer;
+    v_seq integer;
 BEGIN
     IF p_operation IS NULL OR TRIM(p_operation) = '' THEN
         RAISE EXCEPTION 'Operation is required.';
@@ -95,6 +113,7 @@ BEGIN
             sp.registration_number,
             sp.affiliation_number,
             sp.board_id,
+            sp.board_state_id,
             sp.school_type_id,
             sp.ownership_type_id,
             sp.medium_id,
@@ -111,6 +130,9 @@ BEGIN
             a.district,
             a.state,
             a.pincode,
+            a.country_id,
+            a.state_id,
+            a.district_id,
 
             c.contact_type_id,
             c.contact_name,
@@ -247,7 +269,33 @@ BEGIN
     END IF;
 
     IF p_contact_name IS NULL OR TRIM(p_contact_name) = '' THEN
-        RAISE EXCEPTION 'Contact name is required.';
+        RAISE EXCEPTION 'Primary contact person is required.';
+    END IF;
+
+    -- Boards flagged requires_state (State Board, Madrasah Board) are meaningless
+    -- without knowing WHICH state's board — MSBSHSE and UP Board share nothing but
+    -- the label. Driven by the flag, not a hardcoded board_id.
+    IF p_board_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM config.boards
+                   WHERE board_id = p_board_id AND requires_state = TRUE AND is_deleted = FALSE)
+       AND (p_board_state_id IS NULL OR p_board_state_id <= 0) THEN
+        RAISE EXCEPTION 'Please select which state''s board this school follows.';
+    END IF;
+
+    -- A State Board is granted by one state's education department, so a UP Board school
+    -- cannot be located in Bihar. Rejected rather than silently corrected: here the super
+    -- admin chose both values, so they should see which one is wrong. (On the school's own
+    -- Basic Profile the field is locked instead — nothing to correct there.)
+    -- This is the hole SCH14 came through.
+    IF p_board_id IS NOT NULL
+       AND p_board_state_id IS NOT NULL AND p_board_state_id > 0
+       AND p_state_id IS NOT NULL AND p_state_id > 0
+       AND p_state_id <> p_board_state_id
+       AND EXISTS (SELECT 1 FROM config.boards
+                   WHERE board_id = p_board_id AND requires_state = TRUE AND is_deleted = FALSE) THEN
+        RAISE EXCEPTION 'A % school must be located in % — the address state does not match the board.',
+            (SELECT name FROM config.boards WHERE board_id = p_board_id),
+            (SELECT name FROM config.states WHERE state_id = p_board_state_id);
     END IF;
 
     IF p_phone IS NULL OR TRIM(p_phone) = '' THEN
@@ -398,14 +446,12 @@ BEGIN
             RAISE EXCEPTION 'Admin email is required.';
         END IF;
 
-        IF p_operation = 'INSERT'
-           AND EXISTS (
-                SELECT 1
-                FROM core.users
-                WHERE LOWER(TRIM(email)) = LOWER(TRIM(p_admin_email))
-                  AND is_active = TRUE
-           ) THEN
-            RAISE EXCEPTION 'Admin email already exists.';
+        -- One shared guard (see Database/user_email_unique.sql) instead of an
+        -- inline EXISTS. The inline version filtered only is_active, so an email
+        -- held by a DEACTIVATED user slipped past it and then blew up on the
+        -- unique index with a raw Postgres error instead of this message.
+        IF p_operation = 'INSERT' AND core.fn_user_email_taken(p_admin_email) THEN
+            RAISE EXCEPTION 'This email is already registered to another user.';
         END IF;
 
         -- Phone must be unique across active login users (mirrors the email rule).
@@ -427,7 +473,27 @@ BEGIN
         Only basic school fields should be stored in core.schools.
     */
     IF p_operation = 'INSERT' THEN
-        v_school_code := 'SCH' || TO_CHAR(NOW(), 'YYYYMMDDHH24MISS');
+        -- Running sequence: SCH1, SCH2, SCH3, ... (see Database/school_code_sequence.sql)
+        --
+        -- WHY a counter row and not a sequence: nextval() does not roll back, so a
+        -- failed save would burn a number and leave a hole. This UPDATE rolls back
+        -- with the transaction, keeping the numbering gap-free, and its row lock
+        -- makes concurrent creates queue instead of racing to the same number.
+        --
+        -- The old 'SCH' || YYYYMMDDHH24MISS was only unique to the second, so two
+        -- schools created in the same second on one tenant collided on
+        -- uq_school_code (tenant_id, school_code) and the second save failed.
+        UPDATE core.school_code_counters
+        SET last_seq   = last_seq + 1,
+            updated_at = NOW()
+        WHERE counter_key = 'GLOBAL'
+        RETURNING last_seq INTO v_seq;
+
+        IF v_seq IS NULL THEN
+            RAISE EXCEPTION 'School code counter is missing. Run Database/school_code_sequence.sql.';
+        END IF;
+
+        v_school_code := 'SCH' || v_seq;
 
         INSERT INTO core.schools
         (
@@ -492,6 +558,7 @@ BEGIN
         registration_number,
         affiliation_number,
         board_id,
+        board_state_id,
         school_type_id,
         ownership_type_id,
         medium_id,
@@ -508,6 +575,11 @@ BEGIN
         NULLIF(TRIM(p_registration_number), ''),
         NULLIF(TRIM(p_affiliation_number), ''),
         p_board_id,
+        -- Cleared when the chosen board doesn't need one, so switching State Board
+        -- -> CBSE can't leave a stale state behind.
+        CASE WHEN EXISTS (SELECT 1 FROM config.boards
+                          WHERE board_id = p_board_id AND requires_state = TRUE AND is_deleted = FALSE)
+             THEN p_board_state_id ELSE NULL END,
         p_school_type_id,
         p_ownership_type_id,
         p_medium_id,
@@ -522,6 +594,7 @@ BEGIN
         registration_number = EXCLUDED.registration_number,
         affiliation_number = EXCLUDED.affiliation_number,
         board_id = EXCLUDED.board_id,
+        board_state_id = EXCLUDED.board_state_id,
         school_type_id = EXCLUDED.school_type_id,
         ownership_type_id = EXCLUDED.ownership_type_id,
         medium_id = EXCLUDED.medium_id,
@@ -546,6 +619,9 @@ BEGIN
         district,
         state,
         pincode,
+        country_id,
+        state_id,
+        district_id,
         is_primary,
         is_active,
         created_by,
@@ -562,6 +638,9 @@ BEGIN
         NULLIF(TRIM(p_district), ''),
         TRIM(p_state),
         TRIM(p_pincode),
+        p_country_id,
+        p_state_id,
+        p_district_id,
         TRUE,
         TRUE,
         p_action_user_id,
@@ -575,6 +654,9 @@ BEGIN
         district = EXCLUDED.district,
         state = EXCLUDED.state,
         pincode = EXCLUDED.pincode,
+        country_id = EXCLUDED.country_id,
+        state_id = EXCLUDED.state_id,
+        district_id = EXCLUDED.district_id,
         is_primary = TRUE,
         is_active = TRUE,
         is_deleted = FALSE,
@@ -801,14 +883,9 @@ BEGIN
         ORDER BY ur.is_primary DESC, u.user_id
         LIMIT 1;
 
-        -- Email must stay unique across active users (excluding the admin being edited).
-        IF EXISTS (
-            SELECT 1 FROM core.users
-            WHERE LOWER(TRIM(email)) = LOWER(TRIM(p_admin_email))
-              AND is_active = TRUE
-              AND (v_user_id IS NULL OR user_id <> v_user_id)
-        ) THEN
-            RAISE EXCEPTION 'Admin email already exists.';
+        -- Same guard, excluding the admin being edited so they don't clash with themselves.
+        IF core.fn_user_email_taken(p_admin_email, v_user_id) THEN
+            RAISE EXCEPTION 'This email is already registered to another user.';
         END IF;
 
         -- Phone must stay unique across active login users (excluding the admin being edited).
@@ -828,6 +905,16 @@ BEGIN
             UPDATE core.users
             SET email = LOWER(TRIM(p_admin_email)),
                 password_hash = COALESCE(NULLIF(TRIM(p_password_hash), ''), password_hash),
+                -- A super-admin reset must be single-use: the admin is forced to pick
+                -- their own password at next login, so the person who reset it does not
+                -- keep working knowledge of a live credential. INSERT already does this
+                -- for brand-new admins; the reset path was missing it.
+                -- CASE, not TRUE: this same UPDATE runs for a plain name/email edit with
+                -- no password, and that must NOT lock the admin out of their own session.
+                must_change_password = CASE
+                    WHEN NULLIF(TRIM(p_password_hash), '') IS NOT NULL THEN TRUE
+                    ELSE must_change_password
+                END,
                 updated_by = p_action_user_id,
                 updated_at = NOW()
             WHERE user_id = v_user_id;

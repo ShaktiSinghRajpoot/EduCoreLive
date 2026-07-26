@@ -15,6 +15,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
         private const string SpSchoolManage = "core.sp_school_manage";
         private const string SpSchoolList = "core.sp_school_list";
         private const string SpSchoolDropdowns = "config.sp_school_dropdowns";
+        private const string SpUserEmailCheck = "core.sp_user_email_check";
+        private const string SpSchoolArchive = "core.sp_school_archive";
+        private const string SpSchoolPurge = "core.sp_school_purge";
 
         public SchoolService(PgExec db)
         {
@@ -144,6 +147,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 RegistrationNumber = row["registration_number"]?.ToString(),
                 AffiliationNumber = row["affiliation_number"]?.ToString(),
                 BoardId = ToNullableInt(row["board_id"]),
+                BoardStateId = HasColumn(row, "board_state_id") ? ToNullableInt(row["board_state_id"]) : null,
                 SchoolTypeId = ToNullableInt(row["school_type_id"]),
                 OwnershipTypeId = ToNullableInt(row["ownership_type_id"]),
                 MediumId = ToNullableInt(row["medium_id"]),
@@ -157,6 +161,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 District = row["district"]?.ToString(),
                 State = row["state"]?.ToString(),
                 Pincode = row["pincode"]?.ToString(),
+
+                // Nullable on legacy rows whose free-text state never matched a real
+                // state — the wizard then shows the stored text as a "re-select" hint.
+                CountryId = HasColumn(row, "country_id") ? ToNullableInt(row["country_id"]) : null,
+                StateId = HasColumn(row, "state_id") ? ToNullableInt(row["state_id"]) : null,
+                DistrictId = HasColumn(row, "district_id") ? ToNullableInt(row["district_id"]) : null,
 
                 ContactTypeId = ToInt(row["contact_type_id"], 1),
                 ContactName = row["contact_name"]?.ToString(),
@@ -185,18 +195,70 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
             };
         }
 
-        public async Task DeleteSchoolAsync(int schoolId, int tenantId, int actionUserId)
+
+        public async Task<bool> IsEmailTakenAsync(string email, int? excludeUserId = null)
         {
-            var model = new SchoolManageModel
+            if (string.IsNullOrWhiteSpace(email))
+                return false;
+
+            var parameters = new NpgsqlParameter[]
             {
-                SchoolId = schoolId,
-                Operation = "DELETE"
+                new NpgsqlParameter("p_email", email.Trim()),
+                new NpgsqlParameter("p_exclude_user_id", (object?)excludeUserId ?? DBNull.Value),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "email_check_cursor" }
             };
 
-            var parameters = BuildSchoolParameters("DELETE", tenantId, actionUserId, model);
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpUserEmailCheck, parameters);
 
-            var dal = _db;
-            await dal.ExecuteProcedureWithCursorsAsync(SpSchoolManage, parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                return false;
+
+            return ToBool(ds.Tables[0].Rows[0]["is_taken"]);
+        }
+
+        public async Task<SchoolArchiveModel?> ArchiveSchoolAsync(int schoolId, int tenantId)
+        {
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "archive_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpSchoolArchive, parameters);
+
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                return null;
+
+            var row = ds.Tables[0].Rows[0];
+
+            return new SchoolArchiveModel
+            {
+                SchoolId = ToInt(row["school_id"], 0),
+                SchoolCode = row["school_code"]?.ToString(),
+                SchoolName = row["school_name"]?.ToString(),
+                TotalRows = row["total_rows"] == DBNull.Value ? 0 : Convert.ToInt64(row["total_rows"]),
+                ArchiveJson = row["archive_json"]?.ToString() ?? "{}"
+            };
+        }
+
+        public async Task PurgeSchoolAsync(int schoolId, int tenantId, int actionUserId, string confirmName)
+        {
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_confirm_name", confirmName ?? string.Empty),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "purge_cursor" }
+            };
+
+            // PgExec runs this inside a transaction, so any guard or the proc's
+            // completeness check raising rolls the whole delete back.
+            await _db.ExecuteProcedureWithCursorsAsync(SpSchoolPurge, parameters);
         }
 
         public async Task<SchoolDropdownModel> GetSchoolDropdownsAsync()
@@ -224,6 +286,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 Tenants = ToDropdownList(ds, 0),
                 Statuses = ToDropdownList(ds, 1),
                 Boards = ToDropdownList(ds, 2),
+                // Kept off DropdownItem: only the boards list has this, and the wizard
+                // wants the ids as a set anyway to decide when to show the state picker.
+                BoardsRequiringState = ToFlaggedIds(ds, 2, "requires_state"),
                 SchoolTypes = ToDropdownList(ds, 3),
                 OwnershipTypes = ToDropdownList(ds, 4),
                 Mediums = ToDropdownList(ds, 5),
@@ -297,6 +362,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 new NpgsqlParameter("p_admin_phone", (object?)model?.AdminPhone ?? DBNull.Value),
                 new NpgsqlParameter("p_password_hash", (object?)model?.Password ?? DBNull.Value),
 
+                // Geography ids from the shared Country/State/District master. Must stay
+                // immediately before p_result — the proc declares them in this order.
+                new NpgsqlParameter("p_country_id", (object?)model?.CountryId ?? DBNull.Value),
+                new NpgsqlParameter("p_state_id", (object?)model?.StateId ?? DBNull.Value),
+                new NpgsqlParameter("p_district_id", (object?)model?.DistrictId ?? DBNull.Value),
+
+                // Which state's board, for boards flagged requires_state. The proc clears
+                // it when the chosen board doesn't need one.
+                new NpgsqlParameter("p_board_state_id", (object?)model?.BoardStateId ?? DBNull.Value),
+
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "school_cursor" }
             };
         }
@@ -318,6 +393,23 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
             }
 
             return list;
+        }
+
+        /// <summary>Ids from a dropdown cursor whose boolean column is true (e.g. requires_state).</summary>
+        private static List<int> ToFlaggedIds(DataSet ds, int tableIndex, string flagColumn)
+        {
+            var ids = new List<int>();
+
+            if (ds.Tables.Count <= tableIndex || !ds.Tables[tableIndex].Columns.Contains(flagColumn))
+                return ids;
+
+            foreach (DataRow row in ds.Tables[tableIndex].Rows)
+            {
+                if (row[flagColumn] != DBNull.Value && Convert.ToBoolean(row[flagColumn]))
+                    ids.Add(ToInt(row["id"], 0));
+            }
+
+            return ids;
         }
 
         private static bool HasColumn(DataRow row, string columnName)

@@ -14,6 +14,13 @@ out/
 # Local secrets — connection strings live here, never commit
 appsettings.Development.json
 
+# School purge archives. Written by SuperAdmin/Schools/Purge before a school is
+# permanently deleted; each file is that school's ENTIRE data set — students,
+# staff, fee payments, transfer certificates, logins. Never commit, and keep it
+# out of wwwroot (it already is) so it is not web-servable either.
+# Back these up separately: they are the only way to recover a purged school.
+educore/App_Data/school-archives/
+
 # OS noise
 Thumbs.db
 .DS_Store

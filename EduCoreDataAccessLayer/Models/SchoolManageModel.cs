@@ -21,6 +21,21 @@ namespace educore.Models
         [Required(ErrorMessage = "Board is required.")]
         public int? BoardId { get; set; }
 
+        /// <summary>
+        /// Which state's board, for boards flagged config.boards.requires_state
+        /// (State Board, Madrasah Board). NULL for CBSE/ICSE/IB/etc — the proc clears
+        /// it when the chosen board doesn't need one. Points at config.states.
+        /// </summary>
+        public int? BoardStateId { get; set; }
+
+        /// <summary>
+        /// True for boards granted by a single state (State Board, Madrasah Board), from
+        /// config.boards.requires_state. Such a school must sit in its board's state — a UP
+        /// Board school cannot be in Bihar — so the address State is locked to the board
+        /// state. National boards (CBSE/ICSE/IB/NIOS) leave it free.
+        /// </summary>
+        public bool BoardRequiresState { get; set; }
+
         [Required(ErrorMessage = "School type is required.")]
         public int? SchoolTypeId { get; set; }
 
@@ -51,7 +66,10 @@ namespace educore.Models
 
         [Required(ErrorMessage = "City is required.")]
         [StringLength(100)]
-        [RegularExpression(@"^[A-Za-z\s]+$", ErrorMessage = "City must contain only letters.")]
+        // Letters-only rejected real Indian place names — "Hubballi-Dharwad",
+        // "Y.S.R. Kadapa", "Bengaluru (Bangalore)". Allow the punctuation that
+        // actually occurs, still block digits and symbols.
+        [RegularExpression(@"^[A-Za-z][A-Za-z\s\.\-'()]*$", ErrorMessage = "Enter a valid city name.")]
         public string City { get; set; } = string.Empty;
 
         [StringLength(100)]
@@ -61,13 +79,24 @@ namespace educore.Models
         [StringLength(100)]
         public string State { get; set; } = string.Empty;
 
+        // Geography ids from the shared Country/State/District master
+        // (config.countries/states/districts — see Database/geo_master.sql).
+        // The State/District text above is still posted and stored alongside these,
+        // because every existing proc, list filter and report reads the varchar.
+        public int? CountryId { get; set; }
+
+        [Required(ErrorMessage = "State is required.")]
+        public int? StateId { get; set; }
+
+        public int? DistrictId { get; set; }
+
         [Required(ErrorMessage = "Pincode is required.")]
         [RegularExpression(@"^[1-9][0-9]{5}$", ErrorMessage = "Enter valid 6 digit pincode.")]
         public string Pincode { get; set; } = string.Empty;
 
         public int ContactTypeId { get; set; } = 1;
 
-        [Required(ErrorMessage = "Contact name is required.")]
+        [Required(ErrorMessage = "Primary contact person is required.")]
         [StringLength(150)]
         public string ContactName { get; set; } = string.Empty;
 
@@ -109,7 +138,9 @@ namespace educore.Models
 
         public bool AutoGeneratePassword { get; set; } = true;
 
-        [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters.")]
+        // 8 to match ChangePasswordViewModel — a 6-char password set here could not be
+        // re-entered on the forced first-login reset, which demands 8.
+        [StringLength(100, MinimumLength = 8, ErrorMessage = "Password must be at least 8 characters.")]
         public string? Password { get; set; }
 
         public int? TenantId { get; set; }
@@ -143,6 +174,16 @@ namespace educore.Models
         public List<SelectListItem> TenantList { get; set; } = new();
         public List<SelectListItem> StatusList { get; set; } = new();
         public List<SelectListItem> BoardList { get; set; } = new();
+
+        /// <summary>States/UTs for the "which state's board" picker (config.states).</summary>
+        public List<SelectListItem> BoardStateList { get; set; } = new();
+
+        /// <summary>
+        /// Board ids that require a state. Driven by config.boards.requires_state, so the
+        /// wizard never hardcodes "board 3 == State Board" — flag a new board in SQL and
+        /// the UI follows.
+        /// </summary>
+        public List<int> BoardsRequiringState { get; set; } = new();
         public List<SelectListItem> SchoolTypeList { get; set; } = new();
         public List<SelectListItem> OwnershipTypeList { get; set; } = new();
         public List<SelectListItem> MediumList { get; set; } = new();

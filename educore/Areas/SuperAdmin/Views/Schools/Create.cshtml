@@ -3,6 +3,9 @@
 
 @{
     bool isEdit = Model.SchoolId > 0;
+    // A school being edited may still have no admin (created with the toggle off, or
+    // before the admin step existed) — that case has to behave like Create, not Edit.
+    bool hasAdmin = isEdit && Model.AdminUserId.GetValueOrDefault() > 0;
     ViewData["Title"] = isEdit ? "Edit School" : "Add School";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 }
@@ -53,15 +56,28 @@
         </div>
         <!-- RIGHT FORM -->
         <div class="col-lg-8 form-panel">
-            <form asp-action="@(Model.SchoolId > 0 ? "Edit" : "Create")" method="post">
+            @* autocomplete="off" + the new-password hint below: without them Chrome sees a form
+               containing a password box, decides it is a login form, and drops the saved
+               EduCore username (superadmin@educore.com) into the first text field it likes —
+               which is why Display Name arrived pre-filled with an email address. *@
+            @* id is load-bearing: the layout renders the navbar (which contains a logout
+               form) BEFORE the content, so $("form").first() picks the wrong form. *@
+            <form id="schoolWizardForm" asp-action="@(Model.SchoolId > 0 ? "Edit" : "Create")" method="post" autocomplete="off">
                 @Html.AntiForgeryToken()
 
-                <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                @* Rendered conditionally: an unconditional div.alert-danger shows an empty red
+                   bar on every fresh load, because the alert box exists even with no errors. *@
+                @if (!ViewData.ModelState.IsValid && ViewData.ModelState[string.Empty]?.Errors.Count > 0)
+                {
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger"></div>
+                }
 
-                <input asp-for="Operation" type="hidden" value="INSERT" />
+                @* No hardcoded value= — the model carries the right value, and "INSERT" here
+                   was simply wrong on the Edit screen. *@
+                <input asp-for="Operation" type="hidden" />
                 <input asp-for="SchoolId" type="hidden" />
-                <input asp-for="AddressTypeId" type="hidden" value="1" />
-                <input asp-for="ContactTypeId" type="hidden" value="1" />
+                <input asp-for="AddressTypeId" type="hidden" />
+                <input asp-for="ContactTypeId" type="hidden" />
 
                 @* Optional fields kept out of the wizard but round-tripped so an Edit
                    never wipes values the school may already have set. *@
@@ -89,67 +105,92 @@
                     <p class="text-muted mb-4">Select the tenant and enter the core school details.</p>
 
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label">Tenant Option <span class="text-danger">*</span></label>
-                            <select asp-for="TenantMode" class="form-select" id="TenantMode">
-                                <option value="existing">Select Existing Tenant</option>
-                                <option value="new">Create New Tenant</option>
-                            </select>
-                            <span asp-validation-for="TenantMode" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-12" id="existingTenantBox">
-                            <label class="form-label">Select Tenant <span class="text-danger">*</span></label>
-                            <select asp-for="TenantId"
-                                    class="form-select"
-                                    asp-items="@(new SelectList(Model.TenantList, "Value", "Text"))">
-                                <option value="">Select Tenant</option>
-                            </select>
-                            <span asp-validation-for="TenantId" class="text-danger small"></span>
-                        </div>
-
-                        <div id="newTenantBox" class="row g-3 d-none">
-                            <div class="col-md-6">
-                                <label class="form-label">Organization Name <span class="text-danger">*</span></label>
-                                <input asp-for="TenantName" class="form-control" placeholder="DPS Group" />
-                                <span asp-validation-for="TenantName" class="text-danger small"></span>
+                        @if (isEdit)
+                        {
+                            @* A school cannot change tenant: sp_school_manage resolves the tenant
+                               from the school row on UPDATE and ignores whatever is posted. An
+                               editable dropdown here just lied to the user. *@
+                            <div class="col-12">
+                                <label class="form-label" for="tenantReadOnly">Organization (Tenant)</label>
+                                <input id="tenantReadOnly" class="form-control" readonly
+                                       value="@(Model.TenantList.FirstOrDefault(t => t.Value == Model.TenantId?.ToString())?.Text ?? "—")" />
+                                <span class="text-muted small">A school cannot be moved to another tenant.</span>
+                            </div>
+                            <input asp-for="TenantMode" type="hidden" />
+                            <input asp-for="TenantId" type="hidden" />
+                        }
+                        else
+                        {
+                            <div class="col-12">
+                                <label class="form-label" asp-for="TenantMode">Tenant Option <span class="text-danger">*</span></label>
+                                <select asp-for="TenantMode" class="form-select" id="TenantMode">
+                                    <option value="existing">Select Existing Tenant</option>
+                                    <option value="new">Create New Tenant</option>
+                                </select>
+                                <span asp-validation-for="TenantMode" class="text-danger small"></span>
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label">Tenant Code <span class="text-danger">*</span></label>
-                                <input asp-for="TenantCode" class="form-control" placeholder="dps-group" />
-                                <span asp-validation-for="TenantCode" class="text-danger small"></span>
+                            <div class="col-12" id="existingTenantBox">
+                                <label class="form-label" asp-for="TenantId">Select Tenant <span class="text-danger">*</span></label>
+                                <select asp-for="TenantId"
+                                        class="form-select"
+                                        asp-items="@(new SelectList(Model.TenantList, "Value", "Text"))">
+                                    <option value="">Select Tenant</option>
+                                </select>
+                                <span asp-validation-for="TenantId" class="text-danger small"></span>
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label">Contact Email</label>
-                                <input asp-for="TenantEmail" class="form-control" placeholder="admin@school.com" />
-                                <span asp-validation-for="TenantEmail" class="text-danger small"></span>
-                            </div>
+                            @* col-12 wrapper: a .row nested directly inside a .row applies negative
+                               margins twice and pushed these four fields outside the panel. *@
+                            <div class="col-12 d-none" id="newTenantBox">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label" asp-for="TenantName">Organization Name <span class="text-danger">*</span></label>
+                                        <input asp-for="TenantName" class="form-control" placeholder="DPS Group" autocomplete="off" />
+                                        <span asp-validation-for="TenantName" class="text-danger small"></span>
+                                    </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label">Contact Phone</label>
-                                <input asp-for="TenantPhone" class="form-control" placeholder="9876543210" />
-                                <span asp-validation-for="TenantPhone" class="text-danger small"></span>
+                                    <div class="col-md-6">
+                                        <label class="form-label" asp-for="TenantCode">Tenant Code <span class="text-danger">*</span></label>
+                                        <input asp-for="TenantCode" class="form-control" placeholder="dps-group" autocomplete="off" />
+                                        <span asp-validation-for="TenantCode" class="text-danger small"></span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label" asp-for="TenantEmail">Contact Email</label>
+                                        <input asp-for="TenantEmail" type="email" class="form-control" placeholder="admin@school.com" autocomplete="off" />
+                                        <span asp-validation-for="TenantEmail" class="text-danger small"></span>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label class="form-label" asp-for="TenantPhone">Contact Phone</label>
+                                        <input asp-for="TenantPhone" class="form-control" placeholder="9876543210"
+                                               inputmode="numeric" maxlength="10" autocomplete="off" />
+                                        <span asp-validation-for="TenantPhone" class="text-danger small"></span>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        }
 
                         <div class="col-12"><hr class="my-1" /></div>
 
                         <div class="col-12">
-                            <label class="form-label">School Name <span class="text-danger">*</span></label>
-                            <input asp-for="SchoolName" class="form-control" placeholder="International Public School" />
+                            <label class="form-label" asp-for="SchoolName">School Name <span class="text-danger">*</span></label>
+                            <input asp-for="SchoolName" class="form-control" placeholder="International Public School"
+                                   maxlength="200" autocomplete="off" />
                             <span asp-validation-for="SchoolName" class="text-danger small"></span>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Display Name</label>
-                            <input asp-for="DisplayName" class="form-control" placeholder="IPS Academy" />
-                            <span asp-validation-for="DisplayName" class="text-danger small"></span>
+                            <label class="form-label" asp-for="DisplayName">Display Name</label>
+                            <input asp-for="DisplayName" class="form-control" placeholder="IPS Academy"
+                                   maxlength="200" autocomplete="off" />
+                            <span class="text-muted small">Short name for receipts and reports. Leave blank to use the school name.</span>
+                            <span asp-validation-for="DisplayName" class="text-danger small d-block"></span>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Status <span class="text-danger">*</span></label>
+                            <label class="form-label" asp-for="StatusId">Status <span class="text-danger">*</span></label>
                             <select asp-for="StatusId"
                                     class="form-select"
                                     asp-items="@(new SelectList(Model.StatusList, "Value", "Text"))">
@@ -159,7 +200,7 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Board <span class="text-danger">*</span></label>
+                            <label class="form-label" asp-for="BoardId">Board <span class="text-danger">*</span></label>
                             <select asp-for="BoardId"
                                     class="form-select"
                                     asp-items="@(new SelectList(Model.BoardList, "Value", "Text"))">
@@ -168,8 +209,23 @@
                             <span asp-validation-for="BoardId" class="text-danger small"></span>
                         </div>
 
+                        @* Shown only for boards flagged config.boards.requires_state — "State
+                           Board" on its own doesn't say which one, and MSBSHSE / UP Board / RBSE
+                           differ in syllabus, exam pattern and TC rules. Which boards need this
+                           comes from the DB, so flagging a new board needs no change here. *@
+                        <div class="col-md-6 d-none" id="boardStateBox">
+                            <label class="form-label" asp-for="BoardStateId">State Board <span class="text-danger">*</span></label>
+                            <select asp-for="BoardStateId"
+                                    class="form-select"
+                                    asp-items="@(new SelectList(Model.BoardStateList, "Value", "Text"))">
+                                <option value="">Select State</option>
+                            </select>
+                            <span class="text-muted small d-block">Which state's board this school is affiliated to.</span>
+                            <span asp-validation-for="BoardStateId" class="text-danger small"></span>
+                        </div>
+
                         <div class="col-md-6">
-                            <label class="form-label">School Type <span class="text-danger">*</span></label>
+                            <label class="form-label" asp-for="SchoolTypeId">School Type <span class="text-danger">*</span></label>
                             <select asp-for="SchoolTypeId"
                                     class="form-select"
                                     asp-items="@(new SelectList(Model.SchoolTypeList, "Value", "Text"))">
@@ -188,46 +244,54 @@
 
                     <div class="row g-3">
                         <div class="col-12">
-                            <label class="form-label">Address Line 1 <span class="text-danger">*</span></label>
-                            <input asp-for="AddressLine1" class="form-control" placeholder="Building / Street / Area" />
+                            <label class="form-label" asp-for="AddressLine1">Address Line 1 <span class="text-danger">*</span></label>
+                            <input asp-for="AddressLine1" class="form-control" placeholder="Building / Street / Area"
+                                   maxlength="250" autocomplete="off" />
                             <span asp-validation-for="AddressLine1" class="text-danger small"></span>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label">City <span class="text-danger">*</span></label>
-                            <input asp-for="City" class="form-control" />
+                        @* Shared Country → State → District → City picker. Replaces the free-text
+                           State/City boxes that produced 'UP', 'uttarpradesh', 'Uttar Pradesh'
+                           and 'TEST' as four different states in core.school_addresses. *@
+                        <div class="col-12">
+                            @await Html.PartialAsync("_StateDistrictCity", new educore.Models.GeoPickerModel
+                       {
+                           CountryId = Model.CountryId,
+                           StateId = Model.StateId,
+                           DistrictId = Model.DistrictId,
+                           City = Model.City,
+                           LegacyStateText = Model.State,
+                           ColumnCss = "col-md-4"
+                       })
+                            <span asp-validation-for="StateId" class="text-danger small"></span>
                             <span asp-validation-for="City" class="text-danger small"></span>
                         </div>
 
                         <div class="col-md-4">
-                            <label class="form-label">State <span class="text-danger">*</span></label>
-                            <input asp-for="State" class="form-control" />
-                            <span asp-validation-for="State" class="text-danger small"></span>
-                        </div>
-
-                        <div class="col-md-4">
-                            <label class="form-label">Pincode <span class="text-danger">*</span></label>
-                            <input asp-for="Pincode" class="form-control" />
+                            <label class="form-label" asp-for="Pincode">Pincode <span class="text-danger">*</span></label>
+                            <input asp-for="Pincode" class="form-control" inputmode="numeric" maxlength="6"
+                                   placeholder="110001" autocomplete="off" />
                             <span asp-validation-for="Pincode" class="text-danger small"></span>
                         </div>
 
                         <div class="col-12"><hr class="my-1" /></div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Contact Name <span class="text-danger">*</span></label>
-                            <input asp-for="ContactName" class="form-control" />
+                            <label class="form-label" asp-for="ContactName">Primary Contact Person <span class="text-danger">*</span></label>
+                            <input asp-for="ContactName" class="form-control" maxlength="150" autocomplete="off" />
                             <span asp-validation-for="ContactName" class="text-danger small"></span>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Phone <span class="text-danger">*</span></label>
-                            <input asp-for="Phone" class="form-control" />
+                            <label class="form-label" asp-for="Phone">Phone <span class="text-danger">*</span></label>
+                            <input asp-for="Phone" class="form-control" inputmode="numeric" maxlength="10"
+                                   placeholder="9876543210" autocomplete="off" />
                             <span asp-validation-for="Phone" class="text-danger small"></span>
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label">Contact Email</label>
-                            <input asp-for="ContactEmail" class="form-control" />
+                            <label class="form-label" asp-for="ContactEmail">Contact Email</label>
+                            <input asp-for="ContactEmail" type="email" class="form-control" maxlength="150" autocomplete="off" />
                             <span asp-validation-for="ContactEmail" class="text-danger small"></span>
                         </div>
                     </div>
@@ -245,11 +309,17 @@
 
                     <input asp-for="AdminUserId" type="hidden" />
 
-                    @if (!isEdit)
+                    @* hasAdmin, not isEdit: editing a school that never got an admin must still
+                       offer to create one. Previously CreateSchoolAdmin was posted as a hidden
+                       "false" in that case, so the proc silently skipped the admin block and the
+                       save appeared to succeed while creating nothing. *@
+                    @if (!hasAdmin)
                     {
                         <div class="form-check form-switch mb-4">
-                            <input asp-for="CreateSchoolAdmin" class="form-check-input" type="checkbox" id="CreateSchoolAdmin" checked />
-                            <label class="form-check-label">Create School Admin now</label>
+                            @* No hardcoded checked= — it overrode the posted value, so unchecking
+                               the switch and hitting a validation error re-rendered it checked. *@
+                            <input asp-for="CreateSchoolAdmin" class="form-check-input" type="checkbox" id="CreateSchoolAdmin" />
+                            <label class="form-check-label" for="CreateSchoolAdmin">Create School Admin now</label>
                         </div>
                     }
                     else
@@ -260,47 +330,61 @@
                     <div id="adminFields">
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label">Admin Full Name <span class="text-danger">*</span></label>
-                                <input asp-for="AdminFullName" class="form-control" />
+                                <label class="form-label" asp-for="AdminFullName">Admin Full Name <span class="text-danger">*</span></label>
+                                <input asp-for="AdminFullName" class="form-control" maxlength="150" autocomplete="off" />
                                 <span asp-validation-for="AdminFullName" class="text-danger small"></span>
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Admin Email <span class="text-danger">*</span></label>
-                                <input asp-for="AdminEmail" class="form-control" />
-                                <span asp-validation-for="AdminEmail" class="text-danger small"></span>
+                                <label class="form-label" asp-for="AdminEmail">Admin Email <span class="text-danger">*</span></label>
+                                <input asp-for="AdminEmail" type="email" class="form-control" maxlength="150" autocomplete="off" />
+                                <span class="text-muted small">This is the username they sign in with.</span>
+                                @* Live availability, filled by checkAdminEmail() on blur. *@
+                                <span class="small d-block" id="adminEmailStatus"></span>
+                                <span asp-validation-for="AdminEmail" class="text-danger small d-block"></span>
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label">Admin Phone</label>
-                                <input asp-for="AdminPhone" class="form-control" />
+                                <label class="form-label" asp-for="AdminPhone">Admin Phone</label>
+                                <input asp-for="AdminPhone" class="form-control" inputmode="numeric" maxlength="10"
+                                       placeholder="9876543210" autocomplete="off" />
                                 <span asp-validation-for="AdminPhone" class="text-danger small"></span>
                             </div>
 
-                            @if (!isEdit)
+                            @if (!hasAdmin)
                             {
                                 <div class="col-md-6 d-flex align-items-end">
                                     <div class="form-check form-switch">
-                                        <input asp-for="AutoGeneratePassword" class="form-check-input" type="checkbox" id="AutoGeneratePassword" checked />
-                                        <label class="form-check-label">Auto-generate password</label>
+                                        <input asp-for="AutoGeneratePassword" class="form-check-input" type="checkbox" id="AutoGeneratePassword" />
+                                        <label class="form-check-label" for="AutoGeneratePassword">Auto-generate password</label>
                                     </div>
                                 </div>
 
                                 <div class="col-md-6" id="passwordBox">
-                                    <label class="form-label">Password</label>
-                                    <input asp-for="Password" type="password" class="form-control" />
+                                    <label class="form-label" asp-for="Password">Password <span class="text-danger">*</span></label>
+                                    <input asp-for="Password" type="password" class="form-control" autocomplete="new-password" />
                                     <span asp-validation-for="Password" class="text-danger small"></span>
                                 </div>
                             }
                             else
                             {
                                 <div class="col-md-6" id="passwordBox">
-                                    <label class="form-label">Reset Password <span class="text-muted small">(leave blank to keep current)</span></label>
+                                    <label class="form-label" asp-for="Password">Reset Password <span class="text-muted small">(leave blank to keep current)</span></label>
                                     <input asp-for="Password" type="password" class="form-control" autocomplete="new-password" />
                                     <span asp-validation-for="Password" class="text-danger small"></span>
                                 </div>
                             }
                         </div>
+
+                        @if (!isEdit)
+                        {
+                            <div class="alert alert-info mt-4 mb-0 small">
+                                <i class="bx bx-info-circle me-1"></i>
+                                A one-time password is generated and emailed with the sign-in link.
+                                The admin is forced to set their own password before they can use
+                                anything else.
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -310,45 +394,61 @@
                     <h4 class="fw-bold">Review &amp; Save</h4>
                     <p class="text-muted mb-4">Review the information before saving the school.</p>
 
-                    <div class="alert alert-info">
-                        School code will be generated automatically after saving.
-                    </div>
+                    @if (!isEdit)
+                    {
+                        <div class="alert alert-info">
+                            School code will be generated automatically after saving.
+                        </div>
+                    }
 
+                    @* Every required field is echoed here — the old panel showed 5 of 13, so a
+                       wrong Status or Board could not be caught before saving.
+
+                       Each card carries its own Edit link back to the step that owns the
+                       field. Before this, spotting a mistake on Review meant hunting for the
+                       right step in the left sidebar — the panel was read-only with no way
+                       back to the thing you were looking at.
+
+                       Built from a list so the 8 cards can't drift apart; `target` is the
+                       step number, `focus` the field to land the cursor on. *@
+                    @{
+                        var reviewCards = new[]
+                        {
+                            new { Label = "Organization",  Id = "reviewTenant",     Target = 1, Focus = isEdit ? "" : "TenantId",  Sub = (string?)null },
+                            new { Label = "School Name",   Id = "reviewSchoolName", Target = 1, Focus = "SchoolName",              Sub = (string?)null },
+                            new { Label = "Status",        Id = "reviewStatus",     Target = 1, Focus = "StatusId",                Sub = (string?)null },
+                            new { Label = "Board / Type",  Id = "reviewBoard",      Target = 1, Focus = "BoardId",                 Sub = (string?)null },
+                            new { Label = "Address",       Id = "reviewAddress",    Target = 2, Focus = "AddressLine1",            Sub = (string?)null },
+                            new { Label = "Location",      Id = "reviewLocation",   Target = 2, Focus = "StateId",                 Sub = (string?)null },
+                            new { Label = "Contact",       Id = "reviewContact",    Target = 2, Focus = "ContactName",             Sub = (string?)null },
+                            new { Label = "School Admin",  Id = "reviewAdmin",      Target = 3, Focus = "AdminFullName",           Sub = (string?)"reviewAdminEmail" }
+                        };
+                    }
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="border rounded p-3">
-                                <small class="text-muted">Organization</small>
-                                <div class="fw-bold" id="reviewTenant">-</div>
+                        @foreach (var card in reviewCards)
+                        {
+                            <div class="col-md-6">
+                                <div class="border rounded p-3 h-100">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <small class="text-muted">@card.Label</small>
+                                        @* type="button" is load-bearing: a bare <button> inside a
+                                           form defaults to type="submit" and would save the school. *@
+                                        <button type="button"
+                                                class="btn btn-link btn-sm p-0 text-decoration-none review-edit"
+                                                data-goto="@card.Target"
+                                                data-focus="@card.Focus"
+                                                aria-label="Edit @card.Label">
+                                            <i class="bx bx-pencil"></i> Edit
+                                        </button>
+                                    </div>
+                                    <div class="fw-bold" id="@card.Id">-</div>
+                                    @if (card.Sub != null)
+                                    {
+                                        <div class="text-muted small" id="@card.Sub">-</div>
+                                    }
+                                </div>
                             </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="border rounded p-3">
-                                <small class="text-muted">School Name</small>
-                                <div class="fw-bold" id="reviewSchoolName">-</div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="border rounded p-3">
-                                <small class="text-muted">Location</small>
-                                <div class="fw-bold" id="reviewLocation">-</div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="border rounded p-3">
-                                <small class="text-muted">Contact</small>
-                                <div class="fw-bold" id="reviewContact">-</div>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="border rounded p-3">
-                                <small class="text-muted">Admin Email</small>
-                                <div class="fw-bold" id="reviewAdminEmail">-</div>
-                            </div>
-                        </div>
+                        }
                     </div>
                 </div>
 
@@ -374,10 +474,91 @@
     </div>
 </div>
 @section PageScripts {
+    <script src="~/js/geo-cascade.js" asp-append-version="true"></script>
     <script>
         let currentStep = 1;
         const totalSteps = 4;
         const isEdit = @(isEdit ? "true" : "false");
+        const hasAdmin = @(hasAdmin ? "true" : "false");
+
+        // Scope every selector to this form. The old code bound to a bare
+        // $("input, select, textarea"), which also grabbed the layout's navbar search.
+        // By id, NOT $("form").first(): the navbar's logout form comes first in the DOM,
+        // so .first() bound every delegated handler below to the wrong element — submit
+        // validation, error clearing, the State Board toggle and the email check all
+        // silently did nothing.
+        const $form = $("#schoolWizardForm");
+
+        // ── Admin email availability ────────────────────────────────────────
+        // Asks the server on blur so a taken email surfaces at step 3, not after
+        // filling all four steps and pressing Save. Convenience only — the proc and
+        // the uq_user_email_active index are what actually enforce it, so a failed
+        // lookup here never blocks the user.
+        const adminUserId = @(Model.AdminUserId?.ToString() ?? "0");
+        let emailChecked = "";      // last address we got an answer for
+        let emailTaken = false;
+
+        function checkAdminEmail() {
+            const $input = $('[name="AdminEmail"]');
+            const value = $.trim($input.val() || "");
+            const $status = $("#adminEmailStatus");
+
+            // Only ask once per address, and only for something email-shaped.
+            if (value === emailChecked) return;
+            if (value === "" || !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
+                emailChecked = ""; emailTaken = false; $status.text("").removeClass("text-danger text-success");
+                return;
+            }
+
+            $status.removeClass("text-danger text-success").addClass("text-muted").text("Checking…");
+
+            $.getJSON("@Url.Action("CheckEmail", "Schools", new { area = "SuperAdmin" })",
+                      { email: value, userId: adminUserId > 0 ? adminUserId : null })
+                .done(function (res) {
+                    emailChecked = value;
+                    emailTaken = !res.ok;
+                    $status.removeClass("text-muted");
+                    if (emailTaken) {
+                        // Message lives in the status span only — calling showError() too
+                        // would print the same sentence twice under the field.
+                        $status.addClass("text-danger").text(res.message);
+                        $input.addClass("is-invalid");
+                    } else {
+                        $status.addClass("text-success").text("Available");
+                        removeError($input);
+                    }
+                })
+                .fail(function () {
+                    // Server unreachable — say nothing rather than a scary message.
+                    emailChecked = ""; emailTaken = false;
+                    $status.removeClass("text-muted").text("");
+                });
+        }
+
+        // Board ids that need a state (config.boards.requires_state) — data, not a
+        // hardcoded "3 === State Board".
+        const boardsNeedingState = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.BoardsRequiringState));
+
+        function boardNeedsState() {
+            return boardsNeedingState.indexOf(parseInt($('[name="BoardId"]').val(), 10)) > -1;
+        }
+
+        function toggleBoardState() {
+            var needed = boardNeedsState();
+            $("#boardStateBox").toggleClass("d-none", !needed);
+            // Clear on switch away, so changing State Board -> CBSE can't submit a
+            // stale state (the proc nulls it too, this just keeps the UI honest).
+            if (!needed) {
+                $('[name="BoardStateId"]').val("");
+                removeError($('[name="BoardStateId"]'));
+            }
+        }
+
+        // True when the admin section must be filled in: an existing admin is always
+        // edited, otherwise only when the "Create School Admin now" switch is on.
+        function adminRequired() {
+            return hasAdmin || $("#CreateSchoolAdmin").is(":checked");
+        }
 
         function showStep(step) {
             $(".step-content").addClass("d-none");
@@ -395,159 +576,189 @@
             }
         }
 
-        function validateCurrentStep() {
-            let isValid = true;
-            let currentContent = $('[data-step-content="' + currentStep + '"]');
+        // Validates one step by number. The old version only ever validated the step on
+        // screen, so clicking straight from step 1 to step 4 in the sidebar skipped steps
+        // 2 and 3 entirely and went to Save with an empty address.
+        // ── Validation ──────────────────────────────────────────────────────
+        // One field's rules live here so the SAME logic serves both the step gate
+        // and the live (as-you-type) feedback below. Returns true when the field
+        // is acceptable, and shows/clears its message as a side effect.
+        function validateField(input) {
+            let value = $.trim(input.val());
+            let name = input.attr("name");
 
-            currentContent.find("input, select, textarea").each(function () {
-                let input = $(this);
-                let value = $.trim(input.val());
-                let name = input.attr("name");
+            removeError(input);
 
-                removeError(input);
+            if (input.prop("disabled") || input.attr("type") === "hidden") {
+                return true;
+            }
 
-                if (input.prop("disabled") || input.attr("type") === "hidden") {
-                    return true;
+            let ok = true;
+            const fail = (msg) => { showError(input, msg); ok = false; };
+
+            let tenantMode = $("#TenantMode").val();
+
+            if (name === "TenantId" && tenantMode === "existing" && value === "") {
+                fail("Tenant is required.");
+            }
+
+            if (tenantMode === "new") {
+                if (name === "TenantName" && value === "") {
+                    fail("Organization name is required.");
                 }
 
-                let tenantMode = $("#TenantMode").val();
-
-                if (name === "TenantId" && tenantMode === "existing" && value === "") {
-                    showError(input, "Tenant is required.");
-                    isValid = false;
+                if (name === "TenantCode" && value === "") {
+                    fail("Tenant code is required.");
                 }
 
-                if (tenantMode === "new") {
-                    if (name === "TenantName" && value === "") {
-                        showError(input, "Organization name is required.");
-                        isValid = false;
-                    }
-
-                    if (name === "TenantCode" && value === "") {
-                        showError(input, "Tenant code is required.");
-                        isValid = false;
-                    }
-
-                    if (name === "TenantEmail" && value !== "" && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
-                        showError(input, "Enter valid tenant email.");
-                        isValid = false;
-                    }
-
-                    if (name === "TenantPhone" && value !== "" && !/^[6-9][0-9]{9}$/.test(value)) {
-                        showError(input, "Enter valid tenant phone number.");
-                        isValid = false;
-                    }
+                if (name === "TenantEmail" && value !== "" && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
+                    fail("Enter valid tenant email.");
                 }
 
-                if (name === "SchoolName" && value === "") {
-                    showError(input, "School name is required.");
-                    isValid = false;
+                if (name === "TenantPhone" && value !== "" && !/^[6-9][0-9]{9}$/.test(value)) {
+                    fail("Enter valid tenant phone number.");
+                }
+            }
+
+            if (name === "SchoolName" && value === "") {
+                fail("School name is required.");
+            }
+
+            if (name === "StatusId" && (value === "" || value === "0")) {
+                fail("Status is required.");
+            }
+
+            if (name === "BoardId" && (value === "" || value === "0")) {
+                fail("Board is required.");
+            }
+
+            if (name === "BoardStateId" && boardNeedsState() && (value === "" || value === "0")) {
+                fail("Please select which state's board this school follows.");
+            }
+
+            if (name === "SchoolTypeId" && (value === "" || value === "0")) {
+                fail("School Type is required.");
+            }
+
+            if (name === "AddressLine1" && value === "") {
+                fail("Address is required.");
+            }
+
+            if (name === "City" && value === "") {
+                fail("City is required.");
+            }
+
+            // State is now the StateId dropdown; the "State" input is the hidden text
+            // companion the geo picker fills in, and hidden inputs are skipped above.
+            if (name === "StateId" && value === "") {
+                fail("State is required.");
+            }
+
+            if (name === "Pincode") {
+                if (value === "") {
+                    fail("Pincode is required.");
+                } else if (!/^[1-9][0-9]{5}$/.test(value)) {
+                    fail("Enter valid 6 digit pincode.");
+                }
+            }
+
+            if (name === "ContactName" && value === "") {
+                fail("Primary contact person is required.");
+            }
+
+            if (name === "Phone") {
+                if (value === "") {
+                    fail("Phone number is required.");
+                } else if (!/^[6-9][0-9]{9}$/.test(value)) {
+                    fail("Enter valid 10 digit Indian mobile number.");
+                }
+            }
+
+            if (name === "ContactEmail" && value !== "" && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
+                fail("Enter valid contact email.");
+            }
+
+            if (adminRequired()) {
+                if (name === "AdminFullName" && value === "") {
+                    fail("Admin full name is required.");
                 }
 
-                if (name === "StatusId" && (value === "" || value === "0")) {
-                    showError(input, "Status is required.");
-                    isValid = false;
-                }
-
-                if (name === "BoardId" && (value === "" || value === "0")) {
-                    showError(input, "Board is required.");
-                    isValid = false;
-                }
-
-                if (name === "SchoolTypeId" && (value === "" || value === "0")) {
-                    showError(input, "School Type is required.");
-                    isValid = false;
-                }
-
-                if (name === "AddressLine1" && value === "") {
-                    showError(input, "Address is required.");
-                    isValid = false;
-                }
-
-                if (name === "City" && value === "") {
-                    showError(input, "City is required.");
-                    isValid = false;
-                }
-
-                if (name === "State" && value === "") {
-                    showError(input, "State is required.");
-                    isValid = false;
-                }
-
-                if (name === "Pincode") {
+                if (name === "AdminEmail") {
                     if (value === "") {
-                        showError(input, "Pincode is required.");
-                        isValid = false;
-                    } else if (!/^[1-9][0-9]{5}$/.test(value)) {
-                        showError(input, "Enter valid 6 digit pincode.");
-                        isValid = false;
+                        fail("Admin email is required.");
+                    } else if (!/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
+                        fail("Enter valid admin email.");
+                    } else if (emailTaken && value === emailChecked) {
+                        // Already known to be taken — don't let them walk to step 4 just
+                        // to be rejected on Save. No showError(): #adminEmailStatus is
+                        // already displaying the reason, so only mark the field.
+                        input.addClass("is-invalid"); ok = false;
                     }
                 }
 
-                if (name === "ContactName" && value === "") {
-                    showError(input, "Contact name is required.");
-                    isValid = false;
+                if (name === "AdminPhone" && value !== "" && !/^[6-9][0-9]{9}$/.test(value)) {
+                    fail("Enter valid admin phone number.");
                 }
 
-                if (name === "Phone") {
-                    if (value === "") {
-                        showError(input, "Phone number is required.");
-                        isValid = false;
-                    } else if (!/^[6-9][0-9]{9}$/.test(value)) {
-                        showError(input, "Enter valid 10 digit Indian mobile number.");
-                        isValid = false;
-                    }
-                }
-
-                if (name === "ContactEmail" && value !== "" && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
-                    showError(input, "Enter valid contact email.");
-                    isValid = false;
-                }
-
-                if (isEdit || $("#CreateSchoolAdmin").is(":checked")) {
-                    if (name === "AdminFullName" && value === "") {
-                        showError(input, "Admin full name is required.");
-                        isValid = false;
-                    }
-
-                    if (name === "AdminEmail") {
-                        if (value === "") {
-                            showError(input, "Admin email is required.");
-                            isValid = false;
-                        } else if (!/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
-                            showError(input, "Enter valid admin email.");
-                            isValid = false;
+                // 8, not 6 — the forced first-login reset (ChangePasswordViewModel)
+                // demands 8, so a 6-char password set here could not be re-entered.
+                if (name === "Password") {
+                    if (hasAdmin) {
+                        // Existing admin: blank keeps the current password.
+                        if (value !== "" && value.length < 8) {
+                            fail("Password must be at least 8 characters.");
                         }
-                    }
-
-                    if (name === "AdminPhone" && value !== "" && !/^[6-9][0-9]{9}$/.test(value)) {
-                        showError(input, "Enter valid admin phone number.");
-                        isValid = false;
-                    }
-
-                    if (isEdit) {
-                        // Edit: password optional (blank keeps current); validate length only if typed.
-                        if (name === "Password" && value !== "" && value.length < 6) {
-                            showError(input, "Password must be at least 6 characters.");
-                            isValid = false;
+                    } else if (isEdit) {
+                        // Editing a school with no admin yet — the proc only creates one
+                        // when a password is supplied, so it is mandatory here.
+                        if (value === "") {
+                            fail("This school has no administrator yet — set a password to create one.");
+                        } else if (value.length < 8) {
+                            fail("Password must be at least 8 characters.");
                         }
                     } else if (!$("#AutoGeneratePassword").is(":checked")) {
-                        if (name === "Password" && value === "") {
-                            showError(input, "Password is required.");
-                            isValid = false;
-                        } else if (name === "Password" && value.length < 6) {
-                            showError(input, "Password must be at least 6 characters.");
-                            isValid = false;
+                        if (value === "") {
+                            fail("Password is required.");
+                        } else if (value.length < 8) {
+                            fail("Password must be at least 8 characters.");
                         }
                     }
                 }
+            }
+
+            return ok;
+        }
+
+        // Validates one step by number. The old version only ever validated the step on
+        // screen, so clicking straight from step 1 to step 4 in the sidebar skipped steps
+        // 2 and 3 entirely and went to Save with an empty address.
+        function validateStep(stepNo) {
+            let isValid = true;
+            let currentContent = $('[data-step-content="' + stepNo + '"]');
+
+            currentContent.find("input, select, textarea").each(function () {
+                if (!validateField($(this))) isValid = false;
             });
 
             if (!isValid) {
-                currentContent.find(".is-invalid:first").focus();
+                currentContent.find(".is-invalid").first().trigger("focus");
             }
 
             return isValid;
+        }
+
+        // Everything from step 1 up to and including stepNo. Jumps to a later step and the
+        // final Save both go through this, so nothing can be skipped.
+        function validateThrough(stepNo) {
+            let firstBad = 0;
+            for (let s = 1; s <= stepNo; s++) {
+                if (!validateStep(s) && firstBad === 0) firstBad = s;
+            }
+            if (firstBad !== 0 && firstBad !== currentStep) {
+                currentStep = firstBad;
+                showStep(currentStep);
+            }
+            return firstBad === 0;
         }
 
         function showError(input, message) {
@@ -563,34 +774,78 @@
         function removeError(input) {
             input.removeClass("is-invalid");
             input.next(".field-validation-error").remove();
+            // Also clear the server-rendered span. Without this a message from a failed
+            // POST stayed on screen after the user had already corrected the field.
+            input.siblings("[data-valmsg-for='" + input.attr("name") + "']").text("");
+        }
+
+        // Text of the selected option, or "" for the placeholder.
+        function pick(selector) {
+            let el = $(selector);
+            if (!el.length) return "";
+            let txt = el.find("option:selected").text();
+            return el.val() ? $.trim(txt) : "";
+        }
+
+        function join(parts, sep) {
+            return parts.filter(function (p) { return p; }).join(sep) || "-";
         }
 
         function fillReview() {
             let tenantMode = $("#TenantMode").val();
 
-            if (tenantMode === "new") {
+            if (isEdit) {
+                $("#reviewTenant").text($("#tenantReadOnly").val() || "-");
+            } else if (tenantMode === "new") {
                 $("#reviewTenant").text($('[name="TenantName"]').val() || "-");
             } else {
-                let selectedTenant = $('[name="TenantId"] option:selected').text();
-                $("#reviewTenant").text(selectedTenant && selectedTenant !== "Select Tenant" ? selectedTenant : "-");
+                $("#reviewTenant").text(pick('[name="TenantId"]') || "-");
             }
 
-            $("#reviewSchoolName").text($('[name="SchoolName"]').val() || "-");
+            $("#reviewSchoolName").text(join([
+                $('[name="SchoolName"]').val(),
+                $('[name="DisplayName"]').val() ? "(" + $('[name="DisplayName"]').val() + ")" : ""
+            ], " "));
 
-            let city = $('[name="City"]').val() || "";
-            let state = $('[name="State"]').val() || "";
-            $("#reviewLocation").text((city + ", " + state).replace(/^, |, $/g, "") || "-");
+            $("#reviewStatus").text(pick('[name="StatusId"]') || "-");
+            // "State Board (Maharashtra)" — matches how the school list renders it.
+            var board = pick('[name="BoardId"]');
+            if (board && boardNeedsState()) {
+                var bs = pick('[name="BoardStateId"]');
+                board = bs ? board + " (" + bs + ")" : board;
+            }
+            $("#reviewBoard").text(join([board, pick('[name="SchoolTypeId"]')], " / "));
 
-            let contact = $('[name="ContactName"]').val() || "";
-            let phone = $('[name="Phone"]').val() || "";
-            $("#reviewContact").text((contact + " - " + phone).replace(/^ - | - $/g, "") || "-");
+            $("#reviewAddress").text(join([
+                $('[name="AddressLine1"]').val(),
+                $('[name="Pincode"]').val()
+            ], " — "));
 
-            $("#reviewAdminEmail").text($('[name="AdminEmail"]').val() || "-");
+            $("#reviewLocation").text(join([
+                $('[name="City"]').val(),
+                pick('[name="DistrictId"]'),
+                pick('[name="StateId"]')
+            ], ", "));
+
+            $("#reviewContact").text(join([
+                $('[name="ContactName"]').val(),
+                $('[name="Phone"]').val()
+            ], " — "));
+
+            if (adminRequired()) {
+                $("#reviewAdmin").text($('[name="AdminFullName"]').val() || "-");
+                $("#reviewAdminEmail").text($('[name="AdminEmail"]').val() || "-");
+            } else {
+                $("#reviewAdmin").text("Not created");
+                $("#reviewAdminEmail").text("You can add one later from Edit.");
+            }
         }
 
         function toggleTenantMode() {
-            let tenantMode = $("#TenantMode").val();
-            let isNew = tenantMode === "new";
+            // Absent on Edit — the tenant is fixed there.
+            if (!$("#TenantMode").length) return;
+
+            let isNew = $("#TenantMode").val() === "new";
 
             $("#existingTenantBox").toggleClass("d-none", isNew);
             $("#newTenantBox").toggleClass("d-none", !isNew);
@@ -606,11 +861,9 @@
         }
 
         $("#nextBtn").on("click", function () {
-            if (validateCurrentStep()) {
-                if (currentStep < totalSteps) {
-                    currentStep++;
-                    showStep(currentStep);
-                }
+            if (validateStep(currentStep) && currentStep < totalSteps) {
+                currentStep++;
+                showStep(currentStep);
             }
         });
 
@@ -624,23 +877,62 @@
         $(".step-item").on("click", function () {
             let targetStep = parseInt($(this).data("step"));
 
-            if (targetStep > currentStep) {
-                if (!validateCurrentStep()) {
-                    return;
-                }
+            // Jumping forward must clear EVERY step in between, not just the current one.
+            if (targetStep > currentStep && !validateThrough(targetStep - 1)) {
+                return;
             }
 
             currentStep = targetStep;
             showStep(currentStep);
         });
 
-        $("input, select, textarea").on("input change blur", function () {
-            removeError($(this));
+        // Last line of defence: the sidebar isn't the only way onto step 4, and the server
+        // would otherwise be the first thing to reject an incomplete form.
+        $form.on("submit", function (e) {
+            if (!validateThrough(totalSteps)) {
+                e.preventDefault();
+            }
         });
 
-        $("#TenantMode").on("change", function () {
-            toggleTenantMode();
+        // ── Live validation ─────────────────────────────────────────────────
+        // Errors used to appear only when you pressed Next. Now:
+        //   blur / change -> validate the field you just left (show the problem)
+        //   input         -> re-validate ONLY a field already showing an error,
+        //                    so it clears the moment you fix it.
+        // The input rule is deliberately not "validate everything as you type":
+        // that shouts "Enter valid email" at the first keystroke of a fresh field.
+        $form.on("blur change", "input, select, textarea", function () {
+            validateField($(this));
         });
+
+        $form.on("input", "input, textarea", function () {
+            if ($(this).hasClass("is-invalid")) validateField($(this));
+        });
+
+        $("#TenantMode").on("change", toggleTenantMode);
+
+        $form.on("change", '[name="BoardId"]', toggleBoardState);
+
+        // Review -> jump back to the step that owns the field, and put the cursor on it.
+        // No validation gate: this only ever moves BACKWARDS from step 4, and blocking
+        // someone from returning to fix a mistake is the opposite of the point.
+        $form.on("click", ".review-edit", function () {
+            const step = parseInt($(this).data("goto"), 10);
+            const focus = $(this).data("focus");
+
+            currentStep = step;
+            showStep(step);
+
+            if (focus) {
+                // After showStep: the field is inside a .d-none panel until then, and
+                // focusing a hidden element silently does nothing.
+                const $field = $('[name="' + focus + '"]:visible').first();
+                if ($field.length) $field.trigger("focus");
+            }
+        });
+
+        // blur, not keyup: one request when they finish typing, not one per keystroke.
+        $form.on("blur", '[name="AdminEmail"]', checkAdminEmail);
 
         $("#CreateSchoolAdmin").on("change", function () {
             $("#adminFields").toggle(this.checked);
@@ -653,10 +945,12 @@
         $(document).ready(function () {
             showStep(1);
             toggleTenantMode();
-            // On edit the admin fields are always shown (existing admin) and the password box
-            // is an optional reset; on create they follow the toggles.
-            $("#adminFields").toggle(isEdit || $("#CreateSchoolAdmin").is(":checked"));
-            $("#passwordBox").toggle(isEdit || !$("#AutoGeneratePassword").is(":checked"));
+            toggleBoardState();
+            // Admin fields show whenever the section applies (existing admin, or the switch on).
+            // The password box is an optional reset for an existing admin, mandatory otherwise,
+            // and hidden only while auto-generate is on.
+            $("#adminFields").toggle(adminRequired());
+            $("#passwordBox").toggle(hasAdmin || !$("#AutoGeneratePassword").is(":checked"));
         });
     </script>
 }
