@@ -1,0 +1,168 @@
+{
+    "data": {
+        "core.schools": [
+            {
+                "is_active": true,
+                "school_id": 12,
+                "status_id": 8,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T23:27:57.326019",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "updated_at": "2026-07-26T20:04:48.150829",
+                "updated_by": 1,
+                "school_code": "SCH7",
+                "school_name": "Demo Private School",
+                "display_name": "DPS"
+            }
+        ],
+        "core.user_roles": [
+            {
+                "role_id": 19,
+                "user_id": 13,
+                "is_active": true,
+                "school_id": 12,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T23:27:57.326019",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "is_primary": true,
+                "updated_at": null,
+                "updated_by": null,
+                "user_role_id": 15
+            }
+        ],
+        "core.user_profiles": [
+            {
+                "phone": null,
+                "user_id": 13,
+                "full_name": "Shakti Singh",
+                "is_active": false,
+                "school_id": 12,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T23:27:57.326019",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": true,
+                "updated_at": "2026-07-26T15:07:03.220952",
+                "updated_by": null,
+                "designation": "School Admin",
+                "alternate_phone": null,
+                "user_profile_id": 13,
+                "profile_photo_url": null
+            }
+        ],
+        "core.school_contacts": [
+            {
+                "email": "princesingh@gmail.com",
+                "phone": "9918142561",
+                "is_active": true,
+                "school_id": 12,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T23:27:57.326019",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "is_primary": true,
+                "updated_at": null,
+                "updated_by": null,
+                "designation": null,
+                "contact_name": "Prince Singh",
+                "alternate_phone": null,
+                "contact_type_id": 1,
+                "school_contact_id": 37
+            }
+        ],
+        "core.school_profiles": [
+            {
+                "website": null,
+                "board_id": 1,
+                "logo_url": null,
+                "is_active": true,
+                "medium_id": null,
+                "school_id": 12,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T23:27:57.326019",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "updated_at": null,
+                "updated_by": null,
+                "description": null,
+                "board_state_id": null,
+                "school_type_id": 12,
+                "established_year": null,
+                "header_image_url": null,
+                "ownership_type_id": null,
+                "school_profile_id": 37,
+                "affiliation_number": null,
+                "registration_number": null
+            }
+        ],
+        "core.school_settings": [
+            {
+                "currency": "INR",
+                "timezone": "Asia/Kolkata",
+                "is_active": true,
+                "school_id": 12,
+                "tc_format": "Basic",
+                "tenant_id": 11,
+                "created_at": "2026-06-25T23:27:57.326019",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "enable_sms": false,
+                "is_deleted": false,
+                "updated_at": null,
+                "updated_by": null,
+                "enable_email": true,
+                "date_format_id": null,
+                "id_card_format": "Portrait",
+                "receipt_format": "A4",
+                "time_format_id": null,
+                "enable_whatsapp": false,
+                "academic_year_id": null,
+                "default_language": "English",
+                "school_setting_id": 13,
+                "attendance_backdate_days": 7
+            }
+        ],
+        "core.school_addresses": [
+            {
+                "city": "Kushinagar",
+                "state": "Uttar Pradesh",
+                "pincode": "274402",
+                "district": null,
+                "latitude": null,
+                "state_id": 26,
+                "is_active": true,
+                "longitude": null,
+                "school_id": 12,
+                "tenant_id": 11,
+                "country_id": 1,
+                "created_at": "2026-06-25T23:27:57.326019",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "is_primary": true,
+                "updated_at": "2026-07-26T15:38:41.330679",
+                "updated_by": null,
+                "district_id": null,
+                "address_line1": "Kaise",
+                "address_line2": null,
+                "address_type_id": 1,
+                "school_address_id": 37
+            }
+        ]
+    },
+    "school_id": 12,
+    "archived_at": "2026-07-26T20:49:31"
+}

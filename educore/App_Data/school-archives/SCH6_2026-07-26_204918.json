@@ -1,0 +1,168 @@
+{
+    "data": {
+        "core.schools": [
+            {
+                "is_active": true,
+                "school_id": 11,
+                "status_id": 8,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T22:32:08.388749",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "updated_at": "2026-07-26T20:04:48.150829",
+                "updated_by": 1,
+                "school_code": "SCH6",
+                "school_name": "Demo Public School",
+                "display_name": "DPS"
+            }
+        ],
+        "core.user_roles": [
+            {
+                "role_id": 19,
+                "user_id": 12,
+                "is_active": true,
+                "school_id": 11,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T22:32:08.388749",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "is_primary": true,
+                "updated_at": null,
+                "updated_by": null,
+                "user_role_id": 14
+            }
+        ],
+        "core.user_profiles": [
+            {
+                "phone": "8601633239",
+                "user_id": 12,
+                "full_name": "Shakti Singh",
+                "is_active": false,
+                "school_id": 11,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T22:32:08.388749",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": true,
+                "updated_at": "2026-07-26T15:07:03.220952",
+                "updated_by": 1,
+                "designation": "School Admin",
+                "alternate_phone": null,
+                "user_profile_id": 12,
+                "profile_photo_url": null
+            }
+        ],
+        "core.school_contacts": [
+            {
+                "email": "anmol@gmail.com",
+                "phone": "9839073643",
+                "is_active": true,
+                "school_id": 11,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T22:32:08.388749",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "is_primary": true,
+                "updated_at": "2026-06-25T23:23:43.480187",
+                "updated_by": 1,
+                "designation": null,
+                "contact_name": "Anmol Singh",
+                "alternate_phone": null,
+                "contact_type_id": 1,
+                "school_contact_id": 33
+            }
+        ],
+        "core.school_profiles": [
+            {
+                "website": null,
+                "board_id": 1,
+                "logo_url": null,
+                "is_active": true,
+                "medium_id": null,
+                "school_id": 11,
+                "tenant_id": 11,
+                "created_at": "2026-06-25T22:32:08.388749",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "updated_at": "2026-06-25T23:23:43.480187",
+                "updated_by": 1,
+                "description": null,
+                "board_state_id": null,
+                "school_type_id": 6,
+                "established_year": null,
+                "header_image_url": null,
+                "ownership_type_id": null,
+                "school_profile_id": 33,
+                "affiliation_number": null,
+                "registration_number": null
+            }
+        ],
+        "core.school_settings": [
+            {
+                "currency": "INR",
+                "timezone": "Asia/Kolkata",
+                "is_active": true,
+                "school_id": 11,
+                "tc_format": "Basic",
+                "tenant_id": 11,
+                "created_at": "2026-06-25T22:32:08.388749",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "enable_sms": false,
+                "is_deleted": false,
+                "updated_at": "2026-06-25T23:23:43.480187",
+                "updated_by": 1,
+                "enable_email": true,
+                "date_format_id": null,
+                "id_card_format": "Portrait",
+                "receipt_format": "A4",
+                "time_format_id": null,
+                "enable_whatsapp": false,
+                "academic_year_id": null,
+                "default_language": "English",
+                "school_setting_id": 9,
+                "attendance_backdate_days": 7
+            }
+        ],
+        "core.school_addresses": [
+            {
+                "city": "Kasia",
+                "state": "Uttar Pradesh",
+                "pincode": "274402",
+                "district": null,
+                "latitude": null,
+                "state_id": 26,
+                "is_active": true,
+                "longitude": null,
+                "school_id": 11,
+                "tenant_id": 11,
+                "country_id": 1,
+                "created_at": "2026-06-25T22:32:08.388749",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "is_primary": true,
+                "updated_at": "2026-06-25T23:23:43.480187",
+                "updated_by": 1,
+                "district_id": null,
+                "address_line1": "Demo Kasia",
+                "address_line2": null,
+                "address_type_id": 1,
+                "school_address_id": 33
+            }
+        ]
+    },
+    "school_id": 11,
+    "archived_at": "2026-07-26T20:49:18"
+}

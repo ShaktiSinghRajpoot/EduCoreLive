@@ -1,0 +1,208 @@
+{
+    "data": {
+        "core.users": [
+            {
+                "email": "itservices.ali@byldgroup.com",
+                "user_id": 9,
+                "is_active": true,
+                "school_id": 8,
+                "tenant_id": 7,
+                "created_at": "2026-06-25T06:33:43.74588",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "updated_at": "2026-06-25T08:31:47.880747",
+                "updated_by": 1,
+                "last_login_at": null,
+                "password_hash": "$2a$11$iBI.zIYvP3UEZojhFfskC.V80iq4w0cMPy1sCmI.sq7DozF0eT5r6",
+                "is_email_verified": false,
+                "must_change_password": false
+            }
+        ],
+        "core.schools": [
+            {
+                "is_active": true,
+                "school_id": 8,
+                "status_id": 8,
+                "tenant_id": 7,
+                "created_at": "2026-06-25T06:33:43.74588",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "updated_at": "2026-07-26T20:04:48.150829",
+                "updated_by": 1,
+                "school_code": "SCH3",
+                "school_name": "shakti test school",
+                "display_name": "credential delivery"
+            }
+        ],
+        "core.user_roles": [
+            {
+                "role_id": 11,
+                "user_id": 9,
+                "is_active": true,
+                "school_id": 8,
+                "tenant_id": 7,
+                "created_at": "2026-06-25T06:33:43.74588",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "is_primary": true,
+                "updated_at": "2026-06-25T07:09:55.076146",
+                "updated_by": null,
+                "user_role_id": 11
+            }
+        ],
+        "core.user_profiles": [
+            {
+                "phone": "7408071009",
+                "user_id": 9,
+                "full_name": "Shakti Singh",
+                "is_active": true,
+                "school_id": 8,
+                "tenant_id": 7,
+                "created_at": "2026-06-25T06:33:43.74588",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "updated_at": "2026-06-25T08:31:47.880747",
+                "updated_by": 1,
+                "designation": "School Admin",
+                "alternate_phone": null,
+                "user_profile_id": 9,
+                "profile_photo_url": null
+            }
+        ],
+        "core.login_attempts": [
+            {
+                "email": "itservices.ali@byldgroup.com",
+                "user_id": 9,
+                "school_id": 8,
+                "tenant_id": 7,
+                "created_at": "2026-06-25T06:35:47.24126",
+                "created_by": 9,
+                "deleted_at": null,
+                "deleted_by": null,
+                "ip_address": null,
+                "is_deleted": false,
+                "is_success": false,
+                "updated_at": null,
+                "updated_by": null,
+                "user_agent": null,
+                "failure_reason": "Invalid email",
+                "login_attempt_id": 532
+            }
+        ],
+        "core.school_contacts": [
+            {
+                "email": "shakti@gmail.com",
+                "phone": "9839073643",
+                "is_active": true,
+                "school_id": 8,
+                "tenant_id": 7,
+                "created_at": "2026-06-25T06:33:43.74588",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "is_primary": true,
+                "updated_at": "2026-06-25T08:31:47.880747",
+                "updated_by": 1,
+                "designation": null,
+                "contact_name": "Shakti Singh",
+                "alternate_phone": null,
+                "contact_type_id": 1,
+                "school_contact_id": 28
+            }
+        ],
+        "core.school_profiles": [
+            {
+                "website": null,
+                "board_id": 1,
+                "logo_url": null,
+                "is_active": true,
+                "medium_id": null,
+                "school_id": 8,
+                "tenant_id": 7,
+                "created_at": "2026-06-25T06:33:43.74588",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "updated_at": "2026-06-25T08:31:47.880747",
+                "updated_by": 1,
+                "description": null,
+                "board_state_id": null,
+                "school_type_id": 4,
+                "established_year": null,
+                "header_image_url": null,
+                "ownership_type_id": null,
+                "school_profile_id": 28,
+                "affiliation_number": null,
+                "registration_number": null
+            }
+        ],
+        "core.school_settings": [
+            {
+                "currency": "INR",
+                "timezone": "Asia/Kolkata",
+                "is_active": true,
+                "school_id": 8,
+                "tc_format": "Basic",
+                "tenant_id": 7,
+                "created_at": "2026-06-25T06:33:43.74588",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "enable_sms": false,
+                "is_deleted": false,
+                "updated_at": "2026-06-25T08:31:47.880747",
+                "updated_by": 1,
+                "enable_email": true,
+                "date_format_id": null,
+                "id_card_format": "Portrait",
+                "receipt_format": "A4",
+                "time_format_id": null,
+                "enable_whatsapp": false,
+                "academic_year_id": null,
+                "default_language": "English",
+                "school_setting_id": 4,
+                "attendance_backdate_days": 7
+            }
+        ],
+        "core.school_addresses": [
+            {
+                "city": "GurgaonTEST",
+                "state": "TEST",
+                "pincode": "122022",
+                "district": null,
+                "latitude": null,
+                "state_id": null,
+                "is_active": true,
+                "longitude": null,
+                "school_id": 8,
+                "tenant_id": 7,
+                "country_id": null,
+                "created_at": "2026-06-25T06:33:43.74588",
+                "created_by": 1,
+                "deleted_at": null,
+                "deleted_by": null,
+                "is_deleted": false,
+                "is_primary": true,
+                "updated_at": "2026-06-25T08:31:47.880747",
+                "updated_by": 1,
+                "district_id": null,
+                "address_line1": "Glaxy Apartment , Sukhrali Sec-17, Mata Wali Gali ,Gurgaon",
+                "address_line2": null,
+                "address_type_id": 1,
+                "school_address_id": 28
+            }
+        ]
+    },
+    "school_id": 8,
+    "archived_at": "2026-07-26T20:48:32"
+}
