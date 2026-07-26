@@ -37,7 +37,13 @@ DECLARE
     v_user_id INTEGER;
     v_tenant_id INTEGER;
     v_school_id INTEGER;
+    -- p_email is really an IDENTIFIER: an email address OR a mobile number.
+    -- Digits-only, so '+91 86016-33239' and '8601633239' are the same person.
+    -- An email yields far fewer than 10 digits, so it can never be mistaken for
+    -- a phone (see the length check in the WHERE clauses below).
+    v_digits TEXT;
 BEGIN
+    v_digits := regexp_replace(COALESCE(p_email, ''), '\D', '', 'g');
 
     IF p_operation_type = 'GET_LOGIN_USER' THEN
 
@@ -59,7 +65,26 @@ BEGIN
 
             r.role_id,
             r.role_name,
-            r.role_code
+            r.role_code,
+
+            -- School gate. Returned as DATA rather than filtering the user out, on
+            -- purpose: AccountController checks these only AFTER BCrypt.Verify
+            -- succeeds. If the row were filtered here, "your school is suspended"
+            -- would be learnable by anyone who guessed an email — an enumeration
+            -- vector. This way only someone with the correct password sees it.
+            -- A deleted/disabled school is blocked whatever its status says.
+            COALESCE(
+                CASE WHEN COALESCE(ur.school_id, 0) = 0      THEN TRUE    -- super admin, no school
+                     WHEN sc.school_id IS NULL               THEN FALSE   -- school row gone
+                     WHEN sc.is_deleted OR NOT sc.is_active  THEN FALSE   -- deleted / disabled
+                     ELSE st.allows_login
+                END, FALSE)                          AS school_allows_login,
+            COALESCE(st.status_code, 'UNKNOWN')      AS school_status_code,
+            CASE WHEN COALESCE(ur.school_id, 0) > 0
+                      AND (sc.school_id IS NULL OR sc.is_deleted OR NOT sc.is_active)
+                 THEN 'This school is closed and no longer accessible.'
+                 ELSE st.login_message
+            END                                      AS school_login_message
         FROM core.users u
         LEFT JOIN core.user_profiles up
             ON up.user_id = u.user_id
@@ -79,7 +104,28 @@ BEGIN
            AND r.is_deleted = FALSE
            AND r.is_active = TRUE
 
-        WHERE LOWER(u.email) = LOWER(p_email)
+        -- LEFT, not INNER: a super admin has school_id = 0 and no row in
+        -- core.schools — an INNER JOIN would lock the platform admin out.
+        -- No is_deleted filter here either: the CASE above needs to SEE a deleted
+        -- school in order to block it, rather than have the row vanish.
+        LEFT JOIN core.schools sc
+            ON sc.school_id = ur.school_id
+        LEFT JOIN config.school_statuses st
+            ON st.school_status_id = sc.status_id
+           AND st.is_deleted = FALSE
+
+        -- Email OR phone. Matches how core.sp_password_reset already resolves a
+        -- user, and is backed by uq_user_phone_active so a number can only ever
+        -- point at one signed-in-able account (see user_login_by_phone.sql).
+        WHERE (
+                LOWER(TRIM(u.email)) = LOWER(TRIM(p_email))
+                OR (
+                        length(v_digits) >= 10
+                    AND up.phone IS NOT NULL
+                    AND up.is_active = TRUE
+                    AND right(regexp_replace(up.phone, '\D', '', 'g'), 10) = right(v_digits, 10)
+                   )
+              )
           AND u.is_deleted = FALSE
           AND u.is_active = TRUE
         ORDER BY
@@ -219,7 +265,20 @@ BEGIN
            AND ur.tenant_id = u.tenant_id
            AND ur.is_deleted = FALSE
            AND ur.is_primary = TRUE
-        WHERE LOWER(u.email) = LOWER(p_email)
+        -- Joined so an attempt made with a PHONE is still attributed to the right
+        -- user; without it a phone login would log an anonymous attempt.
+        LEFT JOIN core.user_profiles up
+            ON up.user_id = u.user_id
+           AND up.tenant_id = u.tenant_id
+           AND up.is_deleted = FALSE
+        WHERE (
+                LOWER(TRIM(u.email)) = LOWER(TRIM(p_email))
+                OR (
+                        length(v_digits) >= 10
+                    AND up.phone IS NOT NULL
+                    AND right(regexp_replace(up.phone, '\D', '', 'g'), 10) = right(v_digits, 10)
+                   )
+              )
           AND u.is_deleted = FALSE
         LIMIT 1;
 

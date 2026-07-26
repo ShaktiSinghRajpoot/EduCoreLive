@@ -223,7 +223,16 @@ namespace EduCoreDataAccessLayer.Services
 
                 RoleId = ToInt(row, "role_id"),
                 RoleName = ToStringValue(row, "role_name"),
-                RoleCode = ToStringValue(row, "role_code")
+                RoleCode = ToStringValue(row, "role_code"),
+
+                // School gate — the proc returns these instead of filtering the row
+                // out, so AccountController can check them only AFTER the password
+                // verifies (otherwise the status message leaks to anyone guessing
+                // an email). Only GET_LOGIN_USER selects them; the other branches
+                // fall back to "allowed" via the HasColumn check.
+                SchoolAllowsLogin = !HasColumn(row, "school_allows_login") || ToBool(row, "school_allows_login"),
+                SchoolStatusCode = ToStringValue(row, "school_status_code"),
+                SchoolLoginMessage = ToStringValue(row, "school_login_message")
             };
         }
 

@@ -216,30 +216,43 @@
                                 <textarea asp-for="AddressLine1" class="form-control" rows="3" placeholder="Enter address line 1"></textarea>
                                 <span asp-validation-for="AddressLine1" class="text-danger small"></span>
                             </div>
+                            @* Address Line 2 removed from the form — a school has one address,
+                               so the second line was noise. Kept as a hidden field so saving
+                               this page does not wipe a value an older record already holds. *@
+                            <input asp-for="AddressLine2" type="hidden" />
+
+                            @* State -> District -> City, in that order, from the shared
+                               Country/State/District master — the same picker the SuperAdmin
+                               wizard uses. Previously these were four free-text boxes in the
+                               order City, State, Pincode, District, which is both backwards
+                               (child before parent) and how 'UP' / 'uttarpradesh' / 'Uttar
+                               Pradesh' ended up in the data. *@
                             <div class="col-12">
-                                <label class="form-label">Address Line 2</label>
-                                <textarea asp-for="AddressLine2" class="form-control" rows="2" placeholder="Enter address line 2"></textarea>
-                                <span asp-validation-for="AddressLine2" class="text-danger small"></span>
+                                @* State is locked for boards granted by a single state: a UP Board
+                                   school cannot be in Bihar, so its address state follows the board
+                                   rather than being the school's to pick. District/City/Pincode stay
+                                   editable — that is the part a school actually needs to correct.
+                                   CBSE/ICSE/IB are national, so they keep a free State. *@
+                                @await Html.PartialAsync("_StateDistrictCity", new educore.Models.GeoPickerModel
+                           {
+                               CountryId = Model.CountryId,
+                               StateId = Model.StateId,
+                               DistrictId = Model.DistrictId,
+                               City = Model.City,
+                               LegacyStateText = Model.State,
+                               ColumnCss = "col-md-4",
+                               StateReadOnly = Model.BoardRequiresState,
+                               StateReadOnlyNote = Model.BoardRequiresState
+                                   ? $"Set by your board ({Model.BoardName}). Contact EduCore support to change."
+                                   : null
+                           })
                             </div>
+
                             <div class="col-md-4">
-                                <label class="form-label">City</label>
-                                <input asp-for="City" class="form-control" placeholder="City" />
-                                <span asp-validation-for="City" class="text-danger small"></span>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">State</label>
-                                <input asp-for="State" class="form-control" placeholder="State" />
-                                <span asp-validation-for="State" class="text-danger small"></span>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Pincode</label>
-                                <input asp-for="Pincode" class="form-control" placeholder="Pincode" />
+                                <label class="form-label" for="Pincode">Pincode <span class="text-danger">*</span></label>
+                                <input asp-for="Pincode" class="form-control" placeholder="Pincode"
+                                       inputmode="numeric" maxlength="6" />
                                 <span asp-validation-for="Pincode" class="text-danger small"></span>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">District</label>
-                                <input asp-for="District" class="form-control" placeholder="District" />
-                                <span asp-validation-for="District" class="text-danger small"></span>
                             </div>
                         </div>
                     </div>
@@ -263,11 +276,10 @@
                                 <input asp-for="ContactName" class="form-control" placeholder="Contact person name" />
                                 <span asp-validation-for="ContactName" class="text-danger small"></span>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Designation</label>
-                                <input asp-for="Designation" class="form-control" placeholder="Designation" />
-                                <span asp-validation-for="Designation" class="text-danger small"></span>
-                            </div>
+                            @* Designation removed — it will come from the Department /
+                               Designation masters, not free text typed here. Hidden so an
+                               existing value survives a save on this page. *@
+                            <input asp-for="Designation" type="hidden" />
                             <div class="col-md-6">
                                 <label class="form-label">Official Phone <span class="text-danger">*</span></label>
                                 <input asp-for="Phone" class="form-control" placeholder="Official phone" />
@@ -305,6 +317,8 @@
 
 @section PageScripts {
 
+    @* Drives the State -> District cascade in the shared _StateDistrictCity partial. *@
+    <script src="~/js/geo-cascade.js" asp-append-version="true"></script>
 
     <script>
         $(document).ready(function () {
@@ -370,64 +384,58 @@
                toastr.info("Logo selected.");
             });
 
-            $("form").on("submit", function (e) {
+            // ── Validation ──────────────────────────────────────────────────
+            // One rule per field, in one place. Live feedback and the submit check
+            // both read this list, so they can never drift apart. Each rule takes the
+            // trimmed value and returns an error message, or "" when the value is fine.
+            const rules = {
+                AddressLine1:    v => v ? "" : "Address Line 1 is required.",
+                StateId:         v => v ? "" : "State is required.",
+                City:            v => v ? "" : "City is required.",
+                Pincode:         v => !v ? "Pincode is required."
+                                         : /^[1-9][0-9]{5}$/.test(v) ? "" : "Enter valid 6 digit pincode.",
+                ContactName:     v => v ? "" : "Contact Name is required.",
+                Phone:           v => !v ? "Official Phone is required."
+                                         : /^[6-9][0-9]{9}$/.test(v) ? "" : "Enter valid 10 digit Indian mobile number.",
+                AlternatePhone:  v => !v || /^[6-9][0-9]{9}$/.test(v) ? "" : "Enter valid alternate phone number.",
+                ContactEmail:    v => !v || /^[^@@ ]+@@[^@@ ]+[.][^@@ ]+$/.test(v) ? "" : "Enter valid official email.",
+                Website:         v => !v || /^(https?:\/\/)?([A-Za-z0-9-]+[.])+[A-Za-z]{2,}(\/.*)?$/.test(v) ? "" : "Enter valid website.",
+                EstablishedYear: v => !v || (+v >= 1800 && +v <= new Date().getFullYear()) ? "" : "Enter valid established year."
+            };
 
-                let isValid = true;
-                const currentYear = new Date().getFullYear();
+            function validateField(name) {
+                const $i = $('[name="' + name + '"]');
+                if (!$i.length || !rules[name]) return true;
 
-                $(".is-invalid").removeClass("is-invalid").removeData("toast-shown");
+                const msg = rules[name]($.trim($i.val() || ""));
 
-                function required(name, message) {
-                    const input = $('[name="' + name + '"]');
+                $i.toggleClass("is-invalid", !!msg);
+                $i.siblings(".live-error").remove();
+                if (msg) $i.after('<span class="live-error text-danger small d-block">' + msg + '</span>');
 
-                    if (!$.trim(input.val())) {
-                        showToastError(input, message);
-                        isValid = false;
-                    }
-                }
+                return !msg;
+            }
 
-                function validatePattern(name, regex, message) {
-                    const input = $('[name="' + name + '"]');
-                    const value = $.trim(input.val());
-
-                    if (value && !regex.test(value)) {
-                        showToastError(input, message);
-                        isValid = false;
-                    }
-                }
-
-                required("AddressLine1", "Address Line 1 is required.");
-                required("ContactName", "Contact Name is required.");
-                required("Phone", "Official Phone is required.");
-
-                validatePattern("Phone", /^[6-9][0-9]{9}$/, "Enter valid 10 digit Indian mobile number.");
-                validatePattern("AlternatePhone", /^[6-9][0-9]{9}$/, "Enter valid alternate phone number.");
-                validatePattern("ContactEmail", /^[^@@ ]+@@[^@@ ]+[.][^@@ ]+$/, "Enter valid official email.");
-                validatePattern("Website", /^(https?:\/\/)?([A-Za-z0-9-]+[.])+[A-Za-z]{2,}(\/.*)?$/, "Enter valid website.");
-                validatePattern("Pincode", /^[1-9][0-9]{5}$/, "Enter valid 6 digit pincode.");
-
-                const establishedYearInput = $('[name="EstablishedYear"]');
-                const establishedYear = $.trim(establishedYearInput.val());
-
-                if (establishedYear) {
-                    const year = parseInt(establishedYear);
-
-                    if (isNaN(year) || year < 1800 || year > currentYear) {
-                        showToastError(establishedYearInput, "Enter valid established year.");
-                        isValid = false;
-                    }
-                }
-
-                        if (!isValid) {
-            e.preventDefault();
-            toastr.warning("Please fix the highlighted fields.");
-            $(".is-invalid:first").focus();
-            return false;
-                        }
+            // blur/change -> check the field you just left.
+            // input -> re-check ONLY a field already showing an error, so it clears as
+            // soon as you fix it. Validating every keystroke would shout "invalid email"
+            // at the first character of an empty box.
+            $("form").on("blur change", "input, select, textarea", function () {
+                validateField($(this).attr("name"));
             });
 
-            $("input, textarea").on("input change blur", function () {
-                clearFieldError(this);
+            $("form").on("input", "input, textarea", function () {
+                if ($(this).hasClass("is-invalid")) validateField($(this).attr("name"));
+            });
+
+            $("form").on("submit", function (e) {
+                const bad = Object.keys(rules).filter(n => !validateField(n));
+
+                if (bad.length) {
+                    e.preventDefault();
+                    toastr.warning("Please fix the highlighted fields.");
+                    $(".is-invalid").first().trigger("focus");
+                }
             });
 
         });

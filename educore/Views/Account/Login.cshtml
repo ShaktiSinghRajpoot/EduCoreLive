@@ -36,13 +36,17 @@
             @Html.AntiForgeryToken()
 
             <div>
-                <label for="Email" class="form-label">Email</label>
+                @* The field is still bound to Email, but the proc treats it as an
+                   IDENTIFIER — email or mobile. Parents and staff remember a number
+                   far more reliably than the address someone typed at admission. *@
+                <label for="Email" class="form-label">Email or Mobile Number</label>
                 <div class="login-input-wrap">
                     <i class="icon-base bx bx-user field-icon"></i>
                     <input type="text"
                            asp-for="Email"
                            class="form-control"
-                           placeholder="Enter email"
+                           placeholder="Email address or 10-digit mobile"
+                           autocomplete="username"
                            autofocus />
                 </div>
             </div>

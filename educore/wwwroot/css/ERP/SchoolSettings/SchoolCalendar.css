@@ -1,0 +1,112 @@
+/* School Calendar — weekly offs + dated holidays (sc-*) */
+
+/* summary cards */
+.sc-card{
+    border:1px solid var(--ec-border); border-radius:var(--ec-radius);
+    background:#fff; padding:1rem 1.1rem;
+    display:flex; align-items:center; gap:.85rem; height:100%;
+    transition:var(--ec-transition);
+}
+.sc-card:hover{ transform:translateY(-2px); box-shadow:var(--ec-shadow); }
+.sc-card-ic{ width:44px; height:44px; flex:0 0 44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:1.25rem; }
+.sc-ic-red{ background:#fdecea; color:#c62828; }
+.sc-ic-orange{ background:#fff4e6; color:#c2410c; }
+.sc-ic-green{ background:#e8f5e9; color:#2e7d32; }
+.sc-ic-blue{ background:#e3f2fd; color:#1565c0; }
+.sc-card-val{ font-size:1.3rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; }
+.sc-card-lbl{ font-size:.68rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; }
+
+/* year / month navigation */
+.sc-yearnav{ display:inline-flex; align-items:center; gap:.4rem; }
+.sc-year{ font-size:1rem; font-weight:800; color:var(--ec-text-dark); min-width:3.4rem; text-align:center; font-variant-numeric:tabular-nums; }
+.sc-nav-btn{
+    width:36px; height:36px; border-radius:10px; border:1px solid var(--ec-border); background:#fff;
+    color:var(--ec-text,#2b2c40); display:inline-flex; align-items:center; justify-content:center;
+    font-size:1.1rem; cursor:pointer; transition:var(--ec-transition);
+}
+.sc-nav-btn:hover{ border-color:rgba(255,138,0,.5); color:var(--ec-primary,#ff8a00); }
+
+/* weekly off chips */
+.sc-dow{ display:flex; flex-wrap:wrap; gap:.5rem; }
+.sc-dow-chip{
+    display:inline-flex; align-items:center; gap:.35rem;
+    padding:.5rem .9rem; border-radius:10px; border:1px solid var(--ec-border); background:#fff;
+    font-size:.82rem; font-weight:700; color:var(--ec-text-muted); cursor:pointer; transition:var(--ec-transition);
+}
+.sc-dow-chip:hover{ border-color:rgba(255,138,0,.5); color:var(--ec-primary,#ff8a00); }
+.sc-dow-chip.on{ background:#e3f2fd; border-color:#64b5f6; color:#1565c0; }
+
+/* month grid */
+.sc-grid-head{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; }
+.sc-grid-head div{ text-align:center; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--ec-text-muted); }
+.sc-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+
+.sc-cell{
+    position:relative; min-height:74px; border:1px solid var(--ec-border); border-radius:12px; background:#fff;
+    padding:.4rem .45rem; cursor:pointer; overflow:hidden; transition:var(--ec-transition);
+}
+.sc-cell:hover{ border-color:rgba(255,138,0,.55); box-shadow:var(--ec-shadow); }
+.sc-cell.empty{ border:0; background:transparent; cursor:default; box-shadow:none; }
+.sc-cell-day{ font-size:.85rem; font-weight:800; color:var(--ec-text-dark); }
+.sc-cell-tag{
+    position:absolute; left:.45rem; right:.45rem; bottom:.4rem;
+    font-size:.6rem; font-weight:800; line-height:1.2;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.sc-cell.today{ box-shadow:inset 0 0 0 2px var(--ec-primary,#ff8a00); }
+
+.sc-cell.t-holiday{ background:#fdecea; border-color:#f5c6c2; }
+.sc-cell.t-holiday .sc-cell-tag,
+.sc-cell.t-holiday .sc-cell-day{ color:#c62828; }
+.sc-cell.t-half_day{ background:#fff4e6; border-color:#f6d4ae; }
+.sc-cell.t-half_day .sc-cell-tag,
+.sc-cell.t-half_day .sc-cell-day{ color:#c2410c; }
+.sc-cell.t-working{ background:#e8f5e9; border-color:#b5dcb8; }
+.sc-cell.t-working .sc-cell-tag,
+.sc-cell.t-working .sc-cell-day{ color:#2e7d32; }
+.sc-cell.t-weekly{ background:#f4f5f7; border-color:#e3e5e9; }
+.sc-cell.t-weekly .sc-cell-tag,
+.sc-cell.t-weekly .sc-cell-day{ color:#78838f; }
+
+.sc-legend{ display:flex; gap:1rem; flex-wrap:wrap; align-items:center; font-size:.72rem; font-weight:700; color:var(--ec-text-muted); }
+.sc-legend span{ display:inline-flex; align-items:center; gap:.35rem; }
+.sc-l-dot{ width:12px; height:12px; border-radius:4px; }
+.sc-l-holiday{ background:#ef9a9a; }
+.sc-l-half{ background:#ffcc80; }
+.sc-l-working{ background:#a5d6a7; }
+.sc-l-off{ background:#cfd8dc; }
+
+/* entry list */
+.sc-list{ display:flex; flex-direction:column; gap:.5rem; max-height:430px; overflow-y:auto; }
+.sc-row{
+    display:flex; align-items:center; gap:.7rem;
+    border:1px solid var(--ec-border); border-left-width:4px; border-radius:12px; background:#fff; padding:.55rem .7rem;
+    transition:var(--ec-transition);
+}
+.sc-row:hover{ box-shadow:var(--ec-shadow); }
+.sc-row.t-holiday{ border-left-color:#e53935; }
+.sc-row.t-half_day{ border-left-color:#fb8c00; }
+.sc-row.t-working{ border-left-color:#43a047; }
+.sc-row-date{ width:38px; flex:0 0 38px; text-align:center; line-height:1.1; }
+.sc-row-date strong{ display:block; font-size:1rem; font-weight:800; color:var(--ec-text-dark); }
+.sc-row-date small{ font-size:.62rem; font-weight:800; text-transform:uppercase; color:var(--ec-text-muted); }
+.sc-row-info{ flex:1 1 auto; min-width:0; }
+.sc-row-name{ font-size:.86rem; font-weight:800; color:var(--ec-text-dark); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sc-row-meta{ font-size:.7rem; font-weight:700; color:var(--ec-text-muted); }
+.sc-icon-btn{
+    width:30px; height:30px; flex:0 0 30px; border-radius:8px; border:1px solid var(--ec-border); background:#fff;
+    color:var(--ec-text-muted); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; transition:var(--ec-transition);
+}
+.sc-icon-btn:hover{ border-color:#ef5350; color:#e53935; background:#fdecea; }
+
+.sc-empty{ text-align:center; padding:2rem .5rem; color:var(--ec-text-muted); font-size:.82rem; font-weight:600; }
+.sc-empty i{ font-size:2.2rem; display:block; margin-bottom:.5rem; opacity:.5; }
+
+/* modal */
+.sc-modal-lbl{ font-size:.75rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--ec-text-muted); }
+.sc-hint{ font-size:.72rem; color:var(--ec-text-muted); font-weight:600; }
+
+@media (max-width:575.98px){
+    .sc-cell{ min-height:58px; }
+    .sc-cell-tag{ display:none; }
+}

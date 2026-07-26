@@ -1,0 +1,399 @@
+@{
+    ViewData["Title"] = "School Calendar";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/SchoolSettings/SchoolCalendar.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <!-- Header -->
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+          <div class="ec-page-title-wrap">
+            <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+              <i class="bx bx-calendar-event fs-4"></i>
+            </div>
+            <div>
+              <h4 class="ec-page-title mb-1">School Calendar</h4>
+              <div class="ec-page-subtitle">Weekly offs and dated holidays — the Smart Bell stays silent on closed days</div>
+            </div>
+          </div>
+          <div class="sc-yearnav">
+            <button class="sc-nav-btn" id="yrPrev"><i class="bx bx-chevron-left"></i></button>
+            <span class="sc-year" id="yrLabel">—</span>
+            <button class="sc-nav-btn" id="yrNext"><i class="bx bx-chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="sc-card">
+          <div class="sc-card-ic sc-ic-red"><i class="bx bx-calendar-star"></i></div>
+          <div><div class="sc-card-val" id="cHolidays">—</div><div class="sc-card-lbl">Holidays</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sc-card">
+          <div class="sc-card-ic sc-ic-orange"><i class="bx bx-time-five"></i></div>
+          <div><div class="sc-card-val" id="cHalf">—</div><div class="sc-card-lbl">Half Days</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sc-card">
+          <div class="sc-card-ic sc-ic-green"><i class="bx bx-briefcase"></i></div>
+          <div><div class="sc-card-val" id="cWorking">—</div><div class="sc-card-lbl">Working Overrides</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sc-card">
+          <div class="sc-card-ic sc-ic-blue"><i class="bx bx-calendar-x"></i></div>
+          <div><div class="sc-card-val" id="cWeekly">—</div><div class="sc-card-lbl">Weekly Offs</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly pattern -->
+    <div class="ec-card mb-4">
+      <div class="ec-card-header">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-repeat"></i></span>
+            <div>
+              <div class="ec-section-title">Weekly Offs</div>
+              <div class="ec-section-subtitle">Days the school is closed every week. A dated entry below always wins over this.</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="btnSaveWeekly"><i class="bx bx-save me-1"></i>Save Weekly Offs</button>
+        </div>
+      </div>
+      <div class="ec-card-body pt-2">
+        <div class="sc-dow" id="dowPicker"></div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <!-- Month grid -->
+      <div class="col-12 col-lg-8">
+        <div class="ec-card mb-0 h-100">
+          <div class="ec-card-header">
+            <div class="d-flex justify-content-between align-items-center gap-2">
+              <div class="ec-section-title-wrap">
+                <span class="ec-section-icon"><i class="bx bx-calendar"></i></span>
+                <div>
+                  <div class="ec-section-title" id="monLabel">—</div>
+                  <div class="ec-section-subtitle">Click any date to mark it a holiday, half day, or a working day</div>
+                </div>
+              </div>
+              <div class="sc-yearnav">
+                <button class="sc-nav-btn" id="monPrev"><i class="bx bx-chevron-left"></i></button>
+                <button class="sc-nav-btn" id="monToday" title="Today"><i class="bx bx-target-lock"></i></button>
+                <button class="sc-nav-btn" id="monNext"><i class="bx bx-chevron-right"></i></button>
+              </div>
+            </div>
+          </div>
+          <div class="ec-card-body pt-2">
+            <div class="sc-grid-head" id="gridHead"></div>
+            <div class="sc-grid" id="grid"></div>
+            <div class="sc-legend mt-3">
+              <span><span class="sc-l-dot sc-l-holiday"></span>Holiday</span>
+              <span><span class="sc-l-dot sc-l-half"></span>Half day</span>
+              <span><span class="sc-l-dot sc-l-working"></span>Working override</span>
+              <span><span class="sc-l-dot sc-l-off"></span>Weekly off</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Entry list -->
+      <div class="col-12 col-lg-4">
+        <div class="ec-card mb-0 h-100">
+          <div class="ec-card-header">
+            <div class="ec-section-title-wrap">
+              <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
+              <div>
+                <div class="ec-section-title">Dated Entries</div>
+                <div class="ec-section-subtitle" id="listSub">—</div>
+              </div>
+            </div>
+          </div>
+          <div class="ec-card-body pt-2">
+            <div class="sc-list" id="entryList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    @Html.AntiForgeryToken()
+  </div>
+</div>
+
+<!-- Day modal -->
+<div class="modal fade" id="dayModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:0;border-radius:20px;overflow:hidden;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-calendar-event"></i></span>
+          <div>
+            <div class="ec-section-title" id="dmTitle">Mark Day</div>
+            <div class="ec-section-subtitle" id="dmDate">—</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label sc-modal-lbl">This day is</label>
+            <select class="form-select" id="dmType">
+              <option value="holiday">Holiday — school closed, no bells</option>
+              <option value="half_day">Half day — bells stop at a set time</option>
+              <option value="working">Working day — overrides the weekly off</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label sc-modal-lbl">Name</label>
+            <input type="text" class="form-control" id="dmName" placeholder="e.g. Diwali / Annual Day">
+          </div>
+          <div class="col-12 d-none" id="dmEndWrap">
+            <label class="form-label sc-modal-lbl">School closes at</label>
+            <input type="time" class="form-control" id="dmEnd">
+            <div class="sc-hint mt-1">Periods starting after this are skipped; a period running through it ends here.</div>
+          </div>
+        </div>
+      </div>
+      <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-between gap-2">
+        <button type="button" class="btn btn-outline-danger px-3 d-none" id="dmClear"><i class="bx bx-trash me-1"></i>Clear</button>
+        <div class="d-flex flex-column flex-sm-row gap-2 ms-sm-auto">
+          <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary px-4" id="dmSave"><i class="bx bx-check me-1"></i>Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+(function(){
+'use strict';
+
+var DATA_URL   ='@Url.Action("SchoolCalendarData","SchoolSettings",new{area="ERP"})';
+var SAVE_URL   ='@Url.Action("SaveCalendarEntry","SchoolSettings",new{area="ERP"})';
+var DELETE_URL ='@Url.Action("DeleteCalendarEntry","SchoolSettings",new{area="ERP"})';
+var WEEKLY_URL ='@Url.Action("SaveWeeklyOff","SchoolSettings",new{area="ERP"})';
+
+var DOW=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+var DOW_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+var today=new Date();
+var year=today.getFullYear(), month=today.getMonth();
+var WEEKLY=[0], ENTRIES={}, editDate=null;
+
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
+function two(n){ return (n<10?'0':'')+n; }
+/* Build date keys from parts — never via Date.toISOString, which shifts by timezone. */
+function key(y,m,d){ return y+'-'+two(m+1)+'-'+two(d); }
+function parseKey(k){ var p=k.split('-'); return {y:+p[0], m:+p[1]-1, d:+p[2]}; }
+function fmt12(t){ if(!t) return '—'; var p=String(t).split(':'),h=parseInt(p[0],10),m=p[1]; var ap=h>=12?'PM':'AM'; var hh=h%12||12; return hh+':'+m+' '+ap; }
+function longDate(k){ var o=parseKey(k); return DOW[new Date(o.y,o.m,o.d).getDay()]+', '+o.d+' '+MONTHS[o.m]+' '+o.y; }
+function token(){ var t=document.querySelector('input[name="__RequestVerificationToken"]'); return t?t.value:''; }
+function post(url,payload){
+  return $.ajax({ url:url, type:'POST', contentType:'application/json',
+    headers:{ 'RequestVerificationToken':token(), 'X-Requested-With':'XMLHttpRequest' },
+    data:JSON.stringify(payload) });
+}
+function typeLabel(t){ return {holiday:'Holiday', half_day:'Half day', working:'Working day'}[t]||t; }
+
+/* ---------------- load ---------------- */
+function load(){
+  $.getJSON(DATA_URL, {year:year})
+    .done(function(res){
+      WEEKLY=(res && res.weeklyOffDays) || [];
+      ENTRIES={};
+      ((res && res.entries)||[]).forEach(function(e){ ENTRIES[e.date]=e; });
+      renderAll();
+    })
+    .fail(function(){ toast('error','Could not load the calendar.'); });
+}
+
+function renderAll(){ renderDow(); renderCards(); renderMonth(); renderList(); }
+
+/* ---------------- weekly offs ---------------- */
+function renderDow(){
+  el('yrLabel').textContent=year;
+  el('dowPicker').innerHTML=DOW.map(function(d,i){
+    var on=WEEKLY.indexOf(i)>=0;
+    return '<button type="button" class="sc-dow-chip'+(on?' on':'')+'" data-d="'+i+'">'
+         +   '<i class="bx '+(on?'bx-calendar-x':'bx-calendar-check')+'"></i>'+d
+         + '</button>';
+  }).join('');
+  el('dowPicker').querySelectorAll('.sc-dow-chip').forEach(function(b){
+    b.addEventListener('click',function(){
+      var d=parseInt(this.dataset.d,10), i=WEEKLY.indexOf(d);
+      if(i>=0) WEEKLY.splice(i,1); else WEEKLY.push(d);
+      renderDow(); renderCards(); renderMonth();
+    });
+  });
+}
+
+el('btnSaveWeekly').addEventListener('click',function(){
+  post(WEEKLY_URL,{days:WEEKLY.slice().sort()})
+    .done(function(res){
+      if(res && res.success){ toast('success',res.message||'Weekly offs saved.'); load(); }
+      else toast('error',(res&&res.message)||'Save failed.');
+    })
+    .fail(function(){ toast('error','Save failed. Check your connection.'); });
+});
+
+/* ---------------- summary ---------------- */
+function renderCards(){
+  var list=Object.keys(ENTRIES).map(function(k){ return ENTRIES[k]; });
+  el('cHolidays').textContent=list.filter(function(e){ return e.dayType==='holiday'; }).length;
+  el('cHalf').textContent    =list.filter(function(e){ return e.dayType==='half_day'; }).length;
+  el('cWorking').textContent =list.filter(function(e){ return e.dayType==='working'; }).length;
+  el('cWeekly').textContent  =WEEKLY.length ? WEEKLY.map(function(d){ return DOW_SHORT[d]; }).join(', ') : 'None';
+}
+
+/* ---------------- month grid ---------------- */
+function renderMonth(){
+  el('monLabel').textContent=MONTHS[month]+' '+year;
+  el('gridHead').innerHTML=DOW_SHORT.map(function(d){ return '<div>'+d+'</div>'; }).join('');
+
+  var first=new Date(year,month,1).getDay();
+  var days=new Date(year,month+1,0).getDate();
+  var todayKey=key(today.getFullYear(),today.getMonth(),today.getDate());
+  var cells=[];
+
+  for(var i=0;i<first;i++) cells.push('<div class="sc-cell empty"></div>');
+
+  for(var d=1;d<=days;d++){
+    var k=key(year,month,d), e=ENTRIES[k], dow=new Date(year,month,d).getDay();
+    var cls='sc-cell', badge='';
+    if(e){
+      cls+=' t-'+e.dayType;
+      badge='<span class="sc-cell-tag">'+esc(e.dayType==='half_day' ? fmt12(e.halfDayEnd) : e.title)+'</span>';
+    } else if(WEEKLY.indexOf(dow)>=0){
+      cls+=' t-weekly';
+      badge='<span class="sc-cell-tag">Weekly off</span>';
+    }
+    if(k===todayKey) cls+=' today';
+    cells.push('<div class="'+cls+'" data-k="'+k+'"><span class="sc-cell-day">'+d+'</span>'+badge+'</div>');
+  }
+
+  el('grid').innerHTML=cells.join('');
+  el('grid').querySelectorAll('.sc-cell[data-k]').forEach(function(c){
+    c.addEventListener('click',function(){ openModal(this.dataset.k); });
+  });
+}
+
+el('monPrev').addEventListener('click',function(){
+  month--; if(month<0){ month=11; year--; load(); return; }
+  renderMonth();
+});
+el('monNext').addEventListener('click',function(){
+  month++; if(month>11){ month=0; year++; load(); return; }
+  renderMonth();
+});
+el('monToday').addEventListener('click',function(){
+  var changed=(year!==today.getFullYear());
+  year=today.getFullYear(); month=today.getMonth();
+  if(changed) load(); else renderMonth();
+});
+el('yrPrev').addEventListener('click',function(){ year--; load(); });
+el('yrNext').addEventListener('click',function(){ year++; load(); });
+
+/* ---------------- entry list ---------------- */
+function renderList(){
+  var list=Object.keys(ENTRIES).sort().map(function(k){ return ENTRIES[k]; });
+  el('listSub').textContent=list.length ? list.length+' entries in '+year : 'Nothing marked in '+year;
+
+  if(!list.length){
+    el('entryList').innerHTML='<div class="sc-empty"><i class="bx bx-calendar-x"></i><div>No holidays marked yet.<br>Click a date on the calendar to add one.</div></div>';
+    return;
+  }
+
+  el('entryList').innerHTML=list.map(function(e){
+    var o=parseKey(e.date);
+    return '<div class="sc-row t-'+e.dayType+'">'
+      +'<div class="sc-row-date"><strong>'+o.d+'</strong><small>'+MONTHS[o.m].slice(0,3)+'</small></div>'
+      +'<div class="sc-row-info">'
+      +  '<div class="sc-row-name">'+esc(e.title)+'</div>'
+      +  '<div class="sc-row-meta">'+typeLabel(e.dayType)
+      +    (e.dayType==='half_day' ? ' · closes '+fmt12(e.halfDayEnd) : '')+'</div>'
+      +'</div>'
+      +'<button class="sc-icon-btn js-del" data-id="'+e.calendarId+'" title="Remove"><i class="bx bx-trash"></i></button>'
+      +'</div>';
+  }).join('');
+
+  el('entryList').querySelectorAll('.js-del').forEach(function(b){
+    b.addEventListener('click',function(){ del(parseInt(this.dataset.id,10)); });
+  });
+}
+
+function del(id){
+  if(!id) return;
+  post(DELETE_URL,{id:id})
+    .done(function(res){
+      if(res && res.success){ toast('info',res.message||'Entry removed.'); load(); }
+      else toast('error',(res&&res.message)||'Could not remove the entry.');
+    })
+    .fail(function(){ toast('error','Could not remove the entry.'); });
+}
+
+/* ---------------- modal ---------------- */
+function syncEndVisibility(){ el('dmEndWrap').classList.toggle('d-none', el('dmType').value!=='half_day'); }
+el('dmType').addEventListener('change', syncEndVisibility);
+
+function openModal(k){
+  editDate=k;
+  var e=ENTRIES[k];
+  el('dmTitle').textContent=e?'Edit Day':'Mark Day';
+  el('dmDate').textContent=longDate(k);
+  el('dmType').value=e?e.dayType:'holiday';
+  el('dmName').value=e?e.title:'';
+  el('dmEnd').value=(e&&e.halfDayEnd)?e.halfDayEnd:'12:30';
+  el('dmClear').classList.toggle('d-none', !e);
+  el('dmClear').dataset.id=e?e.calendarId:'';
+  syncEndVisibility();
+  new bootstrap.Modal(el('dayModal')).show();
+}
+
+el('dmSave').addEventListener('click',function(){
+  var type=el('dmType').value, name=el('dmName').value.trim(), end=el('dmEnd').value;
+  if(type==='half_day' && !end){ toast('error','Set the closing time for a half day.'); return; }
+
+  post(SAVE_URL,{ date:editDate, dayType:type, title:name, halfDayEnd:(type==='half_day'?end:null) })
+    .done(function(res){
+      if(res && res.success){
+        bootstrap.Modal.getInstance(el('dayModal')).hide();
+        toast('success',res.message||'Calendar updated.');
+        load();
+      } else toast('error',(res&&res.message)||'Save failed.');
+    })
+    .fail(function(){ toast('error','Save failed. Check your connection.'); });
+});
+
+el('dmClear').addEventListener('click',function(){
+  var id=parseInt(this.dataset.id,10);
+  bootstrap.Modal.getInstance(el('dayModal')).hide();
+  del(id);
+});
+
+/* init */
+load();
+
+})();
+</script>
+}

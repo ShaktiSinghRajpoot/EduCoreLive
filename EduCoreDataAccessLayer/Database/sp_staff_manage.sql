@@ -182,8 +182,9 @@ BEGIN
            AND p_email IS NOT NULL AND TRIM(p_email) <> ''
            AND p_password_hash IS NOT NULL AND TRIM(p_password_hash) <> '' THEN
 
-            IF EXISTS (SELECT 1 FROM core.users
-                       WHERE LOWER(TRIM(email)) = LOWER(TRIM(p_email)) AND is_active = TRUE) THEN
+            -- Shared guard (Database/user_email_unique.sql) so this can't drift from
+            -- the uq_user_email_active index. The old inline check missed is_deleted.
+            IF core.fn_user_email_taken(p_email) THEN
                 RAISE EXCEPTION 'A login with this email already exists.';
             END IF;
 

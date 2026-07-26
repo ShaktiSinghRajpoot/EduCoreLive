@@ -33,7 +33,10 @@ BEGIN
         s.display_name,
         t.tenant_name,
         st.name AS status_name,
-        b.name  AS board_name,
+        -- "State Board" alone is not useful on a list of schools across states, so
+        -- boards that carry a state show it: "State Board (Maharashtra)".
+        CASE WHEN bs.name IS NOT NULL THEN b.name || ' (' || bs.name || ')' ELSE b.name END
+            AS board_name,
         sty.name AS school_type_name,
         a.city,
         a.state,
@@ -57,6 +60,8 @@ BEGIN
     LEFT JOIN config.boards b
         ON b.board_id = sp.board_id
        AND b.is_deleted = FALSE
+    LEFT JOIN config.states bs
+        ON bs.state_id = sp.board_state_id
     LEFT JOIN config.school_types sty
         ON sty.school_type_id = sp.school_type_id
        AND sty.is_deleted = FALSE

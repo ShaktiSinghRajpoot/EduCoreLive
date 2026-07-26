@@ -267,19 +267,6 @@
 @section PageScripts {
 <partial name="_ValidationScriptsPartial" />
 <script>
-<<<<<<< HEAD
-(function(){
-  function toggle(checkId, boxId){
-    var chk = document.getElementById(checkId);
-    var box = document.getElementById(boxId);
-    if (!chk) return;
-    function sync(){ if(box) box.style.display = chk.checked ? 'flex' : 'none'; }
-    chk.addEventListener('change', sync); sync();
-  }
-  toggle('chkLogin', 'loginFields');   // create login (person has none yet)
-  toggle('chkPwd',   'pwdFields');     // reset password (existing login)
-})();
-=======
     $(function () {
 
         // Department → designations (cascade), same pattern as the CRM app.
@@ -312,7 +299,11 @@
         $('#chkLogin').change(function () {
             $('#loginFields').css('display', $(this).is(':checked') ? 'flex' : 'none');
         }).trigger('change');
+
+        // Reset-password fields toggle (only present when this person already has a login).
+        $('#chkPwd').change(function () {
+            $('#pwdFields').css('display', $(this).is(':checked') ? 'flex' : 'none');
+        }).trigger('change');
     });
->>>>>>> July_Branch
 </script>
 }

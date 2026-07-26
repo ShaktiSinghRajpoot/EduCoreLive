@@ -67,6 +67,8 @@
       </div>
     </div>
 
+    @Html.AntiForgeryToken()
+
   </div>
 </div>
 
@@ -117,97 +119,139 @@
 (function(){
 'use strict';
 
-/* ---- Bell schedules per shift (would come from Period Structure SP) ---- */
-var SCHEDULES={
-  senior:[
-    {id:'p1',name:'P1',time:'08:00–08:40',type:'class'},
-    {id:'p2',name:'P2',time:'08:40–09:20',type:'class'},
-    {id:'p3',name:'P3',time:'09:20–10:00',type:'class'},
-    {id:'b1',name:'Break',time:'10:00–10:15',type:'break'},
-    {id:'p4',name:'P4',time:'10:15–10:55',type:'class'},
-    {id:'p5',name:'P5',time:'10:55–11:35',type:'class'},
-    {id:'l1',name:'Lunch',time:'11:35–12:10',type:'break'},
-    {id:'p6',name:'P6',time:'12:10–12:50',type:'class'},
-    {id:'p7',name:'P7',time:'12:50–13:30',type:'class'},
-    {id:'p8',name:'P8',time:'13:30–14:10',type:'class'}
-  ],
-  primary:[
-    {id:'p1',name:'P1',time:'08:30–09:05',type:'class'},
-    {id:'p2',name:'P2',time:'09:05–09:40',type:'class'},
-    {id:'b1',name:'Break',time:'09:40–09:55',type:'break'},
-    {id:'p3',name:'P3',time:'09:55–10:30',type:'class'},
-    {id:'p4',name:'P4',time:'10:30–11:05',type:'class'},
-    {id:'l1',name:'Lunch',time:'11:05–11:40',type:'break'},
-    {id:'p5',name:'P5',time:'11:40–12:15',type:'class'},
-    {id:'p6',name:'P6',time:'12:15–12:50',type:'class'}
-  ]
-};
-var SHIFTS=[{id:'senior',label:'Senior Wing'},{id:'primary',label:'Primary Wing'}];
-var DAYS=['Mon','Tue','Wed','Thu','Fri','Sat'];
+/* Everything below is loaded from the server: periods come from Period Structure,
+   day columns from the School Calendar's weekly offs, sections/subjects/teachers
+   from their own masters. The page stores nothing of its own. */
+var SETUP_URL  ='@Url.Action("TimetableSetup","SchoolSettings",new{area="ERP"})';
+var GRID_URL   ='@Url.Action("TimetableGrid","SchoolSettings",new{area="ERP"})';
+var TEACHER_URL='@Url.Action("TimetableTeacherGrid","SchoolSettings",new{area="ERP"})';
+var SAVE_URL   ='@Url.Action("SaveTimetableCell","SchoolSettings",new{area="ERP"})';
+var CLEAR_URL  ='@Url.Action("ClearTimetableCell","SchoolSettings",new{area="ERP"})';
+var COPY_URL   ='@Url.Action("CopyTimetableDay","SchoolSettings",new{area="ERP"})';
 
-var SUBJECTS=[
-  {id:1,name:'English'},{id:2,name:'Maths'},{id:3,name:'Science'},{id:4,name:'Social Studies'},
-  {id:5,name:'Hindi'},{id:6,name:'Computer'},{id:7,name:'Phys. Edu'},{id:8,name:'Art'}
-];
-var TEACHERS=[
-  {id:1,name:'Mrs. Rao'},{id:2,name:'Ms. Dsouza'},{id:3,name:'Mr. Khanna'},{id:4,name:'Mrs. Iyer'},
-  {id:5,name:'Mrs. Sharma'},{id:6,name:'Mr. Banerjee'},{id:7,name:'Ms. Fernandes'},{id:8,name:'Mr. Mehta'},
-  {id:9,name:'Mrs. Pillai'},{id:10,name:'Dr. Nair'},{id:11,name:'Mr. Gupta'},{id:12,name:'Ms. Verma'}
-];
-var SECTIONS=[
-  {id:'5A',label:'Class 5 – A',room:'201',wing:'senior'},
-  {id:'5B',label:'Class 5 – B',room:'202',wing:'senior'},
-  {id:'10A',label:'Class 10 – A',room:'301',wing:'senior'},
-  {id:'10B',label:'Class 10 – B',room:'302',wing:'senior'},
-  {id:'12A',label:'Class 12 – A',room:'402',wing:'senior'}
-];
+var PERIOD_LIST=[];     /* {id:period_seq, name, time, type} */
+var DAYS=[], DAY_VALUES=[];   /* labels for the UI, real 0-6 day numbers for the server */
+var SECTIONS=[], TEACHERS=[], SUBJECTS=[];
 
-/* TT[sectionId][dayIdx+'_'+periodId] = {subjectId, teacherId, room} */
-var TT={};
-SECTIONS.forEach(function(s){ TT[s.id]={}; });
-TT['10A']['0_p1']={subjectId:2,teacherId:3,room:'301'};
-TT['10A']['0_p2']={subjectId:1,teacherId:1,room:'301'};
-TT['10A']['1_p1']={subjectId:3,teacherId:10,room:'Lab-1'};
-TT['10B']['0_p1']={subjectId:4,teacherId:3,room:'302'};  // clash w/ 10A (Mr. Khanna)
-TT['10B']['0_p3']={subjectId:5,teacherId:12,room:'302'};
-TT['5A']['0_p1']={subjectId:1,teacherId:5,room:'201'};
+/* TT[dayIdx+'_'+periodSeq] = {subjectId, subjectName, teacherId, teacherName, room}
+   — only the section on screen. BUSY holds every OTHER section's teacher booking. */
+var TT={}, BUSY={}, TEACH={};
 
-var view='class', shift='senior', curSection='10A', curTeacher=1, curDay=0, ctx=null;
-function PERIODS(){ return SCHEDULES[shift]; }
+var view='class', curSection=0, curTeacher=0, curDay=0, ctx=null;
+function PERIODS(){ return PERIOD_LIST; }
 
-function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
-function subj(id){ return SUBJECTS.find(function(x){return x.id===id;}); }
 function teacherName(id){ var t=TEACHERS.find(function(x){return x.id===id;}); return t?t.name:''; }
 function sectionLabel(id){ var s=SECTIONS.find(function(x){return x.id===id;}); return s?s.label:''; }
+function dotClass(id){ return 's'+(((Math.abs(id)-1)%8)+1); }   /* reuse the 8-colour palette */
+function token(){ var t=document.querySelector('input[name="__RequestVerificationToken"]'); return t?t.value:''; }
+function post(url,payload){
+  return $.ajax({ url:url, type:'POST', contentType:'application/json',
+    headers:{ 'RequestVerificationToken':token(), 'X-Requested-With':'XMLHttpRequest' },
+    data:JSON.stringify(payload) });
+}
 
-function clashSection(sectionId,dayIdx,periodId,teacherId){
+/* A clash is the same teacher, same day+period, in another section. */
+function clashSection(dayIdx,periodId,teacherId){
   if(!teacherId) return null;
-  for(var i=0;i<SECTIONS.length;i++){
-    var sid=SECTIONS[i].id; if(sid===sectionId) continue;
-    var e=TT[sid][dayIdx+'_'+periodId];
-    if(e && e.teacherId===teacherId) return SECTIONS[i];
-  }
-  return null;
+  var label=BUSY[DAY_VALUES[dayIdx]+'_'+periodId+'_'+teacherId];
+  return label ? {label:label} : null;
+}
+
+/* ---- load ---- */
+function loadSetup(){
+  $.getJSON(SETUP_URL)
+    .done(function(s){
+      PERIOD_LIST=(s.periods||[]).map(function(p){
+        return {id:p.periodSeq, name:p.label, time:p.startTime+'–'+p.endTime, type:p.periodType};
+      });
+      SECTIONS=(s.sections||[]).map(function(x){ return {id:x.sectionId, label:x.label, room:x.roomNo}; });
+      TEACHERS=(s.teachers||[]).map(function(x){ return {id:x.staffId, name:x.fullName}; });
+      DAYS      =(s.days||[]).map(function(d){ return d.dayLabel; });
+      DAY_VALUES=(s.days||[]).map(function(d){ return d.dayOfWeek; });
+
+      fillSelectors();
+
+      if(!PERIOD_LIST.length){ toast('info','Set the daily periods in Period Structure first.'); render(); return; }
+      if(!SECTIONS.length){ toast('info','Add classes & sections first.'); render(); return; }
+
+      curSection=SECTIONS[0].id;
+      curTeacher=TEACHERS.length?TEACHERS[0].id:0;
+      loadGrid();
+    })
+    .fail(function(){ toast('error','Could not load the timetable.'); });
+}
+
+function loadGrid(){
+  if(!curSection){ render(); return; }
+  $.getJSON(GRID_URL,{sectionId:curSection})
+    .done(function(g){
+      TT={};
+      (g.entries||[]).forEach(function(e){
+        var di=DAY_VALUES.indexOf(e.dayOfWeek);
+        if(di<0) return;                       /* that day is a weekly off now */
+        TT[di+'_'+e.periodSeq]={subjectId:e.subjectId, subjectName:e.subjectName,
+                                teacherId:e.staffId||0, teacherName:e.staffName, room:e.roomNo};
+      });
+      BUSY={};
+      (g.busy||[]).forEach(function(b){ BUSY[b.dayOfWeek+'_'+b.periodSeq+'_'+b.staffId]=b.sectionLabel; });
+      SUBJECTS=(g.subjects||[]).map(function(s){ return {id:s.subjectId, name:s.subjectName}; });
+      fillSubjectSelect();
+      render();
+    })
+    .fail(function(){ toast('error','Could not load this class\'s timetable.'); });
+}
+
+function loadTeacherGrid(){
+  if(!curTeacher){ TEACH={}; render(); return; }
+  $.getJSON(TEACHER_URL,{staffId:curTeacher})
+    .done(function(rows){
+      TEACH={};
+      (rows||[]).forEach(function(e){
+        var di=DAY_VALUES.indexOf(e.dayOfWeek);
+        if(di<0) return;
+        TEACH[di+'_'+e.periodSeq]={subjectId:e.subjectId, subjectName:e.subjectName,
+                                   sectionLabel:e.sectionLabel, room:e.roomNo};
+      });
+      render();
+    })
+    .fail(function(){ toast('error','Could not load the teacher schedule.'); });
 }
 
 /* selectors */
-(function(){
+function fillSelectors(){
+  /* one bell schedule per school — the selector stays, it just has one entry */
   var sh=document.getElementById('shiftSel');
-  SHIFTS.forEach(function(s){ var o=document.createElement('option'); o.value=s.id; o.textContent=s.label; sh.appendChild(o); });
-  var pc=document.getElementById('pickClass');
-  SECTIONS.forEach(function(s){ var o=document.createElement('option'); o.value=s.id; o.textContent=s.label; pc.appendChild(o); });
-  pc.value=curSection;
-  var pt=document.getElementById('pickTeacher');
-  TEACHERS.forEach(function(t){ var o=document.createElement('option'); o.value=t.id; o.textContent=t.name; pt.appendChild(o); });
-  pt.value=curTeacher;
-  var ms=document.getElementById('mSubject'); ms.innerHTML='<option value="0">— Select —</option>';
-  SUBJECTS.forEach(function(s){ var o=document.createElement('option'); o.value=s.id; o.textContent=s.name; ms.appendChild(o); });
+  sh.innerHTML='';
+  var o=document.createElement('option');
+  o.value='school';
+  o.textContent=PERIOD_LIST.length
+    ? 'Bell Schedule · '+PERIOD_LIST[0].time.split('–')[0]+'–'+PERIOD_LIST[PERIOD_LIST.length-1].time.split('–')[1]
+    : 'No bell schedule';
+  sh.appendChild(o);
+
+  var pc=document.getElementById('pickClass'); pc.innerHTML='';
+  SECTIONS.forEach(function(s){ var x=document.createElement('option'); x.value=s.id; x.textContent=s.label; pc.appendChild(x); });
+  if(SECTIONS.length) pc.value=SECTIONS[0].id;
+
+  var pt=document.getElementById('pickTeacher'); pt.innerHTML='';
+  TEACHERS.forEach(function(t){ var x=document.createElement('option'); x.value=t.id; x.textContent=t.name; pt.appendChild(x); });
+  if(TEACHERS.length) pt.value=TEACHERS[0].id;
+
   var mt=document.getElementById('mTeacher'); mt.innerHTML='<option value="0">— Select —</option>';
-  TEACHERS.forEach(function(t){ var o=document.createElement('option'); o.value=t.id; o.textContent=t.name; mt.appendChild(o); });
-  var dt=document.getElementById('dayTabs');
+  TEACHERS.forEach(function(t){ var x=document.createElement('option'); x.value=t.id; x.textContent=t.name; mt.appendChild(x); });
+
+  var dt=document.getElementById('dayTabs'); dt.innerHTML='';
   DAYS.forEach(function(d,i){ var b=document.createElement('button'); b.className='tt-day'+(i===0?' on':''); b.textContent=d; b.dataset.d=i; dt.appendChild(b); });
-})();
+}
+
+/* the modal only offers subjects the selected class actually studies */
+function fillSubjectSelect(){
+  var ms=document.getElementById('mSubject');
+  ms.innerHTML='<option value="0">— Select —</option>';
+  SUBJECTS.forEach(function(s){ var o=document.createElement('option'); o.value=s.id; o.textContent=s.name; ms.appendChild(o); });
+}
 
 /* stats */
 function renderStats(){
@@ -216,7 +260,7 @@ function renderStats(){
   if(view==='class'){
     var filled=0, clashes=0;
     PERIODS().filter(function(p){return p.type==='class';}).forEach(function(p){
-      DAYS.forEach(function(d,di){ var e=TT[curSection][di+'_'+p.id]; if(e){ filled++; if(clashSection(curSection,di,p.id,e.teacherId)) clashes++; } });
+      DAYS.forEach(function(d,di){ var e=TT[di+'_'+p.id]; if(e){ filled++; if(clashSection(di,p.id,e.teacherId)) clashes++; } });
     });
     bar.innerHTML='<span class="tt-stat"><b>'+filled+'</b><i>/ '+classPeriods+' set</i></span>'
       +'<span class="tt-stat"><b>'+(classPeriods-filled)+'</b><i>free</i></span>'
@@ -224,7 +268,7 @@ function renderStats(){
   } else {
     var taught=0, secSet={};
     PERIODS().filter(function(p){return p.type==='class';}).forEach(function(p){
-      DAYS.forEach(function(d,di){ SECTIONS.forEach(function(sec){ var e=TT[sec.id][di+'_'+p.id]; if(e && e.teacherId===curTeacher){ taught++; secSet[sec.id]=1; } }); });
+      DAYS.forEach(function(d,di){ var e=TEACH[di+'_'+p.id]; if(e){ taught++; secSet[e.sectionLabel]=1; } });
     });
     bar.innerHTML='<span class="tt-stat"><b>'+taught+'</b><i>periods/wk</i></span>'
       +'<span class="tt-stat"><b>'+(classPeriods-taught)+'</b><i>free</i></span>'
@@ -238,11 +282,11 @@ function renderGrid(){
   var head='<thead><tr><th class="tt-pcol">Period</th>'+DAYS.map(function(d){return '<th>'+d+'</th>';}).join('')+'</tr></thead>';
   var body='<tbody>';
   PERIODS().forEach(function(p){
-    if(p.type==='break'){
-      body+='<tr class="tt-break"><td class="tt-pcell"><div class="tt-pname">'+p.name+'</div><div class="tt-ptime">'+p.time+'</div></td><td colspan="'+DAYS.length+'">'+p.name+' · '+p.time+'</td></tr>';
+    if(p.type!=='class'){          /* break and lunch are not bookable */
+      body+='<tr class="tt-break"><td class="tt-pcell"><div class="tt-pname">'+esc(p.name)+'</div><div class="tt-ptime">'+p.time+'</div></td><td colspan="'+DAYS.length+'">'+esc(p.name)+' · '+p.time+'</td></tr>';
       return;
     }
-    body+='<tr><td><div class="tt-pcell"><div class="tt-pname">'+p.name+'</div><div class="tt-ptime">'+p.time+'</div></div></td>';
+    body+='<tr><td><div class="tt-pcell"><div class="tt-pname">'+esc(p.name)+'</div><div class="tt-ptime">'+p.time+'</div></div></td>';
     DAYS.forEach(function(d,di){ body+='<td>'+cellHtml(di,p.id,false)+'</td>'; });
     body+='</tr>';
   });
@@ -254,29 +298,26 @@ function renderMob(){
   var box=document.getElementById('mobList');
   document.querySelectorAll('.tt-day').forEach(function(b){ b.classList.toggle('on', parseInt(b.dataset.d,10)===curDay); });
   box.innerHTML=PERIODS().map(function(p){
-    if(p.type==='break') return '<div class="tt-mbreak">'+p.name+' · '+p.time+'</div>';
-    return '<div class="tt-mrow"><div class="tt-mp"><div class="tt-mp-name">'+p.name+'</div><div class="tt-mp-time">'+p.time+'</div></div>'+cellHtml(curDay,p.id,true)+'</div>';
+    if(p.type!=='class') return '<div class="tt-mbreak">'+esc(p.name)+' · '+p.time+'</div>';
+    return '<div class="tt-mrow"><div class="tt-mp"><div class="tt-mp-name">'+esc(p.name)+'</div><div class="tt-mp-time">'+p.time+'</div></div>'+cellHtml(curDay,p.id,true)+'</div>';
   }).join('');
 }
 
 function cellHtml(dayIdx,periodId,mob){
   var base=mob?'tt-mcell':'tt-cell';
   if(view==='class'){
-    var e=TT[curSection][dayIdx+'_'+periodId];
+    var e=TT[dayIdx+'_'+periodId];
     if(!e){ return '<'+(mob?'div':'button')+' class="'+base+' empty js-cell" data-d="'+dayIdx+'" data-p="'+periodId+'"><i class="bx bx-plus"></i>'+(mob?'Add':'')+'</'+(mob?'div':'button')+'>'; }
-    var c=clashSection(curSection,dayIdx,periodId,e.teacherId), s=subj(e.subjectId);
+    var c=clashSection(dayIdx,periodId,e.teacherId);
     return '<'+(mob?'div':'button')+' class="'+base+' js-cell'+(c?' clash':'')+'" data-d="'+dayIdx+'" data-p="'+periodId+'">'
-      +'<div class="tt-subj"><span class="dot s'+e.subjectId+'"></span>'+esc(s?s.name:'')+(c?' <i class="bx bx-error tt-clash-ic" title="Clash with '+esc(c.label)+'"></i>':'')+'</div>'
-      +'<div class="tt-teacher">'+esc(teacherName(e.teacherId))+'</div>'
+      +'<div class="tt-subj"><span class="dot '+dotClass(e.subjectId)+'"></span>'+esc(e.subjectName)+(c?' <i class="bx bx-error tt-clash-ic" title="Clash with '+esc(c.label)+'"></i>':'')+'</div>'
+      +'<div class="tt-teacher">'+esc(e.teacherName||'Unassigned')+'</div>'
       +'<div class="tt-room">Room '+esc(e.room||'—')+'</div></'+(mob?'div':'button')+'>';
   } else {
-    for(var i=0;i<SECTIONS.length;i++){
-      var sid=SECTIONS[i].id, e2=TT[sid][dayIdx+'_'+periodId];
-      if(e2 && e2.teacherId===curTeacher){
-        var s2=subj(e2.subjectId);
-        return '<div class="'+base+' ro"><div class="tt-subj"><span class="dot s'+e2.subjectId+'"></span>'+esc(s2?s2.name:'')+'</div>'
-          +'<div class="tt-teacher">'+esc(SECTIONS[i].label)+'</div><div class="tt-room">Room '+esc(e2.room||'—')+'</div></div>';
-      }
+    var e2=TEACH[dayIdx+'_'+periodId];
+    if(e2){
+      return '<div class="'+base+' ro"><div class="tt-subj"><span class="dot '+dotClass(e2.subjectId)+'"></span>'+esc(e2.subjectName)+'</div>'
+        +'<div class="tt-teacher">'+esc(e2.sectionLabel)+'</div><div class="tt-room">Room '+esc(e2.room||'—')+'</div></div>';
     }
     return '<div class="'+base+' ro empty"><span style="font-size:.7rem;font-weight:700;">Free</span></div>';
   }
@@ -297,53 +338,71 @@ function bindCells(){
 
 /* cell editor */
 function openCell(dayIdx,periodId){
+  if(!SUBJECTS.length){ toast('error','This class has no subjects yet — set them in Subject Management.'); return; }
   ctx={dayIdx:dayIdx,periodId:periodId};
-  var e=TT[curSection][dayIdx+'_'+periodId]||{subjectId:0,teacherId:0,room:''};
-  var pname=PERIODS().find(function(p){return p.id===periodId;}).name;
-  document.getElementById('cellSlot').textContent=sectionLabel(curSection)+' · '+DAYS[dayIdx]+' · '+pname;
+  var e=TT[dayIdx+'_'+periodId]||{subjectId:0,teacherId:0,room:''};
+  var p=PERIODS().find(function(x){return x.id===periodId;});
+  document.getElementById('cellSlot').textContent=sectionLabel(curSection)+' · '+DAYS[dayIdx]+' · '+(p?p.name:'');
   document.getElementById('mSubject').value=e.subjectId||0;
   document.getElementById('mTeacher').value=e.teacherId||0;
-  document.getElementById('mRoom').value=e.room || (SECTIONS.find(function(s){return s.id===curSection;}).room) || '';
+  var sec=SECTIONS.find(function(s){return s.id===curSection;});
+  document.getElementById('mRoom').value=e.room || (sec?sec.room:'') || '';
+  document.getElementById('cellClear').style.display = e.subjectId ? '' : 'none';
   checkModalClash();
   new bootstrap.Modal(document.getElementById('cellModal')).show();
 }
 function checkModalClash(){
   if(!ctx) return;
   var tid=parseInt(document.getElementById('mTeacher').value,10);
-  var c=clashSection(curSection,ctx.dayIdx,ctx.periodId,tid), w=document.getElementById('cellWarn');
+  var c=clashSection(ctx.dayIdx,ctx.periodId,tid), w=document.getElementById('cellWarn');
   if(c){ document.getElementById('cellWarnTxt').textContent=teacherName(tid)+' is already teaching '+c.label+' at this slot.'; w.classList.add('show'); }
   else w.classList.remove('show');
 }
 document.getElementById('mTeacher').addEventListener('change',checkModalClash);
+
 document.getElementById('cellSave').addEventListener('click',function(){
   var sid=parseInt(document.getElementById('mSubject').value,10), tid=parseInt(document.getElementById('mTeacher').value,10);
   if(!sid){ toast('error','Pick a subject.'); return; }
-  TT[curSection][ctx.dayIdx+'_'+ctx.periodId]={subjectId:sid,teacherId:tid,room:document.getElementById('mRoom').value.trim()};
-  // Wire to SP: save timetable cell (sectionId, day, periodId, subjectId, teacherId, room)
-  bootstrap.Modal.getInstance(document.getElementById('cellModal')).hide();
-  render(); toast('success','Period updated.');
-});
-document.getElementById('cellClear').addEventListener('click',function(){
-  delete TT[curSection][ctx.dayIdx+'_'+ctx.periodId];
-  bootstrap.Modal.getInstance(document.getElementById('cellModal')).hide();
-  render(); toast('info','Period cleared.');
+  var btn=this; btn.disabled=true;
+
+  /* The proc has the final say on clashes — it rejects a double-booked teacher. */
+  post(SAVE_URL,{ sectionId:curSection, day:DAY_VALUES[ctx.dayIdx], periodSeq:ctx.periodId,
+                  subjectId:sid, staffId:tid||null, room:document.getElementById('mRoom').value.trim() })
+    .done(function(res){
+      if(res && res.success){
+        bootstrap.Modal.getInstance(document.getElementById('cellModal')).hide();
+        toast('success',res.message||'Period updated.');
+        loadGrid();
+      } else toast('error',(res&&res.message)||'Could not save this period.');
+    })
+    .fail(function(){ toast('error','Save failed. Check your connection.'); })
+    .always(function(){ btn.disabled=false; });
 });
 
-/* copy Monday → whole week */
+document.getElementById('cellClear').addEventListener('click',function(){
+  post(CLEAR_URL,{ sectionId:curSection, day:DAY_VALUES[ctx.dayIdx], periodSeq:ctx.periodId })
+    .done(function(res){
+      bootstrap.Modal.getInstance(document.getElementById('cellModal')).hide();
+      if(res && res.success){ toast('info',res.message||'Period cleared.'); loadGrid(); }
+      else toast('error',(res&&res.message)||'Could not clear this period.');
+    })
+    .fail(function(){ toast('error','Could not clear this period.'); });
+});
+
+/* copy the first working day → whole week */
 document.getElementById('btnCopy').addEventListener('click',function(){
+  if(!DAYS.length) return;
   var classP=PERIODS().filter(function(p){return p.type==='class';});
-  var monCount=classP.filter(function(p){return TT[curSection]['0_'+p.id];}).length;
-  if(!monCount){ toast('error','Monday is empty — fill it first, then copy.'); return; }
-  if(!confirm('Copy Monday’s '+monCount+' period(s) to Tue–Sat for '+sectionLabel(curSection)+'? This overwrites those days.')) return;
-  for(var di=1; di<DAYS.length; di++){
-    classP.forEach(function(p){
-      var src=TT[curSection]['0_'+p.id];
-      if(src) TT[curSection][di+'_'+p.id]={subjectId:src.subjectId,teacherId:src.teacherId,room:src.room};
-      else delete TT[curSection][di+'_'+p.id];
-    });
-  }
-  // Wire to SP: bulk-save copied week
-  render(); toast('success','Monday copied across the week. Review flagged clashes & tweak.');
+  var srcCount=classP.filter(function(p){return TT['0_'+p.id];}).length;
+  if(!srcCount){ toast('error',DAYS[0]+' is empty — fill it first, then copy.'); return; }
+  if(!confirm('Copy '+DAYS[0]+'’s '+srcCount+' period(s) to the rest of the week for '+sectionLabel(curSection)+'? This overwrites those days.')) return;
+
+  post(COPY_URL,{ sectionId:curSection, day:DAY_VALUES[0] })
+    .done(function(res){
+      if(res && res.success){ toast('success',res.message||'Copied across the week.'); loadGrid(); }
+      else toast('error',(res&&res.message)||'Copy failed.');
+    })
+    .fail(function(){ toast('error','Copy failed. Check your connection.'); });
 });
 
 /* toolbar */
@@ -356,15 +415,14 @@ document.querySelectorAll('#viewSeg button').forEach(function(b){
     document.getElementById('modeHint').innerHTML = view==='class'
       ? '<i class="bx bx-info-circle"></i> Click a cell to assign'
       : '<i class="bx bx-lock-alt"></i> Read-only — from class timetables';
-    render();
+    if(view==='teacher') loadTeacherGrid(); else loadGrid();
   });
 });
-document.getElementById('shiftSel').addEventListener('change',function(){ shift=this.value; render(); });
-document.getElementById('pickClass').addEventListener('change',function(){ curSection=this.value; render(); });
-document.getElementById('pickTeacher').addEventListener('change',function(){ curTeacher=parseInt(this.value,10); render(); });
+document.getElementById('pickClass').addEventListener('change',function(){ curSection=parseInt(this.value,10); loadGrid(); });
+document.getElementById('pickTeacher').addEventListener('change',function(){ curTeacher=parseInt(this.value,10); loadTeacherGrid(); });
 document.getElementById('dayTabs').addEventListener('click',function(e){ var b=e.target.closest('.tt-day'); if(!b) return; curDay=parseInt(b.dataset.d,10); renderMob(); });
 
-render();
+loadSetup();
 
 })();
 </script>

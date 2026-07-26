@@ -1,7 +1,8 @@
 @{
     ViewData["Title"] = "Subject Management";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
-    var classes = ViewBag.Classes as List<string> ?? new List<string>();
+    var classes = ViewBag.Classes as List<EduCoreDataAccessLayer.Models.ERP.SubjectClassItem>
+                  ?? new List<EduCoreDataAccessLayer.Models.ERP.SubjectClassItem>();
 }
 
 @section PageStyles {
@@ -42,13 +43,13 @@
                 <div class="sm-class-list" id="classList">
                     @foreach (var cls in classes)
                     {
-                        <div class="sm-class-item" data-class="@cls">
+                        <div class="sm-class-item" data-class="@cls.ClassName" data-id="@cls.AcademicClassId">
                             <div class="sm-class-ic"><i class="bx bx-book-open"></i></div>
                             <div class="flex-grow-1 min-width-0">
-                                <div class="sm-class-name">@cls</div>
-                                <div class="sm-class-meta"><span class="cls-subj-count">0</span> subjects</div>
+                                <div class="sm-class-name">@cls.ClassName</div>
+                                <div class="sm-class-meta"><span class="cls-subj-count">@cls.SubjectCount</span> subjects</div>
                             </div>
-                            <span class="sm-count-badge sm-badge-zero cls-badge">0</span>
+                            <span class="sm-count-badge sm-badge-zero cls-badge">@cls.SubjectCount</span>
                         </div>
                     }
                 </div>
@@ -133,6 +134,7 @@
 
     </div>
 
+    @Html.AntiForgeryToken()
 
   </div>
 </div>
@@ -170,12 +172,15 @@ $(document).ready(function () {
     }
 
     // ── State ─────────────────────────────────────────────────────────────────
-    // subjectData: { 'Class 9': ['Mathematics','English', ...], ... }
-    // Pre-populate from localStorage so data survives page navigation
-    const LS_KEY     = 'educore_subjects';
-    const subjectData = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    let activeClass   = null;
-    let originalSnap  = [];   // snapshot of subjects when class was loaded
+    // subjectData: { <academic_class_id>: ['Mathematics','English', ...] }
+    // Loaded from the server per class, saved back through the subject proc.
+    const LOAD_URL   = '@Url.Action("ClassSubjects","SchoolSettings",new{area="ERP"})';
+    const SAVE_URL   = '@Url.Action("SaveClassSubjects","SchoolSettings",new{area="ERP"})';
+    const LS_KEY     = 'educore_subjects';   // still mirrored: CreateExam/MarkEntry read this
+    const subjectData = {};
+    let activeClass   = null;   // display name
+    let activeId      = 0;      // academic_class_id
+    let originalSnap  = [];     // snapshot of subjects when class was loaded
 
     // ── Helpers ──────────────────────────────────────────────────────────────
     // Unified: route through the app-wide ecToast/toastr.
@@ -183,19 +188,24 @@ $(document).ready(function () {
         window.ecToast(type === 'error' ? 'error' : 'success', msg);
     }
 
-    function getSubjects(cls) {
-        return subjectData[cls] || [];
+    function getSubjects(id) {
+        return subjectData[id] || [];
     }
 
-    function setSubjects(cls, arr) {
-        subjectData[cls] = arr;
-        updateClassBadge(cls);
+    function setSubjects(id, arr) {
+        subjectData[id] = arr;
+        updateClassBadge(id);
+    }
+
+    function token() {
+        const t = document.querySelector('input[name="__RequestVerificationToken"]');
+        return t ? t.value : '';
     }
 
     // ── Update left panel badge ───────────────────────────────────────────────
-    function updateClassBadge(cls) {
-        const count = getSubjects(cls).length;
-        const $item = $('#classList .sm-class-item[data-class="' + CSS.escape(cls) + '"]');
+    function updateClassBadge(id, forceCount) {
+        const $item  = $('#classList .sm-class-item[data-id="' + id + '"]');
+        const count  = (typeof forceCount === 'number') ? forceCount : getSubjects(id).length;
         const $badge = $item.find('.cls-badge');
         const $meta  = $item.find('.cls-subj-count');
 
@@ -209,8 +219,8 @@ $(document).ready(function () {
 
     // ── Render subject pills ──────────────────────────────────────────────────
     function renderPills() {
-        if (!activeClass) return;
-        const subjects = getSubjects(activeClass);
+        if (!activeId) return;
+        const subjects = getSubjects(activeId);
         const $wrap    = $('#smPillWrap');
         $wrap.empty();
 
@@ -252,8 +262,8 @@ $(document).ready(function () {
     }
 
     function updateSuggestionState() {
-        if (!activeClass) return;
-        const added = getSubjects(activeClass).map(s => s.toLowerCase());
+        if (!activeId) return;
+        const added = getSubjects(activeId).map(s => s.toLowerCase());
         $('#smSuggestChips .sm-suggest-chip').each(function() {
             const s = $(this).data('subj').toLowerCase();
             if (added.includes(s)) {
@@ -267,13 +277,14 @@ $(document).ready(function () {
     }
 
     // ── Load a class into the work area ──────────────────────────────────────
-    function loadClass(cls) {
+    function loadClass(id, cls) {
+        activeId     = id;
         activeClass  = cls;
-        originalSnap = [...getSubjects(cls)];
+        originalSnap = [...getSubjects(id)];
 
         // Highlight left panel
         $('#classList .sm-class-item').removeClass('active');
-        $(`#classList .sm-class-item[data-class="${CSS.escape(cls)}"]`).addClass('active');
+        $(`#classList .sm-class-item[data-id="${id}"]`).addClass('active');
 
         // Show work area
         $('#smEmptyState').hide();
@@ -290,11 +301,20 @@ $(document).ready(function () {
         $('#smSubjInput').val('').focus();
     }
 
-    // ── Class item click ──────────────────────────────────────────────────────
+    // ── Class item click — fetch the class's saved subjects once, then cache ──
     $(document).on('click', '.sm-class-item', function() {
+        const id  = parseInt($(this).data('id'), 10);
         const cls = $(this).data('class');
-        if (cls === activeClass) return;
-        loadClass(cls);
+        if (!id || id === activeId) return;
+
+        if (subjectData[id]) { loadClass(id, cls); return; }
+
+        $.getJSON(LOAD_URL, { classId: id })
+            .done(function(list) {
+                subjectData[id] = list || [];
+                loadClass(id, cls);
+            })
+            .fail(function() { showToast('Could not load subjects for ' + cls + '.', 'error'); });
     });
 
     // ── Add via suggestion chip ───────────────────────────────────────────────
@@ -317,60 +337,77 @@ $(document).ready(function () {
     });
 
     function addSubject(s) {
-        if (!activeClass) return;
-        const subjects = getSubjects(activeClass);
+        if (!activeId) return;
+        const subjects = getSubjects(activeId);
         if (subjects.map(x => x.toLowerCase()).includes(s.toLowerCase())) {
             showToast(s + ' is already added.', 'error');
             return;
         }
         subjects.push(s);
-        setSubjects(activeClass, subjects);
+        setSubjects(activeId, subjects);
         renderPills();
     }
 
     // ── Remove pill ───────────────────────────────────────────────────────────
     $(document).on('click', '.sm-pill-remove', function() {
         const s = $(this).closest('.sm-pill').data('subject');
-        if (!activeClass) return;
-        const subjects = getSubjects(activeClass).filter(x => x !== s);
-        setSubjects(activeClass, subjects);
+        if (!activeId) return;
+        const subjects = getSubjects(activeId).filter(x => x !== s);
+        setSubjects(activeId, subjects);
         renderPills();
     });
 
     // ── Discard changes ───────────────────────────────────────────────────────
     $('#smCancelBtn').on('click', function() {
-        if (!activeClass) return;
-        setSubjects(activeClass, [...originalSnap]);
+        if (!activeId) return;
+        setSubjects(activeId, [...originalSnap]);
         renderPills();
         showToast('Changes discarded.', 'error');
     });
 
-    // ── Save — persists to localStorage so CreateExam can read it ────────────
+    // ── Save — replace-all for this class, through the subject proc ──────────
     $('#smSaveBtn').on('click', function() {
-        if (!activeClass) return;
-        originalSnap = [...getSubjects(activeClass)];
-        localStorage.setItem(LS_KEY, JSON.stringify(subjectData));
-        showToast('Subjects saved · CreateExam will use these subjects.', 'success');
-        updateAllBadges();
+        if (!activeId) return;
+        const subjects = getSubjects(activeId);
+        const $btn = $(this).prop('disabled', true);
+
+        $.ajax({
+            url:         SAVE_URL,
+            type:        'POST',
+            contentType: 'application/json',
+            headers:     { 'RequestVerificationToken': token(), 'X-Requested-With': 'XMLHttpRequest' },
+            data:        JSON.stringify({ classId: activeId, subjects: subjects })
+        })
+        .done(function(res) {
+            if (res && res.success) {
+                originalSnap = [...subjects];
+                updateClassBadge(activeId);
+                mirrorToLocalStorage();
+                showToast(res.message || 'Subjects saved.', 'success');
+            } else {
+                showToast((res && res.message) || 'Save failed.', 'error');
+            }
+        })
+        .fail(function() { showToast('Save failed. Check your connection.', 'error'); })
+        .always(function() { $btn.prop('disabled', false); });
     });
 
-    function updateAllBadges() {
+    // CreateExam and MarkEntry still read subjects out of localStorage; keep that
+    // key in step until those two pages are wired to the server as well.
+    function mirrorToLocalStorage() {
+        const byName = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
         $('#classList .sm-class-item').each(function() {
-            updateClassBadge($(this).data('class'));
+            const id = parseInt($(this).data('id'), 10);
+            if (subjectData[id]) byName[$(this).data('class')] = subjectData[id];
         });
+        localStorage.setItem(LS_KEY, JSON.stringify(byName));
     }
 
-    // ── Init — restore badges from localStorage ───────────────────────────────
+    // ── Init — colour the badges the server already rendered ─────────────────
     $('#classList .sm-class-item').each(function() {
-        updateClassBadge($(this).data('class'));
+        const id = parseInt($(this).data('id'), 10);
+        updateClassBadge(id, parseInt($(this).find('.cls-badge').text(), 10) || 0);
     });
-
-    // Show a connected indicator if data already exists in localStorage
-    const stored = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    const configuredCount = Object.keys(stored).filter(k => stored[k].length > 0).length;
-    if (configuredCount > 0) {
-        showToast(configuredCount + ' classes already configured · connected to Create Exam.', 'success');
-    }
 
 });
 </script>

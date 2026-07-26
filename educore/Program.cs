@@ -3,8 +3,10 @@ using educore.Services.Notifications;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Services;
+using EduCoreDataAccessLayer.Services.Contract;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using EduCoreDataAccessLayer.Services.Contract.SuperAdmin;
+using EduCoreDataAccessLayer.Services.Repository;
 using EduCoreDataAccessLayer.Services.Repository.ERP;
 using EduCoreDataAccessLayer.Services.Repository.SuperAdmin;
 using Microsoft.AspNetCore.Authentication;
@@ -140,6 +142,9 @@ builder.Services.AddSingleton<AppCache>();
 // Stateless over the bound EmailSettings, so singleton. Settings come from the "Email"
 // config section; secrets live in appsettings.Development.json / Email__* env vars.
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Email"));
+
+// Support contacts for Account/SchoolUnavailable (school-status block page).
+builder.Services.Configure<SupportSettings>(builder.Configuration.GetSection("Support"));
 builder.Services.AddSingleton<IEmailService, EmailService>();
 
 // WHY: channel-agnostic notifications. INotificationService fans a message out to every enabled
@@ -154,6 +159,7 @@ builder.Services.AddSingleton<INotificationService, NotificationService>();
 
 builder.Services.AddScoped<IBaseService, BaseService>();
 builder.Services.AddScoped<IReferenceDataService, ReferenceDataService>();
+builder.Services.AddScoped<IGeoService, GeoService>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<ISchoolSettingsService, SchoolSettingsService>();
 builder.Services.AddScoped<ISchoolService, SchoolService>();
@@ -163,6 +169,9 @@ builder.Services.AddScoped<ITransferCertificateService, TransferCertificateServi
 builder.Services.AddScoped<IIdCardService, IdCardService>();
 builder.Services.AddScoped<IAttendanceService, AttendanceService>();
 builder.Services.AddScoped<IClassTeacherService, ClassTeacherService>();
+builder.Services.AddScoped<ISchoolCalendarService, SchoolCalendarService>();
+builder.Services.AddScoped<ISubjectService, SubjectService>();
+builder.Services.AddScoped<ITimetableService, TimetableService>();
 builder.Services.AddScoped<IAdmissionWorkflowService, AdmissionWorkflowService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<IFeePaymentService, FeePaymentService>();

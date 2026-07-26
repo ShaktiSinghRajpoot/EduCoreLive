@@ -1,0 +1,107 @@
+@model educore.Models.GeoPickerModel
+@*
+    Shared Country → State → District → City picker.
+
+    Usage (any address form):
+        @await Html.PartialAsync("_StateDistrictCity", new GeoPickerModel { StateId = Model.StateId, ... })
+    plus, once per page:
+        <script src="~/js/geo-cascade.js" asp-append-version="true"></script>
+
+    Options are fetched from /Geo/* by wwwroot/js/geo-cascade.js, so the partial
+    renders no option lists server-side and needs nothing in the controller beyond
+    the current ids. State/district TEXT is posted alongside the ids in hidden
+    inputs, because core.school_addresses (and the student/staff address tables)
+    still store and report on the varchar columns.
+
+    Two pickers on one page (permanent + correspondence) need distinct InstanceId.
+*@
+@{
+    var uid = Model.InstanceId;
+    var countryId = $"geoCountry{uid}";
+    var stateId = $"geoState{uid}";
+    var districtId = $"geoDistrict{uid}";
+    var cityId = $"geoCity{uid}";
+    var cityListId = $"geoCityList{uid}";
+}
+<div class="row g-3" data-geo-cascade
+     data-geo-state="@(Model.StateId?.ToString() ?? "")"
+     data-geo-district="@(Model.DistrictId?.ToString() ?? "")">
+
+    @if (Model.ShowCountry)
+    {
+        <div class="@Model.ColumnCss">
+            <label class="form-label" for="@countryId">Country</label>
+            <select id="@countryId" name="@Model.CountryFieldName" class="form-select" data-geo="country">
+                <option value="">Select Country</option>
+            </select>
+        </div>
+    }
+    else
+    {
+        <input type="hidden" name="@Model.CountryFieldName" value="@(Model.CountryId?.ToString() ?? "")" />
+    }
+
+    <div class="@Model.ColumnCss">
+        <label class="form-label" for="@stateId">
+            State @if (Model.StateRequired)
+            {<span class="text-danger">*</span>}
+        </label>
+        @* Locked variant: the select stays (geo-cascade still reads its value to load
+           districts) but is disabled and carries no name — a disabled control posts
+           nothing — so a hidden input supplies StateId instead. The server enforces
+           this too; the lock here is only so the user isn't offered a dead choice. *@
+        <select id="@stateId" class="form-select" data-geo="state"
+                name="@(Model.StateReadOnly ? null : Model.StateFieldName)"
+                disabled="@(Model.StateReadOnly ? "disabled" : null)">
+            <option value="">Select State</option>
+        </select>
+        @if (Model.StateReadOnly)
+        {
+            <input type="hidden" name="@Model.StateFieldName" value="@(Model.StateId?.ToString() ?? "")" />
+            @if (!string.IsNullOrWhiteSpace(Model.StateReadOnlyNote))
+            {
+                <span class="text-muted small d-block">
+                    <i class="bx bx-lock-alt"></i> @Model.StateReadOnlyNote
+                </span>
+            }
+        }
+        <input type="hidden" name="@Model.StateTextFieldName" data-geo-text="state" />
+        @if (Model.StateId == null && !string.IsNullOrWhiteSpace(Model.LegacyStateText))
+        {
+            @* Legacy row whose free-text state never matched a real state ('UP', 'Haryanafff').
+               Say so, otherwise the box just looks mysteriously empty on an existing record. *@
+            <span class="text-warning small">
+                Saved as &ldquo;@Model.LegacyStateText&rdquo; — please re-select the state.
+            </span>
+        }
+    </div>
+
+    @if (Model.ShowDistrict)
+    {
+        <div class="@Model.ColumnCss">
+            <label class="form-label" for="@districtId">
+                District @if (Model.DistrictRequired)
+                {<span class="text-danger">*</span>}
+            </label>
+            <select id="@districtId" name="@Model.DistrictFieldName" class="form-select" data-geo="district">
+                <option value="">Select District</option>
+            </select>
+            <input type="hidden" name="@Model.DistrictTextFieldName" data-geo-text="district" />
+        </div>
+    }
+
+    @if (Model.ShowCity)
+    {
+        <div class="@Model.ColumnCss">
+            <label class="form-label" for="@cityId">
+                City / Town @if (Model.CityRequired)
+                {<span class="text-danger">*</span>}
+            </label>
+            <input id="@cityId" name="@Model.CityFieldName" class="form-control" list="@cityListId"
+                   value="@Model.City" maxlength="100" autocomplete="off" data-geo="city"
+                   placeholder="Start typing…" />
+            @* Suggestions only — a school in a town that isn't a district HQ can still type its own. *@
+            <datalist id="@cityListId" data-geo-list="city"></datalist>
+        </div>
+    }
+</div>

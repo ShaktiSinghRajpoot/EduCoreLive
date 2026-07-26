@@ -99,6 +99,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             model.AffiliationNumber = row["affiliation_number"] == DBNull.Value ? null : row["affiliation_number"].ToString();
             model.BoardId = row["board_id"] == DBNull.Value ? null : Convert.ToInt32(row["board_id"]);
             model.BoardName = row["board_name"] == DBNull.Value ? null : row["board_name"].ToString();
+            // Locks the address State when the board is granted by a single state.
+            model.BoardRequiresState = row.Table.Columns.Contains("board_requires_state")
+                                       && row["board_requires_state"] != DBNull.Value
+                                       && Convert.ToBoolean(row["board_requires_state"]);
             model.SchoolTypeId = row["school_type_id"] == DBNull.Value ? null : Convert.ToInt32(row["school_type_id"]);
             model.SchoolTypeName = row["school_type_name"] == DBNull.Value ? null : row["school_type_name"].ToString();
             model.OwnershipTypeId = row["ownership_type_id"] == DBNull.Value ? null : Convert.ToInt32(row["ownership_type_id"]);
@@ -114,6 +118,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             model.District = row["district"] == DBNull.Value ? null : row["district"].ToString();
             model.State = row["state"] == DBNull.Value ? string.Empty : row["state"].ToString() ?? string.Empty;
             model.Pincode = row["pincode"] == DBNull.Value ? string.Empty : row["pincode"].ToString() ?? string.Empty;
+
+            // Geography ids so the shared Country -> State -> District picker pre-selects,
+            // instead of this page showing free-text boxes that drift from what the
+            // SuperAdmin wizard stored (see Database/geo_master.sql).
+            model.CountryId = row.Table.Columns.Contains("country_id") && row["country_id"] != DBNull.Value ? Convert.ToInt32(row["country_id"]) : null;
+            model.StateId = row.Table.Columns.Contains("state_id") && row["state_id"] != DBNull.Value ? Convert.ToInt32(row["state_id"]) : null;
+            model.DistrictId = row.Table.Columns.Contains("district_id") && row["district_id"] != DBNull.Value ? Convert.ToInt32(row["district_id"]) : null;
             model.ContactTypeId = row["contact_type_id"] == DBNull.Value ? 1 : Convert.ToInt32(row["contact_type_id"]);
             model.ContactName = row["contact_name"] == DBNull.Value ? string.Empty : row["contact_name"].ToString() ?? string.Empty;
             model.Designation = row["designation"] == DBNull.Value ? null : row["designation"].ToString();
@@ -176,6 +187,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_enable_sms", model.EnableSms),
                 new NpgsqlParameter("p_enable_email", model.EnableEmail),
                 new NpgsqlParameter("p_enable_whatsapp", model.EnableWhatsapp),
+
+                // Must stay immediately before p_result — the proc declares them in this
+                // order. The proc COALESCEs them, so a null never wipes existing geography.
+                new NpgsqlParameter("p_country_id", (object?)model.CountryId ?? DBNull.Value),
+                new NpgsqlParameter("p_state_id", (object?)model.StateId ?? DBNull.Value),
+                new NpgsqlParameter("p_district_id", (object?)model.DistrictId ?? DBNull.Value),
+
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "basic_profile_cursor" }
             };
 

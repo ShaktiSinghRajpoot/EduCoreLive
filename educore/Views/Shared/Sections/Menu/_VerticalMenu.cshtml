@@ -411,7 +411,7 @@
         @* ---- Settings ---- *@
         @if (gSettings)
         {
-        <li class='menu-item @Open("BasicProfile","Documents","AcademicYears","ClassSection","SubjectManagement","AssignClassTeacher","PeriodStructure","SmartBell","FeeHead","FeeStructure","WorkflowSettings","StaffMasters","Roles")'>
+        <li class='menu-item @Open("BasicProfile","Documents","AcademicYears","ClassSection","SubjectManagement","AssignClassTeacher","PeriodStructure","SchoolCalendar","SmartBell","FeeHead","FeeStructure","WorkflowSettings","StaffMasters","Roles")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-cog ic-settings"></i>
                 <div class="text-truncate">School Settings</div>
@@ -431,6 +431,7 @@
                 <li class='menu-item @On("ClassSection")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="ClassSection" class="menu-link"><i class="bx bx-grid-alt submenu-icon c-blue"></i><div class="text-truncate">Classes &amp; Sections</div></a></li>
                 <li class='menu-item @On("SubjectManagement")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SubjectManagement" class="menu-link"><i class="bx bx-book-alt submenu-icon c-purple"></i><div class="text-truncate">Subjects</div></a></li>
                 <li class='menu-item @On("PeriodStructure")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="PeriodStructure" class="menu-link"><i class="bx bx-time submenu-icon c-teal"></i><div class="text-truncate">Period Structure</div></a></li>
+                <li class='menu-item @On("SchoolCalendar")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SchoolCalendar" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-purple"></i><div class="text-truncate">School Calendar</div></a></li>
                 <li class='menu-item @On("SmartBell")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SmartBell" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Smart Bell</div></a></li>
                 <li class='menu-item @On("AssignClassTeacher")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AssignClassTeacher" class="menu-link"><i class="bx bx-user-voice submenu-icon c-green"></i><div class="text-truncate">Assign Class Teacher</div></a></li>
                 }

@@ -3,6 +3,7 @@ using educore.Services;
 using educore.Services.Notifications;
 using EduCoreDataAccessLayer.Extensions;
 using EduCoreDataAccessLayer.Helpers;
+using EduCoreDataAccessLayer.Services.Contract;
 using EduCoreDataAccessLayer.Services.Contract.SuperAdmin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,10 +19,14 @@ namespace educore.Areas.SuperAdmin.Controllers
     {
         private readonly ISchoolService _schoolService;
         private readonly INotificationService _notificationService;
-        public SchoolsController(ISchoolService schoolService, INotificationService notificationService)
+        private readonly IGeoService _geoService;
+        private readonly IWebHostEnvironment _env;
+        public SchoolsController(ISchoolService schoolService, INotificationService notificationService, IGeoService geoService, IWebHostEnvironment env)
         {
             _schoolService = schoolService;
             _notificationService = notificationService;
+            _geoService = geoService;
+            _env = env;
         }
 
         [HttpGet]
@@ -84,6 +89,32 @@ namespace educore.Areas.SuperAdmin.Controllers
                 Selected = selected.HasValue && selected.Value == x.Id
             }).ToList();
 
+        /// <summary>
+        /// Live "is this email free?" for the wizard, so the super admin finds out on blur
+        /// instead of after filling all four steps and hitting Save.
+        ///
+        /// Calls the SAME guard as the save path (core.fn_user_email_taken), so the hint and
+        /// the actual result can never disagree. This is a convenience, not the enforcement —
+        /// sp_school_manage and the uq_user_email_active index still decide.
+        ///
+        /// An "does this email exist?" endpoint is an enumeration vector, so it stays behind
+        /// the controller's [Authorize(Roles = SuperAdmin)] — only platform admins can call it.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> CheckEmail(string? email, int? userId)
+        {
+            if (string.IsNullOrWhiteSpace(email))
+                return Json(new { ok = true });
+
+            var taken = await _schoolService.IsEmailTakenAsync(email, userId);
+
+            return Json(new
+            {
+                ok = !taken,
+                message = taken ? "This email is already registered to another user." : null
+            });
+        }
+
         [HttpGet]
         public async Task<IActionResult> Create()
         {
@@ -95,7 +126,8 @@ namespace educore.Areas.SuperAdmin.Controllers
                 AutoGeneratePassword = true,
                 EnableEmail = true,
                 AddressTypeId = 1,
-                ContactTypeId = 1
+                ContactTypeId = 1,
+                CountryId = await _geoService.GetDefaultCountryIdAsync()   // India
             };
 
             await FillDropdownsAsync(model);
@@ -111,18 +143,10 @@ namespace educore.Areas.SuperAdmin.Controllers
 
             ValidateTenant(model);
             ValidateSchoolAdmin(model);
+            await ValidateBoardStateAsync(model);
 
             if (!ModelState.IsValid)
             {
-                var errors = ModelState
-        .Where(x => x.Value.Errors.Count > 0)
-        .Select(x => new
-        {
-            Field = x.Key,
-            Errors = x.Value.Errors.Select(e => e.ErrorMessage)
-        })
-        .ToList();
-
                 await FillDropdownsAsync(model);
                 return View(model);
             }
@@ -192,43 +216,42 @@ namespace educore.Areas.SuperAdmin.Controllers
             }
             else
             {
-                // Nothing delivered (channels disabled/failed) — show the credentials once so they can be relayed manually.
-                TempData["Warning"] =
-                    $"School created, but the welcome message could not be sent. " +
-                    $"Share these login details with the admin now — Email: {model.AdminEmail} | " +
-                    $"Temporary password: {tempPassword}";
+                // Nothing delivered (channels disabled/failed) — the temp password now exists
+                // ONLY here. A toast auto-dismisses after 3.5s (see _Scripts.cshtml), which
+                // loses it for good, so these go to a dedicated key that SchoolList renders as
+                // a persistent, manually-dismissed alert.
+                TempData["Success"] = "School created.";
+                TempData["CredentialEmail"] = model.AdminEmail;
+                TempData["CredentialPassword"] = tempPassword;
             }
         }
 
-        // Generates a 12-char temporary password with at least one lower, upper, digit and symbol,
-        // using a cryptographically secure RNG.
+        // Temporary password for a brand-new school admin.
+        //
+        // Shape: 4 groups of 4 from a 30-char unambiguous alphabet — "K7MQ-P9XR-4TWH-3JNB".
+        // WHY not the classic "aK7#mQ2$xP9!":
+        //   * This password is routinely read down a phone or copied off a screen when email
+        //     delivery fails, and symbols/lookalikes (l vs 1, O vs 0) are where that goes wrong.
+        //   * Dropping symbols costs nothing here: 16 chars x log2(30) is ~78 bits, far beyond
+        //     any brute-force reach, and login is rate-limited to 5 attempts / 5 min per IP.
+        //   * It is single-use anyway — core.users.must_change_password is set TRUE by
+        //     sp_school_manage, and the middleware in Program.cs pins the admin to
+        //     /Account/ChangePassword until they pick their own.
         private static string GenerateTempPassword()
         {
-            const string lower = "abcdefghijkmnopqrstuvwxyz";
-            const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-            const string digits = "23456789";
-            const string symbols = "!@#$%*?";
-            const string all = lower + upper + digits + symbols;
+            // No I, L, O, S, U, Z, 0, 1 — the characters people mis-hear or mis-read.
+            const string alphabet = "ABCDEFGHJKMNPQRTVWXY23456789";
+            const int groups = 4, groupSize = 4;
 
-            var chars = new List<char>
+            var sb = new StringBuilder(groups * groupSize + groups - 1);
+            for (int g = 0; g < groups; g++)
             {
-                lower[RandomNumberGenerator.GetInt32(lower.Length)],
-                upper[RandomNumberGenerator.GetInt32(upper.Length)],
-                digits[RandomNumberGenerator.GetInt32(digits.Length)],
-                symbols[RandomNumberGenerator.GetInt32(symbols.Length)]
-            };
-
-            while (chars.Count < 12)
-                chars.Add(all[RandomNumberGenerator.GetInt32(all.Length)]);
-
-            // Shuffle so the guaranteed-class characters aren't always in front.
-            for (int i = chars.Count - 1; i > 0; i--)
-            {
-                int j = RandomNumberGenerator.GetInt32(i + 1);
-                (chars[i], chars[j]) = (chars[j], chars[i]);
+                if (g > 0) sb.Append('-');
+                for (int i = 0; i < groupSize; i++)
+                    sb.Append(alphabet[RandomNumberGenerator.GetInt32(alphabet.Length)]);
             }
 
-            return new string(chars.ToArray());
+            return sb.ToString();
         }
 
         private static string BuildWelcomeEmail(string? adminName, string? schoolName, string email, string tempPassword, string loginUrl)
@@ -278,6 +301,7 @@ namespace educore.Areas.SuperAdmin.Controllers
 
             ValidateTenant(model);
             ValidateSchoolAdmin(model);
+            await ValidateBoardStateAsync(model);
 
             if (!ModelState.IsValid)
             {
@@ -308,15 +332,82 @@ namespace educore.Areas.SuperAdmin.Controllers
             }
         }
 
+        // Delete (soft delete) removed. It set core.schools.is_deleted, which hid the
+        // school from the list AND from Edit — so its status could never be changed and
+        // it could never be purged. Seven schools were stranded that way, one holding
+        // 10 students and 25 fee payments nobody could reach.
+        //
+        // Ending a school is now Edit -> Status -> Closed: blocks every login, stays
+        // visible, and is reversible. Purge handles permanent removal.
+        // Removed rather than left unused, because an unreferenced [HttpPost] endpoint
+        // still accepts a request.
+
+        // Boards flagged requires_state (State Board, Madrasah Board) must say WHICH state's
+        // board. The proc enforces this too; doing it here turns a raw PostgresException into
+        // a field-level error on the right control.
+        private async Task ValidateBoardStateAsync(SchoolManageModel model)
+        {
+            if (!model.BoardId.HasValue)
+                return;
+
+            var d = await _schoolService.GetSchoolDropdownsAsync();
+
+            if (d.BoardsRequiringState.Contains(model.BoardId.Value) &&
+                !(model.BoardStateId > 0))
+            {
+                ModelState.AddModelError(nameof(model.BoardStateId),
+                    "Please select which state's board this school follows.");
+            }
+        }
+
+        /// <summary>
+        /// Permanently deletes a school and everything belonging to it.
+        ///
+        /// ORDER MATTERS: archive first, write the file, and only then purge. The purge
+        /// has no undo, so if the archive or the file write fails we stop with the data
+        /// still intact. Doing it the other way round would mean a failed write leaves
+        /// nothing to recover from.
+        ///
+        /// The proc independently re-checks all three guards (platform caller, school is
+        /// Closed, name matches), so a hand-made POST cannot skip them.
+        /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Purge(int id, string? confirmName)
         {
             var userId = User.Identity.GetUserId();
             var tenantId = User.Identity.GetTenantId();
-            await _schoolService.DeleteSchoolAsync(id, tenantId, userId);
 
-            TempData["Success"] = "School deactivated successfully.";
+            try
+            {
+                var archive = await _schoolService.ArchiveSchoolAsync(id, tenantId);
+
+                if (archive == null)
+                {
+                    TempData["Error"] = "School not found.";
+                    return RedirectToAction(nameof(SchoolList));
+                }
+
+                // Outside wwwroot on purpose — this file holds the school's entire data
+                // set, including student and fee records. It must never be web-servable.
+                var folder = Path.Combine(_env.ContentRootPath, "App_Data", "school-archives");
+                Directory.CreateDirectory(folder);
+
+                var path = Path.Combine(folder, archive.FileName);
+                await System.IO.File.WriteAllTextAsync(path, archive.ArchiveJson);
+
+                await _schoolService.PurgeSchoolAsync(id, tenantId, userId, confirmName ?? string.Empty);
+
+                TempData["Success"] =
+                    $"{archive.SchoolName} purged permanently. {archive.TotalRows:N0} rows archived to {archive.FileName}.";
+            }
+            catch (Exception ex)
+            {
+                // Reaches here with the school still intact: either a guard refused, or the
+                // archive/file write failed before the purge ran.
+                TempData["Error"] = ex.Message;
+            }
+
             return RedirectToAction(nameof(SchoolList));
         }
 
@@ -352,11 +443,27 @@ namespace educore.Areas.SuperAdmin.Controllers
             if (string.IsNullOrWhiteSpace(model.AdminEmail))
                 ModelState.AddModelError(nameof(model.AdminEmail), "Admin email is required.");
 
-            // Password is required only when creating (INSERT) with manual entry. On edit it is
-            // optional — blank keeps the current password.
             bool isEdit = model.Operation == "UPDATE";
-            if (!isEdit && !model.AutoGeneratePassword && string.IsNullOrWhiteSpace(model.Password))
-                ModelState.AddModelError(nameof(model.Password), "Password is required.");
+
+            if (!isEdit)
+            {
+                // Create with manual entry — a password must be typed.
+                if (!model.AutoGeneratePassword && string.IsNullOrWhiteSpace(model.Password))
+                    ModelState.AddModelError(nameof(model.Password), "Password is required.");
+
+                return;
+            }
+
+            // Edit against an EXISTING admin: password is optional (blank keeps the current one).
+            if (model.AdminUserId.GetValueOrDefault() > 0)
+                return;
+
+            // Edit of a school that has no admin yet. sp_school_manage only creates one when a
+            // password hash arrives, so without this the save "succeeds" and silently creates
+            // nothing — the school stays admin-less with no error shown.
+            if (string.IsNullOrWhiteSpace(model.Password))
+                ModelState.AddModelError(nameof(model.Password),
+                    "This school has no administrator yet — set a password to create one.");
         }
         private async Task FillDropdownsAsync(SchoolManageModel model)
         {
@@ -373,6 +480,12 @@ namespace educore.Areas.SuperAdmin.Controllers
                 Value = x.Id.ToString(),
                 Text = x.Name
             }).ToList();
+
+            // "State Board" alone doesn't say which state's board, and MSBSHSE / UP Board /
+            // RBSE share nothing but the label. Which boards need a state comes from
+            // config.boards.requires_state, so the wizard never hardcodes a board id.
+            model.BoardsRequiringState = d.BoardsRequiringState;
+            model.BoardStateList = await _geoService.GetStatesAsync();
 
             model.SchoolTypeList = d.SchoolTypes.Select(x => new SelectListItem
             {
