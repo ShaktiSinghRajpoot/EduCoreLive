@@ -232,6 +232,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFRyYW5zcG9ydFxWZWhpY2xlcy5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/Github/EduCoreLiveV1/educore/Areas/ERP/Views/_ViewImports.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXF9WaWV3SW1wb3J0cy5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/Github/EduCoreLiveV1/educore/Areas/SuperAdmin/Views/Schools/Create.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcU3VwZXJBZG1pblxWaWV3c1xTY2hvb2xzXENyZWF0ZS5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 

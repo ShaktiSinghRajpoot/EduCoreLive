@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("EduCoreDataAccessLayer")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0491e607ba10e331d0c89a9a3fddfdd916d2909e")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+30fabdc5935aa9c96b198609a8345efc6861dca1")]
 [assembly: System.Reflection.AssemblyProductAttribute("EduCoreDataAccessLayer")]
 [assembly: System.Reflection.AssemblyTitleAttribute("EduCoreDataAccessLayer")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
