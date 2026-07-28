@@ -184,9 +184,10 @@
 
             $('#rcFormatSave').on('click', function () {
                 var fmt = $('.rc-fmt:checked').val();
-                if (!fmt) { toastr.error('Choose a format.'); return; }
+                if (!fmt) { ecToast('error', 'Choose a format.'); return; }
 
-                var $btn = $(this).prop('disabled', true);
+                var $btn = $(this);
+                EC.buttonBusy($btn, 'Saving…');
                 $.ajax({
                     url: '@Url.Action("SaveReceiptFormat", "Fee", new { area = "ERP" })',
                     type: 'POST',
@@ -195,11 +196,11 @@
                     data: JSON.stringify({ format: fmt })
                 })
                 .done(function (res) {
-                    if (res && res.success) toastr.success(res.message || 'Saved.');
-                    else toastr.error((res && res.message) || 'Could not save.');
+                    if (res && res.success) ecToast('success', res.message || 'Saved.');
+                    else ecToast('error', (res && res.message) || 'Could not save.');
                 })
-                .fail(function () { toastr.error('Something went wrong.'); })
-                .always(function () { $btn.prop('disabled', false); });
+                .fail(function () { ecToast('error', 'Something went wrong.'); })
+                .always(function () { EC.buttonReset($btn); });
             });
 
             // ── Transfer Certificate ──
@@ -211,9 +212,10 @@
 
             $('#tcFormatSave').on('click', function () {
                 var fmt = $('.tc-fmt:checked').val();
-                if (!fmt) { toastr.error('Choose a format.'); return; }
+                if (!fmt) { ecToast('error', 'Choose a format.'); return; }
 
-                var $btn = $(this).prop('disabled', true);
+                var $btn = $(this);
+                EC.buttonBusy($btn, 'Saving…');
                 $.ajax({
                     url: '@Url.Action("SaveTcFormat", "SchoolSettings", new { area = "ERP" })',
                     type: 'POST',
@@ -222,11 +224,11 @@
                     data: JSON.stringify({ format: fmt })
                 })
                 .done(function (res) {
-                    if (res && res.success) toastr.success(res.message || 'Saved.');
-                    else toastr.error((res && res.message) || 'Could not save.');
+                    if (res && res.success) ecToast('success', res.message || 'Saved.');
+                    else ecToast('error', (res && res.message) || 'Could not save.');
                 })
-                .fail(function () { toastr.error('Something went wrong.'); })
-                .always(function () { $btn.prop('disabled', false); });
+                .fail(function () { ecToast('error', 'Something went wrong.'); })
+                .always(function () { EC.buttonReset($btn); });
             });
 
             // ── Student ID Card ──
@@ -237,9 +239,10 @@
 
             $('#idFormatSave').on('click', function () {
                 var fmt = $('.id-fmt:checked').val();
-                if (!fmt) { toastr.error('Choose a layout.'); return; }
+                if (!fmt) { ecToast('error', 'Choose a layout.'); return; }
 
-                var $btn = $(this).prop('disabled', true);
+                var $btn = $(this);
+                EC.buttonBusy($btn, 'Saving…');
                 $.ajax({
                     url: '@Url.Action("SaveIdCardFormat", "SchoolSettings", new { area = "ERP" })',
                     type: 'POST',
@@ -248,11 +251,11 @@
                     data: JSON.stringify({ format: fmt })
                 })
                 .done(function (res) {
-                    if (res && res.success) toastr.success(res.message || 'Saved.');
-                    else toastr.error((res && res.message) || 'Could not save.');
+                    if (res && res.success) ecToast('success', res.message || 'Saved.');
+                    else ecToast('error', (res && res.message) || 'Could not save.');
                 })
-                .fail(function () { toastr.error('Something went wrong.'); })
-                .always(function () { $btn.prop('disabled', false); });
+                .fail(function () { ecToast('error', 'Something went wrong.'); })
+                .always(function () { EC.buttonReset($btn); });
             });
 
         });

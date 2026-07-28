@@ -29,7 +29,7 @@
     <div class="cmd">
       <div class="ec-page-icon"><i class="bx bx-wallet"></i></div>
       <div><div class="title">Fee Collection</div><div class="sub">Find a student, choose how many months to collect, then take payment</div></div>
-      <div class="today"><div class="dot"><i class="bx bx-rupee"></i></div><div><div class="n" id="todayN">₹0</div><div class="l">This session · <span id="todayC">0</span> receipts</div></div></div>
+      <div class="today"><div class="dot"><i class="bx bx-rupee"></i></div><div><div class="n" id="todayN">₹0.00</div><div class="l">This session · <span id="todayC">0</span> receipts</div></div></div>
       <a href="@Url.Action("DayClose","Fee",new{area="ERP"})" class="btn btn-sm ec-btn-soft"><i class="bx bx-lock-open-alt me-1"></i>Day close</a>
       <a href="@Url.Action("Reports","Fee",new{area="ERP"})" class="btn btn-sm ec-btn-soft"><i class="bx bx-bar-chart-alt-2 me-1"></i>Reports</a>
     </div>
@@ -81,7 +81,7 @@
             <div class="stu-name" id="dName">—</div>
             <div class="stu-sub" id="dSub">—</div>
           </div>
-          <div class="stu-out"><div class="amt" id="dOutstanding">₹0</div><div class="lbl">Total Outstanding</div></div>
+          <div class="stu-out"><div class="amt" id="dOutstanding">₹0.00</div><div class="lbl">Total Outstanding</div></div>
         </div>
         <div class="view-tabs mt-3">
           <button type="button" class="view-tab active" data-view="dues">Dues &amp; Collect</button>
@@ -126,24 +126,24 @@
                 <div class="s-scope-lbl">Collecting</div>
                 <div class="s-scope" id="scope">—</div>
 
-                <div class="s-line muted"><span>Dues selected (<span id="selCount">0</span>)</span><span class="v" id="duesSel">₹0</span></div>
+                <div class="s-line muted"><span>Dues selected (<span id="selCount">0</span>)</span><span class="v" id="duesSel">₹0.00</span></div>
                 <div class="s-line suc"><span>Discount <small class="text-muted" id="discReason"></small></span><span class="v" id="discCell"><button type="button" class="add-link" id="openDisc">+ Add</button></span></div>
-                <div class="s-line muted"><span>Extra charges</span><span class="v" id="extraSum">₹0</span></div>
+                <div class="s-line muted"><span>Extra charges</span><span class="v" id="extraSum">₹0.00</span></div>
 
-                <div class="s-pay"><span class="k">Payable</span><span class="v" id="payable">₹0</span></div>
+                <div class="s-pay"><span class="k">Payable</span><span class="v" id="payable">₹0.00</span></div>
 
                 <div class="s-line suc" id="advUseRow" style="display:none;"><span><i class="bx bx-wallet"></i> Use advance <small class="text-muted" id="advAvail"></small></span><span><input type="number" min="0" id="advUse" class="form-control s-disc" value="0"></span></div>
 
-                <div class="tender-head"><span>Payment</span><span id="tenderSum">₹0 of ₹0</span></div>
+                <div class="tender-head"><span>Payment</span><span id="tenderSum">₹0.00 of ₹0.00</span></div>
                 <div id="tenders"></div>
                 <button type="button" class="add-tender" id="addTender"><i class="bx bx-plus"></i> Split payment (add mode)</button>
 
                 <div class="mt-2"><label class="form-label">Remarks</label><input type="text" id="pRemarks" class="form-control" placeholder="Optional note"></div>
 
                 <div class="s-foot">
-                  <div class="row1"><span>Paid</span><span id="paidV">₹0</span></div>
-                  <div class="row1 muted"><span id="balLbl">Balance</span><span id="balV">₹0</span></div>
-                  <div class="s-adv" id="advRow"><i class="bx bx-wallet"></i> <span id="advV">₹0</span> will be saved as advance</div>
+                  <div class="row1"><span>Paid</span><span id="paidV">₹0.00</span></div>
+                  <div class="row1 muted"><span id="balLbl">Balance</span><span id="balV">₹0.00</span></div>
+                  <div class="s-adv" id="advRow"><i class="bx bx-wallet"></i> <span id="advV">₹0.00</span> will be saved as advance</div>
                 </div>
 
                 <button type="button" class="btn btn-primary collect-cta" id="collectBtn" disabled><i class="bx bx-check-circle me-1"></i>Collect &amp; Receipt</button>
@@ -193,7 +193,7 @@
 <div class="modal fade" id="cancelModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered" style="max-width:430px"><div class="modal-content">
   <div class="modal-header py-2"><h6 class="modal-title fw-bold text-danger"><i class="bx bx-x-circle me-1"></i>Cancel receipt <span id="cmNo"></span></h6><button class="btn-close" data-bs-dismiss="modal"></button></div>
   <div class="modal-body">
-    <div class="alert alert-warning py-2 small mb-3"><i class="bx bx-error me-1"></i>This reverses the <b id="cmAmt">₹0</b> payment and <b>re-opens the dues</b>. The receipt stays on record marked <b>Cancelled</b> (never deleted).</div>
+    <div class="alert alert-warning py-2 small mb-3"><i class="bx bx-error me-1"></i>This reverses the <b id="cmAmt">₹0.00</b> payment and <b>re-opens the dues</b>. The receipt stays on record marked <b>Cancelled</b> (never deleted).</div>
     <label class="form-label">Reason for cancellation <span class="text-danger">*</span></label>
     <input class="form-control mb-3" id="cmReason" placeholder="e.g. Wrong student / duplicate / mode change">
     <label class="form-label">Authorised by</label>
@@ -255,11 +255,7 @@
 $(function () {
     'use strict';
 
-    function money(n){ return '₹' + Math.round(Number(n||0)).toLocaleString('en-IN'); }
-    function num(n){ n = Number(n); return isFinite(n) && n > 0 ? n : 0; }
     function initials(name){ return (name||'?').trim().split(/\s+/).map(function(w){return w[0];}).slice(0,2).join('').toUpperCase(); }
-    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-    function notify(t,m){ if (typeof toastr!=='undefined') toastr[t](m); }
 
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
     var URL = {
@@ -305,7 +301,7 @@ $(function () {
 
     function fillSelect($el, items, ph){
         var h = ph ? '<option value="">'+ph+'</option>' : '';
-        items.forEach(function(x){ h += '<option value="'+esc(x)+'">'+esc(x)+'</option>'; });
+        items.forEach(function(x){ h += '<option value="'+EC.esc(x)+'">'+EC.esc(x)+'</option>'; });
         $el.html(h);
     }
 
@@ -330,7 +326,7 @@ $(function () {
     }
     function fillStudentSelect(){
         var h='<option value="">'+(students.length?'Select Student':'No students')+'</option>';
-        students.forEach(function(s){ h+='<option value="'+s.id+'">Roll '+esc(s.roll||'—')+' — '+esc(s.name)+' ('+esc(s.admNo)+')</option>'; });
+        students.forEach(function(s){ h+='<option value="'+s.id+'">Roll '+EC.esc(s.roll||'—')+' — '+EC.esc(s.name)+' ('+EC.esc(s.admNo)+')</option>'; });
         $student.html(h).prop('disabled',students.length===0);
     }
     $session.on('change',loadClasses);
@@ -339,14 +335,14 @@ $(function () {
     $student.on('change',function(){ var id=Number($(this).val()); if(!id){ clearStudentView(); return; } loadStudentById(id); });
     function loadStudentById(id){
         currentStudent = students.find(function(s){ return s.id===id; }) || null;
-        if(currentStudent) api.dues(currentStudent.id).done(openStudent).fail(function(){ notify('error','Could not load dues.'); });
+        if(currentStudent) api.dues(currentStudent.id).done(openStudent).fail(function(){ ecToast('error','Could not load dues.'); });
     }
 
     /* ── admission search ── */
     function doAdmSearch(){
-        var adm=$adm.val().trim(); if(!adm){ notify('warning','Enter an admission number.'); return; }
+        var adm=$adm.val().trim(); if(!adm){ ecToast('warning','Enter an admission number.'); return; }
         api.findByAdm($session.val(),adm).done(function(r){
-            if(!r){ notify('error','No student found for "'+adm+'".'); return; }
+            if(!r){ ecToast('error','No student found for "'+adm+'".'); return; }
             $class.val(r.className);
             api.sections($session.val(),r.className).done(function(sec){
                 fillSelect($section,sec,'Select Section'); $section.val(r.section).prop('disabled',false);
@@ -379,7 +375,7 @@ $(function () {
         $('#dAvatar').text(initials(currentStudent.name));
         $('#dName').text(currentStudent.name);
         $('#dSub').text(currentStudent.admNo + ' · ' + $class.val() + ' - ' + $section.val() + ' · Roll ' + (currentStudent.roll||'—'));
-        $('#dOutstanding').text(money(total));
+        $('#dOutstanding').text(EC.money(total));
         $duesEmpty.addClass('d-none'); $duesPane.removeClass('d-none');
         switchView('dues');
         $('.chip').removeClass('active'); $('#scope').text('—');
@@ -387,7 +383,7 @@ $(function () {
         renderDues(); renderExtras(); renderTenders(); settle();
         api.advance(currentStudent.id).done(function(a){
             advanceAvail=Number((a&&a.balance)||0);
-            if(advanceAvail>0){ $('#advAvail').text('(of '+money(advanceAvail)+' available)'); $('#advUseRow').show(); }
+            if(advanceAvail>0){ $('#advAvail').text('(of '+EC.money(advanceAvail)+' available)'); $('#advUseRow').show(); }
             else { $('#advUse').val(0); $('#advUseRow').hide(); }
             settle();
         });
@@ -408,9 +404,9 @@ $(function () {
         var s=!!sel[d.id];
         return '<div class="due'+(s?' sel':'')+'" data-id="'+d.id+'">'+
             '<label class="due-main"><input type="checkbox" class="form-check-input due-chk"'+(s?' checked':'')+'>'+
-              '<div class="due-info"><div class="due-label">'+esc(d.label)+(deposit?'<span class="deposit-tag">refundable</span>':'')+'</div>'+
-              '<div class="due-meta">'+(d.overdue?'<span class="overdue">Overdue</span> · ':'')+'Due '+esc(d.dueDate||'—')+'</div></div>'+
-              '<div class="due-amt">'+money(d.amount)+'</div></label></div>';
+              '<div class="due-info"><div class="due-label">'+EC.esc(d.label)+(deposit?'<span class="deposit-tag">refundable</span>':'')+'</div>'+
+              '<div class="due-meta">'+(d.overdue?'<span class="overdue">Overdue</span> · ':'')+'Due '+EC.esc(d.dueDate||'—')+'</div></div>'+
+              '<div class="due-amt">'+EC.money(d.amount)+'</div></label></div>';
     }
     function renderDues(){
         var html='';
@@ -419,7 +415,7 @@ $(function () {
             $('#duesList').html(html); return;
         }
         months.forEach(function(m){
-            html+='<div class="grp"><i class="bx bx-calendar"></i>'+esc(m.title)+'</div>';
+            html+='<div class="grp"><i class="bx bx-calendar"></i>'+EC.esc(m.title)+'</div>';
             m.dues.forEach(function(d){ html+=dueRow(d,false); });
         });
         if(otherDues.length){
@@ -448,8 +444,8 @@ $(function () {
     function renderExtras(){
         if(!extras.length){ $('#extraList').html('<div class="empty-line">No extra charges. Use “Add extra charge” for late fine, lost book, etc.</div>'); return; }
         var h=extras.map(function(e,i){
-            return '<div class="li" data-i="'+i+'"><div class="li-info"><div class="li-label">'+esc(e.label)+'</div>'+(e.note?'<div class="li-sub">'+esc(e.note)+'</div>':'')+'</div>'+
-                '<div class="li-amt">'+money(e.amount)+'</div><button type="button" class="li-rm"><i class="bx bx-x"></i></button></div>';
+            return '<div class="li" data-i="'+i+'"><div class="li-info"><div class="li-label">'+EC.esc(e.label)+'</div>'+(e.note?'<div class="li-sub">'+EC.esc(e.note)+'</div>':'')+'</div>'+
+                '<div class="li-amt">'+EC.money(e.amount)+'</div><button type="button" class="li-rm"><i class="bx bx-x"></i></button></div>';
         }).join('');
         $('#extraList').html(h);
     }
@@ -457,8 +453,8 @@ $(function () {
     var extraModal=new bootstrap.Modal(document.getElementById('extraModal'));
     $('#openExtra').on('click', function(){ $('#extraLabel').val(''); $('#extraAmt').val(''); $('#extraNote').val(''); extraModal.show(); });
     $('#applyExtra').on('click', function(){
-        var label=$('#extraLabel').val().trim(), amt=num($('#extraAmt').val()), note=$('#extraNote').val().trim();
-        if(!label || amt<=0){ notify('warning','Enter a charge name and amount.'); return; }
+        var label=$('#extraLabel').val().trim(), amt=EC.numPos($('#extraAmt').val()), note=$('#extraNote').val().trim();
+        if(!label || amt<=0){ ecToast('warning','Enter a charge name and amount.'); return; }
         extras.push({label:label,amount:amt,note:note}); extraModal.hide(); renderExtras(); settle();
     });
 
@@ -469,8 +465,8 @@ $(function () {
         $('#discValLbl').text(t==='pct'?'Percentage (%)':'Amount (₹)'); discPreview();
     }
     function discPreview(){
-        var v=num($('#discVal').val()), dues=calc().dues, amt=discType==='pct'?Math.round(dues*v/100):v;
-        $('#discPreview').text(v>0 ? (discType==='pct'? v+'% of '+money(dues)+' = ':'Flat ')+'discount '+money(Math.min(amt,dues)) : '');
+        var v=EC.numPos($('#discVal').val()), dues=calc().dues, amt=discType==='pct'?Math.round(dues*v/100):v;
+        $('#discPreview').text(v>0 ? (discType==='pct'? v+'% of '+EC.money(dues)+' = ':'Flat ')+'discount '+EC.money(Math.min(amt,dues)) : '');
     }
     $('#discModal .fc-seg').on('click', function(){ setSeg($(this).data('t')); });
     $('#discVal').on('input', discPreview);
@@ -481,9 +477,9 @@ $(function () {
     }
     $('#openDisc').on('click', openDiscountModal);
     $('#applyDisc').on('click', function(){
-        var v=num($('#discVal').val()), reason=$('#discReasonIn').val().trim();
-        if(v<=0){ notify('warning','Enter a discount value.'); return; }
-        if(!reason){ notify('warning','A reason is required for a discount.'); return; }
+        var v=EC.numPos($('#discVal').val()), reason=$('#discReasonIn').val().trim();
+        if(v<=0){ ecToast('warning','Enter a discount value.'); return; }
+        if(!reason){ ecToast('warning','A reason is required for a discount.'); return; }
         discount={type:discType,value:v,reason:reason}; discModal.hide(); settle();
     });
     function renderDiscount(){
@@ -492,7 +488,7 @@ $(function () {
             $cell.find('.add-link').on('click',openDiscountModal); return; }
         var amt=calc().disc;
         $rsn.text('· '+discount.reason + (discount.type==='pct'?' ('+discount.value+'%)':''));
-        $cell.html('<span class="disc-set">−'+money(amt)+' <i class="bx bx-pencil e" title="Edit"></i> <i class="bx bx-x x" title="Remove"></i></span>');
+        $cell.html('<span class="disc-set">−'+EC.money(amt)+' <i class="bx bx-pencil e" title="Edit"></i> <i class="bx bx-x x" title="Remove"></i></span>');
         $cell.find('.e').on('click',openDiscountModal);
         $cell.find('.x').on('click',function(){ discount=null; settle(); });
     }
@@ -509,7 +505,7 @@ $(function () {
         $('#tenders').html(h);
     }
     $('#tenders').on('change','select', function(){ tenders[$(this).closest('.tender-row').data('i')].mode=$(this).val(); });
-    $('#tenders').on('input','.t-amt', function(){ amtTouched=true; tenders[$(this).closest('.tender-row').data('i')].amt=num($(this).val()); settle(); });
+    $('#tenders').on('input','.t-amt', function(){ amtTouched=true; tenders[$(this).closest('.tender-row').data('i')].amt=EC.numPos($(this).val()); settle(); });
     $('#tenders').on('click','.rm', function(){ tenders.splice($(this).closest('.tender-row').data('i'),1); renderTenders(); settle(); });
     $('#addTender').on('click', function(){ tenders.push({mode:'UPI',amt:0}); renderTenders(); settle(); });
 
@@ -522,22 +518,22 @@ $(function () {
         var payable=Math.max(0, dues-disc+ext);
         return {dues:dues,ext:ext,disc:disc,payable:payable,n:n};
     }
-    function tendersTotal(){ return tenders.reduce(function(t,x){return t+num(x.amt);},0); }
-    function advUseVal(c){ return Math.min(num($('#advUse').val()), advanceAvail, c.payable); }
+    function tendersTotal(){ return tenders.reduce(function(t,x){return t+EC.numPos(x.amt);},0); }
+    function advUseVal(c){ return Math.min(EC.numPos($('#advUse').val()), advanceAvail, c.payable); }
     function settle(){
         var c=calc(); renderDiscount();
         var advUse=advUseVal(c);
-        if(num($('#advUse').val())>advUse) $('#advUse').val(advUse);
+        if(EC.numPos($('#advUse').val())>advUse) $('#advUse').val(advUse);
         var net=Math.max(0, c.payable-advUse);
-        $('#selCount').text(c.n); $('#duesSel').text(money(c.dues)); $('#extraSum').text(money(c.ext)); $('#payable').text(money(c.payable));
+        $('#selCount').text(c.n); $('#duesSel').text(EC.money(c.dues)); $('#extraSum').text(EC.money(c.ext)); $('#payable').text(EC.money(c.payable));
         if(!amtTouched && tenders.length===1){ tenders[0].amt=net; renderTenders(); }
         var paid=tendersTotal(), funded=paid+advUse;
-        $('#tenderSum').text(money(paid)+' of '+money(net));
-        $('#paidV').text(money(funded));
+        $('#tenderSum').text(EC.money(paid)+' of '+EC.money(net));
+        $('#paidV').text(EC.money(funded));
         var bal=c.payable-funded;
-        $('#balLbl').text(bal>0?'Balance due':'Balance'); $('#balV').text(money(Math.max(0,bal)));
+        $('#balLbl').text(bal>0?'Balance due':'Balance'); $('#balV').text(EC.money(Math.max(0,bal)));
         var adv=Math.max(0,funded-c.payable);
-        $('#advRow').toggle(adv>0); $('#advV').text(money(adv));
+        $('#advRow').toggle(adv>0); $('#advV').text(EC.money(adv));
         $('#collectBtn').prop('disabled', c.payable<=0 && c.disc<=0);
     }
     $('#advUse').on('input', settle);
@@ -561,12 +557,11 @@ $(function () {
     $('#collectBtn').on('click', function(){
         var items=buildItems();
         var exs=extras.filter(function(e){return e.amount>0&&(e.label||'').trim();}).map(function(e){return {label:e.label,amount:e.amount};});
-        if(!items.length && !exs.length){ notify('warning','Pick a due or add an extra charge.'); return; }
+        if(!items.length && !exs.length){ ecToast('warning','Pick a due or add an extra charge.'); return; }
         var advUse=advUseVal(calc());
-        var paidTenders = tenders.filter(function(t){ return num(t.amt)>0; }).map(function(t){ return { mode:t.mode, amount:num(t.amt) }; });
+        var paidTenders = tenders.filter(function(t){ return EC.numPos(t.amt)>0; }).map(function(t){ return { mode:t.mode, amount:EC.numPos(t.amt) }; });
         var primaryMode = tenders.length>1 ? 'Mixed' : (tenders[0]&&tenders[0].mode) || 'Cash';
-        var $btn=$(this), old=$btn.html();
-        $btn.prop('disabled',true).html('<i class="bx bx-loader-circle bx-spin me-1"></i>Collecting…');
+        var $btn=$(this); EC.buttonBusy($btn,'Collecting…');
         api.collect({ studentId:currentStudent.id, mode:primaryMode, reference:'', remarks:$('#pRemarks').val(),
                       session:$session.val(), items:items, extras:exs,
                       discountType: discount ? (discount.type==='pct'?'Percent':'Flat') : null,
@@ -574,16 +569,16 @@ $(function () {
                       discountReason: discount ? discount.reason : null,
                       tenders: paidTenders, advanceUsed: advUse })
         .done(function(res){
-            $btn.prop('disabled',false).html(old);
-            if(!res || !res.success){ notify('error',(res&&res.message)||'Could not record payment.'); return; }
-            notify('success','Collected '+money(res.amount)+'. Receipt '+res.receiptNo+'.');
-            today.n+=num(res.amount); today.c++; $('#todayN').text(money(today.n)); $('#todayC').text(today.c);
+            EC.buttonReset($btn);
+            if(!res || !res.success){ ecToast('error',(res&&res.message)||'Could not record payment.'); return; }
+            ecToast('success','Collected '+EC.money(res.amount)+'. Receipt '+res.receiptNo+'.');
+            today.n+=EC.numPos(res.amount); today.c++; $('#todayN').text(EC.money(today.n)); $('#todayC').text(today.c);
             $('#pRemarks').val('');
             // Receipt is NOT force-opened — the cashier may be mid-queue. It is
             // available from the payment history list ("Print") whenever needed.
             api.dues(currentStudent.id).done(openStudent);
         })
-        .fail(function(){ $btn.prop('disabled',false).html(old); notify('error','Could not record payment.'); });
+        .fail(function(){ EC.buttonReset($btn); ecToast('error','Could not record payment.'); });
     });
 
     /* ── history ── */
@@ -596,15 +591,19 @@ $(function () {
             rows.forEach(function(r){
                 var x=r.isCancelled;
                 h+='<div class="hist-row'+(x?' cancelled':'')+'"><div class="hist-info">'+
-                   '<div class="hist-rcp'+(x?' strike':'')+'">'+esc(r.receiptNo)+(x?' <span class="ec-badge ec-badge-default">Cancelled</span>':'')+'</div>'+
-                   '<div class="hist-meta">'+esc(r.date||'—')+' · '+esc(r.mode)+(r.reference?' · '+esc(r.reference):'')+(r.concession>0?' · '+money(r.concession)+' off':'')+
-                       (x&&r.cancelReason?' · <span class="text-danger">'+esc(r.cancelReason)+'</span>':'')+'</div></div>'+
-                   '<div class="hist-amt'+(x?' strike':'')+'">'+money(r.amount)+'</div>'+
-                   '<button type="button" class="btn btn-outline-secondary btn-sm hist-print" data-rcp="'+esc(r.receiptNo)+'" title="Re-print"><i class="bx bx-printer"></i></button>'+
-                   (x?'':'<button type="button" class="btn btn-outline-danger btn-sm hist-cancel" data-rcp="'+esc(r.receiptNo)+'" data-amt="'+r.amount+'" title="Cancel receipt"><i class="bx bx-x-circle"></i></button>')+
+                   '<div class="hist-rcp'+(x?' strike':'')+'">'+EC.esc(r.receiptNo)+(x?' <span class="ec-badge ec-badge-default">Cancelled</span>':'')+'</div>'+
+                   '<div class="hist-meta">'+EC.esc(r.date||'—')+' · '+EC.esc(r.mode)+(r.reference?' · '+EC.esc(r.reference):'')+(r.concession>0?' · '+EC.money(r.concession)+' off':'')+
+                       (x&&r.cancelReason?' · <span class="text-danger">'+EC.esc(r.cancelReason)+'</span>':'')+'</div></div>'+
+                   '<div class="hist-amt'+(x?' strike':'')+'">'+EC.money(r.amount)+'</div>'+
+                   '<button type="button" class="btn btn-outline-secondary btn-sm hist-print" data-rcp="'+EC.esc(r.receiptNo)+'" title="Re-print"><i class="bx bx-printer"></i></button>'+
+                   (x?'':'<button type="button" class="btn btn-outline-danger btn-sm hist-cancel" data-rcp="'+EC.esc(r.receiptNo)+'" data-amt="'+r.amount+'" title="Cancel receipt"><i class="bx bx-x-circle"></i></button>')+
                    '</div>';
             });
             $('#histList').html(h);
+        })
+        .fail(function(){
+            // Without this, "Loading…" stayed on screen forever.
+            EC.listEmpty('#histList', 'Could not load payment history.', 'bx-error-circle');
         });
     }
     $('#histList').on('click', '.hist-print', function () {
@@ -614,62 +613,61 @@ $(function () {
     /* ── cancel receipt ── */
     var cancelModal=new bootstrap.Modal(document.getElementById('cancelModal'));
     $('#histList').on('click','.hist-cancel', function(){
-        $('#cmNo').text($(this).data('rcp')); $('#cmAmt').text(money($(this).data('amt')));
+        $('#cmNo').text($(this).data('rcp')); $('#cmAmt').text(EC.money($(this).data('amt')));
         $('#cmReason').val(''); $('#cmAuth').val('');
         cancelModal.show();
     });
     $('#cmConfirm').on('click', function(){
         var rcp=$('#cmNo').text(), reason=$('#cmReason').val().trim(), auth=$('#cmAuth').val();
-        if(!reason){ notify('warning','A reason is required.'); return; }
-        var $btn=$(this), old=$btn.html(); $btn.prop('disabled',true).html('<i class="bx bx-loader-circle bx-spin"></i>');
+        if(!reason){ ecToast('warning','A reason is required.'); return; }
+        var $btn=$(this); EC.buttonBusy($btn);
         api.cancel({ receiptNo:rcp, reason:reason, authorizedBy:auth })
         .done(function(res){
-            $btn.prop('disabled',false).html(old);
-            if(!res||!res.success){ notify('error',(res&&res.message)||'Could not cancel.'); return; }
-            cancelModal.hide(); notify('success',res.message||'Receipt cancelled.');
+            EC.buttonReset($btn);
+            if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not cancel.'); return; }
+            cancelModal.hide(); ecToast('success',res.message||'Receipt cancelled.');
             if(currentStudent) api.dues(currentStudent.id).done(function(d){ openStudent(d); switchView('history'); });
             else loadHistory();
         })
-        .fail(function(){ $btn.prop('disabled',false).html(old); notify('error','Could not cancel the receipt.'); });
+        .fail(function(){ EC.buttonReset($btn); ecToast('error','Could not cancel the receipt.'); });
     });
 
     /* ── refund (deposit / overpayment) ── */
     var refundModal=new bootstrap.Modal(document.getElementById('refundModal'));
     var refundables=[];
     $('#openRefund').on('click', function(){
-        if(!currentStudent){ notify('warning','Select a student first.'); return; }
+        if(!currentStudent){ ecToast('warning','Select a student first.'); return; }
         api.refundable(currentStudent.id).done(function(rows){
             refundables=rows||[];
-            if(!refundables.length){ notify('info','Nothing to refund — no paid amount is held for this student.'); return; }
-            $('#rfItem').html(refundables.map(function(r,i){ return '<option value="'+i+'">'+(r.isRefundable?'★ ':'')+esc(r.label)+' — '+money(r.refundable)+' refundable</option>'; }).join(''));
+            if(!refundables.length){ ecToast('info','Nothing to refund — no paid amount is held for this student.'); return; }
+            $('#rfItem').html(refundables.map(function(r,i){ return '<option value="'+i+'">'+(r.isRefundable?'★ ':'')+EC.esc(r.label)+' — '+EC.money(r.refundable)+' refundable</option>'; }).join(''));
             $('#rfReason').val(''); $('#rfAuth').val(''); $('#rfMode').val('Cash');
             refundItemChanged(); refundModal.show();
-        }).fail(function(){ notify('error','Could not load refundable amounts.'); });
+        }).fail(function(){ ecToast('error','Could not load refundable amounts.'); });
     });
     function refundItemChanged(){
         var r=refundables[Number($('#rfItem').val())]; if(!r) return;
-        $('#rfAvail').html('Paid '+money(r.paid)+(r.refunded>0?' · already refunded '+money(r.refunded):'')+' · <b>'+money(r.refundable)+' refundable</b>');
+        $('#rfAvail').html('Paid '+EC.money(r.paid)+(r.refunded>0?' · already refunded '+EC.money(r.refunded):'')+' · <b>'+EC.money(r.refundable)+' refundable</b>');
         $('#rfAmt').val(r.refundable);
     }
     $('#rfItem').on('change', refundItemChanged);
     $('#rfConfirm').on('click', function(){
-        var r=refundables[Number($('#rfItem').val())]; if(!r){ notify('warning','Pick a charge to refund.'); return; }
-        var amt=num($('#rfAmt').val()), reason=$('#rfReason').val().trim();
-        if(amt<=0){ notify('warning','Enter a refund amount.'); return; }
-        if(amt>r.refundable+0.001){ notify('warning','Amount exceeds the refundable balance ('+money(r.refundable)+').'); return; }
-        if(!reason){ notify('warning','A reason is required.'); return; }
-        var $btn=$(this), old=$btn.html(); $btn.prop('disabled',true).html('<i class="bx bx-loader-circle bx-spin"></i>');
+        var r=refundables[Number($('#rfItem').val())]; if(!r){ ecToast('warning','Pick a charge to refund.'); return; }
+        var amt=EC.numPos($('#rfAmt').val()), reason=$('#rfReason').val().trim();
+        if(amt<=0){ ecToast('warning','Enter a refund amount.'); return; }
+        if(amt>r.refundable+0.001){ ecToast('warning','Amount exceeds the refundable balance ('+EC.money(r.refundable)+').'); return; }
+        if(!reason){ ecToast('warning','A reason is required.'); return; }
+        var $btn=$(this); EC.buttonBusy($btn);
         api.refund({ studentId:currentStudent.id, ledgerId:r.ledgerId, amount:amt, mode:$('#rfMode').val(), reason:reason, authorizedBy:$('#rfAuth').val() })
         .done(function(res){
-            $btn.prop('disabled',false).html(old);
-            if(!res||!res.success){ notify('error',(res&&res.message)||'Could not refund.'); return; }
-            refundModal.hide(); notify('success',res.message||'Refund recorded.');
+            EC.buttonReset($btn);
+            if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not refund.'); return; }
+            refundModal.hide(); ecToast('success',res.message||'Refund recorded.');
             if(currentStudent) api.dues(currentStudent.id).done(function(d){ openStudent(d); switchView('history'); });
         })
-        .fail(function(){ $btn.prop('disabled',false).html(old); notify('error','Could not record the refund.'); });
+        .fail(function(){ EC.buttonReset($btn); ecToast('error','Could not record the refund.'); });
     });
 
-    if (typeof toastr !== 'undefined') toastr.options = { closeButton:true, progressBar:true, positionClass:'toast-top-right', timeOut:3000 };
 });
 </script>
 }

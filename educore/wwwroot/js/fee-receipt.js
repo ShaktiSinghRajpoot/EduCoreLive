@@ -19,13 +19,6 @@
 
     var ENDPOINT = '/ERP/Fee/GetReceipt';
 
-    function money(n) { return '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-    function esc(s) {
-        return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
-        });
-    }
-    function notify(type, msg) { if (typeof toastr !== 'undefined') toastr[type](msg); }
 
     function fmtDate(d) {
         if (!d) return '-';
@@ -74,11 +67,11 @@
         return (r.lines || []).map(function (l, i) {
             var extra  = l.lineType === 'Extra' ? ' <span class="rc-muted">(extra)</span>' : '';
             var waived = (!compact && l.concession > 0)
-                ? ' <span class="rc-muted">(−' + money(l.concession) + ' waived)</span>' : '';
+                ? ' <span class="rc-muted">(−' + EC.money(l.concession) + ' waived)</span>' : '';
             return '<tr>' +
                    (compact ? '' : '<td class="rc-sn">' + (i + 1) + '</td>') +
-                   '<td>' + esc(l.label) + extra + waived + '</td>' +
-                   '<td class="rc-amt">' + money(l.amount) + '</td></tr>';
+                   '<td>' + EC.esc(l.label) + extra + waived + '</td>' +
+                   '<td class="rc-amt">' + EC.money(l.amount) + '</td></tr>';
         }).join('');
     }
 
@@ -88,13 +81,13 @@
         if (r.concession > 0) {
             var lbl = 'Concession' +
                 (r.discountType === 'Percent' ? ' (' + r.discountValue + '%)' : '') +
-                (r.discountReason ? ' <span class="rc-muted">' + esc(r.discountReason) + '</span>' : '');
-            out += '<tr><td colspan="' + cols + '">' + lbl + '</td><td class="rc-amt">−' + money(r.concession) + '</td></tr>';
+                (r.discountReason ? ' <span class="rc-muted">' + EC.esc(r.discountReason) + '</span>' : '');
+            out += '<tr><td colspan="' + cols + '">' + lbl + '</td><td class="rc-amt">−' + EC.money(r.concession) + '</td></tr>';
         }
         if (r.advanceUsed > 0)
-            out += '<tr><td colspan="' + cols + '">Paid from advance</td><td class="rc-amt">−' + money(r.advanceUsed) + '</td></tr>';
+            out += '<tr><td colspan="' + cols + '">Paid from advance</td><td class="rc-amt">−' + EC.money(r.advanceUsed) + '</td></tr>';
         if (r.advanceCredit > 0)
-            out += '<tr><td colspan="' + cols + '">Saved to advance</td><td class="rc-amt">+' + money(r.advanceCredit) + '</td></tr>';
+            out += '<tr><td colspan="' + cols + '">Saved to advance</td><td class="rc-amt">+' + EC.money(r.advanceCredit) + '</td></tr>';
         return out;
     }
 
@@ -107,7 +100,7 @@
     // slot so a missing/broken file never leaves a blank box on the receipt.
     function logoImg(sch, cls) {
         if (!sch || !sch.logo) return '';
-        return '<img class="' + cls + '" src="' + esc(sch.logo) + '" alt="" ' +
+        return '<img class="' + cls + '" src="' + EC.esc(sch.logo) + '" alt="" ' +
                'onerror="this.style.display=\'none\'" />';
     }
 
@@ -121,8 +114,8 @@
             '<div class="rc-lettermark">' +
               logoImg(sch, 'rc-logo') +
               '<div class="rc-lettertext">' +
-                '<div class="rc-school">' + esc(sch.name || 'School') + '</div>' +
-                (sch.address ? '<div class="rc-addr">' + esc(sch.address) + '</div>' : '') +
+                '<div class="rc-school">' + EC.esc(sch.name || 'School') + '</div>' +
+                (sch.address ? '<div class="rc-addr">' + EC.esc(sch.address) + '</div>' : '') +
               '</div>' +
             '</div>' +
             '<div class="rc-title">' + title(r) + '</div>' +
@@ -130,28 +123,28 @@
           '</div>' +
 
           '<div class="rc-meta">' +
-            '<div><span>Receipt No</span><b>' + esc(r.receiptNo) + '</b></div>' +
+            '<div><span>Receipt No</span><b>' + EC.esc(r.receiptNo) + '</b></div>' +
             '<div><span>Date</span><b>' + fmtDate(r.date) + '</b></div>' +
           '</div>' +
 
           '<table class="rc-info">' +
-            '<tr><td><span>Student</span><b>' + esc(stu.name || '-') + '</b></td>' +
-                '<td><span>Adm / Reg No</span><b>' + esc(stu.admNo || '-') + '</b></td></tr>' +
-            '<tr><td><span>Class</span><b>' + esc(cls) + '</b></td>' +
-                '<td><span>Roll No</span><b>' + esc(stu.roll || '-') + '</b></td></tr>' +
+            '<tr><td><span>Student</span><b>' + EC.esc(stu.name || '-') + '</b></td>' +
+                '<td><span>Adm / Reg No</span><b>' + EC.esc(stu.admNo || '-') + '</b></td></tr>' +
+            '<tr><td><span>Class</span><b>' + EC.esc(cls) + '</b></td>' +
+                '<td><span>Roll No</span><b>' + EC.esc(stu.roll || '-') + '</b></td></tr>' +
           '</table>' +
 
           '<table class="rc-lines">' +
             '<thead><tr><th class="rc-sn">#</th><th>Particulars</th><th class="rc-amt">Amount</th></tr></thead>' +
             '<tbody>' + lineRows(r, false) + adjustmentRows(r, 2) + '</tbody>' +
-            '<tfoot><tr><td colspan="2">Total Paid</td><td class="rc-amt">' + money(r.amount) + '</td></tr></tfoot>' +
+            '<tfoot><tr><td colspan="2">Total Paid</td><td class="rc-amt">' + EC.money(r.amount) + '</td></tr></tfoot>' +
           '</table>' +
 
-          '<div class="rc-words"><span>In words:</span> ' + esc(amountWords(r.amount)) + '</div>' +
+          '<div class="rc-words"><span>In words:</span> ' + EC.esc(amountWords(r.amount)) + '</div>' +
 
           '<div class="rc-pay">' +
-            '<div><span>Mode</span><b>' + esc(r.mode || '-') + (r.reference ? ' · ' + esc(r.reference) : '') + '</b></div>' +
-            (r.remarks ? '<div><span>Note</span><b>' + esc(r.remarks) + '</b></div>' : '') +
+            '<div><span>Mode</span><b>' + EC.esc(r.mode || '-') + (r.reference ? ' · ' + EC.esc(r.reference) : '') + '</b></div>' +
+            (r.remarks ? '<div><span>Note</span><b>' + EC.esc(r.remarks) + '</b></div>' : '') +
           '</div>' +
 
           '<div class="rc-sign">' +
@@ -172,26 +165,26 @@
             '<div class="rc-lettermark">' +
               logoImg(sch, 'rc-logo') +
               '<div class="rc-lettertext">' +
-                '<div class="rc-school">' + esc(sch.name || 'School') + '</div>' +
-                (sch.address ? '<div class="rc-addr">' + esc(sch.address) + '</div>' : '') +
+                '<div class="rc-school">' + EC.esc(sch.name || 'School') + '</div>' +
+                (sch.address ? '<div class="rc-addr">' + EC.esc(sch.address) + '</div>' : '') +
               '</div>' +
             '</div>' +
             '<div class="rc-title">' + title(r) + '</div>' +
           '</div>' +
           '<div class="rc-meta">' +
-            '<div><span>Receipt</span><b>' + esc(r.receiptNo) + '</b></div>' +
+            '<div><span>Receipt</span><b>' + EC.esc(r.receiptNo) + '</b></div>' +
             '<div><span>Date</span><b>' + fmtDate(r.date) + '</b></div>' +
           '</div>' +
           '<div class="rc-inline">' +
-            '<b>' + esc(stu.name || '-') + '</b> · ' + esc(stu.admNo || '-') + ' · ' + esc(cls) +
+            '<b>' + EC.esc(stu.name || '-') + '</b> · ' + EC.esc(stu.admNo || '-') + ' · ' + EC.esc(cls) +
           '</div>' +
           '<table class="rc-lines">' +
             '<tbody>' + lineRows(r, true) + adjustmentRows(r, 1) + '</tbody>' +
-            '<tfoot><tr><td>Total Paid</td><td class="rc-amt">' + money(r.amount) + '</td></tr></tfoot>' +
+            '<tfoot><tr><td>Total Paid</td><td class="rc-amt">' + EC.money(r.amount) + '</td></tr></tfoot>' +
           '</table>' +
-          '<div class="rc-words">' + esc(amountWords(r.amount)) + '</div>' +
-          '<div class="rc-pay"><div><span>Mode</span><b>' + esc(r.mode || '-') +
-              (r.reference ? ' · ' + esc(r.reference) : '') + '</b></div></div>' +
+          '<div class="rc-words">' + EC.esc(amountWords(r.amount)) + '</div>' +
+          '<div class="rc-pay"><div><span>Mode</span><b>' + EC.esc(r.mode || '-') +
+              (r.reference ? ' · ' + EC.esc(r.reference) : '') + '</b></div></div>' +
           '<div class="rc-sign"><div class="rc-sign-box"><div class="rc-line"></div>Cashier</div></div>' +
         '</div>';
     }
@@ -204,24 +197,24 @@
         '<div class="rc rc-th">' +
           '<div class="rc-head">' +
             logoImg(sch, 'rc-logo') +
-            '<div class="rc-school">' + esc(sch.name || 'School') + '</div>' +
-            (sch.address ? '<div class="rc-addr">' + esc(sch.address) + '</div>' : '') +
+            '<div class="rc-school">' + EC.esc(sch.name || 'School') + '</div>' +
+            (sch.address ? '<div class="rc-addr">' + EC.esc(sch.address) + '</div>' : '') +
             '<div class="rc-title">' + title(r) + '</div>' +
           '</div>' +
           '<div class="rc-sep"></div>' +
-          '<div class="rc-kv"><span>Receipt</span><b>' + esc(r.receiptNo) + '</b></div>' +
+          '<div class="rc-kv"><span>Receipt</span><b>' + EC.esc(r.receiptNo) + '</b></div>' +
           '<div class="rc-kv"><span>Date</span><b>' + fmtDate(r.date) + '</b></div>' +
-          '<div class="rc-kv"><span>Student</span><b>' + esc(stu.name || '-') + '</b></div>' +
-          '<div class="rc-kv"><span>Adm No</span><b>' + esc(stu.admNo || '-') + '</b></div>' +
-          '<div class="rc-kv"><span>Class</span><b>' + esc(cls) + '</b></div>' +
+          '<div class="rc-kv"><span>Student</span><b>' + EC.esc(stu.name || '-') + '</b></div>' +
+          '<div class="rc-kv"><span>Adm No</span><b>' + EC.esc(stu.admNo || '-') + '</b></div>' +
+          '<div class="rc-kv"><span>Class</span><b>' + EC.esc(cls) + '</b></div>' +
           '<div class="rc-sep"></div>' +
           '<table class="rc-lines"><tbody>' + lineRows(r, true) + adjustmentRows(r, 1) + '</tbody></table>' +
           '<div class="rc-sep"></div>' +
-          '<div class="rc-kv rc-tot"><span>TOTAL</span><b>' + money(r.amount) + '</b></div>' +
-          '<div class="rc-kv"><span>Mode</span><b>' + esc(r.mode || '-') + '</b></div>' +
-          (r.reference ? '<div class="rc-kv"><span>Ref</span><b>' + esc(r.reference) + '</b></div>' : '') +
+          '<div class="rc-kv rc-tot"><span>TOTAL</span><b>' + EC.money(r.amount) + '</b></div>' +
+          '<div class="rc-kv"><span>Mode</span><b>' + EC.esc(r.mode || '-') + '</b></div>' +
+          (r.reference ? '<div class="rc-kv"><span>Ref</span><b>' + EC.esc(r.reference) + '</b></div>' : '') +
           '<div class="rc-sep"></div>' +
-          '<div class="rc-words">' + esc(amountWords(r.amount)) + '</div>' +
+          '<div class="rc-words">' + EC.esc(amountWords(r.amount)) + '</div>' +
           '<div class="rc-foot">Thank you.<br/>System-generated receipt.</div>' +
         '</div>';
     }
@@ -330,8 +323,8 @@
         if (!current) return;
         var f = current.format || 'A4';
         var w = window.open('', '_blank', 'width=460,height=680');
-        if (!w) { notify('error', 'Allow pop-ups to print the receipt.'); return; }
-        w.document.write('<html><head><title>' + esc(current.receiptNo || 'Receipt') + '</title>' +
+        if (!w) { ecToast('error', 'Allow pop-ups to print the receipt.'); return; }
+        w.document.write('<html><head><title>' + EC.esc(current.receiptNo || 'Receipt') + '</title>' +
                          '<style>' + styles(f) + '</style></head><body>' + buildHtml(current) + '</body></html>');
         w.document.close();
         w.focus();
@@ -345,7 +338,7 @@
         if (!receiptNo) return;
         $.getJSON(ENDPOINT, { receiptNo: receiptNo })
             .done(function (r) {
-                if (!r) { notify('error', 'Receipt not found.'); return; }
+                if (!r) { ecToast('error', 'Receipt not found.'); return; }
                 render(r);
                 var el = document.getElementById('ecReceiptModal');
                 if (!el) return;
@@ -354,7 +347,7 @@
                 $(el).find('.modal-dialog').removeClass('modal-lg');
                 if (window.bootstrap) new window.bootstrap.Modal(el).show();
             })
-            .fail(function () { notify('error', 'Could not load the receipt.'); });
+            .fail(function () { ecToast('error', 'Could not load the receipt.'); });
     }
 
     // Load + print without opening the preview (list "Print" buttons).
@@ -362,11 +355,11 @@
         if (!receiptNo) return;
         $.getJSON(ENDPOINT, { receiptNo: receiptNo })
             .done(function (r) {
-                if (!r) { notify('error', 'Receipt not found.'); return; }
+                if (!r) { ecToast('error', 'Receipt not found.'); return; }
                 current = r;
                 printCurrent();
             })
-            .fail(function () { notify('error', 'Could not load the receipt.'); });
+            .fail(function () { ecToast('error', 'Could not load the receipt.'); });
     }
 
     $(function () {
@@ -405,7 +398,7 @@
     function preview(format, school) {
         render(sampleReceipt(format, school));
         var el = document.getElementById('ecReceiptModal');
-        if (!el) { notify('error', 'Preview is not available on this page.'); return; }
+        if (!el) { ecToast('error', 'Preview is not available on this page.'); return; }
         // Label it a preview and give A4 room to breathe; show() resets both when a
         // real receipt is opened in the same shared modal.
         $(el).find('.modal-title').text('Receipt preview — ' + (format || 'A4'));

@@ -136,8 +136,6 @@ function two(n){ return (n<10?'0':'')+n; }
 function fmt12(t){ if(!t) return '—'; var p=String(t).split(':'),h=parseInt(p[0],10),m=p[1]; var ap=h>=12?'PM':'AM'; var hh=h%12||12; return hh+':'+m+' '+ap; }
 function typeIcon(t){ return {'class':'bx-book','break':'bx-coffee','lunch':'bx-restaurant'}[t]||'bx-book'; }
 function typeLabel(t){ return {'class':'Class','break':'Break','lunch':'Lunch'}[t]||'Class'; }
-function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 function el(id){ return document.getElementById(id); }
 
 /* ---------------- server-anchored clock ----------------
@@ -379,9 +377,9 @@ function setLive(){ el('sbOffCard').classList.add('d-none'); el('sbLive').classL
 
 function renderDayChip(){
   var c=el('sbDayChip');
-  if(DAY.type==='holiday'){      c.className='sb-chip holiday'; c.innerHTML='<i class="bx bx-calendar-star"></i>'+esc(DAY.title||'Holiday'); }
+  if(DAY.type==='holiday'){      c.className='sb-chip holiday'; c.innerHTML='<i class="bx bx-calendar-star"></i>'+EC.esc(DAY.title||'Holiday'); }
   else if(DAY.type==='half_day'){ c.className='sb-chip half';    c.innerHTML='<i class="bx bx-time-five"></i>Half day · closes '+fmt12(DAY.halfEnd); }
-  else if(DAY.type==='weekly_off'){ c.className='sb-chip off';   c.innerHTML='<i class="bx bx-calendar-x"></i>'+esc(DAY.title||'Weekly off'); }
+  else if(DAY.type==='weekly_off'){ c.className='sb-chip off';   c.innerHTML='<i class="bx bx-calendar-x"></i>'+EC.esc(DAY.title||'Weekly off'); }
   else { c.className='sb-chip d-none'; c.innerHTML=''; }
 }
 
@@ -390,7 +388,7 @@ function renderStrip(nowMin){
   el('sbStrip').innerHTML=PERIODS.map(function(p){
     var w=Math.max(p.e-p.s,0)/span*100;
     var state=(nowMin>=p.s && nowMin<p.e)?'now':(nowMin>=p.e?'done':'');
-    return '<div class="sb-seg '+p.type+' '+state+'" style="flex:'+w+' 1 0;" title="'+esc(p.name)+' '+p.start+'–'+p.end+'">'+(w>6?esc(p.name):'')+'</div>';
+    return '<div class="sb-seg '+p.type+' '+state+'" style="flex:'+w+' 1 0;" title="'+EC.esc(p.name)+' '+p.start+'–'+p.end+'">'+(w>6?EC.esc(p.name):'')+'</div>';
   }).join('');
 }
 
@@ -489,7 +487,7 @@ function showBetween(label,upcoming,toStartSec,nowMin){
   el('sbProg').style.width='0%';
 
   el('sbCountNum').textContent=countdownText(Math.max(toStartSec,0));
-  el('sbCountLbl').textContent='to '+esc(upcoming.name);
+  el('sbCountLbl').textContent='to '+EC.esc(upcoming.name);
   el('sbCount').classList.toggle('warn', toStartSec<=60);
 
   el('sbNextName').textContent=upcoming.name;
@@ -507,20 +505,20 @@ el('sbBellBtn').addEventListener('click',function(){
     speakSeq([{text:'स्मार्ट बेल घोषणाएँ अब चालू हैं।',lang:'hi-IN'},{text:'Smart bell announcements are now enabled.',lang:'en-IN'}]);
     this.classList.add('armed');
     this.innerHTML='<i class="bx bx-bell"></i><span>Bell On</span>';
-    if(!DAY.working) toast('info','Bell enabled — but the school is closed today ('+(DAY.title||'non-working day')+'), so nothing will ring.');
-    else toast('success','Bell enabled — Hindi + English announcements will repeat for 1 minute at each transition.');
+    if(!DAY.working) ecToast('info','Bell enabled — but the school is closed today ('+(DAY.title||'non-working day')+'), so nothing will ring.');
+    else ecToast('success','Bell enabled — Hindi + English announcements will repeat for 1 minute at each transition.');
   } else {
     announceToken++;                                           /* cancel any repeating cycle */
     if('speechSynthesis' in window) speechSynthesis.cancel();  /* stop any announcement in progress */
     this.classList.remove('armed');
     this.innerHTML='<i class="bx bx-bell-off"></i><span>Enable Bell</span>';
-    toast('info','Bell muted.');
+    ecToast('info','Bell muted.');
   }
 });
 
 el('sbTestBtn').addEventListener('click',function(){
   testAnnounce();
-  toast('info','Playing a sample announcement (Hindi → English → bell).');
+  ecToast('info','Playing a sample announcement (Hindi → English → bell).');
 });
 
 el('sbFsBtn').addEventListener('click',function(){

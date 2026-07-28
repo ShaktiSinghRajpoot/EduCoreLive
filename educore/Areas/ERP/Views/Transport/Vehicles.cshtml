@@ -87,7 +87,6 @@ $(function(){
   var CSRF=$('input[name="__RequestVerificationToken"]').val();
   var URL={ save:'@Url.Action("SaveVehicle")', del:'@Url.Action("DeleteVehicle")', toggle:'@Url.Action("ToggleVehicleStatus")' };
   // staffId -> { name, phone } so picking a driver auto-fills the phone.
-  function notify(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
   function post(url,data){ return $.ajax({url:url,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},data:JSON.stringify(data)}); }
   function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
   function syncPhone(){ $('#vDp').val($('#vDsid option:selected').data('phone') || ''); }
@@ -97,15 +96,20 @@ $(function(){
   $('.editV').on('click',function(){ var d=$(this); $('#vTitle').text('Edit Vehicle'); $('#vId').val(d.data('id')); $('#vNo').val(d.data('no')); $('#vCap').val(d.data('cap')||''); $('#vDsid').val(d.data('dsid')||''); syncPhone(); if(!$('#vDp').val()) $('#vDp').val(d.data('dp')||''); $('#vRid').val(d.data('rid')||''); new bootstrap.Modal('#vModal').show(); });
 
   $('#saveVBtn').on('click',function(){
-    var no=$('#vNo').val().trim(); if(!no){ notify('warning','Enter a vehicle number.'); return; }
+    var no=$('#vNo').val().trim(); if(!no){ ecToast('warning','Enter a vehicle number.'); return; }
     post(URL.save,{ vehicleId:Number($('#vId').val())||0, vehicleNo:no, capacity:Number($('#vCap').val())||null,
         driverStaffId:Number($('#vDsid').val())||null, driverPhone:$('#vDp').val().trim(), routeId:Number($('#vRid').val())||null })
-      .done(function(res){ if(res.success){ notify('success',res.message); setTimeout(function(){location.reload();},600);} else notify('error',res.message); });
+      .done(function(res){ if(res.success){ ecToast('success',res.message); setTimeout(function(){location.reload();},600);} else ecToast('error',res.message); });
   });
-  $('.toggleV').on('click',function(){ postForm(URL.toggle,{id:$(this).data('id')}).done(function(res){ notify(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); }); });
-  $('.delV').on('click',function(){ if(!confirm('Delete vehicle "'+$(this).data('no')+'"?')) return; postForm(URL.del,{id:$(this).data('id')}).done(function(res){ notify(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); }); });
+  $('.toggleV').on('click',function(){ postForm(URL.toggle,{id:$(this).data('id')}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); }); });
+  $('.delV').on('click',function(){
+    var id=$(this).data('id');
+    EC.confirm({ title:'Delete this vehicle?', name:$(this).data('no'), okText:'Delete vehicle' }).then(function(ok){
+      if(!ok) return;
+      postForm(URL.del,{id:id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); });
+    });
+  });
 
-  if(typeof toastr!=='undefined') toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
 });
 </script>
 }

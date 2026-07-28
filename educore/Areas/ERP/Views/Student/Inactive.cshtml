@@ -330,9 +330,12 @@
 
         $('.btn-readmit').on('click', function () {
             var name = $(this).data('name');
-            if (!confirm('Re-admit ' + name + ' to the active roll?')) return;
-
             var id = $(this).data('id');
+            EC.confirm({ danger: false, icon: 'bx-user-plus',
+                         title: 'Re-admit this student?', name: name,
+                         message: 'They will move back to the active roll.',
+                         okText: 'Re-admit' }).then(function (ok) {
+            if (!ok) return;
             $.ajax({
                 url: '@Url.Action("Reactivate", "Student", new { area = "ERP" })',
                 type: 'POST',
@@ -342,13 +345,14 @@
             })
             .done(function (res) {
                 if (res && res.success) {
-                    toastr.success(res.message);
+                    ecToast('success', res.message);
                     location.reload();
                 } else {
-                    toastr.error((res && res.message) || 'Could not re-admit.');
+                    ecToast('error', (res && res.message) || 'Could not re-admit.');
                 }
             })
-            .fail(function () { toastr.error('Something went wrong.'); });
+            .fail(function () { ecToast('error', 'Something went wrong.'); });
+            });
         });
 
         // ── Issue TC ──
@@ -371,7 +375,8 @@
         });
 
         $('#tcIssueBtn').on('click', function () {
-            var $btn = $(this).prop('disabled', true);
+            var $btn = $(this);
+            EC.buttonBusy($btn, 'Issuing…');
             $.ajax({
                 url: '@Url.Action("Issue", "Tc", new { area = "ERP" })',
                 type: 'POST',
@@ -396,16 +401,16 @@
             })
             .done(function (res) {
                 if (res && res.success) {
-                    toastr.success(res.message);
+                    ecToast('success', res.message);
                     tcModal.hide();
                     // Open the freshly issued certificate to print.
                     window.open('@Url.Action("Print", "Tc", new { area = "ERP" })?id=' + res.tcId, '_blank');
                 } else {
-                    toastr.error((res && res.message) || 'Could not issue the certificate.');
+                    ecToast('error', (res && res.message) || 'Could not issue the certificate.');
                 }
             })
-            .fail(function () { toastr.error('Something went wrong.'); })
-            .always(function () { $btn.prop('disabled', false); });
+            .fail(function () { ecToast('error', 'Something went wrong.'); })
+            .always(function () { EC.buttonReset($btn); });
         });
 
     });

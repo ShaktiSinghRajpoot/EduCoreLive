@@ -144,8 +144,6 @@ function el(id){ return document.getElementById(id); }
 
 var avatarColors=['primary','success','info','warning','danger','secondary'];
 function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
-function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 
 /* Build each student's per-day marks for the month from the server data.
    Sundays render as H; a non-Sunday day with no register shows blank. */
@@ -188,7 +186,7 @@ function loadData(){
     SCHOOL_DAYS=res.schoolDays||0;
     render();
   })
-  .fail(function(){ toast('error','Could not load the attendance register.'); });
+  .fail(function(){ ecToast('error','Could not load the attendance register.'); });
 }
 
 /* Fill the Section dropdown for the chosen class, then (optionally) load data. */
@@ -246,7 +244,7 @@ function renderRegister(){
   var body='<tbody>';
   STUDENTS.forEach(function(s){
     var arr=DATA[s.id], st=statsFor(s.id);
-    body+='<tr><td class="ar-stick"><div class="ar-nm">'+esc(s.name)+'</div><div class="ar-rl">Roll '+esc(s.roll)+'</div></td>';
+    body+='<tr><td class="ar-stick"><div class="ar-nm">'+EC.esc(s.name)+'</div><div class="ar-rl">Roll '+EC.esc(s.roll)+'</div></td>';
     for(var d=0; d<arr.length; d++){
       var mk=arr[d];
       body += mk ? '<td><span class="ar-mark m-'+mk+'">'+mk+'</span></td>' : '<td></td>';
@@ -267,8 +265,8 @@ function renderDefaulters(){
   box.innerHTML=defs.map(function(x){
     return '<div class="col-12 col-md-6 col-xl-4"><div class="ar-def">'
       +'<div class="ar-def-av">'+ini(x.s.name)+'</div>'
-      +'<div class="flex-grow-1"><div class="ar-nm">'+esc(x.s.name)+'</div>'
-      +  '<div class="ar-rl">Roll '+esc(x.s.roll)+' · '+x.st.a+' absent · '+x.st.l+' leave</div>'
+      +'<div class="flex-grow-1"><div class="ar-nm">'+EC.esc(x.s.name)+'</div>'
+      +  '<div class="ar-rl">Roll '+EC.esc(x.s.roll)+' · '+x.st.a+' absent · '+x.st.l+' leave</div>'
       +  '<div class="ar-def-bar"><div class="ar-def-fill" style="width:'+x.st.pct+'%"></div></div></div>'
       +'<span class="ar-pct bad">'+x.st.pct+'%</span>'
       +'</div></div>';
@@ -282,8 +280,8 @@ function renderSummary(){
     var col=avatarColors[i%avatarColors.length];
     return '<div class="ar-hrow">'
       +'<div class="ar-hrow-av bg-label-'+col+' text-'+col+'">'+ini(x.s.name)+'</div>'
-      +'<div class="flex-grow-1"><div class="ar-nm">'+esc(x.s.name)+'</div>'
-      +  '<div class="ar-hrow-mini"><span>Roll <b>'+esc(x.s.roll)+'</b></span><span>Present <b>'+x.st.p+'</b></span><span>Absent <b>'+x.st.a+'</b></span><span>Leave <b>'+x.st.l+'</b></span></div></div>'
+      +'<div class="flex-grow-1"><div class="ar-nm">'+EC.esc(x.s.name)+'</div>'
+      +  '<div class="ar-hrow-mini"><span>Roll <b>'+EC.esc(x.s.roll)+'</b></span><span>Present <b>'+x.st.p+'</b></span><span>Absent <b>'+x.st.a+'</b></span><span>Leave <b>'+x.st.l+'</b></span></div></div>'
       +'<span class="ar-pct '+pctCls(x.st.pct)+'">'+x.st.pct+'%</span>'
       +'</div>';
   }).join('');
@@ -306,7 +304,7 @@ function render(){
 
 /* Export the current month's per-student summary as a CSV. */
 function exportCsv(){
-  if(!STUDENTS.length){ toast('info','Nothing to export.'); return; }
+  if(!STUDENTS.length){ ecToast('info','Nothing to export.'); return; }
   var rows=[['Roll','Student','Present','Absent','Leave','Percent']];
   STUDENTS.forEach(function(s){
     var st=statsFor(s.id);

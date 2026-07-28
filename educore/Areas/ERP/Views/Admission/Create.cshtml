@@ -282,7 +282,7 @@
                         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
                             <div>
                                 <div class="ec-profile-subtitle">Collect at Admission</div>
-                                <div class="fee-total" id="annualTotalText">₹0</div>
+                                <div class="fee-total" id="annualTotalText">₹0.00</div>
                                 <div class="kit-meta mt-1" id="annualRefText">One-time charges due now</div>
                             </div>
                             <div class="ec-avatar rounded-4 d-flex align-items-center justify-content-center">
@@ -396,7 +396,7 @@
                                 <div class="col-12">
                                     <div class="d-flex align-items-center justify-content-between px-1">
                                         <span class="text-muted" style="font-size:.8rem">Monthly bus fee (billed with monthly dues)</span>
-                                        <strong id="transportFare" style="color:#ff8a00">₹0</strong>
+                                        <strong id="transportFare" style="color:#ff8a00">₹0.00</strong>
                                     </div>
                                 </div>
                             </div>
@@ -466,9 +466,7 @@ $(function () {
 
     var fees = [];   // fee rows for the selected class + year
 
-    function money(n) { return '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN'); }
 
-    function notify(type, msg) { if (typeof toastr !== 'undefined') toastr[type](msg); }
 
     /* ── sections: configured per class + year in Academic Setup ── */
     function loadSections() {
@@ -497,7 +495,7 @@ $(function () {
     /* ── fee preview ─────────────────────────────────── */
     function showEmptyFees() {
         fees = [];
-        $annual.text('₹0');
+        $annual.text('₹0.00');
         $annualRef.text('One-time charges due now');
         $concession.addClass('d-none');
         $ledger.val('');
@@ -519,7 +517,7 @@ $(function () {
             .done(function (res) {
                 if (!res || !res.success || !res.fees || !res.fees.length) {
                     fees = [];
-                    $annual.text('₹0');
+                    $annual.text('₹0.00');
                     $annualRef.text('One-time charges due now');
                     $concession.addClass('d-none');
                     $ledger.val('');
@@ -563,7 +561,7 @@ $(function () {
                 : fee.cycle === 'Quarterly' ? '/qtr'
                 : fee.cycle === 'Half Yearly' ? '/half-yr'
                 : (fee.stage === 'Yearly' ? '/yr' : '');
-            var amt = '<strong>' + money(fee.amount) + per + '</strong>';
+            var amt = '<strong>' + EC.money(fee.amount) + per + '</strong>';
             var sub = fee.cycle + (muted ? ' · billed later' : ' · due now');
             if (!fee.mandatory) {
                 return '<div class="fee-check-row"><div class="d-flex gap-2">' +
@@ -622,21 +620,21 @@ $(function () {
 
         var summary = '<div class="fee-summary">' +
             '<div class="fee-group-title" style="margin:0 0 .5rem;">Due at Admission</div>' +
-            '<div class="summary-line"><span>One-Time Fees</span><strong>' + money(payNow) + '</strong></div>';
-        if (applyTo === 'payToday' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + money(disc) + '</strong></div>';
-        summary += '<hr class="opacity-25"><div class="summary-line"><span style="color:var(--ec-heading);font-weight:950;">Collect at Admission</span><strong style="color:var(--ec-primary);">' + money(payToday) + '</strong></div>';
+            '<div class="summary-line"><span>One-Time Fees</span><strong>' + EC.money(payNow) + '</strong></div>';
+        if (applyTo === 'payToday' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + EC.money(disc) + '</strong></div>';
+        summary += '<hr class="opacity-25"><div class="summary-line"><span style="color:var(--ec-heading);font-weight:950;">Collect at Admission</span><strong style="color:var(--ec-primary);">' + EC.money(payToday) + '</strong></div>';
         summary += '<div class="fee-group-title" style="margin:1rem 0 .5rem;">Scheduled — Billed Later</div>' +
-            '<div class="summary-line"><span>Monthly</span><strong>' + money(monthly) + '/mo</strong></div>';
-        if (quarterly > 0) summary += '<div class="summary-line"><span>Quarterly</span><strong>' + money(quarterly) + '/qtr</strong></div>';
-        if (halfYearly > 0) summary += '<div class="summary-line"><span>Half-Yearly</span><strong>' + money(halfYearly) + '/half-yr</strong></div>';
-        summary += '<div class="summary-line"><span>Yearly</span><strong>' + money(yearly) + '/yr</strong></div>';
-        if (applyTo === 'annual' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + money(disc) + '</strong></div>';
-        summary += '<div class="summary-line"><span>Estimated Annual Fee</span><strong>' + money(estAnnual) + '</strong></div>' +
+            '<div class="summary-line"><span>Monthly</span><strong>' + EC.money(monthly) + '/mo</strong></div>';
+        if (quarterly > 0) summary += '<div class="summary-line"><span>Quarterly</span><strong>' + EC.money(quarterly) + '/qtr</strong></div>';
+        if (halfYearly > 0) summary += '<div class="summary-line"><span>Half-Yearly</span><strong>' + EC.money(halfYearly) + '/half-yr</strong></div>';
+        summary += '<div class="summary-line"><span>Yearly</span><strong>' + EC.money(yearly) + '/yr</strong></div>';
+        if (applyTo === 'annual' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + EC.money(disc) + '</strong></div>';
+        summary += '<div class="summary-line"><span>Estimated Annual Fee</span><strong>' + EC.money(estAnnual) + '</strong></div>' +
             '</div>';
         html += summary;
 
-        $annual.text(money(payToday));
-        $annualRef.text('Est. annual fee ' + money(estAnnual) + ' · billed through the year');
+        $annual.text(EC.money(payToday));
+        $annualRef.text('Est. annual fee ' + EC.money(estAnnual) + ' · billed through the year');
         $feeBox.html(html);
 
         // Cap collection at the amount due now (no advance/prepay at admission — that's
@@ -681,7 +679,7 @@ $(function () {
         var v = Number($(this).val() || 0);
         if (payTodayMax > 0 && v > payTodayMax) {
             $(this).val(payTodayMax);
-            notify('warning', 'Amount cannot exceed ' + money(payTodayMax) + ' (due now). For advance / prepay use the Fee counter.');
+            ecToast('warning', 'Amount cannot exceed ' + EC.money(payTodayMax) + ' (due now). For advance / prepay use the Fee counter.');
         }
     });
     $('#collectFeeNow').on('change', function () {
@@ -706,7 +704,7 @@ $(function () {
     function transMoney(n) { return '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN'); }
     function clearTransport() {
         $('#transportRoute').val(''); $('#transportStop').prop('disabled', true).html('<option value="">Select route first</option>');
-        $('#transportFare').text('₹0'); $('#transportRouteId').val(''); $('#transportStopId').val('');
+        $('#transportFare').text('₹0.00'); $('#transportRouteId').val(''); $('#transportStopId').val('');
     }
     $('#usesTransport').on('change', function () {
         $('#transportFields').toggleClass('d-none', !this.checked);
@@ -715,7 +713,7 @@ $(function () {
     $('#transportRoute').on('change', function () {
         var r = transportRoutes.find(function (x) { return x.routeId === Number($('#transportRoute').val()); });
         $('#transportRouteId').val(r ? r.routeId : '');
-        $('#transportStopId').val(''); $('#transportFare').text('₹0');
+        $('#transportStopId').val(''); $('#transportFare').text('₹0.00');
         if (!r) { $('#transportStop').prop('disabled', true).html('<option value="">Select route first</option>'); return; }
         var h = '<option value="">Select Stop</option>';
         r.stops.forEach(function (s) { h += '<option value="' + s.stopId + '" data-fare="' + s.fare + '">' + s.stopName + ' — ' + transMoney(s.fare) + '</option>'; });
@@ -735,14 +733,14 @@ $(function () {
         if (!this.checkValidity()) { $form.addClass('was-validated'); return; }
         if (Number($discValue.val() || 0) > 0 && !$.trim($discReason.val())) {
             $discReason.focus();
-            notify('error', 'Please enter a concession reason.');
+            ecToast('error', 'Please enter a concession reason.');
             return;
         }
         if (!$ledger.val()) {
             if (!$year.val() || !$class.val()) {
-                notify('error', 'Please select Academic Year and Class.');
+                ecToast('error', 'Please select Academic Year and Class.');
             } else {
-                notify('error', 'No fee structure is configured for ' + $class.val() + ' (' + $year.val() + '). Set it up under School Settings → Fee Structure first.');
+                ecToast('error', 'No fee structure is configured for ' + $class.val() + ' (' + $year.val() + '). Set it up under School Settings → Fee Structure first.');
             }
             return;
         }
@@ -750,7 +748,7 @@ $(function () {
         if ($('#collectFeeNow').is(':checked') && payTodayMax > 0 &&
             Number($('#paymentAmount').val() || 0) > payTodayMax) {
             $('#paymentAmount').focus();
-            notify('error', 'Amount to collect cannot exceed ' + money(payTodayMax) + ' (due now). For advance / prepay use the Fee counter.');
+            ecToast('error', 'Amount to collect cannot exceed ' + EC.money(payTodayMax) + ' (due now). For advance / prepay use the Fee counter.');
             return;
         }
 
@@ -759,9 +757,10 @@ $(function () {
             return { name: $(this).val(), status: this.checked ? 'Collected' : 'Pending' };
         }).get()));
 
+        // Deliberately not reset on success — the page redirects, so the button
+        // should stay busy to block a second submit.
         var $btn = $form.find('button[type="submit"]');
-        var oldHtml = $btn.html();
-        $btn.prop('disabled', true).html('<i class="bx bx-loader-circle bx-spin me-1"></i>Saving…');
+        EC.buttonBusy($btn, 'Saving…');
 
         $.ajax({
             url: URL_SAVE,
@@ -775,7 +774,7 @@ $(function () {
             if (res && res.success) {
                 var msg = 'Admission ' + (res.admissionNo || '') + ' saved.';
                 if (res.receiptNo) msg += ' Receipt ' + res.receiptNo + ' generated.';
-                notify('success', msg);
+                ecToast('success', msg);
                 // If a fee was collected, show the printable receipt; go to the
                 // student list once the user closes it. Otherwise redirect straight away.
                 if (res.receiptNo && window.EcReceipt) {
@@ -786,18 +785,17 @@ $(function () {
                     setTimeout(function () { window.location.href = URL_LIST; }, 900);
                 }
             } else {
-                notify('error', (res && res.message) || 'Unable to save admission.');
-                $btn.prop('disabled', false).html(oldHtml);
+                ecToast('error', (res && res.message) || 'Unable to save admission.');
+                EC.buttonReset($btn);
             }
         })
         .fail(function () {
-            notify('error', 'Something went wrong while saving.');
-            $btn.prop('disabled', false).html(oldHtml);
+            ecToast('error', 'Something went wrong while saving.');
+            EC.buttonReset($btn);
         });
     });
 
     if (typeof toastr !== 'undefined') {
-        toastr.options = { closeButton: true, progressBar: true, positionClass: 'toast-top-right', timeOut: 3000 };
     }
 
     showEmptyFees();

@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model EduCoreDataAccessLayer.Models.ERP.FeeStructureModel
 @{
     ViewData["Title"] = "Fee Structure";
@@ -335,22 +335,22 @@
 
                             <div class="summary-row">
                                 <span class="summary-label">One Time</span>
-                                <span class="summary-value" id="oneTimeTotal">₹0</span>
+                                <span class="summary-value" id="oneTimeTotal">₹0.00</span>
                             </div>
 
                             <div class="summary-row">
                                 <span class="summary-label">Monthly</span>
-                                <span class="summary-value" id="monthlyTotal">₹0 / month</span>
+                                <span class="summary-value" id="monthlyTotal">₹0.00 / month</span>
                             </div>
 
                             <div class="summary-row">
                                 <span class="summary-label">Yearly</span>
-                                <span class="summary-value" id="yearlyTotal">₹0 / year</span>
+                                <span class="summary-value" id="yearlyTotal">₹0.00 / year</span>
                             </div>
 
                             <div class="summary-total-box mt-3">
                                 <small class="text-muted d-block mb-1">Estimated Annual Fee</small>
-                                <h3 id="annualTotal">₹0</h3>
+                                <h3 id="annualTotal">₹0.00</h3>
                             </div>
 
                             <small class="text-muted d-block mt-3">
@@ -481,23 +481,6 @@
 
         $(document).ready(function () {
 
-            if (typeof toastr !== 'undefined') {
-                toastr.options = {
-                    closeButton: true,
-                    progressBar: true,
-                    positionClass: 'toast-top-right',
-                    timeOut: 3000
-                };
-            }
-
-            function showToast(type, message) {
-                if (typeof toastr !== 'undefined') {
-                    toastr[type](message);
-                } else {
-                    console.log(message);
-                }
-            }
-
             function formatINR(amount) {
                 return '₹' + amount.toLocaleString('en-IN', {
                     maximumFractionDigits: 0
@@ -618,7 +601,7 @@
 
             $('#selectAllClassesBtn').on('click', function () {
                 if ($('#IsEditMode').val() === 'true') {
-                    showToast('warning', 'Exit edit mode to select multiple classes.');
+                    ecToast('warning', 'Exit edit mode to select multiple classes.');
                     return;
                 }
 
@@ -626,12 +609,12 @@
                 $('.class-chip-card').addClass('active');
 
                 updateSummary();
-                showToast('success', 'All classes selected.');
+                ecToast('success', 'All classes selected.');
             });
 
             $('#clearAllClassesBtn').on('click', function () {
                 if ($('#IsEditMode').val() === 'true') {
-                    showToast('warning', 'Exit edit mode to clear classes.');
+                    ecToast('warning', 'Exit edit mode to clear classes.');
                     return;
                 }
 
@@ -639,7 +622,7 @@
                 $('.class-chip-card').removeClass('active');
 
                 updateSummary();
-                showToast('info', 'Class selection cleared.');
+                ecToast('info', 'Class selection cleared.');
             });
 
             $(document).on('change', '.class-checkbox', function () {
@@ -663,7 +646,7 @@
                 });
 
                 updateSummary();
-                showToast('success', 'Mandatory fee heads selected.');
+                ecToast('success', 'Mandatory fee heads selected.');
             });
 
             $('.edit-structure-btn').on('click', function () {
@@ -685,7 +668,7 @@
                 if (selectedCheckbox.length === 0) {
                     $('#IsEditMode').val('false');
                     $('#EditClassName').val('');
-                    showToast('error', 'Class "' + className + '" is no longer configured in Academic Setup. Re-create the structure for a current class.');
+                    ecToast('error', 'Class "' + className + '" is no longer configured in Academic Setup. Re-create the structure for a current class.');
                     return;
                 }
 
@@ -725,15 +708,15 @@
                                 }
                             });
 
-                            showToast('info', 'Edit mode — ' + className + ' structure loaded from database.');
+                            ecToast('info', 'Edit mode — ' + className + ' structure loaded from database.');
                         } else {
-                            showToast('warning', 'Could not load saved structure. Using defaults.');
+                            ecToast('warning', 'Could not load saved structure. Using defaults.');
                         }
 
                         updateSummary();
                     },
                     error: function () {
-                        showToast('error', 'Failed to load structure. Please try again.');
+                        ecToast('error', 'Failed to load structure. Please try again.');
                         updateSummary();
                     }
                 });
@@ -753,7 +736,7 @@
                 $('.class-chip-card').removeClass('active');
 
                 updateSummary();
-                showToast('info', 'Edit mode closed.');
+                ecToast('info', 'Edit mode closed.');
             });
 
             $('#feeStructureForm').on('submit', function (e) {
@@ -763,27 +746,27 @@
 
                 if (!academicYear) {
                     e.preventDefault();
-                    showToast('error', 'Please select academic year.');
+                    ecToast('error', 'Please select academic year.');
                     $('#AcademicYear').focus();
                     return false;
                 }
 
                 if (selectedClasses === 0) {
                     e.preventDefault();
-                    showToast('error', 'Please select at least one class.');
+                    ecToast('error', 'Please select at least one class.');
                     return false;
                 }
 
                 if (selectedFeeHeads === 0) {
                     e.preventDefault();
-                    showToast('error', 'Please select at least one fee head.');
+                    ecToast('error', 'Please select at least one fee head.');
                     return false;
                 }
 
                 let existingClasses = getExistingSelectedClasses();
 
                 if (existingClasses.length > 0) {
-                    showToast('warning', 'Existing class structures will be updated.');
+                    ecToast('warning', 'Existing class structures will be updated.');
                 }
             });
 

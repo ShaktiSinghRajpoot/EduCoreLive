@@ -252,12 +252,6 @@
     </div>
 </div>
 
-<!-- Success toast -->
-<div class="me-toast" id="meToast">
-    <i class="bx bx-check-circle" style="font-size:1.3rem;color:#28a745;flex-shrink:0;"></i>
-    <span id="meToastMsg">Marks saved successfully.</span>
-</div>
-
 @section PageScripts {
 <script>
 $(document).ready(function () {
@@ -719,11 +713,15 @@ document.getElementById('btnMarkAllPresent').addEventListener('click', function 
 });
 
 document.getElementById('btnClearAll').addEventListener('click', function () {
-    if (!confirm('Clear all entered marks? This cannot be undone.')) return;
-    state.rows.forEach(r => { r.marks = null; r.absent = false; });
-    renderGrid();
-    renderSummary();
-    updateProgress();
+    EC.confirm({ title: 'Clear all entered marks?', icon: 'bx-eraser',
+                 message: 'Every mark on this sheet will be cleared. This cannot be undone.',
+                 okText: 'Clear marks' }).then(function (ok) {
+        if (!ok) return;
+        state.rows.forEach(r => { r.marks = null; r.absent = false; });
+        renderGrid();
+        renderSummary();
+        updateProgress();
+    });
 });
 
 // ── Show UI panels ────────────────────────────────────────────────────────
@@ -747,7 +745,7 @@ function updateBarInfo() {
 // ── Save draft ────────────────────────────────────────────────────────────
 document.getElementById('btnDraft').addEventListener('click', function () {
     // In production: POST to SaveMarks with action=draft
-    showToast('Marks saved as draft.');
+    ecToast('success', 'Marks saved as draft.');
 });
 
 // ── Finalize ──────────────────────────────────────────────────────────────
@@ -782,11 +780,10 @@ document.getElementById('confirmFinalizeBtn').addEventListener('click', function
     document.getElementById('btnMarkAllPresent').disabled = true;
     document.getElementById('btnClearAll').disabled = true;
 
-    showToast('Marks finalized and locked successfully.');
+    ecToast('success', 'Marks finalized and locked successfully.');
 });
 
 // ── Toast (unified — routes through the app-wide ecToast/toastr) ────────────
-function showToast(msg) { window.ecToast('success', msg); }
 // Post-redirect flash messages are handled globally by _Scripts.cshtml.
 
 // ── Auto-load defaults so mock data shows immediately ─────────────────────

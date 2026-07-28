@@ -209,8 +209,6 @@
     </div>
 </div>
 
-<div class="pv-toast-wrap" id="pvToastWrap"></div>
-
 @section PageScripts {
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -222,11 +220,6 @@
             const allRows = Array.from(tbody.querySelectorAll('tr'));
             const pvModal = new bootstrap.Modal($('#pvModal'));
 
-            // Unified: route through the app-wide ecToast/toastr (maps legacy colors to a toast type).
-            function toast(text, color) {
-                const map = { '#dc2626': 'error', '#ff8a00': 'warning', '#0284c7': 'info' };
-                window.ecToast(color ? (map[String(color).toLowerCase()] || 'success') : 'success', text);
-            }
 
             // ---------- stats ----------
             function recompute() {
@@ -328,8 +321,8 @@
                 recompute();
                 renderTable();
             }
-            function approve(tr) { setAction(tr, 'verified', 'You · just now'); toast('Payment of ₹' + tr.dataset.amt + ' for ' + tr.dataset.student + ' verified & posted'); }
-            function reject(tr, reason) { setAction(tr, 'rejected', reason || 'Rejected'); toast('Payment for ' + tr.dataset.student + ' rejected', '#dc2626'); }
+            function approve(tr) { setAction(tr, 'verified', 'You · just now'); ecToast('success', 'Payment of ₹' + tr.dataset.amt + ' for ' + tr.dataset.student + ' verified & posted'); }
+            function reject(tr, reason) { setAction(tr, 'rejected', reason || 'Rejected'); ecToast('error', 'Payment for ' + tr.dataset.student + ' rejected'); }
 
             // delegated row actions
             tbody.addEventListener('click', function (e) {
@@ -359,7 +352,7 @@
                 const sel = allChecked(); if (!sel.length) return;
                 const n = sel.length;
                 sel.forEach(c => approve(c.closest('tr')));
-                toast(n + ' payment' + (n > 1 ? 's' : '') + ' verified & posted to ledger');
+                ecToast('success', n + ' payment' + (n > 1 ? 's' : '') + ' verified & posted to ledger');
             });
             $('#pvSelectAll').addEventListener('change', function () {
                 visibleChecks().forEach(c => c.checked = this.checked); refreshSel();
@@ -386,8 +379,8 @@
                 $(s).addEventListener('change', () => { page = 1; renderTable(); });
             });
 
-            $('#pvExport').addEventListener('click', () => toast('Payment report exported to Excel', '#ff8a00'));
-            $('#pvSync').addEventListener('click', () => toast('Synced with payment gateway · 0 new', '#0284c7'));
+            $('#pvExport').addEventListener('click', () => ecToast('warning', 'Payment report exported to Excel'));
+            $('#pvSync').addEventListener('click', () => ecToast('info', 'Synced with payment gateway · 0 new'));
 
             recompute();
             renderTable();

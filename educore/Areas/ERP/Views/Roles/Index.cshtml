@@ -78,7 +78,10 @@
                         <i class="bx bx-edit"></i>
                       </button>
                       <form asp-area="ERP" asp-controller="Roles" asp-action="Delete" method="post" class="d-inline"
-                            onsubmit="return confirm('Delete this role? Users must be reassigned first.');">
+                            data-ec-confirm="Delete this role?"
+                            data-ec-confirm-name="@r.RoleName"
+                            data-ec-confirm-message="Users must be reassigned first."
+                            data-ec-confirm-ok="Delete role">
                         @Html.AntiForgeryToken()
                         <input type="hidden" name="id" value="@r.RoleId" />
                         <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bx bx-trash"></i></button>

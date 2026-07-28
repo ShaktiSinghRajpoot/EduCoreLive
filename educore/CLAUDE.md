@@ -71,7 +71,13 @@ Services that catch DB errors inject `ILogger<T>` and log **before** returning a
 ### Database scripts
 Feature SQL (procs, migrations) lives in **`EduCoreDataAccessLayer/Database/*.sql`**, named per feature (e.g. `fee_collection_full_flow.sql`, `enquiry_registration.sql`). When changing a proc's signature or result columns, update the matching script and the consuming service together.
 
+### Frontend (page JavaScript)
+Shared helpers live on a single global `EC` in **`wwwroot/js/site.js`** (loaders, busy buttons, confirm/prompt, list states, `esc`, `money`, `num`), plus `ecToast` in `_Scripts.cshtml`. **Never add a page-local copy of one of these** — the project used to have five different `toast` functions (two with reversed arguments) and four `esc` bodies, and copying a line between pages silently changed behaviour.
+
+**Read `educore/docs/FRONTEND-CONVENTIONS.md` before touching any `.cshtml` script block.** It documents the helpers, the loading/empty-state rules, and the traps that have actually bitten: missing area `_ViewImports.cshtml` killing every `asp-*` attribute, jQuery loading *after* body partials, `$` being shadowed in two files, and the fact that **`dotnet build` does not check inline JavaScript** — a broken `<script>` in a view still reports 0 errors.
+
 ## Conventions for changes here
-- **Keep it simple.** Prefer the smallest change that fits the existing pattern; match the surrounding service's style rather than introducing new abstractions.
+- **Keep it simple.** Prefer the smallest change that fits the existing pattern; match the surrounding service's style rather than introducing new abstractions. This applies to JavaScript too: plain `var`/`function` in `site.js`, no clever indirection, nothing that needs a paragraph to explain.
+- Comments are in **English**, matching the rest of the repo.
 - New data access goes through `PgExec` — never reintroduce a per-call connection or `DataAdapter`.
-- Background and rationale for the data-layer/perf/security work is documented in **`docs/SCALING-AND-FIXES.md`** (read it before large refactors).
+- Background and rationale for the data-layer/perf/security work is documented in the **repo-root** **`docs/SCALING-AND-FIXES.md`** (read it before large refactors). Note the two doc folders: repo-root `docs/` holds that one file, everything else lives in **`educore/docs/`**. Part 3 of SCALING-AND-FIXES is a running change log — add an entry there for anything structural.

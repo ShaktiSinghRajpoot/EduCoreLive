@@ -161,8 +161,6 @@
 @section PageScripts {
 <script>
 $(document).ready(function () {
-    if (typeof toastr !== 'undefined') toastr.options = { closeButton:true, progressBar:true, timeOut:'3000', positionClass:'toast-top-right' };
-    function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 
     const COLORS = { primary:'bg-label-primary text-primary', info:'bg-label-info text-info', success:'bg-label-success text-success', warning:'bg-label-warning text-warning', danger:'bg-label-danger text-danger' };
     const TYPE = { Casual:'t-casual', Sick:'t-sick', Earned:'t-earned', Maternity:'t-maternity', 'Comp-off':'t-comp' };
@@ -243,7 +241,7 @@ $(document).ready(function () {
         const r = requests.find(x=>x.id===id); if(!r) return;
         r.status = act==='approve' ? 'approved' : 'rejected';
         render();
-        toast(act==='approve'?'success':'warning', r.name+"'s leave "+(act==='approve'?'approved':'rejected')+'.');
+        ecToast(act==='approve'?'success':'warning', r.name+"'s leave "+(act==='approve'?'approved':'rejected')+'.');
     });
 
     // Modal duration

@@ -112,7 +112,7 @@
 
         $('#idOpenSheet').on('click', function () {
             var cls = $('#idClass').val();
-            if (!cls) { toastr.error('Choose a class.'); return; }
+            if (!cls) { ecToast('error', 'Choose a class.'); return; }
 
             var url = '@Url.Action("Print", "IdCard", new { area = "ERP" })'
                 + '?class='   + encodeURIComponent(cls)

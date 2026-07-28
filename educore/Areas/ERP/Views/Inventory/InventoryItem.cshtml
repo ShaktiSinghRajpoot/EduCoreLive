@@ -307,9 +307,7 @@ var PAGE=1, PER=10, sortCol=null, sortDir='asc', filtered=[];
 var items=(window.EduInventory ? window.EduInventory.all() : []);
 
 /* ── Helpers ───────────────────────────────────── */
-function money(n){ return "₹"+Number(n||0).toLocaleString("en-IN"); }
 function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); else console.log(m); }
 function value(it){ return Number(it.stock)*Number(it.cost); }
 function stockState(it){ if(it.stock<=0) return 'out'; if(it.stock<=it.minimum) return 'low'; return 'available'; }
 function stockBadge(it){
@@ -366,7 +364,7 @@ function updateCards(){
   document.getElementById('sumTotal').textContent=items.length;
   document.getElementById('sumLow').textContent=items.filter(function(it){return stockState(it)==='low';}).length;
   document.getElementById('sumOut').textContent=items.filter(function(it){return stockState(it)==='out';}).length;
-  document.getElementById('sumValue').textContent=money(items.reduce(function(s,it){return s+value(it);},0));
+  document.getElementById('sumValue').textContent=EC.money(items.reduce(function(s,it){return s+value(it);},0));
 }
 
 /* ── Render ────────────────────────────────────── */
@@ -394,7 +392,7 @@ function renderDesk(slice){
       +'<td>'+it.unit+'</td>'
       +'<td class="fw-bold">'+it.stock+'</td>'
       +'<td>'+it.minimum+'</td>'
-      +'<td class="fw-bold">'+money(value(it))+'</td>'
+      +'<td class="fw-bold">'+EC.money(value(it))+'</td>'
       +'<td>'+stockBadge(it)+'</td>'
       +'<td class="text-end"><button class="iv-act edit-item" data-id="'+it.id+'" title="Edit"><i class="bx bx-edit"></i></button> '
       +  '<button class="iv-act del delete-item" data-id="'+it.id+'" title="Delete"><i class="bx bx-trash"></i></button></td>'
@@ -416,7 +414,7 @@ function renderMob(slice){
       +  '<div class="iv-mob-field"><label>Unit</label><span>'+it.unit+'</span></div>'
       +  '<div class="iv-mob-field"><label>Stock</label><span>'+it.stock+'</span></div>'
       +  '<div class="iv-mob-field"><label>Minimum</label><span>'+it.minimum+'</span></div>'
-      +  '<div class="iv-mob-field"><label>Value</label><span>'+money(value(it))+'</span></div>'
+      +  '<div class="iv-mob-field"><label>Value</label><span>'+EC.money(value(it))+'</span></div>'
       +  '<div class="iv-mob-field"><label>Brand</label><span>'+(it.brand||'-')+'</span></div>'
       +'</div>'
       +'<div class="d-flex gap-2 mt-2">'
@@ -445,7 +443,7 @@ function renderPag(pages,total,start,end){
 
 /* ── Export ────────────────────────────────────── */
 document.getElementById('btnExcel').addEventListener('click',function(){
-  if(!filtered.length){ toast('error','No items to export.'); return; }
+  if(!filtered.length){ ecToast('error','No items to export.'); return; }
   var hdr=['Name','SKU','Category','Sub Category','Type','Unit','Brand','Stock','Minimum','Cost','Selling','Value','Status'];
   var rows=filtered.map(function(it){return [it.name,it.code,it.category,it.subCategory,it.type,it.unit,it.brand,it.stock,it.minimum,it.cost,it.selling,value(it),it.status];});
   var csv='﻿'+[hdr].concat(rows).map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
@@ -453,7 +451,7 @@ document.getElementById('btnExcel').addEventListener('click',function(){
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
   a.download='inventory_items_'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();
-  toast('success',filtered.length+' items exported.');
+  ecToast('success',filtered.length+' items exported.');
 });
 document.getElementById('btnPdf').addEventListener('click',function(){ window.print(); });
 
@@ -489,10 +487,10 @@ function resetForm(){
 }
 function validateItem(){
   var id=Number($("#itemId").val()||0), code=($("#itemCode").val()||"").trim().toLowerCase();
-  if(!($("#itemName").val()||"").trim()){ toast('error',"Item name is required."); return false; }
-  if(!code){ toast('error',"Item code / SKU is required."); return false; }
-  if(!$("#itemCategory").val()){ toast('error',"Category is required."); return false; }
-  if(items.some(function(x){return x.code.toLowerCase()===code && x.id!==id;})){ toast('error',"Duplicate item code / SKU is not allowed."); return false; }
+  if(!($("#itemName").val()||"").trim()){ ecToast('error',"Item name is required."); return false; }
+  if(!code){ ecToast('error',"Item code / SKU is required."); return false; }
+  if(!$("#itemCategory").val()){ ecToast('error',"Category is required."); return false; }
+  if(items.some(function(x){return x.code.toLowerCase()===code && x.id!==id;})){ ecToast('error',"Duplicate item code / SKU is not allowed."); return false; }
   return true;
 }
 $("#saveItemBtn").on("click",function(){
@@ -508,8 +506,8 @@ $("#saveItemBtn").on("click",function(){
     cost:Number($("#costPrice").val()||0), selling:Number($("#sellingPrice").val()||0),
     status:$("#itemStatus").val(), description:$("#description").val().trim()
   };
-  if(id){ items[items.findIndex(function(x){return x.id===id;})]=data; toast('success',"Item updated successfully."); }
-  else  { items.unshift(data); toast('success',"Item saved successfully."); }
+  if(id){ items[items.findIndex(function(x){return x.id===id;})]=data; ecToast('success',"Item updated successfully."); }
+  else  { items.unshift(data); ecToast('success',"Item saved successfully."); }
   $("#itemModal").modal("hide"); resetForm(); applyFilters();
 });
 $(document).on("click",".edit-item",function(){
@@ -530,15 +528,17 @@ $(document).on("click",".delete-item",function(){
   var id=Number($(this).data("id"));
   var it=items.find(function(x){return x.id===id;});
   if(!it) return;
-  if(!confirm('Delete "'+it.name+'"? This cannot be undone.')) return;
-  items.splice(items.findIndex(function(x){return x.id===id;}),1);
-  toast('success',"Item deleted successfully.");
-  applyFilters();
+  EC.confirm({ title:'Delete this item?', name:it.name,
+               message:'This cannot be undone.', okText:'Delete item' }).then(function(ok){
+    if(!ok) return;
+    items.splice(items.findIndex(function(x){return x.id===id;}),1);
+    ecToast('success',"Item deleted successfully.");
+    applyFilters();
+  });
 });
 $("#itemModal").on("hidden.bs.modal",resetForm);
 
 /* ── toastr ────────────────────────────────────── */
-if(typeof toastr!=='undefined') toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
 
 applyFilters();
 })();

@@ -245,7 +245,6 @@ $(function () {
     'use strict';
 
     if (typeof toastr !== 'undefined') {
-        toastr.options = { closeButton: true, progressBar: true, positionClass: 'toast-top-right', timeOut: 3000 };
     }
 
     var $enable   = $('#EnableRegistration');
@@ -324,17 +323,17 @@ $(function () {
     // Server keeps exactly ONE head per kind (reuses the existing one) — client just
     // sends the amount; no "add another".
     function saveFee(kind, name, amount, $btn) {
-        if (!(amount > 0)) { toastr.error('Enter an amount greater than 0.'); return; }
-        $btn.prop('disabled', true);
+        if (!(amount > 0)) { ecToast('error', 'Enter an amount greater than 0.'); return; }
+        EC.buttonBusy($btn, 'Saving…');
         $.ajax({ url: '/ERP/AdmissionWorkflow/SaveSetupFee', type: 'POST', contentType: 'application/json',
             headers: { 'RequestVerificationToken': awCsrf },
             data: JSON.stringify({ kind: kind, feeHeadId: 0, name: name, amount: amount }) })
         .done(function (res) {
-            if (res && res.success) { REG_FEE = res.registration; SEC_FEE = res.security; renderFees(); toastr.success('Saved.'); }
-            else { toastr.error((res && res.message) || 'Unable to save.'); }
+            if (res && res.success) { REG_FEE = res.registration; SEC_FEE = res.security; renderFees(); ecToast('success', 'Saved.'); }
+            else { ecToast('error', (res && res.message) || 'Unable to save.'); }
         })
-        .fail(function () { toastr.error('Something went wrong.'); })
-        .always(function () { $btn.prop('disabled', false); });
+        .fail(function () { ecToast('error', 'Something went wrong.'); })
+        .always(function () { EC.buttonReset($btn); });
     }
 
     $('#regFeeSave').on('click', function () { saveFee('Registration', $.trim($('#regFeeName').val()), parseFloat($('#regFeeAmount').val()) || 0, $(this)); });
@@ -342,15 +341,18 @@ $(function () {
 
     $('#regFeeRemove, #secFeeRemove').on('click', function () {
         var id = $(this).data('id');
-        if (!id || !confirm('Remove this amount?')) return;
+        if (!id) return;
+        EC.confirm({ title: 'Remove this amount?', okText: 'Remove' }).then(function (ok) {
+        if (!ok) return;
         $.ajax({ url: '/ERP/AdmissionWorkflow/DeleteSetupFee', type: 'POST', contentType: 'application/json',
             headers: { 'RequestVerificationToken': awCsrf },
             data: JSON.stringify({ id: id }) })
         .done(function (res) {
-            if (res && res.success) { REG_FEE = res.registration; SEC_FEE = res.security; renderFees(); toastr.success('Removed.'); }
-            else { toastr.error((res && res.message) || 'Unable to remove.'); }
+            if (res && res.success) { REG_FEE = res.registration; SEC_FEE = res.security; renderFees(); ecToast('success', 'Removed.'); }
+            else { ecToast('error', (res && res.message) || 'Unable to remove.'); }
         })
-        .fail(function () { toastr.error('Something went wrong.'); });
+        .fail(function () { ecToast('error', 'Something went wrong.'); });
+        });
     });
 
     renderFees();

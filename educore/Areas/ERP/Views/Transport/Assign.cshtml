@@ -38,7 +38,7 @@
         <div class="row g-3 align-items-end">
           <div class="col-md-4"><label class="form-label">Route</label><select id="aRoute" class="form-select"><option value="">Select Route</option></select></div>
           <div class="col-md-4"><label class="form-label">Stop</label><select id="aStop" class="form-select" disabled><option value="">Select route first</option></select></div>
-          <div class="col-md-2"><div class="fare-box"><div class="amt" id="aFare">₹0</div><div class="lbl">Monthly</div></div></div>
+          <div class="col-md-2"><div class="fare-box"><div class="amt" id="aFare">₹0.00</div><div class="lbl">Monthly</div></div></div>
           <div class="col-md-2"><button class="btn btn-primary w-100" id="saveBtn" disabled><i class="bx bx-check me-1"></i>Assign</button></div>
         </div>
         <div class="text-muted mt-2" style="font-size:.8rem"><i class="bx bx-info-circle"></i> Bus fee is billed monthly from this month to the end of the academic year, and appears on the Fee Collection counter.</div>
@@ -56,8 +56,6 @@ $(function(){
   var CSRF=$('input[name="__RequestVerificationToken"]').val();
   var URL={ sessions:'@Url.Action("GetSessions")', classes:'@Url.Action("GetClasses")', sections:'@Url.Action("GetSections")', students:'@Url.Action("GetStudents")',
             routes:'@Url.Action("GetRoutesDropdown")', getAssign:'@Url.Action("GetAssignment")', save:'@Url.Action("SaveAssignment")', remove:'@Url.Action("RemoveAssignment")' };
-  function notify(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
-  function money(n){ return '₹'+Math.round(Number(n||0)).toLocaleString('en-IN'); }
   function post(url,data){ return $.ajax({url:url,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},data:JSON.stringify(data)}); }
   function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
   function fill($el,items,ph){ var h=ph?'<option value="">'+ph+'</option>':''; items.forEach(function(x){h+='<option value="'+x+'">'+x+'</option>';}); $el.html(h); }
@@ -78,9 +76,9 @@ $(function(){
   function clearPane(){ currentStudent=null; $('#pane').addClass('d-none'); $('#paneEmpty').removeClass('d-none'); }
   function openStudent(){
     $('#paneEmpty').addClass('d-none'); $('#pane').removeClass('d-none');
-    $('#aRoute').val(''); $('#aStop').prop('disabled',true).html('<option value="">Select route first</option>'); $('#aFare').text('₹0'); $('#saveBtn').prop('disabled',true);
+    $('#aRoute').val(''); $('#aStop').prop('disabled',true).html('<option value="">Select route first</option>'); $('#aFare').text('₹0.00'); $('#saveBtn').prop('disabled',true);
     $.getJSON(URL.getAssign,{studentId:currentStudent.id},function(a){
-      if(a){ $('#curAssign').removeClass('d-none'); $('#curText').text(a.routeName+' · '+a.stopName+' · '+money(a.fare)+'/mo'); }
+      if(a){ $('#curAssign').removeClass('d-none'); $('#curText').text(a.routeName+' · '+a.stopName+' · '+EC.money(a.fare)+'/mo'); }
       else { $('#curAssign').addClass('d-none'); }
     });
   }
@@ -88,24 +86,30 @@ $(function(){
   function fillRoutes(){ var h='<option value="">Select Route</option>'; routes.forEach(function(r){ h+='<option value="'+r.routeId+'">'+r.routeName+'</option>'; }); $('#aRoute').html(h); }
   $('#aRoute').on('change',function(){
     var r=routes.find(function(x){return x.routeId===Number($('#aRoute').val());});
-    if(!r){ $('#aStop').prop('disabled',true).html('<option value="">Select route first</option>'); $('#aFare').text('₹0'); $('#saveBtn').prop('disabled',true); return; }
-    var h='<option value="">Select Stop</option>'; r.stops.forEach(function(s){ h+='<option value="'+s.stopId+'" data-fare="'+s.fare+'">'+s.stopName+' — '+money(s.fare)+'</option>'; });
-    $('#aStop').html(h).prop('disabled',false); $('#aFare').text('₹0'); $('#saveBtn').prop('disabled',true);
+    if(!r){ $('#aStop').prop('disabled',true).html('<option value="">Select route first</option>'); $('#aFare').text('₹0.00'); $('#saveBtn').prop('disabled',true); return; }
+    var h='<option value="">Select Stop</option>'; r.stops.forEach(function(s){ h+='<option value="'+s.stopId+'" data-fare="'+s.fare+'">'+s.stopName+' — '+EC.money(s.fare)+'</option>'; });
+    $('#aStop').html(h).prop('disabled',false); $('#aFare').text('₹0.00'); $('#saveBtn').prop('disabled',true);
   });
-  $('#aStop').on('change',function(){ var fare=Number($(this).find(':selected').data('fare'))||0; $('#aFare').text(money(fare)); $('#saveBtn').prop('disabled', !$(this).val()); });
+  $('#aStop').on('change',function(){ var fare=Number($(this).find(':selected').data('fare'))||0; $('#aFare').text(EC.money(fare)); $('#saveBtn').prop('disabled', !$(this).val()); });
 
   $('#saveBtn').on('click',function(){
     var routeId=Number($('#aRoute').val()), stopId=Number($('#aStop').val());
-    if(!routeId||!stopId){ notify('warning','Select a route and stop.'); return; }
-    var $b=$(this), old=$b.html(); $b.prop('disabled',true).html('<i class="bx bx-loader-circle bx-spin"></i>');
+    if(!routeId||!stopId){ ecToast('warning','Select a route and stop.'); return; }
+    var $btn=$(this); EC.buttonBusy($btn);
     post(URL.save,{ studentId:currentStudent.id, routeId:routeId, stopId:stopId, session:$session.val() })
-      .done(function(res){ $b.prop('disabled',false).html(old); notify(res.success?'success':'error',res.message); if(res.success) openStudent(); })
-      .fail(function(){ $b.prop('disabled',false).html(old); notify('error','Could not assign transport.'); });
+      .done(function(res){ EC.buttonReset($btn); ecToast(res.success?'success':'error',res.message); if(res.success) openStudent(); })
+      .fail(function(){ EC.buttonReset($btn); ecToast('error','Could not assign transport.'); });
   });
-  $('#removeBtn').on('click',function(){ if(!currentStudent||!confirm('Remove transport for this student? Future unpaid bus dues will be removed.')) return;
-    postForm(URL.remove,{studentId:currentStudent.id}).done(function(res){ notify(res.success?'success':'error',res.message); if(res.success) openStudent(); }); });
+  $('#removeBtn').on('click',function(){
+    if(!currentStudent) return;
+    EC.confirm({ title:'Remove transport?', name:currentStudent.name,
+                 message:'Future unpaid bus dues for this student will be removed.',
+                 okText:'Remove transport' }).then(function(ok){
+      if(!ok) return;
+      postForm(URL.remove,{studentId:currentStudent.id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) openStudent(); });
+    });
+  });
 
-  if(typeof toastr!=='undefined') toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
 });
 </script>
 }

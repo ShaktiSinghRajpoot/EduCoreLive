@@ -49,7 +49,10 @@
         @if (Model.Status != "Inactive")
         {
           <form asp-area="ERP" asp-controller="Staff" asp-action="Deactivate" method="post"
-                onsubmit="return confirm('Deactivate this staff member?');">
+                data-ec-confirm="Deactivate this staff member?"
+                data-ec-confirm-name="@Model.FullName"
+                data-ec-confirm-message="They will move to the inactive list. You can reactivate them later."
+                data-ec-confirm-ok="Deactivate">
             @Html.AntiForgeryToken()
             <input type="hidden" name="id" value="@staffId" />
             <button type="submit" class="btn btn-outline-danger d-flex align-items-center gap-1">

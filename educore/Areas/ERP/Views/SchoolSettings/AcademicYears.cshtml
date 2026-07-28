@@ -154,7 +154,6 @@ var URL_DELETE  = '@Url.Action("DeleteAcademicYear", "SchoolSettings", new { are
 
 var editId = null;
 
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 
 // jQuery AJAX (app standard). $.ajax returns a thenable and parses the JSON
 // response, so callers keep using .then(res => ...) unchanged.
@@ -195,39 +194,42 @@ document.querySelectorAll('.js-del').forEach(function(b){ b.addEventListener('cl
 
 document.getElementById('yearSave').addEventListener('click',function(){
   var name=document.getElementById('mYearName').value.trim();
-  if(!name){ toast('error','Academic year name is required.'); return; }
+  if(!name){ ecToast('error','Academic year name is required.'); return; }
   var start=document.getElementById('mStart').value;
   var end=document.getElementById('mEnd').value;
-  if(start && end && end < start){ toast('error','End date cannot be before start date.'); return; }
+  if(start && end && end < start){ ecToast('error','End date cannot be before start date.'); return; }
 
   post(URL_SAVE, { id: editId||0, name:name, startDate:start||null, endDate:end||null, isCurrent:document.getElementById('mCurrent').checked })
     .then(function(res){
       if(res && res.success){
         bootstrap.Modal.getInstance(document.getElementById('yearModal')).hide();
-        toast('success','Academic year saved.');
+        ecToast('success','Academic year saved.');
         setTimeout(function(){ window.location.reload(); }, 600);
-      } else { toast('error',(res&&res.message)||'Save failed.'); }
+      } else { ecToast('error',(res&&res.message)||'Save failed.'); }
     })
-    .catch(function(){ toast('error','Save failed. Check your connection.'); });
+    .catch(function(){ ecToast('error','Save failed. Check your connection.'); });
 });
 
 function setCurrent(id){
   post(URL_CURRENT, { id:id })
     .then(function(res){
-      if(res && res.success){ toast('success','Current academic year updated.'); setTimeout(function(){ window.location.reload(); }, 500); }
-      else { toast('error',(res&&res.message)||'Failed.'); }
+      if(res && res.success){ ecToast('success','Current academic year updated.'); setTimeout(function(){ window.location.reload(); }, 500); }
+      else { ecToast('error',(res&&res.message)||'Failed.'); }
     })
-    .catch(function(){ toast('error','Failed. Check your connection.'); });
+    .catch(function(){ ecToast('error','Failed. Check your connection.'); });
 }
 
 function del(id, name){
-  if(!confirm('Delete academic year "'+(name||'')+'"?')) return;
-  post(URL_DELETE, { id:id })
-    .then(function(res){
-      if(res && res.success){ toast('success','Academic year deleted.'); setTimeout(function(){ window.location.reload(); }, 500); }
-      else { toast('error',(res&&res.message)||'Cannot delete this year.'); }
-    })
-    .catch(function(){ toast('error','Failed. Check your connection.'); });
+  EC.confirm({ title:'Delete this academic year?', name:name||'',
+               okText:'Delete year' }).then(function(ok){
+    if(!ok) return;
+    post(URL_DELETE, { id:id })
+      .then(function(res){
+        if(res && res.success){ ecToast('success','Academic year deleted.'); setTimeout(function(){ window.location.reload(); }, 500); }
+        else { ecToast('error',(res&&res.message)||'Cannot delete this year.'); }
+      })
+      .catch(function(){ ecToast('error','Failed. Check your connection.'); });
+  });
 }
 
 })();

@@ -309,8 +309,6 @@
     </div>
 </div>
 
-<div class="fdr-toast-wrap" id="fdrToastWrap"></div>
-
 @section PageScripts {
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -412,18 +410,13 @@
             });
             checks().forEach(c => c.addEventListener('change', refreshCompose));
 
-            // Unified: route through the app-wide ecToast/toastr (maps legacy colors to a toast type).
-            function toast(text, color) {
-                const map = { '#dc2626': 'error', '#ff8a00': 'warning', '#0284c7': 'info' };
-                window.ecToast(color ? (map[String(color).toLowerCase()] || 'success') : 'success', text);
-            }
 
             document.querySelectorAll('.fdr-remind-one').forEach(btn => btn.addEventListener('click', function () {
                 const tr = this.closest('tr'), name = tr.querySelector('.fw-semibold').textContent, ch = activeChannels();
-                if (!ch.length) { toast('Select at least one channel first', '#dc2626'); return; }
+                if (!ch.length) { ecToast('error', 'Select at least one channel first'); return; }
                 tr.querySelector('.fdr-last').innerHTML = '<small class="fw-semibold" style="color:#16a34a"><i class="bx bx-check"></i> Just now</small>';
                 tr.dataset.last = '0';
-                toast('Reminder sent to ' + name + ' in ' + LANG_NAME[lang] + ' via ' + ch.join(' + '));
+                ecToast('success', 'Reminder sent to ' + name + ' in ' + LANG_NAME[lang] + ' via ' + ch.join(' + '));
             }));
             // ---------- send (real) ----------
             // Posts the selected student ids + channels + message. The server re-reads
@@ -436,11 +429,13 @@
                 const sel = checks().filter(c => c.checked), ch = activeChannels();
                 if (!sel.length || !ch.length) return;
 
-                const btn = this;
-                btn.disabled = true;
-                btn.innerHTML = '<i class="bx bx-loader-circle bx-spin me-1"></i>Sending…';
+                // jQuery(this), not $(this) — `$` is shadowed here (see line ~349).
+                const $btn = jQuery(this);
+                EC.buttonBusy($btn, 'Sending…');
 
-                $.ajax({
+                // jQuery.ajax, not $.ajax — in this scope `$` is shadowed by
+                // document.querySelector (see line ~349).
+                jQuery.ajax({
                     url: '@Url.Action("SendReminders", "FeeDueReminders", new { area = "ERP" })',
                     type: 'POST',
                     contentType: 'application/json',
@@ -453,7 +448,7 @@
                 })
                 .done(function (res) {
                     if (res && res.success) {
-                        toast(res.message || 'Reminders sent.');
+                        ecToast('success', res.message || 'Reminders sent.');
                         sel.forEach(c => {
                             const tr = c.closest('tr');
                             tr.querySelector('.fdr-last').innerHTML =
@@ -463,34 +458,30 @@
                         $('#fdrSelectAll').checked = false;
                     } else {
                         // Not an error state we hide: e.g. SMS has no provider wired yet.
-                        toast((res && res.message) || 'Could not send reminders.', '#dc2626');
+                        ecToast('error', (res && res.message) || 'Could not send reminders.');
                     }
                     if (res && typeof res.sentToday !== 'undefined') $('#fdrSentToday').textContent = res.sentToday;
                     if (res && res.history) renderHistory(res.history);
                     refreshCompose();
                 })
-                .fail(function () { toast('Something went wrong while sending.', '#dc2626'); })
+                .fail(function () { ecToast('error', 'Something went wrong while sending.'); })
                 .always(function () {
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="bx bx-paper-plane me-1"></i>Send to <span id="fdrSendCount">0</span>';
+                    EC.buttonReset($btn);
                     refreshCompose();
                 });
             });
-
-            function esc(s){ return (s == null ? '' : String(s)).replace(/[&<>"']/g, c => (
-                { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
             function renderHistory(rows) {
                 const body = $('#fdrHistBody');
                 if (!body) return;
                 body.innerHTML = rows.map(function (h) {
                     const st = h.status === 'Sent' ? 'success' : (h.status === 'Partial' ? 'warning' : 'danger');
-                    return '<tr><td class="fw-semibold">' + esc(h.studentName) + '</td>'
-                         + '<td><small class="text-muted">' + esc(h.className) + '</small></td>'
-                         + '<td><span class="badge bg-label-info">' + (esc(h.channels) || '—') + '</span></td>'
+                    return '<tr><td class="fw-semibold">' + EC.esc(h.studentName) + '</td>'
+                         + '<td><small class="text-muted">' + EC.esc(h.className) + '</small></td>'
+                         + '<td><span class="badge bg-label-info">' + (EC.esc(h.channels) || '—') + '</span></td>'
                          + '<td>₹' + Number(h.outstanding || 0).toLocaleString('en-IN') + '</td>'
-                         + '<td><small class="text-muted">' + esc(h.sentAt) + '</small></td>'
-                         + '<td><span class="badge bg-label-' + st + '">' + esc(h.status) + '</span></td></tr>';
+                         + '<td><small class="text-muted">' + EC.esc(h.sentAt) + '</small></td>'
+                         + '<td><span class="badge bg-label-' + st + '">' + EC.esc(h.status) + '</span></td></tr>';
                 }).join('');
             }
 

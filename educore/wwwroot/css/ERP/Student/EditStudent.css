@@ -222,21 +222,6 @@
     color:var(--ec-text-dark);
 }
 
-/* ── Success toast ──────────────────────────── */
-.es-toast{
-    position:fixed; top:1.25rem; right:1.25rem; z-index:9999;
-    background:#fff; border:1px solid #d1e7dd;
-    border-left:4px solid #28a745;
-    border-radius:14px;
-    padding:.9rem 1.25rem;
-    box-shadow:0 8px 28px rgba(0,0,0,.1);
-    display:flex; align-items:center; gap:.75rem;
-    font-size:.86rem; font-weight:700; color:#0a5a35;
-    transform:translateX(110%);
-    transition:transform .35s cubic-bezier(.34,1.56,.64,1);
-    max-width:340px;
-}
-.es-toast.show{ transform:translateX(0); }
 
 @media (max-width:991.98px){
     .es-panel{ position:static; margin-top:1.25rem; }

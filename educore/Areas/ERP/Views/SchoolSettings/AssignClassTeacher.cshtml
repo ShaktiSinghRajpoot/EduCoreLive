@@ -109,8 +109,6 @@ var DATA=[];       // [{ cls, rank, sections:[{ id, name, room, teacherId }] }]
 
 var showUnassignedOnly=false;
 
-function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 function teacherName(id){ var t=TEACHERS.find(function(x){return x.id===id;}); return t?t.name:''; }
 
 /* All sections flattened */
@@ -154,7 +152,7 @@ function loadAll(){
       updateCards();
       render();
     })
-    .fail(function(){ toast('error','Could not load class teachers.'); });
+    .fail(function(){ ecToast('error','Could not load class teachers.'); });
 }
 
 /* Summary */
@@ -174,7 +172,7 @@ function selectHtml(sec){
   TEACHERS.forEach(function(t){
     var load=lm[t.id]||0;
     var extra = (load>0 && t.id!==sec.teacherId) ? ' ('+load+' sec)' : (t.id===sec.teacherId && load>1 ? ' ('+load+' sec)' : '');
-    opts+='<option value="'+t.id+'"'+(t.id===sec.teacherId?' selected':'')+'>'+esc(t.name)+extra+'</option>';
+    opts+='<option value="'+t.id+'"'+(t.id===sec.teacherId?' selected':'')+'>'+EC.esc(t.name)+extra+'</option>';
   });
   return '<select class="act-select js-assign'+(sec.teacherId?'':' empty')+'" data-sec="'+sec.id+'">'+opts+'</select>';
 }
@@ -212,18 +210,18 @@ function render(){
         : '<span class="act-stat empty"><i class="bx bx-error-circle"></i>Unassigned</span>';
 
       return '<div class="act-row'+(s.teacherId?'':' unassigned')+'">'
-        +'<div class="act-sec-name"><span class="act-sec-badge">'+esc(s.name)+'</span>'
-        +  '<div><div class="act-sec-title">Section '+esc(s.name)+'</div><div class="act-sec-sub">Room '+esc(s.room||'—')+'</div></div></div>'
+        +'<div class="act-sec-name"><span class="act-sec-badge">'+EC.esc(s.name)+'</span>'
+        +  '<div><div class="act-sec-title">Section '+EC.esc(s.name)+'</div><div class="act-sec-sub">Room '+EC.esc(s.room||'—')+'</div></div></div>'
         +'<div>'+selectHtml(s)+'</div>'
         +'<div>'+loadHtml+'</div>'
         +'<div class="text-lg-end">'+statHtml+'</div>'
-        +(conflict?'<div class="act-warn"><i class="bx bx-error"></i>'+esc(teacherName(s.teacherId))+' is class teacher of '+load+' sections.</div>':'')
+        +(conflict?'<div class="act-warn"><i class="bx bx-error"></i>'+EC.esc(teacherName(s.teacherId))+' is class teacher of '+load+' sections.</div>':'')
         +'</div>';
     }).join('');
 
     html+='<div class="act-grp">'
       +'<div class="act-grp-head"><span class="act-grp-rank">'+(c.rank||'–')+'</span>'
-      +  '<span class="act-grp-name">'+esc(c.cls)+'</span>'
+      +  '<span class="act-grp-name">'+EC.esc(c.cls)+'</span>'
       +  '<span class="act-grp-meta">'+assignedHere+'/'+c.sections.length+' assigned</span></div>'
       +rowsHtml+'</div>';
     shown+=rows.length;
@@ -259,8 +257,8 @@ function bindRows(){
       sec.sec.teacherId=tid;
       updateCards(); render();
       saveAssign(secId, tid, function(ok, msg){
-        if(ok){ toast(tid?'success':'info', tid ? (teacherName(tid)+' assigned to '+sec.cls+' – '+sec.sec.name) : ('Class teacher cleared for '+sec.cls+' – '+sec.sec.name)); }
-        else { sec.sec.teacherId=prev; updateCards(); render(); toast('error', msg||'Could not save.'); }
+        if(ok){ ecToast(tid?'success':'info', tid ? (teacherName(tid)+' assigned to '+sec.cls+' – '+sec.sec.name) : ('Class teacher cleared for '+sec.cls+' – '+sec.sec.name)); }
+        else { sec.sec.teacherId=prev; updateCards(); render(); ecToast('error', msg||'Could not save.'); }
       });
     });
   });
@@ -279,8 +277,8 @@ document.getElementById('unassignedCard').addEventListener('click',function(){
 });
 document.getElementById('btnAuto').addEventListener('click',function(){
   var empties=allSecs().filter(function(r){return !r.sec.teacherId;});
-  if(!empties.length){ toast('info','Every section already has a class teacher.'); return; }
-  if(!TEACHERS.length){ toast('error','No teachers available to assign.'); return; }
+  if(!empties.length){ ecToast('info','Every section already has a class teacher.'); return; }
+  if(!TEACHERS.length){ ecToast('error','No teachers available to assign.'); return; }
 
   // Assign each empty section to the least-loaded teacher, saving as we go.
   var picks=empties.map(function(r){
@@ -296,8 +294,8 @@ document.getElementById('btnAuto').addEventListener('click',function(){
     saveAssign(p.sectionId, p.staffId, function(ok){
       done++; if(!ok) failed++;
       if(done===picks.length){
-        if(failed){ toast('warning', (picks.length-failed)+' saved, '+failed+' failed.'); loadAll(); }
-        else toast('success','Auto-balanced '+picks.length+' section'+(picks.length>1?'s':'')+'.');
+        if(failed){ ecToast('warning', (picks.length-failed)+' saved, '+failed+' failed.'); loadAll(); }
+        else ecToast('success','Auto-balanced '+picks.length+' section'+(picks.length>1?'s':'')+'.');
       }
     });
   });

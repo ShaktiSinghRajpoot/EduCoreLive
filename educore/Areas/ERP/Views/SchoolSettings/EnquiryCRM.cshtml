@@ -14,7 +14,6 @@
     <link rel="stylesheet" href="~/css/ERP/SchoolSettings/EnquiryCRM.css" asp-append-version="true" />
 }
 
-<div id="crmTopLoader"></div>
 @* Standalone CSRF token for all AJAX POST calls on this page *@
 @Html.AntiForgeryToken()
 
@@ -778,7 +777,7 @@
                              style="background:#fff8ef;border:1px solid #ffe2c2;">
                             <div>
                                 <div class="fw-bold" style="font-size:.88rem">Registration Fee</div>
-                                <small class="text-muted">Amount: <span class="fw-bold" id="regFeeAmountLabel">₹0</span></small>
+                                <small class="text-muted">Amount: <span class="fw-bold" id="regFeeAmountLabel">₹0.00</span></small>
                             </div>
                             <div class="form-check form-switch m-0">
                                 <input class="form-check-input" type="checkbox" id="regFeePaid" />
@@ -804,7 +803,7 @@
                                 <input type="text" class="form-control" id="regDiscountReason" maxlength="200" placeholder="Required if discount" />
                             </div>
                             <div class="col-12">
-                                <div class="alert alert-light border mb-0 py-2" id="regNetLine" style="font-size:.83rem">Fee ₹0</div>
+                                <div class="alert alert-light border mb-0 py-2" id="regNetLine" style="font-size:.83rem">Fee ₹0.00</div>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Payment Mode</label>
@@ -874,11 +873,6 @@
 <script>
 $(document).ready(function () {
 
-    /* ── Toastr ─────────────────────────────────────────── */
-    toastr.options = {
-        closeButton: true, progressBar: true, newestOnTop: true,
-        positionClass: 'toast-top-right', preventDuplicates: true, timeOut: 3500
-    };
     /* ── CSRF token (uses standalone token outside any form) ── */
     var csrf = $('input[name="__RequestVerificationToken"]').first().val();
     if (!csrf) {
@@ -886,24 +880,13 @@ $(document).ready(function () {
         csrf = $('[name="__RequestVerificationToken"]').val() || '';
     }
 
-    /* ── Loader ─────────────────────────────────────────── */
-    var $loader = $('#crmTopLoader');
-    function showLoader() { $loader.stop(true).css({ width:'0%', opacity:1 }).animate({ width:'72%' }, 300); }
-    function hideLoader() {
-        $loader.stop(true).animate({ width:'100%' }, 180, function() {
-            $(this).delay(150).animate({ opacity:0 }, 180, function(){ $(this).css({ width:'0%', opacity:1 }); });
-        });
-    }
+    /* ── Loader: EC.showLoader / EC.hideLoader (wwwroot/js/site.js) ── */
+    var showLoader = EC.showLoader, hideLoader = EC.hideLoader;
 
     /* ── Filter state ───────────────────────────────────── */
     var F = { page:1, pageSize:10, search:'', session:'', className:'', source:'', pipeline:'', assignedTo:'', overdue:false, today:false };
 
     /* ── HTML escape ────────────────────────────────────── */
-    function esc(s) {
-        return (s||'').toString()
-            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-            .replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    }
 
     /* ── Fetch data ─────────────────────────────────────── */
     var fetchXhr;
@@ -919,14 +902,27 @@ $(document).ready(function () {
             overdue: F.overdue, today: F.today
         })
         .done(function(d) {
-            if (!d.success) { hideLoader(); return; }
+            if (!d.success) {
+                // Otherwise the first-load #loadingRow keeps spinning forever.
+                EC.listEmpty('#leadTableBody', d.message || 'Could not load enquiries.', 'bx-error-circle');
+                $('#mobileLoader').hide();
+                hideLoader();
+                return;
+            }
             renderTable(d.rows);
             renderMobileCards(d.rows);
             updatePagination(d);
             hideLoader();
         })
         .fail(function(x) {
-            if (x.statusText !== 'abort') { toastr.error('Failed to load data.'); hideLoader(); }
+            // 'abort' means the user changed a filter — a newer request is
+            // already running, so leave the list alone.
+            if (x.statusText !== 'abort') {
+                ecToast('error', 'Failed to load data.');
+                EC.listEmpty('#leadTableBody', 'Could not load enquiries. Please retry.', 'bx-error-circle');
+                $('#mobileLoader').hide();
+                hideLoader();
+            }
         });
     }
 
@@ -956,13 +952,13 @@ $(document).ready(function () {
     function buildStatusDropdown(r) {
         if (r.isTerminal) {
             return '<span class="badge bg-label-success" title="Admission Confirmed — final status">'
-                + '<i class="bx bx-check-circle me-1"></i>' + esc(r.status) + '</span>';
+                + '<i class="bx bx-check-circle me-1"></i>' + EC.esc(r.status) + '</span>';
         }
         // Registration Done is action-driven (issued by the Register action). Lock it as a
         // badge — to revert, use Cancel Registration on the Registrations screen.
         if (r.status === 'Registration Done') {
             return '<span class="badge bg-label-secondary" title="Registered — use Cancel Registration to revert">'
-                + '<i class="bx bx-clipboard me-1"></i>' + esc(r.status) + '</span>';
+                + '<i class="bx bx-clipboard me-1"></i>' + EC.esc(r.status) + '</span>';
         }
         var items = STATUS_LIST.map(function (s) {
             var isActive  = (s.key === r.status);
@@ -970,9 +966,9 @@ $(document).ready(function () {
             return '<li><a class="dropdown-item status-opt' + (isActive ? ' active' : '') + ' ' + s.cls + '"'
                 + ' href="#"'
                 + ' data-id="'     + r.enquiryId + '"'
-                + ' data-status="' + esc(s.key)  + '"'
+                + ' data-status="' + EC.esc(s.key)  + '"'
                 + (needsLost ? ' data-needs-lost="1"' : '') + '>'
-                + '<i class="bx ' + s.icon + ' me-2"></i>' + esc(s.label)
+                + '<i class="bx ' + s.icon + ' me-2"></i>' + EC.esc(s.label)
                 + (isActive ? '<i class="bx bx-check check-icon ms-auto"></i>' : '')
                 + '</a></li>';
         }).join('');
@@ -984,9 +980,9 @@ $(document).ready(function () {
            already prevents row navigation when clicking inside a dropdown.
         ──────────────────────────────────────────────────────────── */
         return '<div class="dropdown">'
-            + '<span class="badge ' + esc(r.statusBadgeClass) + ' status-badge-toggle"'
+            + '<span class="badge ' + EC.esc(r.statusBadgeClass) + ' status-badge-toggle"'
             + ' data-bs-toggle="dropdown" aria-expanded="false" style="cursor:pointer">'
-            + esc(r.status)
+            + EC.esc(r.status)
             + ' <i class="bx bx-chevron-down" style="font-size:.65rem;opacity:.75;vertical-align:middle"></i>'
             + '</span>'
             + '<ul class="dropdown-menu dropdown-menu-end shadow py-1" style="min-width:215px;font-size:.82rem">'
@@ -1011,69 +1007,69 @@ $(document).ready(function () {
 
     function buildTableRow(r) {
         var oClass = r.isOverdue ? 'overdue-row' : '';
-        var fwIcon = r.followupIcon ? '<i class="bx ' + esc(r.followupIcon) + ' me-1"></i>' : '';
-        var fwSub  = r.followupSubtext ? '<div class="lead-meta">' + esc(r.followupSubtext) + '</div>' : '';
+        var fwIcon = r.followupIcon ? '<i class="bx ' + EC.esc(r.followupIcon) + ' me-1"></i>' : '';
+        var fwSub  = r.followupSubtext ? '<div class="lead-meta">' + EC.esc(r.followupSubtext) + '</div>' : '';
         var fwCnt  = r.followupCount > 0
             ? ' <span class="followup-count-badge"><i class="bx bx-chat"></i>' + r.followupCount + '</span>' : '';
 
         return '<tr class="lead-row ' + oClass + '" data-id="' + r.enquiryId + '">'
             + '<td><div class="d-flex align-items-center gap-2">'
-            +   '<div class="student-avatar ' + esc(r.avatarColorClass) + '">' + esc(r.studentInitials) + '</div>'
+            +   '<div class="student-avatar ' + EC.esc(r.avatarColorClass) + '">' + EC.esc(r.studentInitials) + '</div>'
             +   '<div>'
-            +     '<div class="lead-name">' + esc(r.studentName) + '</div>'
-            +     '<div class="lead-meta">' + esc(r.className) + ' &middot; ' + esc(r.session) + '</div>'
+            +     '<div class="lead-name">' + EC.esc(r.studentName) + '</div>'
+            +     '<div class="lead-meta">' + EC.esc(r.className) + ' &middot; ' + EC.esc(r.session) + '</div>'
             +   '</div>'
             + '</div></td>'
             + '<td>'
-            +   '<div class="fw-semibold text-dark" style="font-size:.83rem">' + esc(r.parentName) + '</div>'
-            +   '<a href="' + esc(r.callUrl) + '" class="lead-meta text-decoration-none" onclick="event.stopPropagation()">'
-            +     '<i class="bx bx-phone me-1"></i>' + esc(r.mobile) + '</a>'
+            +   '<div class="fw-semibold text-dark" style="font-size:.83rem">' + EC.esc(r.parentName) + '</div>'
+            +   '<a href="' + EC.esc(r.callUrl) + '" class="lead-meta text-decoration-none" onclick="event.stopPropagation()">'
+            +     '<i class="bx bx-phone me-1"></i>' + EC.esc(r.mobile) + '</a>'
             + '</td>'
             + '<td>'
-            +   '<span class="badge bg-label-primary">' + esc(r.className) + '</span>'
-            +   '<div class="lead-meta mt-1">' + esc(r.session) + '</div>'
+            +   '<span class="badge bg-label-primary">' + EC.esc(r.className) + '</span>'
+            +   '<div class="lead-meta mt-1">' + EC.esc(r.session) + '</div>'
             + '</td>'
-            + '<td><span class="source-pill"><i class="bx ' + esc(r.sourceIcon) + '"></i> ' + esc(r.leadSource) + '</span></td>'
+            + '<td><span class="source-pill"><i class="bx ' + EC.esc(r.sourceIcon) + '"></i> ' + EC.esc(r.leadSource) + '</span></td>'
             + '<td>' + buildStatusDropdown(r) + '</td>'
             + '<td>'
-            +   '<div class="' + esc(r.followupCssClass) + '">' + fwIcon + esc(r.followupDisplay) + fwCnt + '</div>'
+            +   '<div class="' + EC.esc(r.followupCssClass) + '">' + fwIcon + EC.esc(r.followupDisplay) + fwCnt + '</div>'
             +   fwSub
             + '</td>'
-            + '<td><span class="lead-meta">' + esc(r.daysSinceLabel) + '</span></td>'
+            + '<td><span class="lead-meta">' + EC.esc(r.daysSinceLabel) + '</span></td>'
             + '<td class="text-end"><div class="d-inline-flex gap-1 align-items-center flex-nowrap">'
             /* ── Contact: Call · WhatsApp ── */
-            +   '<a href="' + esc(r.callUrl) + '"'
+            +   '<a href="' + EC.esc(r.callUrl) + '"'
             +     ' class="btn btn-sm btn-icon btn-outline-info crm-action-btn" title="Call">'
             +     '<i class="bx bx-phone-call"></i></a>'
-            +   '<a href="' + esc(r.whatsAppUrl) + '" target="_blank"'
+            +   '<a href="' + EC.esc(r.whatsAppUrl) + '" target="_blank"'
             +     ' class="btn btn-sm btn-icon btn-outline-success crm-action-btn" title="WhatsApp">'
             +     '<i class="bx bxl-whatsapp"></i></a>'
             +   '<div class="vr mx-1" style="opacity:.18"></div>'
             /* ── Nurture & progress: Follow-up · Register · Convert ── */
             +   '<button type="button" class="btn btn-sm btn-icon btn-outline-secondary crm-action-btn btn-log-followup"'
             +     ' title="Log Follow-up"'
-            +     ' data-id="' + r.enquiryId + '" data-name="' + esc(r.studentName) + '">'
+            +     ' data-id="' + r.enquiryId + '" data-name="' + EC.esc(r.studentName) + '">'
             +     '<i class="bx bx-calendar-plus"></i></button>'
             + ((SHOW_REGISTRATION && !r.isTerminal && r.status !== 'Registration Done')
                 ? '<button type="button" class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-register-enquiry"'
                 +   ' title="Register"'
                 +   ' data-id="'      + r.enquiryId       + '"'
-                +   ' data-name="'    + esc(r.studentName) + '"'
-                +   ' data-parent="'  + esc(r.parentName)  + '"'
-                +   ' data-class="'   + esc(r.className)   + '"'
-                +   ' data-session="' + esc(r.session)     + '">'
+                +   ' data-name="'    + EC.esc(r.studentName) + '"'
+                +   ' data-parent="'  + EC.esc(r.parentName)  + '"'
+                +   ' data-class="'   + EC.esc(r.className)   + '"'
+                +   ' data-session="' + EC.esc(r.session)     + '">'
                 +   '<i class="bx bx-clipboard"></i></button>'
                 : '')
             + (!r.isTerminal
                 ? '<button type="button" class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"'
                 +   ' title="Convert to Admission"'
                 +   ' data-id="'      + r.enquiryId         + '"'
-                +   ' data-name="'    + esc(r.studentName)   + '"'
-                +   ' data-parent="'  + esc(r.parentName)    + '"'
-                +   ' data-mobile="'  + esc(r.mobile)        + '"'
-                +   ' data-class="'   + esc(r.className)     + '"'
-                +   ' data-session="' + esc(r.session)       + '"'
-                +   ' data-status="'  + esc(r.status)        + '">'
+                +   ' data-name="'    + EC.esc(r.studentName)   + '"'
+                +   ' data-parent="'  + EC.esc(r.parentName)    + '"'
+                +   ' data-mobile="'  + EC.esc(r.mobile)        + '"'
+                +   ' data-class="'   + EC.esc(r.className)     + '"'
+                +   ' data-session="' + EC.esc(r.session)       + '"'
+                +   ' data-status="'  + EC.esc(r.status)        + '">'
                 +   '<i class="bx bx-user-check"></i></button>'
                 : '')
             +   '<div class="vr mx-1" style="opacity:.18"></div>'
@@ -1085,7 +1081,7 @@ $(document).ready(function () {
             +   '<button type="button" class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"'
             +     ' title="Delete"'
             +     ' data-id="'   + r.enquiryId       + '"'
-            +     ' data-name="' + esc(r.studentName) + '">'
+            +     ' data-name="' + EC.esc(r.studentName) + '">'
             +     '<i class="bx bx-trash"></i></button>'
             + '</div></td>'
             + '</tr>';
@@ -1102,48 +1098,48 @@ $(document).ready(function () {
     }
 
     function buildMobileCard(r) {
-        var fwIcon = r.followupIcon ? '<i class="bx ' + esc(r.followupIcon) + ' me-1"></i>' : '';
+        var fwIcon = r.followupIcon ? '<i class="bx ' + EC.esc(r.followupIcon) + ' me-1"></i>' : '';
         return '<div class="crm-card lead-row ' + (r.isOverdue ? 'overdue-card' : '') + '" data-id="' + r.enquiryId + '">'
             + '<div class="d-flex justify-content-between align-items-start mb-2">'
             +   '<div class="d-flex align-items-center gap-2">'
-            +     '<div class="student-avatar ' + esc(r.avatarColorClass) + '">' + esc(r.studentInitials) + '</div>'
-            +     '<div><div class="lead-name">' + esc(r.studentName) + '</div><div class="lead-meta">' + esc(r.parentName) + '</div></div>'
+            +     '<div class="student-avatar ' + EC.esc(r.avatarColorClass) + '">' + EC.esc(r.studentInitials) + '</div>'
+            +     '<div><div class="lead-name">' + EC.esc(r.studentName) + '</div><div class="lead-meta">' + EC.esc(r.parentName) + '</div></div>'
             +   '</div>'
             +   buildStatusDropdown(r)
             + '</div>'
             + '<div class="d-flex flex-wrap gap-2 mb-2">'
-            +   '<span class="badge bg-label-primary">' + esc(r.className) + '</span>'
-            +   '<span class="source-pill"><i class="bx ' + esc(r.sourceIcon) + '"></i> ' + esc(r.leadSource) + '</span>'
+            +   '<span class="badge bg-label-primary">' + EC.esc(r.className) + '</span>'
+            +   '<span class="source-pill"><i class="bx ' + EC.esc(r.sourceIcon) + '"></i> ' + EC.esc(r.leadSource) + '</span>'
             + '</div>'
             + '<div class="d-flex justify-content-between align-items-center">'
-            +   '<div class="' + esc(r.followupCssClass) + '" style="font-size:.76rem">' + fwIcon + esc(r.followupDisplay) + '</div>'
+            +   '<div class="' + EC.esc(r.followupCssClass) + '" style="font-size:.76rem">' + fwIcon + EC.esc(r.followupDisplay) + '</div>'
             +   '<div class="d-flex gap-1 flex-wrap align-items-center">'
             /* ── Contact: Call · WhatsApp ── */
-            +     '<a href="' + esc(r.callUrl) + '" class="btn btn-sm btn-icon btn-outline-info crm-action-btn"><i class="bx bx-phone-call"></i></a>'
-            +     '<a href="' + esc(r.whatsAppUrl) + '" target="_blank" class="btn btn-sm btn-icon btn-outline-success crm-action-btn"><i class="bx bxl-whatsapp"></i></a>'
+            +     '<a href="' + EC.esc(r.callUrl) + '" class="btn btn-sm btn-icon btn-outline-info crm-action-btn"><i class="bx bx-phone-call"></i></a>'
+            +     '<a href="' + EC.esc(r.whatsAppUrl) + '" target="_blank" class="btn btn-sm btn-icon btn-outline-success crm-action-btn"><i class="bx bxl-whatsapp"></i></a>'
             +     '<div class="vr mx-1" style="opacity:.18"></div>'
             /* ── Nurture & progress: Follow-up · Register · Convert ── */
             +     '<button class="btn btn-sm btn-icon btn-outline-secondary crm-action-btn btn-log-followup"'
-            +       ' data-id="' + r.enquiryId + '" data-name="' + esc(r.studentName) + '">'
+            +       ' data-id="' + r.enquiryId + '" data-name="' + EC.esc(r.studentName) + '">'
             +       '<i class="bx bx-calendar-plus"></i></button>'
             + ((SHOW_REGISTRATION && !r.isTerminal && r.status !== 'Registration Done')
                 ? '<button class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-register-enquiry"'
                 +   ' data-id="'      + r.enquiryId       + '"'
-                +   ' data-name="'    + esc(r.studentName) + '"'
-                +   ' data-parent="'  + esc(r.parentName)  + '"'
-                +   ' data-class="'   + esc(r.className)   + '"'
-                +   ' data-session="' + esc(r.session)     + '">'
+                +   ' data-name="'    + EC.esc(r.studentName) + '"'
+                +   ' data-parent="'  + EC.esc(r.parentName)  + '"'
+                +   ' data-class="'   + EC.esc(r.className)   + '"'
+                +   ' data-session="' + EC.esc(r.session)     + '">'
                 +   '<i class="bx bx-clipboard"></i></button>'
                 : '')
             + (!r.isTerminal
                 ? '<button class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"'
                 +   ' data-id="'      + r.enquiryId       + '"'
-                +   ' data-name="'    + esc(r.studentName) + '"'
-                +   ' data-parent="'  + esc(r.parentName)  + '"'
-                +   ' data-mobile="'  + esc(r.mobile)      + '"'
-                +   ' data-class="'   + esc(r.className)   + '"'
-                +   ' data-session="' + esc(r.session)     + '"'
-                +   ' data-status="'  + esc(r.status)      + '">'
+                +   ' data-name="'    + EC.esc(r.studentName) + '"'
+                +   ' data-parent="'  + EC.esc(r.parentName)  + '"'
+                +   ' data-mobile="'  + EC.esc(r.mobile)      + '"'
+                +   ' data-class="'   + EC.esc(r.className)   + '"'
+                +   ' data-session="' + EC.esc(r.session)     + '"'
+                +   ' data-status="'  + EC.esc(r.status)      + '">'
                 +   '<i class="bx bx-user-check"></i></button>'
                 : '')
             +     '<div class="vr mx-1" style="opacity:.18"></div>'
@@ -1152,7 +1148,7 @@ $(document).ready(function () {
                 ? '<button class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-edit-enquiry" data-id="' + r.enquiryId + '"><i class="bx bx-edit"></i></button>'
                 : '')
             +     '<button class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"'
-            +       ' data-id="' + r.enquiryId + '" data-name="' + esc(r.studentName) + '">'
+            +       ' data-id="' + r.enquiryId + '" data-name="' + EC.esc(r.studentName) + '">'
             +       '<i class="bx bx-trash"></i></button>'
             +   '</div>'
             + '</div></div>';
@@ -1275,7 +1271,7 @@ $(document).ready(function () {
         var id     = $('#lostEnquiryId').val();
         var status = $('#lostTargetStatus').val();
         var reason = $('#lostReasonSelect').val();
-        if (!reason) { toastr.error('Please select a reason.'); return; }
+        if (!reason) { ecToast('error', 'Please select a reason.'); return; }
         bootstrap.Modal.getInstance(document.getElementById('lostReasonModal')).hide();
         callUpdateStatus(id, status, reason);
     });
@@ -1293,17 +1289,17 @@ $(document).ready(function () {
             }),
             success: function (res) {
                 if (res.success) {
-                    toastr.success('Status changed to "' + status + '".');
+                    ecToast('success', 'Status changed to "' + status + '".');
                     fetchData(false);
                 } else {
                     // SP may return a specific message (e.g. "Cannot change after Admission Confirmed")
-                    toastr.error(res.message || 'Unable to update status.');
+                    ecToast('error', res.message || 'Unable to update status.');
                 }
             },
             error: function (xhr) {
                 var msg = (xhr.responseJSON && xhr.responseJSON.message)
                             ? xhr.responseJSON.message : 'Something went wrong.';
-                toastr.error(msg);
+                ecToast('error', msg);
             }
         });
     }
@@ -1385,23 +1381,23 @@ $(document).ready(function () {
             entries.forEach(function (e) {
                 if (e.type === 'status') {
                     html += '<li>'
-                        + '<div class="tl-time"><i class="bx bx-transfer me-1 text-muted"></i>' + esc(e.display) + '</div>'
+                        + '<div class="tl-time"><i class="bx bx-transfer me-1 text-muted"></i>' + EC.esc(e.display) + '</div>'
                         + '<div class="tl-title">'
-                        + (e.statusFrom ? '<span class="text-muted">' + esc(e.statusFrom) + '</span> → ' : '<span class="text-muted">Created</span> → ')
-                        + '<span class="badge ' + esc(e.badgeClass) + '">' + esc(e.statusTo) + '</span>'
+                        + (e.statusFrom ? '<span class="text-muted">' + EC.esc(e.statusFrom) + '</span> → ' : '<span class="text-muted">Created</span> → ')
+                        + '<span class="badge ' + EC.esc(e.badgeClass) + '">' + EC.esc(e.statusTo) + '</span>'
                         + '</div>'
-                        + (e.note ? '<div class="tl-note">' + esc(e.note) + '</div>' : '')
+                        + (e.note ? '<div class="tl-note">' + EC.esc(e.note) + '</div>' : '')
                         + '</li>';
                 } else {
                     html += '<li>'
-                        + '<div class="tl-time"><i class="bx ' + esc(e.typeIcon) + ' me-1 text-primary"></i>' + esc(e.display) + '</div>'
-                        + '<div class="tl-title"><strong>' + esc(e.followupType) + '</strong>'
-                        + (e.outcome ? ' — <span class="badge ' + esc(e.badgeClass) + '">' + esc(e.outcome) + '</span>' : '')
+                        + '<div class="tl-time"><i class="bx ' + EC.esc(e.typeIcon) + ' me-1 text-primary"></i>' + EC.esc(e.display) + '</div>'
+                        + '<div class="tl-title"><strong>' + EC.esc(e.followupType) + '</strong>'
+                        + (e.outcome ? ' — <span class="badge ' + EC.esc(e.badgeClass) + '">' + EC.esc(e.outcome) + '</span>' : '')
                         + (e.statusAfter && e.statusAfter !== e.statusBefore
-                            ? ' <i class="bx bx-right-arrow-alt text-muted"></i> <span class="text-muted small">' + esc(e.statusAfter) + '</span>'
+                            ? ' <i class="bx bx-right-arrow-alt text-muted"></i> <span class="text-muted small">' + EC.esc(e.statusAfter) + '</span>'
                             : '')
                         + '</div>'
-                        + (e.note ? '<div class="tl-note">' + esc(e.note) + '</div>' : '')
+                        + (e.note ? '<div class="tl-note">' + EC.esc(e.note) + '</div>' : '')
                         + '</li>';
                 }
             });
@@ -1442,14 +1438,14 @@ $(document).ready(function () {
         var lostReason = $.trim($('#followupLostReason').val()) || null;
 
         // Validations
-        if (!outcome) { toastr.error('Please select an outcome.'); return; }
+        if (!outcome) { ecToast('error', 'Please select an outcome.'); return; }
         if ((outcome === 'Not Interested' || newStatus === 'Not Interested') && !lostReason) {
-            toastr.error('Please select a reason for Not Interested.'); return;
+            ecToast('error', 'Please select a reason for Not Interested.'); return;
         }
-        if (!id) { toastr.error('Invalid enquiry.'); return; }
+        if (!id) { ecToast('error', 'Invalid enquiry.'); return; }
 
-        var $btn = $(this).prop('disabled', true)
-                          .html('<i class="bx bx-loader-circle bx-spin me-1"></i> Saving...');
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Saving...');
 
         $.ajax({
             url:         '/ERP/Enquiry/LogFollowup',
@@ -1466,20 +1462,20 @@ $(document).ready(function () {
                 lostReason:      lostReason
             }),
             success: function (res) {
-                $btn.prop('disabled', false).html('<i class="bx bx-save me-1"></i> Save Follow-up');
+                EC.buttonReset($btn);
                 if (res.success) {
-                    toastr.success('Follow-up logged successfully.');
+                    ecToast('success', 'Follow-up logged successfully.');
                     bootstrap.Modal.getInstance(document.getElementById('logFollowupModal')).hide();
                     fetchData(false);
                 } else {
-                    toastr.error(res.message || 'Unable to save follow-up.');
+                    ecToast('error', res.message || 'Unable to save follow-up.');
                 }
             },
             error: function (xhr) {
-                $btn.prop('disabled', false).html('<i class="bx bx-save me-1"></i> Save Follow-up');
+                EC.buttonReset($btn);
                 var msg = (xhr.responseJSON && xhr.responseJSON.message)
                             ? xhr.responseJSON.message : 'Something went wrong. Please try again.';
-                toastr.error(msg);
+                ecToast('error', msg);
             }
         });
     });
@@ -1527,7 +1523,7 @@ $(document).ready(function () {
                         (REG_FEE_AMOUNT === 0 ? ' — configure a Registration-point Fee Head' : ''));
                     regUpdateNet();
                 })
-                .fail(function () { $('#regFeeAmountLabel').text('₹0'); REG_FEE_AMOUNT = 0; regUpdateNet(); });
+                .fail(function () { $('#regFeeAmountLabel').text('₹0.00'); REG_FEE_AMOUNT = 0; regUpdateNet(); });
         } else {
             $('#regFeeRow').addClass('d-none');
         }
@@ -1573,12 +1569,12 @@ $(document).ready(function () {
 
         var regNumber = REG_AUTO_NUMBER ? '' : $.trim($('#regNumber').val());
         if (!REG_AUTO_NUMBER && regNumber === '') {
-            toastr.error('Please enter a registration number.');
+            ecToast('error', 'Please enter a registration number.');
             return;
         }
 
-        var $btn = $(this).prop('disabled', true)
-                          .html('<i class="bx bx-loader-circle bx-spin me-1"></i> Saving…');
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Saving…');
 
         $.ajax({
             url:         '/ERP/Enquiry/RegisterEnquiry',
@@ -1600,19 +1596,17 @@ $(document).ready(function () {
         .done(function (res) {
             if (res && res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('registerEnquiryModal')).hide();
-                toastr.success((res.message || 'Registration completed.') +
+                ecToast('success', (res.message || 'Registration completed.') +
                                (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
                 // Show the printable registration-fee receipt when a fee was collected.
                 // Receipt not auto-opened; print it from the Registrations list.
                 fetchData(false);
             } else {
-                toastr.error((res && res.message) || 'Unable to complete registration.');
+                ecToast('error', (res && res.message) || 'Unable to complete registration.');
             }
         })
-        .fail(function () { toastr.error('Something went wrong while registering.'); })
-        .always(function () {
-            $btn.prop('disabled', false).html('<i class="bx bx-check me-1"></i> Complete Registration');
-        });
+        .fail(function () { ecToast('error', 'Something went wrong while registering.'); })
+        .always(function () { EC.buttonReset($btn); });
     });
 
     /* ── Convert to Admission ───────────────────────────── */
@@ -1629,7 +1623,7 @@ $(document).ready(function () {
         // Gate: when the school requires registration before admission, block
         // conversion until the lead has reached "Registration Done".
         if (REGISTRATION_REQUIRED && status !== 'Registration Done') {
-            toastr.warning('Complete registration for ' + name + ' before converting to admission.');
+            ecToast('warning', 'Complete registration for ' + name + ' before converting to admission.');
             return;
         }
 
@@ -1647,8 +1641,8 @@ $(document).ready(function () {
         var id = parseInt($('#convertEnquiryId').val());
         if (!id) { return; }
 
-        $(this).prop('disabled', true)
-               .html('<i class="bx bx-loader-circle bx-spin me-1"></i> Opening…');
+        // Not reset — the page navigates away to the Admission module.
+        EC.buttonBusy(this, 'Opening…');
 
         // Hand off to the Admission module. Saving the admission there links
         // this enquiry (sets admission_id) and moves it to "Admission Confirmed",
@@ -1668,8 +1662,8 @@ $(document).ready(function () {
 
     $('#confirmDeleteBtn').on('click', function () {
         var id  = $('#deleteEnquiryId').val();
-        var btn = $(this).prop('disabled', true)
-                         .html('<i class="bx bx-loader-circle bx-spin me-1"></i> Deleting...');
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Deleting...');
 
         $.ajax({
             url:         '/ERP/Enquiry/DeleteEnquiry',
@@ -1678,18 +1672,18 @@ $(document).ready(function () {
             headers:     { 'RequestVerificationToken': csrf },
             data:        JSON.stringify({ enquiryId: parseInt(id) }),
             success: function (res) {
-                btn.prop('disabled', false).html('<i class="bx bx-trash me-1"></i> Delete');
+                EC.buttonReset($btn);
                 bootstrap.Modal.getInstance(document.getElementById('deleteEnquiryModal')).hide();
                 if (res.success) {
-                    toastr.success('Enquiry deleted.');
+                    ecToast('success', 'Enquiry deleted.');
                     fetchData(false);
                 } else {
-                    toastr.error(res.message || 'Unable to delete enquiry.');
+                    ecToast('error', res.message || 'Unable to delete enquiry.');
                 }
             },
             error: function () {
-                btn.prop('disabled', false).html('<i class="bx bx-trash me-1"></i> Delete');
-                toastr.error('Something went wrong. Please try again.');
+                EC.buttonReset($btn);
+                ecToast('error', 'Something went wrong. Please try again.');
             }
         });
     });
@@ -1806,10 +1800,10 @@ $(document).ready(function () {
                     enquiryFormFill(res.data);
                     new bootstrap.Modal(document.getElementById('addEnquiryModal')).show();
                 } else {
-                    toastr.error(res.message || 'Unable to load enquiry.');
+                    ecToast('error', res.message || 'Unable to load enquiry.');
                 }
             })
-            .fail(function () { toastr.error('Failed to load enquiry.'); });
+            .fail(function () { ecToast('error', 'Failed to load enquiry.'); });
     }
 
     $(document).on('click', '.btn-edit-enquiry', function (e) {
@@ -1831,7 +1825,7 @@ $(document).ready(function () {
         var ok = true;
         function req(id, label){
             var val = $.trim($(id,'#addEnquiryModal').val());
-            if(!val){ toastr.error(label+' is required.'); ok=false; }
+            if(!val){ ecToast('error', label+' is required.'); ok=false; }
         }
         req('[name="StudentName"]','Student Name');
         req('[name="ClassName"]','Class');
@@ -1839,9 +1833,9 @@ $(document).ready(function () {
 
         var fMob = $.trim($('#addFatherMobile').val());
         if (!fMob) {
-            toastr.error("Father's mobile number is required."); ok = false;
+            ecToast('error', "Father's mobile number is required."); ok = false;
         } else if (!/^[6-9][0-9]{9}$/.test(fMob)) {
-            toastr.error('Enter a valid 10-digit mobile number.'); ok = false;
+            ecToast('error', 'Enter a valid 10-digit mobile number.'); ok = false;
         } else {
             $('#addPrimaryMobile').val(fMob);
         }
@@ -1854,7 +1848,7 @@ $(document).ready(function () {
         // Optional email format check
         var email = $.trim($('#addParentEmail').val());
         if (email && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(email)) {
-            toastr.error('Enter a valid email address.'); ok = false;
+            ecToast('error', 'Enter a valid email address.'); ok = false;
         }
 
         if (!ok) e.preventDefault();

@@ -547,6 +547,48 @@ code is unchanged, but this rollout touched every data path.
 
 ---
 
+### [2026-07-28] Frontend — shared `EC` helpers, and the dead `asp-*` attributes
+
+Not one of the seven numbered fixes; this is the frontend equivalent. Full conventions and the
+trap list live in **`educore/docs/FRONTEND-CONVENTIONS.md`** — read that before touching page
+JavaScript. Summary only here.
+
+**What changed.** Page JavaScript now shares one global `EC` in `wwwroot/js/site.js` (loaders,
+busy buttons, `confirm`/`prompt`, list loading/empty states, `esc`, `money`, `num`/`numPos`),
+plus the single `ecToast` in `_Scripts.cshtml`. Page-local copies were removed across ~46
+views: 5 different toast function names (two taking their arguments in the *opposite* order),
+14 `esc` definitions across 4 variants, 8 `money` across 2, and one `num` name with two
+different behaviours. All 17 native `confirm()`, the 1 `prompt()` and 1 of the 2 `alert()`
+calls are gone — the remaining `alert` is the fallback *inside* `ecToast` for when toastr
+itself fails to load, and must stay.
+
+**The find that mattered most:** `Areas/ERP/Views/_ViewImports.cshtml` did not exist, so tag
+helpers were off for the whole ERP area and **363 `asp-*` attributes across 48 views rendered
+as literal dead HTML**. Add Staff was the clearest casualty — its 21 inputs had no `name`, so
+the form posted nothing and could never have worked. Adding the one file fixed all of it. A new
+area needs its own `_ViewImports.cshtml`, and Razor runtime compilation does not pick up a
+*new* one without an app restart.
+
+**Also fixed:** `Views/Account/Error.cshtml` hardcoded "404 Page Not Found" while
+`UseStatusCodePagesWithReExecute` routes every status through it, so a user hitting a page
+their role can't open was told it did not exist — it now reads the real status code.
+`_FeeReceiptModal` used `$` in a body-rendered partial, but jQuery loads at the bottom of the
+page, so its format buttons never got a handler on any of the 6 pages that include it.
+
+**Verified:** `dotnet build` → 0 errors. Helpers, toasts, confirm/prompt, empty states, money
+and number formatting exercised in the browser against the running app.
+
+**Worth knowing:** `dotnet build` does **not** check inline JavaScript — a `.cshtml` with a
+broken `<script>` still reports 0 errors. Three such breakages were found only by fetching each
+rendered page and running its inline scripts through `new Function(src)`. Roughly 10,400 of the
+24,661 `.cshtml` lines are inline `<script>`, and none of it is linted; adding ESLint is the
+highest-value frontend work left.
+
+**Not verified end to end:** the receipt format buttons and the TC void prompt — this school
+has no receipts and no TC records to exercise them.
+
+---
+
 # Glossary (quick reference)
 
 | Term | Plain meaning |

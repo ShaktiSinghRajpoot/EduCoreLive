@@ -161,9 +161,9 @@
             </div>
             <div class="col-12 col-lg-5">
                 <div class="purchase-total-box p-3 h-100">
-                    <div class="purchase-total-row"><span>Sub Total</span><strong id="subTotalAmount">₹0</strong></div>
-                    <div class="purchase-total-row"><span>Total Tax</span><strong id="taxAmount">₹0</strong></div>
-                    <div class="purchase-total-row"><span>Grand Total</span><strong class="fs-5" id="grandTotalAmount">₹0</strong></div>
+                    <div class="purchase-total-row"><span>Sub Total</span><strong id="subTotalAmount">₹0.00</strong></div>
+                    <div class="purchase-total-row"><span>Total Tax</span><strong id="taxAmount">₹0.00</strong></div>
+                    <div class="purchase-total-row"><span>Grand Total</span><strong class="fs-5" id="grandTotalAmount">₹0.00</strong></div>
                 </div>
             </div>
         </div>
@@ -191,9 +191,6 @@ $(document).ready(function () {
     var catalog = (window.EduInventory ? window.EduInventory.all() : []);
     var itemOptions = catalog.map(function (i) { return i.name; });
 
-    function money(v){ return "₹" + Number(v||0).toLocaleString("en-IN"); }
-    function toastSuccess(m){ if(typeof toastr!=="undefined") toastr.success(m); else console.log(m); }
-    function toastError(m){ if(typeof toastr!=="undefined") toastr.error(m); else console.error(m); }
 
     function rowTotals(row){
         var amount=Number(row.qty)*Number(row.rate);
@@ -219,7 +216,7 @@ $(document).ready(function () {
                 + '<td><input type="number" class="form-control qty-input" min="1" value="'+row.qty+'"></td>'
                 + '<td><input type="number" class="form-control rate-input" min="0" value="'+row.rate+'"></td>'
                 + '<td><input type="number" class="form-control tax-input" min="0" value="'+row.tax+'"></td>'
-                + '<td><div class="fw-bold row-total">'+money(t.total)+'</div><small class="text-muted row-tax">Tax: '+money(t.tax)+'</small></td>'
+                + '<td><div class="fw-bold row-total">'+EC.money(t.total)+'</div><small class="text-muted row-tax">Tax: '+EC.money(t.tax)+'</small></td>'
                 + '<td class="text-center"><button type="button" class="grid-remove-btn remove-row-btn"><i class="bx bx-trash"></i></button></td>'
                 + '</tr>';
         });
@@ -236,9 +233,9 @@ $(document).ready(function () {
     function calculateTotals(){
         var subTotal=0, taxTotal=0;
         purchaseRows.forEach(function(row){ var t=rowTotals(row); subTotal+=t.amount; taxTotal+=t.tax; });
-        $("#subTotalAmount").text(money(subTotal));
-        $("#taxAmount").text(money(taxTotal));
-        $("#grandTotalAmount").text(money(subTotal+taxTotal));
+        $("#subTotalAmount").text(EC.money(subTotal));
+        $("#taxAmount").text(EC.money(taxTotal));
+        $("#grandTotalAmount").text(EC.money(subTotal+taxTotal));
     }
 
     $(document).on("click", "#addPurchaseRowBtn, #emptyAddRowBtn", addRow);
@@ -259,8 +256,8 @@ $(document).ready(function () {
         row.rate=Number(tr.find(".rate-input").val()||0);
         row.tax=Number(tr.find(".tax-input").val()||0);
         var t=rowTotals(row);
-        tr.find(".row-total").text(money(t.total));
-        tr.find(".row-tax").text("Tax: "+money(t.tax));
+        tr.find(".row-total").text(EC.money(t.total));
+        tr.find(".row-tax").text("Tax: "+EC.money(t.tax));
         calculateTotals();
     });
 
@@ -278,12 +275,12 @@ $(document).ready(function () {
     });
 
     $("#savePurchaseBtn").on("click", function(){
-        if(!$("#supplierId").val()){ toastError("Please select supplier."); return; }
-        if(!$("#purchaseDate").val()){ toastError("Please select purchase date."); return; }
-        if(!purchaseRows.length){ toastError("Please add at least one item."); return; }
+        if(!$("#supplierId").val()){ ecToast('error', "Please select supplier."); return; }
+        if(!$("#purchaseDate").val()){ ecToast('error', "Please select purchase date."); return; }
+        if(!purchaseRows.length){ ecToast('error', "Please add at least one item."); return; }
         var invalid=purchaseRows.some(function(x){return !x.item || x.qty<=0 || x.rate<=0;});
-        if(invalid){ toastError("Please complete all purchase item rows."); return; }
-        toastSuccess("Purchase entry saved successfully.");
+        if(invalid){ ecToast('error', "Please complete all purchase item rows."); return; }
+        ecToast('success', "Purchase entry saved successfully.");
         console.log({
             supplier:$("#supplierId").val(), purchaseDate:$("#purchaseDate").val(),
             invoiceNumber:$("#invoiceNumber").val(), paymentMode:$("#paymentMode").val(),
@@ -292,16 +289,19 @@ $(document).ready(function () {
     });
 
     $("#cancelPurchaseBtn").on("click", function(){
-        if(!confirm("Discard this purchase entry?")) return;
-        $("#supplierId, #paymentMode").prop("selectedIndex",0);
-        $("#purchaseDate, #invoiceNumber, #purchaseRemarks").val("");
-        purchaseRows=[]; addRow();
+        EC.confirm({ title:"Discard this purchase entry?", icon:'bx-x-circle',
+                     message:"Everything typed on this form will be cleared.",
+                     okText:"Discard" }).then(function(ok){
+            if(!ok) return;
+            $("#supplierId, #paymentMode").prop("selectedIndex",0);
+            $("#purchaseDate, #invoiceNumber, #purchaseRemarks").val("");
+            purchaseRows=[]; addRow();
+        });
     });
 
     $("#printBtn").on("click", function(){ window.print(); });
-    $("#historyBtn").on("click", function(){ toastError("Purchase History screen is coming soon."); });
+    $("#historyBtn").on("click", function(){ ecToast('error', "Purchase History screen is coming soon."); });
 
-    if(typeof toastr!=="undefined") toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
 
     addRow();
 });
