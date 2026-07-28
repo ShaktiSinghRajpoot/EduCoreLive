@@ -1,6 +1,45 @@
 /* Allow flex children to shrink below their natural content width */
 .min-width-0 { min-width: 0; }
 
+/* ---------- Confirm dialog (EC.confirm in site.js) ---------- */
+.ec-confirm .modal-content { border: 0; border-radius: 18px; }
+.ec-confirm .modal-body    { padding: 1.5rem 1.5rem .75rem; }
+.ec-confirm .modal-footer  { border: 0; padding: 0 1.5rem 1.5rem; display: flex; gap: .5rem; }
+.ec-confirm-ic {
+    width: 64px; height: 64px; border-radius: 50%; margin: 0 auto .9rem;
+    display: flex; align-items: center; justify-content: center;
+}
+.ec-confirm-ic i          { font-size: 1.9rem; }
+.ec-confirm-ic.is-danger  { background: #fee2e2; }
+.ec-confirm-ic.is-danger i{ color: #dc2626; }
+.ec-confirm-ic.is-normal  { background: var(--ec-primary-light, #fff3e6); }
+.ec-confirm-ic.is-normal i{ color: var(--ec-primary, #ff8a00); }
+.ec-confirm-title { font-weight: 900; margin-bottom: .35rem; }
+.ec-confirm-name {
+    font-weight: 800; background: #f5f4f2; border-radius: 8px;
+    padding: .35rem .7rem; display: inline-block; margin-bottom: .5rem;
+}
+.ec-confirm-msg { font-size: .84rem; color: var(--ec-text-muted, #8592a3); margin-bottom: 0; }
+.ec-confirm-field { text-align: left; margin-top: .9rem; }
+.ec-confirm-label {
+    font-size: .72rem; font-weight: 900; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--ec-text-muted, #8592a3); margin-bottom: .3rem;
+}
+.ec-confirm-input { font-size: .86rem; resize: vertical; }
+.ec-confirm-yes:disabled { opacity: .5; }
+.ec-confirm-yes           { color: #fff; }
+.ec-confirm-yes.is-danger { background: #dc2626; }
+.ec-confirm-yes.is-danger:hover { background: #b91c1c; color: #fff; }
+.ec-confirm-yes.is-normal { background: var(--ec-primary, #ff8a00); }
+.ec-confirm-yes.is-normal:hover { background: #e67c00; color: #fff; }
+
+/* ---------- Top progress bar (EC.showLoader / EC.hideLoader in site.js) ---------- */
+.ec-top-loader {
+    position: fixed; top: 0; left: 0; width: 0; height: 3px;
+    background: var(--ec-primary, var(--bs-primary, #ff8a00)); z-index: 99999;
+    opacity: 1; pointer-events: none; border-radius: 0 2px 2px 0;
+}
+
 /* ---------- Reusable server-side pager (_Pager.cshtml) ---------- */
 .ec-pager { display: inline-flex; align-items: center; gap: .25rem; flex-wrap: wrap; }
 .ec-pager-btn {

@@ -33,10 +33,13 @@
 </div>
 
 <script>
-    $(function () {
-        $('#ecReceiptFormats button').on('click', function () {
-            EcReceipt.setFormat($(this).data('fmt'));
-        });
+    // Plain JS with delegation on purpose: this partial renders in the BODY, but
+    // jQuery only loads at the bottom of the page (_Scripts.cshtml). Using $ here
+    // threw "$ is not defined" on all six pages that include this partial, so the
+    // format buttons never got a click handler at all.
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('#ecReceiptFormats button');
+        if (btn) EcReceipt.setFormat(btn.dataset.fmt);
     });
 </script>
 

@@ -84,7 +84,6 @@ $(function(){
   'use strict';
   var CSRF=$('input[name="__RequestVerificationToken"]').val();
   var URL={ stops:'@Url.Action("GetStops")', save:'@Url.Action("SaveRoute")', del:'@Url.Action("DeleteRoute")', toggle:'@Url.Action("ToggleRouteStatus")' };
-  function notify(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
   function post(url,data){ return $.ajax({url:url,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},data:JSON.stringify(data)}); }
   function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
 
@@ -113,23 +112,26 @@ $(function(){
 
   $('#saveRouteBtn').on('click',function(){
     var name=$('#rName').val().trim();
-    if(!name){ notify('warning','Enter a route name.'); return; }
+    if(!name){ ecToast('warning','Enter a route name.'); return; }
     var stops=[]; $('#stopsBody tr').each(function(i){
       var nm=$(this).find('.s-name').val().trim(); if(!nm) return;
       stops.push({ stopId:Number($(this).find('.s-id').val())||0, stopName:nm, monthlyFare:Number($(this).find('.s-fare').val())||0, displayOrder:i+1 });
     });
     post(URL.save,{ routeId:Number($('#rRouteId').val())||0, routeName:name, description:$('#rDesc').val().trim(), stops:stops })
-      .done(function(res){ if(res.success){ notify('success',res.message); setTimeout(function(){location.reload();},600);} else notify('error',res.message); })
-      .fail(function(){ notify('error','Could not save the route.'); });
+      .done(function(res){ if(res.success){ ecToast('success',res.message); setTimeout(function(){location.reload();},600);} else ecToast('error',res.message); })
+      .fail(function(){ ecToast('error','Could not save the route.'); });
   });
 
-  $('.toggleRoute').on('click',function(){ postForm(URL.toggle,{id:$(this).data('id')}).done(function(res){ notify(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); }); });
+  $('.toggleRoute').on('click',function(){ postForm(URL.toggle,{id:$(this).data('id')}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); }); });
   $('.delRoute').on('click',function(){
-    if(!confirm('Delete route "'+$(this).data('name')+'"? Stops on it will be removed.')) return;
-    postForm(URL.del,{id:$(this).data('id')}).done(function(res){ notify(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); });
+    var id=$(this).data('id');
+    EC.confirm({ title:'Delete this route?', name:$(this).data('name'),
+                 message:'Stops on it will be removed.', okText:'Delete route' }).then(function(ok){
+      if(!ok) return;
+      postForm(URL.del,{id:id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); });
+    });
   });
 
-  if(typeof toastr!=='undefined') toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
 });
 </script>
 }

@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model educore.Models.SchoolManageModel
 
 @{
@@ -323,21 +323,13 @@
     <script>
         $(document).ready(function () {
 
-            toastr.options = {
-                closeButton: true,
-                progressBar: true,
-                newestOnTop: true,
-                positionClass: "toast-top-right",
-                preventDuplicates: true,
-                timeOut: 3500
-            };
 
             @if (!ViewData.ModelState.IsValid)
             {
                     foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
                     {
                             <text>
-                                toastr.error('@error.ErrorMessage');
+                                ecToast('error', '@error.ErrorMessage');
                             </text>
                     }
             }
@@ -350,7 +342,7 @@
                 field.addClass("is-invalid");
 
                 if (!field.data("toast-shown")) {
-                    toastr.error(message);
+                    ecToast('error', message);
                     field.data("toast-shown", true);
                 }
             }
@@ -381,7 +373,7 @@
                 }
 
                 $("#logoPreview").attr("src", URL.createObjectURL(file));
-               toastr.info("Logo selected.");
+               ecToast('info', "Logo selected.");
             });
 
             // ── Validation ──────────────────────────────────────────────────
@@ -433,7 +425,7 @@
 
                 if (bad.length) {
                     e.preventDefault();
-                    toastr.warning("Please fix the highlighted fields.");
+                    ecToast('warning', "Please fix the highlighted fields.");
                     $(".is-invalid").first().trigger("focus");
                 }
             });

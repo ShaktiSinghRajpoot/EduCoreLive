@@ -382,31 +382,7 @@
                 margin-top: .15rem;
             }
 
-        .fdr-toast-wrap {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 1080;
-            display: flex;
-            flex-direction: column;
-            gap: .5rem;
-        }
 
-        .fdr-toast {
-            display: flex;
-            align-items: center;
-            gap: .55rem;
-            background: #fff;
-            border-left: 4px solid #16a34a;
-            border-radius: 10px;
-            box-shadow: var(--ec-shadow-lg);
-            padding: .6rem .9rem;
-            min-width: 15rem;
-            font-size: .82rem;
-            font-weight: 600;
-            color: var(--ec-text);
-            animation: fdrIn .25s ease;
-        }
 
         @keyframes fdrIn {
             from {

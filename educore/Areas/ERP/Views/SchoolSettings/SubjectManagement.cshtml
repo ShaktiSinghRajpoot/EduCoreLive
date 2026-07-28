@@ -87,6 +87,7 @@
                     <div class="sm-suggest-section">
                         <div class="sm-suggest-lbl">
                             <i class="bx bx-bulb" style="color:#f59e0b;"></i> Quick add suggestions
+                            <span class="sm-suggest-count" id="smSuggestCount"></span>
                         </div>
                         <div class="sm-suggest-chips" id="smSuggestChips"></div>
                     </div>
@@ -118,8 +119,13 @@
                 <!-- Save bar -->
                 <div class="sm-save-bar">
                     <div class="sm-save-hint">
-                        <i class="bx bx-info-circle" style="color:var(--ec-primary);"></i>
-                        Changes apply to exam creation, mark entry and timetable for this class.
+                        <span class="sm-dirty-badge d-none" id="smDirtyBadge">
+                            <i class="bx bx-edit-alt"></i> Unsaved changes
+                        </span>
+                        <span id="smSaveHintText">
+                            <i class="bx bx-info-circle" style="color:var(--ec-primary);"></i>
+                            Changes apply to exam creation, mark entry and timetable for this class.
+                        </span>
                     </div>
                     <div class="d-flex gap-2">
                         <button class="sm-cancel-btn" id="smCancelBtn">Discard</button>
@@ -137,12 +143,6 @@
     @Html.AntiForgeryToken()
 
   </div>
-</div>
-
-<!-- Toast -->
-<div class="sm-toast" id="smToast">
-    <i class="bx bx-check-circle" style="font-size:1.3rem;color:#28a745;flex-shrink:0;"></i>
-    <span id="smToastMsg">Subjects saved.</span>
 </div>
 
 @section PageScripts {
@@ -183,10 +183,6 @@ $(document).ready(function () {
     let originalSnap  = [];     // snapshot of subjects when class was loaded
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-    // Unified: route through the app-wide ecToast/toastr.
-    function showToast(msg, type) {
-        window.ecToast(type === 'error' ? 'error' : 'success', msg);
-    }
 
     function getSubjects(id) {
         return subjectData[id] || [];
@@ -233,6 +229,17 @@ $(document).ready(function () {
         $('#smSubjCounter').text(count);
         $('#smSubjCountLabel').text(count + ' subject' + (count !== 1 ? 's' : '') + ' configured');
         updateSuggestionState();
+        updateDirty();
+    }
+
+    // Adding or removing only changed the pills, so there was no sign that a
+    // Save was still pending.
+    function updateDirty() {
+        const cur   = getSubjects(activeId);
+        const dirty = cur.length !== originalSnap.length ||
+                      cur.some((s, i) => s !== originalSnap[i]);
+        $('#smDirtyBadge').toggleClass('d-none', !dirty);
+        $('#smSaveHintText').toggleClass('d-none', dirty);
     }
 
     function buildPill(subject) {
@@ -264,16 +271,21 @@ $(document).ready(function () {
     function updateSuggestionState() {
         if (!activeId) return;
         const added = getSubjects(activeId).map(s => s.toLowerCase());
+        let left = 0;
         $('#smSuggestChips .sm-suggest-chip').each(function() {
             const s = $(this).data('subj').toLowerCase();
             if (added.includes(s)) {
                 $(this).addClass('chip-added');
-                $(this).html(`<i class="bx bx-check" style="font-size:.8rem;color:#28a745;"></i>${$(this).data('subj')}`);
+                $(this).html(`<i class="bx bx-check" style="font-size:.8rem;"></i>${$(this).data('subj')}`);
             } else {
+                left++;
                 $(this).removeClass('chip-added');
                 $(this).html(`<i class="bx bx-plus" style="font-size:.8rem;"></i>${$(this).data('subj')}`);
             }
         });
+        // Show how many are left — when everything is already added it looks
+        // like no suggestions arrived at all.
+        $('#smSuggestCount').text(left ? '· ' + left + ' to add' : '· all already added');
     }
 
     // ── Load a class into the work area ──────────────────────────────────────
@@ -297,24 +309,48 @@ $(document).ready(function () {
         renderSuggestions(cls);
         renderPills();
 
-        // Focus input
-        $('#smSubjInput').val('').focus();
+        // preventScroll: without it, focus scrolls the page down to the input
+        // and the screen jumps on every class click.
+        $('#smSubjInput').val('')[0].focus({ preventScroll: true });
     }
 
     // ── Class item click — fetch the class's saved subjects once, then cache ──
     $(document).on('click', '.sm-class-item', function() {
-        const id  = parseInt($(this).data('id'), 10);
-        const cls = $(this).data('class');
+        const $item = $(this);
+        const id  = parseInt($item.data('id'), 10);
+        const cls = $item.data('class');
         if (!id || id === activeId) return;
 
         if (subjectData[id]) { loadClass(id, cls); return; }
+
+        // The server call takes ~1s. Open the work area immediately — title and
+        // selection right away, a loader where the subjects will go. Otherwise
+        // the click gets no response at all and the page feels hung.
+        $('#classList .sm-class-item').removeClass('active');
+        $item.addClass('active is-loading');
+        $('#smEmptyState').hide();
+        $('#smSubjArea').show();
+        $('#smAreaTitle').text(cls);
+        $('#smSubjCountLabel').text('Loading…');
+        $('#smSubjCounter').text('–');
+        $('#smNoSubj').addClass('d-none');
+        $('#smSuggestChips').empty();
+        EC.showLoader();
+        EC.listLoading('#smPillWrap', 'Loading subjects…');
 
         $.getJSON(LOAD_URL, { classId: id })
             .done(function(list) {
                 subjectData[id] = list || [];
                 loadClass(id, cls);
             })
-            .fail(function() { showToast('Could not load subjects for ' + cls + '.', 'error'); });
+            .fail(function() {
+                ecToast('error', 'Could not load subjects for ' + cls + '.');
+                $item.removeClass('active');
+                $('#smPillWrap').empty();
+                $('#smSubjArea').hide();
+                $('#smEmptyState').show();
+            })
+            .always(function() { EC.hideLoader(); $item.removeClass('is-loading'); });
     });
 
     // ── Add via suggestion chip ───────────────────────────────────────────────
@@ -326,7 +362,7 @@ $(document).ready(function () {
     // ── Add via button ────────────────────────────────────────────────────────
     $('#smAddBtn').on('click', function() {
         const val = $.trim($('#smSubjInput').val());
-        if (!val) { showToast('Please enter a subject name.', 'error'); return; }
+        if (!val) { ecToast('error', 'Please enter a subject name.'); return; }
         addSubject(val);
         $('#smSubjInput').val('').focus();
     });
@@ -340,7 +376,7 @@ $(document).ready(function () {
         if (!activeId) return;
         const subjects = getSubjects(activeId);
         if (subjects.map(x => x.toLowerCase()).includes(s.toLowerCase())) {
-            showToast(s + ' is already added.', 'error');
+            ecToast('error', s + ' is already added.');
             return;
         }
         subjects.push(s);
@@ -362,14 +398,15 @@ $(document).ready(function () {
         if (!activeId) return;
         setSubjects(activeId, [...originalSnap]);
         renderPills();
-        showToast('Changes discarded.', 'error');
+        ecToast('error', 'Changes discarded.');
     });
 
     // ── Save — replace-all for this class, through the subject proc ──────────
     $('#smSaveBtn').on('click', function() {
         if (!activeId) return;
         const subjects = getSubjects(activeId);
-        const $btn = $(this).prop('disabled', true);
+        const $btn = $(this);
+        EC.buttonBusy($btn, 'Saving…');
 
         $.ajax({
             url:         SAVE_URL,
@@ -381,15 +418,16 @@ $(document).ready(function () {
         .done(function(res) {
             if (res && res.success) {
                 originalSnap = [...subjects];
+                updateDirty();
                 updateClassBadge(activeId);
                 mirrorToLocalStorage();
-                showToast(res.message || 'Subjects saved.', 'success');
+                ecToast('success', res.message || 'Subjects saved.');
             } else {
-                showToast((res && res.message) || 'Save failed.', 'error');
+                ecToast('error', (res && res.message) || 'Save failed.');
             }
         })
-        .fail(function() { showToast('Save failed. Check your connection.', 'error'); })
-        .always(function() { $btn.prop('disabled', false); });
+        .fail(function() { ecToast('error', 'Save failed. Check your connection.'); })
+        .always(function () { EC.buttonReset($btn); });
     });
 
     // CreateExam and MarkEntry still read subjects out of localStorage; keep that

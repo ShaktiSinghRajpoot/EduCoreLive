@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @using Microsoft.AspNetCore.Mvc.ViewFeatures
 @model EduCoreDataAccessLayer.Models.ERP.FeeHead
 @{
@@ -424,15 +424,17 @@
                                             <form asp-action="DeleteFeeHead"
                                                   asp-controller="SchoolSettings"
                                                   method="post"
-                                                  class="d-inline">
+                                                  class="d-inline"
+                                                  data-ec-confirm="Delete this fee head?"
+                                                  data-ec-confirm-name="@item.FeeHeadName"
+                                                  data-ec-confirm-ok="Delete fee head">
 
                                                 @Html.AntiForgeryToken()
 
                                                 <input type="hidden" name="id" value="@item.FeeHeadId" />
 
                                                 <button type="submit"
-                                                        class="btn btn-sm btn-outline-danger fee-action-btn"
-                                                        onclick="return confirm('Are you sure you want to delete this fee head?')">
+                                                        class="btn btn-sm btn-outline-danger fee-action-btn">
                                                     <i class="bx bx-trash"></i>
                                                 </button>
 
@@ -474,23 +476,6 @@
     <script>
         $(document).ready(function () {
 
-            if (typeof toastr !== 'undefined') {
-                toastr.options = {
-                    closeButton: true,
-                    progressBar: true,
-                    positionClass: 'toast-top-right',
-                    timeOut: 3000
-                };
-            }
-
-            function showToast(type, message) {
-                if (typeof toastr !== 'undefined') {
-                    toastr[type](message);
-                } else {
-                    console.log(message);
-                }
-            }
-
             // Search / cycle filter / sort are now SERVER-SIDE (the filter <form>
             // above submits back to the FeeHead action) — no client-side row filtering.
 
@@ -514,21 +499,21 @@
 
                 if (!feeHeadName) {
                     e.preventDefault();
-                    showToast('error', 'Please enter fee head name.');
+                    ecToast('error', 'Please enter fee head name.');
                     $('#FeeHeadName').focus();
                     return false;
                 }
 
                 if (!frequency) {
                     e.preventDefault();
-                    showToast('error', 'Please select billing cycle.');
+                    ecToast('error', 'Please select billing cycle.');
                     $('#Frequency').focus();
                     return false;
                 }
 
                 if (!feeType) {
                     e.preventDefault();
-                    showToast('error', 'Please select fee type.');
+                    ecToast('error', 'Please select fee type.');
                     return false;
                 }
             });
@@ -556,7 +541,7 @@
                             behavior: 'smooth'
                         });
                     } else {
-                        showToast('error', response.message);
+                        ecToast('error', response.message);
                     }
                 });
             });

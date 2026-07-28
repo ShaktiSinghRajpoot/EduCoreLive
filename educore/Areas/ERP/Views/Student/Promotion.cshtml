@@ -252,9 +252,7 @@ var carry=true;
 
 /* ── Helpers ─────────────────────────────────── */
 function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
-function inr(n){ return n>0 ? '₹'+n.toLocaleString('en-IN') : '₹0'; }
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
-function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function inr(n){ return n>0 ? '₹'+n.toLocaleString('en-IN') : '₹0.00'; }
 
 /* ── Section dropdowns cascade from the chosen class ── */
 function fillSelect(sel, list, firstLabel, firstVal){
@@ -288,7 +286,7 @@ document.getElementById('loadBtn').addEventListener('click', function(){
   var cls=document.getElementById('srcClass').value,
       sec=document.getElementById('srcSection').value,
       yr =document.getElementById('srcYear').value;
-  if(!cls){ toast('warning','Please select a class first.'); return; }
+  if(!cls){ ecToast('warning','Please select a class first.'); return; }
 
   var btn=this; btn.disabled=true;
   $.getJSON(ROSTER_URL, { 'class':cls, section:sec, year:yr })
@@ -311,7 +309,7 @@ document.getElementById('loadBtn').addEventListener('click', function(){
     render();
     if(roster.length) document.getElementById('rosterCard').scrollIntoView({behavior:'smooth',block:'nearest'});
   })
-  .fail(function(){ toast('error','Could not load students for this class.'); })
+  .fail(function(){ ecToast('error','Could not load students for this class.'); })
   .always(function(){ btn.disabled=false; });
 });
 
@@ -341,15 +339,15 @@ function render(){
   tb.innerHTML=roster.map(function(s){
     var nc=nextClass(s.cls), oc=outcome[s.id];
     var ncTxt = oc==='passout' ? '<span class="text-info fw-bold">Graduate</span>'
-              : oc==='retain'  ? '<span class="text-muted">Stays in '+esc(s.cls)+'</span>'
-              : (nc? '<span class="fw-bold">'+esc(nc)+'</span>' : '<span class="text-muted">—</span>');
+              : oc==='retain'  ? '<span class="text-muted">Stays in '+EC.esc(s.cls)+'</span>'
+              : (nc? '<span class="fw-bold">'+EC.esc(nc)+'</span>' : '<span class="text-muted">—</span>');
     return '<tr class="'+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input pr-pick" data-id="'+s.id+'" checked></td>'
       +'<td><div class="d-flex align-items-center gap-2">'
       +   '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
-      +   '<div><div class="pr-nm">'+esc(s.name)+'</div><div class="pr-rl">'+esc(s.cls)+' – '+esc(s.sec)+'</div></div>'
+      +   '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
       +'</div></td>'
-      +'<td>'+esc(s.roll||'—')+'</td>'
+      +'<td>'+EC.esc(s.roll||'—')+'</td>'
       +'<td><span class="text-muted small" title="Exam results module not wired yet">—</span></td>'
       +'<td><span class="pr-due '+(s.due>0?'has':'clear')+'">'+inr(s.due)+'</span></td>'
       +'<td>'+ncTxt+'</td>'
@@ -359,12 +357,12 @@ function render(){
 
   mob.innerHTML=roster.map(function(s){
     var nc=nextClass(s.cls), oc=outcome[s.id];
-    var ncTxt = oc==='passout'?'Graduate':oc==='retain'?'Stays in '+esc(s.cls):(nc?esc(nc):'—');
+    var ncTxt = oc==='passout'?'Graduate':oc==='retain'?'Stays in '+EC.esc(s.cls):(nc?EC.esc(nc):'—');
     return '<div class="pr-mob-card '+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<div class="pr-mob-top">'
       +  '<input type="checkbox" class="form-check-input pr-pick mt-0" data-id="'+s.id+'" checked>'
       +  '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
-      +  '<div><div class="pr-nm">'+esc(s.name)+'</div><div class="pr-rl">'+esc(s.roll||'—')+' · '+esc(s.cls)+' – '+esc(s.sec)+'</div></div>'
+      +  '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.roll||'—')+' · '+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
       +'</div>'
       +'<div class="pr-mob-meta">'
       +  '<span class="text-muted small">Result —</span>'
@@ -426,7 +424,7 @@ document.querySelectorAll('.pr-bulk-btn[data-all]').forEach(function(b){
 document.getElementById('promoteFailed').addEventListener('click', function(){
   roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
   render();
-  toast('info','Outcomes set by result — students below '+PASS+'% retained.');
+  ecToast('info','Outcomes set by result — students below '+PASS+'% retained.');
 });
 
 /* ── Select all ──────────────────────────────── */
@@ -448,7 +446,7 @@ document.getElementById('resetBtn').addEventListener('click', function(){
   document.getElementById('rosterCard').style.display='none';
   document.getElementById('srcClass').value='';
   document.getElementById('srcSection').value='';
-  toast('info','Cleared. Select a class to start again.');
+  ecToast('info','Cleared. Select a class to start again.');
 });
 
 /* ── Review modal fill ───────────────────────── */
@@ -464,14 +462,14 @@ document.getElementById('reviewBtn').addEventListener('click', function(){
 /* ── Commit — the actual promote (write) step isn't wired yet ── */
 document.getElementById('commitBtn').addEventListener('click', function(){
   var sel=picked();
-  if(!sel.length){ toast('warning','No students selected.'); return; }
+  if(!sel.length){ ecToast('warning','No students selected.'); return; }
 
   var modalEl=document.getElementById('confirmModal');
   var inst=bootstrap.Modal.getInstance(modalEl); if(inst) inst.hide();
 
   // The selection is real; executing the promotion (moving students to the next
   // session, carrying dues) needs a dedicated stored procedure — not built yet.
-  toast('info', 'Selection ready for '+sel.length+' student'+(sel.length!==1?'s':'')+'. The promote step isn’t enabled yet.');
+  ecToast('info', 'Selection ready for '+sel.length+' student'+(sel.length!==1?'s':'')+'. The promote step isn’t enabled yet.');
 });
 
 })();

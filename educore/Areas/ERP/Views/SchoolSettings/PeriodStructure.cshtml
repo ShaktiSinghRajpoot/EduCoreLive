@@ -161,8 +161,6 @@ var PERIODS=(seed||[]).map(function(p){
 });
 function rows(){ return PERIODS; }
 
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
-function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function toMin(t){ if(!t) return 0; var p=t.split(':'); return parseInt(p[0],10)*60+parseInt(p[1],10); }
 function dur(r){ return toMin(r.end)-toMin(r.start); }
 function fmt12(t){ if(!t) return '—'; var p=t.split(':'),h=parseInt(p[0],10),m=p[1]; var ap=h>=12?'PM':'AM'; var hh=h%12||12; return hh+':'+m+' '+ap; }
@@ -193,7 +191,7 @@ function renderGlance(){
   g.innerHTML=list.map(function(r){
     var w=Math.max(dur(r),0)/total*100;
     var cls=r.type==='class'?'ps-g-class':(r.type==='lunch'?'ps-g-lunch':'ps-g-break');
-    return '<div class="ps-g-seg '+cls+'" style="flex:'+w+' 1 0;" title="'+esc(r.name)+' · '+r.start+'–'+r.end+'">'+(w>5?esc(r.name):'')+'</div>';
+    return '<div class="ps-g-seg '+cls+'" style="flex:'+w+' 1 0;" title="'+EC.esc(r.name)+' · '+r.start+'–'+r.end+'">'+(w>5?EC.esc(r.name):'')+'</div>';
   }).join('');
   var hrs=Math.floor(total/60), mins=total%60;
   document.getElementById('totalDur').textContent='Total day: '+(hrs?hrs+'h ':'')+(mins?mins+'m':'');
@@ -208,7 +206,7 @@ function render(){
       +'<div class="ps-line"><span class="ps-dot"></span></div>'
       +'<div class="ps-block">'
       +  '<div class="ps-blk-ic"><i class="bx '+typeIcon(r.type)+'"></i></div>'
-      +  '<div class="ps-blk-info"><div class="ps-blk-name">'+esc(r.name)+'</div>'
+      +  '<div class="ps-blk-info"><div class="ps-blk-name">'+EC.esc(r.name)+'</div>'
       +     '<div class="ps-blk-meta">'+fmt12(r.start)+' – '+fmt12(r.end)+'</div></div>'
       +  '<span class="ps-dur">'+(d>0?d+' min':'—')+'</span>'
       +  '<span class="ps-type '+r.type+'">'+typeLabel(r.type)+'</span>'
@@ -249,9 +247,11 @@ function move(i,dir){
 function del(id){
   var list=rows(), r=list.find(function(x){return x.id===id;});
   if(!r) return;
-  if(!confirm('Remove "'+r.name+'" from the schedule?')) return;
-  PERIODS=list.filter(function(x){return x.id!==id;});
-  render(); toast('info','Period removed. Click Save Schedule to keep the change.');
+  EC.confirm({ title:'Remove from schedule?', name:r.name, okText:'Remove' }).then(function(ok){
+    if(!ok) return;
+    PERIODS=list.filter(function(x){return x.id!==id;});
+    render(); ecToast('info','Period removed. Click Save Schedule to keep the change.');
+  });
 }
 
 /* ---- modal ---- */
@@ -272,8 +272,8 @@ document.getElementById('pmSave').addEventListener('click',function(){
   var name=document.getElementById('mName').value.trim();
   var start=document.getElementById('mStart').value, end=document.getElementById('mEnd').value;
   var type=document.getElementById('mType').value;
-  if(!name){ toast('error','Enter a label.'); return; }
-  if(!start||!end){ toast('error','Enter start and end time.'); return; }
+  if(!name){ ecToast('error','Enter a label.'); return; }
+  if(!start||!end){ ecToast('error','Enter start and end time.'); return; }
   if(toMin(end)<=toMin(start)){
     document.getElementById('mWarnTxt').textContent='End time must be after start time.';
     document.getElementById('mWarn').classList.remove('d-none'); return;
@@ -281,10 +281,10 @@ document.getElementById('pmSave').addEventListener('click',function(){
   if(editId){
     var r=rows().find(function(x){return x.id===editId;});
     r.name=name; r.start=start; r.end=end; r.type=type;
-    toast('success','Period updated.');
+    ecToast('success','Period updated.');
   } else {
     rows().push({id:++nextId,name:name,start:start,end:end,type:type});
-    toast('success','Period added.');
+    ecToast('success','Period added.');
   }
   /* keep chronological order */
   rows().sort(function(a,b){return toMin(a.start)-toMin(b.start);});
@@ -294,7 +294,7 @@ document.getElementById('pmSave').addEventListener('click',function(){
 
 /* ---- save the whole schedule (replace-all) ---- */
 document.getElementById('btnSave').addEventListener('click',function(){
-  if(findIssue()){ toast('error','Fix the highlighted timing issue before saving.'); return; }
+  if(findIssue()){ ecToast('error','Fix the highlighted timing issue before saving.'); return; }
   var token=document.querySelector('input[name="__RequestVerificationToken"]');
   var payload={ periods: rows().map(function(r){ return {name:r.name,start:r.start,end:r.end,type:r.type}; }) };
   $.ajax({
@@ -305,10 +305,10 @@ document.getElementById('btnSave').addEventListener('click',function(){
     data:        JSON.stringify(payload)
   })
   .done(function(res){
-    if(res && res.success) toast('success', res.message || 'Schedule saved.');
-    else toast('error', (res && res.message) || 'Save failed.');
+    if(res && res.success) ecToast('success', res.message || 'Schedule saved.');
+    else ecToast('error', (res && res.message) || 'Save failed.');
   })
-  .fail(function(){ toast('error','Save failed. Check your connection.'); });
+  .fail(function(){ ecToast('error','Save failed. Check your connection.'); });
 });
 
 /* init */

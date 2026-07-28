@@ -50,9 +50,9 @@
       @* Collected is money IN; refunds are money OUT. NET is what the school
          actually kept for the range — the figure that must tie to the books. *@
       <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Collected</div><div class="v" id="rTotal">₹0</div></div></div>
-        <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Refunded</div><div class="v" id="rRefund" style="color:var(--dng)">₹0</div></div></div>
-        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Net collection</div><div class="v" id="rNet">₹0</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Collected</div><div class="v" id="rTotal">₹0.00</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Refunded</div><div class="v" id="rRefund" style="color:var(--dng)">₹0.00</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Net collection</div><div class="v" id="rNet">₹0.00</div></div></div>
         <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Receipts</div><div class="v" id="rCount">0</div></div></div>
         <div class="col-12"><div class="sumcard"><div class="l">By mode</div><div class="mt-1" id="rModes">—</div></div></div>
       </div>
@@ -110,7 +110,7 @@
       </div>
 
       <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Total outstanding</div><div class="v" id="dTotal">₹0</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Total outstanding</div><div class="v" id="dTotal">₹0.00</div></div></div>
         <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Defaulters</div><div class="v" id="dCount">0</div></div></div>
       </div>
 
@@ -138,7 +138,7 @@
       </div>
 
       <div class="row g-2 mb-3">
-        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Concession given</div><div class="v" id="aConcTotal">₹0</div></div></div>
+        <div class="col-6 col-md-3"><div class="sumcard tot"><div class="l">Concession given</div><div class="v" id="aConcTotal">₹0.00</div></div></div>
         <div class="col-6 col-md-3"><div class="sumcard"><div class="l">Receipts cancelled</div><div class="v" id="aCancCount">0</div></div></div>
       </div>
 
@@ -167,9 +167,6 @@
 <script>
 $(function () {
     'use strict';
-    function money(n){ return '₹' + Math.round(Number(n||0)).toLocaleString('en-IN'); }
-    function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-    function notify(t,m){ if (typeof toastr!=='undefined') toastr[t](m); }
     function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
     function monthStart(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'; }
     function csv(rows, name){
@@ -190,40 +187,40 @@ $(function () {
     function loadReg(){
         $.getJSON(URL.reg,{from:$('#rFrom').val(),to:$('#rTo').val()}).done(function(d){
             regData=d;
-            $('#rTotal').text(money(d.total)); $('#rCount').text((d.receipts||[]).length);
-            $('#rRefund').text(money(d.refundTotal)); $('#rNet').text(money(d.net));
+            $('#rTotal').text(EC.money(d.total)); $('#rCount').text((d.receipts||[]).length);
+            $('#rRefund').text(EC.money(d.refundTotal)); $('#rNet').text(EC.money(d.net));
 
             // Refunds panel: only shown when there is money out in this range.
             var refunds = d.refunds||[];
             $('#rRefundWrap').toggleClass('d-none', refunds.length===0);
             $('#rRefundRows').html(refunds.map(function(r){
-                return '<tr><td class="text-muted">'+esc(r.date||'—')+'</td>'
-                     + '<td class="fw-semibold">'+esc(r.refundNo)+'</td>'
-                     + '<td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td>'
-                     + '<td>'+esc(r.cls)+'</td>'
-                     + '<td class="text-muted" style="font-size:.78rem">'+esc(r.against)+'</td>'
-                     + '<td>'+esc(r.mode)+'</td>'
-                     + '<td class="text-muted" style="font-size:.78rem">'+esc(r.reason||'—')+'</td>'
-                     + '<td class="text-muted" style="font-size:.78rem">'+esc(r.authorised||'—')+'</td>'
-                     + '<td class="num fw-bold" style="color:var(--dng)">-'+money(r.amount)+'</td></tr>';
+                return '<tr><td class="text-muted">'+EC.esc(r.date||'—')+'</td>'
+                     + '<td class="fw-semibold">'+EC.esc(r.refundNo)+'</td>'
+                     + '<td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td>'
+                     + '<td>'+EC.esc(r.cls)+'</td>'
+                     + '<td class="text-muted" style="font-size:.78rem">'+EC.esc(r.against)+'</td>'
+                     + '<td>'+EC.esc(r.mode)+'</td>'
+                     + '<td class="text-muted" style="font-size:.78rem">'+EC.esc(r.reason||'—')+'</td>'
+                     + '<td class="text-muted" style="font-size:.78rem">'+EC.esc(r.authorised||'—')+'</td>'
+                     + '<td class="num fw-bold" style="color:var(--dng)">-'+EC.money(r.amount)+'</td></tr>';
             }).join(''));
-            $('#rModes').html((d.modes||[]).length? d.modes.map(function(m){ return '<span class="chip">'+esc(m.mode)+' <b>'+money(m.amount)+'</b></span>'; }).join('') : '<span class="text-muted">—</span>');
-            $('#rHeads').html((d.heads||[]).length? d.heads.map(function(h){ return '<tr><td>'+esc(h.head)+'</td><td class="num">'+money(h.amount)+'</td></tr>'; }).join('') : '<tr><td colspan="2" class="text-muted text-center py-3">—</td></tr>');
+            $('#rModes').html((d.modes||[]).length? d.modes.map(function(m){ return '<span class="chip">'+EC.esc(m.mode)+' <b>'+EC.money(m.amount)+'</b></span>'; }).join('') : '<span class="text-muted">—</span>');
+            $('#rHeads').html((d.heads||[]).length? d.heads.map(function(h){ return '<tr><td>'+EC.esc(h.head)+'</td><td class="num">'+EC.money(h.amount)+'</td></tr>'; }).join('') : '<tr><td colspan="2" class="text-muted text-center py-3">—</td></tr>');
             $('#rRows').html((d.receipts||[]).length? d.receipts.map(function(r){
                 var typeCls = r.type === 'Registration' ? 'bg-label-warning' : 'bg-label-info';
-                return '<tr><td class="text-muted">'+esc(r.date||'—')+'</td>'
-                     + '<td class="fw-semibold">'+esc(r.receiptNo)
-                     + (r.reference ? '<div class="text-muted" style="font-size:.72rem">Ref '+esc(r.reference)+'</div>' : '')+'</td>'
-                     + '<td><span class="badge '+typeCls+'">'+esc(r.type||'Fee')+'</span></td>'
-                     + '<td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td>'
-                     + '<td>'+esc(r.cls)+'</td>'
-                     + '<td class="text-muted" style="font-size:.78rem">'+esc(r.heads||'—')+'</td>'
-                     + '<td>'+esc(r.mode)+'</td>'
-                     + '<td class="num">'+(Number(r.discount)>0 ? money(r.discount) : '—')+'</td>'
-                     + '<td class="num fw-bold">'+money(r.amount)+'</td>'
-                     + '<td class="text-end"><button class="btn btn-sm btn-icon btn-outline-secondary rc-print" data-rcp="'+esc(r.receiptNo)+'" title="View / print receipt"><i class="bx bx-printer"></i></button></td></tr>';
+                return '<tr><td class="text-muted">'+EC.esc(r.date||'—')+'</td>'
+                     + '<td class="fw-semibold">'+EC.esc(r.receiptNo)
+                     + (r.reference ? '<div class="text-muted" style="font-size:.72rem">Ref '+EC.esc(r.reference)+'</div>' : '')+'</td>'
+                     + '<td><span class="badge '+typeCls+'">'+EC.esc(r.type||'Fee')+'</span></td>'
+                     + '<td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td>'
+                     + '<td>'+EC.esc(r.cls)+'</td>'
+                     + '<td class="text-muted" style="font-size:.78rem">'+EC.esc(r.heads||'—')+'</td>'
+                     + '<td>'+EC.esc(r.mode)+'</td>'
+                     + '<td class="num">'+(Number(r.discount)>0 ? EC.money(r.discount) : '—')+'</td>'
+                     + '<td class="num fw-bold">'+EC.money(r.amount)+'</td>'
+                     + '<td class="text-end"><button class="btn btn-sm btn-icon btn-outline-secondary rc-print" data-rcp="'+EC.esc(r.receiptNo)+'" title="View / print receipt"><i class="bx bx-printer"></i></button></td></tr>';
             }).join('') : '<tr><td colspan="10" class="text-muted text-center py-4">No receipts in this range.</td></tr>');
-        }).fail(function(){ notify('error','Could not load the register.'); });
+        }).fail(function(){ ecToast('error','Could not load the register.'); });
     }
     // Receipts are printed FROM the list (they are no longer forced open after payment).
     $('#rRows').on('click', '.rc-print', function () {
@@ -245,18 +242,18 @@ $(function () {
 
     // ── defaulters ──
     var defData=[];
-    $.getJSON(URL.classes).done(function(c){ var h='<option value="">All classes</option>'; (c||[]).forEach(function(x){ h+='<option>'+esc(x)+'</option>'; }); $('#dClass').html(h); });
+    $.getJSON(URL.classes).done(function(c){ var h='<option value="">All classes</option>'; (c||[]).forEach(function(x){ h+='<option>'+EC.esc(x)+'</option>'; }); $('#dClass').html(h); });
     function loadDef(){
         $.getJSON(URL.def,{className:$('#dClass').val(),section:$('#dSection').val()}).done(function(rows){
             defData=rows||[];
             var tot=defData.reduce(function(t,r){ return t+Number(r.outstanding||0); },0);
-            $('#dTotal').text(money(tot)); $('#dCount').text(defData.length);
+            $('#dTotal').text(EC.money(tot)); $('#dCount').text(defData.length);
             $('#dRows').html(defData.length? defData.map(function(r){
-                return '<tr><td class="fw-semibold">'+esc(r.student)+(r.roll?'<div class="text-muted" style="font-size:.72rem">Roll '+esc(r.roll)+'</div>':'')+'</td><td>'+esc(r.admNo)+'</td><td>'+esc(r.cls)+'</td>'+
-                       '<td class="num age0">'+money(r.notDue)+'</td><td class="num age1">'+money(r.d0_30)+'</td><td class="num age2">'+money(r.d31_60)+'</td><td class="num age3">'+money(r.d60plus)+'</td>'+
-                       '<td class="num fw-bold">'+money(r.outstanding)+'</td></tr>';
+                return '<tr><td class="fw-semibold">'+EC.esc(r.student)+(r.roll?'<div class="text-muted" style="font-size:.72rem">Roll '+EC.esc(r.roll)+'</div>':'')+'</td><td>'+EC.esc(r.admNo)+'</td><td>'+EC.esc(r.cls)+'</td>'+
+                       '<td class="num age0">'+EC.money(r.notDue)+'</td><td class="num age1">'+EC.money(r.d0_30)+'</td><td class="num age2">'+EC.money(r.d31_60)+'</td><td class="num age3">'+EC.money(r.d60plus)+'</td>'+
+                       '<td class="num fw-bold">'+EC.money(r.outstanding)+'</td></tr>';
             }).join('') : '<tr><td colspan="8" class="text-muted text-center py-4">No outstanding dues. 🎉</td></tr>');
-        }).fail(function(){ notify('error','Could not load defaulters.'); });
+        }).fail(function(){ ecToast('error','Could not load defaulters.'); });
     }
     $('#dLoad').on('click', loadDef);
     $('#dPrint').on('click', function(){ window.print(); });
@@ -271,20 +268,19 @@ $(function () {
     function loadAudit(){
         $.getJSON(URL.audit,{from:$('#aFrom').val(),to:$('#aTo').val()}).done(function(d){
             var conc=d.concessions||[], canc=d.cancels||[];
-            $('#aConcTotal').text(money(conc.reduce(function(t,r){return t+Number(r.amount||0);},0)));
+            $('#aConcTotal').text(EC.money(conc.reduce(function(t,r){return t+Number(r.amount||0);},0)));
             $('#aCancCount').text(canc.length);
             $('#aConcRows').html(conc.length? conc.map(function(r){
-                return '<tr><td class="text-muted">'+esc(r.date||'—')+'</td><td class="fw-semibold">'+esc(r.receiptNo)+'</td><td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td><td>'+esc(r.kind||'—')+'</td><td>'+esc(r.reason||'—')+'</td><td class="num fw-bold" style="color:var(--info)">'+money(r.amount)+'</td></tr>';
+                return '<tr><td class="text-muted">'+EC.esc(r.date||'—')+'</td><td class="fw-semibold">'+EC.esc(r.receiptNo)+'</td><td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td><td>'+EC.esc(r.kind||'—')+'</td><td>'+EC.esc(r.reason||'—')+'</td><td class="num fw-bold" style="color:var(--info)">'+EC.money(r.amount)+'</td></tr>';
             }).join('') : '<tr><td colspan="6" class="text-muted text-center py-4">No concessions in this range.</td></tr>');
             $('#aCancRows').html(canc.length? canc.map(function(r){
-                return '<tr><td class="text-muted">'+esc(r.cancelledAt||r.date||'—')+'</td><td class="fw-semibold">'+esc(r.receiptNo)+'</td><td>'+esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+esc(r.admNo)+'</div></td><td>'+esc(r.reason||'—')+'</td><td>'+esc(r.authorisedBy||'—')+'</td><td class="num fw-bold" style="color:var(--dng)">'+money(r.amount)+'</td></tr>';
+                return '<tr><td class="text-muted">'+EC.esc(r.cancelledAt||r.date||'—')+'</td><td class="fw-semibold">'+EC.esc(r.receiptNo)+'</td><td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td><td>'+EC.esc(r.reason||'—')+'</td><td>'+EC.esc(r.authorisedBy||'—')+'</td><td class="num fw-bold" style="color:var(--dng)">'+EC.money(r.amount)+'</td></tr>';
             }).join('') : '<tr><td colspan="6" class="text-muted text-center py-4">No cancellations in this range.</td></tr>');
-        }).fail(function(){ notify('error','Could not load the register.'); });
+        }).fail(function(){ ecToast('error','Could not load the register.'); });
     }
     $('#aLoad').on('click', loadAudit);
     $('#aPrint').on('click', function(){ window.print(); });
 
-    if (typeof toastr !== 'undefined') toastr.options = { closeButton:true, progressBar:true, positionClass:'toast-top-right', timeOut:3000 };
     loadReg(); loadAudit();
 });
 </script>

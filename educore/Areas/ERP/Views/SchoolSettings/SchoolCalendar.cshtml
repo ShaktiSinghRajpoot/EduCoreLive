@@ -200,8 +200,6 @@ var year=today.getFullYear(), month=today.getMonth();
 var WEEKLY=[0], ENTRIES={}, editDate=null;
 
 function el(id){ return document.getElementById(id); }
-function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 function two(n){ return (n<10?'0':'')+n; }
 /* Build date keys from parts — never via Date.toISOString, which shifts by timezone. */
 function key(y,m,d){ return y+'-'+two(m+1)+'-'+two(d); }
@@ -225,7 +223,7 @@ function load(){
       ((res && res.entries)||[]).forEach(function(e){ ENTRIES[e.date]=e; });
       renderAll();
     })
-    .fail(function(){ toast('error','Could not load the calendar.'); });
+    .fail(function(){ ecToast('error','Could not load the calendar.'); });
 }
 
 function renderAll(){ renderDow(); renderCards(); renderMonth(); renderList(); }
@@ -251,10 +249,10 @@ function renderDow(){
 el('btnSaveWeekly').addEventListener('click',function(){
   post(WEEKLY_URL,{days:WEEKLY.slice().sort()})
     .done(function(res){
-      if(res && res.success){ toast('success',res.message||'Weekly offs saved.'); load(); }
-      else toast('error',(res&&res.message)||'Save failed.');
+      if(res && res.success){ ecToast('success',res.message||'Weekly offs saved.'); load(); }
+      else ecToast('error',(res&&res.message)||'Save failed.');
     })
-    .fail(function(){ toast('error','Save failed. Check your connection.'); });
+    .fail(function(){ ecToast('error','Save failed. Check your connection.'); });
 });
 
 /* ---------------- summary ---------------- */
@@ -283,7 +281,7 @@ function renderMonth(){
     var cls='sc-cell', badge='';
     if(e){
       cls+=' t-'+e.dayType;
-      badge='<span class="sc-cell-tag">'+esc(e.dayType==='half_day' ? fmt12(e.halfDayEnd) : e.title)+'</span>';
+      badge='<span class="sc-cell-tag">'+EC.esc(e.dayType==='half_day' ? fmt12(e.halfDayEnd) : e.title)+'</span>';
     } else if(WEEKLY.indexOf(dow)>=0){
       cls+=' t-weekly';
       badge='<span class="sc-cell-tag">Weekly off</span>';
@@ -329,7 +327,7 @@ function renderList(){
     return '<div class="sc-row t-'+e.dayType+'">'
       +'<div class="sc-row-date"><strong>'+o.d+'</strong><small>'+MONTHS[o.m].slice(0,3)+'</small></div>'
       +'<div class="sc-row-info">'
-      +  '<div class="sc-row-name">'+esc(e.title)+'</div>'
+      +  '<div class="sc-row-name">'+EC.esc(e.title)+'</div>'
       +  '<div class="sc-row-meta">'+typeLabel(e.dayType)
       +    (e.dayType==='half_day' ? ' · closes '+fmt12(e.halfDayEnd) : '')+'</div>'
       +'</div>'
@@ -346,10 +344,10 @@ function del(id){
   if(!id) return;
   post(DELETE_URL,{id:id})
     .done(function(res){
-      if(res && res.success){ toast('info',res.message||'Entry removed.'); load(); }
-      else toast('error',(res&&res.message)||'Could not remove the entry.');
+      if(res && res.success){ ecToast('info',res.message||'Entry removed.'); load(); }
+      else ecToast('error',(res&&res.message)||'Could not remove the entry.');
     })
-    .fail(function(){ toast('error','Could not remove the entry.'); });
+    .fail(function(){ ecToast('error','Could not remove the entry.'); });
 }
 
 /* ---------------- modal ---------------- */
@@ -372,17 +370,17 @@ function openModal(k){
 
 el('dmSave').addEventListener('click',function(){
   var type=el('dmType').value, name=el('dmName').value.trim(), end=el('dmEnd').value;
-  if(type==='half_day' && !end){ toast('error','Set the closing time for a half day.'); return; }
+  if(type==='half_day' && !end){ ecToast('error','Set the closing time for a half day.'); return; }
 
   post(SAVE_URL,{ date:editDate, dayType:type, title:name, halfDayEnd:(type==='half_day'?end:null) })
     .done(function(res){
       if(res && res.success){
         bootstrap.Modal.getInstance(el('dayModal')).hide();
-        toast('success',res.message||'Calendar updated.');
+        ecToast('success',res.message||'Calendar updated.');
         load();
-      } else toast('error',(res&&res.message)||'Save failed.');
+      } else ecToast('error',(res&&res.message)||'Save failed.');
     })
-    .fail(function(){ toast('error','Save failed. Check your connection.'); });
+    .fail(function(){ ecToast('error','Save failed. Check your connection.'); });
 });
 
 el('dmClear').addEventListener('click',function(){

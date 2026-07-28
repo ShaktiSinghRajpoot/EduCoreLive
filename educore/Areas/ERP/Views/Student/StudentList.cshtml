@@ -410,7 +410,6 @@ var EXPORT_URL='@Url.Action("GetStudentsData","Admission",new{area="ERP"})';
 var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function fmtDate(d){if(!d)return'';var x=new Date(d);if(isNaN(x))return d;return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]+' '+x.getFullYear();}
 function val(n){var el=document.querySelector('[name="'+n+'"]');return el?el.value:'';}
-function toast(t,m){if(typeof toastr!=='undefined')toastr[t](m);}
 
 document.getElementById('btnExcel').addEventListener('click',function(){
   var qs='?pageSize=10000&page=1'
@@ -432,13 +431,12 @@ document.getElementById('btnExcel').addEventListener('click',function(){
       a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
       a.download='students_'+new Date().toISOString().slice(0,10)+'.csv';
       a.click();
-      toast('success',body.length+' students exported.');
+      ecToast('success',body.length+' students exported.');
     })
-    .fail(function(){toast('error','Export failed.');});
+    .fail(function(){ecToast('error','Export failed.');});
 });
 document.getElementById('btnPdf').addEventListener('click',function(){window.print();});
 
-if(typeof toastr!=='undefined')toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3000};
 })();
 </script>
 
@@ -455,7 +453,9 @@ if(typeof toastr!=='undefined')toastr.options={closeButton:true,progressBar:true
         });
 
         $('#exitConfirm').on('click', function () {
-            var $btn = $(this).prop('disabled', true);
+            // Not reset on success — the page reloads.
+            var $btn = $(this);
+            EC.buttonBusy($btn, 'Saving…');
             $.ajax({
                 url: '@Url.Action("Exit", "Student", new { area = "ERP" })',
                 type: 'POST',
@@ -470,20 +470,20 @@ if(typeof toastr!=='undefined')toastr.options={closeButton:true,progressBar:true
             })
             .done(function (res) {
                 if (res && res.success) {
-                    toastr.success(res.message);
+                    ecToast('success', res.message);
                     // Dues do not block the exit, but the office needs to know.
                     if (res.outstanding > 0) {
-                        toastr.warning('Outstanding dues of ' + Number(res.outstanding).toFixed(2) + ' remain.');
+                        ecToast('warning', 'Outstanding dues of ' + Number(res.outstanding).toFixed(2) + ' remain.');
                     }
                     setTimeout(function () { location.reload(); }, 1200);
                 } else {
-                    toastr.error((res && res.message) || 'Could not mark as left.');
-                    $btn.prop('disabled', false);
+                    ecToast('error', (res && res.message) || 'Could not mark as left.');
+                    EC.buttonReset($btn);
                 }
             })
             .fail(function () {
-                toastr.error('Something went wrong.');
-                $btn.prop('disabled', false);
+                ecToast('error', 'Something went wrong.');
+                EC.buttonReset($btn);
             });
         });
 
@@ -508,14 +508,16 @@ if(typeof toastr!=='undefined')toastr.options={closeButton:true,progressBar:true
 
         $('#photoUpload').on('click', function () {
             var files = $('#photoFile')[0].files;
-            if (!files || !files.length) { toastr.error('Choose an image.'); return; }
+            if (!files || !files.length) { ecToast('error', 'Choose an image.'); return; }
 
             var fd = new FormData();
             fd.append('id', photoId);
             fd.append('photo', files[0]);
             fd.append('__RequestVerificationToken', $('input[name="__RequestVerificationToken"]').first().val());
 
-            var $btn = $(this).prop('disabled', true);
+            // Not reset on success — the page reloads.
+            var $btn = $(this);
+            EC.buttonBusy($btn, 'Uploading…');
             $.ajax({
                 url: '@Url.Action("UploadPhoto", "Student", new { area = "ERP" })',
                 type: 'POST',
@@ -525,14 +527,14 @@ if(typeof toastr!=='undefined')toastr.options={closeButton:true,progressBar:true
             })
             .done(function (res) {
                 if (res && res.success) {
-                    toastr.success(res.message || 'Photo updated.');
+                    ecToast('success', res.message || 'Photo updated.');
                     setTimeout(function () { location.reload(); }, 800);
                 } else {
-                    toastr.error((res && res.message) || 'Could not upload.');
-                    $btn.prop('disabled', false);
+                    ecToast('error', (res && res.message) || 'Could not upload.');
+                    EC.buttonReset($btn);
                 }
             })
-            .fail(function () { toastr.error('Something went wrong.'); $btn.prop('disabled', false); });
+            .fail(function () { ecToast('error', 'Something went wrong.'); EC.buttonReset($btn); });
         });
     });
 </script>

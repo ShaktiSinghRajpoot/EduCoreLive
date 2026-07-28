@@ -140,8 +140,6 @@ var TT={}, BUSY={}, TEACH={};
 var view='class', curSection=0, curTeacher=0, curDay=0, ctx=null;
 function PERIODS(){ return PERIOD_LIST; }
 
-function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 function teacherName(id){ var t=TEACHERS.find(function(x){return x.id===id;}); return t?t.name:''; }
 function sectionLabel(id){ var s=SECTIONS.find(function(x){return x.id===id;}); return s?s.label:''; }
 function dotClass(id){ return 's'+(((Math.abs(id)-1)%8)+1); }   /* reuse the 8-colour palette */
@@ -173,14 +171,14 @@ function loadSetup(){
 
       fillSelectors();
 
-      if(!PERIOD_LIST.length){ toast('info','Set the daily periods in Period Structure first.'); render(); return; }
-      if(!SECTIONS.length){ toast('info','Add classes & sections first.'); render(); return; }
+      if(!PERIOD_LIST.length){ ecToast('info','Set the daily periods in Period Structure first.'); render(); return; }
+      if(!SECTIONS.length){ ecToast('info','Add classes & sections first.'); render(); return; }
 
       curSection=SECTIONS[0].id;
       curTeacher=TEACHERS.length?TEACHERS[0].id:0;
       loadGrid();
     })
-    .fail(function(){ toast('error','Could not load the timetable.'); });
+    .fail(function(){ ecToast('error','Could not load the timetable.'); });
 }
 
 function loadGrid(){
@@ -200,7 +198,7 @@ function loadGrid(){
       fillSubjectSelect();
       render();
     })
-    .fail(function(){ toast('error','Could not load this class\'s timetable.'); });
+    .fail(function(){ ecToast('error','Could not load this class\'s timetable.'); });
 }
 
 function loadTeacherGrid(){
@@ -216,7 +214,7 @@ function loadTeacherGrid(){
       });
       render();
     })
-    .fail(function(){ toast('error','Could not load the teacher schedule.'); });
+    .fail(function(){ ecToast('error','Could not load the teacher schedule.'); });
 }
 
 /* selectors */
@@ -283,10 +281,10 @@ function renderGrid(){
   var body='<tbody>';
   PERIODS().forEach(function(p){
     if(p.type!=='class'){          /* break and lunch are not bookable */
-      body+='<tr class="tt-break"><td class="tt-pcell"><div class="tt-pname">'+esc(p.name)+'</div><div class="tt-ptime">'+p.time+'</div></td><td colspan="'+DAYS.length+'">'+esc(p.name)+' · '+p.time+'</td></tr>';
+      body+='<tr class="tt-break"><td class="tt-pcell"><div class="tt-pname">'+EC.esc(p.name)+'</div><div class="tt-ptime">'+p.time+'</div></td><td colspan="'+DAYS.length+'">'+EC.esc(p.name)+' · '+p.time+'</td></tr>';
       return;
     }
-    body+='<tr><td><div class="tt-pcell"><div class="tt-pname">'+esc(p.name)+'</div><div class="tt-ptime">'+p.time+'</div></div></td>';
+    body+='<tr><td><div class="tt-pcell"><div class="tt-pname">'+EC.esc(p.name)+'</div><div class="tt-ptime">'+p.time+'</div></div></td>';
     DAYS.forEach(function(d,di){ body+='<td>'+cellHtml(di,p.id,false)+'</td>'; });
     body+='</tr>';
   });
@@ -298,8 +296,8 @@ function renderMob(){
   var box=document.getElementById('mobList');
   document.querySelectorAll('.tt-day').forEach(function(b){ b.classList.toggle('on', parseInt(b.dataset.d,10)===curDay); });
   box.innerHTML=PERIODS().map(function(p){
-    if(p.type!=='class') return '<div class="tt-mbreak">'+esc(p.name)+' · '+p.time+'</div>';
-    return '<div class="tt-mrow"><div class="tt-mp"><div class="tt-mp-name">'+esc(p.name)+'</div><div class="tt-mp-time">'+p.time+'</div></div>'+cellHtml(curDay,p.id,true)+'</div>';
+    if(p.type!=='class') return '<div class="tt-mbreak">'+EC.esc(p.name)+' · '+p.time+'</div>';
+    return '<div class="tt-mrow"><div class="tt-mp"><div class="tt-mp-name">'+EC.esc(p.name)+'</div><div class="tt-mp-time">'+p.time+'</div></div>'+cellHtml(curDay,p.id,true)+'</div>';
   }).join('');
 }
 
@@ -310,14 +308,14 @@ function cellHtml(dayIdx,periodId,mob){
     if(!e){ return '<'+(mob?'div':'button')+' class="'+base+' empty js-cell" data-d="'+dayIdx+'" data-p="'+periodId+'"><i class="bx bx-plus"></i>'+(mob?'Add':'')+'</'+(mob?'div':'button')+'>'; }
     var c=clashSection(dayIdx,periodId,e.teacherId);
     return '<'+(mob?'div':'button')+' class="'+base+' js-cell'+(c?' clash':'')+'" data-d="'+dayIdx+'" data-p="'+periodId+'">'
-      +'<div class="tt-subj"><span class="dot '+dotClass(e.subjectId)+'"></span>'+esc(e.subjectName)+(c?' <i class="bx bx-error tt-clash-ic" title="Clash with '+esc(c.label)+'"></i>':'')+'</div>'
-      +'<div class="tt-teacher">'+esc(e.teacherName||'Unassigned')+'</div>'
-      +'<div class="tt-room">Room '+esc(e.room||'—')+'</div></'+(mob?'div':'button')+'>';
+      +'<div class="tt-subj"><span class="dot '+dotClass(e.subjectId)+'"></span>'+EC.esc(e.subjectName)+(c?' <i class="bx bx-error tt-clash-ic" title="Clash with '+EC.esc(c.label)+'"></i>':'')+'</div>'
+      +'<div class="tt-teacher">'+EC.esc(e.teacherName||'Unassigned')+'</div>'
+      +'<div class="tt-room">Room '+EC.esc(e.room||'—')+'</div></'+(mob?'div':'button')+'>';
   } else {
     var e2=TEACH[dayIdx+'_'+periodId];
     if(e2){
-      return '<div class="'+base+' ro"><div class="tt-subj"><span class="dot '+dotClass(e2.subjectId)+'"></span>'+esc(e2.subjectName)+'</div>'
-        +'<div class="tt-teacher">'+esc(e2.sectionLabel)+'</div><div class="tt-room">Room '+esc(e2.room||'—')+'</div></div>';
+      return '<div class="'+base+' ro"><div class="tt-subj"><span class="dot '+dotClass(e2.subjectId)+'"></span>'+EC.esc(e2.subjectName)+'</div>'
+        +'<div class="tt-teacher">'+EC.esc(e2.sectionLabel)+'</div><div class="tt-room">Room '+EC.esc(e2.room||'—')+'</div></div>';
     }
     return '<div class="'+base+' ro empty"><span style="font-size:.7rem;font-weight:700;">Free</span></div>';
   }
@@ -338,7 +336,7 @@ function bindCells(){
 
 /* cell editor */
 function openCell(dayIdx,periodId){
-  if(!SUBJECTS.length){ toast('error','This class has no subjects yet — set them in Subject Management.'); return; }
+  if(!SUBJECTS.length){ ecToast('error','This class has no subjects yet — set them in Subject Management.'); return; }
   ctx={dayIdx:dayIdx,periodId:periodId};
   var e=TT[dayIdx+'_'+periodId]||{subjectId:0,teacherId:0,room:''};
   var p=PERIODS().find(function(x){return x.id===periodId;});
@@ -362,7 +360,7 @@ document.getElementById('mTeacher').addEventListener('change',checkModalClash);
 
 document.getElementById('cellSave').addEventListener('click',function(){
   var sid=parseInt(document.getElementById('mSubject').value,10), tid=parseInt(document.getElementById('mTeacher').value,10);
-  if(!sid){ toast('error','Pick a subject.'); return; }
+  if(!sid){ ecToast('error','Pick a subject.'); return; }
   var btn=this; btn.disabled=true;
 
   /* The proc has the final say on clashes — it rejects a double-booked teacher. */
@@ -371,11 +369,11 @@ document.getElementById('cellSave').addEventListener('click',function(){
     .done(function(res){
       if(res && res.success){
         bootstrap.Modal.getInstance(document.getElementById('cellModal')).hide();
-        toast('success',res.message||'Period updated.');
+        ecToast('success',res.message||'Period updated.');
         loadGrid();
-      } else toast('error',(res&&res.message)||'Could not save this period.');
+      } else ecToast('error',(res&&res.message)||'Could not save this period.');
     })
-    .fail(function(){ toast('error','Save failed. Check your connection.'); })
+    .fail(function(){ ecToast('error','Save failed. Check your connection.'); })
     .always(function(){ btn.disabled=false; });
 });
 
@@ -383,10 +381,10 @@ document.getElementById('cellClear').addEventListener('click',function(){
   post(CLEAR_URL,{ sectionId:curSection, day:DAY_VALUES[ctx.dayIdx], periodSeq:ctx.periodId })
     .done(function(res){
       bootstrap.Modal.getInstance(document.getElementById('cellModal')).hide();
-      if(res && res.success){ toast('info',res.message||'Period cleared.'); loadGrid(); }
-      else toast('error',(res&&res.message)||'Could not clear this period.');
+      if(res && res.success){ ecToast('info',res.message||'Period cleared.'); loadGrid(); }
+      else ecToast('error',(res&&res.message)||'Could not clear this period.');
     })
-    .fail(function(){ toast('error','Could not clear this period.'); });
+    .fail(function(){ ecToast('error','Could not clear this period.'); });
 });
 
 /* copy the first working day → whole week */
@@ -394,15 +392,19 @@ document.getElementById('btnCopy').addEventListener('click',function(){
   if(!DAYS.length) return;
   var classP=PERIODS().filter(function(p){return p.type==='class';});
   var srcCount=classP.filter(function(p){return TT['0_'+p.id];}).length;
-  if(!srcCount){ toast('error',DAYS[0]+' is empty — fill it first, then copy.'); return; }
-  if(!confirm('Copy '+DAYS[0]+'’s '+srcCount+' period(s) to the rest of the week for '+sectionLabel(curSection)+'? This overwrites those days.')) return;
-
-  post(COPY_URL,{ sectionId:curSection, day:DAY_VALUES[0] })
-    .done(function(res){
-      if(res && res.success){ toast('success',res.message||'Copied across the week.'); loadGrid(); }
-      else toast('error',(res&&res.message)||'Copy failed.');
-    })
-    .fail(function(){ toast('error','Copy failed. Check your connection.'); });
+  if(!srcCount){ ecToast('error',DAYS[0]+' is empty — fill it first, then copy.'); return; }
+  EC.confirm({ title:'Copy '+DAYS[0]+' across the week?',
+               name:sectionLabel(curSection),
+               message:'This overwrites the other days with '+DAYS[0]+'’s '+srcCount+' period(s).',
+               icon:'bx-copy', okText:'Copy & overwrite' }).then(function(ok){
+    if(!ok) return;
+    post(COPY_URL,{ sectionId:curSection, day:DAY_VALUES[0] })
+      .done(function(res){
+        if(res && res.success){ ecToast('success',res.message||'Copied across the week.'); loadGrid(); }
+        else ecToast('error',(res&&res.message)||'Copy failed.');
+      })
+      .fail(function(){ ecToast('error','Copy failed. Check your connection.'); });
+  });
 });
 
 /* toolbar */

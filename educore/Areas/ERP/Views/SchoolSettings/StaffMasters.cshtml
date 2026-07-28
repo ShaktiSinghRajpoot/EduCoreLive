@@ -147,7 +147,6 @@ $(function(){
   var CSRF = $('input[name="__RequestVerificationToken"]').val();
   var URL = { saveDept:'@Url.Action("SaveDepartment")', saveDesig:'@Url.Action("SaveDesignation")',
               del:'@Url.Action("DeleteMaster")', toggle:'@Url.Action("ToggleMaster")' };
-  function notify(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
   function postJson(url,data){ return $.ajax({url:url,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},data:JSON.stringify(data)}); }
   function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
   function reload(){ setTimeout(function(){ location.reload(); }, 600); }
@@ -174,11 +173,11 @@ $(function(){
     new bootstrap.Modal('#desigModal').show();
   });
   $('#saveDesigBtn').on('click', function(){
-    var name = $('#dgName').val().trim(); if(!name){ notify('warning','Enter a designation name.'); return; }
+    var name = $('#dgName').val().trim(); if(!name){ ecToast('warning','Enter a designation name.'); return; }
     var dept = $('#dgDept').val();
     postJson(URL.saveDesig, { designationId:Number($('#dgId').val())||0, name:name, staffType:deptToType(dept),
         defaultDepartment:dept||null })
-      .done(function(res){ notify(res.success?'success':'error', res.message); if(res.success) reload(); });
+      .done(function(res){ ecToast(res.success?'success':'error', res.message); if(res.success) reload(); });
   });
 
   // ── Department add / edit / save ──
@@ -192,23 +191,25 @@ $(function(){
     new bootstrap.Modal('#deptModal').show();
   });
   $('#saveDeptBtn').on('click', function(){
-    var name = $('#dpName').val().trim(); if(!name){ notify('warning','Enter a department name.'); return; }
+    var name = $('#dpName').val().trim(); if(!name){ ecToast('warning','Enter a department name.'); return; }
     postJson(URL.saveDept, { departmentId:Number($('#dpId').val())||0, name:name })
-      .done(function(res){ notify(res.success?'success':'error', res.message); if(res.success) reload(); });
+      .done(function(res){ ecToast(res.success?'success':'error', res.message); if(res.success) reload(); });
   });
 
   // ── Toggle active / delete (shared) ──
   $('.toggleM').on('click', function(){
     postForm(URL.toggle, { kind:$(this).data('kind'), id:$(this).data('id') })
-      .done(function(res){ notify(res.success?'success':'error', res.message); if(res.success) reload(); });
+      .done(function(res){ ecToast(res.success?'success':'error', res.message); if(res.success) reload(); });
   });
   $('.delM').on('click', function(){
-    var d = $(this); if(!confirm('Delete "'+d.data('name')+'"?')) return;
-    postForm(URL.del, { kind:d.data('kind'), id:d.data('id') })
-      .done(function(res){ notify(res.success?'success':'error', res.message); if(res.success) reload(); });
+    var d = $(this);
+    EC.confirm({ title:'Delete this ' + (d.data('kind')||'entry') + '?', name:d.data('name') }).then(function(ok){
+      if(!ok) return;
+      postForm(URL.del, { kind:d.data('kind'), id:d.data('id') })
+        .done(function(res){ ecToast(res.success?'success':'error', res.message); if(res.success) reload(); });
+    });
   });
 
-  if(typeof toastr!=='undefined') toastr.options={closeButton:true,progressBar:true,positionClass:'toast-top-right',timeOut:3500};
 });
 </script>
 }

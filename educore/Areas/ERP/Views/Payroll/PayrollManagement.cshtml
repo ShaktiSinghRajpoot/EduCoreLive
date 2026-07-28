@@ -24,8 +24,8 @@
     </div>
 
     <div class="pr-stats">
-      <div class="pr-stat k-net"><div class="pr-stat-ic"><i class="bx bx-wallet"></i></div><div class="pr-stat-val" id="kNet">₹0</div><div class="pr-stat-lbl">Net Payroll</div></div>
-      <div class="pr-stat k-ded"><div class="pr-stat-ic"><i class="bx bx-minus-circle"></i></div><div class="pr-stat-val" id="kDed">₹0</div><div class="pr-stat-lbl">Total Deductions</div></div>
+      <div class="pr-stat k-net"><div class="pr-stat-ic"><i class="bx bx-wallet"></i></div><div class="pr-stat-val" id="kNet">₹0.00</div><div class="pr-stat-lbl">Net Payroll</div></div>
+      <div class="pr-stat k-ded"><div class="pr-stat-ic"><i class="bx bx-minus-circle"></i></div><div class="pr-stat-val" id="kDed">₹0.00</div><div class="pr-stat-lbl">Total Deductions</div></div>
       <div class="pr-stat k-paid"><div class="pr-stat-ic"><i class="bx bx-check-circle"></i></div><div class="pr-stat-val" id="kPaid">0</div><div class="pr-stat-lbl">Payslips Paid</div></div>
       <div class="pr-stat k-pend"><div class="pr-stat-ic"><i class="bx bx-time-five"></i></div><div class="pr-stat-val" id="kPend">0</div><div class="pr-stat-lbl">Pending Payslips</div></div>
     </div>
@@ -108,7 +108,7 @@
 
       <div class="ps-net">
         <span class="l">Net Salary Payable</span>
-        <span class="v" id="psNet">₹0</span>
+        <span class="v" id="psNet">₹0.00</span>
       </div>
       <div class="ps-note"><i class="bx bx-info-circle me-1"></i>LOP = (Gross ÷ working days) × unpaid days. Unpaid days are pulled from Staff Attendance (absent + ½×half-day) and unpaid Leave.</div>
 
@@ -124,8 +124,6 @@
 @section PageScripts {
 <script>
 $(document).ready(function () {
-    if (typeof toastr !== 'undefined') toastr.options = { closeButton:true, progressBar:true, timeOut:'3000', positionClass:'toast-top-right' };
-    function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 
     const COLORS = ['bg-label-primary text-primary','bg-label-info text-info','bg-label-success text-success','bg-label-warning text-warning','bg-label-danger text-danger'];
     function inr(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
@@ -253,19 +251,19 @@ $(document).ready(function () {
         const s = STAFF.find(x=>x.id===activeId); if(!s) return;
         s.status='paid'; render();
         bootstrap.Modal.getInstance(document.getElementById('payslipModal')).hide();
-        toast('success', s.name+"'s salary marked as paid.");
+        ecToast('success', s.name+"'s salary marked as paid.");
     });
     $('#psPrint').on('click',function(){ window.print(); });
 
     $('#fMonth, #fDept').on('change', render);
-    $('#btnRun').on('click', function(){ render(); toast('success','Payroll computed for '+periodLabel()+'.'); });
+    $('#btnRun').on('click', function(){ render(); ecToast('success','Payroll computed for '+periodLabel()+'.'); });
     $('#btnExport').on('click', function(){
         const rows = visible().map(function(s){ const c=compute(s); return [s.emp,s.name,s.dept,c.gross,c.epf,c.esi,c.pt,c.tds,c.lop,c.totalDed,c.net,s.status]; });
         const hdr = ['Emp','Name','Dept','Gross','EPF','ESI','PT','TDS','LOP','TotalDeductions','NetPay','Status'];
         const csv = '﻿'+[hdr].concat(rows).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
         const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
         a.download='payroll_'+$('#fMonth').val()+'.csv'; a.click();
-        toast('success','Payroll exported.');
+        ecToast('success','Payroll exported.');
     });
 
     render();

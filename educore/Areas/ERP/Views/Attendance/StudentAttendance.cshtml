@@ -133,8 +133,6 @@
 <script>
 $(document).ready(function () {
 
-    if (typeof toastr !== 'undefined') toastr.options = { closeButton: true, progressBar: true, timeOut: '3000', positionClass: 'toast-top-right' };
-    function toast(t, m) { if (typeof toastr !== 'undefined') toastr[t](m); }
 
     var ROSTER_URL   = '@Url.Action("Roster",   "Attendance", new { area = "ERP" })';
     var SECTIONS_URL = '@Url.Action("Sections", "Attendance", new { area = "ERP" })';
@@ -150,7 +148,7 @@ $(document).ready(function () {
     function applyCanMark() {
         $('#saveBtn').prop('disabled', !canMark);
         if (!canMark && students.length) {
-            toast('warning', 'You are not the class teacher of this section — view only.');
+            ecToast('warning', 'You are not the class teacher of this section — view only.');
         }
     }
 
@@ -249,7 +247,7 @@ $(document).ready(function () {
                 render();
                 applyCanMark();
             })
-            .fail(function () { toast('error', 'Could not load the roster.'); });
+            .fail(function () { ecToast('error', 'Could not load the roster.'); });
     }
 
     $(document).on('click', '.att-toggle button', function () {
@@ -276,10 +274,10 @@ $(document).ready(function () {
     $('#filterSection, #attendanceDate').on('change', function () { updateDateBanner(); loadRoster(); });
 
     $('#saveBtn').on('click', function () {
-        if (!students.length) { toast('warning', 'Load a class roster first.'); return; }
-        if (!canMark) { toast('error', 'You are not the class teacher of this section.'); return; }
+        if (!students.length) { ecToast('warning', 'Load a class roster first.'); return; }
+        if (!canMark) { ecToast('error', 'You are not the class teacher of this section.'); return; }
         if (!touched) {
-            toast('warning', 'Please review the roster first. Tap at least one student to confirm attendance before saving.');
+            ecToast('warning', 'Please review the roster first. Tap at least one student to confirm attendance before saving.');
             $('#list').find('.att-row:first').css('box-shadow','0 0 0 3px rgba(255,138,0,.4)');
             setTimeout(function () { $('#list').find('.att-row:first').css('box-shadow',''); }, 1800);
             return;
@@ -288,7 +286,8 @@ $(document).ready(function () {
         var items = students.map(function (s) {
             return { studentId: s.id, status: (status[s.id] === 'absent') ? 'Absent' : 'Present', remarks: '' };
         });
-        var $btn = $(this).prop('disabled', true);
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Saving…');
         $.ajax({
             url: SAVE_URL,
             type: 'POST',
@@ -297,11 +296,11 @@ $(document).ready(function () {
             data: JSON.stringify({ date: $('#attendanceDate').val(), "class": $('#filterClass').val(), section: $('#filterSection').val(), items: items })
         })
         .done(function (res) {
-            if (res && res.success) toast('success', res.message);
-            else toast('error', (res && res.message) || 'Could not save.');
+            if (res && res.success) ecToast('success', res.message);
+            else ecToast('error', (res && res.message) || 'Could not save.');
         })
-        .fail(function () { toast('error', 'Something went wrong.'); })
-        .always(function () { $btn.prop('disabled', false); });
+        .fail(function () { ecToast('error', 'Something went wrong.'); })
+        .always(function () { EC.buttonReset($btn); });
     });
 
     function template() { return 'Dear {parent}, your ward {student} (Class {class}) was marked absent on {date}. Kindly inform the school if this is unexpected.'; }
@@ -312,7 +311,7 @@ $(document).ready(function () {
     }
     function sendWA(id) {
         const s = students.find(x => x.id === id); if (!s) return;
-        if (!s.phone) { toast('warning', 'No mobile number on record for ' + s.name + '.'); return; }
+        if (!s.phone) { ecToast('warning', 'No mobile number on record for ' + s.name + '.'); return; }
         window.open('https://wa.me/91' + String(s.phone).replace(/\D/g,'') + '?text=' + encodeURIComponent(buildMsg(s)), '_blank');
         notified[id] = true; render(); refreshModal();
     }

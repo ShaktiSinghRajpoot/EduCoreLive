@@ -127,8 +127,6 @@
 <script>
 $(document).ready(function () {
 
-    if (typeof toastr !== 'undefined') toastr.options = { closeButton: true, progressBar: true, timeOut: '3000', positionClass: 'toast-top-right' };
-    function toast(t, m) { if (typeof toastr !== 'undefined') toastr[t](m); }
 
     const students = [
         { id:1,  name:'Akash Verma',     roll:'01', parent:'Bhukal Verma',    phone:'9876543210', av:'AV' },
@@ -245,7 +243,7 @@ $(document).ready(function () {
 
     $('#saveBtn').on('click', function () {
         if (!touched) {
-            toast('warning', 'Please review the roster first. Tap at least one student to confirm attendance before saving.');
+            ecToast('warning', 'Please review the roster first. Tap at least one student to confirm attendance before saving.');
             $('#list').find('.att-row:first').css('box-shadow','0 0 0 3px rgba(255,138,0,.4)');
             setTimeout(function () { $('#list').find('.att-row:first').css('box-shadow',''); }, 1800);
             return;
@@ -253,7 +251,7 @@ $(document).ready(function () {
         const present = students.filter(s => status[s.id]==='present').length;
         const absent  = students.length - present;
         // TODO: POST { class, section, date, records:[{id,status}] } to AttendanceController
-        toast('success', 'Attendance saved — Present: ' + present + ', Absent: ' + absent + '.');
+        ecToast('success', 'Attendance saved — Present: ' + present + ', Absent: ' + absent + '.');
     });
 
     function template() { return 'Dear {parent}, your ward {student} (Class {class}) was marked absent on {date}. Kindly inform the school if this is unexpected.'; }

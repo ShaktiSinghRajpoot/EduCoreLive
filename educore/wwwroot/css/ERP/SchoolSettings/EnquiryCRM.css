@@ -1,10 +1,5 @@
 /* EnquiryCRM page styles — extracted from Areas/ERP/Views/SchoolSettings/EnquiryCRM.cshtml */
-    /* ── Top progress loader ── */
-    #crmTopLoader {
-        position: fixed; top: 0; left: 0; width: 0%; height: 3px;
-        background: var(--ec-primary); z-index: 99999;
-        opacity: 1; pointer-events: none; border-radius: 0 2px 2px 0;
-    }
+    /* Top progress loader ab site.css me hai (.ec-top-loader) */
 
     /* ── KPI Cards ── */
     .crm-kpi-card {

@@ -70,6 +70,17 @@
 .sm-badge-warn { background:#fff3cd; color:#856404; }
 .sm-badge-zero { background:#fde8e8; color:#842029; }
 
+/* The class row shows its own loading state — a spinner in place of the badge.
+   Subjects take ~1s to arrive, so the click needs an answer right here. */
+.sm-class-item.is-loading .cls-badge{ color:transparent; position:relative; }
+.sm-class-item.is-loading .cls-badge::after{
+    content:''; position:absolute; inset:0; margin:auto;
+    width:13px; height:13px; border-radius:50%;
+    border:2px solid var(--ec-primary); border-right-color:transparent;
+    animation:sm-spin .6s linear infinite;
+}
+@keyframes sm-spin{ to{ transform:rotate(360deg); } }
+
 /* ── Right subject area ─────────────────────── */
 .sm-right{ height:100%; }
 
@@ -135,11 +146,14 @@
     background:var(--ec-primary-light);
     border-color:var(--ec-primary); border-style:solid;
 }
+/* An added chip used to be #aaa on #f5f5f5 — invisible on screen, which made it
+   look like no suggestions had loaded. Now it clearly reads as "already added". */
 .sm-suggest-chip.chip-added{
-    background:#f5f5f5; border-color:#ddd; border-style:solid;
-    color:#aaa; cursor:not-allowed; pointer-events:none;
+    background:#f0fdf4; border-color:#86efac; border-style:solid;
+    color:#15803d; cursor:default; pointer-events:none;
 }
-.sm-suggest-chip.chip-added i{ color:#28a745; }
+.sm-suggest-chip.chip-added i{ color:#16a34a; }
+.sm-suggest-count{ font-weight:800; color:var(--ec-text-muted); }
 
 /* Add input row */
 .sm-add-row{
@@ -210,6 +224,12 @@
     font-size:.78rem; font-weight:650; color:var(--ec-text-muted);
     display:flex; align-items:center; gap:.35rem;
 }
+.sm-dirty-badge{
+    display:inline-flex; align-items:center; gap:.3rem;
+    padding:.25rem .6rem; border-radius:999px;
+    background:#fff7ed; border:1px solid #fed7aa; color:#c2410c;
+    font-size:.74rem; font-weight:800;
+}
 .sm-save-btn{
     height:42px; padding:0 1.5rem; border-radius:999px; border:0;
     background:linear-gradient(135deg,#ff8a00,#ff9f2f); color:#fff;
@@ -227,19 +247,6 @@
 }
 .sm-cancel-btn:hover{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.3); }
 
-/* Toast */
-.sm-toast{
-    position:fixed; top:1.25rem; right:1.25rem; z-index:9999;
-    background:#fff; border:1px solid #d1e7dd; border-left:4px solid #28a745;
-    border-radius:14px; padding:.85rem 1.2rem;
-    box-shadow:0 8px 28px rgba(0,0,0,.1);
-    display:flex; align-items:center; gap:.75rem;
-    font-size:.86rem; font-weight:700; color:#0a5a35;
-    transform:translateX(110%);
-    transition:transform .35s cubic-bezier(.34,1.56,.64,1);
-    max-width:320px;
-}
-.sm-toast.show{ transform:translateX(0); }
 
 @media (max-width:991.98px){
     .sm-class-panel{ position:static; margin-bottom:1.25rem; }

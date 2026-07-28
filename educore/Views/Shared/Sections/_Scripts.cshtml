@@ -11,7 +11,10 @@
     <!-- TOASTR -->
     <script src="~/vendor/libs/toastr/toastr.min.js"></script>
 
-    <script src="~/js/site.js"></script>
+    @* asp-append-version is required: site.js holds the EC helpers. Without it
+       the browser keeps serving its cached copy and every page throws
+       "EC is not defined". *@
+    <script src="~/js/site.js" asp-append-version="true"></script>
 </environment>
 
 <environment exclude="Development">
@@ -37,20 +40,33 @@
         progressBar: true,
         newestOnTop: true,
         positionClass: "toast-top-right",
-        preventDuplicates: true,
+        // Deliberately false. toastr compares only against the PREVIOUS message,
+        // not against what is on screen — so with this on, the same validation
+        // message never appears a second time in a row, however long the gap.
+        // A cashier who clicks "Close day" twice with the cash box empty would
+        // get no feedback on the second click and think the button is dead.
+        preventDuplicates: false,
         timeOut: 3500
     };
 
-    // Single notification API. Prefer ecToast(...) in new code.
+    // THE notification API for the whole app — always ecToast(type, message).
+    // Do not add a local toast()/notify() wrapper to a page: the project used to
+    // have five of them with two different argument orders, so copying a line
+    // between pages silently showed the wrong thing.
+    //
+    //     ecToast('success', 'Subjects saved.');
+    //     ecToast('error',   'Could not save.');
+    //
     // type: 'success' | 'error' | 'warning' | 'info'
     window.ecToast = function (type, message) {
         if (!message) return;
+        // The one alert() left in the app, and it must stay: this is the fallback
+        // for when toastr itself failed to load. Routing it through ecToast would
+        // recurse; dropping it would swallow the message entirely.
         if (typeof toastr === 'undefined') { try { alert(message); } catch (e) {} return; }
         var fn = (type && typeof toastr[type] === 'function') ? type : 'info';
         toastr[fn](message);
     };
-    // Back-compat alias: some pages call showToast('success', msg).
-    if (typeof window.showToast === 'undefined') { window.showToast = window.ecToast; }
 
     // ── Global double-submit guard ──────────────────────────────────────
     // Disables a form's submit button(s) on submit so a double/triple-click

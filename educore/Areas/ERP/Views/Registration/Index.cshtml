@@ -328,7 +328,6 @@
 <script>
 $(function () {
     'use strict';
-    toastr.options = { closeButton:true, progressBar:true, positionClass:'toast-top-right', timeOut:3000 };
 
     var FEE_ENABLED = @(Model.RegistrationFeeEnabled ? "true" : "false");
     var csrf = $('input[name="__RequestVerificationToken"]').first().val() || $('[name="__RequestVerificationToken"]').val() || '';
@@ -338,7 +337,6 @@ $(function () {
     var F = { page:1, pageSize:10, search:'', session:'', className:'', feeStatus:'' };
     var lastRows = [];
 
-    function esc(s){ return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
     function feeBadge(paid){ return paid ? '<span class="reg-bdg b-paid">Paid</span>' : '<span class="reg-bdg b-unpaid">Pending</span>'; }
     function statusBadge(r){
@@ -359,7 +357,7 @@ $(function () {
         // Fee RECEIPT — "we received your money". A different document, and this list is
         // the only place it can be re-printed (it is filed against the enquiry, not a student).
         if (r.receiptNo)
-            actions += '<button class="btn btn-sm btn-icon btn-outline-secondary reg-act-btn btn-receipt" title="Print fee receipt" data-rcp="'+esc(r.receiptNo)+'"><i class="bx bx-printer"></i></button>';
+            actions += '<button class="btn btn-sm btn-icon btn-outline-secondary reg-act-btn btn-receipt" title="Print fee receipt" data-rcp="'+EC.esc(r.receiptNo)+'"><i class="bx bx-printer"></i></button>';
         // Mark fee paid
         if (FEE_ENABLED && !r.registrationFeePaid && active)
             actions += '<button class="btn btn-sm btn-icon btn-outline-success reg-act-btn btn-fee" title="Mark fee collected" data-id="'+r.enquiryId+'"><i class="bx bx-rupee"></i></button>';
@@ -368,16 +366,16 @@ $(function () {
             actions += '<a href="'+ADMISSION_URL+'?enquiryId='+r.enquiryId+'" class="btn btn-sm btn-icon btn-success reg-act-btn" title="Convert to Admission"><i class="bx bx-user-check"></i></a>';
         // Cancel (mark withdrawn / Not Interested — fee retained)
         if (active)
-            actions += '<button class="btn btn-sm btn-icon btn-outline-danger reg-act-btn btn-cancel" title="Cancel registration" data-id="'+r.enquiryId+'" data-name="'+esc(r.studentName)+'"><i class="bx bx-x"></i></button>';
+            actions += '<button class="btn btn-sm btn-icon btn-outline-danger reg-act-btn btn-cancel" title="Cancel registration" data-id="'+r.enquiryId+'" data-name="'+EC.esc(r.studentName)+'"><i class="bx bx-x"></i></button>';
         actions += '</div>';
 
         var feeCol = FEE_ENABLED ? '<td>'+feeBadge(r.registrationFeePaid)+'</td>' : '';
         return '<tr>'
-            + '<td><span class="reg-no">'+esc(r.registrationNumber)+'</span></td>'
-            + '<td class="fw-bold">'+esc(r.studentName)+'</td>'
-            + '<td>'+esc(r.className||'—')+' <span class="text-muted">· '+esc(r.session||'—')+'</span></td>'
-            + '<td>'+esc(r.parentName||'—')+'<div class="text-muted" style="font-size:.76rem">'+esc(r.mobile||'')+'</div></td>'
-            + '<td>'+esc(r.registrationDate)+'</td>'
+            + '<td><span class="reg-no">'+EC.esc(r.registrationNumber)+'</span></td>'
+            + '<td class="fw-bold">'+EC.esc(r.studentName)+'</td>'
+            + '<td>'+EC.esc(r.className||'—')+' <span class="text-muted">· '+EC.esc(r.session||'—')+'</span></td>'
+            + '<td>'+EC.esc(r.parentName||'—')+'<div class="text-muted" style="font-size:.76rem">'+EC.esc(r.mobile||'')+'</div></td>'
+            + '<td>'+EC.esc(r.registrationDate)+'</td>'
             + feeCol
             + '<td>'+statusBadge(r)+'</td>'
             + '<td class="text-end">'+actions+'</td>'
@@ -385,11 +383,19 @@ $(function () {
     }
 
     function load() {
+        EC.showLoader();
+        EC.listLoading('#regBody');
         $.get('/ERP/Registration/GetRegistrationsData', {
             page:F.page, pageSize:F.pageSize, search:F.search,
             session:F.session, className:F.className, feeStatus:F.feeStatus
         }).done(function (d) {
-            if (!d.success) return;
+            if (!d.success) {
+                // This used to return straight away, leaving the spinner row
+                // turning forever.
+                $('#regEmpty').addClass('d-none');
+                EC.listEmpty('#regBody', d.message || 'Could not load registrations.', 'bx-error-circle');
+                return;
+            }
             lastRows = d.rows || [];
             if (lastRows.length === 0) {
                 $('#regBody').html('');
@@ -405,7 +411,13 @@ $(function () {
                 $('#kpiConverted').text(d.stats.converted);
             }
             renderPaging(d);
-        }).fail(function () { toastr.error('Failed to load registrations.'); });
+        }).fail(function () {
+            ecToast('error', 'Failed to load registrations.');
+            // The toast disappears after 3.5s, so the list needs the message
+            // too — otherwise all that is left is a spinning spinner.
+            $('#regEmpty').addClass('d-none');
+            EC.listEmpty('#regBody', 'Could not load registrations. Please retry.', 'bx-error-circle');
+        }).always(EC.hideLoader);
     }
 
     function renderPaging(d) {
@@ -462,12 +474,12 @@ $(function () {
             headers:{ 'RequestVerificationToken':csrf }, data: JSON.stringify({ enquiryId:id }) })
         .done(function(res){
             if(res.success){
-                toastr.success(res.message + (res.receiptNo ? ' Receipt ' + res.receiptNo + '.' : ''));
+                ecToast('success', res.message + (res.receiptNo ? ' Receipt ' + res.receiptNo + '.' : ''));
                 // Not auto-opened — print from the list when needed.
                 load();
-            } else toastr.error(res.message||'Failed.');
+            } else ecToast('error', res.message||'Failed.');
         })
-        .fail(function(){ toastr.error('Something went wrong.'); });
+        .fail(function(){ ecToast('error', 'Something went wrong.'); });
     });
 
     /* ── cancel registration (mark withdrawn / Not Interested) ── */
@@ -484,21 +496,22 @@ $(function () {
     $('#confirmCancelReg').on('click', function(){
         var id = parseInt($('#cancelEnquiryId').val());
         var reason = $('#cancelReason').val();
-        if (!reason) { toastr.error('Please select a reason.'); return; }
-        var $b = $(this).prop('disabled', true).html('<i class="bx bx-loader-circle bx-spin me-1"></i>…');
+        if (!reason) { ecToast('error', 'Please select a reason.'); return; }
+        var $btn = $(this);
+        EC.buttonBusy($btn);
         $.ajax({ url:'/ERP/Registration/Cancel', type:'POST', contentType:'application/json',
             headers:{ 'RequestVerificationToken':csrf }, data: JSON.stringify({ enquiryId:id, reason:reason }) })
         .done(function(res){
-            if(res.success){ bootstrap.Modal.getInstance(document.getElementById('cancelRegModal')).hide(); toastr.success(res.message); load(); }
-            else toastr.error(res.message||'Failed.');
+            if(res.success){ bootstrap.Modal.getInstance(document.getElementById('cancelRegModal')).hide(); ecToast('success', res.message); load(); }
+            else ecToast('error', res.message||'Failed.');
         })
-        .fail(function(){ toastr.error('Something went wrong.'); })
-        .always(function(){ $b.prop('disabled', false).html('<i class="bx bx-x me-1"></i> Mark Withdrawn'); });
+        .fail(function(){ ecToast('error', 'Something went wrong.'); })
+        .always(function () { EC.buttonReset($btn); });
     });
 
     /* ── export current view to CSV ── */
     $('#btnExport').on('click', function(){
-        if (!lastRows.length) { toastr.info('Nothing to export.'); return; }
+        if (!lastRows.length) { ecToast('info', 'Nothing to export.'); return; }
         var head = ['Reg No','Student','Class','Session','Parent','Mobile','Reg Date','Fee','Status'];
         var lines = lastRows.map(function(r){
             return [r.registrationNumber, r.studentName, r.className, r.session, r.parentName, r.mobile,
@@ -538,7 +551,7 @@ $(function () {
                     (RW_FEE_AMOUNT === 0 ? ' — configure a Registration-point Fee Head' : ''));
                 rwUpdateNet();
             })
-            .fail(function () { $('#rwFeeAmountLabel').text('₹0'); RW_FEE_AMOUNT = 0; rwUpdateNet(); });
+            .fail(function () { $('#rwFeeAmountLabel').text('₹0.00'); RW_FEE_AMOUNT = 0; rwUpdateNet(); });
     }
     $('#rwDiscountType, #rwDiscountValue').on('input change', rwUpdateNet);
 
@@ -562,12 +575,13 @@ $(function () {
         var name = $.trim($('#rwName').val());
         var cls  = $('#rwClass').val(), ses = $('#rwSession').val();
         var mob  = $.trim($('#rwMobile').val());
-        if (!name) { toastr.error('Student name is required.'); return; }
-        if (!cls)  { toastr.error('Please select a class.'); return; }
-        if (!ses)  { toastr.error('Please select a session.'); return; }
-        if (!/^\d{10}$/.test(mob)) { toastr.error('Enter a valid 10-digit mobile.'); return; }
+        if (!name) { ecToast('error', 'Student name is required.'); return; }
+        if (!cls)  { ecToast('error', 'Please select a class.'); return; }
+        if (!ses)  { ecToast('error', 'Please select a session.'); return; }
+        if (!/^\d{10}$/.test(mob)) { ecToast('error', 'Enter a valid 10-digit mobile.'); return; }
 
-        var $b = $(this).prop('disabled', true).html('<i class="bx bx-loader-circle bx-spin me-1"></i> Registering…');
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Registering…');
         $.ajax({
             url: '/ERP/Enquiry/RegisterWalkin', type: 'POST', contentType: 'application/json',
             headers: { 'RequestVerificationToken': csrf },
@@ -594,15 +608,15 @@ $(function () {
         .done(function (res) {
             if (res && res.success) {
                 bootstrap.Modal.getInstance(document.getElementById('registerWalkinModal')).hide();
-                toastr.success((res.message || 'Walk-in registered.') +
+                ecToast('success', (res.message || 'Walk-in registered.') +
                                (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
                 load();
             } else {
-                toastr.error((res && res.message) || 'Unable to register.');
+                ecToast('error', (res && res.message) || 'Unable to register.');
             }
         })
-        .fail(function () { toastr.error('Something went wrong.'); })
-        .always(function () { $b.prop('disabled', false).html('<i class="bx bx-check me-1"></i> Register'); });
+        .fail(function () { ecToast('error', 'Something went wrong.'); })
+        .always(function () { EC.buttonReset($btn); });
     });
 
     load();

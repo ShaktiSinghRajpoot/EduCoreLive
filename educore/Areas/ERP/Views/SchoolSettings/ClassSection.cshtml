@@ -233,8 +233,6 @@ var DATA=(seed||[]).map(function(c,i){
   };
 });
 
-function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-function toast(t,m){ if(typeof toastr!=='undefined') toastr[t](m); }
 function classStr(c){ return c.sections.reduce(function(a,s){return a+(s.str||0);},0); }
 function classCap(c){ return c.sections.reduce(function(a,s){return a+(s.cap||0);},0); }
 function streamLbl(s){ return {gen:'General',sci:'Science',com:'Commerce',art:'Arts'}[s]||'General'; }
@@ -242,7 +240,7 @@ function barCls(pct){ return pct>=100?'full':(pct>=85?'warn':'ok'); }
 
 /* -- Persist the whole structure for the selected year (replace-all) -- */
 function persist(okMsg){
-  if(!ACADEMIC_YEAR_ID){ toast('error','Select an academic year first.'); return; }
+  if(!ACADEMIC_YEAR_ID){ ecToast('error','Select an academic year first.'); return; }
   var payload={
     academicYearId:ACADEMIC_YEAR_ID,
     classes:DATA.slice().sort(function(a,b){return a.rank-b.rank;}).map(function(c){
@@ -260,13 +258,13 @@ function persist(okMsg){
     data:        JSON.stringify(payload)
   })
   .done(function(res){
-    if(res && res.success){ if(okMsg) toast('success', okMsg); }
+    if(res && res.success){ if(okMsg) ecToast('success', okMsg); }
     else {
-      toast('error',(res && res.message) || 'Save failed.');
+      ecToast('error',(res && res.message) || 'Save failed.');
       setTimeout(function(){ window.location.reload(); }, 1200); /* resync from server */
     }
   })
-  .fail(function(){ toast('error','Save failed. Check your connection.'); });
+  .fail(function(){ ecToast('error','Save failed. Check your connection.'); });
 }
 
 /* Summary */
@@ -299,14 +297,14 @@ function render(){
       var p=s.cap?Math.round(s.str/s.cap*100):0;
       return '<div class="cs-sec">'
         +'<div class="cs-sec-top">'
-        +  '<div class="cs-sec-name"><span class="cs-sec-badge">'+esc(s.name)+'</span><span class="cs-sec-title">Section '+esc(s.name)+'</span></div>'
+        +  '<div class="cs-sec-name"><span class="cs-sec-badge">'+EC.esc(s.name)+'</span><span class="cs-sec-title">Section '+EC.esc(s.name)+'</span></div>'
         +  '<div class="d-flex gap-1">'
         +    '<button class="cs-icon-btn js-edit-sec" data-c="'+c.id+'" data-s="'+s.id+'" title="Edit"><i class="bx bx-edit-alt"></i></button>'
         +    '<button class="cs-icon-btn danger js-del-sec" data-c="'+c.id+'" data-s="'+s.id+'" title="Delete"><i class="bx bx-trash"></i></button>'
         +  '</div>'
         +'</div>'
-        +'<div class="cs-sec-meta"><i class="bx bx-user-voice"></i>'+esc(s.teacher||'No teacher')+'</div>'
-        +'<div class="cs-sec-meta"><i class="bx bx-door-open"></i>Room '+esc(s.room||'—')+'</div>'
+        +'<div class="cs-sec-meta"><i class="bx bx-user-voice"></i>'+EC.esc(s.teacher||'No teacher')+'</div>'
+        +'<div class="cs-sec-meta"><i class="bx bx-door-open"></i>Room '+EC.esc(s.room||'—')+'</div>'
         +'<div class="cs-occ-row"><span class="cs-occ-num">'+s.str+' / '+(s.cap||'—')+'</span><span class="cs-occ-pct">'+(s.cap?p+'%':'')+'</span></div>'
         +'<div class="cs-bar"><div class="cs-bar-fill '+barCls(p)+'" style="width:'+Math.min(p,100)+'%"></div></div>'
         +'</div>';
@@ -322,8 +320,8 @@ function render(){
       +  '<i class="bx bx-chevron-right cs-chev"></i>'
       +  '<div class="cs-rank">'+(c.rank||'-')+'</div>'
       +  '<div class="flex-grow-1">'
-      +    '<div class="d-flex align-items-center gap-2 flex-wrap"><span class="cs-class-name">'+esc(c.name)+'</span>'+streamBadge+'</div>'
-      +    '<div class="cs-class-meta">'+(c.coord?('Coordinator: '+esc(c.coord)):'No coordinator')+'</div>'
+      +    '<div class="d-flex align-items-center gap-2 flex-wrap"><span class="cs-class-name">'+EC.esc(c.name)+'</span>'+streamBadge+'</div>'
+      +    '<div class="cs-class-meta">'+(c.coord?('Coordinator: '+EC.esc(c.coord)):'No coordinator')+'</div>'
       +  '</div>'
       +  '<div class="d-flex align-items-center gap-3 cs-class-meta-wrap">'
       +    '<span class="cs-pill"><i class="bx bx-grid"></i>'+c.sections.length+' sec</span>'
@@ -376,14 +374,14 @@ function openClassModal(id){
 document.getElementById('btnAddClass').addEventListener('click',function(){ openClassModal(null); });
 document.getElementById('classSave').addEventListener('click',function(){
   var name=document.getElementById('mClassName').value.trim();
-  if(!name){ toast('error','Class name is required.'); return; }
+  if(!name){ ecToast('error','Class name is required.'); return; }
   var rank=parseInt(document.getElementById('mClassRank').value,10)||(DATA.length+1);
   var stream=document.getElementById('mClassStream').value;
   var coordSel=document.getElementById('mClassCoord');
   var coordStaffId=parseInt(coordSel.value,10)||null;
   var coord=coordStaffId?coordSel.options[coordSel.selectedIndex].text:'';
   var dup=DATA.some(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==editClassId;});
-  if(dup){ toast('warning','A class with this name already exists.'); return; }
+  if(dup){ ecToast('warning','A class with this name already exists.'); return; }
   if(editClassId){
     var c=DATA.find(function(x){return x.id===editClassId;});
     c.name=name; c.rank=rank; c.stream=stream; c.coord=coord; c.coordStaffId=coordStaffId;
@@ -398,10 +396,15 @@ document.getElementById('classSave').addEventListener('click',function(){
 function delClass(id){
   var c=DATA.find(function(x){return x.id===id;});
   if(!c) return;
-  if(classStr(c)>0){ toast('error','Cannot delete — '+classStr(c)+' students are enrolled. Move them first.'); return; }
-  if(!confirm('Delete '+c.name+' and its '+c.sections.length+' section(s)?')) return;
-  DATA=DATA.filter(function(x){return x.id!==id;});
-  updateCards(); render(); persist(c.name+' deleted.');
+  if(classStr(c)>0){ ecToast('error','Cannot delete — '+classStr(c)+' students are enrolled. Move them first.'); return; }
+  EC.confirm({ title:'Delete this class?',
+               name:c.name+' — '+c.sections.length+' section(s)',
+               message:'The class and all of its sections will be removed.',
+               okText:'Delete class' }).then(function(ok){
+    if(!ok) return;
+    DATA=DATA.filter(function(x){return x.id!==id;});
+    updateCards(); render(); persist(c.name+' deleted.');
+  });
 }
 
 /* ---- Section modal ---- */
@@ -421,14 +424,14 @@ document.getElementById('secSave').addEventListener('click',function(){
   var c=DATA.find(function(x){return x.id===secCtx.classId;});
   if(!c) return;
   var name=document.getElementById('mSecName').value.trim();
-  if(!name){ toast('error','Section name is required.'); return; }
+  if(!name){ ecToast('error','Section name is required.'); return; }
   var cap=parseInt(document.getElementById('mSecCap').value,10)||0;
   var room=document.getElementById('mSecRoom').value.trim();
   var dup=c.sections.some(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==secCtx.secId;});
-  if(dup){ toast('warning','This section already exists in '+c.name+'.'); return; }
+  if(dup){ ecToast('warning','This section already exists in '+c.name+'.'); return; }
   if(secCtx.secId){
     var s=c.sections.find(function(x){return x.id===secCtx.secId;});
-    if(cap && cap<s.str){ toast('error','Capacity ('+cap+') is below current strength ('+s.str+').'); return; }
+    if(cap && cap<s.str){ ecToast('error','Capacity ('+cap+') is below current strength ('+s.str+').'); return; }
     s.name=name; s.cap=cap; s.room=room;
   } else {
     c.sections.push({id:++nextSecId,name:name,cap:cap,str:0,teacher:'',room:room});
@@ -441,11 +444,14 @@ function delSection(classId,secId){
   var c=DATA.find(function(x){return x.id===classId;});
   var s=c.sections.find(function(x){return x.id===secId;});
   if(!s) return;
-  if(s.str>0){ toast('error','Cannot delete — '+s.str+' students in Section '+s.name+'. Move them first.'); return; }
-  if(!confirm('Delete Section '+s.name+' of '+c.name+'?')) return;
-  c.sections=c.sections.filter(function(x){return x.id!==secId;});
-  openSet[c.id]=true;
-  updateCards(); render(); persist('Section deleted.');
+  if(s.str>0){ ecToast('error','Cannot delete — '+s.str+' students in Section '+s.name+'. Move them first.'); return; }
+  EC.confirm({ title:'Delete this section?', name:'Section '+s.name+' · '+c.name,
+               okText:'Delete section' }).then(function(ok){
+    if(!ok) return;
+    c.sections=c.sections.filter(function(x){return x.id!==secId;});
+    openSet[c.id]=true;
+    updateCards(); render(); persist('Section deleted.');
+  });
 }
 
 /* ---- Toolbar ---- */

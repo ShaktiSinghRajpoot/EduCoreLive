@@ -417,12 +417,6 @@
   </div>
 </div>
 
-<!-- Success toast -->
-<div class="es-toast" id="esSuccessToast">
-    <i class="bx bx-check-circle" style="font-size:1.3rem;color:#28a745;flex-shrink:0;"></i>
-    <span>Student profile updated successfully.</span>
-</div>
-
 @section Scripts {
 <script>
 (function () {
@@ -541,7 +535,7 @@
         const file = this.files[0];
         if (!file) return;
         if (file.size > 2 * 1024 * 1024) {
-            alert("Photo must be under 2 MB.");
+            ecToast('error', 'Photo must be under 2 MB.');
             this.value = "";
             return;
         }
