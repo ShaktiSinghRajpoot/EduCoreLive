@@ -1,11 +1,11 @@
-/* ============================================================
-   EduCore — Shared Inventory Catalog (single source of truth)
+﻿/* ============================================================
+   SmartSchoolWala â€” Shared Inventory Catalog (single source of truth)
    ------------------------------------------------------------
    All inventory-aware screens read items from here instead of
    keeping their own hard-coded copies:
-     • Inventory Item Master  (ERP/Inventory/InventoryItem)
-     • Purchase Entry         (ERP/Inventory/PurchaseEntry)
-     • New Admission kit      (ERP/Student/StudentList)
+     â€¢ Inventory Item Master  (ERP/Inventory/InventoryItem)
+     â€¢ Purchase Entry         (ERP/Inventory/PurchaseEntry)
+     â€¢ New Admission kit      (ERP/Student/StudentList)
 
    This is the prototype seed. When a backend exists, replace the
    `items` array with an API fetch and keep the same public API so
@@ -16,16 +16,16 @@ window.EduInventory = (function () {
 
     // id, name, code(SKU), category, subCategory, type, unit, brand, model,
     // stock, minimum, cost, selling, status
-    // sellable      → can be sold to a student (store / admission)
-    // admissionKit  → offered as an add-on during New Admission
-    // mandatory     → kit item pre-ticked / required at admission
+    // sellable      â†’ can be sold to a student (store / admission)
+    // admissionKit  â†’ offered as an add-on during New Admission
+    // mandatory     â†’ kit item pre-ticked / required at admission
     var items = [
-        { id: 1,  name: "Uniform Set",          code: "UNI-SET-001",   category: "Uniform",    subCategory: "Full Set",      type: "Saleable",   unit: "Set",   brand: "EduCore", model: "Standard", stock: 60,  minimum: 15, cost: 480, selling: 650, status: "Active", sellable: true,  admissionKit: true,  mandatory: false },
-        { id: 2,  name: "Tie & Belt",           code: "UNI-TB-001",    category: "Uniform",    subCategory: "Accessory",     type: "Saleable",   unit: "Set",   brand: "EduCore", model: "Standard", stock: 140, minimum: 30, cost: 70,  selling: 120, status: "Active", sellable: true,  admissionKit: true,  mandatory: false },
-        { id: 3,  name: "School Diary",         code: "STA-DIARY-001", category: "Stationery", subCategory: "Diary",         type: "Saleable",   unit: "Piece", brand: "EduCore", model: "2026",     stock: 200, minimum: 50, cost: 50,  selling: 80,  status: "Active", sellable: true,  admissionKit: true,  mandatory: false },
-        { id: 4,  name: "ID Card",              code: "STA-ID-001",    category: "Stationery", subCategory: "Identity",      type: "Saleable",   unit: "Piece", brand: "EduCore", model: "PVC",      stock: 500, minimum: 80, cost: 30,  selling: 60,  status: "Active", sellable: true,  admissionKit: true,  mandatory: false },
-        { id: 5,  name: "School Tie",           code: "UNI-TIE-001",   category: "Uniform",    subCategory: "Tie",           type: "Saleable",   unit: "Piece", brand: "EduCore", model: "Standard", stock: 120, minimum: 25, cost: 45,  selling: 80,  status: "Active", sellable: true,  admissionKit: false, mandatory: false },
-        { id: 6,  name: "School Belt",          code: "UNI-BELT-001",  category: "Uniform",    subCategory: "Belt",          type: "Saleable",   unit: "Piece", brand: "EduCore", model: "Standard", stock: 100, minimum: 25, cost: 50,  selling: 90,  status: "Active", sellable: true,  admissionKit: false, mandatory: false },
+        { id: 1,  name: "Uniform Set",          code: "UNI-SET-001",   category: "Uniform",    subCategory: "Full Set",      type: "Saleable",   unit: "Set",   brand: "SmartSchoolWala", model: "Standard", stock: 60,  minimum: 15, cost: 480, selling: 650, status: "Active", sellable: true,  admissionKit: true,  mandatory: false },
+        { id: 2,  name: "Tie & Belt",           code: "UNI-TB-001",    category: "Uniform",    subCategory: "Accessory",     type: "Saleable",   unit: "Set",   brand: "SmartSchoolWala", model: "Standard", stock: 140, minimum: 30, cost: 70,  selling: 120, status: "Active", sellable: true,  admissionKit: true,  mandatory: false },
+        { id: 3,  name: "School Diary",         code: "STA-DIARY-001", category: "Stationery", subCategory: "Diary",         type: "Saleable",   unit: "Piece", brand: "SmartSchoolWala", model: "2026",     stock: 200, minimum: 50, cost: 50,  selling: 80,  status: "Active", sellable: true,  admissionKit: true,  mandatory: false },
+        { id: 4,  name: "ID Card",              code: "STA-ID-001",    category: "Stationery", subCategory: "Identity",      type: "Saleable",   unit: "Piece", brand: "SmartSchoolWala", model: "PVC",      stock: 500, minimum: 80, cost: 30,  selling: 60,  status: "Active", sellable: true,  admissionKit: true,  mandatory: false },
+        { id: 5,  name: "School Tie",           code: "UNI-TIE-001",   category: "Uniform",    subCategory: "Tie",           type: "Saleable",   unit: "Piece", brand: "SmartSchoolWala", model: "Standard", stock: 120, minimum: 25, cost: 45,  selling: 80,  status: "Active", sellable: true,  admissionKit: false, mandatory: false },
+        { id: 6,  name: "School Belt",          code: "UNI-BELT-001",  category: "Uniform",    subCategory: "Belt",          type: "Saleable",   unit: "Piece", brand: "SmartSchoolWala", model: "Standard", stock: 100, minimum: 25, cost: 50,  selling: 90,  status: "Active", sellable: true,  admissionKit: false, mandatory: false },
         { id: 7,  name: "Class 10 Physics Book",code: "BOOK-PHY-10",   category: "Books",      subCategory: "Academic Book", type: "Saleable",   unit: "Piece", brand: "NCERT",   model: "2026",     stock: 18,  minimum: 20, cost: 140, selling: 180, status: "Active", sellable: true,  admissionKit: false, mandatory: false },
         { id: 8,  name: "Notebook",             code: "STA-NB-200",    category: "Stationery", subCategory: "Notebook",      type: "Consumable", unit: "Piece", brand: "Classmate",model: "200pg",    stock: 300, minimum: 60, cost: 25,  selling: 40,  status: "Active", sellable: true,  admissionKit: false, mandatory: false },
         { id: 9,  name: "Football",             code: "SPT-FB-001",    category: "Sports",     subCategory: "Ball",          type: "Reusable",   unit: "Piece", brand: "Nivia",   model: "Size 5",   stock: 24,  minimum: 8,  cost: 300, selling: 450, status: "Active", sellable: true,  admissionKit: false, mandatory: false },

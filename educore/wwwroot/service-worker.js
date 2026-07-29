@@ -1,10 +1,10 @@
-﻿self.addEventListener("install", event => {
-    console.log("EduCore service worker installed");
+self.addEventListener("install", event => {
+    console.log("SmartSchoolWala service worker installed");
     self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {
-    console.log("EduCore service worker activated");
+    console.log("SmartSchoolWala service worker activated");
     event.waitUntil(self.clients.claim());
 });
 
