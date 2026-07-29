@@ -3,19 +3,23 @@
   "WorkspaceRootPath": "D:\\Github\\EduCoreLiveV1\\educore\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelivev1\\educore\\appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:appsettings.development.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\amd64\\Microsoft.Common.CurrentVersion.targets||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelivev1\\educore\\appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}",
-      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:appsettings.json||{90A6B3A7-C1A3-4009-A288-E2FF89E96FA0}"
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelivev1\\educore\\areas\\erp\\views\\student\\studentlist.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\views\\student\\studentlist.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelivev1\\educore\\areas\\erp\\views\\schoolsettings\\basicprofile.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
-      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\views\\schoolsettings\\basicprofile.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelivev1\\educore\\areas\\erp\\controllers\\studentcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\controllers\\studentcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{E57DC038-7CF6-4B3C-8F09-46F558681C0A}|..\\EduCoreDataAccessLayer\\EduCoreDataAccessLayer.csproj|d:\\github\\educorelivev1\\educoredataaccesslayer\\services\\repository\\erp\\schoolsettingsservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelivev1\\educore\\areas\\erp\\views\\enquiry\\enquirycrm.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\views\\enquiry\\enquirycrm.cshtml||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|d:\\github\\educorelivev1\\educore\\areas\\erp\\controllers\\enquirycontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{B0669AA4-51EF-43CE-9DA1-15DC79CF979D}|educore.csproj|solutionrelative:areas\\erp\\controllers\\enquirycontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -25,7 +29,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 5,
+          "SelectedChildIndex": 4,
           "Children": [
             {
               "$type": "Bookmark",
@@ -45,53 +49,66 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "appsettings.json",
-              "DocumentMoniker": "D:\\Github\\EduCoreLiveV1\\educore\\appsettings.json",
-              "RelativeDocumentMoniker": "appsettings.json",
-              "ToolTip": "D:\\Github\\EduCoreLiveV1\\educore\\appsettings.json",
-              "RelativeToolTip": "appsettings.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAQAAAAzAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-07-26T18:15:34.367Z",
+              "DocumentIndex": 0,
+              "Title": "Microsoft.Common.CurrentVersion.targets",
+              "DocumentMoniker": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\amd64\\Microsoft.Common.CurrentVersion.targets",
+              "ToolTip": "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\MSBuild\\Current\\Bin\\amd64\\Microsoft.Common.CurrentVersion.targets",
+              "ViewState": "AgIAABkVAAAAAAAAAAAowAQVAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003801|",
+              "WhenOpened": "2026-07-29T02:50:05.525Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
-              "Title": "appsettings.Development.json",
-              "DocumentMoniker": "D:\\Github\\EduCoreLiveV1\\educore\\appsettings.Development.json",
-              "RelativeDocumentMoniker": "appsettings.Development.json",
-              "ToolTip": "D:\\Github\\EduCoreLiveV1\\educore\\appsettings.Development.json",
-              "RelativeToolTip": "appsettings.Development.json",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAIAAAAYAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001642|",
-              "WhenOpened": "2026-07-26T18:15:28.716Z",
+              "DocumentIndex": 1,
+              "Title": "StudentList.cshtml",
+              "DocumentMoniker": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Views\\Student\\StudentList.cshtml",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Views\\Student\\StudentList.cshtml",
+              "ToolTip": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Views\\Student\\StudentList.cshtml",
+              "RelativeToolTip": "Areas\\ERP\\Views\\Student\\StudentList.cshtml",
+              "ViewState": "AgIAAHMBAAAAAAAAAAAAAMYAAAAKAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-07-29T02:39:03.145Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 2,
-              "Title": "BasicProfile.cshtml",
-              "DocumentMoniker": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Views\\SchoolSettings\\BasicProfile.cshtml",
-              "RelativeDocumentMoniker": "Areas\\ERP\\Views\\SchoolSettings\\BasicProfile.cshtml",
-              "ToolTip": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Views\\SchoolSettings\\BasicProfile.cshtml",
-              "RelativeToolTip": "Areas\\ERP\\Views\\SchoolSettings\\BasicProfile.cshtml",
-              "ViewState": "AgIAABwBAAAAAAAAAAAAACkBAAAeAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
-              "WhenOpened": "2026-07-26T13:43:20.761Z"
+              "Title": "StudentController.cs",
+              "DocumentMoniker": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Controllers\\StudentController.cs",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Controllers\\StudentController.cs",
+              "ToolTip": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Controllers\\StudentController.cs",
+              "RelativeToolTip": "Areas\\ERP\\Controllers\\StudentController.cs",
+              "ViewState": "AgIAAB4AAAAAAAAAAAA1wCYAAAA0AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-07-29T02:38:43.352Z",
+              "EditorCaption": ""
             },
             {
               "$type": "Document",
               "DocumentIndex": 3,
-              "Title": "SchoolSettingsService.cs",
-              "DocumentMoniker": "D:\\Github\\EduCoreLiveV1\\EduCoreDataAccessLayer\\Services\\Repository\\ERP\\SchoolSettingsService.cs",
-              "RelativeDocumentMoniker": "..\\EduCoreDataAccessLayer\\Services\\Repository\\ERP\\SchoolSettingsService.cs",
-              "ToolTip": "D:\\Github\\EduCoreLiveV1\\EduCoreDataAccessLayer\\Services\\Repository\\ERP\\SchoolSettingsService.cs",
-              "RelativeToolTip": "..\\EduCoreDataAccessLayer\\Services\\Repository\\ERP\\SchoolSettingsService.cs",
-              "ViewState": "AgIAAAYAAAAAAAAAAAAAACQAAAARAAAAAAAAAA==",
+              "Title": "EnquiryCRM.cshtml",
+              "DocumentMoniker": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Views\\Enquiry\\EnquiryCRM.cshtml",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Views\\Enquiry\\EnquiryCRM.cshtml",
+              "ToolTip": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Views\\Enquiry\\EnquiryCRM.cshtml",
+              "RelativeToolTip": "Areas\\ERP\\Views\\Enquiry\\EnquiryCRM.cshtml",
+              "ViewState": "AgIAAGYEAAAAAAAAAAAAAGYEAAAdAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-07-29T02:37:02.081Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "EnquiryController.cs",
+              "DocumentMoniker": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Controllers\\EnquiryController.cs",
+              "RelativeDocumentMoniker": "Areas\\ERP\\Controllers\\EnquiryController.cs",
+              "ToolTip": "D:\\Github\\EduCoreLiveV1\\educore\\Areas\\ERP\\Controllers\\EnquiryController.cs",
+              "RelativeToolTip": "Areas\\ERP\\Controllers\\EnquiryController.cs",
+              "ViewState": "AgIAABQAAAAAAAAAAAAAwCcAAABOAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-07-26T13:42:50.396Z"
+              "WhenOpened": "2026-07-29T02:15:38.919Z",
+              "EditorCaption": ""
             }
           ]
         }

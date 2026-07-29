@@ -25,17 +25,24 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         // ── Page load ────────────────────────────────────────────
-        public async Task<EnquiryCrmPageModel> GetEnquiryCrmPageAsync(int tenantId, int schoolId, int actionUserId)
-{
-            var (items, totalCount) = await GetEnquiriesAsync(tenantId, schoolId, actionUserId, 1, 10);
-            return new EnquiryCrmPageModel
-            {
-                Enquiries  = items,
-                TotalCount = totalCount,
-                PageNumber = 1,
-                PageSize   = 10,
-                Stats      = await GetKpiStatsAsync(tenantId, schoolId, actionUserId)
-            };
+        // Same shape as AdmissionService.GetStudentListPageAsync: the bound query
+        // model comes in from the query string, and this fills Items + TotalCount
+        // on it. One model drives the list, the filter bar and the pager.
+        public async Task<EnquiryCrmPageModel> GetEnquiryCrmPageAsync(
+            EnquiryCrmPageModel query, int tenantId, int schoolId, int actionUserId)
+        {
+            var (items, totalCount) = await GetEnquiriesAsync(
+                tenantId, schoolId, actionUserId,
+                query.Page, query.PageSize,
+                query.Search, query.FilterSession, null,
+                query.FilterClass, query.FilterSource, query.FilterPipeline,
+                query.FilterAssignedTo, query.FilterOverdue, query.FilterToday,
+                query.SortColumn, query.SortDirection);
+
+            query.Items      = items;
+            query.TotalCount = totalCount;
+            query.Stats      = await GetKpiStatsAsync(tenantId, schoolId, actionUserId);
+            return query;
         }
 
         // ── Filtered + paginated list ────────────────────────────
@@ -53,7 +60,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             string? filterPipeline   = null,
             int?    filterAssignedTo = null,
             bool    filterOverdue    = false,
-            bool    filterToday      = false)
+            bool    filterToday      = false,
+            string? sortColumn       = null,
+            string? sortDir          = "asc")
         {
             var list = new List<EnquiryListModel>();
             if (tenantId <= 1 || schoolId <= 0) return (list, 0);
@@ -75,6 +84,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_filter_assigned_to", NpgsqlDbType.Integer){ Value = (object?)filterAssignedTo ?? DBNull.Value },
                 new("p_filter_overdue",   NpgsqlDbType.Boolean) { Value = filterOverdue },
                 new("p_filter_today",     NpgsqlDbType.Boolean) { Value = filterToday },
+                new("p_sort_column",      NpgsqlDbType.Text)    { Value = (object?)sortColumn ?? DBNull.Value },
+                new("p_sort_dir",         NpgsqlDbType.Text)    { Value = (object?)sortDir    ?? "asc" },
                 new("p_result", NpgsqlDbType.Refcursor)
                     { Direction = ParameterDirection.InputOutput, Value = "p_result" }
             };
@@ -371,7 +382,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     FollowupType = row["followup_type"] == DBNull.Value ? "Call": row["followup_type"].ToString()!,
                     Outcome=row["outcome"]== DBNull.Value ? null: row["outcome"].ToString(),
                     Notes  = row["notes"]               == DBNull.Value ? null                  : row["notes"].ToString(),
-                    NextFollowupDate  = row["next_followup_date"]  == DBNull.Value ? null                  : DateOnly.FromDateTime(Convert.ToDateTime(row["next_followup_date"])),
+                    NextFollowupDate  = DateVal(row, "next_followup_date"),
                     StatusBefore      = row["status_before"]       == DBNull.Value ? null                  : row["status_before"].ToString(),
                     StatusAfter       = row["status_after"]        == DBNull.Value ? null                  : row["status_after"].ToString(),
                     CreatedBy         = IntVal(row, "created_by"),
@@ -468,8 +479,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             m.SchoolId              = schoolId;
             m.StudentName           = Str(row, "student_name");
             m.Gender                = NullStr(row, "gender");
-            //m.Dob                   = Has(row,"dob") && row["dob"] != DBNull.Value
-            //                            ? DateOnly.FromDateTime(Convert.ToDateTime(row["dob"])) : null;
+            m.Dob                   = DateVal(row, "dob");
             m.ClassName             = Str(row, "class_name");
             m.Session               = Str(row, "session");
             m.InterestedStream      = NullStr(row, "interested_stream");
@@ -496,12 +506,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             m.AssignedToId          = Has(row,"assigned_to_id") && row["assigned_to_id"] != DBNull.Value
                                         ? Convert.ToInt32(row["assigned_to_id"]) : null;
             m.LostReason            = NullStr(row, "lost_reason");
-            m.EnquiryDate = Has(row, "enquiry_date") && row["enquiry_date"] != DBNull.Value
-     ? (DateOnly)row["enquiry_date"]
-     : DateOnly.FromDateTime(DateTime.Today);
-            m.NextFollowupDate = Has(row, "next_followup_date") && row["next_followup_date"] != DBNull.Value
-     ? (DateOnly?)row["next_followup_date"]
-     : null;
+            m.EnquiryDate           = DateVal(row, "enquiry_date") ?? DateOnly.FromDateTime(DateTime.Today);
+            m.NextFollowupDate      = DateVal(row, "next_followup_date");
             m.Notes                 = NullStr(row, "notes");
             m.EstimatedFee          = Has(row,"estimated_fee") && row["estimated_fee"] != DBNull.Value
                                         ? Convert.ToDecimal(row["estimated_fee"]) : null;
@@ -526,5 +532,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static bool    BoolVal(DataRow r, string col)  => Has(r,col) && r[col] != DBNull.Value && Convert.ToBoolean(r[col]);
         private static string  Str(DataRow r, string col)      => Has(r,col) && r[col] != DBNull.Value ? r[col].ToString()!        : string.Empty;
         private static string? NullStr(DataRow r, string col)  => Has(r,col) && r[col] != DBNull.Value ? r[col].ToString()         : null;
+
+        // A Postgres `date` arrives as DateOnly, which does NOT implement IConvertible —
+        // Convert.ToDateTime on it throws InvalidCastException. Always cast, never Convert.
+        private static DateOnly? DateVal(DataRow r, string col) =>
+            Has(r, col) && r[col] != DBNull.Value ? (DateOnly)r[col] : null;
     }
 }

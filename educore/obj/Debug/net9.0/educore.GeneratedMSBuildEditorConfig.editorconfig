@@ -48,6 +48,18 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEF0dGVuZGFuY2VcU3R1ZGVudEF0dGVuZGFuY2UuY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
+[D:/Github/EduCoreLiveV1/educore/Areas/ERP/Views/Enquiry/EnquiryCRM.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEVucXVpcnlcRW5xdWlyeUNSTS5jc2h0bWw=
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLiveV1/educore/Areas/ERP/Views/Enquiry/_EnquiryRowActions.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEVucXVpcnlcX0VucXVpcnlSb3dBY3Rpb25zLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
+[D:/Github/EduCoreLiveV1/educore/Areas/ERP/Views/Enquiry/_EnquiryStatusCell.cshtml]
+build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEVucXVpcnlcX0VucXVpcnlTdGF0dXNDZWxsLmNzaHRtbA==
+build_metadata.AdditionalFiles.CssScope = 
+
 [D:/Github/EduCoreLiveV1/educore/Areas/ERP/Views/Exam/CreateExam.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXEV4YW1cQ3JlYXRlRXhhbS5jc2h0bWw=
 build_metadata.AdditionalFiles.CssScope = 
@@ -130,10 +142,6 @@ build_metadata.AdditionalFiles.CssScope =
 
 [D:/Github/EduCoreLiveV1/educore/Areas/ERP/Views/SchoolSettings/Documents.cshtml]
 build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFNjaG9vbFNldHRpbmdzXERvY3VtZW50cy5jc2h0bWw=
-build_metadata.AdditionalFiles.CssScope = 
-
-[D:/Github/EduCoreLiveV1/educore/Areas/ERP/Views/SchoolSettings/EnquiryCRM.cshtml]
-build_metadata.AdditionalFiles.TargetPath = QXJlYXNcRVJQXFZpZXdzXFNjaG9vbFNldHRpbmdzXEVucXVpcnlDUk0uY3NodG1s
 build_metadata.AdditionalFiles.CssScope = 
 
 [D:/Github/EduCoreLiveV1/educore/Areas/ERP/Views/SchoolSettings/FeeHead.cshtml]

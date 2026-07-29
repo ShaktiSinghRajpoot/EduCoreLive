@@ -1,0 +1,71 @@
+@model EduCoreDataAccessLayer.Models.ERP.EnquiryListModel
+@{
+    // The status cell: either a locked badge or a dropdown of the statuses a user
+    // may pick by hand. Shared by the desktop table and the mobile cards.
+    //
+    // Only MANUAL statuses belong in the list. "Registration Done" and "Admission
+    // Confirmed" are action-driven (set by the Register action / admission save)
+    // and must NOT be directly selectable — picking them here would create records
+    // with no registration number and no student.
+    var statuses = new (string Key, string Icon, string Css)[]
+    {
+        ("New",                    "bx-user",      ""),
+        ("Follow-up Pending",      "bx-phone",     ""),
+        ("Interested",             "bx-heart",     ""),
+        ("Campus Visit Scheduled", "bx-building",  ""),
+        ("Not Interested",         "bx-x-circle",  "text-danger")
+    };
+}
+
+@if (Model.IsTerminal)
+{
+    <span class="badge bg-label-success" title="Admission Confirmed — final status">
+        <i class="bx bx-check-circle me-1"></i>@Model.Status
+    </span>
+}
+else if (Model.Status == "Registration Done")
+{
+    @* Action-driven (issued by the Register action). Locked as a badge — to revert,
+       use Cancel Registration on the Registrations screen. *@
+    <span class="badge bg-label-secondary" title="Registered — use Cancel Registration to revert">
+        <i class="bx bx-clipboard me-1"></i>@Model.Status
+    </span>
+}
+else
+{
+    @* NO onclick="stopPropagation" here: Bootstrap's dropdown data-API and the
+       page's jQuery delegation both listen on document, and stopPropagation on a
+       parent kills them both. The row-click handler's own guard already prevents
+       row navigation when the click lands inside a dropdown. *@
+    <div class="dropdown">
+        <span class="badge @Model.StatusBadgeClass status-badge-toggle"
+              data-bs-toggle="dropdown" aria-expanded="false" style="cursor:pointer">
+            @Model.Status
+            <i class="bx bx-chevron-down" style="font-size:.65rem;opacity:.75;vertical-align:middle"></i>
+        </span>
+        <ul class="dropdown-menu dropdown-menu-end shadow py-1" style="min-width:215px;font-size:.82rem">
+            <li>
+                <div class="px-3 pt-2 pb-1" style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ec-text-muted)">
+                    Change Status
+                </div>
+            </li>
+            <li><hr class="dropdown-divider my-1"></li>
+            @foreach (var s in statuses)
+            {
+                var isActive  = s.Key == Model.Status;
+                var needsLost = s.Key == "Not Interested";
+                <li>
+                    <a class="dropdown-item status-opt @(isActive ? "active" : "") @s.Css" href="#"
+                       data-id="@Model.EnquiryId" data-status="@s.Key"
+                       data-needs-lost="@(needsLost ? "1" : "")">
+                        <i class="bx @s.Icon me-2"></i>@s.Key
+                        @if (isActive)
+                        {
+                            <i class="bx bx-check check-icon ms-auto"></i>
+                        }
+                    </a>
+                </li>
+            }
+        </ul>
+    </div>
+}
