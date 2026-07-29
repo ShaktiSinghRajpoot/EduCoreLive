@@ -1,4 +1,7 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using System.Linq
+@using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Mvc.ViewFeatures
 @model EduCoreDataAccessLayer.Models.ERP.EnquiryCrmPageModel
 @{
     ViewData["Title"] = "Enquiry CRM";
@@ -8,10 +11,46 @@
     var classes      = Model.AvailableClasses;
     var counsellors  = Model.AvailableCounsellors;
     var showRegistration = Model.Workflow.EnableRegistration;
+    // Read by _EnquiryRowActions to show/hide the Register button.
+    ViewData["ShowRegistration"] = showRegistration;
+
+    // Sort header link: preserves filters, drops Page (back to page 1), toggles
+    // direction when the same column is clicked again. Server-side + whitelisted.
+    // Same helper as StudentList so both pages behave identically.
+    string SortUrl(string col)
+    {
+        var q = Context.Request.Query
+            .Where(k => !new[] { "SortColumn", "SortDir", "Page" }.Contains(k.Key, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(k => k.Key, k => k.Value.ToString());
+        q["SortColumn"] = col;
+        q["SortDir"] = (string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase) && !Model.Desc) ? "desc" : "asc";
+        return Context.Request.Path + QueryString.Create(q);
+    }
+    string SortIcon(string col)
+    {
+        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-sort ec-si";
+        return "bx " + (Model.Desc ? "bx-sort-down" : "bx-sort-up") + " ec-si ec-si-on";
+    }
+
+    bool Sel(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+
+    // Pipeline tab link: swaps FilterPipeline and drops Page, keeping the search
+    // and dropdown filters. The quick filters are cleared because a pipeline stage
+    // and "overdue only" answer two different questions.
+    string PipelineUrl(string key)
+    {
+        var q = Context.Request.Query
+            .Where(k => !new[] { "FilterPipeline", "FilterOverdue", "FilterToday", "Page" }.Contains(k.Key, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(k => k.Key, k => k.Value.ToString());
+        if (!string.IsNullOrEmpty(key)) { q["FilterPipeline"] = key; }
+        return Context.Request.Path + QueryString.Create(q);
+    }
+    string PipelineCss(string key)
+        => string.Equals(Model.FilterPipeline ?? "", key, StringComparison.OrdinalIgnoreCase) ? "pipeline-tab active" : "pipeline-tab";
 }
 
 @section PageStyles {
-    <link rel="stylesheet" href="~/css/ERP/SchoolSettings/EnquiryCRM.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/ERP/Enquiry/EnquiryCRM.css" asp-append-version="true" />
 }
 
 @* Standalone CSRF token for all AJAX POST calls on this page *@
@@ -42,45 +81,12 @@
         </div>
     </div>
 
-    <!-- ── KPI Cards ─── -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-sm-4 col-xl-2">
-            <div class="crm-kpi-card d-flex align-items-center gap-3">
-                <div class="kpi-icon bg-label-primary"><i class="bx bx-group text-primary"></i></div>
-                <div><div class="kpi-value text-primary">@stats.TotalLeads</div><div class="kpi-label">Total Leads</div><div class="kpi-sub">This session</div></div>
-            </div>
-        </div>
-        <div class="col-6 col-sm-4 col-xl-2">
-            <div class="crm-kpi-card d-flex align-items-center gap-3">
-                <div class="kpi-icon bg-label-warning"><i class="bx bx-time text-warning"></i></div>
-                <div><div class="kpi-value text-warning">@stats.DueToday</div><div class="kpi-label">Due Today</div><div class="kpi-sub">Follow-ups</div></div>
-            </div>
-        </div>
-        <div class="col-6 col-sm-4 col-xl-2">
-            <div class="crm-kpi-card d-flex align-items-center gap-3">
-                <div class="kpi-icon bg-label-danger"><i class="bx bx-error-circle text-danger"></i></div>
-                <div><div class="kpi-value text-danger">@stats.OverdueCount</div><div class="kpi-label">Overdue</div><div class="kpi-sub">Need attention</div></div>
-            </div>
-        </div>
-        <div class="col-6 col-sm-4 col-xl-2">
-            <div class="crm-kpi-card d-flex align-items-center gap-3">
-                <div class="kpi-icon bg-label-info"><i class="bx bx-building text-info"></i></div>
-                <div><div class="kpi-value text-info">@stats.CampusVisits</div><div class="kpi-label">Campus Visits</div><div class="kpi-sub">Scheduled</div></div>
-            </div>
-        </div>
-        <div class="col-6 col-sm-4 col-xl-2">
-            <div class="crm-kpi-card d-flex align-items-center gap-3">
-                <div class="kpi-icon bg-label-success"><i class="bx bx-check-circle text-success"></i></div>
-                <div><div class="kpi-value text-success">@stats.Admitted</div><div class="kpi-label">Admitted</div><div class="kpi-sub">This session</div></div>
-            </div>
-        </div>
-        <div class="col-6 col-sm-4 col-xl-2">
-            <div class="crm-kpi-card d-flex align-items-center gap-3">
-                <div class="kpi-icon bg-label-secondary"><i class="bx bx-trending-up"></i></div>
-                <div><div class="kpi-value">@stats.ConversionRate%</div><div class="kpi-label">Conversion</div><div class="kpi-sub">Rate</div></div>
-            </div>
-        </div>
-    </div>
+    @* The KPI card row used to sit here. It was removed because it repeated the
+       pipeline tabs (Total/All, Campus Visits, Admitted) and the quick-filter
+       buttons (Due Today, Overdue) — the same number in two or three places.
+       The stage counts live on the tabs below, Due Today / Overdue are counts on
+       the quick-filter buttons, and Conversion Rate — the only figure that was
+       unique to the row — is the chip in this card's header. *@
 
     <!-- ── Pipeline Tabs ─── -->
     <div class="ec-card mb-3">
@@ -90,21 +96,29 @@
                     <span class="ec-section-icon"><i class="bx bx-git-branch"></i></span>
                     <div><h5 class="ec-section-title mb-1">Admission Pipeline</h5><p class="ec-section-subtitle mb-0">Click a stage to filter.</p></div>
                 </div>
+                <div class="crm-conv-chip" title="Admitted as a share of total enquiries">
+                    <i class="bx bx-trending-up"></i>
+                    <span class="crm-conv-val">@stats.ConversionRate%</span>
+                    <span class="crm-conv-lbl">Conversion</span>
+                </div>
             </div>
         </div>
         <div class="ec-card-body py-3">
+            @* Plain links carrying FilterPipeline in the query string — no JavaScript.
+               The active tab is decided by the model, so a refresh or a shared URL
+               lands on the same stage. *@
             <div class="crm-pipeline" id="pipelineTabs">
-                <a class="pipeline-tab active" data-pipeline=""              href="#"><span class="ptab-count">@stats.TotalLeads</span><span class="ptab-label">All</span></a>
-                <a class="pipeline-tab"        data-pipeline="new"           href="#"><span class="ptab-count">@stats.CntNew</span><span class="ptab-label">New</span></a>
-                <a class="pipeline-tab"        data-pipeline="followup"      href="#"><span class="ptab-count">@stats.CntFollowup</span><span class="ptab-label">Follow-up</span></a>
-                <a class="pipeline-tab"        data-pipeline="interested"    href="#"><span class="ptab-count">@stats.CntInterested</span><span class="ptab-label">Interested</span></a>
-                <a class="pipeline-tab"        data-pipeline="campusvisit"   href="#"><span class="ptab-count">@stats.CntCampusVisit</span><span class="ptab-label">Campus Visit</span></a>
+                <a class="@PipelineCss("")"             href="@PipelineUrl("")"><span class="ptab-count">@stats.TotalLeads</span><span class="ptab-label">All</span></a>
+                <a class="@PipelineCss("new")"          href="@PipelineUrl("new")"><span class="ptab-count">@stats.CntNew</span><span class="ptab-label">New</span></a>
+                <a class="@PipelineCss("followup")"     href="@PipelineUrl("followup")"><span class="ptab-count">@stats.CntFollowup</span><span class="ptab-label">Follow-up</span></a>
+                <a class="@PipelineCss("interested")"   href="@PipelineUrl("interested")"><span class="ptab-count">@stats.CntInterested</span><span class="ptab-label">Interested</span></a>
+                <a class="@PipelineCss("campusvisit")"  href="@PipelineUrl("campusvisit")"><span class="ptab-count">@stats.CntCampusVisit</span><span class="ptab-label">Campus Visit</span></a>
                 @if (showRegistration)
                 {
-                <a class="pipeline-tab"        data-pipeline="registered"    href="#"><span class="ptab-count">@stats.CntRegistered</span><span class="ptab-label">Registered</span></a>
+                <a class="@PipelineCss("registered")"   href="@PipelineUrl("registered")"><span class="ptab-count">@stats.CntRegistered</span><span class="ptab-label">Registered</span></a>
                 }
-                <a class="pipeline-tab"        data-pipeline="admitted"      href="#"><span class="ptab-count">@stats.Admitted</span><span class="ptab-label">Admitted</span></a>
-                <a class="pipeline-tab"        data-pipeline="notinterested" href="#"><span class="ptab-count text-danger">@stats.CntNotInterested</span><span class="ptab-label">Not Interested</span></a>
+                <a class="@PipelineCss("admitted")"     href="@PipelineUrl("admitted")"><span class="ptab-count">@stats.Admitted</span><span class="ptab-label">Admitted</span></a>
+                <a class="@PipelineCss("notinterested")" href="@PipelineUrl("notinterested")"><span class="ptab-count text-danger">@stats.CntNotInterested</span><span class="ptab-label">Not Interested</span></a>
             </div>
         </div>
     </div>
@@ -120,61 +134,85 @@
             </div>
         </div>
         <div class="ec-card-body">
-            <div class="row g-2 align-items-end">
-                <div class="col-12 col-lg-4">
-                    <div class="input-group">
-                        <span class="input-group-text bg-transparent border-end-0 pe-1">
-                            <i class="bx bx-search text-muted"></i>
-                        </span>
-                        <input type="search" class="form-control border-start-0 ps-0"
-                               id="leadSearch" placeholder="Search student, parent or mobile..." />
+            @* All filtering/sorting/paging is server-side: this GET form round-trips
+               the query string. Omitting Page here means any filter change resets to
+               page 1. Sort is carried in hidden fields so it survives a filter change. *@
+            <form id="enqFilterForm" method="get" asp-area="ERP" asp-controller="Enquiry" asp-action="EnquiryCRM">
+                <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+                <input type="hidden" name="SortDir" value="@Model.SortDirection" />
+
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-lg-4">
+                        <div class="input-group">
+                            <span class="input-group-text bg-transparent border-end-0 pe-1">
+                                <i class="bx bx-search text-muted"></i>
+                            </span>
+                            <input type="search" class="form-control border-start-0 ps-0" name="Search"
+                                   value="@Model.Search" placeholder="Search student, parent or mobile..."
+                                   onchange="this.form.submit()" />
+                        </div>
                     </div>
-                </div>
-                <div class="col-6 col-sm-3 col-lg-2">
-                    <select class="form-select" id="sessionFilter">
-                        <option value="">All Sessions</option>
-                        @foreach (var s in sessions){<option value="@s.Text">@s.Text</option>}
-                    </select>
-                </div>
-                <div class="col-6 col-sm-3 col-lg-2">
-                    <select class="form-select" id="classFilter">
-                        <option value="">All Classes</option>
-                        @foreach (var c in classes){<option value="@c.Text">@c.Text</option>}
-                    </select>
-                </div>
-                <div class="col-6 col-sm-3 col-lg-2">
-                    <select class="form-select" id="sourceFilter">
-                        <option value="">All Sources</option>
-                        <option value="Walk-in">Walk-in</option>
-                        <option value="QR Code">QR Code</option>
-                        <option value="Referral">Referral</option>
-                        <option value="Website">Website</option>
-                        <option value="Phone Call">Phone Call</option>
-                        <option value="Social Media">Social Media</option>
-                    </select>
-                </div>
-                @if (counsellors.Any())
-                {
                     <div class="col-6 col-sm-3 col-lg-2">
-                        <select class="form-select" id="counsellorFilter">
-                            <option value="">All Counsellors</option>
-                            @foreach (var c in counsellors){<option value="@c.Value">@c.Text</option>}
+                        <select class="form-select" name="FilterSession" onchange="this.form.submit()">
+                            <option value="">All Sessions</option>
+                            @foreach (var s in sessions){<option value="@s.Text" selected="@Sel(s.Text, Model.FilterSession)">@s.Text</option>}
                         </select>
                     </div>
-                }
-            </div>
-            <div class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top">
-                <span class="text-muted" style="font-size:.76rem">Quick:</span>
-                <button type="button" class="qf-btn" id="btnTodayFollowups">
-                    <i class="bx bx-time"></i> Today's Follow-ups
-                </button>
-                <button type="button" class="qf-btn" id="btnOverdue">
-                    <i class="bx bx-error-circle"></i> Overdue Only
-                </button>
-                <button type="button" class="qf-btn ms-auto" id="btnClear">
-                    <i class="bx bx-x"></i> Clear All
-                </button>
-            </div>
+                    <div class="col-6 col-sm-3 col-lg-2">
+                        <select class="form-select" name="FilterClass" onchange="this.form.submit()">
+                            <option value="">All Classes</option>
+                            @foreach (var c in classes){<option value="@c.Text" selected="@Sel(c.Text, Model.FilterClass)">@c.Text</option>}
+                        </select>
+                    </div>
+                    <div class="col-6 col-sm-3 col-lg-2">
+                        <select class="form-select" name="FilterSource" onchange="this.form.submit()">
+                            <option value="">All Sources</option>
+                            @foreach (var src in new[] { "Walk-in", "QR Code", "Referral", "Website", "Phone Call", "Social Media" })
+                            {
+                                <option value="@src" selected="@Sel(src, Model.FilterSource)">@src</option>
+                            }
+                        </select>
+                    </div>
+                    @if (counsellors.Any())
+                    {
+                        <div class="col-6 col-sm-3 col-lg-2">
+                            <select class="form-select" name="FilterAssignedTo" onchange="this.form.submit()">
+                                <option value="">All Counsellors</option>
+                                @foreach (var c in counsellors)
+                                {
+                                    <option value="@c.Value" selected="@Sel(c.Value, Model.FilterAssignedTo?.ToString())">@c.Text</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                </div>
+
+                @* The two quick filters are booleans carried in the same form. Each
+                   button flips its hidden field and resubmits, so they combine with
+                   the dropdowns above instead of replacing them. *@
+                <input type="hidden" name="FilterToday"   id="fToday"   value="@Model.FilterToday.ToString().ToLower()" />
+                <input type="hidden" name="FilterOverdue" id="fOverdue" value="@Model.FilterOverdue.ToString().ToLower()" />
+
+                <div class="d-flex flex-wrap align-items-center gap-2 mt-3 pt-3 border-top">
+                    <span class="text-muted" style="font-size:.76rem">Quick:</span>
+                    @* The counts used to be KPI cards of their own. They belong here,
+                       on the button that actually filters by them. *@
+                    <button type="button" class="qf-btn @(Model.FilterToday ? "active-warning" : "")" data-toggle-filter="fToday">
+                        <i class="bx bx-time"></i> Today's Follow-ups
+                        <span class="qf-count">@stats.DueToday</span>
+                    </button>
+                    <button type="button" class="qf-btn @(Model.FilterOverdue ? "active-danger" : "")" data-toggle-filter="fOverdue">
+                        <i class="bx bx-error-circle"></i> Overdue Only
+                        <span class="qf-count @(stats.OverdueCount > 0 ? "qf-count-danger" : "")">@stats.OverdueCount</span>
+                    </button>
+                    @if (Model.HasFilters)
+                    {
+                        <a asp-area="ERP" asp-controller="Enquiry" asp-action="EnquiryCRM" class="qf-btn ms-auto">
+                            <i class="bx bx-x"></i> Clear All
+                        </a>
+                    }
+                </div>
+            </form>
         </div>
     </div>
 
@@ -186,77 +224,170 @@
                     <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
                     <div>
                         <h5 class="ec-section-title mb-1">Enquiries</h5>
-                        <p class="ec-section-subtitle mb-0" id="tableSubtitle">Loading...</p>
+                        <p class="ec-section-subtitle mb-0">
+                            @if (Model.TotalCount > 0)
+                            {
+                                <text>Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount enquiries</text>
+                            }
+                            else
+                            {
+                                <text>No enquiries found</text>
+                            }
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="table-responsive">
-            <table class="table ec-table table-hover align-middle mb-0">
+        <div class="ec-list-tbl-wrap">
+            <table class="table ec-list-tbl align-middle mb-0">
                 <thead>
                     <tr>
-                        <th style="min-width:185px">Student</th>
+                        <th class="text-center" style="width:56px">S.No</th>
+                        <th style="min-width:185px"><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("name")">Student <i class="@SortIcon("name")"></i></a></th>
                         <th style="min-width:165px">Parent &amp; Contact</th>
-                        <th style="min-width:110px">Class / Session</th>
-                        <th style="min-width:100px">Source</th>
-                        <th style="min-width:130px">Status</th>
-                        <th style="min-width:130px">Next Follow-up</th>
-                        <th style="min-width:80px">Age</th>
+                        <th style="min-width:110px"><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("class")">Class / Session <i class="@SortIcon("class")"></i></a></th>
+                        <th style="min-width:100px"><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("source")">Source <i class="@SortIcon("source")"></i></a></th>
+                        <th style="min-width:130px"><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("status")">Status <i class="@SortIcon("status")"></i></a></th>
+                        <th style="min-width:130px"><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("nextfu")">Next Follow-up <i class="@SortIcon("nextfu")"></i></a></th>
+                        <th style="min-width:80px"><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("age")">Age <i class="@SortIcon("age")"></i></a></th>
                         <th class="text-end" style="min-width:185px">Actions</th>
                     </tr>
                 </thead>
-                <tbody id="leadTableBody">
-                    <tr id="loadingRow">
-                        <td colspan="8" class="text-center py-5 text-muted">
-                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                            Loading enquiries...
-                        </td>
-                    </tr>
+                <tbody>
+                    @{ var rowNo = Model.FirstRow; }
+                    @foreach (var e in Model.Items)
+                    {
+                        <tr class="lead-row @(e.IsOverdue ? "overdue-row" : "")" data-id="@e.EnquiryId">
+                            <td class="text-center lead-meta">@rowNo</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="student-avatar @e.AvatarColorClass">@e.StudentInitials</div>
+                                    <div>
+                                        <div class="lead-name">@e.StudentName</div>
+                                        <div class="lead-meta">@e.ClassName &middot; @e.Session</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="fw-semibold text-dark" style="font-size:.83rem">@e.PrimaryParentDisplay</div>
+                                <a href="@e.CallUrl" class="lead-meta text-decoration-none" onclick="event.stopPropagation()">
+                                    <i class="bx bx-phone me-1"></i>@e.Mobile
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge bg-label-primary">@e.ClassName</span>
+                                <div class="lead-meta mt-1">@e.Session</div>
+                            </td>
+                            <td><span class="source-pill"><i class="bx @e.SourceIcon"></i> @e.LeadSource</span></td>
+                            <td>@await Html.PartialAsync("_EnquiryStatusCell", e)</td>
+                            <td>
+                                <div class="@e.FollowupCssClass">
+                                    @if (!string.IsNullOrEmpty(e.FollowupIcon))
+                                    {
+                                        <i class="bx @e.FollowupIcon me-1"></i>
+                                    }
+                                    @e.FollowupDisplay
+                                    @if (e.FollowupCount > 0)
+                                    {
+                                        <span class="followup-count-badge"><i class="bx bx-chat"></i>@e.FollowupCount</span>
+                                    }
+                                </div>
+                                @if (!string.IsNullOrEmpty(e.FollowupSubtext))
+                                {
+                                    <div class="lead-meta">@e.FollowupSubtext</div>
+                                }
+                            </td>
+                            <td><span class="lead-meta">@e.DaysSinceLabel</span></td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-1 align-items-center flex-nowrap">
+                                    @await Html.PartialAsync("_EnquiryRowActions", e)
+                                </div>
+                            </td>
+                        </tr>
+                        rowNo++;
+                    }
                 </tbody>
             </table>
         </div>
 
-        <div class="text-center py-5 d-none" id="leadEmptyState">
-            <div class="avatar avatar-lg mx-auto mb-3">
-                <span class="avatar-initial rounded bg-label-secondary"><i class="bx bx-search"></i></span>
+        @if (Model.Items.Count == 0)
+        {
+            <div class="text-center py-5">
+                <div class="avatar avatar-lg mx-auto mb-3">
+                    <span class="avatar-initial rounded bg-label-secondary"><i class="bx bx-search"></i></span>
+                </div>
+                <h6 class="mb-1">No enquiries match your filters</h6>
+                <p class="text-muted mb-0">Try adjusting search, filters, or pipeline stage.</p>
             </div>
-            <h6 class="mb-1">No enquiries match your filters</h6>
-            <p class="text-muted mb-0">Try adjusting search, filters, or pipeline stage.</p>
-        </div>
+        }
 
-        <div class="crm-pg-bar" id="pgBar">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <label class="text-muted" style="font-size:.77rem">Per page:</label>
-                <select class="form-select form-select-sm" id="pageSizeSelect" style="width:auto">
-                    <option value="10" selected>10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                </select>
-                <span class="text-muted" id="pgInfo" style="font-size:.77rem"></span>
-            </div>
-            <nav><ul class="pagination pagination-sm mb-0" id="pgControls"></ul></nav>
-        </div>
     </div>
 
     <!-- ── Mobile Card List ─── -->
-    <div class="crm-card-list" id="mobileCardList">
-        <div class="text-center py-5 text-muted" id="mobileLoader">
-            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-            Loading...
-        </div>
-    </div>
-    <div class="ec-card d-md-none mt-2" id="mobilePgCard" style="display:none!important">
-        <div class="crm-pg-bar">
-            <div class="d-flex align-items-center gap-2">
-                <label class="text-muted" style="font-size:.77rem">Per page:</label>
-                <select class="form-select form-select-sm" id="mobilePgSize" style="width:auto">
-                    <option value="10" selected>10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                </select>
+    @* Same rows as the table above, stacked as cards below 768px. Server-rendered
+       from the same Model.Items, so the two views can never disagree. *@
+    <div class="crm-card-list">
+        @{ var cardNo = Model.FirstRow; }
+        @foreach (var e in Model.Items)
+        {
+            <div class="crm-card lead-row @(e.IsOverdue ? "overdue-card" : "")" data-id="@e.EnquiryId">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="lead-meta crm-card-sno">@cardNo</span>
+                        <div class="student-avatar @e.AvatarColorClass">@e.StudentInitials</div>
+                        <div>
+                            <div class="lead-name">@e.StudentName</div>
+                            <div class="lead-meta">@e.PrimaryParentDisplay</div>
+                        </div>
+                    </div>
+                    @await Html.PartialAsync("_EnquiryStatusCell", e)
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <span class="badge bg-label-primary">@e.ClassName</span>
+                    <span class="source-pill"><i class="bx @e.SourceIcon"></i> @e.LeadSource</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="@e.FollowupCssClass" style="font-size:.76rem">
+                            @if (!string.IsNullOrEmpty(e.FollowupIcon))
+                            {
+                                <i class="bx @e.FollowupIcon me-1"></i>
+                            }
+                            @e.FollowupDisplay
+                        </div>
+                        @if (!string.IsNullOrEmpty(e.FollowupSubtext))
+                        {
+                            <div class="lead-meta">@e.FollowupSubtext</div>
+                        }
+                    </div>
+                    <div class="d-flex gap-1 flex-wrap align-items-center">
+                        @await Html.PartialAsync("_EnquiryRowActions", e)
+                    </div>
+                </div>
             </div>
-            <nav><ul class="pagination pagination-sm mb-0" id="mobilePgControls"></ul></nav>
+            cardNo++;
+        }
+        @if (Model.Items.Count == 0)
+        {
+            <div class="text-center py-5 text-muted">
+                <i class="bx bx-search fs-1 d-block mb-2 opacity-25"></i>No results.
+            </div>
+        }
+    </div>
+    @* ONE pagination bar for both the table and the cards. Rendering _PageSize
+       twice would put two name="PageSize" selects in the same form, and the pair
+       would post as "10,25" — the value would fail to bind and silently do nothing. *@
+    <div class="ec-card mt-2">
+        <div class="crm-pg-bar">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <partial name="_PageSize" model="Model" view-data='@(new ViewDataDictionary(ViewData) { { "FormId", "enqFilterForm" }, { "Label", "Per page" } })' />
+                @if (Model.TotalCount > 0)
+                {
+                    <span class="text-muted" style="font-size:.77rem">Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount</span>
+                }
+            </div>
+            <partial name="_Pager" model="Model" />
         </div>
     </div>
 
@@ -554,19 +685,15 @@
                         <input type="date" class="form-control" id="followupNextDate" />
                     </div>
 
-                    <!-- Update Status (optional) -->
-                    <div class="col-12">
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="updateStatusCheck" />
-                            <label class="form-check-label" for="updateStatusCheck">
-                                Also update enquiry status
-                            </label>
-                        </div>
-                    </div>
-                    <div class="col-12 d-none" id="newStatusRow">
-                        <label class="form-label">New Status</label>
+                    @* This used to sit behind an "Also update enquiry status" switch. The
+                       switch hid the one field the outcome above already implies, so the
+                       user had to flip it to see a choice that was made for them. Changing
+                       status after a call is the normal case, not the exception — so the
+                       field is always visible and defaults to leaving the status alone. *@
+                    <div class="col-12" id="newStatusRow">
+                        <label class="form-label">Status after this follow-up</label>
                         <select class="form-select" id="followupNewStatus">
-                            <option value="">Keep current</option>
+                            <option value="" id="keepCurrentOption">Keep current</option>
                             <option value="New">New</option>
                             <option value="Follow-up Pending">Follow-up Pending</option>
                             <option value="Interested">Interested</option>
@@ -575,6 +702,13 @@
                         </select>
                         @* Registration Done / Admission Confirmed are intentionally omitted —
                            they are set only by the Register action and admission save. *@
+                    </div>
+                    <div class="col-12 d-none" id="statusLockedNote">
+                        <div class="alert alert-light border mb-0 py-2" style="font-size:.8rem">
+                            <i class="bx bx-lock-alt me-1"></i>
+                            Status is locked for this enquiry. Use <strong>Cancel Registration</strong>
+                            or the admission screen to change it. You can still log this follow-up.
+                        </div>
                     </div>
 
                     <!-- Lost reason — shown when status or outcome = Not Interested -->
@@ -645,6 +779,42 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger btn-sm" id="confirmLostBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     SCHEDULE CAMPUS VISIT MODAL
+     "Campus Visit Scheduled" used to be a status with no date anywhere, so the
+     visit itself was never recorded. Picking that status now asks when.
+═════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="scheduleVisitModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <div class="modal-header d-flex align-items-center justify-content-between gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bx bx-building text-info fs-5 flex-shrink-0"></i>
+                    <div>
+                        <h6 class="modal-title mb-0">Schedule Campus Visit</h6>
+                        <small class="text-muted" id="visitStudentName"></small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="visitEnquiryId" />
+                <label class="form-label">Visit date <span class="text-danger">*</span></label>
+                <input type="date" class="form-control mb-3" id="visitDate" />
+                <label class="form-label">Note <span class="text-muted">(optional)</span></label>
+                <input type="text" class="form-control" id="visitNote" maxlength="300"
+                       placeholder="e.g. Parents coming at 11 AM with both children" />
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" id="confirmVisitBtn">
+                    <i class="bx bx-calendar-check me-1"></i>Schedule
+                </button>
             </div>
         </div>
     </div>
@@ -833,38 +1003,8 @@
     </div>
 </div>
 
-<!-- ════════════════════════════════════════════════════════
-     DELETE CONFIRMATION MODAL
-═════════════════════════════════════════════════════════ -->
-<div class="modal fade" id="deleteEnquiryModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-sm">
-        <div class="modal-content">
-            <div class="modal-header d-flex align-items-center justify-content-between gap-2 border-0 pb-0">
-                <div class="d-flex align-items-center gap-2">
-                    <div style="width:32px;height:32px;border-radius:8px;background:rgba(239,68,68,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                        <i class="bx bx-trash text-danger"></i>
-                    </div>
-                    <h6 class="modal-title mb-0">Delete Enquiry</h6>
-                </div>
-                <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body pt-2">
-                <p class="mb-0">
-                    Are you sure you want to delete the enquiry for
-                    <strong id="deleteEnquiryName"></strong>?
-                    This action cannot be undone.
-                </p>
-                <input type="hidden" id="deleteEnquiryId" />
-            </div>
-            <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteBtn">
-                    <i class="bx bx-trash me-1"></i> Delete
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+@* Delete confirmation uses the shared EC.confirm dialog (site.js), so this page
+   has no delete modal of its own. *@
 
 @await Html.PartialAsync("_FeeReceiptModal")
 
@@ -880,51 +1020,11 @@ $(document).ready(function () {
         csrf = $('[name="__RequestVerificationToken"]').val() || '';
     }
 
-    /* ── Loader: EC.showLoader / EC.hideLoader (wwwroot/js/site.js) ── */
-    var showLoader = EC.showLoader, hideLoader = EC.hideLoader;
-
-    /* ── Filter state ───────────────────────────────────── */
-    var F = { page:1, pageSize:10, search:'', session:'', className:'', source:'', pipeline:'', assignedTo:'', overdue:false, today:false };
-
-    /* ── HTML escape ────────────────────────────────────── */
-
-    /* ── Fetch data ─────────────────────────────────────── */
-    var fetchXhr;
-    function fetchData(resetPage) {
-        if (resetPage) F.page = 1;
-        if (fetchXhr) fetchXhr.abort();
-        showLoader();
-
-        fetchXhr = $.get('/ERP/Enquiry/GetEnquiriesData', {
-            page: F.page, pageSize: F.pageSize,
-            search: F.search, session: F.session, className: F.className,
-            source: F.source, pipeline: F.pipeline, assignedTo: F.assignedTo,
-            overdue: F.overdue, today: F.today
-        })
-        .done(function(d) {
-            if (!d.success) {
-                // Otherwise the first-load #loadingRow keeps spinning forever.
-                EC.listEmpty('#leadTableBody', d.message || 'Could not load enquiries.', 'bx-error-circle');
-                $('#mobileLoader').hide();
-                hideLoader();
-                return;
-            }
-            renderTable(d.rows);
-            renderMobileCards(d.rows);
-            updatePagination(d);
-            hideLoader();
-        })
-        .fail(function(x) {
-            // 'abort' means the user changed a filter — a newer request is
-            // already running, so leave the list alone.
-            if (x.statusText !== 'abort') {
-                ecToast('error', 'Failed to load data.');
-                EC.listEmpty('#leadTableBody', 'Could not load enquiries. Please retry.', 'bx-error-circle');
-                $('#mobileLoader').hide();
-                hideLoader();
-            }
-        });
-    }
+    /* ── Reload after a row action ──────────────────────────
+       The list, filters, sorting and paging are all rendered server-side now
+       (same as StudentList), so after a successful row action the page simply
+       reloads and comes back with the current query string intact. */
+    function reloadList() { window.location.reload(); }
 
     /* ── Status dropdown ────────────────────────────────── */
     // Registration stage shows only when the school enables it in Admission Workflow settings.
@@ -937,307 +1037,19 @@ $(document).ready(function () {
     // opens (see openRegisterModal), not stored on the workflow settings.
     var REG_FEE_AMOUNT  = 0;
     var REG_AUTO_NUMBER = @(Model.Workflow.AutoGenerateRegistrationNumber ? "true" : "false");
-    // Only MANUAL statuses belong here. Registration Done and Admission Confirmed are
-    // action-driven (set by the Register action / admission save) and must NOT be
-    // directly selectable — picking them here would create records with no registration
-    // number / no student. They are reached only through their proper actions.
-    var STATUS_LIST = [
-        { key:'New',                    label:'New',                    icon:'bx-user',         cls:'' },
-        { key:'Follow-up Pending',      label:'Follow-up Pending',      icon:'bx-phone',        cls:'' },
-        { key:'Interested',             label:'Interested',             icon:'bx-heart',        cls:'' },
-        { key:'Campus Visit Scheduled', label:'Campus Visit Scheduled', icon:'bx-building',     cls:'' },
-        { key:'Not Interested',         label:'Not Interested',         icon:'bx-x-circle',     cls:'text-danger' }
-    ];
-
-    function buildStatusDropdown(r) {
-        if (r.isTerminal) {
-            return '<span class="badge bg-label-success" title="Admission Confirmed — final status">'
-                + '<i class="bx bx-check-circle me-1"></i>' + EC.esc(r.status) + '</span>';
-        }
-        // Registration Done is action-driven (issued by the Register action). Lock it as a
-        // badge — to revert, use Cancel Registration on the Registrations screen.
-        if (r.status === 'Registration Done') {
-            return '<span class="badge bg-label-secondary" title="Registered — use Cancel Registration to revert">'
-                + '<i class="bx bx-clipboard me-1"></i>' + EC.esc(r.status) + '</span>';
-        }
-        var items = STATUS_LIST.map(function (s) {
-            var isActive  = (s.key === r.status);
-            var needsLost = (s.key === 'Not Interested' || s.key === 'Dropped');
-            return '<li><a class="dropdown-item status-opt' + (isActive ? ' active' : '') + ' ' + s.cls + '"'
-                + ' href="#"'
-                + ' data-id="'     + r.enquiryId + '"'
-                + ' data-status="' + EC.esc(s.key)  + '"'
-                + (needsLost ? ' data-needs-lost="1"' : '') + '>'
-                + '<i class="bx ' + s.icon + ' me-2"></i>' + EC.esc(s.label)
-                + (isActive ? '<i class="bx bx-check check-icon ms-auto"></i>' : '')
-                + '</a></li>';
-        }).join('');
-
-        /* ── NO onclick="stopPropagation" here ───────────────────────
-           Bootstrap dropdown data-API + jQuery delegation both listen
-           on document. stopPropagation on a parent kills them both.
-           The row-click handler's own guard (.closest button/a/.dropdown)
-           already prevents row navigation when clicking inside a dropdown.
-        ──────────────────────────────────────────────────────────── */
-        return '<div class="dropdown">'
-            + '<span class="badge ' + EC.esc(r.statusBadgeClass) + ' status-badge-toggle"'
-            + ' data-bs-toggle="dropdown" aria-expanded="false" style="cursor:pointer">'
-            + EC.esc(r.status)
-            + ' <i class="bx bx-chevron-down" style="font-size:.65rem;opacity:.75;vertical-align:middle"></i>'
-            + '</span>'
-            + '<ul class="dropdown-menu dropdown-menu-end shadow py-1" style="min-width:215px;font-size:.82rem">'
-            + '<li><div class="px-3 pt-2 pb-1" style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ec-text-muted)">Change Status</div></li>'
-            + '<li><hr class="dropdown-divider my-1"></li>'
-            + items
-            + '</ul></div>';
-    }
-
-    /* ── Render table ───────────────────────────────────── */
-    function renderTable(rows) {
-        if (!rows || rows.length === 0) {
-            $('#leadTableBody').html('');
-            $('#leadEmptyState').removeClass('d-none');
-            return;
-        }
-        $('#leadEmptyState').addClass('d-none');
-        $('#leadTableBody').html(rows.map(buildTableRow).join(''));
-        // Re-initialise Bootstrap tooltips on dynamically injected rows
-        $('#leadTableBody [data-bs-toggle="tooltip"]').tooltip({ trigger: 'hover' });
-    }
-
-    function buildTableRow(r) {
-        var oClass = r.isOverdue ? 'overdue-row' : '';
-        var fwIcon = r.followupIcon ? '<i class="bx ' + EC.esc(r.followupIcon) + ' me-1"></i>' : '';
-        var fwSub  = r.followupSubtext ? '<div class="lead-meta">' + EC.esc(r.followupSubtext) + '</div>' : '';
-        var fwCnt  = r.followupCount > 0
-            ? ' <span class="followup-count-badge"><i class="bx bx-chat"></i>' + r.followupCount + '</span>' : '';
-
-        return '<tr class="lead-row ' + oClass + '" data-id="' + r.enquiryId + '">'
-            + '<td><div class="d-flex align-items-center gap-2">'
-            +   '<div class="student-avatar ' + EC.esc(r.avatarColorClass) + '">' + EC.esc(r.studentInitials) + '</div>'
-            +   '<div>'
-            +     '<div class="lead-name">' + EC.esc(r.studentName) + '</div>'
-            +     '<div class="lead-meta">' + EC.esc(r.className) + ' &middot; ' + EC.esc(r.session) + '</div>'
-            +   '</div>'
-            + '</div></td>'
-            + '<td>'
-            +   '<div class="fw-semibold text-dark" style="font-size:.83rem">' + EC.esc(r.parentName) + '</div>'
-            +   '<a href="' + EC.esc(r.callUrl) + '" class="lead-meta text-decoration-none" onclick="event.stopPropagation()">'
-            +     '<i class="bx bx-phone me-1"></i>' + EC.esc(r.mobile) + '</a>'
-            + '</td>'
-            + '<td>'
-            +   '<span class="badge bg-label-primary">' + EC.esc(r.className) + '</span>'
-            +   '<div class="lead-meta mt-1">' + EC.esc(r.session) + '</div>'
-            + '</td>'
-            + '<td><span class="source-pill"><i class="bx ' + EC.esc(r.sourceIcon) + '"></i> ' + EC.esc(r.leadSource) + '</span></td>'
-            + '<td>' + buildStatusDropdown(r) + '</td>'
-            + '<td>'
-            +   '<div class="' + EC.esc(r.followupCssClass) + '">' + fwIcon + EC.esc(r.followupDisplay) + fwCnt + '</div>'
-            +   fwSub
-            + '</td>'
-            + '<td><span class="lead-meta">' + EC.esc(r.daysSinceLabel) + '</span></td>'
-            + '<td class="text-end"><div class="d-inline-flex gap-1 align-items-center flex-nowrap">'
-            /* ── Contact: Call · WhatsApp ── */
-            +   '<a href="' + EC.esc(r.callUrl) + '"'
-            +     ' class="btn btn-sm btn-icon btn-outline-info crm-action-btn" title="Call">'
-            +     '<i class="bx bx-phone-call"></i></a>'
-            +   '<a href="' + EC.esc(r.whatsAppUrl) + '" target="_blank"'
-            +     ' class="btn btn-sm btn-icon btn-outline-success crm-action-btn" title="WhatsApp">'
-            +     '<i class="bx bxl-whatsapp"></i></a>'
-            +   '<div class="vr mx-1" style="opacity:.18"></div>'
-            /* ── Nurture & progress: Follow-up · Register · Convert ── */
-            +   '<button type="button" class="btn btn-sm btn-icon btn-outline-secondary crm-action-btn btn-log-followup"'
-            +     ' title="Log Follow-up"'
-            +     ' data-id="' + r.enquiryId + '" data-name="' + EC.esc(r.studentName) + '">'
-            +     '<i class="bx bx-calendar-plus"></i></button>'
-            + ((SHOW_REGISTRATION && !r.isTerminal && r.status !== 'Registration Done')
-                ? '<button type="button" class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-register-enquiry"'
-                +   ' title="Register"'
-                +   ' data-id="'      + r.enquiryId       + '"'
-                +   ' data-name="'    + EC.esc(r.studentName) + '"'
-                +   ' data-parent="'  + EC.esc(r.parentName)  + '"'
-                +   ' data-class="'   + EC.esc(r.className)   + '"'
-                +   ' data-session="' + EC.esc(r.session)     + '">'
-                +   '<i class="bx bx-clipboard"></i></button>'
-                : '')
-            + (!r.isTerminal
-                ? '<button type="button" class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"'
-                +   ' title="Convert to Admission"'
-                +   ' data-id="'      + r.enquiryId         + '"'
-                +   ' data-name="'    + EC.esc(r.studentName)   + '"'
-                +   ' data-parent="'  + EC.esc(r.parentName)    + '"'
-                +   ' data-mobile="'  + EC.esc(r.mobile)        + '"'
-                +   ' data-class="'   + EC.esc(r.className)     + '"'
-                +   ' data-session="' + EC.esc(r.session)       + '"'
-                +   ' data-status="'  + EC.esc(r.status)        + '">'
-                +   '<i class="bx bx-user-check"></i></button>'
-                : '')
-            +   '<div class="vr mx-1" style="opacity:.18"></div>'
-            /* ── Manage: Edit · Delete ── */
-            + (r.status !== 'Admission Confirmed'
-                ? '<button type="button" class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-edit-enquiry"'
-                +   ' title="Edit enquiry" data-id="' + r.enquiryId + '"><i class="bx bx-edit"></i></button>'
-                : '')
-            +   '<button type="button" class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"'
-            +     ' title="Delete"'
-            +     ' data-id="'   + r.enquiryId       + '"'
-            +     ' data-name="' + EC.esc(r.studentName) + '">'
-            +     '<i class="bx bx-trash"></i></button>'
-            + '</div></td>'
-            + '</tr>';
-    }
-
-    /* ── Render mobile cards ────────────────────────────── */
-    function renderMobileCards(rows) {
-        $('#mobileLoader').hide();
-        if (!rows || rows.length === 0) {
-            $('#mobileCardList').html('<div class="text-center py-5 text-muted"><i class="bx bx-search fs-1 d-block mb-2 opacity-25"></i>No results.</div>');
-            return;
-        }
-        $('#mobileCardList').html(rows.map(buildMobileCard).join(''));
-    }
-
-    function buildMobileCard(r) {
-        var fwIcon = r.followupIcon ? '<i class="bx ' + EC.esc(r.followupIcon) + ' me-1"></i>' : '';
-        return '<div class="crm-card lead-row ' + (r.isOverdue ? 'overdue-card' : '') + '" data-id="' + r.enquiryId + '">'
-            + '<div class="d-flex justify-content-between align-items-start mb-2">'
-            +   '<div class="d-flex align-items-center gap-2">'
-            +     '<div class="student-avatar ' + EC.esc(r.avatarColorClass) + '">' + EC.esc(r.studentInitials) + '</div>'
-            +     '<div><div class="lead-name">' + EC.esc(r.studentName) + '</div><div class="lead-meta">' + EC.esc(r.parentName) + '</div></div>'
-            +   '</div>'
-            +   buildStatusDropdown(r)
-            + '</div>'
-            + '<div class="d-flex flex-wrap gap-2 mb-2">'
-            +   '<span class="badge bg-label-primary">' + EC.esc(r.className) + '</span>'
-            +   '<span class="source-pill"><i class="bx ' + EC.esc(r.sourceIcon) + '"></i> ' + EC.esc(r.leadSource) + '</span>'
-            + '</div>'
-            + '<div class="d-flex justify-content-between align-items-center">'
-            +   '<div class="' + EC.esc(r.followupCssClass) + '" style="font-size:.76rem">' + fwIcon + EC.esc(r.followupDisplay) + '</div>'
-            +   '<div class="d-flex gap-1 flex-wrap align-items-center">'
-            /* ── Contact: Call · WhatsApp ── */
-            +     '<a href="' + EC.esc(r.callUrl) + '" class="btn btn-sm btn-icon btn-outline-info crm-action-btn"><i class="bx bx-phone-call"></i></a>'
-            +     '<a href="' + EC.esc(r.whatsAppUrl) + '" target="_blank" class="btn btn-sm btn-icon btn-outline-success crm-action-btn"><i class="bx bxl-whatsapp"></i></a>'
-            +     '<div class="vr mx-1" style="opacity:.18"></div>'
-            /* ── Nurture & progress: Follow-up · Register · Convert ── */
-            +     '<button class="btn btn-sm btn-icon btn-outline-secondary crm-action-btn btn-log-followup"'
-            +       ' data-id="' + r.enquiryId + '" data-name="' + EC.esc(r.studentName) + '">'
-            +       '<i class="bx bx-calendar-plus"></i></button>'
-            + ((SHOW_REGISTRATION && !r.isTerminal && r.status !== 'Registration Done')
-                ? '<button class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-register-enquiry"'
-                +   ' data-id="'      + r.enquiryId       + '"'
-                +   ' data-name="'    + EC.esc(r.studentName) + '"'
-                +   ' data-parent="'  + EC.esc(r.parentName)  + '"'
-                +   ' data-class="'   + EC.esc(r.className)   + '"'
-                +   ' data-session="' + EC.esc(r.session)     + '">'
-                +   '<i class="bx bx-clipboard"></i></button>'
-                : '')
-            + (!r.isTerminal
-                ? '<button class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"'
-                +   ' data-id="'      + r.enquiryId       + '"'
-                +   ' data-name="'    + EC.esc(r.studentName) + '"'
-                +   ' data-parent="'  + EC.esc(r.parentName)  + '"'
-                +   ' data-mobile="'  + EC.esc(r.mobile)      + '"'
-                +   ' data-class="'   + EC.esc(r.className)   + '"'
-                +   ' data-session="' + EC.esc(r.session)     + '"'
-                +   ' data-status="'  + EC.esc(r.status)      + '">'
-                +   '<i class="bx bx-user-check"></i></button>'
-                : '')
-            +     '<div class="vr mx-1" style="opacity:.18"></div>'
-            /* ── Manage: Edit · Delete ── */
-            + (r.status !== 'Admission Confirmed'
-                ? '<button class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-edit-enquiry" data-id="' + r.enquiryId + '"><i class="bx bx-edit"></i></button>'
-                : '')
-            +     '<button class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"'
-            +       ' data-id="' + r.enquiryId + '" data-name="' + EC.esc(r.studentName) + '">'
-            +       '<i class="bx bx-trash"></i></button>'
-            +   '</div>'
-            + '</div></div>';
-    }
-
-    /* ── Pagination ─────────────────────────────────────── */
-    function updatePagination(d) {
-        var s = d.totalCount > 0 ? (d.page-1)*d.pageSize+1 : 0;
-        var e = Math.min(d.page*d.pageSize, d.totalCount);
-        $('#tableSubtitle').text(d.totalCount + ' record' + (d.totalCount!==1?'s':'') + ' · page ' + d.page + ' of ' + d.totalPages);
-        $('#pgInfo').text(d.totalCount > 0 ? 'Showing ' + s + '–' + e + ' of ' + d.totalCount : '0 results');
-        var html = buildPgHtml(d.page, d.totalPages);
-        $('#pgControls').html(html);
-        $('#mobilePgControls').html(html);
-        if (d.totalCount > 0) { $('#pgBar').show(); $('#mobilePgCard').css('display',''); }
-    }
-
-    function buildPgHtml(cur, total) {
-        if (total <= 1) return '';
-        var h = '<li class="page-item' + (cur<=1?' disabled':'') + '">'
-              + '<a class="page-link" href="#" data-pg="' + (cur-1) + '"><i class="bx bx-chevron-left"></i></a></li>';
-        pageRange(cur,total).forEach(function(p) {
-            if (p==='...') { h += '<li class="page-item disabled"><span class="page-link">…</span></li>'; }
-            else { h += '<li class="page-item' + (p===cur?' active':'') + '"><a class="page-link" href="#" data-pg="' + p + '">' + p + '</a></li>'; }
-        });
-        h += '<li class="page-item' + (cur>=total?' disabled':'') + '">'
-           + '<a class="page-link" href="#" data-pg="' + (cur+1) + '"><i class="bx bx-chevron-right"></i></a></li>';
-        return h;
-    }
-
-    function pageRange(cur, total) {
-        if (total<=7) return Array.from({length:total},function(_,i){return i+1;});
-        var r=[1]; if(cur>3) r.push('...');
-        for(var i=Math.max(2,cur-1);i<=Math.min(total-1,cur+1);i++) r.push(i);
-        if(cur<total-2) r.push('...'); r.push(total); return r;
-    }
-
-    $(document).on('click','#pgControls .page-link, #mobilePgControls .page-link',function(e){
-        e.preventDefault(); var p=parseInt($(this).data('pg'));
-        if(!isNaN(p)&&p>=1&&p!==F.page){F.page=p;fetchData(false);}
+    /* ── Quick filters ──────────────────────────────────────
+       The search box, the dropdowns and the pipeline tabs all submit or navigate
+       on their own (see the GET form and the tab links in the markup). Only the
+       two quick-filter buttons need script: each flips its hidden field and
+       submits the form. They are mutually exclusive — "due today" and "overdue"
+       cannot both be true — so turning one on turns the other off. */
+    $('[data-toggle-filter]').on('click', function () {
+        var mine  = $('#' + $(this).data('toggle-filter'));
+        var other = $('#fToday').is(mine) ? $('#fOverdue') : $('#fToday');
+        mine.val(mine.val() === 'true' ? 'false' : 'true');
+        other.val('false');
+        $('#enqFilterForm').submit();
     });
-    $('#pageSizeSelect').on('change',function(){ F.pageSize=parseInt($(this).val()); $('#mobilePgSize').val($(this).val()); fetchData(true); });
-    $('#mobilePgSize').on('change',function(){ F.pageSize=parseInt($(this).val()); $('#pageSizeSelect').val($(this).val()); fetchData(true); });
-
-    /* ── Pipeline tabs ──────────────────────────────────── */
-    $('#pipelineTabs .pipeline-tab').on('click',function(e){
-        e.preventDefault();
-        $('#pipelineTabs .pipeline-tab').removeClass('active');
-        $(this).addClass('active');
-        F.pipeline=$(this).data('pipeline')||''; F.overdue=false; F.today=false;
-        clearQF(); fetchData(true);
-    });
-
-    /* ── Quick filters ──────────────────────────────────── */
-    $('#btnTodayFollowups').on('click',function(){
-        F.today=!F.today; F.overdue=false; resetPipelineToAll();
-        $(this).toggleClass('active-warning',F.today); $('#btnOverdue').removeClass('active-danger'); fetchData(true);
-    });
-    $('#btnOverdue').on('click',function(){
-        F.overdue=!F.overdue; F.today=false; resetPipelineToAll();
-        $(this).toggleClass('active-danger',F.overdue); $('#btnTodayFollowups').removeClass('active-warning'); fetchData(true);
-    });
-    $('#btnClear').on('click',function(){
-        $('#leadSearch').val('');
-        $('#sessionFilter,#classFilter,#sourceFilter,#counsellorFilter').val('');
-        F={page:1,pageSize:F.pageSize,search:'',session:'',className:'',source:'',pipeline:'',assignedTo:'',overdue:false,today:false};
-        clearQF(); resetPipelineToAll(); fetchData(true);
-    });
-
-    function resetPipelineToAll(){
-        $('#pipelineTabs .pipeline-tab').removeClass('active');
-        $('#pipelineTabs .pipeline-tab[data-pipeline=""]').addClass('active');
-        F.pipeline='';
-    }
-    function clearQF(){
-        $('#btnTodayFollowups').removeClass('active-warning');
-        $('#btnOverdue').removeClass('active-danger');
-    }
-
-    /* ── Debounced search ───────────────────────────────── */
-    var searchTimer;
-    $('#leadSearch').on('input',function(){
-        clearTimeout(searchTimer); showLoader(); F.search=$(this).val().trim();
-        searchTimer=setTimeout(function(){fetchData(true);},350);
-    });
-    $('#sessionFilter').on('change',function(){ F.session=$(this).val(); fetchData(true); });
-    $('#classFilter').on('change',function(){ F.className=$(this).val(); fetchData(true); });
-    $('#sourceFilter').on('change',function(){ F.source=$(this).val(); fetchData(true); });
-    $('#counsellorFilter').on('change',function(){ F.assignedTo=$(this).val(); fetchData(true); });
 
     /* ── Row click ──────────────────────────────────────── */
     $(document).on('click','.lead-row',function(e){
@@ -1263,7 +1075,56 @@ $(document).ready(function () {
             return;
         }
 
+        // Campus Visit Scheduled → requires the visit date, otherwise the status
+        // says a visit is coming without recording when.
+        if (status === 'Campus Visit Scheduled') {
+            $('#visitEnquiryId').val(id);
+            $('#visitStudentName').text($item.closest('tr,.crm-card').find('.lead-name').first().text());
+            $('#visitDate').val('');
+            $('#visitNote').val('');
+            new bootstrap.Modal(document.getElementById('scheduleVisitModal')).show();
+            return;
+        }
+
         callUpdateStatus(id, status, null);
+    });
+
+    /* ── Schedule campus visit ──────────────────────────── */
+    // Goes through LogFollowup, not UpdateStatus: that one call sets the date and the
+    // status together and leaves a timeline entry. UpdateStatus takes no date at all.
+    $('#confirmVisitBtn').on('click', function () {
+        var date = $('#visitDate').val();
+        if (!date) { ecToast('error', 'Please pick the visit date.'); return; }
+
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Scheduling…');
+
+        $.ajax({
+            url:         '/ERP/Enquiry/LogFollowup',
+            type:        'POST',
+            contentType: 'application/json',
+            headers:     { 'RequestVerificationToken': csrf },
+            data: JSON.stringify({
+                enquiryId:        parseInt($('#visitEnquiryId').val()),
+                followupType:     'Visit',
+                outcome:          null,
+                notes:            $.trim($('#visitNote').val()) || null,
+                nextFollowupDate: date,
+                newStatus:        'Campus Visit Scheduled',
+                lostReason:       null
+            }),
+            success: function (res) {
+                EC.buttonReset($btn);
+                if (!res.success) { ecToast('error', res.message || 'Could not schedule the visit.'); return; }
+                bootstrap.Modal.getInstance(document.getElementById('scheduleVisitModal')).hide();
+                ecToast('success', 'Campus visit scheduled.');
+                reloadList();
+            },
+            error: function () {
+                EC.buttonReset($btn);
+                ecToast('error', 'Something went wrong. Please try again.');
+            }
+        });
     });
 
     /* ── Lost reason confirm ────────────────────────────── */
@@ -1290,7 +1151,7 @@ $(document).ready(function () {
             success: function (res) {
                 if (res.success) {
                     ecToast('success', 'Status changed to "' + status + '".');
-                    fetchData(false);
+                    reloadList();
                 } else {
                     // SP may return a specific message (e.g. "Cannot change after Admission Confirmed")
                     ecToast('error', res.message || 'Unable to update status.');
@@ -1307,8 +1168,10 @@ $(document).ready(function () {
     /* ── Log Follow-up ──────────────────────────────────── */
     $(document).on('click','.btn-log-followup',function(e){
         e.stopPropagation();
-        var id   = $(this).data('id');
-        var name = $(this).data('name');
+        var id      = $(this).data('id');
+        var name    = $(this).data('name');
+        var current = $(this).data('status') || '';
+        var locked  = $(this).data('locked') === 1 || $(this).data('locked') === '1';
 
         $('#followupEnquiryId').val(id);
         $('#followupStudentName').text(name);
@@ -1316,9 +1179,17 @@ $(document).ready(function () {
         $('#followupOutcome').val('');
         $('#followupNotes').val('');
         $('#followupNextDate').val('');
-        $('#updateStatusCheck').prop('checked',false);
-        $('#newStatusRow').addClass('d-none');
         $('#lostReasonRow').addClass('d-none');
+
+        // Spell out what "keep current" actually means for this lead.
+        $('#keepCurrentOption').text(current ? 'Keep current (' + current + ')' : 'Keep current');
+        $('#followupNewStatus').val('');
+        statusTouched = false;
+
+        // A registered/admitted lead keeps the follow-up form but loses the status
+        // field — the table already refuses the same change, so this matches it.
+        $('#newStatusRow').toggleClass('d-none', locked);
+        $('#statusLockedNote').toggleClass('d-none', !locked);
         $('#followupLostReason').val('');
         $('#followupTimeline').html('<li><div class="tl-time"><i class="bx bx-loader-circle bx-spin me-1"></i>Loading history...</div></li>');
 
@@ -1338,68 +1209,28 @@ $(document).ready(function () {
                 return;
             }
 
-            // Merge status history + follow-up logs into one chronological list
-            var entries = [];
-
-            if (d.history && d.history.length) {
-                d.history.forEach(function (h) {
-                    entries.push({
-                        type:       'status',
-                        sortKey:    h.changedAt,
-                        display:    h.changedAt,
-                        statusFrom: h.statusFrom,
-                        statusTo:   h.statusTo,
-                        badgeClass: h.statusToBadgeClass,
-                        note:       h.changeNote
-                    });
-                });
-            }
-
-            if (d.followups && d.followups.length) {
-                d.followups.forEach(function (f) {
-                    entries.push({
-                        type:       'followup',
-                        sortKey:    f.followupDate || f.timeAgo,
-                        display:    f.timeAgo,
-                        typeIcon:   f.typeIcon,
-                        followupType: f.followupType,
-                        outcome:    f.outcome,
-                        badgeClass: f.outcomeBadgeClass,
-                        note:       f.notes,
-                        statusBefore: f.statusBefore,
-                        statusAfter:  f.statusAfter
-                    });
-                });
-            }
-
-            // Sort newest first (both arrays come with string dates — sort descending)
-            entries.sort(function (a, b) {
-                return new Date(b.sortKey) - new Date(a.sortKey);
-            });
-
+            // The server sends one ready-sorted timeline, so this only renders.
             var html = '';
-            entries.forEach(function (e) {
-                if (e.type === 'status') {
-                    html += '<li>'
-                        + '<div class="tl-time"><i class="bx bx-transfer me-1 text-muted"></i>' + EC.esc(e.display) + '</div>'
-                        + '<div class="tl-title">'
-                        + (e.statusFrom ? '<span class="text-muted">' + EC.esc(e.statusFrom) + '</span> → ' : '<span class="text-muted">Created</span> → ')
-                        + '<span class="badge ' + EC.esc(e.badgeClass) + '">' + EC.esc(e.statusTo) + '</span>'
-                        + '</div>'
-                        + (e.note ? '<div class="tl-note">' + EC.esc(e.note) + '</div>' : '')
-                        + '</li>';
+            (d.timeline || []).forEach(function (e) {
+                var head, title;
+                if (e.kind === 'status') {
+                    head  = '<i class="bx bx-transfer me-1 text-muted"></i>' + EC.esc(e.at);
+                    title = '<span class="text-muted">' + EC.esc(e.statusFrom) + '</span> \u2192 '
+                          + '<span class="badge ' + EC.esc(e.badgeClass) + '">' + EC.esc(e.statusTo) + '</span>';
                 } else {
-                    html += '<li>'
-                        + '<div class="tl-time"><i class="bx ' + EC.esc(e.typeIcon) + ' me-1 text-primary"></i>' + EC.esc(e.display) + '</div>'
-                        + '<div class="tl-title"><strong>' + EC.esc(e.followupType) + '</strong>'
-                        + (e.outcome ? ' — <span class="badge ' + EC.esc(e.badgeClass) + '">' + EC.esc(e.outcome) + '</span>' : '')
-                        + (e.statusAfter && e.statusAfter !== e.statusBefore
-                            ? ' <i class="bx bx-right-arrow-alt text-muted"></i> <span class="text-muted small">' + EC.esc(e.statusAfter) + '</span>'
-                            : '')
-                        + '</div>'
-                        + (e.note ? '<div class="tl-note">' + EC.esc(e.note) + '</div>' : '')
-                        + '</li>';
+                    head  = '<i class="bx ' + EC.esc(e.typeIcon) + ' me-1 text-primary"></i>' + EC.esc(e.at)
+                          + ' <span class="text-muted">\u00b7 ' + EC.esc(e.timeAgo) + '</span>';
+                    title = '<strong>' + EC.esc(e.followupType) + '</strong>'
+                          + (e.outcome ? ' \u2014 <span class="badge ' + EC.esc(e.badgeClass) + '">' + EC.esc(e.outcome) + '</span>' : '')
+                          + (e.statusAfter && e.statusAfter !== e.statusBefore
+                              ? ' <i class="bx bx-right-arrow-alt text-muted"></i> <span class="text-muted small">' + EC.esc(e.statusAfter) + '</span>'
+                              : '');
                 }
+                html += '<li>'
+                      + '<div class="tl-time">' + head + '</div>'
+                      + '<div class="tl-title">' + title + '</div>'
+                      + (e.note ? '<div class="tl-note">' + EC.esc(e.note) + '</div>' : '')
+                      + '</li>';
             });
 
             $('#followupTimeline').html(html || '<li><div class="tl-time text-muted">No activity yet.</div></li>');
@@ -1409,12 +1240,6 @@ $(document).ready(function () {
             $('#followupTimeline').html('<li><div class="tl-time text-danger"><i class="bx bx-error me-1"></i>Failed to load history.</div></li>');
         });
     }
-
-    /* Show/hide status row when checkbox toggled */
-    $('#updateStatusCheck').on('change',function(){
-        if($(this).is(':checked')) $('#newStatusRow').removeClass('d-none');
-        else { $('#newStatusRow').addClass('d-none'); $('#followupNewStatus').val(''); $('#lostReasonRow').addClass('d-none'); }
-    });
 
     /* Show/hide lost reason based on outcome or new status */
     function checkLostVisibility() {
@@ -1426,6 +1251,28 @@ $(document).ready(function () {
     }
     $('#followupOutcome, #followupNewStatus').on('change', checkLostVisibility);
 
+    /* Outcome fills in the matching status, visibly, so the user can see and change it.
+       The same fact used to be typed twice — outcome here, status there — with nothing
+       linking them, so the two drifted apart. */
+    var OUTCOME_STATUS = {
+        'Interested':      'Interested',
+        'Call Back Later': 'Follow-up Pending',
+        'No Answer':       'Follow-up Pending',
+        'Busy':            'Follow-up Pending',
+        'Left Message':    'Follow-up Pending',
+        'Not Interested':  'Not Interested'
+    };
+    var statusTouched = false;   // set once the user picks a status by hand
+
+    $('#followupNewStatus').on('change', function () { statusTouched = true; });
+
+    $('#followupOutcome').on('change', function () {
+        // Never overwrite a status the user picked themselves.
+        if (statusTouched) return;
+        $('#followupNewStatus').val(OUTCOME_STATUS[$(this).val()] || '');
+        checkLostVisibility();
+    });
+
     /* Save follow-up */
     $('#saveFollowupBtn').on('click', function () {
         var id         = parseInt($('#followupEnquiryId').val());
@@ -1433,8 +1280,8 @@ $(document).ready(function () {
         var outcome    = $('#followupOutcome').val();
         var notes      = $.trim($('#followupNotes').val()) || null;
         var nextDate   = $('#followupNextDate').val() || null;
-        var newStatus  = ($('#updateStatusCheck').is(':checked') && $('#followupNewStatus').val())
-                            ? $('#followupNewStatus').val() : null;
+        // Empty value = "Keep current", so null means "leave the status alone".
+        var newStatus  = $('#followupNewStatus').val() || null;
         var lostReason = $.trim($('#followupLostReason').val()) || null;
 
         // Validations
@@ -1466,7 +1313,7 @@ $(document).ready(function () {
                 if (res.success) {
                     ecToast('success', 'Follow-up logged successfully.');
                     bootstrap.Modal.getInstance(document.getElementById('logFollowupModal')).hide();
-                    fetchData(false);
+                    reloadList();
                 } else {
                     ecToast('error', res.message || 'Unable to save follow-up.');
                 }
@@ -1600,7 +1447,7 @@ $(document).ready(function () {
                                (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
                 // Show the printable registration-fee receipt when a fee was collected.
                 // Receipt not auto-opened; print it from the Registrations list.
-                fetchData(false);
+                reloadList();
             } else {
                 ecToast('error', (res && res.message) || 'Unable to complete registration.');
             }
@@ -1651,40 +1498,43 @@ $(document).ready(function () {
     });
 
     /* ── Delete Enquiry ─────────────────────────────────── */
+    // Shared EC.confirm dialog (site.js) so every delete in the app looks the
+    // same. The row's trash button stays busy while the request is in flight.
     $(document).on('click', '.btn-delete-enquiry', function (e) {
         e.stopPropagation();
-        var id   = $(this).data('id');
-        var name = $(this).data('name');
-        $('#deleteEnquiryId').val(id);
-        $('#deleteEnquiryName').text(name);
-        new bootstrap.Modal(document.getElementById('deleteEnquiryModal')).show();
-    });
+        var $btn = $(this);          // capture: `this` is not the button inside .then()
+        var id   = $btn.data('id');
+        var name = $btn.data('name');
 
-    $('#confirmDeleteBtn').on('click', function () {
-        var id  = $('#deleteEnquiryId').val();
-        var $btn = $(this);
-        EC.buttonBusy($btn, 'Deleting...');
+        EC.confirm({
+            title:   'Delete this enquiry?',
+            name:    name,
+            message: 'The enquiry and its follow-up history will be removed. This cannot be undone.',
+            okText:  'Delete enquiry'
+        }).then(function (ok) {
+            if (!ok) return;
+            EC.buttonBusy($btn);
 
-        $.ajax({
-            url:         '/ERP/Enquiry/DeleteEnquiry',
-            type:        'POST',
-            contentType: 'application/json',
-            headers:     { 'RequestVerificationToken': csrf },
-            data:        JSON.stringify({ enquiryId: parseInt(id) }),
-            success: function (res) {
-                EC.buttonReset($btn);
-                bootstrap.Modal.getInstance(document.getElementById('deleteEnquiryModal')).hide();
-                if (res.success) {
-                    ecToast('success', 'Enquiry deleted.');
-                    fetchData(false);
-                } else {
-                    ecToast('error', res.message || 'Unable to delete enquiry.');
+            $.ajax({
+                url:         '/ERP/Enquiry/DeleteEnquiry',
+                type:        'POST',
+                contentType: 'application/json',
+                headers:     { 'RequestVerificationToken': csrf },
+                data:        JSON.stringify({ enquiryId: parseInt(id) }),
+                success: function (res) {
+                    EC.buttonReset($btn);
+                    if (res.success) {
+                        ecToast('success', 'Enquiry deleted.');
+                        reloadList();
+                    } else {
+                        ecToast('error', res.message || 'Unable to delete enquiry.');
+                    }
+                },
+                error: function () {
+                    EC.buttonReset($btn);
+                    ecToast('error', 'Something went wrong. Please try again.');
                 }
-            },
-            error: function () {
-                EC.buttonReset($btn);
-                ecToast('error', 'Something went wrong. Please try again.');
-            }
+            });
         });
     });
 
@@ -1734,6 +1584,8 @@ $(document).ready(function () {
 
     function enquiryFormReset() {
         $('#addEnquiryModal form')[0].reset();
+        // reset() clears the values but not the red marks from the last attempt.
+        if (enquiryForm) enquiryForm.clear();
         $('#enquiryFormId').val('0');
         $('#enquiryModalTitle').text('Add Enquiry');
         $('#enquiryModalSubtitle').text('Capture student & parent details.');
@@ -1821,41 +1673,27 @@ $(document).ready(function () {
     })();
 
     /* ── Add Enquiry form validation ────────────────────── */
-    $('#addEnquiryModal form').on('submit',function(e){
-        var ok = true;
-        function req(id, label){
-            var val = $.trim($(id,'#addEnquiryModal').val());
-            if(!val){ ecToast('error', label+' is required.'); ok=false; }
-        }
-        req('[name="StudentName"]','Student Name');
-        req('[name="ClassName"]','Class');
-        req('[name="Session"]','Academic Session');
-
-        var fMob = $.trim($('#addFatherMobile').val());
-        if (!fMob) {
-            ecToast('error', "Father's mobile number is required."); ok = false;
-        } else if (!/^[6-9][0-9]{9}$/.test(fMob)) {
-            ecToast('error', 'Enter a valid 10-digit mobile number.'); ok = false;
-        } else {
-            $('#addPrimaryMobile').val(fMob);
-        }
-
-        // Sync WhatsApp if same-as-mobile checkbox is checked
-        if ($('#whatsappSameAsMobile').is(':checked')) {
-            $('#addWhatsApp').val(fMob);
-        }
-
-        // Optional email format check
-        var email = $.trim($('#addParentEmail').val());
-        if (email && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(email)) {
-            ecToast('error', 'Enter a valid email address.'); ok = false;
-        }
-
-        if (!ok) e.preventDefault();
+    // Rules here, behaviour from EC.liveValidate (site.js) — same as School Profile.
+    // This form used to check only on submit and fire one toast per bad field, so a
+    // half-filled form threw four toasts and highlighted nothing.
+    var enquiryForm = EC.liveValidate('#addEnquiryModal form', {
+        StudentName:  EC.rule.required('Student name'),
+        ClassName:    EC.rule.required('Class'),
+        Session:      EC.rule.required('Academic session'),
+        FatherMobile: function (v) { return !v ? "Father's mobile number is required." : EC.rule.mobile(v); },
+        ParentEmail:  EC.rule.email
     });
 
-    /* ── Init ───────────────────────────────────────────── */
-    fetchData(true);
+    // Mobile fields the server expects, mirrored from what was typed. Registered
+    // after liveValidate, so isDefaultPrevented() tells us the rules already
+    // rejected this submit — no point copying a half-typed number across.
+    $('#addEnquiryModal form').on('submit', function (e) {
+        if (e.isDefaultPrevented()) return;
+        var fMob = $.trim($('#addFatherMobile').val());
+        $('#addPrimaryMobile').val(fMob);
+        if ($('#whatsappSameAsMobile').is(':checked')) $('#addWhatsApp').val(fMob);
+    });
+
 });
 </script>
 }

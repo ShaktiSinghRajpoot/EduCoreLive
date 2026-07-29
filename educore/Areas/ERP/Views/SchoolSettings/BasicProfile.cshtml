@@ -377,56 +377,24 @@
             });
 
             // ── Validation ──────────────────────────────────────────────────
-            // One rule per field, in one place. Live feedback and the submit check
-            // both read this list, so they can never drift apart. Each rule takes the
-            // trimmed value and returns an error message, or "" when the value is fine.
-            const rules = {
-                AddressLine1:    v => v ? "" : "Address Line 1 is required.",
-                StateId:         v => v ? "" : "State is required.",
-                City:            v => v ? "" : "City is required.",
-                Pincode:         v => !v ? "Pincode is required."
-                                         : /^[1-9][0-9]{5}$/.test(v) ? "" : "Enter valid 6 digit pincode.",
-                ContactName:     v => v ? "" : "Contact Name is required.",
-                Phone:           v => !v ? "Official Phone is required."
-                                         : /^[6-9][0-9]{9}$/.test(v) ? "" : "Enter valid 10 digit Indian mobile number.",
-                AlternatePhone:  v => !v || /^[6-9][0-9]{9}$/.test(v) ? "" : "Enter valid alternate phone number.",
-                ContactEmail:    v => !v || /^[^@@ ]+@@[^@@ ]+[.][^@@ ]+$/.test(v) ? "" : "Enter valid official email.",
-                Website:         v => !v || /^(https?:\/\/)?([A-Za-z0-9-]+[.])+[A-Za-z]{2,}(\/.*)?$/.test(v) ? "" : "Enter valid website.",
-                EstablishedYear: v => !v || (+v >= 1800 && +v <= new Date().getFullYear()) ? "" : "Enter valid established year."
-            };
-
-            function validateField(name) {
-                const $i = $('[name="' + name + '"]');
-                if (!$i.length || !rules[name]) return true;
-
-                const msg = rules[name]($.trim($i.val() || ""));
-
-                $i.toggleClass("is-invalid", !!msg);
-                $i.siblings(".live-error").remove();
-                if (msg) $i.after('<span class="live-error text-danger small d-block">' + msg + '</span>');
-
-                return !msg;
-            }
-
-            // blur/change -> check the field you just left.
-            // input -> re-check ONLY a field already showing an error, so it clears as
-            // soon as you fix it. Validating every keystroke would shout "invalid email"
-            // at the first character of an empty box.
-            $("form").on("blur change", "input, select, textarea", function () {
-                validateField($(this).attr("name"));
-            });
-
-            $("form").on("input", "input, textarea", function () {
-                if ($(this).hasClass("is-invalid")) validateField($(this).attr("name"));
-            });
-
-            $("form").on("submit", function (e) {
-                const bad = Object.keys(rules).filter(n => !validateField(n));
-
-                if (bad.length) {
-                    e.preventDefault();
-                    ecToast('warning', "Please fix the highlighted fields.");
-                    $(".is-invalid").first().trigger("focus");
+            // Rules live here; the behaviour (blur check, live clearing, submit
+            // block) comes from EC.liveValidate in site.js so every form matches.
+            EC.liveValidate("form", {
+                AddressLine1:    EC.rule.required("Address Line 1"),
+                StateId:         EC.rule.required("State"),
+                City:            EC.rule.required("City"),
+                Pincode:         function (v) { return !v ? "Pincode is required." : EC.rule.pincode(v); },
+                ContactName:     EC.rule.required("Contact Name"),
+                Phone:           function (v) { return !v ? "Official Phone is required." : EC.rule.mobile(v); },
+                AlternatePhone:  EC.rule.mobile,
+                ContactEmail:    EC.rule.email,
+                Website:         function (v) {
+                    return !v || /^(https?:\/\/)?([A-Za-z0-9-]+[.])+[A-Za-z]{2,}(\/.*)?$/.test(v)
+                        ? "" : "Enter valid website.";
+                },
+                EstablishedYear: function (v) {
+                    return !v || (+v >= 1800 && +v <= new Date().getFullYear())
+                        ? "" : "Enter valid established year.";
                 }
             });
 

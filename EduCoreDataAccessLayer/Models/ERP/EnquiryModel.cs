@@ -115,26 +115,68 @@ namespace EduCoreDataAccessLayer.Models.ERP
             _              => "bx-link"
         };
 
-        // Follow-up display
+        // ── Follow-up display ────────────────────────────────────
+        // The column always shows the DATE on the first line and the state as subtext.
+        // It used to switch between the two — the word "Overdue" for a past date but the
+        // raw date for a future one — so "16 Jul 2026" read like a plan even when it was
+        // twelve days stale.
+
+        // A closed lead is not waiting on anyone. Registration Done is deliberately NOT
+        // closed: a registered student is still mid-pipeline and does get followed up.
+        public bool IsClosed => Status is "Admission Confirmed" or "Not Interested" or "Dropped";
+
+        // Days from today to the next follow-up: negative = overdue, 0 = today.
+        private int? DaysToFollowup => NextFollowupDate.HasValue
+            ? NextFollowupDate.Value.DayNumber - DateOnly.FromDateTime(DateTime.Today).DayNumber
+            : null;
+
         public string FollowupCssClass =>
-            IsOverdue ? "followup-overdue" :
-            IsToday   ? "followup-today"   :
-            NextFollowupDate.HasValue ? "followup-upcoming" : "followup-done";
+            IsClosed  ? "followup-done"     :
+            IsOverdue ? "followup-overdue"  :
+            IsToday   ? "followup-today"    :
+            NextFollowupDate.HasValue ? "followup-upcoming" : "followup-none";
 
         public string FollowupDisplay =>
-            IsOverdue             ? "Overdue"    :
-            IsToday               ? "Due Today"  :
-            NextFollowupDate.HasValue ? NextFollowupDate.Value.ToString("dd MMM yyyy") : "Done";
+            IsClosed ? "—" :
+            NextFollowupDate.HasValue ? NextFollowupDate.Value.ToString("dd MMM yyyy")
+                                      : "Not scheduled";
+
+        public bool IsVisitScheduled => Status == "Campus Visit Scheduled";
 
         public string FollowupIcon =>
-            IsOverdue             ? "bx-error-circle" :
-            IsToday               ? "bx-time"         :
-            NextFollowupDate.HasValue ? string.Empty   : "bx-check-circle";
+            IsClosed  ? "bx-check-circle"  :
+            IsOverdue ? "bx-error-circle"  :
+            IsToday   ? "bx-time"          :
+            IsVisitScheduled ? "bx-building" :
+            NextFollowupDate.HasValue ? string.Empty : "bx-calendar-x";
 
-        public string FollowupSubtext =>
-            IsOverdue             ? $"Was due {NextFollowupDate?.ToString("dd MMM yyyy")}" :
-            IsToday               ? "Action required today" :
-            NextFollowupDate.HasValue ? string.Empty          : "All caught up";
+        // Subtext is pure date arithmetic, so it is always true about the date itself.
+        // The red/amber styling above stays driven by the proc's is_overdue/is_today,
+        // which is also what the KPI cards and the "Overdue Only" filter count.
+        public string FollowupSubtext
+        {
+            get
+            {
+                // A lost lead's reason was captured but never shown anywhere, so nobody
+                // could tell WHY it was dropped. This column is empty for them anyway.
+                if (IsClosed)
+                    return string.IsNullOrWhiteSpace(LostReason) ? "No follow-up needed" : LostReason!;
+
+                var days = DaysToFollowup;
+                if (days is null)
+                    return IsVisitScheduled ? "Visit date not set" : "Add a date to track this lead";
+
+                var when = days < 0  ? $"Overdue by {Plural(-days.Value, "day")}"
+                         : days == 0 ? "Due today"
+                         :             $"In {Plural(days.Value, "day")}";
+
+                // For a scheduled visit the date IS the visit date, so say so — otherwise
+                // the column reads like an ordinary call reminder.
+                return IsVisitScheduled ? $"Campus visit · {when}" : when;
+            }
+        }
+
+        private static string Plural(int n, string word) => n == 1 ? $"1 {word}" : $"{n} {word}s";
 
         // Days since label
         public string DaysSinceLabel =>
@@ -249,16 +291,21 @@ namespace EduCoreDataAccessLayer.Models.ERP
             _                  => "bg-label-secondary"
         };
 
+        // The DataSet round-trip drops DateTimeKind, so this UTC value arrives tagged
+        // Unspecified. ToUniversalTime() would treat it as local and subtract the offset
+        // again — which is why a follow-up logged seconds ago used to read "5h ago".
+        private DateTime CreatedAtUtc => DateTime.SpecifyKind(CreatedAt, DateTimeKind.Utc);
+
         public string TimeAgo
         {
             get
             {
-                var diff = DateTime.UtcNow - CreatedAt.ToUniversalTime();
+                var diff = DateTime.UtcNow - CreatedAtUtc;
                 if (diff.TotalMinutes < 1)  return "Just now";
                 if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
                 if (diff.TotalHours   < 24) return $"{(int)diff.TotalHours}h ago";
                 if (diff.TotalDays    < 7)  return $"{(int)diff.TotalDays}d ago";
-                return CreatedAt.ToString("dd MMM yyyy");
+                return CreatedAtUtc.ToString("dd MMM yyyy");
             }
         }
     }
@@ -289,9 +336,13 @@ namespace EduCoreDataAccessLayer.Models.ERP
     }
 
     // ── Full page model ──────────────────────────────────────────
-    public class EnquiryCrmPageModel
+    // Inherits ListModelBase so this page pages and sorts exactly like
+    // StudentList / StaffList / TC Register: Page, PageSize, SortColumn,
+    // SortDir, Search and TotalCount are bound from the query string by the
+    // GET filter form, and the shared _Pager / _PageSize partials read them.
+    public class EnquiryCrmPageModel : ListModelBase
     {
-        public List<EnquiryListModel>  Enquiries          { get; set; } = new();
+        public List<EnquiryListModel>  Items              { get; set; } = new();
         public EnquiryStatsModel       Stats              { get; set; } = new();
         public EnquiryModel            Form               { get; set; } = new();
         public List<SelectListItem>    AvailableClasses   { get; set; } = new();
@@ -303,12 +354,22 @@ namespace EduCoreDataAccessLayer.Models.ERP
 
         // Admission workflow settings — drive show/hide of the Registration stage.
         public AdmissionWorkflowModel  Workflow { get; set; } = new();
-        // Pagination
-        public int  PageNumber { get; set; } = 1;
-        public int  PageSize   { get; set; } = 10;
-        public int  TotalCount { get; set; } = 0;
-        public int  TotalPages => TotalCount > 0
-            ? (int)Math.Ceiling((double)TotalCount / PageSize) : 1;
+
+        // ── Filters (bound from the query string, same as StudentList) ──
+        public string? FilterSession  { get; set; }
+        public string? FilterClass    { get; set; }
+        public string? FilterSource   { get; set; }
+        public string? FilterPipeline { get; set; }
+        public int?    FilterAssignedTo { get; set; }
+        public bool    FilterOverdue { get; set; }
+        public bool    FilterToday   { get; set; }
+
+        // True when any filter is active — drives the "Clear" button.
+        public bool HasFilters =>
+            !string.IsNullOrEmpty(Search)        || !string.IsNullOrEmpty(FilterSession) ||
+            !string.IsNullOrEmpty(FilterClass)   || !string.IsNullOrEmpty(FilterSource)  ||
+            !string.IsNullOrEmpty(FilterPipeline)|| FilterAssignedTo.HasValue            ||
+            FilterOverdue || FilterToday;
     }
     // ── Request models ───────────────────────────────────────────
     public class LogFollowupRequest

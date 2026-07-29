@@ -210,6 +210,93 @@ document.addEventListener('submit', function (e) {
     });
 }, true);
 
+// ── Live form validation ────────────────────────────────────────────────
+// Lifted out of the School Profile page, which had the pattern first, so every
+// form can behave the same way instead of each growing its own checks.
+//
+// A rule takes the trimmed value and returns an error message, or '' when the
+// value is fine. The SAME list drives the live feedback and the submit check,
+// so the two can never drift apart:
+//
+//     EC.liveValidate('#addEnquiryModal form', {
+//         StudentName:  EC.rule.required('Student name'),
+//         FatherMobile: EC.rule.mobile,
+//         ParentEmail:  EC.rule.email
+//     });
+//
+// Fields not listed are left alone.
+
+// Shared formats, so five pages don't grow five different mobile regexes —
+// the same drift that once gave this project four copies of esc().
+EC.rule = {
+    required: function (label) {
+        return function (v) { return v ? '' : label + ' is required.'; };
+    },
+    // Blank passes: use required() as well when the field is mandatory.
+    mobile:  function (v) { return !v || /^[6-9][0-9]{9}$/.test(v)      ? '' : 'Enter a valid 10-digit mobile number.'; },
+    email:   function (v) { return !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? '' : 'Enter a valid email address.'; },
+    pincode: function (v) { return !v || /^[1-9][0-9]{5}$/.test(v)      ? '' : 'Enter a valid 6-digit pincode.'; }
+};
+
+EC.liveValidate = function (form, rules) {
+    var $form = $(form);
+    if (!$form.length) return null;
+
+    // Turn off the browser's own bubbles. They fire BEFORE the submit event, so
+    // without this a form with `required` fields shows a grey native popup for
+    // some fields and our inline red text for others — two looks, one form.
+    // The contract: every field you mark `required` in the markup needs a rule
+    // here too, because nothing else checks it on the client any more.
+    $form.attr('novalidate', 'novalidate');
+
+    function check(name) {
+        var $i = $form.find('[name="' + name + '"]');
+        if (!$i.length || !rules[name]) return true;
+
+        // A Bootstrap input-group (the "+91" prefix) is a flex row, so an error
+        // dropped straight after the input lands INSIDE that row — beside the box
+        // instead of under it, squashing the input. Hang it off the whole group.
+        var $group = $i.closest('.input-group');
+        var $after = $group.length ? $group : $i;
+
+        var msg = rules[name]($.trim($i.val() || ''));
+        $i.toggleClass('is-invalid', !!msg);
+        $after.siblings('.live-error').remove();
+        if (msg) $after.after('<span class="live-error text-danger small d-block">' + EC.esc(msg) + '</span>');
+        return !msg;
+    }
+
+    function checkAll() {
+        var bad = 0;
+        for (var name in rules) { if (!check(name)) bad++; }
+        if (!bad) return true;
+        ecToast('warning', 'Please fix the highlighted fields.');
+        $form.find('.is-invalid').first().trigger('focus');
+        return false;
+    }
+
+    // blur/change checks the field you just left. input re-checks ONLY a field
+    // already showing an error, so it clears the moment you fix it — checking on
+    // every keystroke would shout "invalid email" at the first character typed.
+    $form.on('blur change', 'input, select, textarea', function () { check($(this).attr('name')); });
+    $form.on('input', 'input, textarea', function () {
+        if ($(this).hasClass('is-invalid')) check($(this).attr('name'));
+    });
+
+    $form.on('submit', function (e) { if (!checkAll()) e.preventDefault(); });
+
+    // Returned so an AJAX form (one that never really submits) can ask for the
+    // same check before sending, and so a page can clear the marks on reset.
+    return {
+        isValid: checkAll,
+        clear: function () {
+            $form.find('.is-invalid').removeClass('is-invalid');
+            $form.find('.live-error').remove();
+        },
+        check: check
+    };
+};
+
 // ── HTML escaping ───────────────────────────────────────────────────────
 // Run every value that comes from the database through this before putting it
 // into an HTML string, e.g.  '<td>' + EC.esc(r.studentName) + '</td>'.

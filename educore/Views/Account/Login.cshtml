@@ -93,8 +93,8 @@
             $('#myform').on('submit', function () {
                 var $btn = $(this).find('button[type="submit"]');
                 if ($btn.data('submitting')) { return false; }
-                $btn.data('submitting', true).prop('disabled', true);
-                $btn.html('Signing in… <span class="spinner-border spinner-border-sm ms-1"></span>');
+                $btn.data('submitting', true);
+                EC.buttonBusy($btn, 'Signing in…');
             });
 
             $('#togglePassword').on('click', function () {

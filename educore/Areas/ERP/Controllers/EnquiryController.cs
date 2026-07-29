@@ -1,4 +1,4 @@
-using educore.Services;
+﻿using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -33,94 +33,29 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── GET: /ERP/Enquiry/EnquiryCRM ───────────────────────
+        // One EnquiryCrmPageModel does it all, exactly like StudentList: the bound
+        // filters/sort/page arrive on the query string, the service fills Items +
+        // TotalCount + KPI. Tenant/school/user come from CLAIMS only.
         [HttpGet]
-        public async Task<IActionResult> EnquiryCRM()
+        public async Task<IActionResult> EnquiryCRM(EnquiryCrmPageModel query)
         {
             int tenantId = TenantId();
             int schoolId = SchoolId();
             int actionUserId = UserId();
-
-            var model = await _enquiryService.GetEnquiryCrmPageAsync(tenantId, schoolId, actionUserId);
 
             // Dropdowns — same pattern as FeeStructure
-            model.AvailableSessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear" ,tenantId.ToString(), schoolId.ToString()); ;
-            model.AvailableClasses = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", tenantId.ToString(), schoolId.ToString());
+            query.AvailableSessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear" ,tenantId.ToString(), schoolId.ToString());
+            query.AvailableClasses = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", tenantId.ToString(), schoolId.ToString());
 
             // Counsellors — try loading; empty list is acceptable if not configured
-            try { model.AvailableCounsellors = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Counsellor", tenantId.ToString(), schoolId.ToString()); }
-            catch { model.AvailableCounsellors = new List<SelectListItem>(); }
+            try { query.AvailableCounsellors = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Counsellor", tenantId.ToString(), schoolId.ToString()); }
+            catch { query.AvailableCounsellors = new List<SelectListItem>(); }
 
             // Admission workflow settings — drive show/hide of the Registration stage.
-            model.Workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, actionUserId);
+            query.Workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, actionUserId);
 
-            return View("~/Areas/ERP/Views/SchoolSettings/EnquiryCRM.cshtml", model);
-        }
-
-        // ── GET: /ERP/Enquiry/GetEnquiriesData (AJAX) ──────────
-        [HttpGet]
-        public async Task<IActionResult> GetEnquiriesData(int page = 1, int pageSize = 10, string? search = null, string? session = null, string? priority = null, string? className = null, string? source = null, string? pipeline = null,
-          int? assignedTo = null, bool overdue = false, bool today = false)
-        {
-            int tenantId = TenantId();
-            int schoolId = SchoolId();
-            int actionUserId = UserId();
-
-            var (rows, totalCount) = await _enquiryService.GetEnquiriesAsync(
-                tenantId, schoolId, actionUserId,
-                page, pageSize,
-                NullIfEmpty(search), NullIfEmpty(session), NullIfEmpty(priority),
-                NullIfEmpty(className), NullIfEmpty(source), NullIfEmpty(pipeline),
-                assignedTo, overdue, today);
-
-            int totalPages = totalCount > 0 ? (int)Math.Ceiling((double)totalCount / pageSize) : 1;
-
-            return Json(new
-            {
-                success = true,
-                page,
-                pageSize,
-                totalCount,
-                totalPages,
-                rows = rows.Select(e => new
-                {
-                    enquiryId = e.EnquiryId,
-                    studentName = e.StudentName,
-                    studentInitials = e.StudentInitials,
-                    avatarColorClass = e.AvatarColorClass,
-                    parentName = e.PrimaryParentDisplay,
-                    fatherName = e.FatherName,
-                    fatherMobile = e.FatherMobile,
-                    mobile = e.Mobile,
-                    className = e.ClassName,
-                    session = e.Session,
-                    leadSource = e.LeadSource,
-                    sourceIcon = e.SourceIcon,
-                    priority = e.Priority,
-                    priorityBadgeClass = e.PriorityBadgeClass,
-                    status = e.Status,
-                    statusBadgeClass = e.StatusBadgeClass,
-                    isTerminal = e.IsTerminal,
-                    estimatedFeeDisplay = e.EstimatedFeeDisplay,
-                    hasFee = e.EstimatedFee.HasValue,
-                    followupDisplay = e.FollowupDisplay,
-                    followupCssClass = e.FollowupCssClass,
-                    followupIcon = e.FollowupIcon,
-                    followupSubtext = e.FollowupSubtext,
-                    followupCount = e.FollowupCount,
-                    daysSinceLabel = e.DaysSinceLabel,
-                    whatsAppUrl = e.WhatsAppUrl,
-                    callUrl = e.CallUrl,
-                    pipelineKey = e.PipelineKey,
-                    sourceKey = e.SourceKey,
-                    priorityKey = e.PriorityKey,
-                    classKey = e.ClassKey,
-                    sessionKey = e.SessionKey,
-                    searchKey = e.SearchKey,
-                    isOverdue = e.IsOverdue,
-                    isToday = e.IsToday,
-                    lostReason = e.LostReason
-                })
-            });
+            await _enquiryService.GetEnquiryCrmPageAsync(query, tenantId, schoolId, actionUserId);
+            return View(query);
         }
 
         // ── GET: /ERP/Enquiry/GetFollowups (AJAX) ──────────────
@@ -134,30 +69,53 @@ namespace educore.Areas.ERP.Controllers
             var followups = await _enquiryService.GetFollowupsAsync(enquiryId, tenantId, schoolId, actionUserId);
             var history = await _enquiryService.GetStatusHistoryAsync(enquiryId, tenantId, schoolId, actionUserId);
 
-            return Json(new
-            {
-                success = true,
-                followups = followups.Select(f => new
+            // One ready-to-render timeline instead of two lists the page has to merge.
+            // Merging here keeps real DateTimes, so sorting and de-duplicating are exact —
+            // the page only had the formatted strings and could do neither reliably.
+            var rows = new List<(DateTime At, object Row)>();
+
+            foreach (var f in followups)
+                rows.Add((f.FollowupDate, new
                 {
-                    followupId = f.FollowupId,
-                    followupDate = f.FollowupDate.ToString("dd MMM yyyy, h:mm tt"),
+                    kind = "followup",
+                    at = IstText(f.FollowupDate),
+                    timeAgo = f.TimeAgo,
                     followupType = f.FollowupType,
                     typeIcon = f.TypeIcon,
                     outcome = f.Outcome,
-                    outcomeBadgeClass = f.OutcomeBadgeClass,
-                    notes = f.Notes,
+                    badgeClass = f.OutcomeBadgeClass,
+                    note = f.Notes,
                     statusBefore = f.StatusBefore,
-                    statusAfter = f.StatusAfter,
-                    timeAgo = f.TimeAgo
-                }),
-                history = history.Select(h => new
+                    statusAfter = f.StatusAfter
+                }));
+
+            foreach (var h in history)
+            {
+                // Logging a follow-up that also changes the status writes BOTH a follow-up
+                // row and a status-history row, which showed up as the same event twice.
+                // The follow-up entry already shows the transition, so drop the twin.
+                // The proc writes the pair inside one transaction, so their timestamps
+                // differ only by however long that transaction took.
+                bool loggedWithFollowup = followups.Any(f =>
+                    f.StatusAfter == h.StatusTo &&
+                    Math.Abs((f.FollowupDate - h.CreatedAt).TotalSeconds) <= SameTransactionSeconds);
+                if (loggedWithFollowup) continue;
+
+                rows.Add((h.CreatedAt, new
                 {
+                    kind = "status",
+                    at = IstText(h.CreatedAt),
                     statusFrom = h.StatusFrom ?? "Created",
                     statusTo = h.StatusTo,
-                    statusToBadgeClass = h.StatusToBadgeClass,
-                    changeNote = h.ChangeNote,
-                    changedAt = h.CreatedAt.ToString("dd MMM yyyy, h:mm tt")
-                })
+                    badgeClass = h.StatusToBadgeClass,
+                    note = h.ChangeNote
+                }));
+            }
+
+            return Json(new
+            {
+                success = true,
+                timeline = rows.OrderByDescending(r => r.At).Select(r => r.Row)
             });
         }
 
@@ -291,6 +249,13 @@ namespace educore.Areas.ERP.Controllers
             if (IsActionDrivenStatus(req.NewStatus))
                 return Json(new { success = false, message = "Use the Register or Convert action to set this status." });
 
+            // The lead's CURRENT status can lock it as well. Only the status change is
+            // refused — logging the follow-up itself stays allowed, because calling an
+            // admitted parent is normal.
+            if (!string.IsNullOrWhiteSpace(req.NewStatus) &&
+                await IsLeadStatusLockedAsync(req.EnquiryId, tenantId, schoolId, actionUserId))
+                return Json(new { success = false, message = LockedStatusMessage });
+
             // Require lost reason when marking as Not Interested
             if (req.NewStatus is "Not Interested" or "Dropped" && string.IsNullOrWhiteSpace(req.LostReason))
                 return Json(new { success = false, message = "Please provide a reason for marking Not Interested." });
@@ -334,6 +299,10 @@ namespace educore.Areas.ERP.Controllers
             // (registration number / student record). Use the Register / Convert actions.
             if (IsActionDrivenStatus(req.Status))
                 return Json(new { success = false, message = "Use the Register or Convert action to set this status." });
+
+            // Already registered / admitted leads cannot be moved back from here either.
+            if (await IsLeadStatusLockedAsync(req.EnquiryId, tenantId, schoolId, actionUserId))
+                return Json(new { success = false, message = LockedStatusMessage });
 
             if (req.Status is "Not Interested" or "Dropped" && string.IsNullOrWhiteSpace(req.LostReason))
                 return Json(new { success = false, message = "Please select a reason for Not Interested." });
@@ -550,10 +519,39 @@ namespace educore.Areas.ERP.Controllers
         private int UserId() => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
         private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
+        // A Postgres `timestamptz` comes back as UTC, so printing it straight showed
+        // times 5:30 behind — a call logged at 10:54 PM read as 5:24 PM. Every screen
+        // here is read in India, same as the wa.me/91 links and the en-IN money format.
+        private static readonly TimeZoneInfo IndiaTime = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+
+        // SpecifyKind, not ToUniversalTime: the DataSet round-trip drops DateTimeKind, so
+        // the UTC value arrives tagged Unspecified. ToUniversalTime() would read that as
+        // local and subtract 5:30 first, which cancels the conversion out entirely.
+        private static string IstText(DateTime dbUtc) =>
+            TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(dbUtc, DateTimeKind.Utc), IndiaTime)
+                        .ToString("dd MMM yyyy, h:mm tt");
+
         // Statuses that may only be set by their owning action (Register / admission save),
         // never by a direct status change — they carry required data/side-effects.
         private static bool IsActionDrivenStatus(string? status) =>
             status is "Registration Done" or "Admission Confirmed";
+
+        // Two rows written by the same proc call count as one event. Generous on
+        // purpose — a slow transaction must not split one action into two entries.
+        private const int SameTransactionSeconds = 5;
+
+        private const string LockedStatusMessage =
+            "This enquiry is already registered or admitted. Use Cancel Registration or the admission screen to change its status.";
+
+        // A lead that already reached an action-driven status is locked: its registration
+        // number / student record hang off that status, so moving it back from a plain
+        // status change would leave them orphaned. The UI hides the control; this is the
+        // matching server-side check, since the UI is not a security boundary.
+        private async Task<bool> IsLeadStatusLockedAsync(int enquiryId, int tenantId, int schoolId, int actionUserId)
+        {
+            var lead = await _enquiryService.GetEnquiryByIdAsync(enquiryId, tenantId, schoolId, actionUserId);
+            return lead != null && IsActionDrivenStatus(lead.Status);
+        }
 
     }
 }

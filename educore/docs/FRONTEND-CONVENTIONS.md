@@ -190,6 +190,22 @@ on a syntax error without executing anything.
 | Button spinner code | 22 copies | `EC.buttonBusy` / `EC.buttonReset` |
 | `confirm()` / `prompt()` | 17 / 1 | `EC.confirm` / `EC.prompt` |
 | `alert()` | 2 | 1 — the fallback inside `ecToast`, which must stay |
+| Hand-rolled yes/no delete modals | 1 (`EnquiryCRM`) | `EC.confirm` |
+
+### Confirmations that stay custom (on purpose)
+
+Searching for `confirm(` does **not** find every confirmation — `EnquiryCRM` had a
+hand-written `#deleteEnquiryModal` and was missed for exactly that reason. Search for
+`class="modal fade"` too. These five are custom by design, because `EC.confirm` only
+renders title + name + message and would drop information the user needs:
+
+| Modal | Why it stays |
+|---|---|
+| `SchoolList` `#purgeModal` | Type-the-school-name-to-confirm before a permanent purge |
+| `ManageFee` `#cancelModal` | Required reason **plus** an "Authorised by" dropdown |
+| `Registration` `#cancelRegModal` | Reason is a fixed dropdown, not free text |
+| `Promotion` `#confirmModal` | Promote / retain / pass-out counts and carry-forward dues |
+| `MarkEntry` `#finalizeModal` | Conditional "N students have no marks" warning |
 
 ### Pages touched
 
@@ -202,7 +218,7 @@ on a syntax error without executing anything.
 Documents, EnquiryCRM, FeeHead, FeeStructure, PeriodStructure, SchoolCalendar, SmartBell,
 StaffMasters, SubjectManagement, Timetable}` · `Staff/StaffProfile` ·
 `Student/{EditStudent, Inactive, Promotion, StudentAttendance, StudentList}` · `Tc/Register` ·
-`Transport/{Assign, Routes, Vehicles}` · `Views/Account/Error` · `Views/Dashboards/Index` ·
+`Transport/{Assign, Routes, Vehicles}` · `Views/Account/{Error, Login}` · `Views/Dashboards/Index` ·
 `Views/Shared/Sections/_Scripts` · `Views/Shared/_FeeReceiptModal`
 
 ---

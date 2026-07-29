@@ -1,0 +1,70 @@
+@model EduCoreDataAccessLayer.Models.ERP.EnquiryListModel
+@{
+    // Row action buttons, shared by the desktop table and the mobile cards so the
+    // two can never drift apart. The buttons still drive the page's AJAX handlers
+    // (same classes + data-* attributes as before) — only the rendering moved from
+    // JavaScript string building to Razor.
+    //
+    // ShowRegistration comes from the parent view via ViewData: the Registration
+    // stage only exists when the school enables it in Admission Workflow settings.
+    var showRegistration = ViewData["ShowRegistration"] as bool? ?? false;
+
+    // A lead whose status was set by an action (Register / admission save) is
+    // locked: that status carries a registration number or a student record.
+    var isLocked = Model.IsTerminal || Model.Status == "Registration Done";
+}
+
+@* ── Contact: Call · WhatsApp ── *@
+<a href="@Model.CallUrl" class="btn btn-sm btn-icon btn-outline-info crm-action-btn" title="Call">
+    <i class="bx bx-phone-call"></i>
+</a>
+<a href="@Model.WhatsAppUrl" target="_blank" class="btn btn-sm btn-icon btn-outline-success crm-action-btn" title="WhatsApp">
+    <i class="bx bxl-whatsapp"></i>
+</a>
+<div class="vr mx-1" style="opacity:.18"></div>
+
+@* ── Nurture & progress: Follow-up · Register · Convert ── *@
+<button type="button" class="btn btn-sm btn-icon btn-outline-secondary crm-action-btn btn-log-followup"
+        title="Log Follow-up"
+        data-id="@Model.EnquiryId" data-name="@Model.StudentName"
+        data-status="@Model.Status" data-locked="@(isLocked ? "1" : "")">
+    <i class="bx bx-calendar-plus"></i>
+</button>
+
+@if (showRegistration && !Model.IsTerminal && Model.Status != "Registration Done")
+{
+    <button type="button" class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-register-enquiry"
+            title="Register"
+            data-id="@Model.EnquiryId" data-name="@Model.StudentName"
+            data-parent="@Model.PrimaryParentDisplay" data-class="@Model.ClassName"
+            data-session="@Model.Session">
+        <i class="bx bx-clipboard"></i>
+    </button>
+}
+
+@if (!Model.IsTerminal)
+{
+    <button type="button" class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"
+            title="Convert to Admission"
+            data-id="@Model.EnquiryId" data-name="@Model.StudentName"
+            data-parent="@Model.PrimaryParentDisplay" data-mobile="@Model.Mobile"
+            data-class="@Model.ClassName" data-session="@Model.Session"
+            data-status="@Model.Status">
+        <i class="bx bx-user-check"></i>
+    </button>
+}
+
+<div class="vr mx-1" style="opacity:.18"></div>
+
+@* ── Manage: Edit · Delete ── *@
+@if (Model.Status != "Admission Confirmed")
+{
+    <button type="button" class="btn btn-sm btn-icon btn-outline-primary crm-action-btn btn-edit-enquiry"
+            title="Edit enquiry" data-id="@Model.EnquiryId">
+        <i class="bx bx-edit"></i>
+    </button>
+}
+<button type="button" class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"
+        title="Delete" data-id="@Model.EnquiryId" data-name="@Model.StudentName">
+    <i class="bx bx-trash"></i>
+</button>

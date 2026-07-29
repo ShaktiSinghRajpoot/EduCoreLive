@@ -4,8 +4,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 {
     public interface IEnquiryService
     {
-        // Page load (first page + KPI)
-        Task<EnquiryCrmPageModel> GetEnquiryCrmPageAsync(int tenantId, int schoolId, int actionUserId);
+        // Page load — fills Items + TotalCount + KPI on the bound query model.
+        Task<EnquiryCrmPageModel> GetEnquiryCrmPageAsync(
+            EnquiryCrmPageModel query, int tenantId, int schoolId, int actionUserId);
 
         // Server-side filtered + paginated list
         Task<(List<EnquiryListModel> Items, int TotalCount)> GetEnquiriesAsync(
@@ -22,7 +23,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             string? filterPipeline  = null,
             int?    filterAssignedTo = null,
             bool    filterOverdue   = false,
-            bool    filterToday     = false);
+            bool    filterToday     = false,
+            string? sortColumn      = null,
+            string? sortDir         = "asc");
 
         Task<EnquiryStatsModel>  GetKpiStatsAsync(int tenantId, int schoolId, int actionUserId);
         Task<EnquiryModel?>      GetEnquiryByIdAsync(int enquiryId, int tenantId, int schoolId, int actionUserId);

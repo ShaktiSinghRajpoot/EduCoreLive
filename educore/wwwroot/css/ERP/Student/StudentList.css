@@ -121,27 +121,9 @@
     .sl-export-btn{ height:32px; width:32px; }
 }
 
-/* table */
-.sl-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
-.sl-tbl{ min-width:920px; width:100%; }
-.sl-tbl thead th{
-    background:linear-gradient(180deg,#fffaf3,#fff6ea);
-    color:var(--ec-text-light); font-size:.7rem;
-    text-transform:uppercase; letter-spacing:.06em; font-weight:800;
-    padding:.8rem .9rem; border-bottom:1px solid var(--ec-border);
-    white-space:nowrap; user-select:none;
-}
-.sl-sortable{ cursor:pointer; }
-.sl-sortable:hover{ background:#fff0e0; color:var(--ec-primary); }
-.sl-si{ font-size:.85rem; opacity:.35; vertical-align:middle; margin-left:3px; }
-.sl-si-on{ opacity:1; color:var(--ec-primary); }
-.sl-tbl tbody td{
-    padding:.78rem .9rem; vertical-align:middle;
-    border-bottom:1px solid #f4f0eb;
-    font-size:.84rem; font-weight:600; color:var(--ec-text);
-}
-.sl-tbl tbody tr:hover td{ background:#fffaf3; cursor:pointer; }
-.sl-tbl tbody tr.sl-row-active td{ background:#fff4e6; }
+/* table — the shared look now lives in educore-theme.css as .ec-list-tbl /
+   .ec-sortable / .ec-si so this page and Enquiry CRM share one definition.
+   Only the page-specific bits stay here. */
 
 /* student cell */
 .sl-av{
@@ -215,14 +197,14 @@
     .layout-menu,.layout-navbar,.ec-page-header,
     .sl-filter-section,.sl-pg-wrap,.sl-sum-section,
     .sl-view-btn{ display:none !important; }
-    .sl-tbl-wrap{ overflow:visible !important; }
-    .sl-tbl{ min-width:100% !important; font-size:.75rem; }
+    .ec-list-tbl-wrap{ overflow:visible !important; }
+    .ec-list-tbl{ min-width:100% !important; font-size:.75rem; }
     .ec-page-shell{ box-shadow:none !important; border:none !important; }
 }
 
 /* responsive */
 @media (max-width:767.98px){
-    .sl-tbl-wrap{ display:none; }
+    .ec-list-tbl-wrap{ display:none; }
     .sl-mob-list{ display:block; }
     .sl-pg-wrap{ justify-content:center; }
     .sl-pg-info{ width:100%; text-align:center; }

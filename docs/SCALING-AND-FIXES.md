@@ -589,6 +589,121 @@ has no receipts and no TC records to exercise them.
 
 ---
 
+### [2026-07-29] Enquiry CRM — S.No column, newest-first ordering, proc pulled into the repo
+
+**What changed.** The Enquiry CRM table gained an `S.No` column — and so did the mobile card
+list, which renders the same rows below 768px — and `GetEnquiries` now orders newest enquiry
+first. The old ordering treated the list as a follow-up work queue
+(`CASE WHEN is_overdue THEN 0 ELSE 1 END, next_followup_date ASC NULLS LAST, created_at DESC`);
+it is now `created_at DESC, enquiry_id DESC`. The id tie-breaker matters — without it, two rows
+sharing a `created_at` can swap places between page fetches and appear twice or not at all.
+
+**S.No is computed, not stored.** Paging is server-side, so the number is
+`(page - 1) * pageSize + index + 1` — taken from the response, not from the row array index,
+which would restart at 1 on every page. The offset is computed once in the fetch callback and
+handed to both `renderTable` and `renderMobileCards`, so the two views cannot drift apart.
+
+**`core.sp_enquiry_crm_manage` existed only in the database.** There was no matching script under
+`EduCoreDataAccessLayer/Database/`, so the proc body was unversioned. It is now checked in as
+`Database/enquiry_crm_manage.sql`, dumped from the live definition with the ORDER BY changed.
+Other procs may be in the same state; check for a script before editing one.
+
+**No shared sorting mechanism exists.** `Models/ListModelBase.cs` provides the *state*
+(`SortColumn`, `SortDir`, paging, `Search`) and 6 list models inherit it, but the clickable
+header UI is copy-pasted: `StudentList.cshtml` and `FeeDueReminders/Index.cshtml` each hold a
+private `SortUrl()`/`SortIcon()` `@functions` pair, and `InventoryItem.cshtml` sorts client-side
+over an in-memory array. Enquiry CRM opts out of all of it — it is AJAX + server-paged, so a
+client-side sort would only reorder the visible page. Sortable headers there need proc-level
+sort params first. A shared `_SortHeader` partial is the obvious cleanup if a third page wants
+sorting.
+
+**Verified:** proc replaced on Railway (`CREATE PROCEDURE`), `pg_get_functiondef` confirms the
+new ORDER BY, and `GetEnquiries` for tenant 23 / school 33 returns enquiry ids 52, 51, 50, 49,
+48 — descending by `created_at`. No C# changed, so no build was needed; note again that
+`dotnet build` would not have checked the view's inline JavaScript anyway.
+
+---
+
+### [2026-07-29] Enquiry CRM converted to the StudentList list pattern
+
+**Why.** The repo had two unrelated ways to build a list screen. StudentList / StaffList /
+FeeDueReminders / TC Register are server-rendered: a model deriving from `ListModelBase`, a GET
+filter form, `SortUrl`/`SortIcon` header links and the shared `_Pager` / `_PageSize` partials.
+Enquiry CRM was AJAX: a JSON endpoint, rows built as HTML strings in JavaScript, and a
+hand-rolled pager. Same job, two patterns, and the AJAX copy had already drifted (see the
+per-page bug below). Enquiry CRM now follows the StudentList pattern exactly.
+
+**What changed, layer by layer.**
+
+| Layer | Change |
+|---|---|
+| `EnquiryModel.cs` | `EnquiryCrmPageModel` now derives from `ListModelBase`; `Enquiries` → `Items`; filters became bound properties |
+| `IEnquiryService` / `EnquiryService` | `GetEnquiryCrmPageAsync(query, …)` fills the bound model, mirroring `GetStudentListPageAsync`; `GetEnquiriesAsync` gained `sortColumn` / `sortDir` |
+| `sp_enquiry_crm_manage` | `GetEnquiries` gained `p_sort_column` / `p_sort_dir` with the same whitelisted CASE sort as `sp_student_list` |
+| `EnquiryController` | `EnquiryCRM(EnquiryCrmPageModel query)` binds from the query string; the `GetEnquiriesData` JSON endpoint was deleted |
+| `EnquiryCRM.cshtml` | List, filters, pipeline tabs, sorting and paging are all server-rendered |
+
+**Adding proc parameters means DROP + CREATE, not CREATE OR REPLACE** — REPLACE cannot change a
+signature. DDL is transactional in Postgres, so wrapping the script in `BEGIN`/`COMMIT` makes the
+swap atomic. This is safe here only because Npgsql binds **named** parameters: `EnquiryService`
+passes ~16 parameters in a completely different order from the 50-parameter signature and works,
+which is the proof. If binding were positional, inserting parameters would have broken every
+caller.
+
+**Net effect on the page:** inline JavaScript dropped from **1041 to 686 lines**. Gone entirely:
+`fetchData`, `renderTable`, `buildTableRow`, `renderMobileCards`, `buildMobileCard`,
+`updatePagination`, `buildPgHtml`, `pageRange`, `buildStatusDropdown`, `STATUS_LIST`, and every
+filter/page-size handler. What replaced them is Razor markup plus two partials,
+`_EnquiryStatusCell.cshtml` and `_EnquiryRowActions.cshtml`, shared by the table and the mobile
+cards so the two cannot drift. Row actions (status change, follow-up, register, convert, delete)
+are still AJAX and now call `reloadList()` — StudentList keeps AJAX for its row actions too, so
+this matches rather than diverges.
+
+**Two bugs fixed on the way:**
+
+1. *Per-page selector vanished.* The old JS hid the whole pager bar on `totalPages <= 1`. With 11
+   records at 25/page everything fits one page, so the selector that got you there disappeared and
+   there was no way back to 10. The shared partials deliberately use **two different rules** —
+   `_Pager` hides on `TotalPages <= 1`, `_PageSize` on `TotalCount <= smallest offered size` — and
+   adopting them fixes this by construction.
+2. *Duplicate `PageSize` input.* Rendering `_PageSize` in both the desktop and mobile bars would
+   put two `name="PageSize"` selects in one form; they post as `"10,25"`, which fails to bind to
+   `int` and silently does nothing. There is now **one** pagination bar serving both layouts, in
+   its own card outside `.crm-table-wrap` and `.crm-card-list`.
+
+**Sortable columns:** name, class, status, source, nextfu, age. Unknown keys — including an
+injection attempt — fall through to the default `created_at DESC, enquiry_id DESC`.
+
+**Verified:** `dotnet build` → **0 errors** (the 2 CS8620 nullability warnings on the new
+`SortUrl` are the same ones StudentList, StaffList and FeeDueReminders already carry — inherent to
+the shared helper). Proc exercised directly for every sort key plus a `'; DROP TABLE …'` input,
+which sorted as default and changed nothing. Inline JS re-checked with `node --check`.
+
+**Not verified:** the rendered page in a browser. Razor views are compiled at build time, so type
+and syntax errors in the view are caught — but the visual result was not confirmed.
+
+**Follow-ups, same day.** The KPI card row was removed from Enquiry CRM: it repeated the pipeline
+tabs (Total/All, Campus Visits, Admitted) and the quick-filter buttons (Due Today, Overdue) — the
+same figure in two or three places. Stage counts stay on the tabs, Due Today / Overdue became
+counts on the buttons that filter by them, and Conversion Rate — the only number unique to the
+row — became a chip in the pipeline card header. `.crm-kpi-card` went with it.
+
+**The list table style is now shared.** It lived in `StudentList.css` as `.sl-tbl` and is now
+`.ec-list-tbl` / `.ec-sortable` / `.ec-si` in **`wwwroot/css/educore-theme.css`**, used by
+StudentList, Student/Inactive and Enquiry CRM. Copying it into the Enquiry page would have
+recreated exactly the duplication this whole change set is removing. Page-specific column widths
+and breakpoints stay in each page's own file. **Add a new list screen by using these classes — do
+not paste the rules again.**
+
+Two things the extraction fixed that the original `.sl-tbl` had wrong:
+`.ec-table thead th` carries no `white-space` rule, so multi-word headers wrapped once a sort icon
+was added — the shared block sets `nowrap`. And `.sl-sortable:hover { color: … }` never applied,
+because Bootstrap's `.text-reset` is `color: inherit !important`; the shared rule matches that
+specificity. The sort icon is also `inline-flex` with a `gap` now, so it sits on the text baseline
+instead of being nudged with `margin-left` and a `vertical-align`.
+
+---
+
 # Glossary (quick reference)
 
 | Term | Plain meaning |

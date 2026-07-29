@@ -20,8 +20,8 @@
     }
     string SortIcon(string col)
     {
-        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-sort sl-si";
-        return "bx " + (Model.Desc ? "bx-sort-down" : "bx-sort-up") + " sl-si sl-si-on";
+        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-sort ec-si";
+        return "bx " + (Model.Desc ? "bx-sort-down" : "bx-sort-up") + " ec-si ec-si-on";
     }
 
     string StatusBadge(string s) => s switch

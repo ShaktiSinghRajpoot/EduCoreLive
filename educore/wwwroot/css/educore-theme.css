@@ -472,6 +472,59 @@ textarea.form-control {
     background-color: #fffaf5 !important;
 }
 
+/* ── Shared list table ──────────────────────────────────────────
+   The look for every server-side list screen (StudentList, Student/Inactive,
+   Enquiry CRM). It started life as `.sl-tbl` inside StudentList.css; it lives
+   here now so the pages share ONE definition instead of each keeping a copy
+   that drifts. Use it as:
+
+       <div class="ec-list-tbl-wrap">
+         <table class="table ec-list-tbl align-middle mb-0"> …
+
+   and for a sortable header:
+
+       <th><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("name")">
+             Name <i class="@SortIcon("name")"></i></a></th>
+
+   where SortIcon returns "bx bx-sort ec-si" or "bx bx-sort-up ec-si ec-si-on".
+   Page-specific column widths and breakpoints stay in the page's own file. */
+.ec-list-tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.ec-list-tbl { min-width: 920px; width: 100%; }
+
+.ec-list-tbl thead th {
+    background:     linear-gradient(180deg, #fffaf3, #fff6ea);
+    color:          var(--ec-text-light);
+    font-size:      .7rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    font-weight:    800;
+    padding:        .8rem .9rem;
+    border-bottom:  1px solid var(--ec-border);
+    /* Without nowrap a two-word header plus a sort icon wraps to two lines. */
+    white-space:    nowrap;
+    user-select:    none;
+}
+
+.ec-list-tbl tbody td {
+    padding:       .78rem .9rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f4f0eb;
+    font-size:     .84rem;
+    font-weight:   600;
+    color:         var(--ec-text);
+}
+.ec-list-tbl tbody tr:hover td { background: #fffaf3; cursor: pointer; }
+.ec-list-tbl tbody tr.ec-row-active td { background: #fff4e6; }
+
+/* Sortable column header. inline-flex keeps the icon on the text baseline and
+   swallows the whitespace a multi-line <a> would otherwise render. */
+.ec-sortable { cursor: pointer; display: inline-flex; align-items: center; gap: .25rem; }
+/* Bootstrap's .text-reset is `color: inherit !important`, so the hover colour
+   has to match that specificity or it never applies. */
+.ec-sortable:hover { color: var(--ec-primary) !important; }
+.ec-si    { font-size: .8rem; opacity: .35; }
+.ec-si-on { opacity: 1; color: var(--ec-primary); }
+
 /* ── Status badges ──────────────────────────────────────────── */
 .ec-badge {
     padding:       6px 12px;

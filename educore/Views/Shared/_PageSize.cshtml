@@ -1,3 +1,4 @@
+@using System.Linq
 @using Microsoft.AspNetCore.Mvc.Rendering
 @model EduCoreDataAccessLayer.Models.ListModelBase
 @{
@@ -12,6 +13,11 @@
     var formId = ViewData["FormId"] as string ?? "";
     var label  = ViewData["Label"]  as string ?? "Rows per page";
     var sizes  = ViewData["Sizes"]  as int[]  ?? new[] { 10, 25, 50 };
+
+    // Nothing to page through yet — a "Rows per page" dropdown next to 3 records is
+    // just noise. Keyed off the SMALLEST offered size, so a page that overrides
+    // Sizes gets the same rule for free. _Pager hides itself the same way.
+    if (Model == null || Model.TotalCount <= sizes.Min()) { return; }
 }
 <label class="mb-0 text-muted" style="white-space:nowrap;font-size:.81rem">@label</label>
 <select name="PageSize" form="@formId" class="form-select form-select-sm" style="width:auto"

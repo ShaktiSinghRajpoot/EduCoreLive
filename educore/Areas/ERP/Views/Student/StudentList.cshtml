@@ -23,8 +23,8 @@
     }
     string SortIcon(string col)
     {
-        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-sort sl-si";
-        return "bx " + (Model.Desc ? "bx-sort-down" : "bx-sort-up") + " sl-si sl-si-on";
+        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-sort ec-si";
+        return "bx " + (Model.Desc ? "bx-sort-down" : "bx-sort-up") + " ec-si ec-si-on";
     }
 
     string Initials(string n)
@@ -196,22 +196,21 @@
               <i class="bxs-file-pdf bx"></i>
             </button>
           </div>
-
         </form>
       </div>
 
       <div class="ec-card-body pt-2">
 
-        <div class="sl-tbl-wrap">
-          <table class="table sl-tbl align-middle mb-0">
+        <div class="ec-list-tbl-wrap">
+          <table class="table ec-list-tbl align-middle mb-0">
             <thead>
               <tr>
-                <th><a class="sl-sortable text-reset text-decoration-none" href="@SortUrl("name")">
+                <th><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("name")">
                   Student <i class="@SortIcon("name")"></i></a></th>
-                <th><a class="sl-sortable text-reset text-decoration-none" href="@SortUrl("class")">
+                <th><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("class")">
                   Class &amp; Section <i class="@SortIcon("class")"></i></a></th>
                 <th>Gender</th>
-                <th><a class="sl-sortable text-reset text-decoration-none" href="@SortUrl("admdate")">
+                <th><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("admdate")">
                   Admission Date <i class="@SortIcon("admdate")"></i></a></th>
                 <th>Parent / Guardian</th>
                 <th>Contact</th>

@@ -249,8 +249,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 RouteId      = ToInt(r["route_id"]),
                 StopId       = ToInt(r["stop_id"]),
                 MonthlyFare  = r["monthly_fare"] == DBNull.Value ? 0 : Convert.ToDecimal(r["monthly_fare"]),
-                //StartDate    = r["start_date"] == DBNull.Value ? null : DateOnly.FromDateTime(Convert.ToDateTime(r["start_date"])),
-                StartDate = r["start_date"] == DBNull.Value ? null : (DateOnly)r["start_date"],
+                // A Postgres `date` is DateOnly — cast it, never Convert.ToDateTime.
+                StartDate    = r["start_date"] == DBNull.Value ? null : (DateOnly)r["start_date"],
                 RouteName    = r["route_name"] == DBNull.Value ? null : r["route_name"].ToString(),
                 StopName     = r["stop_name"] == DBNull.Value ? null : r["stop_name"].ToString()
             };
