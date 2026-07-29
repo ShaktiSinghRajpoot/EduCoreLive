@@ -61,7 +61,14 @@ namespace EduCoreDataAccessLayer.Models
         /// <summary>Tick to also create a login for this staff member.</summary>
         public bool CreateLogin { get; set; }
 
-        /// <summary>Plain password entered when CreateLogin is on (hashed in the controller).</summary>
+        /// <summary>Tick (Edit only) to reset the password of an existing login.</summary>
+        public bool ChangePassword { get; set; }
+
+        /// <summary>
+        /// Plain password entered when CreateLogin (new login) or ChangePassword
+        /// (reset existing login) is on. Hashed in the controller before it reaches
+        /// the data layer.
+        /// </summary>
         [DataType(DataType.Password)]
         public string? LoginPassword { get; set; }
 

@@ -4,6 +4,15 @@
 
 'use strict';
 
+// Treat tablets (incl. iPad landscape at 1024px) as large screens so the
+// left sidebar is the fixed, full-height pinned menu — not the slide-in
+// drawer. Must match the CSS breakpoint in css/educore-theme.css
+// (@media 768px–1199.98px). helpers.js loads before this file and reads
+// this value via `this.LAYOUT_BREAKPOINT`, so overriding it here is enough.
+if (window.Helpers) {
+  window.Helpers.LAYOUT_BREAKPOINT = 768;
+}
+
 let menu, animate;
 document.addEventListener('DOMContentLoaded', function () {
   // class for ios specific styles
@@ -35,6 +44,55 @@ document.addEventListener('DOMContentLoaded', function () {
       window.Helpers.toggleCollapsed();
     });
   });
+
+  // Tablet pop-in/out sidebar (768–1199.98px).
+  // In this band the sidebar is pinned by CSS (educore-theme.css), and the
+  // free template's Helpers.toggleCollapsed() is a no-op on "large" screens —
+  // so wire the navbar hamburger to slide the pinned sidebar in/out and
+  // reclaim the content space, remembering the choice across page loads.
+  // Phones (<768px) and desktop (>=1200px) are untouched.
+  (function () {
+    const tablet = window.matchMedia('(min-width: 768px) and (max-width: 1199.98px)');
+    const html = document.documentElement;
+    const KEY = 'ec-tablet-menu-hidden';
+
+    // Hidden by default on tablets: start collapsed unless the user explicitly
+    // opened it before ('0'). Applied without animating on load.
+    try {
+      if (tablet.matches && localStorage.getItem(KEY) !== '0') {
+        html.classList.add('ec-no-anim', 'ec-menu-hidden');
+        requestAnimationFrame(() => requestAnimationFrame(() => html.classList.remove('ec-no-anim')));
+      }
+    } catch (e) {}
+
+    // The chevron in the menu header (.layout-menu-toggle) collapses the sidebar.
+    document.querySelectorAll('.layout-menu-toggle').forEach(toggle => {
+      toggle.addEventListener('click', () => {
+        if (!tablet.matches) return; // only act in the tablet band
+        const hidden = html.classList.toggle('ec-menu-hidden');
+        try { localStorage.setItem(KEY, hidden ? '1' : '0'); } catch (e) {}
+      });
+    });
+
+    // A floating chevron handle brings the sidebar back once it's hidden
+    // (the in-menu chevron slides away with the menu).
+    const reopen = document.createElement('button');
+    reopen.type = 'button';
+    reopen.className = 'ec-menu-reopen';
+    reopen.setAttribute('aria-label', 'Show menu');
+    reopen.innerHTML = '<i class="icon-base bx bx-chevron-right"></i>';
+    reopen.addEventListener('click', () => {
+      html.classList.remove('ec-menu-hidden');
+      try { localStorage.setItem(KEY, '0'); } catch (e) {}
+    });
+    document.body.appendChild(reopen);
+
+    // Leaving the tablet band (rotate/resize) clears the override so desktop
+    // and phone layouts behave normally.
+    const onChange = () => { if (!tablet.matches) html.classList.remove('ec-menu-hidden'); };
+    if (tablet.addEventListener) tablet.addEventListener('change', onChange);
+    else if (tablet.addListener) tablet.addListener(onChange);
+  })();
 
   // Display menu toggle (layout-menu-toggle) on hover with delay
   let delay = function (elem, callback) {

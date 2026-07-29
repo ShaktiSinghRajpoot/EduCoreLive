@@ -209,6 +209,20 @@ BEGIN
 
         END IF;
 
+        -- Reset the password of an EXISTING login when a new hash is supplied (admin
+        -- "reset password" on the edit form). Force a self-reset on next sign-in.
+        IF p_operation = 'UPDATE'
+           AND COALESCE(p_create_login, FALSE) = FALSE
+           AND v_user_id IS NOT NULL
+           AND p_password_hash IS NOT NULL AND TRIM(p_password_hash) <> '' THEN
+            UPDATE core.users
+            SET    password_hash = p_password_hash,
+                   must_change_password = TRUE,
+                   updated_by = p_action_user_id,
+                   updated_at = now()
+            WHERE  user_id = v_user_id AND tenant_id = p_tenant_id;
+        END IF;
+
         -- Assign / sync the login's role(s). A user's effective permissions are the
         -- UNION of all their roles. Runs for a freshly-created OR an existing login,
         -- so the People edit form is the single place to manage a person's access.

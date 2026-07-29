@@ -234,6 +234,22 @@
               }
             </div>
             <div class="text-muted small mt-1">Permissions are the combined access of every role ticked. Changes take effect the next time they load a page.</div>
+
+            <hr class="my-4">
+
+            <div class="es-login-toggle mb-3">
+              <input asp-for="ChangePassword" type="checkbox" class="form-check-input mt-0" id="chkPwd" style="width:2.4em;height:1.3em;">
+              <label for="chkPwd" class="fw-bold mb-0" style="color:var(--ec-text-dark);">Reset this person's password</label>
+            </div>
+            <div class="row g-3" id="pwdFields" style="display:none;">
+              <div class="col-12 col-md-4">
+                <label class="es-label required">New Password</label>
+                <input asp-for="LoginPassword" type="password" class="form-control" placeholder="At least 8 characters" autocomplete="new-password">
+              </div>
+              <div class="col-12">
+                <div class="text-muted small">They'll be required to set their own password the next time they sign in.</div>
+              </div>
+            </div>
           </div>
         </div>
       }
@@ -282,6 +298,11 @@
         // Login fields toggle (only present when this person has no login yet).
         $('#chkLogin').change(function () {
             $('#loginFields').css('display', $(this).is(':checked') ? 'flex' : 'none');
+        }).trigger('change');
+
+        // Reset-password fields toggle (only present when this person already has a login).
+        $('#chkPwd').change(function () {
+            $('#pwdFields').css('display', $(this).is(':checked') ? 'flex' : 'none');
         }).trigger('change');
     });
 </script>
