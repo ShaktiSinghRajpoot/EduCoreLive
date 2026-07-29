@@ -210,6 +210,80 @@ document.addEventListener('submit', function (e) {
     });
 }, true);
 
+// ── PWA install ─────────────────────────────────────────────────────────
+// Drives the "Install App" item in the sidebar. The item ships hidden and is
+// only revealed when installing is actually possible, so nobody clicks a
+// button that cannot do anything.
+//
+// Two very different worlds:
+//   * Chrome / Edge / Android — fire beforeinstallprompt. We stash the event
+//     and replay it on click; that is the ONLY way to open the install dialog.
+//   * iPhone / iPad — Safari never fires that event and has no install API at
+//     all. The only route is Share -> Add to Home Screen, so there we just
+//     show the instructions.
+EC.installPrompt = null;
+
+EC.isIos = function () {
+    // iPadOS 13+ reports itself as a Mac, so the touch check is what catches iPads.
+    return /iphone|ipod/i.test(navigator.userAgent) ||
+           /ipad/i.test(navigator.userAgent) ||
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
+
+EC.isInstalled = function () {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+           navigator.standalone === true;
+};
+
+window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();              // stop the mini-infobar; we drive it from the menu
+    EC.installPrompt = e;
+    $('#ec-install-item').removeClass('d-none');
+});
+
+window.addEventListener('appinstalled', function () {
+    EC.installPrompt = null;
+    $('#ec-install-item').addClass('d-none');
+    if (window.ecToast) ecToast('success', 'App installed.');
+});
+
+$(function () {
+    var $item = $('#ec-install-item');
+    if (!$item.length || EC.isInstalled()) return;
+
+    // Safari gets no event, so reveal the item up front — it opens instructions.
+    if (EC.isIos()) $item.removeClass('d-none');
+
+    $('#ec-install-app').on('click', function () {
+        if (EC.installPrompt) {
+            EC.installPrompt.prompt();
+            EC.installPrompt.userChoice.then(function (choice) {
+                if (choice.outcome === 'accepted') $item.addClass('d-none');
+                EC.installPrompt = null;
+            });
+            return;
+        }
+
+        if (EC.isIos()) {
+            // danger:false — the default dialog is the red delete one.
+            // The message is escaped into a single <p>, so keep it one paragraph.
+            EC.confirm({
+                title:   'Install SmartSchoolWala',
+                danger:  false,
+                icon:    'bx-download',
+                message: 'In Safari, tap the Share button and choose "Add to Home Screen". ' +
+                         'It only works in Safari — Chrome on iPhone/iPad cannot install apps.',
+                okText:  'Got it'
+            });
+            return;
+        }
+
+        if (window.ecToast) {
+            ecToast('info', 'Your browser cannot install this app. Try Chrome or Edge.');
+        }
+    });
+});
+
 // ── Live form validation ────────────────────────────────────────────────
 // Lifted out of the School Profile page, which had the pattern first, so every
 // form can behave the same way instead of each growing its own checks.

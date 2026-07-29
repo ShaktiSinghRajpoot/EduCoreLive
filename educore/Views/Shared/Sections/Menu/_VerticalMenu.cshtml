@@ -488,17 +488,24 @@
                 <div class="text-truncate">Support &amp; Help</div>
             </a>
         </li>
-        <li class="menu-item">
-            <a href="javascript:void(0);" class="menu-link">
+        @* Hidden until the browser says the app is installable (or we detect iOS,
+           which never fires beforeinstallprompt). Wired up in site.js. *@
+        <li class="menu-item d-none" id="ec-install-item">
+            <a href="javascript:void(0);" class="menu-link" id="ec-install-app">
                 <i class="menu-icon icon-base bx bx-download ic-install"></i>
                 <div class="text-truncate">Install App</div>
             </a>
         </li>
+        @* Logout is [HttpPost][ValidateAntiForgeryToken], so this MUST be a form.
+           It used to be a plain <a> here, which sent a GET and just 405'd. *@
         <li class="menu-item">
-            <a asp-area="" asp-controller="Account" asp-action="Logout" class="menu-link">
-                <i class="menu-icon icon-base bx bx-log-out ic-logout"></i>
-                <div class="text-truncate">Sign out</div>
-            </a>
+            <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" id="ec-logout-form">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="menu-link w-100" style="background:none;border:none;text-align:left;cursor:pointer;">
+                    <i class="menu-icon icon-base bx bx-log-out ic-logout"></i>
+                    <div class="text-truncate">Sign out</div>
+                </button>
+            </form>
         </li>
 
     </ul>
