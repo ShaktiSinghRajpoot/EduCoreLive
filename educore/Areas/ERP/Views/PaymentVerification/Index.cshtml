@@ -190,7 +190,10 @@
                         <div style="opacity:.9;font-size:.85rem;margin-top:.2rem">Payment Successful</div>
                     </div>
                     <div class="pv-receipt-body">
-                        <div class="pv-rrow"><span class="k">Paid To</span><span class="v">EduCore School</span></div>
+                        @* TODO: this should be the logged-in school's name. It was hardcoded
+                           to "EduCore School"; the view has no school name to bind to, so
+                           wiring one through the controller is a separate change. *@
+                        <div class="pv-rrow"><span class="k">Paid To</span><span class="v">Your School</span></div>
                         <div class="pv-rrow"><span class="k">From</span><span class="v" id="pvmParent"></span></div>
                         <div class="pv-rrow"><span class="k">Student</span><span class="v" id="pvmStudent"></span></div>
                         <div class="pv-rrow"><span class="k">Mode</span><span class="v" id="pvmMode"></span></div>

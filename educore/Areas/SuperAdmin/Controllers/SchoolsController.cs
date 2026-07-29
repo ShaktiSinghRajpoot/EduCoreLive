@@ -196,7 +196,7 @@ namespace educore.Areas.SuperAdmin.Controllers
             var loginUrl = Url.Action("Login", "Account", new { area = "" }, Request.Scheme) ?? "/Account/Login";
             var html = BuildWelcomeEmail(model.AdminFullName, model.SchoolName, model.AdminEmail!, tempPassword!, loginUrl);
             var plainText =
-                $"Welcome to EduCore ({model.SchoolName}). Login: {model.AdminEmail} | " +
+                $"Welcome to SmartSchoolWala ({model.SchoolName}). Login: {model.AdminEmail} | " +
                 $"Temporary password: {tempPassword}. Please change it on first login. {loginUrl}";
 
             var delivered = await _notificationService.SendAsync(new NotificationMessage
@@ -205,7 +205,7 @@ namespace educore.Areas.SuperAdmin.Controllers
                 ToPhone = model.AdminPhone,
                 ToName = model.AdminFullName,
                 Channels = NotificationChannels.All,
-                Subject = $"Welcome to EduCore — {model.SchoolName}",
+                Subject = $"Welcome to SmartSchoolWala — {model.SchoolName}",
                 HtmlBody = html,
                 PlainText = plainText
             });
@@ -260,14 +260,14 @@ namespace educore.Areas.SuperAdmin.Controllers
 
             var sb = new StringBuilder();
             sb.Append("<div style=\"font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:auto;color:#2b1b12;\">");
-            sb.Append($"<h2 style=\"color:#ff8a00;\">Welcome to EduCore</h2>");
+            sb.Append($"<h2 style=\"color:#ff8a00;\">Welcome to SmartSchoolWala.com</h2>");
             sb.Append($"<p>Hi {Enc(adminName)},</p>");
             sb.Append($"<p>An administrator account has been created for <strong>{Enc(schoolName)}</strong>. Use the credentials below to sign in.</p>");
             sb.Append("<div style=\"background:#f7f6f4;border:1px solid #eee;border-radius:10px;padding:16px;margin:16px 0;\">");
             sb.Append($"<p style=\"margin:4px 0;\"><strong>Email:</strong> {Enc(email)}</p>");
             sb.Append($"<p style=\"margin:4px 0;\"><strong>Temporary password:</strong> {Enc(tempPassword)}</p>");
             sb.Append("</div>");
-            sb.Append($"<p><a href=\"{Enc(loginUrl)}\" style=\"display:inline-block;background:#ff8a00;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;\">Sign in to EduCore</a></p>");
+            sb.Append($"<p><a href=\"{Enc(loginUrl)}\" style=\"display:inline-block;background:#ff8a00;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;\">Sign in to SmartSchoolWala</a></p>");
             sb.Append("<p style=\"color:#9a938b;font-size:13px;\">For your security, please change this password after your first login.</p>");
             sb.Append("</div>");
             return sb.ToString();

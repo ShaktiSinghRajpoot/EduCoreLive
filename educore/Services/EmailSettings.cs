@@ -18,6 +18,6 @@ namespace educore.Services
         public string Password { get; set; } = string.Empty;
 
         public string FromAddress { get; set; } = string.Empty;
-        public string FromName { get; set; } = "EduCore";
+        public string FromName { get; set; } = "SmartSchoolWala.com";
     }
 }

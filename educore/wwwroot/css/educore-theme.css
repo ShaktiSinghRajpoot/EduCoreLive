@@ -1,7 +1,9 @@
 /* ============================================================
-   EduCore Design System — single source of truth
+   SmartSchoolWala.com Design System — single source of truth
    Every page uses these ec-* classes. No page should redefine
    colours, shadows, border-radii, or card patterns inline.
+   (The ec-* prefix predates the rename and is left alone — it
+   appears in every view; renaming it buys nothing.)
    ============================================================ */
 
 /* ── Design tokens ─────────────────────────────────────────── */
@@ -35,6 +37,57 @@
     --bs-secondary-color:         var(--ec-text-muted); /* #8b8175 */
     --bs-secondary-color-rgb:     139, 129, 117;
     --bs-heading-color:           var(--ec-text-dark);  /* #2b1b12 */
+}
+
+/* ── Brand marks ────────────────────────────────────────────── *
+ * SmartSchoolWala.com logo lockups. The vectors live in
+ * /img/brand/. Size them HERE, never inline in a view, so the
+ * logo stays consistent across the sidebar and the auth pages.  */
+
+/* The "S" mark alone — sidebar (also shows when the menu collapses). */
+.ssw-mark {
+    display: block;
+    height: 26px;
+    width: auto;
+}
+
+/* Sidebar wordmark is real text, not the wordmark SVG: at this size the
+   logo's "MANAGE · AUTOMATE · EMPOWER" tagline would be unreadable.
+   The colour comes from menu.css, which paints .app-brand-text with the
+   orange brand gradient — only the metrics are set here.
+
+   The selector has to out-specify demo.css's `.app-brand-text.demo`
+   (font-size: 1.75rem); at that size "SmartSchoolWala.com" is ~310px wide
+   and spills straight out of the 260px sidebar over the navbar. */
+#layout-menu .app-brand-text.ssw-brand-text {
+    font-weight: 700;
+    font-size: .95rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+/* The lockups with text are PNG, not SVG, on purpose: the traced SVGs
+   drop strokes out of the "MANAGE · AUTOMATE · EMPOWER" tagline and it
+   renders as mush at any size. The PNGs are 768px+ wide, so they stay
+   sharp at these display sizes even on a 2x screen. */
+
+/* Full stacked lockup — the login card, the one spot wide enough
+   to carry the mark, the wordmark and the tagline together. */
+.ssw-logo-stacked {
+    display: block;
+    width: 210px;
+    max-width: 72%;
+    height: auto;
+    margin: 0 auto;
+}
+
+/* Horizontal lockup — the shorter auth cards (forgot / OTP / change password). */
+.ssw-logo-horizontal {
+    display: block;
+    width: 230px;
+    max-width: 82%;
+    height: auto;
+    margin: 0 auto 1.25rem;
 }
 
 /* ── Body ───────────────────────────────────────────────────── */
@@ -550,9 +603,35 @@ textarea.form-control {
 }
 
 .btn-primary:hover,
-.btn-primary:focus {
+.btn-primary:focus,
+.btn-primary:active {
     background:   #eb7d00;
     border-color: #eb7d00;
+}
+
+/* Busy / disabled state. EC.buttonBusy sets the `disabled` property, and
+   without this rule Bootstrap falls back to --bs-btn-disabled-bg — its
+   default BLUE — so every busy button in the app flipped from orange to
+   blue mid-action. Keep the brand colour and just fade it. */
+.btn-primary:disabled,
+.btn-primary.disabled {
+    background:   var(--ec-primary);
+    border-color: var(--ec-primary);
+    opacity:      .65;
+}
+
+/* EC.buttonBusy renders <i class="bx bx-loader-circle bx-spin">, but the
+   Boxicons build bundled here ships no .bx-spin rule — the spinner sat
+   frozen on every busy button in the app. Define the animation once here.
+   inline-block matters: transforms do not apply to inline elements, and
+   not every busy button is a flex container. */
+.bx-spin {
+    display:   inline-block;
+    animation: ec-spin 1s linear infinite;
+}
+
+@keyframes ec-spin {
+    to { transform: rotate(360deg); }
 }
 
 .btn-outline-secondary {

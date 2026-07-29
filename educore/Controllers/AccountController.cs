@@ -439,9 +439,9 @@ namespace educore.Controllers
                     ToPhone = user.Phone,
                     ToName = user.FullName,
                     Channels = NotificationChannels.All,
-                    Subject = "Your EduCore verification code",
+                    Subject = "Your SmartSchoolWala verification code",
                     HtmlBody = BuildOtpEmail(user.FullName, otp),
-                    PlainText = $"Your EduCore password reset code is {otp}. It expires in 10 minutes. Do not share it."
+                    PlainText = $"Your SmartSchoolWala password reset code is {otp}. It expires in 10 minutes. Do not share it."
                 });
             }
 
@@ -512,7 +512,7 @@ namespace educore.Controllers
             var sb = new StringBuilder();
             sb.Append("<div style=\"font-family:Segoe UI,Arial,sans-serif;color:#2b1b12;\">");
             sb.Append($"<p>Hi {Enc(name)},</p>");
-            sb.Append("<p>Use this code to reset your EduCore password:</p>");
+            sb.Append("<p>Use this code to reset your SmartSchoolWala password:</p>");
             sb.Append($"<p style=\"font-size:30px;font-weight:800;letter-spacing:6px;color:#ff8a00;margin:16px 0;\">{Enc(otp)}</p>");
             sb.Append("<p style=\"font-size:13px;color:#9a938b;\">This code expires in 10 minutes. If you didn't request it, you can ignore this email.</p>");
             sb.Append("</div>");

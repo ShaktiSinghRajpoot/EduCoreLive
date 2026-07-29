@@ -11,15 +11,14 @@
 <div class="login-page">
     <div class="login-card">
 
+        @* Stacked lockup (mark over wordmark) — the login card is the one place
+           with room to show the full logo, tagline included. It replaces the old
+           mark + separate .brand-name text. *@
         <div class="brand-box">
             <a href="/" class="app-brand-link text-decoration-none">
-                <span class="app-brand-logo demo">
-                    @await Html.PartialAsync("../_Partials/_Macros")
-                </span>
+                <img src="~/img/brand/ssw-stacked.png" alt="SmartSchoolWala.com" class="ssw-logo-stacked" />
             </a>
         </div>
-
-        <div class="brand-name">@TempData.Peek("appName")</div>
 
         <h1 class="login-title">Welcome Back</h1>
         <p class="login-subtitle">Login to continue managing your school.</p>
@@ -74,8 +73,12 @@
                 <a asp-controller="Account" asp-action="ForgotPassword" class="small" style="color:#ff8a00;text-decoration:none;">Forgot password?</a>
             </div>
 
-            <button class="btn btn-primary d-grid w-100 login-btn" type="submit">
-                Login <span class="ms-1">→</span>
+            @* No d-grid here: it makes the button a grid container, which put the
+               arrow on its own row and pushed the busy spinner out of centre.
+               .login-btn centres its content with flex instead. *@
+            <button class="btn btn-primary w-100 login-btn" type="submit">
+                <span>Login</span>
+                <span class="login-btn-arrow" aria-hidden="true">→</span>
             </button>
         </form>
 

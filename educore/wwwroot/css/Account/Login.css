@@ -18,23 +18,15 @@
             box-shadow: 0 8px 24px rgba(67, 89, 113, .14);
         }
 
-        .brand-box { text-align: center; margin-bottom: .75rem; }
-
-        .brand-name {
-            text-align: center;
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #ff8a00;
-            letter-spacing: -.03em;
-            margin-bottom: 1rem;
-        }
+        .brand-box { text-align: center; margin-bottom: 1.5rem; }
 
         .login-title {
             text-align: center;
             font-size: 1.6rem;
             font-weight: 800;
             color: #2b1b12;
-            margin-bottom: .25rem;
+            letter-spacing: -.02em;
+            margin-bottom: .35rem;
         }
 
         .login-subtitle {
@@ -75,18 +67,58 @@
             z-index: 4;
         }
 
-        .login-options { margin-bottom: 1.25rem; }
+        .login-options { margin-bottom: 1.5rem; }
 
+        /* Flex, not d-grid: grid put the arrow on its own row and knocked the
+           busy spinner off centre. Flex centres both states the same way. */
         .login-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: .4rem;
             font-weight: 700;
-            min-height: 48px;
+            font-size: 1rem;
+            min-height: 50px;
             border-radius: 12px;
             margin-bottom: 1.25rem;
+            background: linear-gradient(135deg, #ff9a1f 0%, #ff8a00 55%, #f07c00 100%);
+            border: none;
+            box-shadow: 0 6px 16px rgba(255, 138, 0, .28);
+            transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
         }
+
+        .login-btn:hover:not(:disabled),
+        .login-btn:focus:not(:disabled) {
+            background: linear-gradient(135deg, #ff9a1f 0%, #ff8a00 55%, #f07c00 100%);
+            box-shadow: 0 8px 20px rgba(255, 138, 0, .36);
+            transform: translateY(-1px);
+        }
+
+        .login-btn:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 4px 12px rgba(255, 138, 0, .3);
+            filter: brightness(.96);
+        }
+
+        /* Busy state: keep the brand gradient, just fade it. Without this the
+           button fell back to Bootstrap's disabled blue while signing in. */
+        .login-btn:disabled,
+        .login-btn.disabled {
+            background: linear-gradient(135deg, #ff9a1f 0%, #ff8a00 55%, #f07c00 100%);
+            box-shadow: none;
+            opacity: .7;
+            transform: none;
+        }
+
+        .login-btn-arrow { transition: transform .15s ease; }
+
+        .login-btn:hover:not(:disabled) .login-btn-arrow { transform: translateX(3px); }
 
         .login-links { text-align: center; font-size: .8rem; color: #8b8175; }
         .login-links a { color: #ff8a00; text-decoration: none; }
+        .login-links a:hover { text-decoration: underline; }
 
         @media (max-width: 480px) {
             .login-card { padding: 2rem 1.25rem; border-radius: 18px; }
+            .ssw-logo-stacked { width: 180px; }
         }

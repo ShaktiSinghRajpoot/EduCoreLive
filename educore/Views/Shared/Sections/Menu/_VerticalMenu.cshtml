@@ -6,7 +6,6 @@
 
 @{
     var currentPage = Context.Request.Path.Value ?? "";
-    var appName = "EduCore";
     var supportUrl = "#";
 
     // Identity / scope (hoisted so the permission gating below can reuse them).
@@ -81,7 +80,10 @@
     <div class='app-brand demo @((ViewData["navbarFull"] != null && Convert.ToBoolean(ViewData["navbarFull"])) ? "d-xl-none" : "")'>
         <a asp-area="" asp-controller="Dashboards" asp-action="Index" class="app-brand-link">
             <span class="app-brand-logo demo">@await Html.PartialAsync("../_Partials/_Macros")</span>
-            <span class="app-brand-text demo menu-text fw-bold ms-2">@appName</span>
+            @* Set as text, not the wordmark image: at sidebar size the logo's
+               "MANAGE · AUTOMATE · EMPOWER" tagline would be unreadable mush.
+               menu.css paints this span with the orange brand gradient. *@
+            <span class="app-brand-text demo menu-text ms-2 ssw-brand-text">SmartSchoolWala.com</span>
         </a>
         <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto">
             <i class="icon-base bx bx-chevron-left d-block d-xl-none align-middle"></i>

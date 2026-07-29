@@ -1,21 +1,37 @@
 {
-  "name": "EduCore",
-  "short_name": "EduCore",
+  "name": "SmartSchoolWala.com",
+  "short_name": "SmartSchoolWala",
+  "description": "SmartSchoolWala.com is a next-generation School ERP platform to manage, automate and empower every school.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2563eb",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FF8A00",
   "icons": [
     {
-      "src": "/icons/OI.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "/icons/OIP.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/maskable-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

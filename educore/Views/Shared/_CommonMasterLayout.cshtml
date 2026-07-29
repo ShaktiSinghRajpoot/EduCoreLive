@@ -13,21 +13,13 @@
 
     @{
         string title   = ViewData["title"] as string ?? "";
-        string appName = TempData.Peek("appName") as string ?? "EduCore";
+        string appName = TempData.Peek("appName") as string ?? "SmartSchoolWala.com";
     }
     <title>@title | @appName</title>
     <meta name="description" content="@(TempData.Peek("description") as string ?? "")" />
 
-    <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="~/img/favicon/favicon.ico" />
-
-    <!-- PWA -->
-    <link rel="manifest" href="~/manifest.json" />
-    <meta name="theme-color" content="#2563eb" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="@appName" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Favicon / PWA / iOS launch screens -->
+    @await Html.PartialAsync("Sections/_PwaHead")
 
     <!-- Core Styles -->
     @await Html.PartialAsync("Sections/_Styles")
@@ -63,8 +55,8 @@
         if ("serviceWorker" in navigator) {
             window.addEventListener("load", function () {
                 navigator.serviceWorker.register("/service-worker.js")
-                    .then(function () { console.log("EduCore PWA registered"); })
-                    .catch(function (err) { console.log("EduCore PWA failed:", err); });
+                    .then(function () { console.log("SmartSchoolWala PWA registered"); })
+                    .catch(function (err) { console.log("SmartSchoolWala PWA failed:", err); });
             });
         }
     </script>
