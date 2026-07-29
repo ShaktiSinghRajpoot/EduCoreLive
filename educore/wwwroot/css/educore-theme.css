@@ -737,3 +737,14 @@ textarea.form-control {
     line-height: 1.2;
 }
 .ec-school-identity-addr i { font-size: .9rem; }
+
+/* Flex items default to min-width:auto, so they refuse to shrink below their
+   own text. On a phone a long school name or address therefore blew the navbar
+   open and pushed the bell + user avatar clean off the right edge (measured:
+   190px outside a 390px viewport) instead of ellipsising. min-width:0 lets the
+   row shrink again so the existing .text-truncate can do its job. Desktop never
+   showed it because there was always enough width. */
+.navbar-nav-right,
+.ec-navbar-identity {
+    min-width: 0;
+}

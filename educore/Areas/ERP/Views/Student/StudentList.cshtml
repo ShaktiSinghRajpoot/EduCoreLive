@@ -308,7 +308,16 @@
                   <div class="sl-mob-field"><label>Fee Status</label><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></div>
                   <div class="sl-mob-field"><label>Class</label><span>@s.ClassName @s.Section</span></div>
                 </div>
-                <a href="@dashUrl" class="btn btn-sm btn-primary w-100"><i class="bx bx-layout me-1"></i>View Dashboard</a>
+                @* The photo button used to exist only in the desktop table, so on a
+                   phone there was no way to set a student's picture at all. *@
+                <div class="d-flex gap-2">
+                  <a href="@dashUrl" class="btn btn-sm btn-primary flex-grow-1"><i class="bx bx-layout me-1"></i>View Dashboard</a>
+                  <button type="button" class="btn btn-sm btn-outline-secondary btn-photo flex-shrink-0"
+                          title="Upload photo" aria-label="Upload photo"
+                          data-id="@s.StudentId" data-name="@s.StudentName">
+                    <i class="bx bx-camera"></i>
+                  </button>
+                </div>
               </div>
           }
           @if (Model.Items.Count == 0)
@@ -388,6 +397,16 @@
       <div class="modal-body text-center">
         <p class="mb-3">Photo for <strong id="photoName">—</strong>. JPG, PNG or WEBP, up to 2 MB.</p>
         <img id="photoPreview" src="" alt="" style="display:none;width:120px;height:150px;object-fit:cover;border:1px solid #ccc;border-radius:8px;margin-bottom:12px;" />
+
+        @* "Take photo" opens the phone camera directly (capture attribute). It is
+           a SEPARATE input from the file picker on purpose: adding capture to the
+           picker would take the gallery option away. Hidden on desktop, where
+           capture is ignored and the button would just duplicate the picker. *@
+        <button type="button" class="btn btn-outline-primary w-100 mb-2 d-md-none" id="photoTake">
+          <i class="bx bx-camera me-1"></i>Take photo
+        </button>
+        <input type="file" id="photoCamera" accept="image/*" capture="environment" class="d-none" />
+
         <input type="file" class="form-control" id="photoFile" accept="image/jpeg,image/png,image/webp" />
       </div>
       <div class="modal-footer">
@@ -490,28 +509,38 @@ document.getElementById('btnPdf').addEventListener('click',function(){window.pri
         var photoId = null;
         var photoModal = new bootstrap.Modal(document.getElementById('photoModal'));
 
+        // The image can come from either input (file picker or camera), so hold
+        // the chosen File here instead of reading one input at upload time.
+        var photoFile = null;
+
         $('.btn-photo').on('click', function () {
             photoId = $(this).data('id');
             $('#photoName').text($(this).data('name'));
             $('#photoFile').val('');
+            $('#photoCamera').val('');
+            photoFile = null;
             $('#photoPreview').hide().attr('src', '');
             photoModal.show();
         });
 
-        // Show the picked image before uploading.
-        $('#photoFile').on('change', function () {
+        $('#photoTake').on('click', function () { $('#photoCamera').trigger('click'); });
+
+        // Show the picked image before uploading. Whichever input fired last wins,
+        // and the other is cleared so a stale pick can never be uploaded.
+        $('#photoFile, #photoCamera').on('change', function () {
             var f = this.files && this.files[0];
+            photoFile = f || null;
+            $(this.id === 'photoFile' ? '#photoCamera' : '#photoFile').val('');
             if (!f) { $('#photoPreview').hide(); return; }
             $('#photoPreview').attr('src', URL.createObjectURL(f)).show();
         });
 
         $('#photoUpload').on('click', function () {
-            var files = $('#photoFile')[0].files;
-            if (!files || !files.length) { ecToast('error', 'Choose an image.'); return; }
+            if (!photoFile) { ecToast('error', 'Choose an image.'); return; }
 
             var fd = new FormData();
             fd.append('id', photoId);
-            fd.append('photo', files[0]);
+            fd.append('photo', photoFile);
             fd.append('__RequestVerificationToken', $('input[name="__RequestVerificationToken"]').first().val());
 
             // Not reset on success — the page reloads.

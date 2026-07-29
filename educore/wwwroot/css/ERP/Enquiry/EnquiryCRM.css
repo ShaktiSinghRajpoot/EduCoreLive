@@ -116,6 +116,17 @@
        line once the numbers reach two and three digits. */
     .crm-card-sno { min-width: 1.5rem; text-align: right; flex-shrink: 0; }
 
+    /* Label + value grid, deliberately the same shape as .sl-mob-field on
+       StudentList so the two list pages read identically on a phone. */
+    .crm-mob-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem .7rem; margin-bottom: .7rem; }
+    .crm-mob-field-wide { grid-column: 1 / -1; }
+    .crm-mob-field label {
+        font-size: .67rem; text-transform: uppercase; letter-spacing: .05em;
+        font-weight: 800; color: var(--ec-text-light); display: block;
+    }
+    .crm-mob-field span  { font-size: .82rem; font-weight: 700; color: var(--ec-text); }
+    .crm-mob-field a     { color: var(--ec-primary); }
+
     /* ── Follow-up timeline ── */
     .followup-timeline { list-style: none; padding: 0; margin: 0; }
     .followup-timeline li {
@@ -156,6 +167,8 @@
         #logFollowupModal .modal-content { max-height: calc(100dvh - 1rem); }
         #addEnquiryModal .modal-dialog,
         #logFollowupModal .modal-dialog  { margin: .5rem; }
+        /* Single column on the narrowest phones, same as .sl-mob-grid. */
+        .crm-mob-grid { grid-template-columns: 1fr; }
     }
 
     /* ── Responsive ── */

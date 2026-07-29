@@ -343,27 +343,69 @@
                     </div>
                     @await Html.PartialAsync("_EnquiryStatusCell", e)
                 </div>
-                <div class="d-flex flex-wrap gap-2 mb-2">
-                    <span class="badge bg-label-primary">@e.ClassName</span>
-                    <span class="source-pill"><i class="bx @e.SourceIcon"></i> @e.LeadSource</span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="@e.FollowupCssClass" style="font-size:.76rem">
-                            @if (!string.IsNullOrEmpty(e.FollowupIcon))
+                @* Labelled grid, matching the StudentList mobile cards. These used
+                   to be bare badges: on a phone you saw a value with nothing saying
+                   what it was, and Contact / Session / Age were missing entirely. *@
+                <div class="crm-mob-grid">
+                    <div class="crm-mob-field">
+                        <label>Parent</label>
+                        <span>@(string.IsNullOrWhiteSpace(e.PrimaryParentDisplay) ? "—" : e.PrimaryParentDisplay)</span>
+                    </div>
+                    <div class="crm-mob-field">
+                        <label>Contact</label>
+                        <span>
+                            @if (!string.IsNullOrWhiteSpace(e.Mobile))
                             {
-                                <i class="bx @e.FollowupIcon me-1"></i>
+                                <a href="@e.CallUrl" class="text-decoration-none" onclick="event.stopPropagation()">
+                                    <i class="bx bx-phone me-1"></i>@e.Mobile
+                                </a>
                             }
-                            @e.FollowupDisplay
-                        </div>
-                        @if (!string.IsNullOrEmpty(e.FollowupSubtext))
-                        {
-                            <div class="lead-meta">@e.FollowupSubtext</div>
-                        }
+                            else
+                            {
+                                @:—
+                            }
+                        </span>
                     </div>
-                    <div class="d-flex gap-1 flex-wrap align-items-center">
-                        @await Html.PartialAsync("_EnquiryRowActions", e)
+                    <div class="crm-mob-field">
+                        <label>Class</label>
+                        <span><span class="badge bg-label-primary">@e.ClassName</span></span>
                     </div>
+                    <div class="crm-mob-field">
+                        <label>Session</label>
+                        <span>@(string.IsNullOrWhiteSpace(e.Session) ? "—" : e.Session)</span>
+                    </div>
+                    <div class="crm-mob-field">
+                        <label>Source</label>
+                        <span><span class="source-pill"><i class="bx @e.SourceIcon"></i> @e.LeadSource</span></span>
+                    </div>
+                    <div class="crm-mob-field">
+                        <label>Age</label>
+                        <span>@(string.IsNullOrWhiteSpace(e.DaysSinceLabel) ? "—" : e.DaysSinceLabel)</span>
+                    </div>
+                    <div class="crm-mob-field crm-mob-field-wide">
+                        <label>Next Follow-up</label>
+                        <span>
+                            <span class="@e.FollowupCssClass">
+                                @if (!string.IsNullOrEmpty(e.FollowupIcon))
+                                {
+                                    <i class="bx @e.FollowupIcon me-1"></i>
+                                }
+                                @e.FollowupDisplay
+                                @if (e.FollowupCount > 0)
+                                {
+                                    <span class="followup-count-badge"><i class="bx bx-chat"></i>@e.FollowupCount</span>
+                                }
+                            </span>
+                            @if (!string.IsNullOrEmpty(e.FollowupSubtext))
+                            {
+                                <span class="lead-meta d-block">@e.FollowupSubtext</span>
+                            }
+                        </span>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-1 flex-wrap align-items-center justify-content-end">
+                    @await Html.PartialAsync("_EnquiryRowActions", e)
                 </div>
             </div>
             cardNo++;
