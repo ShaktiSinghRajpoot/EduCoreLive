@@ -294,7 +294,7 @@
                   {
                       <span class="sl-mob-av bg-label-@color text-@color">@Initials(s.StudentName)</span>
                   }
-                  <div class="flex-grow-1">
+                  <div class="flex-grow-1 sl-mob-id">
                     <div class="sl-nm">@s.StudentName</div>
                     <div class="sl-rl">@roll · @s.ClassName @s.Section</div>
                   </div>
@@ -310,7 +310,7 @@
                 </div>
                 @* The photo button used to exist only in the desktop table, so on a
                    phone there was no way to set a student's picture at all. *@
-                <div class="d-flex gap-2">
+                <div class="sl-mob-actions">
                   <a href="@dashUrl" class="btn btn-sm btn-primary flex-grow-1"><i class="bx bx-layout me-1"></i>View Dashboard</a>
                   <button type="button" class="btn btn-sm btn-outline-secondary btn-photo flex-shrink-0"
                           title="Upload photo" aria-label="Upload photo"

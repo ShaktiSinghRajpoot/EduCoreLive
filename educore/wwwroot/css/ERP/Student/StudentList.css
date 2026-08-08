@@ -188,6 +188,24 @@
 .sl-mob-card{ border:1px solid var(--ec-border); border-radius:var(--ec-radius); background:#fff; padding:.95rem; margin-bottom:.7rem; }
 .sl-mob-top{ display:flex; align-items:center; gap:.7rem; margin-bottom:.7rem; }
 .sl-mob-av{ width:42px; height:42px; flex:0 0 42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:.82rem; font-weight:800; }
+/* A long student name used to burst the card open on a phone: .sl-nm is
+   white-space:nowrap with no ellipsis, and this flex column defaulted to
+   min-width:auto, so the name could not shrink OR truncate. It shoved the
+   status badge (and the card's right edge) off the screen, taking the camera
+   button with it. min-width:0 lets it shrink; the ellipsis absorbs the rest. */
+.sl-mob-id{ min-width:0; }
+.sl-mob-top .sl-nm,
+.sl-mob-top .sl-rl{ overflow:hidden; text-overflow:ellipsis; }
+.sl-mob-top .sl-bdg{ flex-shrink:0; }
+
+/* Action row. educore-theme.css has a blunt `.btn{width:100%}` below 576px, so
+   BOTH the dashboard button and the camera demanded the whole row and the
+   camera was shoved outside the card. Two classes out-specify that rule
+   without needing !important; flex-grow still lets Dashboard fill the gap. */
+.sl-mob-actions{ display:flex; gap:.5rem; align-items:center; }
+.sl-mob-actions .btn{ width:auto; min-width:0; }
+.sl-mob-actions .btn-photo{ flex:0 0 auto; }
+
 .sl-mob-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.45rem .7rem; margin-bottom:.7rem; }
 .sl-mob-field label{ font-size:.67rem; text-transform:uppercase; letter-spacing:.05em; font-weight:800; color:var(--ec-text-light); display:block; }
 .sl-mob-field span { font-size:.82rem; font-weight:700; color:var(--ec-text); }
