@@ -396,7 +396,9 @@
       </div>
       <div class="modal-body text-center">
         <p class="mb-3">Photo for <strong id="photoName">—</strong>. JPG, PNG or WEBP, up to 2 MB.</p>
-        <img id="photoPreview" src="" alt="" style="display:none;width:120px;height:150px;object-fit:cover;border:1px solid #ccc;border-radius:8px;margin-bottom:12px;" />
+        <img id="photoPreview" src="" alt="" style="display:none;width:120px;height:150px;object-fit:cover;border:1px solid #ccc;border-radius:8px;margin-bottom:4px;" />
+        @* Shows "5.2 MB → 180 KB" so the user can see the shot was accepted. *@
+        <div id="photoSize" class="text-muted small mb-2"></div>
 
         @* "Take photo" opens the phone camera directly (capture attribute). It is
            a SEPARATE input from the file picker on purpose: adding capture to the
@@ -407,7 +409,10 @@
         </button>
         <input type="file" id="photoCamera" accept="image/*" capture="environment" class="d-none" />
 
-        <input type="file" class="form-control" id="photoFile" accept="image/jpeg,image/png,image/webp" />
+        @* accept is image/* rather than a jpg/png/webp list: an iPhone gallery
+           holds HEIC, which the narrow list greyed out. Compression re-encodes
+           whatever is picked to JPEG before it reaches the server. *@
+        <input type="file" class="form-control" id="photoFile" accept="image/*" />
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -520,6 +525,8 @@ document.getElementById('btnPdf').addEventListener('click',function(){window.pri
             $('#photoCamera').val('');
             photoFile = null;
             $('#photoPreview').hide().attr('src', '');
+            $('#photoSize').text('');
+            $('#photoUpload').prop('disabled', false);
             photoModal.show();
         });
 
@@ -527,12 +534,28 @@ document.getElementById('btnPdf').addEventListener('click',function(){window.pri
 
         // Show the picked image before uploading. Whichever input fired last wins,
         // and the other is cleared so a stale pick can never be uploaded.
+        //
+        // Camera shots are 5-12 MB against a 2 MB server cap, so shrink first —
+        // EC.compressImage also re-encodes iPhone HEIC to JPEG, which the server
+        // would otherwise reject outright on extension.
         $('#photoFile, #photoCamera').on('change', function () {
             var f = this.files && this.files[0];
-            photoFile = f || null;
             $(this.id === 'photoFile' ? '#photoCamera' : '#photoFile').val('');
-            if (!f) { $('#photoPreview').hide(); return; }
-            $('#photoPreview').attr('src', URL.createObjectURL(f)).show();
+
+            if (!f) { photoFile = null; $('#photoPreview').hide(); $('#photoSize').text(''); return; }
+
+            var original = f.size;
+            $('#photoSize').text('Preparing…');
+            $('#photoUpload').prop('disabled', true);
+
+            EC.compressImage(f).then(function (small) {
+                photoFile = small;
+                $('#photoPreview').attr('src', URL.createObjectURL(small)).show();
+                $('#photoSize').text(small.size < original
+                    ? EC.fileSize(original) + ' → ' + EC.fileSize(small.size)
+                    : EC.fileSize(small.size));
+                $('#photoUpload').prop('disabled', false);
+            });
         });
 
         $('#photoUpload').on('click', function () {

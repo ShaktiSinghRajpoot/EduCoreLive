@@ -284,6 +284,116 @@ $(function () {
     });
 });
 
+// ── Image compression before upload ─────────────────────────────────────
+// A phone camera shot is 5-12 MB, but the server caps uploads at 2 MB, so
+// "Take photo" failed on virtually every device. Shrinking in the browser
+// fixes that AND means the big file never crosses the school's mobile data.
+//
+// The defaults are sized off the biggest place a photo is ever shown: the ID
+// card, at 22mm x 26mm. That is only ~260x307px at 300 DPI, so 800x1000 keeps
+// 2.5x headroom and still lands around 150 KB.
+//
+//     EC.compressImage(file).then(function (smaller) { … });
+//
+// Returns a Promise<File>. Non-images, and anything that fails to decode, come
+// back untouched — compression is an optimisation, never a gate on uploading.
+
+// EXIF: phones store rotation as a flag rather than rotating the pixels.
+// imageOrientation:'from-image' bakes it in; without it portrait photos upload
+// lying on their side.
+function ecLoadImage(file) {
+    var viaBitmap = window.createImageBitmap
+        ? Promise.resolve().then(function () {
+              return createImageBitmap(file, { imageOrientation: 'from-image' });
+          })
+        : Promise.reject();
+
+    return viaBitmap.catch(function () {
+        return new Promise(function (resolve, reject) {
+            var url = URL.createObjectURL(file);
+            var img = new Image();
+            img.onload  = function () { URL.revokeObjectURL(url); resolve(img); };
+            img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+            img.src = url;
+        });
+    });
+}
+
+function ecCanvasBlob(canvas, type, quality) {
+    return new Promise(function (resolve) { canvas.toBlob(resolve, type, quality); });
+}
+
+EC.compressImage = function (file, opts) {
+    opts = opts || {};
+    var maxW    = opts.maxWidth  || 800;
+    var maxH    = opts.maxHeight || 1000;
+    var quality = opts.quality   || 0.82;
+    var pngCap  = opts.pngMaxBytes || 1024 * 1024;
+
+    if (!file || String(file.type).indexOf('image/') !== 0) return Promise.resolve(file);
+
+    return ecLoadImage(file).then(function (img) {
+        // Only ever shrink. Blowing a small photo up would add bytes, not save them.
+        var scale = Math.min(1, maxW / img.width, maxH / img.height);
+        var w = Math.max(1, Math.round(img.width  * scale));
+        var h = Math.max(1, Math.round(img.height * scale));
+
+        // PNG in -> PNG out, so a school logo keeps its transparency. Everything
+        // else (camera JPEG, iPhone HEIC) becomes JPEG.
+        var keepPng = file.type === 'image/png';
+
+        function render(asPng) {
+            var canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            var ctx = canvas.getContext('2d');
+            if (!asPng) {
+                // Transparent pixels encode as BLACK in JPEG. Paint white first.
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+            }
+            ctx.drawImage(img, 0, 0, w, h);
+            return ecCanvasBlob(canvas, asPng ? 'image/png' : 'image/jpeg', quality);
+        }
+
+        return render(keepPng).then(function (blob) {
+            // A photo saved as PNG stays huge. If it is still heavy, drop the
+            // transparency and take the JPEG instead.
+            if (keepPng && blob && blob.size > pngCap) return render(false);
+            return blob;
+        }).then(function (blob) {
+            if (img.close) img.close();
+            if (!blob || blob.size >= file.size) return file;   // no win, keep original
+
+            // Rename to match the new encoding — the server validates on extension,
+            // so an iPhone "image.heic" must not arrive claiming to be HEIC.
+            var base = String(file.name || 'image').replace(/\.[^.]+$/, '');
+            var ext  = blob.type === 'image/png' ? '.png' : '.jpg';
+            return new File([blob], base + ext, { type: blob.type, lastModified: Date.now() });
+        });
+    }).catch(function () {
+        return file;   // could not decode — let the server have its say
+    });
+};
+
+// Human-readable size, for the "2.4 MB → 180 KB" hints next to a picked image.
+EC.fileSize = function (bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+};
+
+// Put a File back into a file input so a normal form POST sends the compressed
+// version instead of the original the user picked.
+EC.setInputFile = function (input, file) {
+    try {
+        var dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        return true;
+    } catch (e) {
+        return false;   // very old browser: the original file gets posted
+    }
+};
+
 // ── Live form validation ────────────────────────────────────────────────
 // Lifted out of the School Profile page, which had the pattern first, so every
 // form can behave the same way instead of each growing its own checks.

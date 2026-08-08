@@ -334,7 +334,8 @@
                     }
             }
 
-            const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+            // Type list dropped: EC.compressImage re-encodes anything the browser
+            // can decode into JPEG/PNG, so the only check left worth making is size.
             const maxImageSizeMb = 2;
 
             function showToastError(input, message) {
@@ -354,26 +355,38 @@
             }
 
             $("#LogoImageFile").on("change", function () {
-                const file = this.files[0];
+                const input = this;
+                const file = input.files[0];
 
-                clearFieldError(this);
+                clearFieldError(input);
 
                 if (!file) return;
 
-                if (!allowedImageTypes.includes(file.type)) {
-                    this.value = "";
-                    showToastError(this, "Only JPG, PNG or WEBP image is allowed.");
+                if (String(file.type).indexOf("image/") !== 0) {
+                    input.value = "";
+                    showToastError(input, "Please choose an image file.");
                     return;
                 }
 
-                if (file.size > maxImageSizeMb * 1024 * 1024) {
-                    this.value = "";
-                    showToastError(this, "Logo image must be less than 2 MB.");
-                    return;
-                }
+                // Shrink before the 2 MB check, not after: a phone photo of a
+                // signboard is 5 MB+ and used to be rejected outright. PNG logos
+                // stay PNG through EC.compressImage, so transparency survives.
+                EC.compressImage(file, { maxWidth: 600, maxHeight: 600 }).then(function (small) {
+                    if (small.size > maxImageSizeMb * 1024 * 1024) {
+                        input.value = "";
+                        showToastError(input, "Logo image must be less than 2 MB.");
+                        return;
+                    }
 
-                $("#logoPreview").attr("src", URL.createObjectURL(file));
-               ecToast('info', "Logo selected.");
+                    // Swap the compressed file back into the input so the form
+                    // posts THAT, not the multi-megabyte original.
+                    EC.setInputFile(input, small);
+
+                    $("#logoPreview").attr("src", URL.createObjectURL(small));
+                    ecToast('info', small.size < file.size
+                        ? "Logo selected — " + EC.fileSize(file.size) + " → " + EC.fileSize(small.size)
+                        : "Logo selected.");
+                });
             });
 
             // ── Validation ──────────────────────────────────────────────────
