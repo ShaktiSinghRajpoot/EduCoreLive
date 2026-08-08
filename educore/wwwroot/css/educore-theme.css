@@ -680,7 +680,42 @@ textarea.form-control {
 /* ── Responsive helpers ─────────────────────────────────────── */
 @media (max-width: 575.98px) {
     .ec-page-header-inner { flex-direction: column; align-items: flex-start; }
-    .btn { width: 100%; }
+
+    /* Full-width buttons on phones.
+     *
+     * A lone Save/Submit does read better full width, so that stays the
+     * default — ~400 buttons across the app rely on it. What was wrong is that
+     * it hit controls SHARING a row too: that is what shoved the camera button
+     * outside the student card, and what five page stylesheets were each
+     * separately undoing with `width:auto !important` (StudentList,
+     * InventoryItem, PurchaseEntry, Student/Dashboard, Admission/Dashboard).
+     *
+     * Icon buttons are SKIPPED by every rule here rather than given
+     * width:auto. They are squares sized with `inline-size` in core.css, and
+     * since this file loads after it, any width we set — 100% or auto — wins
+     * and destroys the square. They were rendering 380x30 instead of 30x30.
+     */
+    .btn:not(.btn-icon) { width: 100%; }
+
+    /* Anything sharing a row keeps its natural width. */
+    .btn:not(.btn-icon) + .btn:not(.btn-icon),
+    .btn-group > .btn:not(.btn-icon),
+    .input-group > .btn:not(.btn-icon),
+    .ec-btn-row > .btn:not(.btn-icon) { width: auto; }
+
+    /* The FIRST button of a pair. Kept in its own block on purpose: a browser
+     * without :has() throws away the entire selector list the pseudo-class
+     * appears in, and that would silently take the button-group and
+     * .ec-btn-row exceptions above down with it. */
+    .btn:not(.btn-icon):has(+ .btn) { width: auto; }
+
+    /* Modal footers are the one place where stacked full-width buttons are
+     * deliberate — easier to tap, and they wrap rather than overflow. All 30
+     * modals already look that way, so they are held as they are and this fix
+     * changes nothing visible there. Needs the sibling combinator to
+     * out-specify the rules above; :has() again split off on its own. */
+    .modal-footer > .btn:not(.btn-icon) + .btn:not(.btn-icon) { width: 100%; }
+    .modal-footer > .btn:not(.btn-icon):has(+ .btn) { width: 100%; }
 }
 
 /* ============================================================

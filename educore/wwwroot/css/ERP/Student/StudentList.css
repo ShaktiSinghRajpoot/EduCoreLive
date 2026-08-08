@@ -198,12 +198,12 @@
 .sl-mob-top .sl-rl{ overflow:hidden; text-overflow:ellipsis; }
 .sl-mob-top .sl-bdg{ flex-shrink:0; }
 
-/* Action row. educore-theme.css has a blunt `.btn{width:100%}` below 576px, so
-   BOTH the dashboard button and the camera demanded the whole row and the
-   camera was shoved outside the card. Two classes out-specify that rule
-   without needing !important; flex-grow still lets Dashboard fill the gap. */
+/* Action row. The two buttons no longer need a width override here: the
+   `.btn + .btn` rule in educore-theme.css now stops side-by-side buttons
+   being stretched to 100% below 576px. min-width:0 is still needed so the
+   Dashboard button can shrink rather than push the camera out. */
 .sl-mob-actions{ display:flex; gap:.5rem; align-items:center; }
-.sl-mob-actions .btn{ width:auto; min-width:0; }
+.sl-mob-actions .btn{ min-width:0; }
 .sl-mob-actions .btn-photo{ flex:0 0 auto; }
 
 .sl-mob-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.45rem .7rem; margin-bottom:.7rem; }
