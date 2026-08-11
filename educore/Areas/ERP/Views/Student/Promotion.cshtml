@@ -3,9 +3,9 @@
     ViewData["Title"] = "Promote Students";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 
-    var _classItems = ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
-                      ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
-    var _classOrderJson = System.Text.Json.JsonSerializer.Serialize(_classItems.Select(c => c.Text));
+    // Teaching order (display_order), not the class dropdown's newest-first order.
+    var _ladder = ViewBag.ClassLadder as List<string> ?? new List<string>();
+    var _classOrderJson = System.Text.Json.JsonSerializer.Serialize(_ladder);
 }
 
 @section PageStyles {
@@ -201,6 +201,8 @@
   </div>
 </div>
 
+@Html.AntiForgeryToken()
+
 <!-- Confirm modal -->
 <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -244,6 +246,7 @@ function nextClass(c){ var i=LADDER.indexOf(c); return (i<0||i===LADDER.length-1
 
 var SEC_URL='@Url.Action("PromotionSections","Student",new{area="ERP"})';
 var ROSTER_URL='@Url.Action("PromotionRoster","Student",new{area="ERP"})';
+var PROMOTE_URL='@Url.Action("Promote","Student",new{area="ERP"})';
 var PALETTE=['primary','info','success','warning','danger','secondary'];
 
 var roster=[];          // currently loaded students (from the server)
@@ -424,7 +427,7 @@ document.querySelectorAll('.pr-bulk-btn[data-all]').forEach(function(b){
 document.getElementById('promoteFailed').addEventListener('click', function(){
   roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
   render();
-  ecToast('info','Outcomes set by result — students below '+PASS+'% retained.');
+  ecToast('info','Outcomes reset to the default for each class.');
 });
 
 /* ── Select all ──────────────────────────────── */
@@ -459,17 +462,47 @@ document.getElementById('reviewBtn').addEventListener('click', function(){
   document.getElementById('mDues').textContent=document.getElementById('carryDues').checked?'Yes':'No';
 });
 
-/* ── Commit — the actual promote (write) step isn't wired yet ── */
+/* ── Commit ──────────────────────────────────── */
 document.getElementById('commitBtn').addEventListener('click', function(){
   var sel=picked();
   if(!sel.length){ ecToast('warning','No students selected.'); return; }
 
-  var modalEl=document.getElementById('confirmModal');
-  var inst=bootstrap.Modal.getInstance(modalEl); if(inst) inst.hide();
+  var srcY=document.getElementById('srcYear').value,
+      tgtY=document.getElementById('tgtYear').value;
+  if(srcY===tgtY){ ecToast('warning','Pick a different session to promote into.'); return; }
 
-  // The selection is real; executing the promotion (moving students to the next
-  // session, carrying dues) needs a dedicated stored procedure — not built yet.
-  ecToast('info', 'Selection ready for '+sel.length+' student'+(sel.length!==1?'s':'')+'. The promote step isn’t enabled yet.');
+  var btn=this;
+  EC.buttonBusy(btn,'Promoting…');
+  $.ajax({
+    url: PROMOTE_URL,
+    type: 'POST',
+    contentType: 'application/json',
+    headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+    data: JSON.stringify({
+      sourceYear:    srcY,
+      targetYear:    tgtY,
+      targetSection: document.getElementById('tgtSection').value,
+      carryDues:     document.getElementById('carryDues').checked,
+      students:      sel.map(function(s){ return { studentId:s.id, outcome:outcome[s.id] }; })
+    })
+  })
+  .done(function(res){
+    if(!res || !res.success){ ecToast('error', (res && res.message) || 'Could not promote.'); return; }
+
+    var modalEl=document.getElementById('confirmModal');
+    var inst=bootstrap.Modal.getInstance(modalEl); if(inst) inst.hide();
+
+    ecToast('success', res.message);
+    // Anyone the proc could not move is named, so the office can fix and re-run.
+    if(res.skipped>0) ecToast('warning', res.skipped+' skipped — '+res.skippedDetail);
+
+    // The students have moved to the new session, so this roster is stale.
+    roster=[]; outcome={};
+    document.getElementById('sumSection').style.display='none';
+    document.getElementById('rosterCard').style.display='none';
+  })
+  .fail(function(){ ecToast('error','Something went wrong.'); })
+  .always(function(){ EC.buttonReset(btn); });
 });
 
 })();

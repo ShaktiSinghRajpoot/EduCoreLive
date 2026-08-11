@@ -16,6 +16,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpStudentList = "core.sp_student_list";
         private const string SpStudentExit = "core.sp_student_exit";
         private const string SpStudentExitList = "core.sp_student_exit_list";
+        private const string SpClassLadder = "core.sp_class_ladder";
+        private const string SpStudentPromote = "core.sp_student_promote";
 
         public AdmissionService(PgExec db)
         {
@@ -452,6 +454,88 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 if (!string.IsNullOrWhiteSpace(sec)) sections.Add(sec!);
             }
             return sections;
+        }
+
+        // ── Promotion ────────────────────────────────────────────
+        // The student row is updated in place (there is no per-year enrolment
+        // table), so the ledger and receipts keep pointing at the same
+        // student_id. core.student_promotion_history holds the trail.
+        public async Task<List<string>> GetClassLadderAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            var classes = new List<string>();
+            if (tenantId <= 1 || schoolId <= 0) return classes;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "class_ladder_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpClassLadder, parameters);
+            if (ds.Tables.Count == 0) return classes;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                var name = NullStr(row, "class_name");
+                if (!string.IsNullOrWhiteSpace(name)) classes.Add(name!);
+            }
+            return classes;
+        }
+
+        public async Task<StudentPromotionResult> PromoteStudentsAsync(
+            StudentPromotionRequest request, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new StudentPromotionResult { Message = "Invalid school scope." };
+
+            if (request.Students == null || request.Students.Count == 0)
+                return new StudentPromotionResult { Message = "No students were selected." };
+
+            // camelCase keys — the proc reads them with quoted identifiers.
+            string studentsJson = JsonSerializer.Serialize(
+                request.Students.Select(s => new { studentId = s.StudentId, outcome = s.Outcome }));
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_source_year",    NpgsqlDbType.Varchar) { Value = request.SourceYear ?? string.Empty },
+                new("p_target_year",    NpgsqlDbType.Varchar) { Value = request.TargetYear ?? string.Empty },
+                new("p_target_section", NpgsqlDbType.Varchar) { Value = (object?)request.TargetSection ?? DBNull.Value },
+                new("p_carry_dues",     NpgsqlDbType.Boolean) { Value = request.CarryDues },
+                new("p_students",       NpgsqlDbType.Jsonb)   { Value = studentsJson },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "student_promote_cursor" }
+            };
+
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpStudentPromote, parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return new StudentPromotionResult { Message = "Nothing was changed." };
+
+                var row = ds.Tables[0].Rows[0];
+                return new StudentPromotionResult
+                {
+                    Success       = true,
+                    Message       = Str(row, "message"),
+                    Promoted      = IntVal(row, "promoted"),
+                    Retained      = IntVal(row, "retained"),
+                    PassedOut     = IntVal(row, "passed_out"),
+                    Skipped       = IntVal(row, "skipped"),
+                    SkippedDetail = NullStr(row, "skipped_detail")
+                };
+            }
+            catch (PostgresException ex)
+            {
+                // The proc RAISEs the business rules ("final class", "session not
+                // set up"), so the office sees that message rather than a stack.
+                return new StudentPromotionResult { Message = ex.MessageText };
+            }
         }
 
         // ── Mapper ───────────────────────────────────────────────

@@ -69,6 +69,11 @@ namespace educore.Areas.ERP.Controllers
             try { ViewBag.YearList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }
             catch { ViewBag.YearList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
 
+            // "Next class" must follow teaching order (display_order), NOT the
+            // dropdown order above, which is newest-class-first and would walk
+            // the school downwards.
+            ViewBag.ClassLadder = await _admissionService.GetClassLadderAsync(TenantId(), SchoolId(), UserId());
+
             return View();
         }
 
@@ -169,16 +174,24 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = result.Success, message = result.Message });
         }
 
+        // Commits the bulk promotion. The target class is worked out in the proc
+        // from the school's class ladder, so it is not accepted from the page.
         [HttpPost]
         [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
-        public IActionResult Promotion(IFormCollection form)
+        public async Task<IActionResult> Promote([FromBody] StudentPromotionRequest request)
         {
-            // Replace with real service call once the promote SP is ready.
-            // Expected payload: source year/class/section, target year/class/section,
-            // per-student outcome (promote/retain/passout), carry-forward-dues flag.
-            TempData["SuccessMessage"] = "Students promoted successfully.";
-            return RedirectToAction("Promotion");
+            var result = await _admissionService.PromoteStudentsAsync(request, TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                success       = result.Success,
+                message       = result.Message,
+                promoted      = result.Promoted,
+                retained      = result.Retained,
+                passedOut     = result.PassedOut,
+                skipped       = result.Skipped,
+                skippedDetail = result.SkippedDetail
+            });
         }
 
         public IActionResult Dashboard(int id = 0)

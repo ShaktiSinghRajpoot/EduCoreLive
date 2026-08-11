@@ -53,5 +53,14 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         /// <summary>Sections that have active students in a class (for cascading dropdowns).</summary>
         Task<List<string>> GetClassSectionsAsync(string className, int tenantId, int schoolId, int actionUserId);
+
+        // ── Promotion (backs Student/Promotion) ──
+
+        /// <summary>The school's classes in teaching order — the ladder promotion walks up.</summary>
+        Task<List<string>> GetClassLadderAsync(int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Bulk promote/retain/pass out. Students that cannot move are reported, not fatal.</summary>
+        Task<StudentPromotionResult> PromoteStudentsAsync(
+            StudentPromotionRequest request, int tenantId, int schoolId, int actionUserId);
     }
 }

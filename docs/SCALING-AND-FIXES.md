@@ -704,6 +704,52 @@ instead of being nudged with `margin-left` and a `vertical-align`.
 
 ---
 
+### [2026-08-10] Student promotion — the write step, in-place, with a history table
+
+**Files changed**
+- `EduCoreDataAccessLayer/Database/student_promotion.sql` (new)
+- `EduCoreDataAccessLayer/Models/ERP/StudentPromotionModel.cs` (new)
+- `EduCoreDataAccessLayer/Services/Contract/ERP/IAdmissionService.cs`
+- `EduCoreDataAccessLayer/Services/Repository/ERP/AdmissionService.cs`
+- `educore/Areas/ERP/Controllers/StudentController.cs`
+- `educore/Areas/ERP/Views/Student/Promotion.cshtml`
+
+**What was wrong.** `ERP/Student/Promotion` looked finished but nothing was ever written.
+`commitBtn` hid the modal and toasted *"The promote step isn't enabled yet."* — a hardcoded
+placeholder, not a setting — and the `[HttpPost] Promotion` action was a stub that set a
+success message without touching the database. No promote proc existed.
+
+**In-place update, not a row per year.** `core.students` holds one row per student with
+`class_name` / `section` / `academic_year` on it; there is no enrolment table, and
+`uq_student_admission_no (tenant_id, school_id, admission_no)` forbids a second row for the
+same student in a new session. `student_fee_plan` and `student_ledger` key on `student_id`
+alone with no year column, so a new row per year would strand every ledger entry and payment
+on the old id. `student_attendance` already snapshots `academic_year`/`class_name`/`section`
+per row *because* the student row is expected to change underneath it. So promotion updates
+the student row and the `student_id` never changes — same reasoning as the exit flow.
+
+**History.** The student row therefore remembers nothing about where it came from, so
+`core.student_promotion_history` records one row per student per run (from year/class/section,
+to year/class/section, outcome, dues snapshot, who and when).
+
+**The ladder bug this uncovered.** The page built its "next class" ladder from
+`config.sp_dropdown_common` `'Class'`, which orders `academic_class_id DESC` — i.e. reversed.
+For the school with LKG…8 configured, "promote" resolved to the class *below*: the write step
+would have demoted the entire school. `academic.academic_classes.display_order` is the column
+meant for this, so `core.sp_class_ladder` reads the ladder from there, the page uses it for the
+preview, and `sp_student_promote` derives the target class from the same ladder server-side —
+the browser no longer says which class a student lands in.
+
+**Dues.** The ledger is not year-scoped, so dues follow the student whatever the checkbox says.
+"Carry forward pending dues" is therefore implemented as a gate: unticked, students with an
+outstanding balance are skipped and named so the office can settle them first.
+
+Skips are per-student and reported (`skipped_detail`), not fatal — one stale row should not roll
+back the class. Re-running is safe: the proc only moves students still sitting on the source
+year, so a double submit finds nothing to do.
+
+---
+
 # Glossary (quick reference)
 
 | Term | Plain meaning |
