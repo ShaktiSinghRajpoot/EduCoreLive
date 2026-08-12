@@ -587,12 +587,47 @@ namespace educore.Areas.ERP.Controllers
                     Text = s.FullName + (string.IsNullOrWhiteSpace(s.Designation) ? "" : $" ({s.Designation})")
                 }).ToList();
 
+            // A session with no classes cannot be used by anything downstream
+            // (promotion has no ladder, the pickers are blank). Offer to copy the
+            // previous session's structure instead of making them retype it.
+            var structure = await _schoolSettingsService.GetSessionStructureAsync(
+                tenantId, schoolId, actionUserId, academicYearId);
+
             ViewBag.AcademicYears = academicYears;
             ViewBag.AcademicYearId = academicYearId;
             ViewBag.ClassDataJson = System.Text.Json.JsonSerializer.Serialize(classes);
             ViewBag.Coordinators = coordinators;
+            ViewBag.CanCopySetup = structure.ClassCount == 0 && structure.CanCopy;
+            ViewBag.CopyFromYearId = structure.SourceYearId;
+            ViewBag.CopyFromYearName = structure.SourceYearName;
 
             return View();
+        }
+
+        // Copies the previous session's classes + sections into this one — the
+        // rollover step that has to happen before students can be promoted in.
+        [HttpPost]
+        [HasPermission("academics.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CopyClassSection([FromBody] CopyClassSectionDto dto)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            if (dto == null || dto.FromAcademicYearId <= 0 || dto.ToAcademicYearId <= 0)
+                return Json(new { success = false, message = "Choose both sessions." });
+
+            var result = await _schoolSettingsService.CloneAcademicYearAsync(
+                dto.FromAcademicYearId, dto.ToAcademicYearId, tenantId, schoolId, actionUserId);
+
+            return Json(new
+            {
+                success        = result.Success,
+                message        = result.Message,
+                classesCopied  = result.ClassesCopied,
+                sectionsCopied = result.SectionsCopied
+            });
         }
 
         // Persists the full structure for one academic year (replace-all),
@@ -1088,6 +1123,13 @@ namespace educore.Areas.ERP.Controllers
     {
         public int AcademicYearId { get; set; }
         public List<ClassSectionItemDto> Classes { get; set; } = new();
+    }
+
+    // ── Payload for copying one session's structure into another ──
+    public class CopyClassSectionDto
+    {
+        public int FromAcademicYearId { get; set; }
+        public int ToAcademicYearId { get; set; }
     }
 
     public class ClassSectionItemDto

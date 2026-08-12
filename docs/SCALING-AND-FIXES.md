@@ -750,6 +750,129 @@ year, so a double submit finds nothing to do.
 
 ---
 
+### [2026-08-11] Session rollover — promotion could write students into a session that had no classes
+
+**Files changed**
+- `EduCoreDataAccessLayer/Database/academic_session_rollover.sql` (new)
+- `EduCoreDataAccessLayer/Database/student_promotion_rollback_2026_08_11.sql` (new, one-off repair)
+- `EduCoreDataAccessLayer/Database/student_promotion.sql`
+- `EduCoreDataAccessLayer/Database/reference_data_lookup.sql`
+- `EduCoreDataAccessLayer/Models/ERP/SessionStructureModel.cs` (new)
+- `EduCoreDataAccessLayer/Services/Contract/ERP/{IAdmissionService,ISchoolSettingsService}.cs`
+- `EduCoreDataAccessLayer/Services/Repository/ERP/{AdmissionService,SchoolSettingsService}.cs`
+- `educore/Areas/ERP/Controllers/{StudentController,SchoolSettingsController}.cs`
+- `educore/Areas/ERP/Views/Student/Promotion.cshtml`
+- `educore/Areas/ERP/Views/SchoolSettings/ClassSection.cshtml`
+
+**What was wrong.** `academic.academic_classes` and `academic.academic_class_sections` both carry
+`academic_year_id` — classes and sections belong to **one session**, which is what
+`ERP/SchoolSettings/ClassSection` edits. `sp_student_promote` only checked that the target session
+existed as a row in `academic.academic_years`. A newly created session does exist, and is empty. So
+promotion happily wrote `class_name`/`academic_year` onto student rows for a session with **zero**
+classes and zero sections — free text pointing at nothing, students missing from every
+class-filtered page. This was not theoretical: two runs on 2026-08-11 moved 14 real students into
+`2028-2029`, which had no structure at all. `student_promotion_rollback_2026_08_11.sql` reversed
+them from the history table (a clean 1:1 map, guarded so it is a no-op on anything since moved).
+
+**Three separate holes, all from the same root.**
+1. *Target session not checked for structure* — the one above.
+2. *The ladder was not session-scoped.* `sp_class_ladder` read `academic_classes` with no
+   `academic_year_id` filter, so it returned every session's classes concatenated. Invisible while
+   only one session had structure; the moment a second one does, the ladder reads
+   `1st, 1st, 2nd, 2nd, …`. Same bug in `config.sp_dropdown_common` `'Class'`, which feeds eleven
+   pages.
+3. *Sections were carried over unchecked.* "Keep same section" moved `1st-C` to `2nd-C` when class
+   `2nd` had only sections A and B. Even a fully set-up session produced invalid rows.
+
+**Session rollover is now its own step.** `academic.sp_academic_year_clone` copies classes (with
+`display_order`, stream, coordinator) and their sections (with `display_order`, capacity, room)
+from one session into an empty one; `academic.sp_academic_year_structure_info` answers "does this
+session have structure, and what could it copy from" and backs both new UI guards. Class teacher is
+deliberately not copied — staff change between sessions and it has its own page. The clone refuses
+to run when the target already has classes rather than merging and silently doubling it.
+
+This mirrors how school ERPs actually sequence it: roll the structure forward first, promote
+students second. Promotion now hard-fails with a message naming the session and the fix, the
+Classes & Sections page offers "Copy from <previous session>" when the selected session is empty,
+and the Promotion page checks the target session on selection — disabling *Review & Promote* and
+explaining why, instead of failing at the last click.
+
+**Promotion is now session-aware end to end.** The next class is read from the **target** session by
+`display_order`, and both class and section must exist there or the student is skipped and named.
+`sp_class_ladder` takes an optional session (null = current), and the page reloads the ladder from
+the target session so the preview matches what the proc will do. The `'Class'` dropdown collapses
+to one row per `class_name` ordered by `MIN(display_order)` — every consumer filters on the class
+name (students store `class_name` as text, and the views bind `c.Text`), so historic classes stay
+selectable for filtering past sessions.
+
+**Still open (the structural one).** Real SIS products keep an enrolment row per session
+(`student_id, session_id, class_id, section_id, roll_no, status`) and leave the student row as
+identity only — that is what gives them year-wise class strength, historical reports and a
+reversible promotion. EduCore updates in place because there is no enrolment table (see the
+2026-08-10 entry for why), so `core.student_promotion_history` remains the only record of where a
+student came from. Fee dues also still share one un-scoped ledger rather than opening a
+per-session balance.
+
+---
+
+### [2026-08-12] Enrolment per session — the structural fix behind the promotion bugs
+
+**Files changed**
+- `EduCoreDataAccessLayer/Database/student_enrolment.sql` (new — table, helpers, backfill, history proc)
+- `EduCoreDataAccessLayer/Database/{student_master_fields,student_exit,student_promotion,student_list,academic_class_section_fields}.sql`
+- `EduCoreDataAccessLayer/Models/ERP/StudentEnrolmentModel.cs` (new)
+- `EduCoreDataAccessLayer/Services/{Contract,Repository}/ERP/AdmissionService*`
+- `educore/Areas/ERP/Controllers/StudentController.cs`
+- `educore/Areas/ERP/Views/Student/Dashboard.cshtml`
+
+**The root cause behind two days of promotion bugs.** `core.students` holds one row per
+student with `class_name` / `section` / `academic_year` on it, and promotion overwrites all
+three. The moment a student moves up, where they came from is gone — so "how many students
+were in 3rd class in 2027-2028" had no answer, filtering the directory by a past session
+returned only the students who happened *not* to have been promoted, and an undo meant
+replaying `student_promotion_history` backwards by hand (which is exactly what the
+2026-08-11 repair had to do).
+
+`core.student_enrolment` now holds **one row per student per session** — the model every
+real SIS uses. `core.students` is deliberately left alone: it keeps its three columns and
+still carries the student's *present* position, so nothing that reads it broke.
+
+**Phase 1 — write, don't read.** The table, a backfill, and dual-write from all three write
+paths (`sp_admission_manage`, `sp_student_promote`, `sp_student_exit`). Nothing read the new
+table yet, so Phase 1 could not break a page. Two helpers keep the logic in one place:
+`fn_student_enrolment_open` (upsert on `(student_id, academic_year)`, so a double submit or a
+re-applied backfill cannot duplicate a session) and `fn_student_enrolment_close` (records the
+outcome: Promoted / Retained / PassedOut / Left). `is_current` marks the row matching
+`students.academic_year` — exactly one per student, enforced by the open helper.
+
+Keyed on the session **name**, not the id: `students.academic_year` is text and that is what
+the whole app matches on. `academic_year_id` / `academic_class_id` are resolved as a
+convenience for joins and are nullable, so a student whose session row is missing can still
+be admitted. Past sessions were rebuilt from `student_promotion_history` (7 rows on prod,
+from the promotion the office ran before the table existed).
+
+**Phase 2 — move the year-wise reads across.**
+- `sp_student_list` and `sp_admission_manage 'GetStudents'` LEFT JOIN enrolment on the
+  requested session. With no session filter the join matches nothing and the COALESCEs fall
+  back to `core.students` — current behaviour is byte-for-byte unchanged. With one, the list
+  returns everyone enrolled *that* session, showing the class and section they held **then**,
+  and the class/section filters match against that same position. On prod, filtering
+  2027-2028 went from 11 students to the correct 18.
+- Class/section strength on the Classes & Sections page now counts enrolment rows for the
+  session being viewed, so past sessions no longer read as zero. The "cannot remove a class
+  that still has students" guard was moved to the same source, which makes it correct for a
+  session other than the current one.
+- New: `sp_student_enrolment_history` + a **Session History** card on the student dashboard —
+  the session-by-session timeline the table was built for. (Note: the rest of that page is
+  still mock data; this card is real.)
+
+**Still open.** Attendance, fee plan and ledger continue to key on `student_id` alone —
+`enrolment_id` should reach them as those modules are next touched, and the exam module
+should be built on it from day one rather than retrofitted. Fee dues still share one
+un-scoped ledger rather than opening a per-session balance.
+
+---
+
 # Glossary (quick reference)
 
 | Term | Plain meaning |

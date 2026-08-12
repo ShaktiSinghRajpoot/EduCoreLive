@@ -243,6 +243,13 @@ BEGIN
         )
         RETURNING student_id INTO v_student_id;
 
+        -- Open the student's first enrolment row (see student_enrolment.sql).
+        -- core.students still carries class/section/year; this is the parallel
+        -- per-session record that keeps the history once they are promoted.
+        PERFORM core.fn_student_enrolment_open(
+            p_tenant_id, p_school_id, v_student_id,
+            v_year, p_class_name, p_section, p_roll_no, p_action_user_id);
+
         -- Freeze the fee plan + generate ledger rows
         IF p_fee_plan_json IS NOT NULL THEN
             FOR v_item IN SELECT * FROM jsonb_array_elements(p_fee_plan_json)
@@ -365,7 +372,12 @@ BEGIN
             WITH filtered AS (
                 SELECT
                     s.student_id, s.admission_no, s.roll_no, s.student_name,
-                    s.gender, s.dob, s.class_name, s.section, s.academic_year,
+                    s.gender, s.dob,
+                    -- When a session is asked for, report the class/section the
+                    -- student held IN THAT SESSION, not their present one.
+                    COALESCE(e.class_name,    s.class_name)    AS class_name,
+                    COALESCE(e.section,       s.section)       AS section,
+                    COALESCE(e.academic_year, s.academic_year) AS academic_year,
                     s.admission_date, s.guardian_name, s.mobile,
                     s.annual_total, s.status, s.approval_status, s.enquiry_id,
                     COALESCE((
@@ -383,6 +395,13 @@ BEGIN
                         WHERE l.student_id = s.student_id
                     ), 0) AS fee_due
                 FROM core.students s
+                -- Per-session position (core.student_enrolment). students.academic_year
+                -- only holds where a student is NOW, so filtering on it loses everyone
+                -- who has since been promoted. Matches only when a session is asked
+                -- for; otherwise e.* is NULL and the COALESCEs fall back to students.
+                LEFT JOIN core.student_enrolment e
+                       ON e.student_id    = s.student_id
+                      AND e.academic_year = NULLIF(TRIM(COALESCE(p_filter_year, '')), '')
                 WHERE s.tenant_id = p_tenant_id
                   AND s.school_id = p_school_id
                   AND s.is_active = TRUE
@@ -393,10 +412,13 @@ BEGIN
                       OR LOWER(COALESCE(s.guardian_name,'')) LIKE '%' || LOWER(TRIM(p_search)) || '%'
                       OR COALESCE(s.mobile,'') LIKE '%' || TRIM(p_search) || '%'
                   )
-                  AND (p_filter_class   IS NULL OR TRIM(p_filter_class)   = '' OR LOWER(s.class_name) = LOWER(TRIM(p_filter_class)))
-                  AND (p_filter_section IS NULL OR TRIM(p_filter_section) = '' OR LOWER(COALESCE(s.section,'')) = LOWER(TRIM(p_filter_section)))
+                  -- Enrolled in the requested session at all.
+                  AND (NULLIF(TRIM(COALESCE(p_filter_year, '')), '') IS NULL
+                       OR e.enrolment_id IS NOT NULL)
+                  -- Class/section are matched against that session's position.
+                  AND (p_filter_class   IS NULL OR TRIM(p_filter_class)   = '' OR LOWER(COALESCE(e.class_name, s.class_name)) = LOWER(TRIM(p_filter_class)))
+                  AND (p_filter_section IS NULL OR TRIM(p_filter_section) = '' OR LOWER(COALESCE(e.section, s.section, '')) = LOWER(TRIM(p_filter_section)))
                   AND (p_filter_gender  IS NULL OR TRIM(p_filter_gender)  = '' OR LOWER(COALESCE(s.gender,''))  = LOWER(TRIM(p_filter_gender)))
-                  AND (p_filter_year    IS NULL OR TRIM(p_filter_year)    = '' OR s.academic_year = TRIM(p_filter_year))
                   AND (p_filter_status  IS NULL OR TRIM(p_filter_status)  = '' OR LOWER(s.status) = LOWER(TRIM(p_filter_status)))
             )
             SELECT *, COUNT(*) OVER() AS total_count

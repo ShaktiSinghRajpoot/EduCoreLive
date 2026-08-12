@@ -89,6 +89,24 @@
           <button class="cs-btn" id="btnExpand"><i class="bx bx-expand-vertical"></i>Expand all</button>
           <button class="cs-btn primary ms-auto" id="btnAddClass"><i class="bx bx-plus"></i>Add Class</button>
         </div>
+
+        @if (ViewBag.CanCopySetup == true)
+        {
+            <!-- This session has no classes yet. Rather than retyping the whole
+                 structure, copy the previous session's — the rollover step that
+                 has to happen before students can be promoted into this session. -->
+            <div class="alert alert-warning d-flex flex-column flex-sm-row align-items-sm-center gap-2 mt-2 mb-0" role="alert">
+                <i class="bx bx-info-circle fs-5"></i>
+                <div class="flex-grow-1 small">
+                    This session has no classes or sections yet. Students cannot be admitted or
+                    promoted into it until it has some.
+                </div>
+                <button type="button" class="btn btn-sm btn-warning text-nowrap" id="btnCopySetup"
+                        data-from="@ViewBag.CopyFromYearId">
+                    <i class="bx bx-copy me-1"></i>Copy from @ViewBag.CopyFromYearName
+                </button>
+            </div>
+        }
       </div>
 
       <div class="ec-card-body pt-2">
@@ -205,6 +223,8 @@
   </div>
 </div>
 
+@Html.AntiForgeryToken()
+
 @section PageScripts {
 <script>
 (function(){
@@ -212,6 +232,7 @@
 
 var ACADEMIC_YEAR_ID = @(ViewBag.AcademicYearId ?? 0);
 var URL_SAVE = '@Url.Action("SaveClassSection", "SchoolSettings", new { area = "ERP" })';
+var URL_COPY = '@Url.Action("CopyClassSection", "SchoolSettings", new { area = "ERP" })';
 var seed = @Html.Raw(ViewBag.ClassDataJson ?? "[]");
 
 var nextClassId=100, nextSecId=900;
@@ -265,6 +286,37 @@ function persist(okMsg){
     }
   })
   .fail(function(){ ecToast('error','Save failed. Check your connection.'); });
+}
+
+/* -- Copy the previous session's structure into this (empty) one -- */
+var btnCopy = document.getElementById('btnCopySetup');
+if (btnCopy) {
+  btnCopy.addEventListener('click', function(){
+    var from = parseInt(btnCopy.getAttribute('data-from'), 10) || 0;
+    if (!from || !ACADEMIC_YEAR_ID) { ecToast('error','Nothing to copy from.'); return; }
+
+    EC.buttonBusy(btnCopy, 'Copying…');
+    $.ajax({
+      url:         URL_COPY,
+      type:        'POST',
+      contentType: 'application/json',
+      headers:     { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+      data:        JSON.stringify({ fromAcademicYearId: from, toAcademicYearId: ACADEMIC_YEAR_ID })
+    })
+    .done(function(res){
+      if (res && res.success) {
+        ecToast('success', res.message || 'Structure copied.');
+        setTimeout(function(){ window.location.reload(); }, 900);
+      } else {
+        ecToast('error', (res && res.message) || 'Copy failed.');
+        EC.buttonReset(btnCopy);
+      }
+    })
+    .fail(function(){
+      ecToast('error','Copy failed. Check your connection.');
+      EC.buttonReset(btnCopy);
+    });
+  });
 }
 
 /* Summary */

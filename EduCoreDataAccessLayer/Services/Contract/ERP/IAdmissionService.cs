@@ -56,11 +56,19 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         // ── Promotion (backs Student/Promotion) ──
 
-        /// <summary>The school's classes in teaching order — the ladder promotion walks up.</summary>
-        Task<List<string>> GetClassLadderAsync(int tenantId, int schoolId, int actionUserId);
+        /// <summary>
+        /// The classes of one session in teaching order — the ladder promotion walks up.
+        /// Classes are per-session rows; a null year means the current session.
+        /// </summary>
+        Task<List<string>> GetClassLadderAsync(
+            int tenantId, int schoolId, int actionUserId, string? academicYearName = null);
 
         /// <summary>Bulk promote/retain/pass out. Students that cannot move are reported, not fatal.</summary>
         Task<StudentPromotionResult> PromoteStudentsAsync(
             StudentPromotionRequest request, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>A student's session-by-session timeline, newest session first.</summary>
+        Task<List<StudentEnrolmentItem>> GetEnrolmentHistoryAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId);
     }
 }

@@ -14,17 +14,20 @@ namespace educore.Areas.ERP.Controllers
         private readonly IBaseService _baseService;
         private readonly IAdmissionService _admissionService;
         private readonly IAdmissionWorkflowService _admissionWorkflowService;
+        private readonly ISchoolSettingsService _schoolSettingsService;
         private readonly IWebHostEnvironment _env;
 
         public StudentController(
             IBaseService baseService,
             IAdmissionService admissionService,
             IAdmissionWorkflowService admissionWorkflowService,
+            ISchoolSettingsService schoolSettingsService,
             IWebHostEnvironment env)
         {
             _baseService = baseService;
             _admissionService = admissionService;
             _admissionWorkflowService = admissionWorkflowService;
+            _schoolSettingsService = schoolSettingsService;
             _env = env;
         }
 
@@ -71,10 +74,36 @@ namespace educore.Areas.ERP.Controllers
 
             // "Next class" must follow teaching order (display_order), NOT the
             // dropdown order above, which is newest-class-first and would walk
-            // the school downwards.
+            // the school downwards. Null year = the current session; the page
+            // reloads the ladder from the target session once one is chosen.
             ViewBag.ClassLadder = await _admissionService.GetClassLadderAsync(TenantId(), SchoolId(), UserId());
 
             return View();
+        }
+
+        // Is the chosen session ready to receive students? Classes and sections
+        // are per-session rows, so a new session is empty until its structure is
+        // copied forward — promoting into it would strand every student on a
+        // class that does not exist. The page asks before showing the confirm.
+        public async Task<IActionResult> PromotionSessionCheck(string? year)
+        {
+            var info = await _schoolSettingsService.GetSessionStructureAsync(
+                TenantId(), SchoolId(), UserId(), academicYearName: year);
+
+            var ladder = info.IsReady
+                ? await _admissionService.GetClassLadderAsync(TenantId(), SchoolId(), UserId(), year)
+                : new List<string>();
+
+            return Json(new
+            {
+                ready          = info.IsReady,
+                yearName       = info.AcademicYearName,
+                classCount     = info.ClassCount,
+                sectionCount   = info.SectionCount,
+                canCopy        = info.CanCopy,
+                sourceYearName = info.SourceYearName,
+                ladder
+            });
         }
 
         // Sections that have active students in a class — fills the Section dropdown.
@@ -198,6 +227,24 @@ namespace educore.Areas.ERP.Controllers
         {
             ViewBag.StudentId = id;
             return View();
+        }
+
+        // A student's session-by-session timeline. core.students only holds their
+        // present position, so this comes from core.student_enrolment.
+        public async Task<IActionResult> EnrolmentHistory(int id = 0)
+        {
+            var items = await _admissionService.GetEnrolmentHistoryAsync(
+                id, TenantId(), SchoolId(), UserId());
+
+            return Json(items.Select(e => new
+            {
+                year      = e.AcademicYear,
+                cls       = e.ClassName,
+                sec       = e.Section,
+                roll      = e.RollNo,
+                status    = e.Status,
+                isCurrent = e.IsCurrent
+            }));
         }
 
         public IActionResult EditStudent(int id = 0)

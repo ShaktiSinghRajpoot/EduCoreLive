@@ -82,15 +82,19 @@ BEGIN
             acs.room_no,
             acs.class_teacher_staff_id,
             cts.full_name AS class_teacher,
+            -- Strength for THE SESSION BEING VIEWED. core.students only holds a
+            -- student's present position, so counting from it showed 0 for every
+            -- past session once a class had been promoted. core.student_enrolment
+            -- has a row per session, which is what this needs.
             COALESCE((
                 SELECT COUNT(*)
-                FROM core.students st
-                WHERE st.tenant_id = p_tenant_id
-                  AND st.school_id = p_school_id
-                  AND st.academic_year = ay.academic_year_name
-                  AND st.class_name = ac.class_name
-                  AND st.section = acs.section_name
-                  AND COALESCE(st.is_active, TRUE) = TRUE
+                FROM core.student_enrolment en
+                WHERE en.tenant_id = p_tenant_id
+                  AND en.school_id = p_school_id
+                  AND en.academic_year = ay.academic_year_name
+                  AND en.class_name = ac.class_name
+                  AND en.section = acs.section_name
+                  AND en.status <> 'Left'   -- left mid-session, not on the roll
             ), 0) AS strength
         FROM academic.academic_years ay
         LEFT JOIN academic.academic_classes ac
@@ -142,14 +146,16 @@ BEGIN
               AND ac.school_id = p_school_id
               AND ac.academic_year_id = v_academic_year_id
               AND COALESCE(ac.is_deleted, FALSE) = FALSE
+              -- Enrolment is per session, so this correctly guards the session
+              -- being edited rather than only whoever sits there right now.
               AND EXISTS (
-                  SELECT 1 FROM core.students st
-                  WHERE st.tenant_id = p_tenant_id
-                    AND st.school_id = p_school_id
-                    AND st.academic_year = v_academic_year_name
-                    AND st.class_name = ac.class_name
-                    AND st.section = acs.section_name
-                    AND COALESCE(st.is_active, TRUE) = TRUE
+                  SELECT 1 FROM core.student_enrolment en
+                  WHERE en.tenant_id = p_tenant_id
+                    AND en.school_id = p_school_id
+                    AND en.academic_year = v_academic_year_name
+                    AND en.class_name = ac.class_name
+                    AND en.section = acs.section_name
+                    AND en.status <> 'Left'
               )
               AND NOT EXISTS (
                   SELECT 1

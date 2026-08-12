@@ -207,6 +207,36 @@
                         </a>
                     </div>
                     <div id="profileContent"></div>
+
+                    <!-- Session history — real data from core.student_enrolment.
+                         The student row only holds the current session, so this
+                         is the only record of the classes they passed through. -->
+                    <div class="ec-card mt-3">
+                      <div class="ec-card-header">
+                        <div class="ec-section-title-wrap">
+                          <span class="ec-section-icon"><i class="bx bx-history"></i></span>
+                          <div>
+                            <div class="ec-section-title">Session History</div>
+                            <div class="ec-section-subtitle">Class and section in each academic session</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="ec-card-body pt-2">
+                        <div class="table-responsive">
+                          <table class="table table-sm align-middle mb-0">
+                            <thead>
+                              <tr>
+                                <th>Session</th><th>Class</th><th>Section</th>
+                                <th>Roll No</th><th>Outcome</th>
+                              </tr>
+                            </thead>
+                            <tbody id="enrolHistoryBody">
+                              <tr><td colspan="5" class="text-muted small">Loading…</td></tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
                 </div>
 
             </div>
@@ -226,6 +256,7 @@
 'use strict';
 
 var STUDENT_ID = @studentId;
+var ENROL_HISTORY_URL = '@Url.Action("EnrolmentHistory","Student",new{area="ERP"})';
 var charts = {};
 
 /* ── Mock Students (same as list page) ─────── */
@@ -662,8 +693,44 @@ document.getElementById('examSel').addEventListener('change',function(){
     if(s) renderExams(s,getDetail(s));
 });
 
+/* ── Session history (real data) ──────────────
+   Everything else on this page is still mock; this card reads
+   core.student_enrolment through the server. */
+function loadEnrolmentHistory(){
+  var body=document.getElementById('enrolHistoryBody');
+  if(!body) return;
+
+  if(!STUDENT_ID){
+    body.innerHTML='<tr><td colspan="5" class="text-muted small">No student selected.</td></tr>';
+    return;
+  }
+
+  $.getJSON(ENROL_HISTORY_URL, { id:STUDENT_ID })
+    .done(function(rows){
+      if(!rows || !rows.length){
+        body.innerHTML='<tr><td colspan="5" class="text-muted small">No session history yet.</td></tr>';
+        return;
+      }
+      body.innerHTML=rows.map(function(r){
+        var badge={Active:'success',Promoted:'primary',Retained:'warning',
+                   PassedOut:'info',Left:'secondary'}[r.status]||'secondary';
+        return '<tr>'
+          +'<td class="fw-bold">'+EC.esc(r.year)+(r.isCurrent?' <span class="badge bg-label-success">current</span>':'')+'</td>'
+          +'<td>'+EC.esc(r.cls)+'</td>'
+          +'<td>'+EC.esc(r.sec||'—')+'</td>'
+          +'<td>'+EC.esc(r.roll||'—')+'</td>'
+          +'<td><span class="badge bg-label-'+badge+'">'+EC.esc(r.status)+'</span></td>'
+          +'</tr>';
+      }).join('');
+    })
+    .fail(function(){
+      body.innerHTML='<tr><td colspan="5" class="text-danger small">Could not load session history.</td></tr>';
+    });
+}
+
 /* ── Init ────────────────────────────────────── */
 loadDashboard(STUDENT_ID||1);
+loadEnrolmentHistory();
 
 })();
 </script>

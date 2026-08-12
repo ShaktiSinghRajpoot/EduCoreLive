@@ -43,13 +43,14 @@ AS $procedure$
 DECLARE
     v_name   varchar;
     v_active boolean;
+    v_year   varchar;   -- session the student is sitting in (for the enrolment row)
     v_dues   numeric(12,2);
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
     END IF;
 
-    SELECT student_name, is_active INTO v_name, v_active
+    SELECT student_name, is_active, academic_year INTO v_name, v_active, v_year
     FROM core.students
     WHERE student_id = p_student_id
       AND tenant_id  = p_tenant_id
@@ -91,6 +92,13 @@ BEGIN
             updated_at       = now()
         WHERE student_id = p_student_id;
 
+        -- Close the session they were in. is_current stays TRUE: this is still
+        -- their latest enrolment, it just ended early.
+        PERFORM core.fn_student_enrolment_close(
+            p_student_id, v_year,
+            CASE WHEN TRIM(p_status) = 'Passout' THEN 'PassedOut' ELSE 'Left' END,
+            p_action_user_id);
+
         OPEN p_result FOR
         SELECT TRUE AS success,
                v_name || ' marked as ' || TRIM(p_status) || '.' AS message,
@@ -111,6 +119,10 @@ BEGIN
             updated_by       = p_action_user_id,
             updated_at       = now()
         WHERE student_id = p_student_id;
+
+        -- Put them back on the roll for the session they were in.
+        PERFORM core.fn_student_enrolment_close(
+            p_student_id, v_year, 'Active', p_action_user_id);
 
         OPEN p_result FOR
         SELECT TRUE AS success,

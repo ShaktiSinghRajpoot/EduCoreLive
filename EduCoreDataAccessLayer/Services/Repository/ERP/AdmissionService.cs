@@ -18,6 +18,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpStudentExitList = "core.sp_student_exit_list";
         private const string SpClassLadder = "core.sp_class_ladder";
         private const string SpStudentPromote = "core.sp_student_promote";
+        private const string SpEnrolmentHistory = "core.sp_student_enrolment_history";
 
         public AdmissionService(PgExec db)
         {
@@ -460,7 +461,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         // The student row is updated in place (there is no per-year enrolment
         // table), so the ledger and receipts keep pointing at the same
         // student_id. core.student_promotion_history holds the trail.
-        public async Task<List<string>> GetClassLadderAsync(int tenantId, int schoolId, int actionUserId)
+        public async Task<List<string>> GetClassLadderAsync(
+            int tenantId, int schoolId, int actionUserId, string? academicYearName = null)
         {
             var classes = new List<string>();
             if (tenantId <= 1 || schoolId <= 0) return classes;
@@ -470,6 +472,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                // NULL = the current session. Classes are per-session rows, so the
+                // ladder is meaningless without one.
+                new("p_academic_year_name", NpgsqlDbType.Varchar)
+                    { Value = string.IsNullOrWhiteSpace(academicYearName) ? DBNull.Value : academicYearName },
                 new("p_result", NpgsqlDbType.Refcursor)
                     { Direction = ParameterDirection.InputOutput, Value = "class_ladder_cursor" }
             };
@@ -536,6 +542,42 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 // set up"), so the office sees that message rather than a stack.
                 return new StudentPromotionResult { Message = ex.MessageText };
             }
+        }
+
+        public async Task<List<StudentEnrolmentItem>> GetEnrolmentHistoryAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId)
+        {
+            var items = new List<StudentEnrolmentItem>();
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0) return items;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",     NpgsqlDbType.Integer) { Value = studentId },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "student_enrolment_history_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpEnrolmentHistory, parameters);
+            if (ds.Tables.Count == 0) return items;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                items.Add(new StudentEnrolmentItem
+                {
+                    AcademicYear = NullStr(row, "academic_year") ?? string.Empty,
+                    ClassName    = NullStr(row, "class_name")    ?? string.Empty,
+                    Section      = NullStr(row, "section"),
+                    RollNo       = NullStr(row, "roll_no"),
+                    Status       = NullStr(row, "status")        ?? string.Empty,
+                    IsCurrent    = row.Table.Columns.Contains("is_current")
+                                   && row["is_current"] != DBNull.Value
+                                   && Convert.ToBoolean(row["is_current"])
+                });
+            }
+            return items;
         }
 
         // ── Mapper ───────────────────────────────────────────────

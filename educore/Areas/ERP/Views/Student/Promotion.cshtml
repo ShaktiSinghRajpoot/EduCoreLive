@@ -93,6 +93,14 @@
 
         </div>
 
+        <!-- Classes and sections belong to one session, so a session that has not
+             been set up yet cannot receive anyone. Say so here rather than letting
+             the write fail at the very last step. -->
+        <div class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0" id="tgtNotReady" style="display:none;">
+          <i class="bx bx-error-circle fs-5"></i>
+          <div class="small flex-grow-1" id="tgtNotReadyText"></div>
+        </div>
+
         <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mt-3">
           <label class="pr-opt mb-0">
             <input type="checkbox" class="form-check-input mt-0" id="carryDues" checked>
@@ -247,6 +255,10 @@ function nextClass(c){ var i=LADDER.indexOf(c); return (i<0||i===LADDER.length-1
 var SEC_URL='@Url.Action("PromotionSections","Student",new{area="ERP"})';
 var ROSTER_URL='@Url.Action("PromotionRoster","Student",new{area="ERP"})';
 var PROMOTE_URL='@Url.Action("Promote","Student",new{area="ERP"})';
+var CHECK_URL='@Url.Action("PromotionSessionCheck","Student",new{area="ERP"})';
+
+/* Set by the session check below: false blocks the commit. */
+var targetReady=true;
 var PALETTE=['primary','info','success','warning','danger','secondary'];
 
 var roster=[];          // currently loaded students (from the server)
@@ -452,6 +464,41 @@ document.getElementById('resetBtn').addEventListener('click', function(){
   ecToast('info','Cleared. Select a class to start again.');
 });
 
+/* ── Is the target session set up? ────────────
+   Classes/sections are per-session rows, so promoting into a session that has
+   none writes students onto classes that do not exist. Check up front, and take
+   the ladder from the TARGET session so the "next class" preview matches what
+   the proc will actually do. */
+function checkTargetSession(){
+  var tgtY=document.getElementById('tgtYear').value,
+      banner=document.getElementById('tgtNotReady'),
+      text=document.getElementById('tgtNotReadyText'),
+      reviewBtn=document.getElementById('reviewBtn');
+
+  if(!tgtY){ targetReady=false; return; }
+
+  $.getJSON(CHECK_URL, { year:tgtY }).done(function(res){
+    targetReady = !!(res && res.ready);
+
+    if(targetReady){
+      banner.style.display='none';
+      reviewBtn.removeAttribute('disabled');
+      if(res.ladder && res.ladder.length){ LADDER=res.ladder; }
+      return;
+    }
+
+    var msg='Session '+tgtY+' has no classes or sections yet, so nobody can be promoted into it. ';
+    msg += (res && res.canCopy)
+      ? 'Open Settings → Classes &amp; Sections, pick '+tgtY+', and copy the structure from '+res.sourceYearName+'.'
+      : 'Set up its classes and sections first under Settings → Classes &amp; Sections.';
+    text.innerHTML=msg;
+    banner.style.display='';
+    reviewBtn.setAttribute('disabled','disabled');
+  });
+}
+document.getElementById('tgtYear').addEventListener('change', checkTargetSession);
+checkTargetSession();
+
 /* ── Review modal fill ───────────────────────── */
 document.getElementById('reviewBtn').addEventListener('click', function(){
   updateCounts();
@@ -470,6 +517,7 @@ document.getElementById('commitBtn').addEventListener('click', function(){
   var srcY=document.getElementById('srcYear').value,
       tgtY=document.getElementById('tgtYear').value;
   if(srcY===tgtY){ ecToast('warning','Pick a different session to promote into.'); return; }
+  if(!targetReady){ ecToast('warning','Set up classes and sections for '+tgtY+' first.'); return; }
 
   var btn=this;
   EC.buttonBusy(btn,'Promoting…');

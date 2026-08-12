@@ -107,15 +107,22 @@ BEGIN
 
     ELSIF p_activity = 'Class' THEN
 
+        -- Classes are stored per academic session, so the same class exists once
+        -- per session — listing the rows raw shows "1st, 1st, 2nd, 2nd, ..." as
+        -- soon as a second session has structure. Every consumer filters on the
+        -- class NAME (students store class_name as text), so collapse to one row
+        -- per name. Historic classes stay in the list, which keeps the filters
+        -- on past sessions working.
         OPEN p_result FOR
         SELECT
             class_name AS "Name",
-            academic_class_id::text AS "Code"
+            MIN(academic_class_id)::text AS "Code"
         FROM academic.academic_classes
         WHERE COALESCE(is_deleted, FALSE) = FALSE
           AND COALESCE(is_active, TRUE) = TRUE
           AND tenant_id = v_tenant AND school_id = v_school   -- multi-tenant scope
-        ORDER BY academic_class_id DESC;
+        GROUP BY class_name
+        ORDER BY MIN(display_order), class_name;   -- teaching order
 
     ELSE
         -- Generic reference lists. Prefer the school's own rows for this

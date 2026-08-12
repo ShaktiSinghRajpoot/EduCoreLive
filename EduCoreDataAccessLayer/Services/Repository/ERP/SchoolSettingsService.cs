@@ -20,6 +20,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpIdCardFormatManage = "core.sp_school_id_card_format_manage";
         private const string SpSchoolDropdowns = "config.sp_school_dropdowns";
         private const string SpAcademicSetupManage = "academic.sp_school_admin_academic_setup_manage";
+        private const string SpSessionStructureInfo = "academic.sp_academic_year_structure_info";
+        private const string SpAcademicYearClone = "academic.sp_academic_year_clone";
         private const string SpPeriodStructureManage = "academic.sp_school_admin_period_structure_manage";
         private const string SpFeeHeadManage = "core.sp_school_admin_fee_head_manage";
         private const string SpFeeStructureManage = "core.sp_school_admin_fee_structure_manage";
@@ -387,6 +389,83 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var row = ds.Tables[0].Rows[0];
 
             return row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]) ? 1 : 0;
+        }
+
+        // ── Session rollover ────────────────────────────────────────────────
+        // Classes and sections belong to one session, so a new session starts
+        // empty. These two back the "copy the setup forward" step that has to
+        // happen before anything can be promoted into it.
+
+        public async Task<SessionStructureInfo> GetSessionStructureAsync(
+            int tenantId, int schoolId, int actionUserId,
+            int academicYearId = 0, string? academicYearName = null)
+        {
+            var info = new SessionStructureInfo();
+            if (tenantId <= 1 || schoolId <= 0) return info;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_academic_year_id", NpgsqlDbType.Integer)
+                    { Value = academicYearId > 0 ? academicYearId : DBNull.Value },
+                new NpgsqlParameter("p_academic_year_name", NpgsqlDbType.Varchar)
+                    { Value = string.IsNullOrWhiteSpace(academicYearName) ? DBNull.Value : academicYearName },
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "structure_info_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpSessionStructureInfo, parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return info;
+
+            var row = ds.Tables[0].Rows[0];
+            info.AcademicYearId   = Convert.ToInt32(row["academic_year_id"]);
+            info.AcademicYearName = AsStr(row, "academic_year_name") ?? string.Empty;
+            info.ClassCount       = Convert.ToInt32(row["class_count"]);
+            info.SectionCount     = Convert.ToInt32(row["section_count"]);
+            info.SourceYearId     = Convert.ToInt32(row["source_year_id"]);
+            info.SourceYearName   = AsStr(row, "source_year_name") ?? string.Empty;
+            return info;
+        }
+
+        public async Task<SessionCloneResult> CloneAcademicYearAsync(
+            int fromAcademicYearId, int toAcademicYearId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new SessionCloneResult { Message = "Invalid school scope." };
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_from_academic_year_id", fromAcademicYearId),
+                new NpgsqlParameter("p_to_academic_year_id", toAcademicYearId),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "year_clone_cursor" }
+            };
+
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpAcademicYearClone, parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return new SessionCloneResult { Message = "Nothing was copied." };
+
+                var row = ds.Tables[0].Rows[0];
+                return new SessionCloneResult
+                {
+                    Success        = row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]),
+                    ClassesCopied  = Convert.ToInt32(row["classes_copied"]),
+                    SectionsCopied = Convert.ToInt32(row["sections_copied"]),
+                    Message        = AsStr(row, "message") ?? string.Empty
+                };
+            }
+            catch (PostgresException ex)
+            {
+                // Business rules are RAISEd by the proc ("already has classes").
+                return new SessionCloneResult { Message = ex.MessageText };
+            }
         }
 
         #region Period Structure

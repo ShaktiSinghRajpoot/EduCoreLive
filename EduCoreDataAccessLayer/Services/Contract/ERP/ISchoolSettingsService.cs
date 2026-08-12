@@ -19,6 +19,15 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         #region Academic Setup
         Task<AcademicSetupModel?> GetAcademicSetupAsync(int tenantId, int schoolId, int academicYearId, int actionUserId);
         Task<int> SaveAcademicSetupAsync(AcademicSetupModel model, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Whether a session has its classes/sections yet, and which session it could copy from.</summary>
+        Task<SessionStructureInfo> GetSessionStructureAsync(
+            int tenantId, int schoolId, int actionUserId,
+            int academicYearId = 0, string? academicYearName = null);
+
+        /// <summary>Copies classes + sections from one session into an empty one (the rollover step).</summary>
+        Task<SessionCloneResult> CloneAcademicYearAsync(
+            int fromAcademicYearId, int toAcademicYearId, int tenantId, int schoolId, int actionUserId);
         #endregion
 
         #region Period Structure
