@@ -1,0 +1,84 @@
+/* Datesheet page — "which class sits what, on which date" */
+    :root {
+        --ec-orange: #ff8a00;
+        --ec-orange-soft: #fff4e6;
+        --ec-border: #ececf5;
+        --ec-heading: #2b1b12;
+        --ec-text: #2b2c40;
+        --ec-muted: #8b8175;
+        --ec-indigo: #4f46e5;
+        --ec-indigo-soft: #eef2ff;
+    }
+
+    .ds-page { padding-bottom: 1rem; }
+    .ds-page *, .ds-page *::before, .ds-page *::after { box-sizing: border-box; }
+
+    .ds-page .form-select {
+        min-height: 46px; border-radius: 12px; border-color: var(--ec-border);
+        font-weight: 700; font-size: .9rem; color: var(--ec-text);
+    }
+    .ds-page .form-select:focus { border-color: var(--ec-orange); box-shadow: 0 0 0 4px rgba(255,138,0,.12); }
+    .ds-label { font-size: .7rem; font-weight: 800; color: var(--ec-muted); margin-bottom: .35rem; letter-spacing: .02em; }
+
+    .btn-ds-primary {
+        background: var(--ec-orange); border: 0; color: #fff; border-radius: 12px; font-weight: 900;
+        min-height: 46px; padding: 0 1.25rem; box-shadow: 0 8px 20px rgba(255,138,0,.22); transition: .16s;
+    }
+    .btn-ds-primary:hover { background: #e07a00; color: #fff; }
+    .btn-ds-ghost {
+        border: 1.5px solid var(--ec-border); background: #fff; color: var(--ec-text);
+        border-radius: 12px; font-weight: 800; min-height: 46px; padding: 0 1rem; width: auto;
+    }
+    .btn-ds-ghost:hover { border-color: var(--ec-orange); color: var(--ec-orange); }
+
+    .ds-result-head {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem;
+    }
+    .ds-result-title { font-size: 1.05rem; font-weight: 900; color: var(--ec-heading); }
+    .ds-result-sub { font-size: .8rem; font-weight: 700; color: var(--ec-muted); margin-top: .1rem; }
+    .ds-count {
+        font-size: .74rem; font-weight: 900; color: var(--ec-orange);
+        background: var(--ec-orange-soft); border-radius: 8px; padding: .25rem .6rem;
+    }
+
+    /* ── One day of the datesheet ── */
+    .ds-day { margin-bottom: 14px; }
+    .ds-day-head {
+        display: flex; align-items: baseline; gap: .5rem;
+        padding: 0 .2rem .4rem; border-bottom: 1.5px solid var(--ec-border); margin-bottom: .5rem;
+    }
+    .ds-day-date { font-size: .92rem; font-weight: 900; color: var(--ec-heading); }
+    .ds-day-name {
+        font-size: .7rem; font-weight: 900; color: var(--ec-muted);
+        text-transform: uppercase; letter-spacing: .05em;
+    }
+    .ds-day-rows { display: flex; flex-direction: column; gap: 6px; }
+
+    .ds-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: .75rem; flex-wrap: wrap;
+        border: 1px solid var(--ec-border); border-radius: 12px; background: #fff;
+        padding: .6rem .85rem;
+    }
+    .ds-row-main { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; min-width: 0; }
+    .ds-subject { font-size: .9rem; font-weight: 900; color: var(--ec-heading); }
+    .ds-chip {
+        font-size: .68rem; font-weight: 900; letter-spacing: .02em;
+        border-radius: 8px; padding: .15rem .5rem;
+        background: #f1f5f9; color: var(--ec-muted);
+    }
+    .ds-chip-class { background: var(--ec-indigo-soft); color: var(--ec-indigo); }
+    .ds-row-marks {
+        display: flex; gap: .9rem; flex-shrink: 0;
+        font-size: .76rem; font-weight: 700; color: var(--ec-muted);
+    }
+    .ds-row-marks strong { color: var(--ec-heading); font-weight: 900; }
+
+    /* ── Print: the datesheet is meant to go on a noticeboard ── */
+    @media print {
+        .ds-no-print { display: none !important; }
+        .ds-page .ec-card { border: 0 !important; box-shadow: none !important; }
+        .ds-row { break-inside: avoid; }
+        .ds-day { break-inside: avoid; }
+    }

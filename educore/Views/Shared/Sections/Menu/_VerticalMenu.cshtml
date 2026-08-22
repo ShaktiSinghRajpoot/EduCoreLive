@@ -208,13 +208,14 @@
         @* ---- Examinations ---- *@
         @if (gExams)
         {
-        <li class='menu-item @Open("CreateExam","MarkEntry")'>
+        <li class='menu-item @Open("CreateExam","Datesheet","MarkEntry")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-file ic-exam"></i>
                 <div class="text-truncate">Examinations</div>
             </a>
             <ul class="menu-sub">
                 <li class='menu-item @On("CreateExam")'><a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-red"></i><div class="text-truncate">Exam Schedule</div></a></li>
+                <li class='menu-item @On("Datesheet")'><a asp-area="ERP" asp-controller="Exam" asp-action="Datesheet" class="menu-link"><i class="bx bx-calendar submenu-icon c-teal"></i><div class="text-truncate">Datesheet</div></a></li>
                 <li class='menu-item @On("MarkEntry")'><a asp-area="ERP" asp-controller="Exam" asp-action="MarkEntry" class="menu-link"><i class="bx bx-edit submenu-icon c-purple"></i><div class="text-truncate">Marks Entry</div></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-indigo"></i><div class="text-truncate">Admit Cards</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-medal submenu-icon c-orange"></i><div class="text-truncate">Grading System</div><span class="ec-badge ec-badge-soon">soon</span></a></li>

@@ -1,11 +1,32 @@
+@using EduCoreDataAccessLayer.Models.ERP
 @{
     ViewData["Title"] = "Exam Mark Entry";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var exams     = ViewBag.Exams as List<ExamListItem> ?? new List<ExamListItem>();
+    var yearName  = ViewBag.AcademicYearName as string ?? string.Empty;
+    var canManage = (bool?)ViewBag.CanManage ?? false;
+    var isAdmin   = (bool?)ViewBag.IsAdmin   ?? false;
+    var selected  = (int?)ViewBag.SelectedExamId ?? 0;
+
+    // Emitted into the page so the selector cascade needs no extra round trip.
+    // System.Text.Json escapes < and >, so an exam name cannot close the script tag.
+    var examsJson = System.Text.Json.JsonSerializer.Serialize(exams.Select(e => new
+    {
+        id        = e.ExamId,
+        name      = e.ExamName,
+        typeLabel = e.TypeLabel,
+        startDate  = e.StartDate,
+        endDate    = e.EndDate,
+        classNames = e.ClassNames
+    }));
 }
 
 @section PageStyles {
     <link rel="stylesheet" href="~/css/ERP/Exam/MarkEntry.css" asp-append-version="true" />
 }
+
+@Html.AntiForgeryToken()
 
 <div class="ec-page-shell me-page">
   <div class="ec-page-content">
@@ -14,10 +35,11 @@
     <div class="ec-page-header">
         <div class="ec-page-header-inner">
             <div class="ec-page-title-wrap">
-                
                 <div>
                     <h4 class="ec-page-title mb-1">Exam Mark Entry</h4>
-                    <div class="ec-page-subtitle">Select an exam, class and subject to enter student marks</div>
+                    <div class="ec-page-subtitle">
+                        Select an exam, class, section and subject to enter student marks@(string.IsNullOrWhiteSpace(yearName) ? "" : " · " + yearName)
+                    </div>
                 </div>
             </div>
             <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam"
@@ -27,6 +49,14 @@
         </div>
     </div>
 
+    @if (exams.Count == 0)
+    {
+        <div class="alert alert-warning" style="border-radius:12px;font-weight:700;">
+            No exams have been created for this academic year yet.
+            <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam">Create an exam schedule</a> first.
+        </div>
+    }
+
     <!-- ── ① Selector bar ───────────────────── -->
     <div class="me-selector">
         <div class="row g-3 align-items-end">
@@ -34,30 +64,24 @@
                 <span class="me-sel-label">Exam</span>
                 <select class="form-select" id="selExam">
                     <option value="">Select Exam</option>
-                    <option value="1">Annual Exam 2025–26</option>
-                    <option value="2">Mid-Term Exam 2025</option>
-                    <option value="3">Unit Test 1 — April 2026</option>
-                    <option value="4">Half Yearly 2025</option>
+                    @foreach (var e in exams)
+                    {
+                        <option value="@e.ExamId" selected="@(e.ExamId == selected)">
+                            @e.ExamName@(string.IsNullOrWhiteSpace(e.TypeLabel) ? "" : " (" + e.TypeLabel + ")")
+                        </option>
+                    }
                 </select>
             </div>
             <div class="col-6 col-sm-3 col-lg-2">
                 <span class="me-sel-label">Class</span>
                 <select class="form-select" id="selClass" disabled>
                     <option value="">Class</option>
-                    <option>1st</option><option>2nd</option><option>3rd</option>
-                    <option>4th</option><option>5th</option><option>6th</option>
-                    <option>7th</option><option>8th</option>
-                    <option value="9th" selected>9th</option>
-                    <option>10th</option><option>11th</option><option>12th</option>
                 </select>
             </div>
             <div class="col-6 col-sm-3 col-lg-2">
                 <span class="me-sel-label">Section</span>
                 <select class="form-select" id="selSection" disabled>
                     <option value="">Sec</option>
-                    <option value="A">A</option>
-                    <option value="B">B</option>
-                    <option value="C">C</option>
                 </select>
             </div>
             <div class="col-12 col-sm-6 col-lg-3">
@@ -67,7 +91,7 @@
                 </select>
             </div>
             <div class="col-12 col-sm-6 col-lg-2">
-                <button class="me-load-btn w-100" id="loadBtn" disabled>
+                <button type="button" class="me-load-btn w-100" id="loadBtn" disabled>
                     <i class="bx bx-spreadsheet"></i> Load Students
                 </button>
             </div>
@@ -78,7 +102,7 @@
     <div class="me-context" id="meContext">
         <div class="me-ctx-row">
             <span class="me-ctx-exam" id="ctxExamName">—</span>
-            <span class="me-type-badge" id="ctxTypeBadge"><i class="bx bx-award"></i> Annual</span>
+            <span class="me-type-badge" id="ctxTypeBadge"><i class="bx bx-award"></i> —</span>
             <span class="me-ctx-sub" id="ctxSub">—</span>
             <span class="me-meta-pill"><i class="bx bx-calendar"></i> <span id="ctxDate">—</span></span>
             <span class="me-meta-pill"><i class="bx bx-trophy"></i> Max: <strong id="ctxMax">—</strong></span>
@@ -147,10 +171,10 @@
         <div class="me-grid-hdr">
             <div class="me-grid-title" id="gridTitle">Student Roster</div>
             <div class="me-grid-actions">
-                <button class="me-bulk-btn" id="btnMarkAllPresent">
+                <button type="button" class="me-bulk-btn" id="btnMarkAllPresent">
                     <i class="bx bx-user-check"></i> All Present
                 </button>
-                <button class="me-bulk-btn" id="btnClearAll">
+                <button type="button" class="me-bulk-btn" id="btnClearAll">
                     <i class="bx bx-reset"></i> Clear Marks
                 </button>
             </div>
@@ -159,7 +183,13 @@
         <!-- Finalized notice -->
         <div class="me-finalized-notice" id="finalizedNotice">
             <i class="bx bx-lock-alt"></i>
-            These marks are finalized. Contact School Admin to make changes.
+            <span id="finalizedText">These marks are finalized. Contact School Admin to make changes.</span>
+            @if (isAdmin)
+            {
+                <button type="button" class="me-bulk-btn ms-auto" id="btnReopen">
+                    <i class="bx bx-lock-open-alt"></i> Unlock
+                </button>
+            }
         </div>
 
         <!-- Desktop table -->
@@ -200,10 +230,10 @@
                 <span id="barInfoText">—</span>
             </div>
             <div class="me-bar-actions">
-                <button class="btn-me-draft" id="btnDraft">
+                <button type="button" class="btn-me-draft" id="btnDraft">
                     <i class="bx bx-save"></i> Save Draft
                 </button>
-                <button class="btn-me-finalize" id="btnFinalize">
+                <button type="button" class="btn-me-finalize" id="btnFinalize">
                     <i class="bx bx-lock-alt"></i> Finalize &amp; Lock
                 </button>
             </div>
@@ -258,6 +288,23 @@ $(document).ready(function () {
 'use strict';
 
 // ── Config ────────────────────────────────────────────────────────────────
+var urls = {
+    classes: '@Url.Action("ExamClasses", "Exam", new { area = "ERP" })',
+    setup:   '@Url.Action("ClassSetup", "Exam", new { area = "ERP" })',
+    sheet:  '@Url.Action("Sheet", "Exam", new { area = "ERP" })',
+    save:   '@Url.Action("SaveMarks", "Exam", new { area = "ERP" })',
+    reopen: '@Url.Action("ReopenSheet", "Exam", new { area = "ERP" })'
+};
+
+var CAN_MANAGE = @(canManage ? "true" : "false");
+
+// Exams for this academic year, straight from the server.
+var EXAM_LIST = @Html.Raw(examsJson);
+var EXAMS = {};
+$.each(EXAM_LIST, function (i, e) { EXAMS[e.id] = e; });
+
+// Display-only grade scale. Grades are NOT stored — no configurable grade scheme
+// exists yet, so this must stay a presentation concern.
 const GRADE_SCALE = [
     { min: 91, grade: 'A+', cls: 'g-aplus' },
     { min: 81, grade: 'A',  cls: 'g-a'     },
@@ -277,206 +324,278 @@ const AVATAR_COLORS = [
     'bg-label-danger text-danger'
 ];
 
-// ── Mock exam data ────────────────────────────────────────────────────────
-const EXAMS = {
-    '1': { name: 'Annual Exam 2025–26',      type: 'Annual',    subjects: ['Mathematics','English','Hindi','Science','Social Science'] },
-    '2': { name: 'Mid-Term Exam 2025',        type: 'Mid Term',  subjects: ['Mathematics','English','Hindi','Science'] },
-    '3': { name: 'Unit Test 1 — April 2026', type: 'Unit Test', subjects: ['Mathematics','English','Science'] },
-    '4': { name: 'Half Yearly 2025',          type: 'Half Yearly', subjects: ['Mathematics','English','Hindi','Science','Social Science'] }
-};
-
-const SUBJECT_SCHEDULE = {
-    'Mathematics':    { date: '14 Jun 2026', max: 100, pass: 33 },
-    'English':        { date: '15 Jun 2026', max: 100, pass: 33 },
-    'Hindi':          { date: '16 Jun 2026', max: 100, pass: 33 },
-    'Science':        { date: '17 Jun 2026', max: 100, pass: 33 },
-    'Social Science': { date: '18 Jun 2026', max: 100, pass: 33 }
-};
-
-// Returns schedule for any subject — defaults to 100/33 for unknown ones
-function getSubjectSchedule(subject) {
-    return SUBJECT_SCHEDULE[subject] || { date: '', max: 100, pass: 33 };
-}
-
-// ── Read subjects from Subject Management (localStorage) ──────────────────
-const LS_KEY = 'educore_subjects';
-
-function getSubjectsForClass(classValue) {
-    const stored = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-    if (!Object.keys(stored).length) return null;
-
-    const num = parseInt(classValue);
-    if (!isNaN(num)) {
-        const key = 'Class ' + num;
-        if (stored[key] && stored[key].length) return stored[key];
-
-        // For Class 11/12 merge all streams (Science + Commerce + Arts)
-        if (num >= 11) {
-            const merged = new Set();
-            Object.keys(stored).forEach(function(k) {
-                if (k.toLowerCase().startsWith('class ' + num)) {
-                    stored[k].forEach(function(s) { merged.add(s); });
-                }
-            });
-            if (merged.size) return [...merged];
-        }
-    }
-    return null; // not in localStorage — caller uses fallback
-}
-
-// ── Mock student roster ───────────────────────────────────────────────────
-const STUDENTS = [
-    { id:1,  roll:'01', name:'Akash Verma',    gender:'M' },
-    { id:2,  roll:'02', name:'Priya Sharma',   gender:'F' },
-    { id:3,  roll:'03', name:'Rahul Kumar',    gender:'M' },
-    { id:4,  roll:'04', name:'Sneha Patel',    gender:'F' },
-    { id:5,  roll:'05', name:'Arjun Singh',    gender:'M' },
-    { id:6,  roll:'06', name:'Kavya Nair',     gender:'F' },
-    { id:7,  roll:'07', name:'Rohan Gupta',    gender:'M' },
-    { id:8,  roll:'08', name:'Anjali Mishra',  gender:'F' },
-    { id:9,  roll:'09', name:'Vikram Joshi',   gender:'M' },
-    { id:10, roll:'10', name:'Divya Rao',      gender:'F' },
-    { id:11, roll:'11', name:'Aditya Shah',    gender:'M' },
-    { id:12, roll:'12', name:'Meera Kapoor',   gender:'F' }
-];
+var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 // ── State ─────────────────────────────────────────────────────────────────
-let state = {
-    examId: '', className: '', section: '', subject: '',
-    maxMarks: 100, passMarks: 33,
-    rows: [],         // { studentId, marks: null|number, absent: false, finalized: false }
-    finalized: false
+var state = {
+    examId: 0, classId: 0, subjectId: 0, section: '',
+    className: '', subjectName: '', examDate: null,
+    maxMarks: 100, passMarks: 35,
+    rows: [],          // { studentId, roll, name, gender, marks, absent, hadMark }
+    finalized: false,
+    loaded: false
 };
 
+var SUBJECTS = {};     // subjectId -> { name, date, maxMarks, passMarks }
+
 // ── DOM refs ──────────────────────────────────────────────────────────────
-const selExam    = document.getElementById('selExam');
-const selClass   = document.getElementById('selClass');
-const selSection = document.getElementById('selSection');
-const selSubject = document.getElementById('selSubject');
-const loadBtn    = document.getElementById('loadBtn');
+var selExam    = document.getElementById('selExam');
+var selClass   = document.getElementById('selClass');
+var selSection = document.getElementById('selSection');
+var selSubject = document.getElementById('selSubject');
+var loadBtn    = document.getElementById('loadBtn');
 
-// ── Selector cascade ──────────────────────────────────────────────────────
-selExam.addEventListener('change', function () {
-    const examId = this.value;
-    state.examId = examId;
-    selClass.disabled   = !examId;
-    selSection.disabled = !examId;
-
-    // Reset class + subject when exam changes
-    selClass.value   = '';
-    selSubject.innerHTML = '<option value="">Select Subject</option>';
-    selSubject.disabled  = true;
-    updateLoadBtn();
-});
-
-// Subject dropdown is driven by CLASS (from Subject Management), not exam
-selClass.addEventListener('change', function () {
-    const classVal = this.value;
-    selSubject.innerHTML = '<option value="">Select Subject</option>';
-
-    if (classVal) {
-        // Try localStorage (Subject Management) first
-        const fromStorage = getSubjectsForClass(classVal);
-        // Fall back to exam's hardcoded subject list
-        const examId  = selExam.value;
-        const fallback = (examId && EXAMS[examId]) ? EXAMS[examId].subjects : [];
-        const subjects = fromStorage || fallback;
-
-        subjects.forEach(function(s) {
-            selSubject.innerHTML += `<option value="${s}">${s}</option>`;
-        });
-        selSubject.disabled = subjects.length === 0;
-    } else {
-        selSubject.disabled = true;
-    }
-    updateLoadBtn();
-});
-
-[selSection, selSubject].forEach(el => {
-    el.addEventListener('change', updateLoadBtn);
-});
-
-function updateLoadBtn() {
-    const ready = selExam.value && selClass.value && selSection.value && selSubject.value;
-    loadBtn.disabled = !ready;
+function token() {
+    return $('input[name="__RequestVerificationToken"]').first().val();
 }
 
-// ── Load students ─────────────────────────────────────────────────────────
-loadBtn.addEventListener('click', function () {
-    state.examId    = selExam.value;
-    state.className = selClass.value;
-    state.section   = selSection.value;
-    state.subject   = selSubject.value;
+// 2026-09-12 -> 12 Sep 2026
+function fmtDate(iso) {
+    if (!iso) return '—';
+    var p = String(iso).split('-');
+    if (p.length !== 3) return iso;
+    return parseInt(p[2], 10) + ' ' + MONTHS[parseInt(p[1], 10) - 1] + ' ' + p[0];
+}
+
+// 78.00 -> "78",  78.50 -> "78.5",  null -> ""
+function fmtMarks(v) {
+    if (v === null || v === undefined || v === '') return '';
+    var n = Number(v);
+    return isFinite(n) ? String(n) : '';
+}
+
+// ── Selector cascade ──────────────────────────────────────────────────────
+function clearSheet() {
+    state.rows = [];
+    state.loaded = false;
     state.finalized = false;
+    document.getElementById('meContext').style.display  = 'none';
+    document.getElementById('meSummary').style.display  = 'none';
+    document.getElementById('meBar').style.display      = 'none';
+    document.getElementById('markTableBody').innerHTML  = '';
+    document.getElementById('mobList').innerHTML        = '';
+    document.getElementById('finalizedNotice').style.display = 'none';
+    document.getElementById('meEmpty').style.display    = 'flex';
+}
 
-    const sched = getSubjectSchedule(state.subject);
-    state.maxMarks  = sched.max;
-    state.passMarks = sched.pass;
+$(selExam).on('change', function () {
+    state.examId  = EC.num(this.value);
+    state.classId = 0;
+    state.className = '';
 
-    // Build rows from mock student list
-    state.rows = STUDENTS.map(s => ({
-        studentId: s.id, roll: s.roll, name: s.name, gender: s.gender,
-        marks: null, absent: false, finalized: false
-    }));
+    resetBelowExam();
+    updateLoadBtn();
 
-    renderContext();
-    renderSummary();
-    renderGrid();
-    showUI();
+    if (!state.examId) return;
+    loadClasses(state.examId);
+});
+
+// Everything under Exam depends on the exam, so clear it in one place.
+function resetBelowExam() {
+    SUBJECTS = {};
+    selClass.innerHTML   = '<option value="">Class</option>';
+    selSection.innerHTML = '<option value="">Sec</option>';
+    selSubject.innerHTML = '<option value="">Select Subject</option>';
+    selClass.disabled    = true;
+    selSection.disabled  = true;
+    selSubject.disabled  = true;
+    clearSheet();
+}
+
+function resetBelowClass() {
+    SUBJECTS = {};
+    selSection.innerHTML = '<option value="">Sec</option>';
+    selSubject.innerHTML = '<option value="">Select Subject</option>';
+    selSection.disabled  = true;
+    selSubject.disabled  = true;
+    clearSheet();
+}
+
+// The classes this exam covers.
+function loadClasses(examId) {
+    EC.showLoader();
+    $.get(urls.classes, { examId: examId })
+        .done(function (rows) {
+            var list = rows || [];
+            $.each(list, function (i, c) {
+                selClass.innerHTML += '<option value="' + c.id + '">' + EC.esc(c.name) + '</option>';
+            });
+            selClass.disabled = list.length === 0;
+
+            if (!list.length) {
+                ecToast('error', 'This exam has no classes on its datesheet.');
+            } else if (list.length === 1) {
+                // Only one class sits it — pick it so the teacher does not have to.
+                selClass.value = String(list[0].id);
+                $(selClass).trigger('change');
+            }
+            updateLoadBtn();
+        })
+        .fail(function () {
+            ecToast('error', 'Could not load the classes for this exam. Please retry.');
+        })
+        .always(EC.hideLoader);
+}
+
+$(selClass).on('change', function () {
+    state.classId   = EC.num(this.value);
+    state.className = this.value ? $(this).find('option:selected').text().trim() : '';
+
+    resetBelowClass();
+    updateLoadBtn();
+
+    if (!state.classId) return;
+    loadSetup(state.examId, state.classId);
+});
+
+function loadSetup(examId, classId) {
+    EC.showLoader();
+    $.get(urls.setup, { examId: examId, classId: classId })
+        .done(function (d) {
+            var sections = (d && d.sections) || [];
+            var subjects = (d && d.subjects) || [];
+
+            $.each(sections, function (i, s) {
+                var label = (s.name || '(no section)') + ' (' + s.students + ')';
+                selSection.innerHTML += '<option value="' + EC.esc(s.name) + '">' + EC.esc(label) + '</option>';
+            });
+            $.each(subjects, function (i, s) {
+                SUBJECTS[s.id] = { name: s.name, date: s.date, maxMarks: s.maxMarks, passMarks: s.passMarks };
+                selSubject.innerHTML += '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
+            });
+
+            selSection.disabled = sections.length === 0;
+            selSubject.disabled = subjects.length === 0;
+
+            if (!sections.length) {
+                ecToast('error', 'No students are enrolled in this class for the exam\'s academic year.');
+            } else if (!subjects.length) {
+                ecToast('error', 'This exam has no subjects on its datesheet.');
+            }
+            updateLoadBtn();
+        })
+        .fail(function () {
+            ecToast('error', 'Could not load the exam. Please retry.');
+        })
+        .always(EC.hideLoader);
+}
+
+$(selSection).on('change', function () { clearSheet(); updateLoadBtn(); });
+$(selSubject).on('change', function () { clearSheet(); updateLoadBtn(); });
+
+function updateLoadBtn() {
+    loadBtn.disabled = !(selExam.value && selClass.value && selSection.value !== '' && selSubject.value);
+}
+
+// ── Load the sheet ────────────────────────────────────────────────────────
+$(loadBtn).on('click', function () {
+    var $btn = $(this);
+    state.examId    = EC.num(selExam.value);
+    state.classId   = EC.num(selClass.value);
+    state.subjectId = EC.num(selSubject.value);
+    state.section   = selSection.value;
+
+    EC.buttonBusy($btn, 'Loading…');
+    $.get(urls.sheet, {
+        examId:    state.examId,
+        classId:   state.classId,
+        subjectId: state.subjectId,
+        section:   state.section
+    })
+        .done(function (d) {
+            if (!d || !d.success) {
+                ecToast('error', (d && d.message) || 'Could not load the sheet.');
+                return;
+            }
+
+            state.maxMarks    = EC.num(d.maxMarks) || 100;
+            state.passMarks   = EC.num(d.passMarks);
+            state.examDate    = d.examDate;
+            state.subjectName = d.subjectName;
+            state.finalized   = !!d.isFinalized;
+
+            state.rows = $.map(d.students || [], function (s) {
+                return {
+                    studentId: s.id,
+                    roll:      s.roll || '',
+                    name:      s.name,
+                    gender:    s.gender || '',
+                    marks:     (s.marks === null || s.marks === undefined) ? null : Number(s.marks),
+                    absent:    !!s.absent,
+                    hadMark:   !!s.hasMark
+                };
+            });
+            state.loaded = true;
+
+            if (!state.rows.length) {
+                clearSheet();
+                document.getElementById('meEmpty').querySelector('.me-empty-title').textContent = 'No students in this section';
+                document.getElementById('meEmpty').querySelector('.me-empty-sub').textContent =
+                    'Nobody is enrolled in this class and section for the exam\'s academic year.';
+                document.getElementById('meGridCard').style.display = 'block';
+                return;
+            }
+
+            renderContext();
+            renderSummary();
+            renderGrid();
+            showUI();
+        })
+        .fail(function () {
+            ecToast('error', 'Could not load the sheet. Please retry.');
+        })
+        .always(function () { EC.buttonReset($btn); });
 });
 
 // ── Render context banner ─────────────────────────────────────────────────
 function renderContext() {
-    const exam  = EXAMS[state.examId];
-    const sched = SUBJECT_SCHEDULE[state.subject] || {};
+    var exam = EXAMS[state.examId] || {};
+    var sectionLabel = state.section ? ' – ' + state.section : '';
 
-    document.getElementById('ctxExamName').textContent = exam ? exam.name : '—';
+    document.getElementById('ctxExamName').textContent = exam.name || '—';
     document.getElementById('ctxTypeBadge').innerHTML  =
-        `<i class="bx bx-award"></i> ${exam ? exam.type : '—'}`;
+        '<i class="bx bx-award"></i> ' + EC.esc(exam.typeLabel || '—');
     document.getElementById('ctxSub').textContent =
-        `${state.subject} · Class ${state.className} – ${state.section}`;
-    document.getElementById('ctxDate').textContent = sched.date || '—';
-    document.getElementById('ctxMax').textContent  = state.maxMarks;
-    document.getElementById('ctxPass').textContent = state.passMarks;
-    document.getElementById('thMax').textContent   = `/ ${state.maxMarks}`;
+        state.subjectName + ' · ' + state.className + sectionLabel;
+    document.getElementById('ctxDate').textContent = fmtDate(state.examDate);
+    document.getElementById('ctxMax').textContent  = fmtMarks(state.maxMarks);
+    document.getElementById('ctxPass').textContent = fmtMarks(state.passMarks);
+    document.getElementById('thMax').textContent   = '/ ' + fmtMarks(state.maxMarks);
 
     updateProgress();
 
-    // Modal preview
-    document.getElementById('modalExamDesc').textContent =
-        exam ? exam.name : '—';
+    document.getElementById('modalExamDesc').textContent = exam.name || '—';
     document.getElementById('modalSubDesc').textContent  =
-        `${state.subject} · Class ${state.className} – ${state.section}`;
+        state.subjectName + ' · ' + state.className + sectionLabel;
 }
 
 function updateProgress() {
-    const total   = state.rows.length;
-    const marked  = state.rows.filter(r => r.absent || r.marks !== null).length;
-    const pct     = total ? Math.round(marked / total * 100) : 0;
+    var total  = state.rows.length;
+    var marked = state.rows.filter(function (r) { return r.absent || r.marks !== null; }).length;
+    var pct    = total ? Math.round(marked / total * 100) : 0;
 
     document.getElementById('ctxProgressBar').style.width  = pct + '%';
-    document.getElementById('ctxProgressLabel').textContent =
-        `${marked} / ${total} students marked`;
+    document.getElementById('ctxProgressLabel').textContent = marked + ' / ' + total + ' students marked';
 
-    const statusEl = document.getElementById('ctxStatus');
-    let cls = 'ms-pending', label = 'Pending';
+    var statusEl = document.getElementById('ctxStatus');
+    var cls = 'ms-pending', label = 'Pending';
     if (state.finalized) { cls = 'ms-finalized'; label = 'Finalized'; }
     else if (marked === total && total > 0) { cls = 'ms-completed'; label = 'Completed'; }
     else if (marked > 0) { cls = 'ms-progress'; label = 'In Progress'; }
-    statusEl.className = `me-status-badge ${cls}`;
+    statusEl.className = 'me-status-badge ' + cls;
     statusEl.textContent = label;
 }
 
 // ── Render summary strip ──────────────────────────────────────────────────
 function renderSummary() {
-    const rows    = state.rows;
-    const absent  = rows.filter(r => r.absent).length;
-    const present = rows.filter(r => !r.absent).length;
-    const withMarks = rows.filter(r => !r.absent && r.marks !== null);
-    const pending   = rows.filter(r => !r.absent && r.marks === null).length;
-    const scores  = withMarks.map(r => r.marks);
-    const pass    = withMarks.filter(r => r.marks >= state.passMarks).length;
-    const fail    = withMarks.filter(r => r.marks < state.passMarks).length;
+    var rows      = state.rows;
+    var absent    = rows.filter(function (r) { return r.absent; }).length;
+    var present   = rows.length - absent;
+    var withMarks = rows.filter(function (r) { return !r.absent && r.marks !== null; });
+    var pending   = rows.filter(function (r) { return !r.absent && r.marks === null; }).length;
+    var scores    = withMarks.map(function (r) { return r.marks; });
+    var pass      = withMarks.filter(function (r) { return r.marks >= state.passMarks; }).length;
+    var fail      = withMarks.length - pass;
 
     document.getElementById('sumPresent').textContent = present;
     document.getElementById('sumAbsent').textContent  = absent;
@@ -485,10 +604,13 @@ function renderSummary() {
     document.getElementById('sumFail').textContent    = fail;
 
     if (scores.length) {
-        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-        document.getElementById('sumAvg').textContent  = avg.toFixed(1) + '%';
-        document.getElementById('sumHigh').textContent = Math.max(...scores);
-        document.getElementById('sumLow').textContent  = Math.min(...scores);
+        var sum = scores.reduce(function (a, b) { return a + b; }, 0);
+        // Percentage of the paper's max, not of 100 — a 50-mark paper must not
+        // read as half the average it really is.
+        var avgPct = (sum / scores.length) / state.maxMarks * 100;
+        document.getElementById('sumAvg').textContent  = avgPct.toFixed(1) + '%';
+        document.getElementById('sumHigh').textContent = fmtMarks(Math.max.apply(null, scores));
+        document.getElementById('sumLow').textContent  = fmtMarks(Math.min.apply(null, scores));
     } else {
         document.getElementById('sumAvg').textContent  = '—';
         document.getElementById('sumHigh').textContent = '—';
@@ -499,115 +621,121 @@ function renderSummary() {
 // ── Compute grade ─────────────────────────────────────────────────────────
 function getGradeInfo(marks, max, pass) {
     if (marks === null) return { pct: null, grade: '—', cls: 'g-ab', result: 'pending' };
-    const pct = Math.round(marks / max * 100);
-    if (marks < pass) return { pct, grade: 'F', cls: 'g-f', result: 'fail' };
-    const found = GRADE_SCALE.find(g => pct >= g.min);
-    return { pct, grade: found ? found.grade : 'F', cls: found ? found.cls : 'g-f', result: 'pass' };
+    var pct = Math.round(marks / max * 100);
+    if (marks < pass) return { pct: pct, grade: 'F', cls: 'g-f', result: 'fail' };
+    var found = GRADE_SCALE.find(function (g) { return pct >= g.min; });
+    return { pct: pct, grade: found ? found.grade : 'F', cls: found ? found.cls : 'g-f', result: 'pass' };
 }
+
+function rowInfo(row) {
+    return row.absent
+        ? { pct: null, grade: 'AB', cls: 'g-ab', result: 'abs' }
+        : getGradeInfo(row.marks, state.maxMarks, state.passMarks);
+}
+
+function initialsOf(name) {
+    return String(name || '?').split(' ')
+        .map(function (p) { return p[0]; })
+        .slice(0, 2).join('').toUpperCase();
+}
+
+function resultHtml(gi) {
+    if (gi.result === 'abs')  return '<span class="me-result r-abs">ABS</span>';
+    if (gi.result === 'pass') return '<span class="me-result r-pass"><i class="bx bx-check"></i> PASS</span>';
+    if (gi.result === 'fail') return '<span class="me-result r-fail"><i class="bx bx-x"></i> FAIL</span>';
+    return '<span style="color:var(--ec-text-muted);font-size:.78rem;font-weight:700;">—</span>';
+}
+
+// Marks and the absent toggle are locked once the sheet is finalized, and for
+// anyone without exams.manage.
+function locked() { return state.finalized || !CAN_MANAGE; }
 
 // ── Render desktop table row ──────────────────────────────────────────────
 function buildTableRow(row, idx) {
-    const gi   = row.absent ? { pct: null, grade: 'AB', cls: 'g-ab', result: 'abs' } : getGradeInfo(row.marks, state.maxMarks, state.passMarks);
-    const pct  = row.absent ? '—' : (gi.pct !== null ? gi.pct + '%' : '—');
-    const avCol = AVATAR_COLORS[idx % AVATAR_COLORS.length];
-    const initials = row.name.split(' ').map(p => p[0]).slice(0,2).join('').toUpperCase();
+    var gi  = rowInfo(row);
+    var pct = row.absent ? '—' : (gi.pct !== null ? gi.pct + '%' : '—');
+    var avCol = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+    var rowCls = row.absent ? 'me-row-abs' : (gi.result === 'pass' ? 'me-row-pass' : gi.result === 'fail' ? 'me-row-fail' : '');
+    var ro  = (locked() || row.absent) ? 'readonly' : '';
+    var dis = locked() ? 'disabled' : '';
 
-    const rowCls = row.absent ? 'me-row-abs' : (gi.result === 'pass' ? 'me-row-pass' : gi.result === 'fail' ? 'me-row-fail' : '');
-    const marksVal = row.absent ? 'AB' : (row.marks !== null ? row.marks : '');
-    const readonly = state.finalized ? 'readonly' : '';
-    const disabledAbs = state.finalized ? 'disabled' : '';
-
-    const resultHtml = row.absent
-        ? `<span class="me-result r-abs">ABS</span>`
-        : gi.result === 'pass'
-        ? `<span class="me-result r-pass"><i class="bx bx-check"></i> PASS</span>`
-        : gi.result === 'fail'
-        ? `<span class="me-result r-fail"><i class="bx bx-x"></i> FAIL</span>`
-        : `<span style="color:var(--ec-text-muted);font-size:.78rem;font-weight:700;">—</span>`;
-
-    return `<tr class="${rowCls}" data-idx="${idx}" data-id="${row.studentId}">
-        <td><span style="font-weight:800;color:var(--ec-text-muted);">${row.roll}</span></td>
-        <td>
-            <div class="d-flex align-items-center gap-2">
-                <div class="me-av ${avCol}">${initials}</div>
-                <div>
-                    <div class="me-nm">${row.name}</div>
-                    <div class="me-rl">${row.gender === 'M' ? 'Male' : 'Female'}</div>
-                </div>
-            </div>
-        </td>
-        <td style="text-align:center;">
-            <label class="me-abs-toggle">
-                <input type="checkbox" class="abs-chk" data-idx="${idx}" ${row.absent?'checked':''} ${disabledAbs}>
-                <span class="me-abs-slider"></span>
-            </label>
-        </td>
-        <td style="text-align:center;">
-            <input type="number" class="me-marks-inp marks-inp"
-                   data-idx="${idx}" min="0" max="${state.maxMarks}"
-                   value="${row.absent ? '' : (row.marks !== null ? row.marks : '')}"
-                   placeholder="—"
-                   ${row.absent ? 'readonly' : readonly}
-                   tabindex="${row.absent ? -1 : 0}">
-        </td>
-        <td style="text-align:center;font-weight:800;color:var(--ec-text-muted);font-size:.84rem;">${pct}</td>
-        <td style="text-align:center;"><span class="me-grade ${gi.cls}">${row.absent ? 'AB' : gi.grade}</span></td>
-        <td style="text-align:center;">${resultHtml}</td>
-    </tr>`;
+    return '<tr class="' + rowCls + '" data-idx="' + idx + '" data-id="' + row.studentId + '">' +
+        '<td><span style="font-weight:800;color:var(--ec-text-muted);">' + EC.esc(row.roll) + '</span></td>' +
+        '<td>' +
+            '<div class="d-flex align-items-center gap-2">' +
+                '<div class="me-av ' + avCol + '">' + EC.esc(initialsOf(row.name)) + '</div>' +
+                '<div>' +
+                    '<div class="me-nm">' + EC.esc(row.name) + '</div>' +
+                    '<div class="me-rl">' + EC.esc(row.gender || '') + '</div>' +
+                '</div>' +
+            '</div>' +
+        '</td>' +
+        '<td style="text-align:center;">' +
+            '<label class="me-abs-toggle">' +
+                '<input type="checkbox" class="abs-chk" data-idx="' + idx + '" ' + (row.absent ? 'checked' : '') + ' ' + dis + '>' +
+                '<span class="me-abs-slider"></span>' +
+            '</label>' +
+        '</td>' +
+        '<td style="text-align:center;">' +
+            '<input type="number" class="me-marks-inp marks-inp" data-idx="' + idx + '" ' +
+                   'min="0" max="' + state.maxMarks + '" step="0.5" placeholder="—" ' +
+                   'value="' + (row.absent ? '' : fmtMarks(row.marks)) + '" ' + ro + '>' +
+        '</td>' +
+        '<td style="text-align:center;font-weight:800;color:var(--ec-text-muted);font-size:.84rem;">' + pct + '</td>' +
+        '<td style="text-align:center;"><span class="me-grade ' + gi.cls + '">' + (row.absent ? 'AB' : gi.grade) + '</span></td>' +
+        '<td style="text-align:center;">' + resultHtml(gi) + '</td>' +
+        '</tr>';
 }
 
 // ── Render mobile card ────────────────────────────────────────────────────
 function buildMobCard(row, idx) {
-    const gi   = row.absent ? { pct: null, grade: 'AB', cls: 'g-ab', result: 'abs' } : getGradeInfo(row.marks, state.maxMarks, state.passMarks);
-    const avCol = AVATAR_COLORS[idx % AVATAR_COLORS.length];
-    const initials = row.name.split(' ').map(p => p[0]).slice(0,2).join('').toUpperCase();
-    const mobCls = row.absent ? 'mob-abs' : (gi.result === 'pass' ? 'mob-pass' : gi.result === 'fail' ? 'mob-fail' : '');
-    const readonly = state.finalized ? 'readonly' : '';
-    const disabledAbs = state.finalized ? 'disabled' : '';
+    var gi = rowInfo(row);
+    var avCol = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+    var mobCls = row.absent ? 'mob-abs' : (gi.result === 'pass' ? 'mob-pass' : gi.result === 'fail' ? 'mob-fail' : '');
+    var ro  = (locked() || row.absent) ? 'readonly' : '';
+    var dis = locked() ? 'disabled' : '';
 
-    return `<div class="me-mob-card ${mobCls}" data-idx="${idx}">
-        <div class="me-mob-top">
-            <div class="me-av ${avCol}">${initials}</div>
-            <div class="flex-grow-1">
-                <div class="me-nm">${row.name}</div>
-                <div class="me-rl">Roll: ${row.roll} · ${row.gender === 'M' ? 'Male' : 'Female'}</div>
-            </div>
-            <span class="me-grade ${gi.cls}" style="flex-shrink:0;">${row.absent ? 'AB' : gi.grade}</span>
-        </div>
-        <div class="me-mob-inp-row">
-            <div>
-                <span class="me-mob-inp-lbl">Absent</span>
-                <label class="me-abs-toggle">
-                    <input type="checkbox" class="abs-chk" data-idx="${idx}" ${row.absent?'checked':''} ${disabledAbs}>
-                    <span class="me-abs-slider"></span>
-                </label>
-            </div>
-            <div>
-                <span class="me-mob-inp-lbl">Marks / ${state.maxMarks}</span>
-                <input type="number" class="me-marks-inp marks-inp"
-                       data-idx="${idx}" min="0" max="${state.maxMarks}"
-                       value="${row.absent ? '' : (row.marks !== null ? row.marks : '')}"
-                       placeholder="—"
-                       style="width:90px;"
-                       ${row.absent ? 'readonly' : readonly}>
-            </div>
-            ${!row.absent && gi.pct !== null ? `<div>
-                <span class="me-mob-inp-lbl">%</span>
-                <span style="font-size:.95rem;font-weight:900;color:var(--ec-text-dark);">${gi.pct}%</span>
-            </div>` : ''}
-        </div>
-    </div>`;
+    return '<div class="me-mob-card ' + mobCls + '" data-idx="' + idx + '">' +
+        '<div class="me-mob-top">' +
+            '<div class="me-av ' + avCol + '">' + EC.esc(initialsOf(row.name)) + '</div>' +
+            '<div class="flex-grow-1">' +
+                '<div class="me-nm">' + EC.esc(row.name) + '</div>' +
+                '<div class="me-rl">Roll: ' + EC.esc(row.roll) + (row.gender ? ' · ' + EC.esc(row.gender) : '') + '</div>' +
+            '</div>' +
+            '<span class="me-grade ' + gi.cls + '" style="flex-shrink:0;">' + (row.absent ? 'AB' : gi.grade) + '</span>' +
+        '</div>' +
+        '<div class="me-mob-inp-row">' +
+            '<div>' +
+                '<span class="me-mob-inp-lbl">Absent</span>' +
+                '<label class="me-abs-toggle">' +
+                    '<input type="checkbox" class="abs-chk" data-idx="' + idx + '" ' + (row.absent ? 'checked' : '') + ' ' + dis + '>' +
+                    '<span class="me-abs-slider"></span>' +
+                '</label>' +
+            '</div>' +
+            '<div>' +
+                '<span class="me-mob-inp-lbl">Marks / ' + fmtMarks(state.maxMarks) + '</span>' +
+                '<input type="number" class="me-marks-inp marks-inp" data-idx="' + idx + '" ' +
+                       'min="0" max="' + state.maxMarks + '" step="0.5" placeholder="—" style="width:90px;" ' +
+                       'value="' + (row.absent ? '' : fmtMarks(row.marks)) + '" ' + ro + '>' +
+            '</div>' +
+            (!row.absent && gi.pct !== null
+                ? '<div><span class="me-mob-inp-lbl">%</span>' +
+                  '<span style="font-size:.95rem;font-weight:900;color:var(--ec-text-dark);">' + gi.pct + '%</span></div>'
+                : '') +
+        '</div>' +
+        '</div>';
 }
 
 // ── Render full grid ──────────────────────────────────────────────────────
 function renderGrid() {
-    const tbody   = document.getElementById('markTableBody');
-    const mobList = document.getElementById('mobList');
-    const empty   = document.getElementById('meEmpty');
-    const fin     = document.getElementById('finalizedNotice');
-    const title   = document.getElementById('gridTitle');
+    var tbody   = document.getElementById('markTableBody');
+    var mobList = document.getElementById('mobList');
+    var empty   = document.getElementById('meEmpty');
+    var fin     = document.getElementById('finalizedNotice');
+    var title   = document.getElementById('gridTitle');
 
-    title.textContent = `${state.className} – ${state.section} · ${state.subject} (${state.rows.length} students)`;
+    title.textContent = state.className + (state.section ? ' – ' + state.section : '') +
+                        ' · ' + state.subjectName + ' (' + state.rows.length + ' students)';
 
     if (state.rows.length === 0) {
         tbody.innerHTML = '';
@@ -617,10 +745,16 @@ function renderGrid() {
     }
     empty.style.display = 'none';
 
-    tbody.innerHTML   = state.rows.map((r, i) => buildTableRow(r, i)).join('');
-    mobList.innerHTML = state.rows.map((r, i) => buildMobCard(r, i)).join('');
+    tbody.innerHTML   = state.rows.map(buildTableRow).join('');
+    mobList.innerHTML = state.rows.map(buildMobCard).join('');
 
     fin.style.display = state.finalized ? 'flex' : 'none';
+
+    var lock = locked();
+    document.getElementById('btnDraft').disabled          = lock;
+    document.getElementById('btnFinalize').disabled       = lock;
+    document.getElementById('btnMarkAllPresent').disabled = lock;
+    document.getElementById('btnClearAll').disabled       = lock;
 
     attachRowEvents();
     updateProgress();
@@ -629,95 +763,78 @@ function renderGrid() {
 
 // ── Attach events to rows ─────────────────────────────────────────────────
 function attachRowEvents() {
-    // Absent toggles
-    document.querySelectorAll('.abs-chk').forEach(chk => {
-        chk.addEventListener('change', function () {
-            const idx = parseInt(this.dataset.idx);
-            state.rows[idx].absent = this.checked;
-            if (this.checked) state.rows[idx].marks = null;
-            renderGrid();
-            renderSummary();
-        });
+    $('.abs-chk').on('change', function () {
+        var idx = parseInt(this.dataset.idx, 10);
+        state.rows[idx].absent = this.checked;
+        if (this.checked) state.rows[idx].marks = null;
+        renderGrid();
+        renderSummary();
     });
 
-    // Marks inputs
-    document.querySelectorAll('.marks-inp').forEach(inp => {
-        inp.addEventListener('input', function () {
-            const idx = parseInt(this.dataset.idx);
-            const raw = this.value.trim();
-            const val = raw === '' ? null : Math.min(parseInt(raw) || 0, state.maxMarks);
+    $('.marks-inp').on('input', function () {
+        var idx = parseInt(this.dataset.idx, 10);
+        var raw = this.value.trim();
+        var val = raw === '' ? null : Number(raw);
 
-            // Clamp visually
-            if (val !== null && val < 0)              this.value = 0;
-            if (val !== null && val > state.maxMarks) this.value = state.maxMarks;
+        if (val !== null && (!isFinite(val) || val < 0)) { val = 0; this.value = 0; }
+        if (val !== null && val > state.maxMarks) { val = state.maxMarks; this.value = state.maxMarks; }
 
-            state.rows[idx].marks = val;
-            this.classList.toggle('inp-error', val !== null && val < 0);
+        state.rows[idx].marks = val;
 
-            // Update just this row without full re-render
-            refreshRow(idx);
-            renderSummary();
-            updateProgress();
-            updateBarInfo();
-        });
+        refreshRow(idx);
+        renderSummary();
+        updateProgress();
+        updateBarInfo();
+    });
 
-        // Tab / Enter moves to next input
-        inp.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' || e.key === 'Tab') {
-                e.preventDefault();
-                const all  = Array.from(document.querySelectorAll('.marks-inp:not([readonly])'));
-                const cur  = all.indexOf(this);
-                const next = all[cur + 1];
-                if (next) next.focus();
-            }
-        });
+    // Enter / Tab moves to the next enterable box
+    $('.marks-inp').on('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            var all  = $('.marks-inp:not([readonly]):visible').toArray();
+            var next = all[all.indexOf(this) + 1];
+            if (next) next.focus();
+        }
     });
 }
 
 // ── Refresh a single row (no full re-render) ──────────────────────────────
 function refreshRow(idx) {
-    const row = state.rows[idx];
-    const gi  = row.absent ? { pct: null, grade: 'AB', cls: 'g-ab', result: 'abs' } : getGradeInfo(row.marks, state.maxMarks, state.passMarks);
+    var row = state.rows[idx];
+    var gi  = rowInfo(row);
 
-    // Desktop
-    const tr = document.querySelector(`#markTableBody tr[data-idx="${idx}"]`);
+    var tr = document.querySelector('#markTableBody tr[data-idx="' + idx + '"]');
     if (tr) {
         tr.className = row.absent ? 'me-row-abs' : (gi.result === 'pass' ? 'me-row-pass' : gi.result === 'fail' ? 'me-row-fail' : '');
-        const cells = tr.querySelectorAll('td');
-        const pct = row.absent ? '—' : (gi.pct !== null ? gi.pct + '%' : '—');
-        cells[4].textContent = pct;
-        cells[5].innerHTML = `<span class="me-grade ${gi.cls}">${row.absent ? 'AB' : gi.grade}</span>`;
-        cells[6].innerHTML = row.absent
-            ? `<span class="me-result r-abs">ABS</span>`
-            : gi.result === 'pass'
-            ? `<span class="me-result r-pass"><i class="bx bx-check"></i> PASS</span>`
-            : gi.result === 'fail'
-            ? `<span class="me-result r-fail"><i class="bx bx-x"></i> FAIL</span>`
-            : `<span style="color:var(--ec-text-muted);font-size:.78rem;font-weight:700;">—</span>`;
+        var cells = tr.querySelectorAll('td');
+        cells[4].textContent = row.absent ? '—' : (gi.pct !== null ? gi.pct + '%' : '—');
+        cells[5].innerHTML = '<span class="me-grade ' + gi.cls + '">' + (row.absent ? 'AB' : gi.grade) + '</span>';
+        cells[6].innerHTML = resultHtml(gi);
     }
 
-    // Mobile
-    const mc = document.querySelector(`#mobList .me-mob-card[data-idx="${idx}"]`);
+    var mc = document.querySelector('#mobList .me-mob-card[data-idx="' + idx + '"]');
     if (mc) {
-        mc.className = `me-mob-card ${row.absent ? 'mob-abs' : gi.result === 'pass' ? 'mob-pass' : gi.result === 'fail' ? 'mob-fail' : ''}`;
-        const gradeEl = mc.querySelector('.me-grade');
-        if (gradeEl) { gradeEl.className = `me-grade ${gi.cls}`; gradeEl.textContent = row.absent ? 'AB' : gi.grade; }
+        mc.className = 'me-mob-card ' + (row.absent ? 'mob-abs' : gi.result === 'pass' ? 'mob-pass' : gi.result === 'fail' ? 'mob-fail' : '');
+        var gradeEl = mc.querySelector('.me-grade');
+        if (gradeEl) { gradeEl.className = 'me-grade ' + gi.cls; gradeEl.textContent = row.absent ? 'AB' : gi.grade; }
     }
 }
 
 // ── Bulk actions ──────────────────────────────────────────────────────────
-document.getElementById('btnMarkAllPresent').addEventListener('click', function () {
-    state.rows.forEach(r => { r.absent = false; });
+$('#btnMarkAllPresent').on('click', function () {
+    state.rows.forEach(function (r) { r.absent = false; });
     renderGrid();
     renderSummary();
 });
 
-document.getElementById('btnClearAll').addEventListener('click', function () {
-    EC.confirm({ title: 'Clear all entered marks?', icon: 'bx-eraser',
-                 message: 'Every mark on this sheet will be cleared. This cannot be undone.',
-                 okText: 'Clear marks' }).then(function (ok) {
+$('#btnClearAll').on('click', function () {
+    EC.confirm({
+        title:   'Clear all entered marks?',
+        message: 'Every mark on this sheet will be cleared. You still have to save for it to take effect.',
+        okText:  'Clear marks'
+    }).then(function (ok) {
         if (!ok) return;
-        state.rows.forEach(r => { r.marks = null; r.absent = false; });
+        state.rows.forEach(function (r) { r.marks = null; r.absent = false; });
         renderGrid();
         renderSummary();
         updateProgress();
@@ -735,75 +852,127 @@ function showUI() {
 
 // ── Bar info text ─────────────────────────────────────────────────────────
 function updateBarInfo() {
-    const exam = EXAMS[state.examId];
-    const total = state.rows.length;
-    const marked = state.rows.filter(r => r.absent || r.marks !== null).length;
+    var exam   = EXAMS[state.examId] || {};
+    var total  = state.rows.length;
+    var marked = state.rows.filter(function (r) { return r.absent || r.marks !== null; }).length;
     document.getElementById('barInfoText').innerHTML =
-        `<strong>${exam ? exam.name : ''}</strong> · ${state.subject} · ${state.className} – ${state.section} · ${marked}/${total} marked`;
+        '<strong>' + EC.esc(exam.name || '') + '</strong> · ' + EC.esc(state.subjectName) + ' · ' +
+        EC.esc(state.className + (state.section ? ' – ' + state.section : '')) + ' · ' + marked + '/' + total + ' marked';
 }
 
-// ── Save draft ────────────────────────────────────────────────────────────
-document.getElementById('btnDraft').addEventListener('click', function () {
-    // In production: POST to SaveMarks with action=draft
-    ecToast('success', 'Marks saved as draft.');
+// ── Save ──────────────────────────────────────────────────────────────────
+// Send a row when it carries something, or when it already had a saved row —
+// otherwise clearing a mark could never be persisted.
+function collectItems() {
+    var out = [];
+    state.rows.forEach(function (r) {
+        if (!r.absent && r.marks === null && !r.hadMark) return;
+        out.push({ studentId: r.studentId, marks: r.absent ? null : r.marks, absent: r.absent });
+    });
+    return out;
+}
+
+function postSheet($btn, finalize) {
+    EC.buttonBusy($btn, finalize ? 'Finalizing…' : 'Saving…');
+
+    return $.ajax({
+        url: urls.save,
+        type: 'POST',
+        contentType: 'application/json',
+        headers: { 'RequestVerificationToken': token() },
+        data: JSON.stringify({
+            examId:          state.examId,
+            academicClassId: state.classId,
+            subjectId:       state.subjectId,
+            section:         state.section,
+            finalize:        finalize,
+            items:           collectItems()
+        })
+    })
+    .done(function (d) {
+        if (!d || !d.success) {
+            ecToast('error', (d && d.message) || 'Could not save the marks.');
+            return;
+        }
+        ecToast('success', d.message || 'Marks saved.');
+
+        // Reload from the server so the sheet reflects exactly what was stored
+        // (finalize turns blanks into Absent server-side).
+        loadBtn.click();
+    })
+    .fail(function () {
+        ecToast('error', 'Could not save the marks. Please retry.');
+    })
+    .always(function () { EC.buttonReset($btn); });
+}
+
+$('#btnDraft').on('click', function () {
+    postSheet($(this), false);
 });
 
-// ── Finalize ──────────────────────────────────────────────────────────────
-document.getElementById('btnFinalize').addEventListener('click', function () {
-    const pending = state.rows.filter(r => !r.absent && r.marks === null).length;
-    const warn    = document.getElementById('modalPendingWarn');
-    const cnt     = document.getElementById('modalPendingCount');
+$('#btnFinalize').on('click', function () {
+    var pending = state.rows.filter(function (r) { return !r.absent && r.marks === null; }).length;
+    var warn = document.getElementById('modalPendingWarn');
+
     if (pending > 0) {
         warn.classList.remove('d-none');
-        cnt.textContent = pending;
+        document.getElementById('modalPendingCount').textContent = pending;
     } else {
         warn.classList.add('d-none');
     }
-    const modal = new bootstrap.Modal(document.getElementById('finalizeModal'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('finalizeModal')).show();
 });
 
-document.getElementById('confirmFinalizeBtn').addEventListener('click', function () {
-    // Mark absent any student with null marks
-    state.rows.forEach(r => { if (!r.absent && r.marks === null) r.absent = true; });
-    state.finalized = true;
-
+$('#confirmFinalizeBtn').on('click', function () {
     bootstrap.Modal.getInstance(document.getElementById('finalizeModal')).hide();
-
-    renderGrid();
-    renderSummary();
-    updateProgress();
-
-    // Disable action buttons
-    document.getElementById('btnDraft').disabled    = true;
-    document.getElementById('btnFinalize').disabled = true;
-    document.getElementById('btnMarkAllPresent').disabled = true;
-    document.getElementById('btnClearAll').disabled = true;
-
-    ecToast('success', 'Marks finalized and locked successfully.');
+    postSheet($('#btnFinalize'), true);
 });
 
-// ── Toast (unified — routes through the app-wide ecToast/toastr) ────────────
-// Post-redirect flash messages are handled globally by _Scripts.cshtml.
+// ── Unlock a finalized sheet (school admin only; the server checks too) ────
+$('#btnReopen').on('click', function () {
+    var $btn = $(this);
 
-// ── Auto-load defaults so mock data shows immediately ─────────────────────
-(function autoLoad() {
-    selExam.value = '1';
-    selExam.dispatchEvent(new Event('change'));
+    EC.confirm({
+        title:   'Unlock this sheet?',
+        name:    state.subjectName + ' · ' + state.className + (state.section ? ' – ' + state.section : ''),
+        message: 'The teacher will be able to edit these marks again.',
+        okText:  'Unlock sheet',
+        danger:  false
+    }).then(function (ok) {
+        if (!ok) return;
 
-    selClass.value = '9th';
-    selClass.dispatchEvent(new Event('change')); // populates subjects from localStorage
+        EC.buttonBusy($btn);
+        $.ajax({
+            url: urls.reopen,
+            type: 'POST',
+            headers: { 'RequestVerificationToken': token() },
+            data: {
+                examId:    state.examId,
+                classId:   state.classId,
+                subjectId: state.subjectId,
+                section:   state.section
+            }
+        })
+        .done(function (d) {
+            if (!d || !d.success) {
+                ecToast('error', (d && d.message) || 'Could not unlock the sheet.');
+                return;
+            }
+            ecToast('success', d.message || 'Sheet reopened.');
+            loadBtn.click();
+        })
+        .fail(function () {
+            ecToast('error', 'Could not unlock the sheet. Please retry.');
+        })
+        .always(function () { EC.buttonReset($btn); });
+    });
+});
 
-    selSection.value = 'A';
-
-    // Pick Mathematics if available, otherwise first subject in list
-    setTimeout(function () {
-        const opts = Array.from(selSubject.options).map(function(o) { return o.value; }).filter(Boolean);
-        selSubject.value = opts.includes('Mathematics') ? 'Mathematics' : (opts[0] || '');
-        updateLoadBtn();
-        if (selSubject.value) loadBtn.click();
-    }, 0);
-})();
+// ── Init ──────────────────────────────────────────────────────────────────
+// An exam preselected in the query string (e.g. from the schedule page) loads
+// its sections and subjects straight away.
+if (selExam.value) $(selExam).trigger('change');
+updateLoadBtn();
 
 }); // end $(document).ready
 </script>

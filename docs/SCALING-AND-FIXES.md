@@ -873,6 +873,185 @@ un-scoped ledger rather than opening a per-session balance.
 
 ---
 
+### [2026-08-19] Exam Schedule — the Create Exam page was a mock-up; it now has a backend
+
+**Files changed**
+- `EduCoreDataAccessLayer/Database/exam_schedule.sql` (new — `academic.exams`, `academic.exam_subjects`, `sp_school_admin_exam_manage`, two more `ExamType` lookup rows)
+- `EduCoreDataAccessLayer/Models/ERP/ExamModel.cs` (new)
+- `EduCoreDataAccessLayer/Services/{Contract,Repository}/ERP/*ExamService*` (new)
+- `educore/Program.cs` (register `IExamService`)
+- `educore/Areas/ERP/Controllers/ExamController.cs`
+- `educore/Areas/ERP/Views/Exam/CreateExam.cshtml` · `wwwroot/css/ERP/Exam/CreateExam.css`
+
+**What it was.** `CreateExam.cshtml` read its class list and subject rows from
+`localStorage['educore_subjects']` — a store nothing has written since Subject Management
+moved to `academic.class_subjects` — with a hard-coded `fallbackMap` of class and subject
+names behind it. The academic year was the literal string `"2025 – 2026"`, sections were a
+hard-coded `A–E`, exam types were a 5-card picker whose labels exist nowhere else in the app,
+and Save did `console.log(payload)` followed by a success toast. The controller had no
+service injected.
+
+**Scope: an exam belongs to a class, not a class-section.** Every section of the class sits
+the same paper on the same date, which is how schools actually publish a datesheet; Marks
+Entry picks the section. That removed the Section step and its whole failure mode (a
+hard-coded section list that had no relationship to `academic_class_sections`).
+
+**Reused rather than rebuilt.** Three existing services already held what the page needed, so
+the only new SQL is the exam tables themselves:
+- classes → `ISubjectService.GetClassesAsync` (current year's classes with a subject count)
+- the datesheet's subject rows → `ISubjectService.GetClassSubjectsAsync`
+- exam types → `IReferenceDataService.GetOptionsAsync("ExamType", …)`, the
+  `config.lookup_value` category that has been sitting there unused since the
+  reference-data work. Two platform defaults were added (`half`, `preboard`) to cover the
+  types the mock-up offered.
+
+**The proc.** One `sp_school_admin_exam_manage` with `GetExams | GetExam | SaveExam |
+DeleteExam`, shaped after `sp_school_admin_subject_manage`: same scope guard, same
+`COALESCE(p_academic_year_id, <is_current>)` year resolution, and the same replace-all
+datesheet write (walk the JSON, collect `v_keep`, delete what is no longer listed). Business
+rules are `RAISE`d so the service surfaces `MessageText` to a toast: duplicate name for that
+class+year (case-insensitive, via a partial unique index that excludes soft-deleted rows so a
+name is reusable after a delete), a subject the class does not study, a subject date outside
+the exam window, pass marks above max, end before start. Delete is soft — marks will
+reference these rows.
+
+**Session-aware from day one**, per the note left on the enrolment entry above: exams key on
+`academic_year_id` + `academic_class_id`, not on a class name. When the marks table is built
+it should carry `enrolment_id`, so a student's marks stay attached to the session they sat
+the paper in.
+
+**Verified** against the local dev database (16 cases: create, list, edit-with-a-dropped-
+subject, soft delete, name reuse after delete, and every guard above). Applying the script to
+Railway is a separate step.
+
+**Still open.** `MarkEntry.cshtml` is still a mock-up — its exam / class / section / subject
+dropdowns can now be fed from these two tables, but it needs a marks table and its own proc.
+*(Done the same day — see the next entry.)*
+
+---
+
+### [2026-08-19] Marks Entry — wired to real rosters, with a per-sheet lock
+
+**Files changed**
+- `EduCoreDataAccessLayer/Database/exam_marks.sql` (new — `academic.exam_marks`, `academic.exam_mark_sheets`, `fn_exam_sheet_roster`, `sp_school_admin_exam_marks_manage`)
+- `EduCoreDataAccessLayer/Models/ERP/ExamModel.cs` · `Services/{Contract,Repository}/ERP/*ExamService*`
+- `educore/Areas/ERP/Controllers/ExamController.cs`
+- `educore/Areas/ERP/Views/Exam/MarkEntry.cshtml`
+
+**What it was.** A well-built page on top of three mock arrays: `EXAMS` (four hard-coded exams),
+`SUBJECT_SCHEDULE` (five subjects at 100/33), and `STUDENTS` (twelve invented names). Subjects
+were read from the dead `localStorage['educore_subjects']` key. An `autoLoad()` block fired on
+page load so the mock always showed something. Save Draft was `ecToast('success', …)` and
+Finalize only flipped a local flag; `ExamController.SaveMarks` set a TempData message and
+redirected.
+
+**A SHEET is one (exam, subject, section)** — what a teacher fills in one sitting. Since an exam
+belongs to a class (previous entry), the selector cascade collapsed to **Exam → Section →
+Subject**: picking the exam fills the Class box read-only, and the section list is built from the
+sections that actually have students enrolled, with their head-counts.
+
+**The roster reads `core.student_enrolment`, not `core.students`.** This is the thing that would
+have quietly broken later. On prod, tenant 23's 2027-2028 enrolment holds 1st-A/B/C, but those
+students have since been promoted, so `core.students` no longer shows anyone in 1st. Reading the
+current table would have made a past session's sheet come back empty. `fn_exam_sheet_roster` is a
+single SQL function used by both the read and the finalize-fill, so the two can never disagree
+about who sits a paper. `roll_no` is not captured on any prod enrolment row yet, so it falls back
+to `students.roll_no` then `admission_no`.
+
+**The lock lives on the sheet, not on the mark.** `exam_mark_sheets` holds
+`is_finalized / finalized_by / finalized_at / reopened_by / reopened_at` per
+(exam, subject, section) — a half-finalized sheet is not a state that should be representable.
+Finalizing English leaves Maths open. Marks carry `enrolment_id` from day one, as the enrolment
+entry above asked for.
+
+**Decisions.** Marks entry is gated on `exams.manage` alone — not on being the class or subject
+teacher, which would silently lock out any school that has not assigned class teachers or built a
+timetable. Reopening a finalized sheet is **school-admin only**, enforced server-side in
+`ReopenSheet` via `IPermissionService.GetUserAccessAsync`, because the page's own text tells
+teachers to ask an admin. **Grades are not stored** — no configurable grade scheme exists, so the
+page derives them from marks for display only; storing them would freeze a scale nobody has set.
+
+**Guards** (all `RAISE`d, surfaced as toasts): marks outside 0..max *for that subject* (a 50-mark
+paper rejects 60), a student not enrolled in that class+section, a subject not on the exam's
+datesheet, saving into a finalized sheet, reopening a sheet that is not finalized. `is_absent` and
+`marks_obtained` cannot disagree — a CHECK constraint plus the proc dropping marks when absent is
+set.
+
+**Verified** with 19 assertions against the local dev database (draft save, absent handling,
+per-subject max, foreign student, finalize filling blanks as Absent, per-sheet lock isolation,
+reopen, cascade on exam delete, scope guards), then read-only against prod: the real exam's
+7-subject datesheet, its sections (A:5, B:2, C:2), and the 5-student 1st-A roster all load.
+
+**Still open.** No report card / consolidated marksheet yet — that is the natural consumer of
+these two tables, and it is where a configurable grade scheme should land rather than being
+hard-coded in a second page. Attendance and the fee ledger still key on `student_id` alone.
+
+---
+
+### [2026-08-19] An exam covers MANY classes — the per-class exam was the wrong shape
+
+**Files changed**
+- `EduCoreDataAccessLayer/Database/exam_multiclass_migration.sql` (new)
+- `EduCoreDataAccessLayer/Database/{exam_schedule,exam_marks}.sql` (rewritten to the new shape)
+- `EduCoreDataAccessLayer/Models/ERP/ExamModel.cs` · `Services/{Contract,Repository}/ERP/*ExamService*`
+- `educore/Areas/ERP/Controllers/ExamController.cs`
+- `educore/Areas/ERP/Views/Exam/{CreateExam,MarkEntry}.cshtml` · `Views/Exam/Datesheet.cshtml` (new)
+- `educore/wwwroot/css/ERP/Exam/{CreateExam,Datesheet}.css` · `Views/Shared/Sections/Menu/_VerticalMenu.cshtml`
+
+**The design error, reported from use.** Both entries above keyed the exam itself to one
+class (`academic.exams.academic_class_id`), chosen to drop the Section dropdown. That took the
+simplification one level too far, and within a day of use it showed up three ways at once:
+
+- "Unit Test 1" for two classes meant **two exam rows with the same name** — the name and the
+  whole 7-subject datesheet retyped per class. Prod had exactly that: exam 2 (1st) and exam 3
+  (2nd), identical in name, type and dates.
+- Marks Entry's exam dropdown listed what looked like **duplicates**, and its Class box had to be
+  read-only because the exam had already decided the class — backwards from how anyone picks it.
+- There was **nowhere** to answer "what is 1st class sitting, and on which date".
+
+**The fix is the shape real school ERPs use.** The exam is school-wide for one academic year;
+the class moves down onto the datesheet (`exam_subjects.academic_class_id`) and onto the marks
+rows. A class sits the exam exactly when it has datesheet rows, so there is no separate
+exam-classes table to keep in step. The duplicate-name guard loses the class: one "Unit Test 1"
+per year. Per-class datesheets are genuinely independent — on prod, 1st and 2nd share a name and
+window but order EVS and General Knowledge on different days.
+
+**A real bug this surfaced.** `exam_mark_sheets` was keyed
+`(exam_id, subject_id, section)`. With one exam spanning classes, section 'A' of 1st and section
+'A' of 2nd would have **shared one lock** — finalizing one would silently freeze the other. The
+class is now part of that key; a regression test asserts the two sheets lock independently.
+
+**Migration.** `exam_multiclass_migration.sql` moves the column, backfills from the old
+`exams.academic_class_id` (falling back to the student's enrolment for marks rows), swaps both
+unique keys, then drops the column. Two guards matter: it refuses rather than guessing if any row
+cannot be attributed to a class, and it **names the exams that now collide** instead of letting
+`CREATE UNIQUE INDEX` fail with a bare Postgres error. That guard fired on prod exactly as
+intended — the two "Unit Test 1" rows were merged by hand (7 datesheet rows moved onto the
+surviving exam, 0 marks existed, nothing lost) and the migration then completed. It also drops
+the stale 11-argument marks proc, because the signature gained a parameter and
+`CREATE OR REPLACE` would have added a second overload rather than replacing it.
+
+**UI.** Exam Schedule now names the exam once, ticks the classes that sit it (a class with no
+subjects mapped is shown disabled with the reason, not hidden), and edits one class's datesheet at
+a time with **"Copy to other classes"** — which copies dates and marks for every subject the
+target class also studies and leaves its other subjects alone. All classes' datesheets are held
+client-side and posted in one Save. Marks Entry is back to the natural
+**Exam → Class → Section → Subject** cascade, auto-selecting the class when only one sits the exam.
+A new **Datesheet** page (third item under Examinations) groups papers by date for one class or
+all, and prints.
+
+**Verified**: 16 assertions on the local dev database (one exam over two classes with different
+subjects and different max marks for the same subject, per-class subject validation, duplicate
+name, class dropped from an exam clearing its datesheet, off-exam class rejected, and the
+sheet-lock isolation above), the migration run end to end locally before prod, and every read path
+re-checked against prod after migrating.
+
+**Still open.** No report card yet — the natural consumer of these tables, and where a
+configurable grade scheme belongs. Max marks on the create form still accepts up to 1000; a
+1000-mark paper was typed by accident once already.
+
+---
+
 # Glossary (quick reference)
 
 | Term | Plain meaning |
