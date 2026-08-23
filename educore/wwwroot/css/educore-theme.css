@@ -783,3 +783,24 @@ textarea.form-control {
 .ec-navbar-identity {
     min-width: 0;
 }
+
+/* ── Session picker ──────────────────────────────────────────────────────────
+   Four setup pages are scoped to one academic session (Classes & Sections,
+   Subjects, Assign Class Teacher, Timetable) and each shows the same picker.
+   These rules used to be copy-pasted into three page stylesheets — and twice
+   into one of them — so they live here instead. The select keeps whatever the
+   page's own bar styles it with; only the label and badge are shared.
+   The badge answers "am I looking at the live session?" at a glance, which
+   matters because editing a past session silently does nothing useful. */
+.ec-session-pick { display: flex; align-items: center; gap: .4rem; flex-wrap: nowrap; }
+.ec-session-pick .form-select { width: auto; min-width: 140px; font-weight: 700; }
+.ec-session-label {
+    font-size: .66rem; font-weight: 800; letter-spacing: .04em;
+    color: #8b8175; white-space: nowrap;
+}
+.ec-session-badge {
+    flex: 0 0 auto; border-radius: 8px; padding: .2rem .45rem;
+    font-size: .62rem; font-weight: 900; letter-spacing: .03em; white-space: nowrap;
+}
+.ec-session-badge.is-current { background: #ecfdf3; color: #16a34a; }
+.ec-session-badge.is-other   { background: #fff3cd; color: #856404; }

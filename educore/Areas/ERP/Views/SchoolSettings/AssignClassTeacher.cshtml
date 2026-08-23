@@ -69,7 +69,7 @@
         <div class="act-fbar">
           @* Sections are keyed per academic year, so the grid needs to be told
              which session. Sits in the existing filter bar, like Timetable. *@
-          <span class="act-session-label">SESSION</span>
+          <span class="ec-session-label">SESSION</span>
           <select class="act-chip" id="sessionSel" title="Academic session">
             @foreach (var y in (ViewBag.AcademicYears as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>()))
             {
@@ -87,7 +87,7 @@
               var _cur = (ViewBag.AcademicYears as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)?.FirstOrDefault(x => x.Selected);
               var _isCurrent = _cur != null && _cur.Value == Convert.ToString(ViewBag.AcademicYearId);
           }
-          <span class="act-session-badge @(_isCurrent ? "is-current" : "is-other")">
+          <span class="ec-session-badge @(_isCurrent ? "is-current" : "is-other")">
             @(_isCurrent ? "CURRENT" : "NOT CURRENT")
           </span>
 

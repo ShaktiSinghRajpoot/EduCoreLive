@@ -82,6 +82,15 @@
                 }
             }
           </select>
+          @* Which session am I editing? Without this the dropdown reads as a
+             filter, and editing a past session looks like it did nothing. *@
+          @{
+              var _cur = (ViewBag.AcademicYears as IEnumerable<SelectListItem>)?.FirstOrDefault(x => x.Selected);
+              var _isCurrent = _cur != null && _cur.Value == Convert.ToString(ViewBag.AcademicYearId);
+          }
+          <span class="ec-session-badge @(_isCurrent ? "is-current" : "is-other")">
+            @(_isCurrent ? "CURRENT" : "NOT CURRENT")
+          </span>
           <div class="cs-srch-wrap">
             <i class="bx bx-search cs-srch-ic"></i>
             <input type="search" class="cs-srch-inp" id="csSearch" placeholder="Search class or section…">
