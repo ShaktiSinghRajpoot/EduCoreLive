@@ -16,11 +16,22 @@
     // Per-school module visibility. The Transport menu is hidden for schools that
     // turned the module off in Admission Workflow settings. Defaults to visible if
     // the school scope or settings can't be resolved (matches pre-toggle behaviour).
-    bool showTransport = true;
+    // One read, four flags. A module a school turned off is hidden from the menu
+    // entirely — that is how a small school keeps a short menu without us
+    // guessing what it needs. Defaults to visible if the scope or settings cannot
+    // be resolved (matches pre-toggle behaviour).
+    bool showTransport = true, showExams = true, showInventory = true, showPayroll = true;
     if (_tId > 1 && _sId > 0)
     {
-        try { showTransport = (await AdmissionWorkflowService.GetAdmissionWorkflowAsync(_tId, _sId, _uId)).EnableTransport; }
-        catch { showTransport = true; }
+        try
+        {
+            var _mods = await AdmissionWorkflowService.GetAdmissionWorkflowAsync(_tId, _sId, _uId);
+            showTransport = _mods.EnableTransport;
+            showExams     = _mods.EnableExams;
+            showInventory = _mods.EnableInventory;
+            showPayroll   = _mods.EnablePayroll;
+        }
+        catch { /* leave everything visible */ }
     }
 
     // ── Dynamic RBAC menu gating ──────────────────────────────────────────────
@@ -33,37 +44,35 @@
     bool Can(string key) => isAdmin || _perms.Contains(key);
 
     // Group visibility (a group shows if the role can reach at least one item).
-    bool gFrontOffice = Can("enquiry.view") || Can("registration.view");
+    // Only modules that actually EXIST appear here. Placeholder groups
+    // (Accounting, Library, Hostel, Communication, Certificates & ID) and every
+    // "soon" stub were removed: half the old menu led nowhere, which is what made
+    // it feel complicated. Planned modules are listed on the "What's coming" page
+    // instead. To add a module later, gate it here and add its group below.
+    bool gAdmissions  = Can("enquiry.view") || Can("registration.view") || Can("students.view");
     bool gStudents    = Can("students.view");
-    bool gAcademics   = Can("academics.view");
     bool gAttendance  = Can("attendance.view");
-    bool gExams       = Can("exams.view");
-    bool secAcademic  = gFrontOffice || gStudents || gAcademics || gAttendance || gExams;
+    bool gExams       = showExams && Can("exams.view");
+    bool gAcademics   = Can("academics.view");
+    bool secAcademic  = gAdmissions || gStudents || gAttendance || gExams || gAcademics;
 
     bool gFees        = Can("fees.view");
-    bool gAccounting  = isAdmin;                       // no permission key yet → admin-only placeholder
-    bool secFinance   = gFees || gAccounting;
+    bool secFinance   = gFees;
 
-    bool gHR          = Can("staff.view");
-    bool gLibrary     = isAdmin;                       // placeholder module
+    bool gStaff       = Can("staff.view");
     bool gTransport   = showTransport && Can("transport.view");
-    bool gHostel      = isAdmin;                       // placeholder module
-    bool gInventory   = Can("fees.view");             // Inventory has its own controller; still gated by fees.view until inventory.* exists
-    bool secPeople    = gHR || gLibrary || gTransport || gHostel || gInventory;
+    bool gInventory   = showInventory && Can("fees.view");   // no inventory.* key yet
+    bool secPeople    = gStaff || gTransport || gInventory;
 
-    bool gComm        = isAdmin;                       // placeholder modules
-    bool gCert        = isAdmin;
-    bool gReports     = isAdmin || Can("reports.view");
-    bool secEngagement = gComm || gCert || gReports;
-
-    // School Settings holds every ONE-TIME / per-year setup screen (school profile,
-    // academic setup, fee masters, admission workflow, people masters). The group
-    // shows if the role can reach ANY of them; each item keeps its own gate below.
+    // Setup screens used to sit in ONE 14-item "School Settings" group, which was
+    // a dumping ground. Split by what each screen configures, so a role only sees
+    // the setup it can actually reach.
     bool gWorkflow    = Can("admission_workflow.view");
-    bool gSettings    = Can("settings.view") || Can("rbac.manage") || Can("academics.view")
-                        || Can("fees.view")  || Can("staff.view")  || gWorkflow;
-    bool gBilling     = isAdmin;                       // placeholder module
-    bool secAdmin     = gSettings || gBilling;
+    bool gSetupSchool = Can("settings.view") || gWorkflow;   // profile, formats, session, workflow
+    bool gSetupAcad   = Can("academics.view");               // classes, subjects, periods, calendar
+    bool gSetupFees   = Can("fees.view");                    // fee heads & structure
+    bool gSetupUsers  = Can("rbac.manage") || Can("staff.view");
+    bool secAdmin     = gSetupSchool || gSetupAcad || gSetupFees || gSetupUsers;
 
     bool IsActive(string value) =>
         currentPage.Contains(value, StringComparison.OrdinalIgnoreCase);
@@ -93,16 +102,16 @@
     <div class="sidebar-search"><input type="text" placeholder="Search menu..." /></div>
     <div class="menu-inner-shadow"></div>
 
+    @* menu.js binds PerfectScrollbar to .menu-inner — without this element the
+       sidebar cannot scroll and the menu search matches nothing. *@
     <ul class="menu-inner py-1">
 
         @*
            ============================================================
-           LINK STATUS LEGEND
-             ✅ real  = points to an existing controller/action
-             🚧 soon  = page not built yet → dimmed, non-clicking placeholder
-           Convert a "soon" item to real later: swap href="javascript:void(0);"
-           + class "menu-link menu-soon" for asp-area/asp-controller/asp-action
-           + class "menu-link", and delete its <span class="ec-badge ec-badge-soon">.
+           Every link here points at a real controller action. There are no
+           "soon" placeholders — planned modules live on the What's coming page
+           (More → What's coming) so navigation only ever shows working screens.
+           Order is roughly how often a school touches something.
            ============================================================
         *@
 
@@ -114,38 +123,33 @@
             </a>
         </li>
 
-        @* ===================== ACADEMIC ZONE ===================== *@
+        @* ===================== ACADEMIC ===================== *@
         @if (secAcademic)
         {
         <li class="menu-header"><span class="menu-header-text">Academic</span></li>
         }
 
-        @* ---- Front Office ---- *@
-        @if (gFrontOffice)
+        @* ---- Admissions: the funnel, in the order it happens ---- *@
+        @if (gAdmissions)
         {
-        <li class='menu-item @Open("EnquiryCRM","Registration","Visitor","CallLog","Postal","Complaint")'>
+        <li class='menu-item @Open("EnquiryCRM","Registration","Admission/Create")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-buildings ic-front"></i>
-                <div class="text-truncate">Front Office</div>
+                <div class="text-truncate">Admissions</div>
             </a>
             <ul class="menu-sub">
                 @if (Can("enquiry.view"))
                 {
-                <li class='menu-item @On("EnquiryCRM")'><a asp-area="ERP" asp-controller="Enquiry" asp-action="EnquiryCRM" class="menu-link"><i class="bx bx-message-square-detail submenu-icon c-pink"></i><div class="text-truncate">Admission Enquiry</div><span class="ec-badge ec-badge-hot">CRM</span></a></li>
+                <li class='menu-item @On("EnquiryCRM")'><a asp-area="ERP" asp-controller="Enquiry" asp-action="EnquiryCRM" class="menu-link"><i class="bx bx-message-square-detail submenu-icon c-pink"></i><div class="text-truncate">Enquiries</div><span class="ec-badge ec-badge-hot">CRM</span></a></li>
                 }
                 @if (Can("registration.view"))
                 {
                 <li class='menu-item @On("Registration")'><a asp-area="ERP" asp-controller="Registration" asp-action="Index" class="menu-link"><i class="bx bx-clipboard submenu-icon c-orange"></i><div class="text-truncate">Registrations</div></a></li>
                 }
-                @* Admission pipeline steps (settings for these live in School Settings → Admission Workflow) *@
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-check-shield submenu-icon c-indigo"></i><div class="text-truncate">Document Verification</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-edit-alt submenu-icon c-blue"></i><div class="text-truncate">Entrance Test</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-conversation submenu-icon c-green"></i><div class="text-truncate">Interview</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-badge-check submenu-icon c-purple"></i><div class="text-truncate">Approvals</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-blue"></i><div class="text-truncate">Visitor Book</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-phone-call submenu-icon c-green"></i><div class="text-truncate">Phone Call Log</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-envelope submenu-icon c-orange"></i><div class="text-truncate">Postal Dispatch/Receive</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-comment-error submenu-icon c-red"></i><div class="text-truncate">Complaints</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                @if (Can("students.view"))
+                {
+                <li class='menu-item @On("Admission/Create")'><a asp-area="ERP" asp-controller="Admission" asp-action="Create" class="menu-link"><i class="bx bx-user-plus submenu-icon c-green"></i><div class="text-truncate">New Admission</div></a></li>
+                }
             </ul>
         </li>
         }
@@ -153,38 +157,17 @@
         @* ---- Students ---- *@
         @if (gStudents)
         {
-        <li class='menu-item @Open("StudentList","Admission/Create","EditStudent","Inactive","Register","IdCard")'>
+        <li class='menu-item @Open("StudentList","EditStudent","Promotion","Inactive","Tc/Register","IdCard")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-plus ic-students"></i>
                 <div class="text-truncate">Students</div>
             </a>
             <ul class="menu-sub">
                 <li class='menu-item @On("StudentList")'><a asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Student Directory</div></a></li>
-                <li class='menu-item @On("Admission/Create")'><a asp-area="ERP" asp-controller="Admission" asp-action="Create" class="menu-link"><i class="bx bx-user-plus submenu-icon c-green"></i><div class="text-truncate">New Admission</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-category submenu-icon c-purple"></i><div class="text-truncate">Student Categories</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
                 <li class='menu-item @On("Promotion")'><a asp-area="ERP" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
                 <li class='menu-item @On("Inactive")'><a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
-                <li class='menu-item @On("Register")'><a asp-area="ERP" asp-controller="Tc" asp-action="Register" class="menu-link"><i class="bx bx-award submenu-icon c-teal"></i><div class="text-truncate">TC Register</div></a></li>
+                <li class='menu-item @On("Tc/Register")'><a asp-area="ERP" asp-controller="Tc" asp-action="Register" class="menu-link"><i class="bx bx-award submenu-icon c-teal"></i><div class="text-truncate">TC Register</div></a></li>
                 <li class='menu-item @On("IdCard")'><a asp-area="ERP" asp-controller="IdCard" asp-action="Index" class="menu-link"><i class="bx bx-id-card submenu-icon c-purple"></i><div class="text-truncate">ID Cards</div></a></li>
-            </ul>
-        </li>
-        }
-
-        @* ---- Academics ---- *@
-        @if (gAcademics)
-        {
-        <li class='menu-item @Open("Timetable")'>
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon icon-base bx bx-book ic-academic"></i>
-                <div class="text-truncate">Academics</div>
-            </a>
-            <ul class="menu-sub">
-                @* Class/Subject/Teacher/Period SETUP moved to School Settings (one-time
-                   per year). Timetable stays here — it is referenced day to day. *@
-                <li class='menu-item @On("Timetable")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="Timetable" class="menu-link"><i class="bx bx-time-five submenu-icon c-indigo"></i><div class="text-truncate">Timetable</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-book-content submenu-icon c-teal"></i><div class="text-truncate">Syllabus &amp; Lesson Plan</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-task submenu-icon c-orange"></i><div class="text-truncate">Assignments / Homework</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-folder-open submenu-icon c-pink"></i><div class="text-truncate">Study Materials</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
         }
@@ -192,14 +175,13 @@
         @* ---- Attendance ---- *@
         @if (gAttendance)
         {
-        <li class='menu-item @Open("StudentAttendance")'>
+        <li class='menu-item @Open("StudentAttendance","AttendanceReport")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-check ic-att"></i>
                 <div class="text-truncate">Attendance</div>
             </a>
             <ul class="menu-sub">
-                <li class='menu-item @On("StudentAttendance")'><a asp-area="ERP" asp-controller="Attendance" asp-action="StudentAttendance" class="menu-link"><i class="bx bx-user-check submenu-icon c-green"></i><div class="text-truncate">Student Attendance</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-user-voice submenu-icon c-blue"></i><div class="text-truncate">Staff Attendance</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("StudentAttendance")'><a asp-area="ERP" asp-controller="Attendance" asp-action="StudentAttendance" class="menu-link"><i class="bx bx-user-check submenu-icon c-green"></i><div class="text-truncate">Mark Attendance</div></a></li>
                 <li class='menu-item @On("AttendanceReport")'><a asp-area="ERP" asp-controller="Attendance" asp-action="AttendanceReport" class="menu-link"><i class="bx bx-bar-chart submenu-icon c-purple"></i><div class="text-truncate">Attendance Reports</div></a></li>
             </ul>
         </li>
@@ -217,50 +199,41 @@
                 <li class='menu-item @On("CreateExam")'><a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-red"></i><div class="text-truncate">Exam Schedule</div></a></li>
                 <li class='menu-item @On("Datesheet")'><a asp-area="ERP" asp-controller="Exam" asp-action="Datesheet" class="menu-link"><i class="bx bx-calendar submenu-icon c-teal"></i><div class="text-truncate">Datesheet</div></a></li>
                 <li class='menu-item @On("MarkEntry")'><a asp-area="ERP" asp-controller="Exam" asp-action="MarkEntry" class="menu-link"><i class="bx bx-edit submenu-icon c-purple"></i><div class="text-truncate">Marks Entry</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-indigo"></i><div class="text-truncate">Admit Cards</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-medal submenu-icon c-orange"></i><div class="text-truncate">Grading System</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-spreadsheet submenu-icon c-blue"></i><div class="text-truncate">Report Cards</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-line-chart submenu-icon c-teal"></i><div class="text-truncate">Result Analysis</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
         }
 
-        @* ===================== FINANCE ZONE ===================== *@
+        @* ---- Timetable: a single screen, so a direct link beats a group of one ---- *@
+        @if (gAcademics)
+        {
+        <li class='menu-item @On("Timetable")'>
+            <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="Timetable" class="menu-link">
+                <i class="menu-icon icon-base bx bx-time-five ic-academic"></i>
+                <div class="text-truncate">Timetable</div>
+            </a>
+        </li>
+        }
+
+        @* ===================== FINANCE ===================== *@
         @if (secFinance)
         {
         <li class="menu-header"><span class="menu-header-text">Finance</span></li>
         }
 
-        @* ---- Fees ---- *@
         @if (gFees)
         {
-        <li class='menu-item @Open("ManageFee","PaymentVerification","FeeDueReminders","Fee/Reports")'>
+        <li class='menu-item @Open("ManageFee","PaymentVerification","FeeDueReminders","Fee/Reports","DayClose")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-wallet ic-fees"></i>
-                <div class="text-truncate">Fees &amp; Collection</div>
+                <div class="text-truncate">Fees</div>
             </a>
             <ul class="menu-sub">
                 @* Fee Heads / Fee Structure are one-time setup → School Settings. *@
                 <li class='menu-item @On("ManageFee")'><a asp-area="ERP" asp-controller="Fee" asp-action="ManageFee" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Collect Fees</div></a></li>
                 <li class='menu-item @On("PaymentVerification")'><a asp-area="ERP" asp-controller="PaymentVerification" asp-action="Index" class="menu-link"><i class="bx bx-check-shield submenu-icon c-indigo"></i><div class="text-truncate">Payment Verification</div></a></li>
                 <li class='menu-item @On("FeeDueReminders")'><a asp-area="ERP" asp-controller="FeeDueReminders" asp-action="Index" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Due Reminders</div></a></li>
+                <li class='menu-item @On("DayClose")'><a asp-area="ERP" asp-controller="Fee" asp-action="DayClose" class="menu-link"><i class="bx bx-lock-alt submenu-icon c-teal"></i><div class="text-truncate">Day Close</div></a></li>
                 <li class='menu-item @On("Fee/Reports")'><a asp-area="ERP" asp-controller="Fee" asp-action="Reports" class="menu-link"><i class="bx bx-bar-chart-alt-2 submenu-icon c-blue"></i><div class="text-truncate">Fee Reports</div></a></li>
-            </ul>
-        </li>
-        }
-
-        @* ---- Accounting ---- *@
-        @if (gAccounting)
-        {
-        <li class='menu-item'>
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon icon-base bx bx-receipt ic-account"></i>
-                <div class="text-truncate">Accounting</div>
-            </a>
-            <ul class="menu-sub">
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-trending-up submenu-icon c-green"></i><div class="text-truncate">Income</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-trending-down submenu-icon c-red"></i><div class="text-truncate">Expenses</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-book-bookmark submenu-icon c-teal"></i><div class="text-truncate">Account Ledger</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
         }
@@ -271,42 +244,28 @@
         <li class="menu-header"><span class="menu-header-text">People &amp; Facilities</span></li>
         }
 
-        @* ---- HR ---- *@
-        @if (gHR)
+        @if (gStaff)
         {
         <li class='menu-item @Open("StaffList","AddStaff","EditStaff","StaffProfile","LeaveManagement","PayrollManagement")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-group ic-hr"></i>
-                <div class="text-truncate">Human Resources</div>
+                <div class="text-truncate">Staff</div>
             </a>
             <ul class="menu-sub">
                 <li class='menu-item @On("StaffList")'><a asp-area="ERP" asp-controller="Staff" asp-action="StaffList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Staff Directory</div></a></li>
+                @if (showPayroll)
+                {
                 <li class='menu-item @On("LeaveManagement")'><a asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement" class="menu-link"><i class="bx bx-calendar-minus submenu-icon c-pink"></i><div class="text-truncate">Leave Management</div></a></li>
                 <li class='menu-item @On("PayrollManagement")'><a asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Payroll &amp; Salary</div></a></li>
+                }
             </ul>
         </li>
         }
 
-        @* ---- Library ---- *@
-        @if (gLibrary)
-        {
-        <li class='menu-item'>
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon icon-base bx bx-book-reader ic-library"></i>
-                <div class="text-truncate">Library</div>
-            </a>
-            <ul class="menu-sub">
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-book-alt submenu-icon c-orange"></i><div class="text-truncate">Book Catalog</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-transfer-alt submenu-icon c-blue"></i><div class="text-truncate">Issue &amp; Return</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-green"></i><div class="text-truncate">Members</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-            </ul>
-        </li>
-        }
-
-        @* ---- Transport (hidden when module off, or when the role lacks transport.view) ---- *@
+        @* ---- Transport (hidden when the school turns the module off) ---- *@
         @if (gTransport)
         {
-        <li class='menu-item'>
+        <li class='menu-item @Open("Routes","Vehicles","Assign")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-bus ic-bus"></i>
                 <div class="text-truncate">Transport</div>
@@ -315,93 +274,21 @@
                 <li class='menu-item @On("Routes")'><a asp-area="ERP" asp-controller="Transport" asp-action="Routes" class="menu-link"><i class="bx bx-map submenu-icon c-blue"></i><div class="text-truncate">Routes</div></a></li>
                 <li class='menu-item @On("Vehicles")'><a asp-area="ERP" asp-controller="Transport" asp-action="Vehicles" class="menu-link"><i class="bx bx-car submenu-icon c-purple"></i><div class="text-truncate">Vehicles &amp; Drivers</div></a></li>
                 <li class='menu-item @On("Assign")'><a asp-area="ERP" asp-controller="Transport" asp-action="Assign" class="menu-link"><i class="bx bx-link submenu-icon c-green"></i><div class="text-truncate">Assign Transport</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-current-location submenu-icon c-red"></i><div class="text-truncate">Live Bus Tracking</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
         </li>
         }
 
-        @* ---- Hostel ---- *@
-        @if (gHostel)
-        {
-        <li class='menu-item'>
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon icon-base bx bx-building-house ic-hostel"></i>
-                <div class="text-truncate">Hostel</div>
-            </a>
-            <ul class="menu-sub">
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-buildings submenu-icon c-pink"></i><div class="text-truncate">Hostels</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-door-open submenu-icon c-blue"></i><div class="text-truncate">Rooms &amp; Types</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-key submenu-icon c-green"></i><div class="text-truncate">Room Allocation</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-            </ul>
-        </li>
-        }
-
-        @* ---- Inventory ---- *@
         @if (gInventory)
         {
         <li class='menu-item @Open("InventoryItem","PurchaseEntry")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-package ic-inv"></i>
-                <div class="text-truncate">Inventory / Store</div>
+                <div class="text-truncate">Inventory</div>
             </a>
             <ul class="menu-sub">
                 <li class='menu-item @On("InventoryItem")'><a asp-area="ERP" asp-controller="Inventory" asp-action="InventoryItem" class="menu-link"><i class="bx bx-box submenu-icon c-orange"></i><div class="text-truncate">Items &amp; Stock</div></a></li>
                 <li class='menu-item @On("PurchaseEntry")'><a asp-area="ERP" asp-controller="Inventory" asp-action="PurchaseEntry" class="menu-link"><i class="bx bx-cart submenu-icon c-green"></i><div class="text-truncate">Purchase Entry</div></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-store submenu-icon c-blue"></i><div class="text-truncate">Suppliers</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-log-out-circle submenu-icon c-purple"></i><div class="text-truncate">Issue Items</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
             </ul>
-        </li>
-        }
-
-        @* ===================== ENGAGEMENT ===================== *@
-        @if (secEngagement)
-        {
-        <li class="menu-header"><span class="menu-header-text">Engagement</span></li>
-        }
-
-        @* ---- Communication ---- *@
-        @if (gComm)
-        {
-        <li class='menu-item'>
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon icon-base bx bx-broadcast ic-comm"></i>
-                <div class="text-truncate">Communication</div>
-            </a>
-            <ul class="menu-sub">
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-news submenu-icon c-red"></i><div class="text-truncate">Notice Board</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-message-rounded-dots submenu-icon c-blue"></i><div class="text-truncate">Send SMS / Email</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-calendar-star submenu-icon c-orange"></i><div class="text-truncate">Events &amp; Calendar</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-bell-ring submenu-icon c-amber"></i><div class="text-truncate">Smart Bell</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-            </ul>
-        </li>
-        }
-
-        @* ---- Certificates ---- *@
-        @if (gCert)
-        {
-        <li class='menu-item'>
-            <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon icon-base bx bx-certification ic-cert"></i>
-                <div class="text-truncate">Certificates &amp; ID</div>
-            </a>
-            <ul class="menu-sub">
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-id-card submenu-icon c-indigo"></i><div class="text-truncate">ID Cards</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-transfer submenu-icon c-orange"></i><div class="text-truncate">Transfer Certificate</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-file submenu-icon c-green"></i><div class="text-truncate">Bonafide / Character</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-award submenu-icon c-purple"></i><div class="text-truncate">Custom Certificates</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-            </ul>
-        </li>
-        }
-
-        @* ---- Reports ---- *@
-        @if (gReports)
-        {
-        <li class="menu-item">
-            <a href="javascript:void(0);" class="menu-link menu-soon">
-                <i class="menu-icon icon-base bx bx-bar-chart-alt-2 ic-reports"></i>
-                <div class="text-truncate">Reports &amp; Analytics</div>
-                <span class="ec-badge ec-badge-soon">soon</span>
-            </a>
         </li>
         }
 
@@ -411,77 +298,94 @@
         <li class="menu-header"><span class="menu-header-text">Administration</span></li>
         }
 
-        @* ---- Settings ---- *@
-        @if (gSettings)
+        @* ---- School setup: done once at onboarding ---- *@
+        @if (gSetupSchool)
         {
-        <li class='menu-item @Open("BasicProfile","Documents","AcademicYears","ClassSection","SubjectManagement","AssignClassTeacher","PeriodStructure","SchoolCalendar","SmartBell","FeeHead","FeeStructure","WorkflowSettings","StaffMasters","Roles")'>
+        <li class='menu-item @Open("BasicProfile","Documents","AcademicYears","WorkflowSettings")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
-                <i class="menu-icon icon-base bx bx-cog ic-settings"></i>
-                <div class="text-truncate">School Settings</div>
+                <i class="menu-icon icon-base bx bx-buildings ic-settings"></i>
+                <div class="text-truncate">School Setup</div>
             </a>
-            @* Everything a school configures ONCE (at setup or per academic year)
-               lives here. Day-to-day screens stay in their operational menus. Each
-               item keeps the permission it had in its old home. *@
             <ul class="menu-sub">
                 @if (Can("settings.view"))
                 {
                 <li class='menu-item @On("BasicProfile")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="BasicProfile" class="menu-link"><i class="bx bx-buildings submenu-icon c-blue"></i><div class="text-truncate">School Profile</div></a></li>
                 <li class='menu-item @On("Documents")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="Documents" class="menu-link"><i class="bx bx-printer submenu-icon c-blue"></i><div class="text-truncate">Documents &amp; Formats</div></a></li>
-                <li class='menu-item @On("AcademicYears")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AcademicYears" class="menu-link"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Academic Year / Session</div></a></li>
-                }
-                @if (Can("academics.view"))
-                {
-                <li class='menu-item @On("ClassSection")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="ClassSection" class="menu-link"><i class="bx bx-grid-alt submenu-icon c-blue"></i><div class="text-truncate">Classes &amp; Sections</div></a></li>
-                <li class='menu-item @On("SubjectManagement")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SubjectManagement" class="menu-link"><i class="bx bx-book-alt submenu-icon c-purple"></i><div class="text-truncate">Subjects</div></a></li>
-                <li class='menu-item @On("PeriodStructure")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="PeriodStructure" class="menu-link"><i class="bx bx-time submenu-icon c-teal"></i><div class="text-truncate">Period Structure</div></a></li>
-                <li class='menu-item @On("SchoolCalendar")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SchoolCalendar" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-purple"></i><div class="text-truncate">School Calendar</div></a></li>
-                <li class='menu-item @On("SmartBell")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SmartBell" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Smart Bell</div></a></li>
-                <li class='menu-item @On("AssignClassTeacher")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AssignClassTeacher" class="menu-link"><i class="bx bx-user-voice submenu-icon c-green"></i><div class="text-truncate">Assign Class Teacher</div></a></li>
-                }
-                @if (Can("fees.view"))
-                {
-                <li class='menu-item @On("FeeHead")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeHead" class="menu-link"><i class="bx bx-list-ul submenu-icon c-teal"></i><div class="text-truncate">Fee Heads</div></a></li>
-                <li class='menu-item @On("FeeStructure")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeStructure" class="menu-link"><i class="bx bx-credit-card submenu-icon c-green"></i><div class="text-truncate">Fee Structure</div></a></li>
+                <li class='menu-item @On("AcademicYears")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AcademicYears" class="menu-link"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Sessions</div></a></li>
                 }
                 @if (gWorkflow)
                 {
-                <li class='menu-item @On("WorkflowSettings")'><a asp-area="ERP" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings" class="menu-link"><i class="bx bx-git-branch submenu-icon c-orange"></i><div class="text-truncate">Admission Workflow</div></a></li>
-                }
-                @if (Can("staff.view"))
-                {
-                <li class='menu-item @On("StaffMasters")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="StaffMasters" class="menu-link"><i class="bx bx-sitemap submenu-icon c-purple"></i><div class="text-truncate">Departments &amp; Designations</div></a></li>
-                }
-                @if (Can("rbac.manage"))
-                {
-                <li class='menu-item @On("Roles")'><a asp-area="ERP" asp-controller="Roles" asp-action="Index" class="menu-link"><i class="bx bx-user-circle submenu-icon c-indigo"></i><div class="text-truncate">Users &amp; Roles</div></a></li>
-                }
-                @if (Can("settings.view"))
-                {
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-plug submenu-icon c-green"></i><div class="text-truncate">SMS / Payment Gateway</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
-                <li class="menu-item"><a href="javascript:void(0);" class="menu-link menu-soon"><i class="bx bx-data submenu-icon c-teal"></i><div class="text-truncate">Backup &amp; Restore</div><span class="ec-badge ec-badge-soon">soon</span></a></li>
+                <li class='menu-item @On("WorkflowSettings")'><a asp-area="ERP" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings" class="menu-link"><i class="bx bx-toggle-left submenu-icon c-green"></i><div class="text-truncate">Modules &amp; Workflow</div></a></li>
                 }
             </ul>
         </li>
         }
 
-        @* Admission Workflow SETTINGS moved into School Settings (one-time setup).
-           Its pipeline steps (Document Verification / Entrance Test / Interview /
-           Approvals) are operational screens → Front Office. *@
-
-        @* ---- Billing ---- *@
-        @if (gBilling)
+        @* ---- Academic setup: revisited each session ---- *@
+        @if (gSetupAcad)
         {
-        <li class="menu-item">
-            <a href="javascript:void(0);" class="menu-link menu-soon">
-                <i class="menu-icon icon-base bx bx-credit-card ic-billing"></i>
-                <div class="text-truncate">Billing &amp; Subscription</div>
-                <span class="ec-badge ec-badge-soon">soon</span>
+        <li class='menu-item @Open("ClassSection","SubjectManagement","PeriodStructure","SchoolCalendar","SmartBell","AssignClassTeacher")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-grid-alt ic-academic"></i>
+                <div class="text-truncate">Academic Setup</div>
             </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("ClassSection")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="ClassSection" class="menu-link"><i class="bx bx-grid-alt submenu-icon c-blue"></i><div class="text-truncate">Classes &amp; Sections</div></a></li>
+                <li class='menu-item @On("SubjectManagement")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SubjectManagement" class="menu-link"><i class="bx bx-book-alt submenu-icon c-purple"></i><div class="text-truncate">Subjects</div></a></li>
+                <li class='menu-item @On("AssignClassTeacher")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AssignClassTeacher" class="menu-link"><i class="bx bx-user-voice submenu-icon c-green"></i><div class="text-truncate">Assign Class Teacher</div></a></li>
+                <li class='menu-item @On("PeriodStructure")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="PeriodStructure" class="menu-link"><i class="bx bx-time submenu-icon c-teal"></i><div class="text-truncate">Period Structure</div></a></li>
+                <li class='menu-item @On("SchoolCalendar")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SchoolCalendar" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-purple"></i><div class="text-truncate">School Calendar</div></a></li>
+                <li class='menu-item @On("SmartBell")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SmartBell" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Smart Bell</div></a></li>
+            </ul>
+        </li>
+        }
+
+        @* ---- Fee setup ---- *@
+        @if (gSetupFees)
+        {
+        <li class='menu-item @Open("FeeHead","FeeStructure")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-credit-card ic-fees"></i>
+                <div class="text-truncate">Fee Setup</div>
+            </a>
+            <ul class="menu-sub">
+                <li class='menu-item @On("FeeHead")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeHead" class="menu-link"><i class="bx bx-list-ul submenu-icon c-teal"></i><div class="text-truncate">Fee Heads</div></a></li>
+                <li class='menu-item @On("FeeStructure")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeStructure" class="menu-link"><i class="bx bx-credit-card submenu-icon c-green"></i><div class="text-truncate">Fee Structure</div></a></li>
+            </ul>
+        </li>
+        }
+
+        @* ---- Users & access ---- *@
+        @if (gSetupUsers)
+        {
+        <li class='menu-item @Open("Roles","StaffMasters")'>
+            <a href="javascript:void(0);" class="menu-link menu-toggle">
+                <i class="menu-icon icon-base bx bx-user-circle ic-settings"></i>
+                <div class="text-truncate">Users &amp; Access</div>
+            </a>
+            <ul class="menu-sub">
+                @if (Can("rbac.manage"))
+                {
+                <li class='menu-item @On("Roles")'><a asp-area="ERP" asp-controller="Roles" asp-action="Index" class="menu-link"><i class="bx bx-user-circle submenu-icon c-indigo"></i><div class="text-truncate">Users &amp; Roles</div></a></li>
+                }
+                @if (Can("staff.view"))
+                {
+                <li class='menu-item @On("StaffMasters")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="StaffMasters" class="menu-link"><i class="bx bx-sitemap submenu-icon c-purple"></i><div class="text-truncate">Departments &amp; Designations</div></a></li>
+                }
+            </ul>
         </li>
         }
 
         @* ===================== MORE ===================== *@
         <li class="menu-header"><span class="menu-header-text">More</span></li>
+
+        @* Everything that used to sit in the menu as a "soon" stub is listed here. *@
+        <li class='menu-item @On("Roadmap")'>
+            <a asp-area="" asp-controller="Home" asp-action="Roadmap" class="menu-link">
+                <i class="menu-icon icon-base bx bx-rocket ic-dash"></i>
+                <div class="text-truncate">What&#39;s coming</div>
+            </a>
+        </li>
 
         <li class="menu-item">
             <a href="@supportUrl" target="_blank" class="menu-link">

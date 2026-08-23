@@ -222,6 +222,36 @@
                 <input class="form-check-input" type="checkbox" id="EnableTransport" asp-for="EnableTransport" />
               </div>
             </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Examinations Module</div>
+                <div class="aw-row-desc">Turn off to hide the Examinations menu (Exam Schedule, Datesheet, Marks Entry) for a school that does not record exams here. Exams and marks already saved are kept.</div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="EnableExams" asp-for="EnableExams" />
+              </div>
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Inventory Module</div>
+                <div class="aw-row-desc">Turn off to hide the Inventory menu (Items &amp; Stock, Purchase Entry) for a school that does not run a store.</div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="EnableInventory" asp-for="EnableInventory" />
+              </div>
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Payroll &amp; Leave</div>
+                <div class="aw-row-desc">Turn off to hide Payroll &amp; Salary and Leave Management under Staff. The staff directory stays visible either way.</div>
+              </div>
+              <div class="form-check form-switch aw-switch m-0">
+                <input class="form-check-input" type="checkbox" id="EnablePayroll" asp-for="EnablePayroll" />
+              </div>
+            </div>
           </div>
         </div>
 

@@ -1211,6 +1211,57 @@ school" after classes are recreated — resolve ids by name instead.
 
 ---
 
+### [2026-08-23] Side menu: half of it led nowhere
+
+**Files changed**
+- `educore/Views/Shared/Sections/Menu/_VerticalMenu.cshtml`
+- `educore/Controllers/HomeController.cs` · `educore/Views/Home/Roadmap.cshtml` (new)
+- `EduCoreDataAccessLayer/Database/school_module_toggles.sql` (new)
+- `EduCoreDataAccessLayer/Models/ERP/AdmissionWorkflowModel.cs` · `Services/Repository/ERP/AdmissionWorkflowService.cs`
+- `educore/Areas/ERP/Views/AdmissionWorkflow/WorkflowSettings.cshtml`
+
+**Reported as "the items are bogus, a basic school will get confused".** Measuring it
+first showed the complaint was not really about grouping: **17 top-level groups, 79 items,
+39 of them (49%) dimmed `soon` placeholders, and five groups where nothing at all worked**
+— Accounting, Library, Hostel, Communication, Certificates & ID. A menu is a promise, and
+39 of them were broken. Front Office showed 10 items of which 2 worked; there was an empty
+"More" section header.
+
+Removed the five dead groups and every `soon` stub: **79 items → 45, all real**, verified by
+resolving every `asp-controller`/`asp-action` pair in the menu against the actual controllers
+(45 links, 0 broken). That check also turned up `Fee/DayClose` — a complete, working page
+that had no menu entry at all.
+
+Regrouped by how often a school touches something, and renamed for plainness (Front Office →
+**Admissions**, in funnel order Enquiries → Registrations → New Admission; Human Resources →
+Staff). Timetable became a direct link rather than a group of one. The 14-item **School
+Settings** dumping ground split into **School Setup / Academic Setup / Fee Setup / Users &
+Access**, each gated by the permission it needs.
+
+The 39 planned features are not lost — they moved to a **What's coming** page (More → What's
+coming), so the roadmap stays visible without costing 39 lines of navigation.
+
+**Module toggles.** Extended the existing `enable_transport` switch to `enable_exams`,
+`enable_inventory` and `enable_payroll` on the same table, proc and settings page, so a school
+hides modules it does not run (the menu item is now called **Modules & Workflow**, since that
+is what the page holds). All default TRUE. Deliberately *not* a new Modules page: the workflow
+proc `COALESCE`s missing params to defaults, so a second page saving only module flags would
+silently **reset** every other workflow setting. Transport's own flag was left where it is — it
+has six consumers including a real access guard in `TransportController`.
+
+**A regression I caused and fixed.** The rewrite used `<ul class="menu-inner py-1">` as a split
+boundary and never re-emitted it, leaving 12 `<ul>` against 13 `</ul>`. `menu.js` binds
+PerfectScrollbar to `.menu-inner`, so with no such element the sidebar could not scroll and
+wheel events fell through to the page; the menu search, which selects
+`#layout-menu > ul.menu-inner > li.menu-item`, silently matched nothing too. I had verified
+link targets and counts but not that the markup was still well-formed — for a wholesale rewrite
+of a structural partial, **tag balance is the first check, not an afterthought**.
+
+**Still open.** Inventory is gated on `fees.view` because no `inventory.*` permission key
+exists yet.
+
+---
+
 # Glossary (quick reference)
 
 | Term | Plain meaning |

@@ -56,6 +56,16 @@ namespace EduCoreDataAccessLayer.Models.ERP
         /// </summary>
         public bool EnableTransport { get; set; } = true;
 
+        /// <summary>
+        /// Optional modules this school runs. Same idea as EnableTransport: when
+        /// off, the module's menu group is hidden so a school is not shown screens
+        /// it will never use. Default true, so existing schools are unaffected.
+        /// Turning one off only hides UI — recorded data is untouched.
+        /// </summary>
+        public bool EnableExams     { get; set; } = true;
+        public bool EnableInventory { get; set; } = true;
+        public bool EnablePayroll   { get; set; } = true;
+
         // ── Fee billing policy ──────────────────────────────────────────────
 
         /// <summary>

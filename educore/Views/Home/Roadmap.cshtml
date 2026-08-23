@@ -1,0 +1,87 @@
+@{
+    ViewData["Title"] = "What's coming";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    // Everything that used to sit in the side menu as a dimmed "soon" stub.
+    // When a module ships, delete its row here and add it back to _VerticalMenu.
+    var planned = new (string Group, string Icon, string[] Items)[]
+    {
+        ("Communication",     "bx-broadcast",      new[] { "Notice board", "Send SMS / email", "Events calendar" }),
+        ("Certificates",      "bx-certification",  new[] { "Bonafide & character certificates", "Custom certificate designer" }),
+        ("Library",           "bx-book-reader",    new[] { "Book catalog", "Issue & return", "Members" }),
+        ("Hostel",            "bx-building-house", new[] { "Hostels & rooms", "Room allocation" }),
+        ("Accounting",        "bx-receipt",        new[] { "Income & expenses", "Account ledger" }),
+        ("Examinations",      "bx-file",           new[] { "Admit cards", "Grading system", "Report cards", "Result analysis" }),
+        ("Academics",         "bx-book",           new[] { "Syllabus & lesson plans", "Assignments / homework", "Study materials" }),
+        ("Front office",      "bx-buildings",      new[] { "Document verification", "Entrance test", "Interview", "Visitor book", "Phone call log", "Complaints" }),
+        ("Attendance",        "bx-user-check",     new[] { "Staff attendance" }),
+        ("Inventory",         "bx-package",        new[] { "Suppliers", "Issue items" }),
+        ("Transport",         "bx-bus",            new[] { "Live bus tracking" }),
+        ("Reports",           "bx-bar-chart-alt-2",new[] { "Reports & analytics" }),
+        ("Administration",    "bx-cog",            new[] { "SMS / payment gateway", "Backup & restore", "Billing & subscription" })
+    };
+    var total = planned.Sum(p => p.Items.Length);
+}
+
+@section PageStyles {
+    <style>
+        .rm-intro { font-size: .88rem; font-weight: 650; color: var(--bs-secondary-color); max-width: 640px; }
+        .rm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+        .rm-card { border: 1px solid var(--bs-border-color); border-radius: 14px; background: #fff; padding: .9rem 1rem; }
+        .rm-head { display: flex; align-items: center; gap: .5rem; margin-bottom: .6rem; }
+        .rm-head i { font-size: 1.15rem; color: #ff8a00; }
+        .rm-head span { font-weight: 900; font-size: .92rem; }
+        .rm-list { list-style: none; margin: 0; padding: 0; }
+        .rm-list li {
+            font-size: .83rem; font-weight: 650; color: var(--bs-secondary-color);
+            padding: .2rem 0 .2rem 1.1rem; position: relative;
+        }
+        .rm-list li::before {
+            content: ""; position: absolute; left: 0; top: .62rem;
+            width: 5px; height: 5px; border-radius: 50%; background: #d9d4cc;
+        }
+    </style>
+}
+
+<div class="ec-page-shell">
+    <div class="ec-page-content">
+
+        <div class="ec-page-header">
+            <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                <div class="ec-page-icon"><i class="bx bx-rocket"></i></div>
+                <div>
+                    <h4 class="ec-page-title mb-1">What&#39;s coming</h4>
+                    <div class="ec-page-subtitle">@total features planned across @planned.Length areas</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <p class="rm-intro mb-0">
+                    These are not in the app yet. They are listed here rather than in the side menu,
+                    so the menu only shows screens that actually work &mdash; a module appears there
+                    the day it ships.
+                </p>
+            </div>
+        </div>
+
+        <div class="rm-grid">
+            @foreach (var p in planned)
+            {
+                <div class="rm-card">
+                    <div class="rm-head">
+                        <i class="bx @p.Icon"></i><span>@p.Group</span>
+                    </div>
+                    <ul class="rm-list">
+                        @foreach (var item in p.Items)
+                        {
+                            <li>@item</li>
+                        }
+                    </ul>
+                </div>
+            }
+        </div>
+
+    </div>
+</div>
