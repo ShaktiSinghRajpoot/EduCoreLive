@@ -1262,6 +1262,50 @@ exists yet.
 
 ---
 
+### [2026-08-23] Session pickers on the setup pages (and a wrong-year bug they exposed)
+
+**Files changed**
+- `EduCoreDataAccessLayer/Database/class_teacher_session.sql` (new)
+- `Services/{Contract,Repository}/ERP/{IClassTeacherService,ClassTeacherService}` · `{ITimetableService,TimetableService}`
+- `educore/Areas/ERP/Controllers/SchoolSettingsController.cs`
+- `educore/Areas/ERP/Views/SchoolSettings/{SubjectManagement,Timetable,AssignClassTeacher}.cshtml` + their CSS
+
+**Which pages need a session, decided from the schema not by eye.** The test is whether
+the page's data carries `academic_year_id`:
+
+| Session-keyed → needs a picker | Not session-keyed → does not |
+|---|---|
+| `academic_classes`, `academic_class_sections` (Classes & Sections, Assign Class Teacher) | `school_calendar` — keyed by date |
+| `class_subjects` (Subjects) | `period_structure`, `school_calendar_settings` (Smart Bell) |
+| `academic.timetable` (Timetable) | `school_fee_heads`, `school_fee_structures` (Fee Setup) |
+
+So Smart Bell and School Calendar deliberately have **no** picker: a bell schedule and a
+weekly-off pattern are school-wide facts, and a picker would imply a per-session variation the
+tables cannot store.
+
+**Classes & Sections already had a picker** — dropdown, default-to-current, URL param, even a
+"copy the previous session's structure" action. The other three now copy that pattern exactly
+rather than the slightly different one used on the Exam pages. Changing session **reloads the
+page**: the class list, subject lists, teacher grid and timetable all belong to one session, so a
+partial refresh would leave two on screen at once. Only `sp_class_teacher_manage` needed a
+parameter added; the subject and timetable procs already took one.
+
+**The bug this exposed.** `sp_class_teacher_manage` resolved the year from
+`core.school_settings.academic_year_id` and then fell back to `MAX(academic_year_id)`. That column
+is **NULL for a live school**, so it silently resolved to the *newest* year, not the current one:
+the grid showed 2028-2029's 2 sections instead of 2027-2028's 11. Worse, the same resolution backs
+the `IsTeacher` operation behind `IClassTeacherService.IsClassTeacherAsync`, which gates **who may
+mark attendance** — so a class teacher of a current section could be told they were not one and
+refused. The fallback order is now: explicit parameter → `academic_years.is_current` (what every
+other proc in the app treats as current) → `school_settings` → newest. Verified: with no parameter
+the grid went from 2 rows to the correct 11.
+
+**Still open.** `core.school_settings.academic_year_id` being NULL is not fixed here — it is now
+simply not relied on first. Worth deciding whether that column should be populated or dropped,
+since two sources of "current session" will drift again.
+
+---
+
 # Glossary (quick reference)
 
 | Term | Plain meaning |

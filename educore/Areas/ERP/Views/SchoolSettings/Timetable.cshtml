@@ -41,6 +41,31 @@
         </div>
 
         <!-- toolbar -->
+          @* Sessions: this page's data is keyed per academic year, so it must be
+             told which one. Same picker as Classes & Sections. *@
+          <div class="ec-session-pick">
+              <span class="ec-session-label">SESSION</span>
+              <select class="form-select form-select-sm" id="sessionSel">
+                  @foreach (var y in (ViewBag.AcademicYears as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>()))
+                  {
+                    if (y.Value == Convert.ToString(ViewBag.AcademicYearId))
+                    {
+                        <option value="@y.Value" selected>@y.Text</option>
+                    }
+                    else
+                    {
+                        <option value="@y.Value">@y.Text</option>
+                    }
+                  }
+              </select>
+              @{
+                  var _cur = (ViewBag.AcademicYears as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)?.FirstOrDefault(x => x.Selected);
+                  var _isCurrent = _cur != null && _cur.Value == Convert.ToString(ViewBag.AcademicYearId);
+              }
+              <span class="ec-session-badge @(_isCurrent ? "is-current" : "is-other")">
+                  @(_isCurrent ? "CURRENT" : "NOT CURRENT")
+              </span>
+          </div>
         <div class="tt-fbar">
           <div class="tt-seg" id="viewSeg">
             <button data-v="class" class="on"><i class="bx bx-group"></i>Class</button>
@@ -123,6 +148,7 @@
    day columns from the School Calendar's weekly offs, sections/subjects/teachers
    from their own masters. The page stores nothing of its own. */
 var SETUP_URL  ='@Url.Action("TimetableSetup","SchoolSettings",new{area="ERP"})';
+var SESSION_ID = @(ViewBag.AcademicYearId ?? 0);
 var GRID_URL   ='@Url.Action("TimetableGrid","SchoolSettings",new{area="ERP"})';
 var TEACHER_URL='@Url.Action("TimetableTeacherGrid","SchoolSettings",new{area="ERP"})';
 var SAVE_URL   ='@Url.Action("SaveTimetableCell","SchoolSettings",new{area="ERP"})';
@@ -159,7 +185,7 @@ function clashSection(dayIdx,periodId,teacherId){
 
 /* ---- load ---- */
 function loadSetup(){
-  $.getJSON(SETUP_URL)
+  $.getJSON(SETUP_URL, { academicYearId: SESSION_ID })
     .done(function(s){
       PERIOD_LIST=(s.periods||[]).map(function(p){
         return {id:p.periodSeq, name:p.label, time:p.startTime+'–'+p.endTime, type:p.periodType};
@@ -427,5 +453,13 @@ document.getElementById('dayTabs').addEventListener('click',function(e){ var b=e
 loadSetup();
 
 })();
+
+    // A session change reloads the page — the class list and each class's subjects
+    // belong to one session, so refreshing only part of it would mix them.
+    document.getElementById('sessionSel').addEventListener('change', function () {
+        var url = new URL(window.location.href);
+        url.searchParams.set('academicYearId', this.value);
+        window.location.href = url.toString();
+    });
 </script>
 }

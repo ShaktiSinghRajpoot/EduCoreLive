@@ -504,19 +504,44 @@ namespace educore.Areas.ERP.Controllers
             return RedirectToAction("EnquiryCRM", "Enquiry");
         }
         [HasPermission("academics.view")]
-        public async Task<IActionResult> SubjectManagement()
+        public async Task<IActionResult> SubjectManagement(int academicYearId = 0)
         {
-            // The school's real classes for the current year, each with its saved
+            // class_subjects is keyed per session, so the page needs to know which
+            // one. Same picker pattern as Classes & Sections.
+            academicYearId = await ResolveSessionAsync(academicYearId);
+
+            // The school's real classes for that session, each with its saved
             // subject count. The page then loads/saves one class at a time.
-            ViewBag.Classes = await _subjectService.GetClassesAsync(SmTenant(), SmSchool(), SmUser());
+            ViewBag.Classes = await _subjectService.GetClassesAsync(
+                SmTenant(), SmSchool(), SmUser(), academicYearId);
             return View();
+        }
+
+        // Session list + resolved id for the setup pages, so each one does not
+        // repeat the "default to current" logic. Sets the two ViewBag keys the
+        // pickers read.
+        private async Task<int> ResolveSessionAsync(int academicYearId)
+        {
+            var years = await _baseService.GetSelectListAsync(
+                "config.sp_dropdown_common", "AcademicYear", SmTenant().ToString(), SmSchool().ToString());
+
+            if (academicYearId <= 0 && years.Any())
+            {
+                var current = years.FirstOrDefault(y => y.Selected) ?? years.First();
+                int.TryParse(current.Value, out academicYearId);
+            }
+
+            ViewBag.AcademicYears  = years;
+            ViewBag.AcademicYearId = academicYearId;
+            return academicYearId;
         }
 
         [HttpGet]
         [HasPermission("academics.view")]
-        public async Task<IActionResult> ClassSubjects(int classId)
+        public async Task<IActionResult> ClassSubjects(int classId, int academicYearId = 0)
         {
-            var subjects = await _subjectService.GetClassSubjectsAsync(classId, SmTenant(), SmSchool(), SmUser());
+            var subjects = await _subjectService.GetClassSubjectsAsync(
+                classId, SmTenant(), SmSchool(), SmUser(), academicYearId);
             return Json(subjects.Select(s => s.SubjectName));
         }
 
@@ -836,17 +861,20 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpGet]
         [HasPermission("academics.view")]
-        public IActionResult AssignClassTeacher()
+        public async Task<IActionResult> AssignClassTeacher(int academicYearId = 0)
         {
+            // Sections are per session, so the grid belongs to one.
+            await ResolveSessionAsync(academicYearId);
             return View();
         }
 
         // ── Assign Class Teacher: real data for the grid ──
         [HttpGet]
         [HasPermission("academics.view")]
-        public async Task<IActionResult> ClassTeacherGrid()
+        public async Task<IActionResult> ClassTeacherGrid(int academicYearId = 0)
         {
-            var grid = await _classTeacherService.GetGridAsync(SmTenant(), SmSchool(), SmUser());
+            var grid = await _classTeacherService.GetGridAsync(
+                SmTenant(), SmSchool(), SmUser(), academicYearId);
             return Json(grid);
         }
 
@@ -874,16 +902,19 @@ namespace educore.Areas.ERP.Controllers
         // School Calendar's weekly offs, sections/subjects/teachers from their own
         // masters — the page holds no data of its own.
         [HasPermission("academics.view")]
-        public IActionResult Timetable()
+        public async Task<IActionResult> Timetable(int academicYearId = 0)
         {
+            // Sections are per session, so the grid belongs to one.
+            await ResolveSessionAsync(academicYearId);
             return View();
         }
 
         [HttpGet]
         [HasPermission("academics.view")]
-        public async Task<IActionResult> TimetableSetup()
+        public async Task<IActionResult> TimetableSetup(int academicYearId = 0)
         {
-            var setup = await _timetableService.GetSetupAsync(SmTenant(), SmSchool(), SmUser());
+            var setup = await _timetableService.GetSetupAsync(
+                SmTenant(), SmSchool(), SmUser(), academicYearId);
             return Json(setup);
         }
 

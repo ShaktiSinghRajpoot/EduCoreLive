@@ -17,12 +17,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             _db = db;
         }
 
-        public async Task<List<ClassTeacherSection>> GetGridAsync(int tenantId, int schoolId, int actionUserId)
+        public async Task<List<ClassTeacherSection>> GetGridAsync(
+            int tenantId, int schoolId, int actionUserId, int academicYearId = 0)
         {
             var list = new List<ClassTeacherSection>();
             if (tenantId <= 1 || schoolId <= 0) return list;
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, Params("Grid", tenantId, schoolId, actionUserId));
+            var p = Params("Grid", tenantId, schoolId, actionUserId);
+            if (academicYearId > 0) p[4].Value = academicYearId;   // p_academic_year_id
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
             if (ds.Tables.Count == 0) return list;
 
             foreach (DataRow row in ds.Tables[0].Rows)
@@ -63,8 +67,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 return (false, "Invalid section.");
 
             var p = Params("Assign", tenantId, schoolId, actionUserId);
-            p[4].Value = sectionId;               // p_section_id
-            p[5].Value = (object?)staffId ?? DBNull.Value;   // p_staff_id
+            p[5].Value = sectionId;               // p_section_id
+            p[6].Value = (object?)staffId ?? DBNull.Value;   // p_staff_id
 
             try
             {
@@ -85,8 +89,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(className)) return false;
 
             var p = Params("IsTeacher", tenantId, schoolId, userId);
-            p[6].Value = className;                       // p_class
-            p[7].Value = (object?)section ?? DBNull.Value; // p_section
+            p[7].Value = className;                       // p_class
+            p[8].Value = (object?)section ?? DBNull.Value; // p_section
 
             var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return false;
@@ -104,6 +108,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_academic_year_id", NpgsqlDbType.Integer) { Value = DBNull.Value },
                 new("p_section_id",     NpgsqlDbType.Integer) { Value = DBNull.Value },
                 new("p_staff_id",       NpgsqlDbType.Integer) { Value = DBNull.Value },
                 new("p_class",          NpgsqlDbType.Varchar) { Value = DBNull.Value },

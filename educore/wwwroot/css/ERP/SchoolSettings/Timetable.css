@@ -72,3 +72,17 @@
     .tt-wrap{ display:none; }
     .tt-mob{ display:block; }
 }
+
+/* ── Session picker: this page's data is keyed per academic year ── */
+.ec-session-pick { display: flex; align-items: center; gap: .4rem; flex-wrap: nowrap; }
+.ec-session-pick .form-select { width: auto; min-width: 140px; font-weight: 700; }
+.ec-session-label {
+    font-size: .66rem; font-weight: 800; letter-spacing: .04em;
+    color: #8b8175; white-space: nowrap;
+}
+.ec-session-badge {
+    flex-shrink: 0; border-radius: 8px; padding: .2rem .45rem;
+    font-size: .62rem; font-weight: 900; letter-spacing: .03em; white-space: nowrap;
+}
+.ec-session-badge.is-current { background: #ecfdf3; color: #16a34a; }
+.ec-session-badge.is-other   { background: #fff3cd; color: #856404; }

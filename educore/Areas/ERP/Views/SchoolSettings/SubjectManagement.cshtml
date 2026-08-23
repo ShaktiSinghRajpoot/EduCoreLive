@@ -31,6 +31,38 @@
         </div>
     </div>
 
+    @* Session lives on its own bar, not in the header: it is a filter for the
+       whole page, and the header is for identity + the one page-level action. *@
+    <div class="sm-session-bar">
+        <span class="ec-session-label">SESSION</span>
+        <select class="form-select form-select-sm" id="sessionSel">
+            @foreach (var y in (ViewBag.AcademicYears as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>()))
+            {
+                if (y.Value == Convert.ToString(ViewBag.AcademicYearId))
+                {
+                    <option value="@y.Value" selected>@y.Text</option>
+                }
+                else
+                {
+                    <option value="@y.Value">@y.Text</option>
+                }
+            }
+        </select>
+        @{
+            var _cur = (ViewBag.AcademicYears as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)?.FirstOrDefault(x => x.Selected);
+            var _isCurrent = _cur != null && _cur.Value == Convert.ToString(ViewBag.AcademicYearId);
+        }
+        <span class="ec-session-badge @(_isCurrent ? "is-current" : "is-other")">
+            @(_isCurrent ? "CURRENT" : "NOT CURRENT")
+        </span>
+
+        <div class="sm-srch-wrap">
+            <i class="bx bx-search sm-srch-ic"></i>
+            <input type="search" class="sm-srch-inp" id="smSearch" placeholder="Search class…">
+        </div>
+        <span class="sm-srch-count" id="smSearchCount"></span>
+    </div>
+
     <div class="row g-4">
 
         <!-- ── Left: Class list ──────────────── -->
@@ -52,6 +84,9 @@
                             <span class="sm-count-badge sm-badge-zero cls-badge">@cls.SubjectCount</span>
                         </div>
                     }
+                    <div class="sm-no-match" id="smNoMatch" style="display:none;">
+                        No class matches that search.
+                    </div>
                 </div>
             </div>
         </div>
@@ -175,6 +210,7 @@ $(document).ready(function () {
     // subjectData: { <academic_class_id>: ['Mathematics','English', ...] }
     // Loaded from the server per class, saved back through the subject proc.
     const LOAD_URL   = '@Url.Action("ClassSubjects","SchoolSettings",new{area="ERP"})';
+    const SESSION_ID = @(ViewBag.AcademicYearId ?? 0);
     const SAVE_URL   = '@Url.Action("SaveClassSubjects","SchoolSettings",new{area="ERP"})';
     const LS_KEY     = 'educore_subjects';   // still mirrored: CreateExam/MarkEntry read this
     const subjectData = {};
@@ -338,7 +374,7 @@ $(document).ready(function () {
         EC.showLoader();
         EC.listLoading('#smPillWrap', 'Loading subjects…');
 
-        $.getJSON(LOAD_URL, { classId: id })
+        $.getJSON(LOAD_URL, { classId: id, academicYearId: SESSION_ID })
             .done(function(list) {
                 subjectData[id] = list || [];
                 loadClass(id, cls);
@@ -448,5 +484,33 @@ $(document).ready(function () {
     });
 
 });
+
+    // A session change reloads the page — the class list and each class's subjects
+    // belong to one session, so refreshing only part of it would mix them.
+    document.getElementById('sessionSel').addEventListener('change', function () {
+        var url = new URL(window.location.href);
+        url.searchParams.set('academicYearId', this.value);
+        window.location.href = url.toString();
+    });
+
+    // Filter the class list. Hides non-matching classes and says how many are
+    // left, so an empty list never looks like a load failure.
+    var $smSearch = $('#smSearch'), $smCount = $('#smSearchCount');
+    function filterClasses() {
+        var q = ($smSearch.val() || '').toLowerCase().trim();
+        var shown = 0, total = 0;
+
+        $('#classList .sm-class-item').each(function () {
+            total++;
+            var name = String($(this).data('class') || '').toLowerCase();
+            var hit  = !q || name.indexOf(q) !== -1;
+            $(this).toggle(hit);
+            if (hit) shown++;
+        });
+
+        $smCount.text(q ? shown + ' of ' + total : '');
+        $('#smNoMatch').toggle(q !== '' && shown === 0);
+    }
+    $smSearch.on('input', filterClasses);
 </script>
 }

@@ -98,3 +98,15 @@
     .act-srch-wrap{ flex:1 1 100%; max-width:100%; }
     .act-row{ grid-template-columns:1fr; }
 }
+
+/* Session picker in the filter bar — inline and sized to content. */
+.act-session-label {
+    font-size: .66rem; font-weight: 800; letter-spacing: .04em;
+    color: #8b8175; white-space: nowrap;
+}
+.act-session-badge {
+    flex: 0 0 auto; border-radius: 8px; padding: .2rem .45rem;
+    font-size: .62rem; font-weight: 900; letter-spacing: .03em; white-space: nowrap;
+}
+.act-session-badge.is-current { background: #ecfdf3; color: #16a34a; }
+.act-session-badge.is-other   { background: #fff3cd; color: #856404; }

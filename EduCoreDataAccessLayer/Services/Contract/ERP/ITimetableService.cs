@@ -9,8 +9,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
     /// </summary>
     public interface ITimetableService
     {
-        /// <summary>Periods, sections, teachers and day columns — one call on page load.</summary>
-        Task<TimetableSetup> GetSetupAsync(int tenantId, int schoolId, int actionUserId);
+        /// <summary>
+        /// Periods, sections, teachers and day columns — one call on page load.
+        /// academicYearId 0 = the current session. Sections are per session, so a
+        /// past year must be asked for explicitly.
+        /// </summary>
+        Task<TimetableSetup> GetSetupAsync(
+            int tenantId, int schoolId, int actionUserId, int academicYearId = 0);
 
         /// <summary>One section's week, plus other sections' bookings and the class's subjects.</summary>
         Task<TimetableGrid> GetGridAsync(int sectionId, int tenantId, int schoolId, int actionUserId);

@@ -67,6 +67,30 @@
         </div>
 
         <div class="act-fbar">
+          @* Sections are keyed per academic year, so the grid needs to be told
+             which session. Sits in the existing filter bar, like Timetable. *@
+          <span class="act-session-label">SESSION</span>
+          <select class="act-chip" id="sessionSel" title="Academic session">
+            @foreach (var y in (ViewBag.AcademicYears as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>()))
+            {
+                if (y.Value == Convert.ToString(ViewBag.AcademicYearId))
+                {
+                    <option value="@y.Value" selected>@y.Text</option>
+                }
+                else
+                {
+                    <option value="@y.Value">@y.Text</option>
+                }
+            }
+          </select>
+          @{
+              var _cur = (ViewBag.AcademicYears as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)?.FirstOrDefault(x => x.Selected);
+              var _isCurrent = _cur != null && _cur.Value == Convert.ToString(ViewBag.AcademicYearId);
+          }
+          <span class="act-session-badge @(_isCurrent ? "is-current" : "is-other")">
+            @(_isCurrent ? "CURRENT" : "NOT CURRENT")
+          </span>
+
           <div class="act-srch-wrap">
             <i class="bx bx-search act-srch-ic"></i>
             <input type="search" class="act-srch-inp" id="actSearch" placeholder="Search class, section or teacher…">
@@ -99,6 +123,7 @@
 'use strict';
 
 var GRID_URL   = '@Url.Action("ClassTeacherGrid", "SchoolSettings", new { area = "ERP" })';
+var SESSION_ID = @(ViewBag.AcademicYearId ?? 0);
 var POOL_URL   = '@Url.Action("ClassTeacherPool", "SchoolSettings", new { area = "ERP" })';
 var ASSIGN_URL = '@Url.Action("AssignClassTeacher", "SchoolSettings", new { area = "ERP" })';
 var TOKEN      = $('input[name="__RequestVerificationToken"]').first().val();
@@ -136,7 +161,7 @@ function populateClassFilter(){
 
 /* Load the staff pool + the class/section grid, then render. */
 function loadAll(){
-  $.when($.getJSON(POOL_URL), $.getJSON(GRID_URL))
+  $.when($.getJSON(POOL_URL), $.getJSON(GRID_URL, { academicYearId: SESSION_ID }))
     .done(function(poolRes, gridRes){
       TEACHERS = (poolRes[0]||[]).map(function(t){ return { id:t.staffId, name:t.fullName }; });
 
@@ -310,5 +335,13 @@ document.getElementById('actSearch').addEventListener('input',render);
 loadAll();
 
 })();
+
+/* A session change reloads: the grid, the class filter and the teacher loads all
+   belong to one session, so refreshing part of it would mix two. */
+document.getElementById('sessionSel').addEventListener('change', function () {
+  var url = new URL(window.location.href);
+  url.searchParams.set('academicYearId', this.value);
+  window.location.href = url.toString();
+});
 </script>
 }

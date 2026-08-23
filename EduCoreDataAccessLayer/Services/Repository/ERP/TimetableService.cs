@@ -17,12 +17,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             _db = db;
         }
 
-        public async Task<TimetableSetup> GetSetupAsync(int tenantId, int schoolId, int actionUserId)
+        public async Task<TimetableSetup> GetSetupAsync(
+            int tenantId, int schoolId, int actionUserId, int academicYearId = 0)
         {
             var setup = new TimetableSetup();
             if (tenantId <= 1 || schoolId <= 0) return setup;
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, Params("GetSetup", tenantId, schoolId, actionUserId));
+            var p = Params("GetSetup", tenantId, schoolId, actionUserId);
+            if (academicYearId > 0) p[4].Value = academicYearId;   // p_academic_year_id
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
             if (ds.Tables.Count == 0) return setup;
 
             foreach (DataRow row in ds.Tables[0].Rows)
