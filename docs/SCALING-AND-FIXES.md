@@ -1331,3 +1331,32 @@ since two sources of "current session" will drift again.
 | **DataReader** | Streams DB rows one at a time (low memory) vs. DataSet buffering all. |
 | **Caching** | Remember an expensive answer to avoid recomputing/refetching. |
 | **Cache invalidation** | Clearing cached data when the real data changes. |
+
+### [2026-08-23] Dropping a proc overload broke the deployed app (42883)
+
+class_teacher_session.sql added `p_academic_year_id` to
+`core.sp_class_teacher_manage` and dropped the 9-arg signature, because
+CREATE OR REPLACE cannot add a parameter. Applying it to Railway broke the
+Railway-hosted app with **42883 procedure does not exist**: local dev and the
+deployed app **share one database**, and the deployed build was still sending 9
+params. It took out the `IsTeacher` operation too — the attendance-marking gate
+at `AttendanceController.cs:38` — so it was not merely a settings page.
+
+Fix: `class_teacher_session_compat.sql` keeps both signatures while the two
+builds coexist, the 9-arg one a thin shim delegating with a NULL year.
+
+Two things that make this less obvious than it looks:
+
+- **Two overloads differing only by a trailing DEFAULT param are ambiguous to a
+  named-argument call** — `procedure is not unique` — and named args are how
+  Npgsql calls procs. So `p_academic_year_id` must have **no** default: a 9-name
+  call then cannot match the 10-arg proc, and a 10-name call cannot match the
+  shim. Verified both ways on PG 16 before touching production.
+- **CREATE OR REPLACE cannot remove a parameter default**, so the proc has to be
+  dropped and recreated. Wrapping it in BEGIN/COMMIT makes that atomic —
+  PostgreSQL DDL is transactional — so no request can land mid-swap.
+
+**The rule this establishes:** a proc signature change is only safe to apply to
+a shared database once every build talking to it sends the new shape. Ship the
+compatible signature first, deploy, then remove the shim. Remove this one when
+the deployed build is on 10 params.
