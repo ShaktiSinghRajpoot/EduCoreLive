@@ -28,43 +28,11 @@
     .exam-page .form-select:focus { border-color: var(--ec-orange); box-shadow: 0 0 0 4px rgba(255,138,0,.12); }
     .exam-field-label { font-size: .7rem; font-weight: 800; color: var(--ec-muted); margin-bottom: .35rem; letter-spacing: .02em; }
 
-    /* ── Section header ── */
-    .exam-section-head {
-        display: flex; align-items: center; gap: .6rem; margin-bottom: 1rem;
-    }
-    .exam-section-num {
-        width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
-        background: var(--ec-orange-soft); color: var(--ec-orange);
-        font-size: .78rem; font-weight: 900;
-        display: flex; align-items: center; justify-content: center;
-    }
     .exam-section-title { font-size: 1rem; font-weight: 900; color: var(--ec-heading); }
-    .exam-section-sub { font-size: .78rem; font-weight: 700; color: var(--ec-muted); margin-top: .05rem; }
-
     /* has-error for selects */
     .has-error .form-select { border-color: var(--ec-danger) !important; }
 
-    /* ── Subject schedule table ── */
-    .subj-table { width: 100%; border-collapse: separate; border-spacing: 0 8px; }
-    .subj-table thead th {
-        font-size: .7rem; font-weight: 800; color: var(--ec-muted); letter-spacing: .04em;
-        padding: 0 .6rem .4rem; text-align: left;
-    }
-    .subj-row { background: #fff; }
-    .subj-row td {
-        padding: .5rem .6rem; border-top: 1px solid var(--ec-border); border-bottom: 1px solid var(--ec-border);
-        vertical-align: middle;
-    }
-    .subj-row td:first-child { border-left: 1px solid var(--ec-border); border-radius: 12px 0 0 12px; padding-left: .9rem; }
-    .subj-row td:last-child  { border-right: 1px solid var(--ec-border); border-radius: 0 12px 12px 0; padding-right: .9rem; }
-    .subj-row .form-control { min-height: 40px; font-size: .85rem; padding: .35rem .65rem; }
     .subj-name { font-weight: 800; font-size: .9rem; color: var(--ec-heading); }
-    .subj-ico {
-        width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
-        display: inline-flex; align-items: center; justify-content: center; font-size: 1rem;
-        background: var(--ec-indigo-soft); color: var(--ec-indigo);
-    }
-
     /* Mobile: table → cards */
     .subj-cards { display: none; }
     .subj-card {
@@ -75,13 +43,12 @@
     .subj-card-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
 
     @media (max-width: 767.98px) {
-        .subj-table-wrap { display: none; }
         .subj-cards { display: block; }
     }
 
-    /* ── Step 3 status panel ──
-       Holds every "no rows" state for the schedule: no class picked, loading,
-       class has no subjects, load failed. Padding comes from EC.listState. */
+    /* ── Status panel ──
+       Holds every "no rows" state for the datesheet: no class picked, loading,
+       classes have no subjects, load failed. Padding comes from EC.listState. */
     .subj-empty {
         text-align: center;
         border: 1.5px dashed var(--ec-border); border-radius: 16px;
@@ -89,7 +56,7 @@
 
     .exam-hint { font-size: .74rem; font-weight: 700; color: var(--ec-muted); margin-top: .3rem; }
 
-    /* ── Step 2: which classes sit the exam ── */
+    /* ── Which classes sit the exam ── */
     .exam-class-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
@@ -108,25 +75,6 @@
     .exam-class-name { display: block; font-size: .88rem; font-weight: 900; color: var(--ec-heading); }
     .exam-class-sub  { display: block; font-size: .7rem; font-weight: 700; color: var(--ec-muted); margin-top: .1rem; }
 
-    /* ── Step 3: whose datesheet is on screen ── */
-    .exam-sheet-bar {
-        display: flex; align-items: flex-end; justify-content: space-between;
-        gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem;
-    }
-    .exam-sheet-pick { display: flex; flex-direction: column; min-width: 200px; }
-    .exam-sheet-pick .form-select { min-width: 200px; }
-
-    .exam-copy-panel {
-        border: 1.5px dashed var(--ec-orange); border-radius: 14px;
-        background: var(--ec-orange-soft); padding: .85rem 1rem; margin-bottom: 1rem;
-    }
-    .exam-copy-title { font-size: .84rem; font-weight: 800; color: var(--ec-heading); margin-bottom: .6rem; }
-    .exam-copy-list { display: flex; flex-wrap: wrap; gap: .5rem 1.1rem; }
-    .exam-copy-item {
-        display: inline-flex; align-items: center; gap: .35rem; margin: 0;
-        font-size: .84rem; font-weight: 800; color: var(--ec-text); cursor: pointer;
-    }
-
     /* ── "Exams this year" list ── */
     .exam-list-row {
         display: flex; align-items: center; gap: .75rem; flex-wrap: wrap;
@@ -137,10 +85,6 @@
     .exam-list-main { flex: 1 1 220px; min-width: 0; }
     .exam-list-name { font-weight: 900; font-size: .92rem; color: var(--ec-heading); }
     .exam-list-meta { font-size: .76rem; font-weight: 700; color: var(--ec-muted); margin-top: .15rem; }
-    .exam-list-classes {
-        font-size: .74rem; font-weight: 800; color: var(--ec-indigo);
-        margin-top: .2rem; word-break: break-word;
-    }
     .exam-list-type {
         display: inline-block; padding: .15rem .5rem; border-radius: 8px;
         font-size: .68rem; font-weight: 900; letter-spacing: .02em;
@@ -174,3 +118,120 @@
     .has-error .form-control,
     .has-error .form-select { border-color: var(--ec-danger) !important; }
     .has-error .field-error { display: block; }
+
+    /* ── Exams this year ── */
+    .exam-list-head { margin-bottom: .85rem; }
+
+    /* ── Optional section chooser, per ticked class ── */
+    .exam-sec-row {
+        display: flex; align-items: center; gap: .5rem 1rem; flex-wrap: wrap;
+        border: 1px solid var(--ec-border); border-radius: 12px; background: #fff;
+        padding: .5rem .8rem; margin-bottom: 6px;
+    }
+    .exam-sec-class { font-size: .85rem; font-weight: 900; color: var(--ec-heading); min-width: 70px; }
+    .exam-sec-item {
+        display: inline-flex; align-items: center; gap: .3rem; margin: 0;
+        font-size: .84rem; font-weight: 800; color: var(--ec-text); cursor: pointer;
+    }
+    .exam-sec-hint { margin-left: auto; font-size: .72rem; font-weight: 800; color: var(--ec-muted); }
+
+    /* ── Class-wise exam list ── */
+    .exam-tbl-wrap { overflow-x: auto; }
+    .exam-tbl { width: 100%; border-collapse: collapse; }
+    .exam-tbl thead th {
+        font-size: .7rem; font-weight: 800; color: var(--ec-muted); letter-spacing: .04em;
+        text-transform: uppercase; text-align: left;
+        padding: .4rem .7rem; border-bottom: 1.5px solid var(--ec-border); white-space: nowrap;
+    }
+    .exam-tbl tbody td {
+        padding: .6rem .7rem; font-size: .85rem; color: var(--ec-text); vertical-align: middle;
+    }
+    /* A continuation row belongs to the exam above it, so only hairline it off. */
+    .exam-tbl tbody tr.is-first td { border-top: 1px solid var(--ec-border); }
+    .exam-tbl tbody tr.is-cont td  { border-top: 1px dashed #f1f0f4; }
+    .exam-tbl tbody tr.is-editing td { background: var(--ec-orange-soft); }
+    .exam-cell-name { font-weight: 900; color: var(--ec-heading); }
+    .exam-cell-year { font-size: .74rem; font-weight: 700; color: var(--ec-muted); margin-top: .1rem; }
+    .exam-cell-cls  { font-weight: 800; color: var(--ec-heading); display: block; }
+    .exam-cell-all  { font-size: .7rem; font-weight: 700; color: var(--ec-muted); }
+    .exam-cell-dates { font-weight: 700; color: var(--ec-muted); white-space: nowrap; }
+    .exam-badge {
+        display: inline-block; padding: .2rem .5rem; border-radius: 8px;
+        font-size: .66rem; font-weight: 900; letter-spacing: .04em;
+    }
+    .exam-badge.is-pub   { background: var(--ec-success-soft); color: var(--ec-success); }
+    .exam-badge.is-draft { background: #f1f5f9; color: var(--ec-muted); }
+    .exam-list-actions .btn { padding: 0 .55rem; }
+
+    /* ── The grid: subjects down, classes across ── */
+    .exam-grid-bar {
+        display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin: 1rem 0 .6rem;
+    }
+    .exam-view-tabs { display: inline-flex; border: 1.5px solid var(--ec-border); border-radius: 12px; overflow: hidden; }
+    .exam-view-tabs button {
+        border: 0; background: #fff; color: var(--ec-muted);
+        font-size: .78rem; font-weight: 900; padding: .45rem .8rem; cursor: pointer;
+        border-right: 1px solid var(--ec-border);
+    }
+    .exam-view-tabs button:last-child { border-right: 0; }
+    .exam-view-tabs button.is-on { background: var(--ec-orange); color: #fff; }
+
+    .exam-grid-wrap { overflow-x: auto; }
+    .exam-grid { border-collapse: separate; border-spacing: 0 6px; min-width: 100%; }
+    .exam-grid thead th {
+        font-size: .72rem; font-weight: 900; color: var(--ec-heading); letter-spacing: .02em;
+        padding: 0 .5rem .35rem; text-align: left; white-space: nowrap;
+    }
+    .exam-grid thead th.col-subject { min-width: 190px; }
+    .exam-grid tbody td {
+        background: #fff; padding: .4rem .5rem; vertical-align: middle;
+        border-top: 1px solid var(--ec-border); border-bottom: 1px solid var(--ec-border);
+    }
+    .exam-grid tbody td:first-child { border-left: 1px solid var(--ec-border); border-radius: 12px 0 0 12px; }
+    .exam-grid tbody td:last-child  { border-right: 1px solid var(--ec-border); border-radius: 0 12px 12px 0; }
+    .exam-grid td.col-subject { display: flex; align-items: center; gap: .4rem; }
+    .exam-grid .form-control { min-height: 38px; font-size: .84rem; padding: .3rem .55rem; min-width: 130px; }
+    .cell-time { display: flex; gap: 4px; }
+    .cell-time .form-control { min-width: 92px; }
+    .cell-na { color: var(--ec-muted); font-weight: 800; padding-left: .3rem; }
+
+    .exam-row-head { display: flex; align-items: center; gap: .45rem; margin: 0; cursor: pointer; flex: 1 1 auto; }
+    .row-fill {
+        border: 1px solid var(--ec-border); background: #fff; color: var(--ec-muted);
+        border-radius: 8px; width: 28px; height: 28px; flex-shrink: 0; cursor: pointer;
+        display: inline-flex; align-items: center; justify-content: center;
+    }
+    .row-fill:hover { border-color: var(--ec-orange); color: var(--ec-orange); }
+    .exam-grid-hint { font-size: .74rem; font-weight: 700; color: var(--ec-muted); margin-top: .5rem; }
+
+    /* Phones: one block per class instead of a wide grid. */
+    .exam-mob { display: none; }
+    .exam-mob-class { margin-bottom: 1rem; }
+    .exam-mob-head {
+        font-size: .8rem; font-weight: 900; color: var(--ec-orange);
+        background: var(--ec-orange-soft); border-radius: 10px;
+        padding: .35rem .7rem; margin-bottom: .5rem; display: inline-block;
+    }
+
+    @media (max-width: 767.98px) {
+        .exam-grid-wrap, .exam-grid-hint { display: none; }
+        .exam-mob { display: block; }
+    }
+
+    /* ── Session picker + which one is current ── */
+    .exam-session-pick { display: flex; align-items: center; gap: .4rem; }
+    .exam-session-pick .form-select { flex: 1 1 auto; min-width: 0; }
+    .exam-session-badge {
+        flex-shrink: 0; border-radius: 8px; padding: .2rem .45rem;
+        font-size: .62rem; font-weight: 900; letter-spacing: .03em; white-space: nowrap;
+    }
+    .exam-session-badge.is-current { background: #ecfdf3; color: #16a34a; }
+    .exam-session-badge.is-other   { background: #fff3cd; color: #856404; }
+
+    /* ── from/to pairs: one field, two inputs, never wrapping apart ── */
+    .exam-range { display: flex; align-items: center; gap: .4rem; }
+    .exam-range .form-control { flex: 1 1 0; min-width: 0; }
+    .exam-range-sep {
+        flex-shrink: 0; font-size: .74rem; font-weight: 800;
+        color: var(--ec-muted); text-transform: uppercase;
+    }

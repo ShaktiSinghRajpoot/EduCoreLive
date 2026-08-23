@@ -6,6 +6,11 @@
     var classes  = ViewBag.Classes as List<SubjectClassItem> ?? new List<SubjectClassItem>();
     var exams    = ViewBag.Exams   as List<ExamListItem>     ?? new List<ExamListItem>();
     var yearName = ViewBag.AcademicYearName as string ?? string.Empty;
+    var sessions  = ViewBag.Sessions as List<SelectListItem> ?? new List<SelectListItem>();
+    var sessionId = (int?)ViewBag.SessionId ?? 0;
+    var currentSessionId = 0;
+    var cur = sessions.FirstOrDefault(x => x.Selected);
+    if (cur != null) { int.TryParse(cur.Value, out currentSessionId); }
 }
 
 @section PageStyles {
@@ -37,7 +42,7 @@
         @if (exams.Count == 0)
         {
             <div class="alert alert-warning" style="border-radius:12px;font-weight:700;">
-                No exams have been created for this academic year yet.
+                No exams have been published for @(string.IsNullOrWhiteSpace(yearName) ? "this session" : yearName) yet.
                 <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam">Create an exam schedule</a> first.
             </div>
         }
@@ -46,7 +51,26 @@
         <div class="ec-card mb-3 ds-no-print">
             <div class="ec-card-body">
                 <div class="row g-3 align-items-end">
-                    <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="col-12 col-sm-6 col-lg-3">
+                        <div class="ds-label">SESSION</div>
+                        <div class="exam-session-pick">
+                            <select class="form-select" id="sessionSel">
+                                @foreach (var sn in sessions)
+                                {
+                                    <option value="@sn.Value" selected="@(sn.Value == sessionId.ToString())">@sn.Text</option>
+                                }
+                            </select>
+                            @if (sessionId == currentSessionId)
+                            {
+                                <span class="exam-session-badge is-current">CURRENT</span>
+                            }
+                            else
+                            {
+                                <span class="exam-session-badge is-other">NOT CURRENT</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-lg-3">
                         <div class="ds-label">CLASS</div>
                         <select class="form-select" id="dsClass">
                             <option value="0">All classes</option>
@@ -56,7 +80,7 @@
                             }
                         </select>
                     </div>
-                    <div class="col-12 col-sm-6 col-lg-4">
+                    <div class="col-12 col-sm-6 col-lg-3">
                         <div class="ds-label">EXAM</div>
                         <select class="form-select" id="dsExam">
                             <option value="0">All exams</option>
@@ -68,7 +92,7 @@
                             }
                         </select>
                     </div>
-                    <div class="col-12 col-lg-4 d-flex gap-2">
+                    <div class="col-12 col-lg-3 d-flex gap-2">
                         <button type="button" class="btn btn-ds-primary flex-grow-1" id="dsLoad">
                             <i class="bx bx-search me-1"></i>Show datesheet
                         </button>
@@ -91,6 +115,10 @@
                     <div class="ds-count" id="dsCount"></div>
                 </div>
 
+                <div class="ds-warn" id="dsWarn" style="display:none;">
+                    <i class="bx bx-error-circle"></i><span></span>
+                </div>
+
                 <div id="dsBody"></div>
             </div>
         </div>
@@ -102,7 +130,13 @@
 <script>
 $(document).ready(function () {
 
-    var urlRows = '@Url.Action("DatesheetRows", "Exam", new { area = "ERP" })';
+    var urlRows    = '@Url.Action("DatesheetRows", "Exam", new { area = "ERP" })';
+    var SESSION_ID = @sessionId;
+
+    // A session change reloads: the class and exam pickers belong to one session.
+    $('#sessionSel').on('change', function () {
+        window.location.href = '@Url.Action("Datesheet", "Exam", new { area = "ERP" })' + '?sessionId=' + EC.num(this.value);
+    });
 
     var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -121,6 +155,13 @@ $(document).ready(function () {
         };
     }
 
+    // 10:00 + 13:00 -> "10:00 – 13:00";  one side only still reads sensibly.
+    function fmtTime(from, to) {
+        if (!from && !to) return '';
+        if (from && to) return from + ' – ' + to;
+        return from || to;
+    }
+
     function fmtMarks(v) {
         var n = Number(v);
         return isFinite(n) ? String(n) : '';
@@ -137,7 +178,7 @@ $(document).ready(function () {
         EC.showLoader();
         EC.listLoading('#dsBody', 'Loading datesheet…');
 
-        $.get(urlRows, { classId: classId, examId: examId })
+        $.get(urlRows, { classId: classId, examId: examId, sessionId: SESSION_ID })
             .done(function (d) {
                 var rows = (d && d.rows) || [];
                 if (!rows.length) {
@@ -145,7 +186,16 @@ $(document).ready(function () {
                     return;
                 }
                 render(rows);
+
+                var clashes = rows.filter(function (r) { return r.clash; }).length;
                 $('#dsCount').text(rows.length + ' paper' + (rows.length === 1 ? '' : 's'));
+                if (clashes) {
+                    $('#dsWarn').show().find('span').text(
+                        clashes + ' paper' + (clashes === 1 ? ' is' : 's are') +
+                        ' scheduled on top of another for the same class. Fix them on the Exam Schedule page.');
+                } else {
+                    $('#dsWarn').hide();
+                }
             })
             .fail(function () {
                 EC.listEmpty('#dsBody', 'Could not load the datesheet. Please retry.', 'bx-error-circle');
@@ -178,10 +228,19 @@ $(document).ready(function () {
                 '<div class="ds-day-rows">';
 
             $.each(byDate[key], function (j, r) {
-                html += '<div class="ds-row">' +
+                var time = fmtTime(r.startTime, r.endTime);
+                var warn = r.clash
+                    ? '<span class="ds-clash" title="This class sits another paper in the same slot">' +
+                      '<i class="bx bx-error"></i> clash</span>'
+                    : '';
+                var cls   = EC.esc(r.className) + (r.sections ? ' (' + EC.esc(r.sections) + ')' : '');
+
+                html += '<div class="ds-row' + (r.clash ? ' is-clash' : '') + '">' +
                     '<div class="ds-row-main">' +
                         '<span class="ds-subject">' + EC.esc(r.subject) + '</span>' +
-                        (showClass ? '<span class="ds-chip ds-chip-class">' + EC.esc(r.className) + '</span>' : '') +
+                        (time ? '<span class="ds-time"><i class="bx bx-time-five"></i> ' + EC.esc(time) + '</span>' : '') +
+                        warn +
+                        (showClass ? '<span class="ds-chip ds-chip-class">' + cls + '</span>' : '') +
                         (showExam  ? '<span class="ds-chip">' + EC.esc(r.examName) + '</span>' : '') +
                     '</div>' +
                     '<div class="ds-row-marks">' +

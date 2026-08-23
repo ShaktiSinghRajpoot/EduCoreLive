@@ -7,6 +7,11 @@
     var classes   = ViewBag.Classes   as List<SubjectClassItem> ?? new List<SubjectClassItem>();
     var examTypes = ViewBag.ExamTypes as List<SelectListItem>   ?? new List<SelectListItem>();
     var yearName  = ViewBag.AcademicYearName as string ?? string.Empty;
+    var sessions  = ViewBag.Sessions as List<SelectListItem> ?? new List<SelectListItem>();
+    var sessionId = (int?)ViewBag.SessionId ?? 0;
+    var currentSessionId = 0;
+    var cur = sessions.FirstOrDefault(x => x.Selected);
+    if (cur != null) { int.TryParse(cur.Value, out currentSessionId); }
 }
 
 @section PageStyles {
@@ -18,43 +23,58 @@
 <div class="ec-page-shell exam-page">
     <div class="ec-page-content">
 
-        <!-- ── Page Header ── -->
+        <!-- ── Page header ── -->
         <div class="ec-page-header">
-            <div class="ec-page-title-wrap d-flex align-items-start gap-3">
-                <div class="ec-page-icon"><i class="bx bx-spreadsheet"></i></div>
-                <div>
-                    <h4 class="ec-page-title mb-1">Exam Schedule</h4>
-                    <div class="ec-page-subtitle">
-                        One exam covers many classes. Name it once, then set each class&#39;s subjects, dates and marks.
+            <div class="ec-page-header-inner">
+                <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                    <div class="ec-page-icon"><i class="bx bx-spreadsheet"></i></div>
+                    <div>
+                        <h4 class="ec-page-title mb-1">Exam Schedule</h4>
+                        <div class="ec-page-subtitle">
+                            One exam, any number of classes@(string.IsNullOrWhiteSpace(yearName) ? "" : " · " + yearName)
+                        </div>
                     </div>
                 </div>
+                <a asp-area="ERP" asp-controller="Exam" asp-action="Datesheet"
+                   class="btn btn-outline-secondary d-flex align-items-center gap-1">
+                    <i class="bx bx-calendar"></i><span class="d-none d-sm-inline">Datesheet</span>
+                </a>
             </div>
         </div>
 
-        <!-- ════ SECTION 1 — Exam Details ════ -->
+        <!-- ════ The exam ════ -->
         <div class="ec-card mb-3">
             <div class="ec-card-body">
-                <div class="exam-section-head">
-                    <div class="exam-section-num">1</div>
-                    <div>
-                        <div class="exam-section-title">Exam Details</div>
-                        <div class="exam-section-sub">Name, type and the window it runs in</div>
-                    </div>
-                </div>
-
                 <div class="row g-3">
-                    <div class="col-12 col-md-6" id="examNameWrap">
+                    <div class="col-12 col-md-3">
+                        <div class="exam-field-label">SESSION</div>
+                        <div class="exam-session-pick">
+                            <select class="form-select" id="sessionSel">
+                                @foreach (var sn in sessions)
+                                {
+                                    <option value="@sn.Value" selected="@(sn.Value == sessionId.ToString())">@sn.Text</option>
+                                }
+                            </select>
+                            @if (sessionId == currentSessionId)
+                            {
+                                <span class="exam-session-badge is-current">CURRENT</span>
+                            }
+                            else
+                            {
+                                <span class="exam-session-badge is-other">NOT CURRENT</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-5" id="examNameWrap">
                         <div class="exam-field-label">EXAM NAME <span style="color:var(--ec-danger)">*</span></div>
                         <input type="text" class="form-control" id="examName" maxlength="80"
-                               placeholder="e.g. Unit Test 1">
+                               placeholder="e.g. Half Yearly">
                         <div class="field-error" id="examNameErr">Please enter an exam name.</div>
-                        <div class="exam-hint">One name for the whole school &mdash; every class below sits this exam.</div>
                     </div>
-
-                    <div class="col-12 col-md-6">
-                        <div class="exam-field-label">EXAM TYPE <span style="color:var(--ec-muted);font-weight:600;">(optional)</span></div>
+                    <div class="col-12 col-md-4">
+                        <div class="exam-field-label">TYPE</div>
                         <select class="form-select" id="examType">
-                            <option value="">Select Type</option>
+                            <option value="">—</option>
                             @foreach (var t in examTypes)
                             {
                                 <option value="@t.Value">@t.Text</option>
@@ -63,53 +83,59 @@
                     </div>
                 </div>
 
-                <div class="row g-3 mt-0">
+                @* A from/to pair reads as one field, so keep each pair on one line. *@
+                <div class="row g-3 mt-0 align-items-start">
+                    <div class="col-12 col-md-4" id="examDatesWrap">
+                        <div class="exam-field-label">EXAM RUNS <span style="color:var(--ec-danger)">*</span></div>
+                        <div class="exam-range">
+                            <input type="date" class="form-control" id="startDate">
+                            <span class="exam-range-sep">to</span>
+                            <input type="date" class="form-control" id="endDate">
+                        </div>
+                        <div class="field-error" id="examDatesErr">
+                            Enter both dates; the end cannot be before the start.
+                        </div>
+                    </div>
                     <div class="col-12 col-md-4">
-                        <div class="exam-field-label">ACADEMIC YEAR</div>
-                        <input type="text" class="form-control" id="academicYear"
-                               value="@(string.IsNullOrWhiteSpace(yearName) ? "Not set up" : yearName)" readonly
-                               style="background:#f8f7f5;cursor:default;">
+                        <div class="exam-field-label">DAILY TIMING</div>
+                        <div class="exam-range">
+                            <input type="time" class="form-control" id="startTime">
+                            <span class="exam-range-sep">to</span>
+                            <input type="time" class="form-control" id="endTime">
+                        </div>
                     </div>
-                    <div class="col-6 col-md-4" id="startDateWrap">
-                        <div class="exam-field-label">START DATE <span style="color:var(--ec-danger)">*</span></div>
-                        <input type="date" class="form-control" id="startDate">
-                        <div class="field-error" id="startDateErr">Required.</div>
+                    <div class="col-6 col-md-2">
+                        <div class="exam-field-label">MAX MARKS</div>
+                        <input type="number" class="form-control" id="maxMarks" value="100" min="1" max="1000">
                     </div>
-                    <div class="col-6 col-md-4" id="endDateWrap">
-                        <div class="exam-field-label">END DATE <span style="color:var(--ec-danger)">*</span></div>
-                        <input type="date" class="form-control" id="endDate">
-                        <div class="field-error" id="endDateErr">Must be on or after start date.</div>
+                    <div class="col-6 col-md-2">
+                        <div class="exam-field-label">PASS MARKS</div>
+                        <input type="number" class="form-control" id="passMarks" value="35" min="0" max="1000">
                     </div>
                 </div>
 
+                <div class="exam-hint mt-2">
+                    The marks and timing above are starting values for each subject. Any cell in the
+                    grid below can differ &mdash; a 50-mark junior paper and a 100-mark senior one
+                    can sit in the same exam.
+                </div>
             </div>
         </div>
 
-        <!-- ════ SECTION 2 — Classes ════ -->
+        <!-- ════ Classes, sections, and the grid ════ -->
         <div class="ec-card mb-3">
             <div class="ec-card-body">
-                <div class="exam-section-head">
-                    <div class="exam-section-num">2</div>
-                    <div>
-                        <div class="exam-section-title">Classes</div>
-                        <div class="exam-section-sub">Which classes sit this exam</div>
-                    </div>
-                </div>
 
                 @if (classes.Count == 0)
                 {
                     <div class="alert alert-warning mb-0" style="border-radius:12px;font-weight:700;">
-                        No classes are set up for the current academic year. Add them under
-                        School Settings &rarr; Classes &amp; Sections first.
+                        No classes are set up for @(string.IsNullOrWhiteSpace(yearName) ? "this session" : yearName).
+                        Add them under School Settings &rarr; Classes &amp; Sections first.
                     </div>
                 }
                 else
                 {
-                    <div class="d-flex gap-2 mb-3">
-                        <button type="button" class="btn btn-ex-ghost btn-sm" id="classSelectAll">Select all</button>
-                        <button type="button" class="btn btn-ex-ghost btn-sm" id="classClearAll">Clear</button>
-                    </div>
-
+                    <div class="exam-field-label">CLASSES SITTING THIS EXAM <span style="color:var(--ec-danger)">*</span></div>
                     <div class="exam-class-grid" id="classGrid">
                         @foreach (var c in classes)
                         {
@@ -117,89 +143,57 @@
                                 <input type="checkbox" class="form-check-input class-chk"
                                        value="@c.AcademicClassId"
                                        data-name="@c.ClassName"
-                                       data-subjects="@c.SubjectCount"
                                        @(c.SubjectCount == 0 ? "disabled" : "")>
                                 <span>
                                     <span class="exam-class-name">@c.ClassName</span>
-                                    <span class="exam-class-sub">
-                                        @(c.SubjectCount == 0 ? "no subjects mapped" : $"{c.SubjectCount} subjects")
-                                    </span>
+                                    @if (c.SubjectCount == 0)
+                                    {
+                                        <span class="exam-class-sub">no subjects</span>
+                                    }
                                 </span>
                             </label>
                         }
                     </div>
-                    <div class="field-error" id="classErr">Please select at least one class.</div>
+
+                    <!-- Optional: narrow a class to certain sections -->
+                    <div id="sectionPickers"></div>
+
+                    <!-- Which value the grid cells hold -->
+                    <div class="exam-grid-bar" id="gridBar" style="display:none;">
+                        <span class="exam-field-label mb-0">CELLS SHOW</span>
+                        <div class="exam-view-tabs" id="viewTabs">
+                            <button type="button" data-view="date" class="is-on">Dates</button>
+                            <button type="button" data-view="time">Times</button>
+                            <button type="button" data-view="max">Max marks</button>
+                            <button type="button" data-view="pass">Pass marks</button>
+                        </div>
+                    </div>
+
+                    <div id="subjStatus" class="subj-empty"></div>
+
+                    <div id="gridResult" style="display:none;">
+                        <div class="exam-grid-wrap">
+                            <table class="exam-grid" id="examGrid"></table>
+                        </div>
+                        <div class="exam-grid-hint">
+                            A dash means the class does not study that subject &mdash; set it up under
+                            Subject Management. Use <i class="bx bx-right-arrow-alt"></i> on a row to copy
+                            its first value across every class.
+                        </div>
+
+                        <!-- Phones get one block per class; a wide grid is unusable there. -->
+                        <div class="exam-mob" id="examMob"></div>
+                    </div>
                 }
 
             </div>
         </div>
 
-        <!-- ════ SECTION 3 — Subject Schedule ════ -->
-        <div class="ec-card mb-3">
-            <div class="ec-card-body">
-                <div class="exam-section-head">
-                    <div class="exam-section-num">3</div>
-                    <div>
-                        <div class="exam-section-title">Subject Schedule</div>
-                        <div class="exam-section-sub">Set each class&#39;s dates and marks &mdash; untick a subject to leave it out</div>
-                    </div>
-                </div>
-
-                <!-- Which class's datesheet is on screen -->
-                <div class="exam-sheet-bar" id="sheetBar" style="display:none;">
-                    <div class="exam-sheet-pick">
-                        <span class="exam-field-label mb-0">DATESHEET FOR</span>
-                        <select class="form-select" id="sheetClass"></select>
-                    </div>
-                    <button type="button" class="btn btn-ex-ghost" id="copyToggle">
-                        <i class="bx bx-copy me-1"></i>Copy to other classes
-                    </button>
-                </div>
-
-                <!-- Copy panel -->
-                <div class="exam-copy-panel" id="copyPanel" style="display:none;">
-                    <div class="exam-copy-title">
-                        Copy <strong id="copyFromName">this</strong> datesheet to:
-                    </div>
-                    <div class="exam-copy-list" id="copyList"></div>
-                    <div class="d-flex gap-2 mt-2">
-                        <button type="button" class="btn btn-ex-primary btn-sm" id="copyApply">Copy datesheet</button>
-                        <button type="button" class="btn btn-ex-ghost btn-sm" id="copyCancel">Cancel</button>
-                    </div>
-                    <div class="exam-hint mt-2">
-                        Dates and marks are copied for every subject the target class also studies.
-                        Its other subjects keep their own values.
-                    </div>
-                </div>
-
-                <!-- Every "no rows" state for this step lands here -->
-                <div id="subjStatus" class="subj-empty"></div>
-
-                <div id="subjResult" style="display:none;">
-                    <div class="subj-table-wrap" id="subjTableWrap">
-                        <table class="subj-table">
-                            <thead>
-                                <tr>
-                                    <th style="width:40%">SUBJECT</th>
-                                    <th style="width:24%">EXAM DATE</th>
-                                    <th style="width:18%">MAX MARKS</th>
-                                    <th style="width:18%">PASS MARKS</th>
-                                </tr>
-                            </thead>
-                            <tbody id="subjTableBody"></tbody>
-                        </table>
-                    </div>
-                    <div class="subj-cards" id="subjCards"></div>
-                </div>
-
-            </div>
-        </div>
-
-        <!-- ════ Sticky Action Bar ════ -->
+        <!-- ════ Sticky bar ════ -->
         <div class="exam-bar">
             <div class="exam-bar-inner">
                 <div class="exam-bar-summary">
-                    <span id="barSummary">Fill in the details above to create an exam.</span>
+                    <span id="barSummary">Fill in the exam details to begin.</span>
                 </div>
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-ex-ghost" id="cancelBtn">Clear</button>
@@ -210,22 +204,27 @@
             </div>
         </div>
 
-        <!-- ════ Exams this year ════ -->
+        <!-- ════ Exams this year (class-wise) ════ -->
         <div class="ec-card mt-3">
             <div class="ec-card-body">
-                <div class="exam-section-head">
-                    <div class="exam-section-num"><i class="bx bx-list-ul"></i></div>
-                    <div>
-                        <div class="exam-section-title">Exams this year</div>
-                        <div class="exam-section-sub">@(string.IsNullOrWhiteSpace(yearName) ? "Current academic year" : yearName)</div>
-                    </div>
-                    <a asp-area="ERP" asp-controller="Exam" asp-action="Datesheet"
-                       class="btn btn-ex-ghost ms-auto">
-                        <i class="bx bx-calendar me-1"></i>View datesheet
-                    </a>
+                <div class="exam-list-head">
+                    <div class="exam-section-title">Exams this year</div>
                 </div>
-
-                <div id="examList"></div>
+                <div class="exam-tbl-wrap">
+                    <table class="exam-tbl">
+                        <thead>
+                            <tr>
+                                <th>Exam Name</th>
+                                <th>Class &amp; Section</th>
+                                <th>Dates</th>
+                                <th>Status</th>
+                                <th style="text-align:right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="examListBody"></tbody>
+                    </table>
+                </div>
+                <div id="examListEmpty"></div>
             </div>
         </div>
 
@@ -238,25 +237,55 @@ $(document).ready(function () {
 
     var urls = {
         subjects: '@Url.Action("Subjects", "Exam", new { area = "ERP" })',
-        exams:    '@Url.Action("Exams", "Exam", new { area = "ERP" })',
+        sections: '@Url.Action("ClassSections", "Exam", new { area = "ERP" })',
+        list:     '@Url.Action("ExamList", "Exam", new { area = "ERP" })',
         exam:     '@Url.Action("Exam", "Exam", new { area = "ERP" })',
         save:     '@Url.Action("SaveExam", "Exam", new { area = "ERP" })',
+        status:   '@Url.Action("SetExamStatus", "Exam", new { area = "ERP" })',
         remove:   '@Url.Action("DeleteExam", "Exam", new { area = "ERP" })'
     };
 
-    // 0 = creating a new exam, otherwise the exam_id being edited.
-    var editingId = 0;
+    var SESSION_ID = @sessionId;
 
-    // classId -> [ { subjectId, name, date, max, pass, on } ]
-    // Held for every ticked class at once, so switching class just swaps the view
-    // and one Save posts the whole exam.
+    // Changing the session reloads the page: the class list, subjects and exam
+    // list all belong to one session, so a partial refresh would mix them.
+    $('#sessionSel').on('change', function () {
+        window.location.href = '@Url.Action("CreateExam", "Exam", new { area = "ERP" })' + '?sessionId=' + EC.num(this.value);
+    });
+
+    var editingId = 0;
+    // classId -> [ { subjectId, name, on, date, from, to, max, pass } ]
+    // The grid is a view over this; each cell edits one (class, subject).
     var sheets = {};
-    var sheetClassId = 0;          // whose datesheet is on screen
+    var sectionsOf = {};       // classId -> [ { name, students } ]
+    var chosen = {};           // classId -> [ section names ]  ([] = whole class)
+    var view = 'date';         // which value the cells hold
 
     var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-    function token() {
-        return $('input[name="__RequestVerificationToken"]').first().val();
+    function token() { return $('input[name="__RequestVerificationToken"]').first().val(); }
+
+    // yyyy-mm-dd + n days, built from parts so no timezone shift creeps in.
+    function addDays(iso, n) {
+        if (!iso) return '';
+        var p = String(iso).split('-');
+        if (p.length !== 3) return '';
+        var d  = new Date(EC.num(p[0]), EC.num(p[1]) - 1, EC.num(p[2]) + n);
+        var mm = String(d.getMonth() + 1), dd = String(d.getDate());
+        if (mm.length < 2) mm = '0' + mm;
+        if (dd.length < 2) dd = '0' + dd;
+        return d.getFullYear() + '-' + mm + '-' + dd;
+    }
+
+    // Papers go on consecutive days from the start. Seeding every subject with the
+    // start date used to put a whole class's papers in one slot, which is
+    // impossible and is now refused on save.
+    function nthDay(i) {
+        var start = $('#startDate').val(), end = $('#endDate').val();
+        if (!start) return '';
+        var d = addDays(start, i);
+        if (end && d > end) return '';        // past the window: leave it blank to fill in
+        return d;
     }
 
     function fmtDate(iso) {
@@ -266,381 +295,460 @@ $(document).ready(function () {
         return parseInt(p[2], 10) + ' ' + MONTHS[parseInt(p[1], 10) - 1] + ' ' + p[0];
     }
 
-    // The ticked classes, in the order they appear on screen.
     function pickedClasses() {
         return $('.class-chk:checked').map(function () { return EC.num(this.value); }).get();
     }
-
-    function classNameOf(classId) {
-        return $('.class-chk[value="' + classId + '"]').data('name') || ('Class ' + classId);
+    function classNameOf(id) {
+        return $('.class-chk[value="' + id + '"]').data('name') || ('Class ' + id);
+    }
+    function numOr(v, fallback) { return v === '' || v === undefined ? fallback : EC.numPos(v); }
+    function defaults() {
+        return {
+            max:  numOr($('#maxMarks').val(), 100),
+            pass: numOr($('#passMarks').val(), 35),
+            from: $('#startTime').val() || '',
+            to:   $('#endTime').val() || ''
+        };
     }
 
-    // ── Step 3: one class's datesheet ─────────────────────────────────────────
-    function renderSheet() {
-        var rows = sheets[sheetClassId];
+    // Every subject any picked class studies, first-seen order.
+    function subjectUnion() {
+        var seen = {}, out = [];
+        $.each(pickedClasses(), function (i, cid) {
+            $.each(sheets[cid] || [], function (j, r) {
+                if (seen[r.subjectId]) return;
+                seen[r.subjectId] = true;
+                out.push({ subjectId: r.subjectId, name: r.name });
+            });
+        });
+        return out;
+    }
 
-        if (!sheetClassId || !rows) {
-            $('#subjResult').hide();
-            $('#subjStatus').show();
-            EC.listEmpty('#subjStatus', 'Tick a class in Step 2 to set its subject schedule.', 'bx-layer');
-            updateBar();
-            return;
-        }
+    function cellOf(classId, subjectId) {
+        var rows = sheets[classId] || [];
+        for (var i = 0; i < rows.length; i++) if (rows[i].subjectId === subjectId) return rows[i];
+        return null;
+    }
 
-        if (!rows.length) {
-            $('#subjResult').hide();
-            $('#subjStatus').show();
-            EC.listEmpty('#subjStatus',
-                'No subjects are mapped to ' + classNameOf(sheetClassId) +
-                '. Add them under School Settings → Subject Management.', 'bx-book-add');
-            updateBar();
-            return;
-        }
+    // Is the subject in the exam at all? Ticked per row, across classes.
+    function rowOn(subjectId) {
+        var any = false, all = true;
+        $.each(pickedClasses(), function (i, cid) {
+            var c = cellOf(cid, subjectId);
+            if (!c) return;
+            if (c.on) any = true; else all = false;
+        });
+        return any && all ? true : (any ? 'some' : false);
+    }
 
-        var tBody = '', cards = '';
-        $.each(rows, function (i, r) {
-            var name = EC.esc(r.name);
-            var chk  = r.on ? ' checked' : '';
+    // ── Read the grid back into `sheets` ─────────────────────────────────────
+    // Only the VISIBLE container. Both are always in the DOM (CSS picks one), and
+    // the hidden one still holds values from the last render — reading both let
+    // stale inputs overwrite what was just typed.
+    function activeCells(sel) {
+        return $('.exam-grid-wrap').is(':visible')
+            ? $('#examGrid ' + sel)
+            : $('#examMob ' + sel);
+    }
 
-            tBody += '<tr class="subj-row" data-idx="' + i + '">' +
-                '<td><div class="d-flex align-items-center gap-2">' +
-                    '<input class="form-check-input subj-on" type="checkbox"' + chk + '>' +
-                    '<span class="subj-ico"><i class="bx bx-book-bookmark"></i></span>' +
-                    '<span class="subj-name">' + name + '</span>' +
-                '</div></td>' +
-                '<td><input type="date" class="form-control subj-date" value="' + (r.date || '') + '"></td>' +
-                '<td><input type="number" class="form-control subj-max" value="' + r.max + '" min="1" max="1000"></td>' +
-                '<td><input type="number" class="form-control subj-pass" value="' + r.pass + '" min="0" max="1000"></td>' +
-                '</tr>';
+    function captureGrid() {
+        activeCells('.cell-in').each(function () {
+            var $i = $(this);
+            var c  = cellOf(EC.num($i.data('class')), EC.num($i.data('subject')));
+            if (!c) return;
+            var f = $i.data('field');
+            var v = $i.val();
 
-            cards += '<div class="subj-card" data-idx="' + i + '">' +
-                '<div class="subj-card-head">' +
-                    '<input class="form-check-input subj-on" type="checkbox"' + chk + '>' +
-                    '<span class="subj-ico"><i class="bx bx-book-bookmark"></i></span>' +
-                    '<span class="subj-name">' + name + '</span>' +
-                '</div>' +
-                '<div class="mb-2"><div class="exam-field-label">EXAM DATE</div>' +
-                    '<input type="date" class="form-control subj-date" value="' + (r.date || '') + '"></div>' +
-                '<div class="subj-card-row">' +
-                    '<div><div class="exam-field-label">MAX MARKS</div>' +
-                        '<input type="number" class="form-control subj-max" value="' + r.max + '" min="1" max="1000"></div>' +
-                    '<div><div class="exam-field-label">PASS MARKS</div>' +
-                        '<input type="number" class="form-control subj-pass" value="' + r.pass + '" min="0" max="1000"></div>' +
-                '</div></div>';
+            if (f === 'date')      c.date = v || '';
+            else if (f === 'from') c.from = v || '';
+            else if (f === 'to')   c.to   = v || '';
+            else if (f === 'max')  c.max  = numOr(v, 100);
+            else if (f === 'pass') c.pass = numOr(v, 35);
         });
 
-        $('#subjTableBody').html(tBody);
-        $('#subjCards').html(cards);
+        activeCells('.row-on').each(function () {
+            var on  = this.checked;
+            var sid = EC.num($(this).data('subject'));
+            $.each(pickedClasses(), function (i, cid) {
+                var c = cellOf(cid, sid);
+                if (c) c.on = on;
+            });
+        });
+    }
+
+    // ── Sections (optional) ──────────────────────────────────────────────────
+    function renderSectionPickers() {
+        var picked = pickedClasses();
+        if (!picked.length) { $('#sectionPickers').empty(); return; }
+
+        var html = '';
+        $.each(picked, function (i, cid) {
+            var secs = sectionsOf[cid] || [];
+            if (!secs.length) return;
+
+            var mine = chosen[cid] || [], boxes = '';
+            $.each(secs, function (j, s) {
+                var on = mine.indexOf(s.name) !== -1 ? ' checked' : '';
+                boxes += '<label class="exam-sec-item">' +
+                    '<input type="checkbox" class="form-check-input sec-chk" value="' + EC.esc(s.name) + '"' + on + '> ' +
+                    EC.esc(s.name) + '</label>';
+            });
+
+            html += '<div class="exam-sec-row" data-class-id="' + cid + '">' +
+                '<span class="exam-sec-class">' + EC.esc(classNameOf(cid)) + '</span>' + boxes +
+                '<span class="exam-sec-hint">' +
+                    (mine.length ? mine.length + ' section' + (mine.length === 1 ? '' : 's') : 'whole class') +
+                '</span></div>';
+        });
+
+        $('#sectionPickers').html(html
+            ? '<div class="exam-field-label mt-3">SECTIONS <span style="color:var(--ec-muted);font-weight:600;">' +
+              '(optional — leave blank for the whole class)</span></div>' + html
+            : '');
+    }
+
+    $(document).on('change', '.sec-chk', function () {
+        var $row = $(this).closest('.exam-sec-row');
+        var cid  = EC.num($row.data('class-id'));
+        chosen[cid] = $row.find('.sec-chk:checked').map(function () { return this.value; }).get();
+        renderSectionPickers();
+    });
+
+    // ── The grid ─────────────────────────────────────────────────────────────
+    function cellInput(classId, c) {
+        var base = ' class="form-control cell-in" data-class="' + classId + '" data-subject="' + c.subjectId + '"';
+
+        if (view === 'date')
+            return '<input type="date"' + base + ' data-field="date" value="' + (c.date || '') + '">';
+        if (view === 'time')
+            return '<div class="cell-time">' +
+                   '<input type="time"' + base + ' data-field="from" value="' + (c.from || '') + '">' +
+                   '<input type="time"' + base + ' data-field="to" value="' + (c.to || '') + '">' +
+                   '</div>';
+        if (view === 'max')
+            return '<input type="number"' + base + ' data-field="max" min="1" max="1000" value="' + c.max + '">';
+        return '<input type="number"' + base + ' data-field="pass" min="0" max="1000" value="' + c.pass + '">';
+    }
+
+    function renderGrid() {
+        var picked = pickedClasses();
+        renderSectionPickers();
+        $('#gridBar').toggle(picked.length > 0);
+
+        if (!picked.length) {
+            $('#gridResult').hide();
+            $('#subjStatus').show();
+            EC.listEmpty('#subjStatus', 'Tick the classes that sit this exam.', 'bx-layer');
+            updateBar();
+            return;
+        }
+
+        var subjects = subjectUnion();
+        if (!subjects.length) {
+            $('#gridResult').hide();
+            $('#subjStatus').show();
+            EC.listEmpty('#subjStatus',
+                'No subjects are mapped to these classes. Add them under School Settings → Subject Management.',
+                'bx-book-add');
+            updateBar();
+            return;
+        }
+
+        // header
+        var head = '<thead><tr><th class="col-subject">Subject</th>';
+        $.each(picked, function (i, cid) {
+            head += '<th>' + EC.esc(classNameOf(cid)) + '</th>';
+        });
+        head += '</tr></thead>';
+
+        // body
+        var body = '<tbody>';
+        $.each(subjects, function (i, s) {
+            var state = rowOn(s.subjectId);
+            var chk = state === true ? ' checked' : (state === 'some' ? ' checked' : '');
+
+            body += '<tr>' +
+                '<td class="col-subject">' +
+                    '<label class="exam-row-head">' +
+                        '<input type="checkbox" class="form-check-input row-on" data-subject="' + s.subjectId + '"' + chk + '>' +
+                        '<span class="subj-name">' + EC.esc(s.name) + '</span>' +
+                    '</label>' +
+                    '<button type="button" class="row-fill" data-subject="' + s.subjectId + '" ' +
+                            'title="Copy the first value across every class">' +
+                        '<i class="bx bx-right-arrow-alt"></i></button>' +
+                '</td>';
+
+            $.each(picked, function (j, cid) {
+                var c = cellOf(cid, s.subjectId);
+                body += '<td>' + (c ? cellInput(cid, c) : '<span class="cell-na">—</span>') + '</td>';
+            });
+            body += '</tr>';
+        });
+        body += '</tbody>';
+
+        $('#examGrid').html(head + body);
+        renderMobile(picked, subjects);
         $('#subjStatus').hide();
-        $('#subjResult').show();
+        $('#gridResult').show();
         updateBar();
     }
 
-    // The container the user is actually typing into (CSS hides the other one).
-    function sheetRows() {
-        return $('#subjTableWrap').is(':visible')
-            ? $('#subjTableBody tr.subj-row')
-            : $('#subjCards .subj-card');
-    }
+    // One block per class — the grid does not fit a phone.
+    function renderMobile(picked, subjects) {
+        var html = '';
+        $.each(picked, function (i, cid) {
+            var rows = sheets[cid] || [];
+            if (!rows.length) return;
 
-    // Copy what is on screen back into `sheets` before switching class or saving.
-    function captureSheet() {
-        var rows = sheets[sheetClassId];
-        if (!rows) return;
-
-        sheetRows().each(function () {
-            var $r  = $(this);
-            var idx = EC.num($r.data('idx'));
-            var row = rows[idx];
-            if (!row) return;
-
-            var max  = $r.find('.subj-max').val();
-            var pass = $r.find('.subj-pass').val();
-
-            row.on   = $r.find('.subj-on').is(':checked');
-            row.date = $r.find('.subj-date').val() || '';
-            row.max  = max  === '' ? 100 : EC.numPos(max);
-            row.pass = pass === '' ? 35  : EC.numPos(pass);
+            html += '<div class="exam-mob-class"><div class="exam-mob-head">' + EC.esc(classNameOf(cid)) + '</div>';
+            $.each(rows, function (j, c) {
+                html += '<div class="subj-card">' +
+                    '<div class="subj-card-head">' +
+                        '<input type="checkbox" class="form-check-input row-on" data-subject="' + c.subjectId + '"' +
+                            (c.on ? ' checked' : '') + '>' +
+                        '<span class="subj-name">' + EC.esc(c.name) + '</span>' +
+                    '</div>' +
+                    '<div class="mb-2"><div class="exam-field-label">EXAM DATE</div>' +
+                        '<input type="date" class="form-control cell-in" data-class="' + cid + '" ' +
+                               'data-subject="' + c.subjectId + '" data-field="date" value="' + (c.date || '') + '"></div>' +
+                    '<div class="subj-card-row">' +
+                        '<div><div class="exam-field-label">FROM</div>' +
+                            '<input type="time" class="form-control cell-in" data-class="' + cid + '" ' +
+                                   'data-subject="' + c.subjectId + '" data-field="from" value="' + (c.from || '') + '"></div>' +
+                        '<div><div class="exam-field-label">TO</div>' +
+                            '<input type="time" class="form-control cell-in" data-class="' + cid + '" ' +
+                                   'data-subject="' + c.subjectId + '" data-field="to" value="' + (c.to || '') + '"></div>' +
+                    '</div>' +
+                    '<div class="subj-card-row">' +
+                        '<div><div class="exam-field-label">MAX</div>' +
+                            '<input type="number" class="form-control cell-in" data-class="' + cid + '" ' +
+                                   'data-subject="' + c.subjectId + '" data-field="max" min="1" max="1000" value="' + c.max + '"></div>' +
+                        '<div><div class="exam-field-label">PASS</div>' +
+                            '<input type="number" class="form-control cell-in" data-class="' + cid + '" ' +
+                                   'data-subject="' + c.subjectId + '" data-field="pass" min="0" max="1000" value="' + c.pass + '"></div>' +
+                    '</div></div>';
+            });
+            html += '</div>';
         });
+        $('#examMob').html(html);
     }
 
-    // Fetch a class's subject list once, seeded from `saved` when editing.
-    function loadClassSheet(classId, saved) {
-        return $.get(urls.subjects, { classId: classId })
+    // ── Grid interactions ────────────────────────────────────────────────────
+    $('#viewTabs').on('click', 'button', function () {
+        captureGrid();
+        view = $(this).data('view');
+        $('#viewTabs button').removeClass('is-on');
+        $(this).addClass('is-on');
+        renderGrid();
+    });
+
+    // Copy the row's first filled value into every class on that row.
+    $(document).on('click', '.row-fill', function () {
+        captureGrid();
+        var sid = EC.num($(this).data('subject'));
+        var picked = pickedClasses();
+
+        var src = null;
+        $.each(picked, function (i, cid) {
+            var c = cellOf(cid, sid);
+            if (!c || src) return;
+            if (view === 'date' && c.date) src = { date: c.date };
+            else if (view === 'time' && (c.from || c.to)) src = { from: c.from, to: c.to };
+            else if (view === 'max')  src = { max: c.max };
+            else if (view === 'pass') src = { pass: c.pass };
+        });
+
+        if (!src) { ecToast('error', 'Set the first class in that row before copying it across.'); return; }
+
+        $.each(picked, function (i, cid) {
+            var c = cellOf(cid, sid);
+            if (!c) return;
+            $.each(src, function (k, v) { c[k] = v; });
+        });
+
+        renderGrid();
+    });
+
+    // The row tick is per subject, so it must not be re-read as a cell value.
+    $(document).on('change', '.row-on', function () {
+        captureGrid();
+        renderGrid();
+    });
+
+    // ── Loading a class ──────────────────────────────────────────────────────
+    // A new class inherits what the other classes already say about a shared
+    // subject, so a common datesheet needs no retyping.
+    function seedFrom(excludeClassId) {
+        var m = {};
+        $.each(pickedClasses(), function (i, cid) {
+            if (cid === excludeClassId) return;
+            $.each(sheets[cid] || [], function (j, r) { if (!m[r.subjectId]) m[r.subjectId] = r; });
+        });
+        return m;
+    }
+
+    function loadClass(classId, saved, savedSections) {
+        var seed = seedFrom(classId);
+
+        var subjReq = $.get(urls.subjects, { classId: classId, sessionId: SESSION_ID })
             .done(function (rows) {
-                var start = $('#startDate').val();
+                var d = defaults();
+                var i = -1;
                 sheets[classId] = $.map(rows || [], function (s) {
+                    i++;
                     var prev = saved ? saved[s.id] : null;
+                    var from = prev || seed[s.id] || null;
                     return {
                         subjectId: s.id,
                         name:      s.name,
                         on:        saved ? !!prev : true,
-                        date:      (prev && prev.date) ? prev.date : (start || ''),
-                        max:       prev ? EC.num(prev.maxMarks)  : 100,
-                        pass:      prev ? EC.num(prev.passMarks) : 35
+                        // Inherit from a class already on the exam, else stagger.
+                        date:      (from && from.date) ? from.date : nthDay(i),
+                        from:      prev ? (prev.startTime || '') : (from ? from.from : d.from),
+                        to:        prev ? (prev.endTime   || '') : (from ? from.to   : d.to),
+                        max:       prev ? EC.num(prev.maxMarks)  : (from ? from.max  : d.max),
+                        pass:      prev ? EC.num(prev.passMarks) : (from ? from.pass : d.pass)
                     };
                 });
             });
+
+        var secReq = $.get(urls.sections, { classId: classId, sessionId: SESSION_ID })
+            .done(function (rows) {
+                sectionsOf[classId] = rows || [];
+                chosen[classId] = savedSections || [];
+            });
+
+        return $.when(subjReq, secReq);
     }
 
-    // ── The "datesheet for" dropdown ──────────────────────────────────────────
-    function refreshSheetPicker() {
-        var picked = pickedClasses();
-
-        if (!picked.length) {
-            $('#sheetBar').hide();
-            $('#copyPanel').hide();
-            sheetClassId = 0;
-            renderSheet();
-            return;
-        }
-
-        var html = '';
-        $.each(picked, function (i, id) {
-            html += '<option value="' + id + '">' + EC.esc(classNameOf(id)) + '</option>';
-        });
-        $('#sheetClass').html(html);
-
-        if (picked.indexOf(sheetClassId) === -1) sheetClassId = picked[0];
-        $('#sheetClass').val(String(sheetClassId));
-        $('#sheetBar').show();
-        renderSheet();
-    }
-
-    // ── Class ticks ───────────────────────────────────────────────────────────
+    // ── Events ───────────────────────────────────────────────────────────────
     $(document).on('change', '.class-chk', function () {
         var id = EC.num(this.value);
-        $('#classErr').closest('.ec-card-body').removeClass('has-error');
 
         if (!this.checked) {
-            delete sheets[id];
-            refreshSheetPicker();
-            updateBar();
+            captureGrid();
+            delete sheets[id]; delete sectionsOf[id]; delete chosen[id];
+            renderGrid();
             return;
         }
 
-        if (sheets[id]) { refreshSheetPicker(); updateBar(); return; }
+        if (sheets[id]) { renderGrid(); return; }
 
-        captureSheet();
+        captureGrid();
         EC.showLoader();
+        $('#gridResult').hide();
         $('#subjStatus').show();
         EC.listLoading('#subjStatus', 'Loading subjects…');
 
-        loadClassSheet(id, null)
-            .done(function () { refreshSheetPicker(); })
+        loadClass(id, null, null)
+            .done(function () { renderGrid(); })
             .fail(function () {
-                delete sheets[id];
+                delete sheets[id]; delete sectionsOf[id]; delete chosen[id];
                 $('.class-chk[value="' + id + '"]').prop('checked', false);
-                ecToast('error', 'Could not load subjects for that class.');
-                refreshSheetPicker();
+                ecToast('error', 'Could not load that class.');
+                renderGrid();
             })
             .always(EC.hideLoader);
     });
 
-    $('#classSelectAll').on('click', function () {
-        var $boxes = $('.class-chk:not(:disabled):not(:checked)');
-        if (!$boxes.length) return;
-        captureSheet();
-        EC.showLoader();
+    // The four boxes above only seed NEW subjects. Re-rendering here would rebuild
+    // the grid mid-keystroke and steal the cursor, which is exactly what it used to do.
 
-        var pending = $boxes.map(function () {
-            var id = EC.num(this.value);
-            $(this).prop('checked', true);
-            return sheets[id] ? null : loadClassSheet(id, null);
-        }).get();
-
-        $.when.apply($, pending)
-            .always(function () {
-                refreshSheetPicker();
-                updateBar();
-                EC.hideLoader();
-            });
-    });
-
-    $('#classClearAll').on('click', function () {
-        $('.class-chk:checked').prop('checked', false);
-        sheets = {};
-        refreshSheetPicker();
-        updateBar();
-    });
-
-    // ── Switching which class is on screen ────────────────────────────────────
-    $('#sheetClass').on('change', function () {
-        captureSheet();
-        sheetClassId = EC.num(this.value);
-        $('#copyPanel').hide();
-        renderSheet();
-    });
-
-    // ── Copy this datesheet to other classes ──────────────────────────────────
-    $('#copyToggle').on('click', function () {
-        if ($('#copyPanel').is(':visible')) { $('#copyPanel').hide(); return; }
-
-        var targets = pickedClasses().filter(function (id) { return id !== sheetClassId; });
-        if (!targets.length) {
-            ecToast('error', 'Tick another class first — there is nothing to copy to.');
-            return;
-        }
-
-        $('#copyFromName').text(classNameOf(sheetClassId));
-        var html = '';
-        $.each(targets, function (i, id) {
-            html += '<label class="exam-copy-item">' +
-                '<input type="checkbox" class="form-check-input copy-chk" value="' + id + '" checked> ' +
-                EC.esc(classNameOf(id)) + '</label>';
-        });
-        $('#copyList').html(html);
-        $('#copyPanel').show();
-    });
-
-    $('#copyCancel').on('click', function () { $('#copyPanel').hide(); });
-
-    $('#copyApply').on('click', function () {
-        captureSheet();
-
-        var source = sheets[sheetClassId] || [];
-        var byId = {};
-        $.each(source, function (i, r) { byId[r.subjectId] = r; });
-
-        var targets = $('.copy-chk:checked').map(function () { return EC.num(this.value); }).get();
-        if (!targets.length) { ecToast('error', 'Pick at least one class to copy to.'); return; }
-
-        var copied = 0;
-        $.each(targets, function (i, id) {
-            var rows = sheets[id];
-            if (!rows) return;
-            $.each(rows, function (j, row) {
-                var src = byId[row.subjectId];
-                if (!src) return;              // that class does not study this subject
-                row.on   = src.on;
-                row.date = src.date;
-                row.max  = src.max;
-                row.pass = src.pass;
-                copied++;
-            });
-        });
-
-        $('#copyPanel').hide();
-        renderSheet();
-        ecToast('success', 'Copied to ' + targets.length + ' class' + (targets.length === 1 ? '' : 'es') +
-                           ' (' + copied + ' subject' + (copied === 1 ? '' : 's') + ').');
-    });
-
-    // ── Field events ──────────────────────────────────────────────────────────
     $('#startDate').on('change', function () {
         var v = $(this).val();
-        // Keep every class's dates inside the exam window.
-        captureSheet();
-        $.each(sheets, function (id, rows) {
-            $.each(rows, function (i, r) { if (!r.date || r.date < v) r.date = v; });
+        captureGrid();
+        // Re-stagger anything blank or now before the window. Collapsing them all
+        // onto the start date is what produced the impossible datesheets.
+        $.each(sheets, function (cid, rows) {
+            $.each(rows, function (i, r) { if (!r.date || r.date < v) r.date = nthDay(i); });
         });
         if ($('#endDate').val() && $('#endDate').val() < v) $('#endDate').val(v);
-        $('#startDateWrap').removeClass('has-error');
-        renderSheet();
+        $('#examDatesWrap').removeClass('has-error');
+        renderGrid();
     });
 
-    $('#endDate').on('change', function () {
-        $('#endDateWrap').removeClass('has-error');
-        updateBar();
-    });
-
-    $('#examName').on('input', function () {
-        $('#examNameWrap').removeClass('has-error');
-        updateBar();
-    });
-
+    $('#endDate').on('change', function () { $('#examDatesWrap').removeClass('has-error'); updateBar(); });
+    $('#examName').on('input', function () { $('#examNameWrap').removeClass('has-error'); updateBar(); });
     $('#examType').on('change', updateBar);
-    $(document).on('change', '.subj-on', updateBar);
 
-    // ── Action bar summary ────────────────────────────────────────────────────
+    // ── Sticky bar ───────────────────────────────────────────────────────────
     function updateBar() {
-        var name    = $('#examName').val().trim();
-        var typeTxt = $('#examType').val() ? $('#examType option:selected').text() : '';
-        var picked  = pickedClasses();
-
-        var ready = name && picked.length > 0 && $('#startDate').val() && $('#endDate').val();
+        var name   = $('#examName').val().trim();
+        var picked = pickedClasses();
+        var ready  = name && picked.length > 0 && $('#startDate').val() && $('#endDate').val();
         $('#saveExamBtn').prop('disabled', !ready);
 
         if (!name && !picked.length) {
-            $('#barSummary').text(editingId
-                ? 'Editing an exam — change the details above.'
-                : 'Fill in the details above to create an exam.');
+            $('#barSummary').text(editingId ? 'Editing an exam.' : 'Fill in the exam details to begin.');
             return;
         }
 
         var parts = [];
-        if (name)    parts.push('<span>' + EC.esc(name) + '</span>');
-        if (typeTxt) parts.push(EC.esc(typeTxt));
-        if (picked.length) parts.push(picked.length + ' class' + (picked.length === 1 ? '' : 'es'));
+        if (name) parts.push('<span>' + EC.esc(name) + '</span>');
+        if (picked.length) {
+            parts.push(picked.length === 1 ? EC.esc(classNameOf(picked[0])) : picked.length + ' classes');
+        }
         $('#barSummary').html(parts.join(' &middot; '));
     }
 
-    // ── Create / edit mode ────────────────────────────────────────────────────
     function setMode() {
-        if (editingId) {
-            $('#saveExamBtn').html('<i class="bx bx-save me-1"></i>Update Exam');
-            $('#cancelBtn').text('Cancel edit');
-        } else {
-            $('#saveExamBtn').html('<i class="bx bx-save me-1"></i>Save Exam');
-            $('#cancelBtn').text('Clear');
-        }
+        $('#saveExamBtn').html('<i class="bx bx-save me-1"></i>' + (editingId ? 'Update Exam' : 'Save Exam'));
+        $('#cancelBtn').text(editingId ? 'Cancel edit' : 'Clear');
     }
 
     function resetForm() {
         editingId = 0;
-        sheets = {};
-        sheetClassId = 0;
-        $('#examName').val('');
-        $('#examType').val('');
-        $('#startDate').val('');
-        $('#endDate').val('');
+        sheets = {}; sectionsOf = {}; chosen = {};
+        view = 'date';
+        $('#viewTabs button').removeClass('is-on').filter('[data-view="date"]').addClass('is-on');
+        $('#examName').val(''); $('#examType').val('');
+        $('#startDate').val(''); $('#endDate').val('');
+        $('#maxMarks').val(100); $('#passMarks').val(35);
+        $('#startTime').val(''); $('#endTime').val('');
         $('.class-chk').prop('checked', false);
         $('.has-error').removeClass('has-error');
-        $('#copyPanel').hide();
-        refreshSheetPicker();
         setMode();
-        updateBar();
+        renderGrid();
     }
 
-    $('#cancelBtn').on('click', function () {
-        resetForm();
-        loadExams();
-    });
+    $('#cancelBtn').on('click', function () { resetForm(); loadList(); });
 
-    // ── Validate & save ───────────────────────────────────────────────────────
+    // ── Save ─────────────────────────────────────────────────────────────────
     $('#saveExamBtn').on('click', function () {
-        captureSheet();
+        captureGrid();
         var valid = true;
 
-        if (!$('#examName').val().trim())  { $('#examNameWrap').addClass('has-error');  valid = false; }
-        if (!$('#startDate').val())        { $('#startDateWrap').addClass('has-error'); valid = false; }
-        if (!$('#endDate').val() || $('#endDate').val() < $('#startDate').val()) {
-            $('#endDateWrap').addClass('has-error'); valid = false;
+        if (!$('#examName').val().trim()) { $('#examNameWrap').addClass('has-error'); valid = false; }
+        if (!$('#startDate').val() || !$('#endDate').val()
+            || $('#endDate').val() < $('#startDate').val()) {
+            $('#examDatesWrap').addClass('has-error'); valid = false;
         }
 
         var picked = pickedClasses();
-        if (!picked.length) { ecToast('error', 'Tick at least one class for this exam.'); return; }
-        if (!valid) { ecToast('error', 'Please complete all required fields.'); return; }
+        if (!picked.length) { ecToast('error', 'Tick at least one class.'); return; }
+        if (!valid) { ecToast('error', 'Please complete the required fields.'); return; }
 
-        // Build the payload and refuse to silently drop a class the user ticked.
-        var payloadClasses = [];
-        var blank = [];
+        var payloadClasses = [], blank = [];
         $.each(picked, function (i, id) {
             var rows = (sheets[id] || []).filter(function (r) { return r.on; });
             if (!rows.length) { blank.push(classNameOf(id)); return; }
-
             payloadClasses.push({
-                classId: id,
+                classId:  id,
+                sections: chosen[id] || [],
                 subjects: $.map(rows, function (r) {
-                    return { subjectId: r.subjectId, examDate: r.date || '', maxMarks: r.max, passMarks: r.pass };
+                    return {
+                        subjectId: r.subjectId,
+                        examDate:  r.date || '',
+                        startTime: r.from || '',
+                        endTime:   r.to   || '',
+                        maxMarks:  r.max,
+                        passMarks: r.pass
+                    };
                 })
             });
         });
 
-        if (blank.length) {
-            ecToast('error', 'No subjects ticked for ' + blank.join(', ') + '.');
-            return;
-        }
+        if (blank.length) { ecToast('error', 'No subjects ticked for ' + blank.join(', ') + '.'); return; }
 
         var $btn = $(this);
         EC.buttonBusy($btn, 'Saving…');
@@ -651,7 +759,8 @@ $(document).ready(function () {
             contentType: 'application/json',
             headers: { 'RequestVerificationToken': token() },
             data: JSON.stringify({
-                examId:    editingId,
+                examId:         editingId,
+                academicYearId: SESSION_ID,
                 examName:  $('#examName').val().trim(),
                 examType:  $('#examType').val(),
                 startDate: $('#startDate').val(),
@@ -660,61 +769,107 @@ $(document).ready(function () {
             })
         })
         .done(function (d) {
-            if (!d || !d.success) {
-                ecToast('error', (d && d.message) || 'Could not save the exam.');
-                return;
-            }
+            if (!d || !d.success) { ecToast('error', (d && d.message) || 'Could not save the exam.'); return; }
             ecToast('success', d.message || 'Exam saved.');
             resetForm();
-            loadExams();
+            loadList();
         })
-        .fail(function () {
-            ecToast('error', 'Could not save the exam. Please retry.');
-        })
+        .fail(function () { ecToast('error', 'Could not save the exam. Please retry.'); })
         .always(function () { EC.buttonReset($btn); });
     });
 
-    // ── Exams this year ───────────────────────────────────────────────────────
-    function loadExams() {
-        EC.listLoading('#examList');
+    // ── The class-wise list ──────────────────────────────────────────────────
+    function loadList() {
+        $('#examListBody').empty();
+        EC.listLoading('#examListEmpty');
 
-        $.get(urls.exams)
-            .done(function (d) {
-                var list = (d && d.exams) || [];
+        $.get(urls.list, { sessionId: SESSION_ID })
+            .done(function (rows) {
+                var list = rows || [];
                 if (!list.length) {
-                    EC.listEmpty('#examList', 'No exams created for this year yet.', 'bx-calendar-x');
+                    $('#examListBody').empty();
+                    EC.listEmpty('#examListEmpty', 'No exams created for this year yet.', 'bx-calendar-x');
                     return;
                 }
+                $('#examListEmpty').empty();
 
-                var html = '';
-                $.each(list, function (i, e) {
-                    html += '<div class="exam-list-row' + (e.id === editingId ? ' is-editing' : '') + '" data-exam-id="' + e.id + '">' +
-                        '<div class="exam-list-main">' +
-                            '<div class="exam-list-name">' + EC.esc(e.name) +
-                                (e.typeLabel ? ' <span class="exam-list-type">' + EC.esc(e.typeLabel) + '</span>' : '') +
-                            '</div>' +
-                            '<div class="exam-list-meta">' +
-                                fmtDate(e.startDate) + ' – ' + fmtDate(e.endDate) + ' &middot; ' +
-                                e.classCount + ' class' + (e.classCount === 1 ? '' : 'es') + ' &middot; ' +
-                                e.subjectCount + ' paper' + (e.subjectCount === 1 ? '' : 's') +
-                            '</div>' +
-                            (e.classNames ? '<div class="exam-list-classes">' + EC.esc(e.classNames) + '</div>' : '') +
-                        '</div>' +
-                        '<div class="exam-list-actions">' +
-                            '<button type="button" class="btn btn-ex-ghost exam-edit"><i class="bx bx-edit"></i> Edit</button>' +
-                            '<button type="button" class="btn btn-ex-ghost exam-del"><i class="bx bx-trash"></i></button>' +
-                        '</div>' +
-                        '</div>';
+                var html = '', lastExam = 0;
+                $.each(list, function (i, r) {
+                    var first = r.examId !== lastExam;
+                    lastExam = r.examId;
+
+                    var badge = r.status === 'Published'
+                        ? '<span class="exam-badge is-pub">PUBLISHED</span>'
+                        : '<span class="exam-badge is-draft">DRAFT</span>';
+
+                    var actions = '';
+                    if (first) {
+                        actions =
+                            '<button type="button" class="btn btn-ex-ghost exam-edit" title="Edit"><i class="bx bx-edit"></i></button>' +
+                            (r.status === 'Published'
+                                ? '<button type="button" class="btn btn-ex-ghost exam-unpub" title="Move back to draft"><i class="bx bx-lock-open-alt"></i></button>'
+                                : '<button type="button" class="btn btn-ex-ghost exam-pub" title="Publish"><i class="bx bx-send"></i></button>') +
+                            '<button type="button" class="btn btn-ex-ghost exam-del" title="Delete"><i class="bx bx-trash"></i></button>';
+                    }
+
+                    html += '<tr class="' + (first ? 'is-first' : 'is-cont') + (r.examId === editingId ? ' is-editing' : '') + '"' +
+                            ' data-exam-id="' + r.examId + '">' +
+                        '<td>' + (first
+                            ? '<div class="exam-cell-name">' + EC.esc(r.examName) +
+                              (r.typeLabel ? ' <span class="exam-list-type">' + EC.esc(r.typeLabel) + '</span>' : '') + '</div>' +
+                              '<div class="exam-cell-year">' + EC.esc(r.academicYear) + '</div>'
+                            : '') + '</td>' +
+                        '<td><span class="exam-cell-cls">' + EC.esc(r.className) +
+                            (r.section ? ' - ' + EC.esc(r.section) : '') + '</span>' +
+                            (r.section ? '' : '<span class="exam-cell-all">all sections</span>') + '</td>' +
+                        '<td class="exam-cell-dates">' + fmtDate(r.startDate) + ' – ' + fmtDate(r.endDate) + '</td>' +
+                        '<td>' + badge + '</td>' +
+                        '<td style="text-align:right;"><div class="exam-list-actions">' + actions + '</div></td>' +
+                        '</tr>';
                 });
-                $('#examList').html(html);
+                $('#examListBody').html(html);
             })
             .fail(function () {
-                EC.listEmpty('#examList', 'Could not load exams. Please retry.', 'bx-error-circle');
+                $('#examListBody').empty();
+                EC.listEmpty('#examListEmpty', 'Could not load exams. Please retry.', 'bx-error-circle');
             });
     }
 
+    // ── Publish / unpublish ──────────────────────────────────────────────────
+    function setStatus($btn, id, status) {
+        EC.buttonBusy($btn);
+        $.ajax({
+            url: urls.status,
+            type: 'POST',
+            headers: { 'RequestVerificationToken': token() },
+            data: { id: id, status: status }
+        })
+        .done(function (d) {
+            if (!d || !d.success) { ecToast('error', (d && d.message) || 'Could not change the status.'); return; }
+            ecToast('success', d.message || 'Status updated.');
+            loadList();
+        })
+        .fail(function () { ecToast('error', 'Could not change the status. Please retry.'); })
+        .always(function () { EC.buttonReset($btn); });
+    }
+
+    $(document).on('click', '.exam-pub', function () {
+        setStatus($(this), $(this).closest('tr').data('exam-id'), 'Published');
+    });
+
+    $(document).on('click', '.exam-unpub', function () {
+        var $btn = $(this), id = $btn.closest('tr').data('exam-id');
+        EC.confirm({
+            title:   'Move this exam back to draft?',
+            message: 'It will disappear from the Datesheet and from Marks Entry until you publish it again.',
+            okText:  'Move to draft',
+            danger:  false
+        }).then(function (ok) { if (ok) setStatus($btn, id, 'Draft'); });
+    });
+
+    // ── Edit ─────────────────────────────────────────────────────────────────
     $(document).on('click', '.exam-edit', function () {
-        var id = $(this).closest('.exam-list-row').data('exam-id');
+        var id = $(this).closest('tr').data('exam-id');
 
         EC.showLoader();
         $.get(urls.exam, { id: id })
@@ -727,8 +882,7 @@ $(document).ready(function () {
 
                 var e = d.exam;
                 editingId = e.id;
-                sheets = {};
-                sheetClassId = 0;
+                sheets = {}; sectionsOf = {}; chosen = {};
 
                 $('#examName').val(e.name);
                 $('#examType').val(e.type || '');
@@ -737,34 +891,29 @@ $(document).ready(function () {
                 $('.class-chk').prop('checked', false);
                 $('.has-error').removeClass('has-error');
 
-                // Each class's full subject list, with the saved datesheet ticked on top.
                 var waits = $.map(e.classes || [], function (c) {
                     $('.class-chk[value="' + c.classId + '"]').prop('checked', true);
                     var saved = {};
                     $.each(c.subjects || [], function (j, s) { saved[s.id] = s; });
-                    return loadClassSheet(c.classId, saved);
+                    return loadClass(c.classId, saved, c.sections || []);
                 });
 
                 $.when.apply($, waits).always(function () {
-                    refreshSheetPicker();
                     setMode();
-                    updateBar();
-                    loadExams();
+                    renderGrid();
+                    loadList();
                     EC.hideLoader();
                     $('html, body').animate({ scrollTop: 0 }, 200);
                 });
             })
-            .fail(function () {
-                ecToast('error', 'Could not load that exam.');
-                EC.hideLoader();
-            });
+            .fail(function () { ecToast('error', 'Could not load that exam.'); EC.hideLoader(); });
     });
 
+    // ── Delete ───────────────────────────────────────────────────────────────
     $(document).on('click', '.exam-del', function () {
-        var $row = $(this).closest('.exam-list-row');
-        var id   = $row.data('exam-id');
-        var name = $row.find('.exam-list-name').text().trim();
-        var $btn = $(this);
+        var $btn = $(this), $tr = $btn.closest('tr');
+        var id   = $tr.data('exam-id');
+        var name = $tr.find('.exam-cell-name').text().trim();
 
         EC.confirm({
             title:   'Delete this exam?',
@@ -782,25 +931,20 @@ $(document).ready(function () {
                 data: { id: id }
             })
             .done(function (d) {
-                if (!d || !d.success) {
-                    ecToast('error', (d && d.message) || 'Could not delete the exam.');
-                    return;
-                }
+                if (!d || !d.success) { ecToast('error', (d && d.message) || 'Could not delete the exam.'); return; }
                 ecToast('success', d.message || 'Exam deleted.');
                 if (editingId === id) resetForm();
-                loadExams();
+                loadList();
             })
-            .fail(function () {
-                ecToast('error', 'Could not delete the exam. Please retry.');
-            })
+            .fail(function () { ecToast('error', 'Could not delete the exam. Please retry.'); })
             .always(function () { EC.buttonReset($btn); });
         });
     });
 
-    // ── Init ──────────────────────────────────────────────────────────────────
+    // ── Init ─────────────────────────────────────────────────────────────────
     setMode();
-    renderSheet();
-    loadExams();
+    renderGrid();
+    loadList();
 });
 </script>
 }

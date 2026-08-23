@@ -18,12 +18,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             _db = db;
         }
 
-        public async Task<List<SubjectClassItem>> GetClassesAsync(int tenantId, int schoolId, int actionUserId)
+        public async Task<List<SubjectClassItem>> GetClassesAsync(
+            int tenantId, int schoolId, int actionUserId, int academicYearId = 0)
         {
             var list = new List<SubjectClassItem>();
             if (tenantId <= 1 || schoolId <= 0) return list;
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, Params("GetClasses", tenantId, schoolId, actionUserId));
+            var p = Params("GetClasses", tenantId, schoolId, actionUserId);
+            if (academicYearId > 0) p[4].Value = academicYearId;   // p_academic_year_id
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
             if (ds.Tables.Count == 0) return list;
 
             foreach (DataRow row in ds.Tables[0].Rows)
@@ -41,12 +45,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<List<SubjectItem>> GetClassSubjectsAsync(
-            int academicClassId, int tenantId, int schoolId, int actionUserId)
+            int academicClassId, int tenantId, int schoolId, int actionUserId, int academicYearId = 0)
         {
             if (academicClassId <= 0) return new List<SubjectItem>();
 
             var p = Params("GetClassSubjects", tenantId, schoolId, actionUserId);
             p[5].Value = academicClassId;      // p_academic_class_id
+            if (academicYearId > 0) p[4].Value = academicYearId;   // p_academic_year_id
 
             return await ReadSubjectsAsync(p, tenantId, schoolId);
         }

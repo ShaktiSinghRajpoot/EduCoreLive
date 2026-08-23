@@ -15,6 +15,27 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int    ClassCount   { get; set; }
         public int    SubjectCount { get; set; }                   // across every class
         public string ClassNames   { get; set; } = string.Empty;   // "1st, 2nd, 3rd"
+        public string Status       { get; set; } = "Draft";        // Draft | Published
+    }
+
+    /// <summary>
+    /// One row of the class-wise Exam Schedule list: an exam as it applies to one
+    /// class, or to one section when the exam targets specific sections.
+    /// </summary>
+    public class ExamListRow
+    {
+        public int    ExamId           { get; set; }
+        public string ExamName         { get; set; } = string.Empty;
+        public string TypeLabel        { get; set; } = string.Empty;
+        public string AcademicYearName { get; set; } = string.Empty;
+        public int    AcademicClassId  { get; set; }
+        public string ClassName        { get; set; } = string.Empty;
+        /// <summary>Blank means the whole class.</summary>
+        public string Section          { get; set; } = string.Empty;
+        public string StartDate        { get; set; } = string.Empty;   // yyyy-MM-dd
+        public string EndDate          { get; set; } = string.Empty;   // yyyy-MM-dd
+        public string Status           { get; set; } = "Draft";
+        public int    SubjectCount     { get; set; }
     }
 
     /// <summary>One subject on a class's datesheet.</summary>
@@ -23,6 +44,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int     SubjectId   { get; set; }
         public string  SubjectName { get; set; } = string.Empty;
         public string? ExamDate    { get; set; }                   // yyyy-MM-dd, null = not set
+        public string? StartTime   { get; set; }                   // HH:mm, null = not set
+        public string? EndTime     { get; set; }                   // HH:mm
         public decimal MaxMarks    { get; set; } = 100;
         public decimal PassMarks   { get; set; } = 35;
     }
@@ -32,6 +55,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
     {
         public int    AcademicClassId { get; set; }
         public string ClassName       { get; set; } = string.Empty;
+        /// <summary>Sections sitting it. Empty = the whole class (the default).</summary>
+        public List<string> Sections  { get; set; } = new();
         public List<ExamSubjectRow> Subjects { get; set; } = new();
     }
 
@@ -59,6 +84,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
     {
         public int      SubjectId { get; set; }
         public string?  ExamDate  { get; set; }                    // yyyy-MM-dd
+        public string?  StartTime { get; set; }                    // HH:mm
+        public string?  EndTime   { get; set; }                    // HH:mm
         public decimal? MaxMarks  { get; set; }
         public decimal? PassMarks { get; set; }
     }
@@ -67,6 +94,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class ExamClassInput
     {
         public int ClassId { get; set; }
+        /// <summary>Sections sitting it. Empty = the whole class.</summary>
+        public List<string> Sections { get; set; } = new();
         public List<ExamSubjectInput> Subjects { get; set; } = new();
     }
 
@@ -74,6 +103,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class ExamSaveRequest
     {
         public int     ExamId    { get; set; }
+        /// <summary>Session to save into. 0 = the current one.</summary>
+        public int     AcademicYearId { get; set; }
         public string? ExamName  { get; set; }
         public string? ExamType  { get; set; }                     // lookup code, optional
         public string? StartDate { get; set; }                     // yyyy-MM-dd
@@ -97,20 +128,39 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class ExamDatesheetRow
     {
         public string? ExamDate        { get; set; }               // yyyy-MM-dd
+        public string? StartTime       { get; set; }               // HH:mm
+        public string? EndTime         { get; set; }               // HH:mm
         public int     AcademicClassId { get; set; }
         public string  ClassName       { get; set; } = string.Empty;
+        /// <summary>Targeted sections, comma separated. Blank = the whole class.</summary>
+        public string  SectionList     { get; set; } = string.Empty;
         public string  SubjectName     { get; set; } = string.Empty;
         public decimal MaxMarks        { get; set; }
         public decimal PassMarks       { get; set; }
         public int     ExamId          { get; set; }
         public string  ExamName        { get; set; } = string.Empty;
         public string  TypeLabel       { get; set; } = string.Empty;
+        /// <summary>This class already sits another paper in the same slot.</summary>
+        public bool    HasClash        { get; set; }
     }
 
     public class ExamDatesheetData
     {
         public string AcademicYearName { get; set; } = string.Empty;
         public List<ExamDatesheetRow> Rows { get; set; } = new();
+    }
+
+    /// <summary>
+    /// Published exams of one session. Marks Entry groups its exam dropdown by
+    /// these instead of carrying a session picker — an exam already belongs to
+    /// exactly one session, so the session is derived, not chosen.
+    /// </summary>
+    public class ExamSessionGroup
+    {
+        public int    AcademicYearId { get; set; }
+        public string SessionName    { get; set; } = string.Empty;
+        public bool   IsCurrent      { get; set; }
+        public List<ExamListItem> Exams { get; set; } = new();
     }
 
     // ── Marks Entry ──
@@ -131,6 +181,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int     SubjectId   { get; set; }
         public string  SubjectName { get; set; } = string.Empty;
         public string? ExamDate    { get; set; }                   // yyyy-MM-dd
+        public string? StartTime   { get; set; }                   // HH:mm
+        public string? EndTime     { get; set; }                   // HH:mm
         public decimal MaxMarks    { get; set; } = 100;
         public decimal PassMarks   { get; set; } = 35;
     }
@@ -167,6 +219,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal MaxMarks    { get; set; } = 100;
         public decimal PassMarks   { get; set; } = 35;
         public string? ExamDate    { get; set; }                   // yyyy-MM-dd
+        public string? StartTime   { get; set; }                   // HH:mm
+        public string? EndTime     { get; set; }                   // HH:mm
         public string  SubjectName { get; set; } = string.Empty;
         public bool    IsFinalized { get; set; }
         public string? FinalizedAt { get; set; }                   // yyyy-MM-dd

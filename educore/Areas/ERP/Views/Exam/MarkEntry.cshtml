@@ -1,25 +1,14 @@
 @using EduCoreDataAccessLayer.Models.ERP
 @{
-    ViewData["Title"] = "Exam Mark Entry";
+    ViewData["Title"] = "Marks Entry";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 
-    var exams     = ViewBag.Exams as List<ExamListItem> ?? new List<ExamListItem>();
+    var examGroups = ViewBag.ExamGroups as List<ExamSessionGroup> ?? new List<ExamSessionGroup>();
+    var examCount  = examGroups.Sum(g => g.Exams.Count);
     var yearName  = ViewBag.AcademicYearName as string ?? string.Empty;
     var canManage = (bool?)ViewBag.CanManage ?? false;
     var isAdmin   = (bool?)ViewBag.IsAdmin   ?? false;
     var selected  = (int?)ViewBag.SelectedExamId ?? 0;
-
-    // Emitted into the page so the selector cascade needs no extra round trip.
-    // System.Text.Json escapes < and >, so an exam name cannot close the script tag.
-    var examsJson = System.Text.Json.JsonSerializer.Serialize(exams.Select(e => new
-    {
-        id        = e.ExamId,
-        name      = e.ExamName,
-        typeLabel = e.TypeLabel,
-        startDate  = e.StartDate,
-        endDate    = e.EndDate,
-        classNames = e.ClassNames
-    }));
 }
 
 @section PageStyles {
@@ -31,44 +20,49 @@
 <div class="ec-page-shell me-page">
   <div class="ec-page-content">
 
-    <!-- ── Page header ───────────────────────── -->
+    <!-- ── Page header ── -->
     <div class="ec-page-header">
         <div class="ec-page-header-inner">
             <div class="ec-page-title-wrap">
                 <div>
-                    <h4 class="ec-page-title mb-1">Exam Mark Entry</h4>
+                    <h4 class="ec-page-title mb-1">Marks Entry</h4>
                     <div class="ec-page-subtitle">
-                        Select an exam, class, section and subject to enter student marks@(string.IsNullOrWhiteSpace(yearName) ? "" : " · " + yearName)
+                        Pick the sheet, then type the marks@(string.IsNullOrWhiteSpace(yearName) ? "" : " · " + yearName)
                     </div>
                 </div>
             </div>
             <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam"
                class="btn btn-outline-secondary d-flex align-items-center gap-1">
-                <i class="bx bx-plus"></i><span class="d-none d-sm-inline">Create Exam</span>
+                <i class="bx bx-plus"></i><span class="d-none d-sm-inline">Exam Schedule</span>
             </a>
         </div>
     </div>
 
-    @if (exams.Count == 0)
+    @if (examCount == 0)
     {
         <div class="alert alert-warning" style="border-radius:12px;font-weight:700;">
-            No exams have been created for this academic year yet.
-            <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam">Create an exam schedule</a> first.
+            No published exams yet. Marks can only be entered once an exam is published on the
+            <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam">Exam Schedule</a> page.
         </div>
     }
 
-    <!-- ── ① Selector bar ───────────────────── -->
+    <!-- ── Selectors ── -->
     <div class="me-selector">
         <div class="row g-3 align-items-end">
             <div class="col-12 col-sm-6 col-lg-3">
                 <span class="me-sel-label">Exam</span>
+                @* Grouped by session — an exam already belongs to one, so no picker. *@
                 <select class="form-select" id="selExam">
                     <option value="">Select Exam</option>
-                    @foreach (var e in exams)
+                    @foreach (var g in examGroups)
                     {
-                        <option value="@e.ExamId" selected="@(e.ExamId == selected)">
-                            @e.ExamName@(string.IsNullOrWhiteSpace(e.TypeLabel) ? "" : " (" + e.TypeLabel + ")")
-                        </option>
+                        <optgroup label="@(g.SessionName + (g.IsCurrent ? "  (current)" : ""))">
+                            @foreach (var e in g.Exams)
+                            {
+                                <option value="@e.ExamId" data-session="@g.SessionName"
+                                        selected="@(e.ExamId == selected)">@e.ExamName</option>
+                            }
+                        </optgroup>
                     }
                 </select>
             </div>
@@ -92,104 +86,35 @@
             </div>
             <div class="col-12 col-sm-6 col-lg-2">
                 <button type="button" class="me-load-btn w-100" id="loadBtn" disabled>
-                    <i class="bx bx-spreadsheet"></i> Load Students
+                    <i class="bx bx-spreadsheet"></i> Open sheet
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- ── ② Context banner ──────────────────── -->
-    <div class="me-context" id="meContext">
-        <div class="me-ctx-row">
-            <span class="me-ctx-exam" id="ctxExamName">—</span>
-            <span class="me-type-badge" id="ctxTypeBadge"><i class="bx bx-award"></i> —</span>
-            <span class="me-ctx-sub" id="ctxSub">—</span>
-            <span class="me-meta-pill"><i class="bx bx-calendar"></i> <span id="ctxDate">—</span></span>
-            <span class="me-meta-pill"><i class="bx bx-trophy"></i> Max: <strong id="ctxMax">—</strong></span>
-            <span class="me-meta-pill"><i class="bx bx-check-circle"></i> Pass: <strong id="ctxPass">—</strong></span>
-            <span class="me-status-badge ms-pending" id="ctxStatus">Pending</span>
-        </div>
-        <div class="me-ctx-prog">
-            <div class="me-progress-wrap">
-                <div class="me-progress-fill" id="ctxProgressBar" style="width:0%"></div>
-            </div>
-            <span class="me-prog-label" id="ctxProgressLabel">0 / 0 students marked</span>
-        </div>
-    </div>
-
-    <!-- ── ③ Summary strip ───────────────────── -->
-    <div class="me-summary" id="meSummary">
-        <div class="me-sum-item">
-            <div class="me-sum-dot" style="background:#28a745;"></div>
-            <span class="me-sum-val" id="sumPresent">0</span>
-            <span class="me-sum-lbl">Present</span>
-        </div>
-        <div class="me-sum-div"></div>
-        <div class="me-sum-item">
-            <div class="me-sum-dot" style="background:#ea5455;"></div>
-            <span class="me-sum-val" id="sumAbsent">0</span>
-            <span class="me-sum-lbl">Absent</span>
-        </div>
-        <div class="me-sum-div"></div>
-        <div class="me-sum-item">
-            <div class="me-sum-dot" style="background:#ffab00;"></div>
-            <span class="me-sum-val" id="sumPending">0</span>
-            <span class="me-sum-lbl">Pending</span>
-        </div>
-        <div class="me-sum-div"></div>
-        <div class="me-sum-item">
-            <span class="me-sum-val" id="sumAvg">—</span>
-            <span class="me-sum-lbl">Avg %</span>
-        </div>
-        <div class="me-sum-div"></div>
-        <div class="me-sum-item">
-            <span class="me-sum-val" id="sumHigh" style="color:#16a34a;">—</span>
-            <span class="me-sum-lbl">Highest</span>
-        </div>
-        <div class="me-sum-div"></div>
-        <div class="me-sum-item">
-            <span class="me-sum-val" id="sumLow" style="color:#ea5455;">—</span>
-            <span class="me-sum-lbl">Lowest</span>
-        </div>
-        <div class="me-sum-div"></div>
-        <div class="me-sum-item">
-            <div class="me-sum-dot" style="background:#16a34a;"></div>
-            <span class="me-sum-val" id="sumPass">0</span>
-            <span class="me-sum-lbl">Pass</span>
-        </div>
-        <div class="me-sum-div"></div>
-        <div class="me-sum-item">
-            <div class="me-sum-dot" style="background:#dc3545;"></div>
-            <span class="me-sum-val" id="sumFail">0</span>
-            <span class="me-sum-lbl">Fail</span>
-        </div>
-    </div>
-
-    <!-- ── ④ Mark entry grid ──────────────────── -->
+    <!-- ── The sheet ── -->
     <div class="me-grid-card" id="meGridCard">
 
+        <!-- One line of context: what you are marking, and the scale. -->
         <div class="me-grid-hdr">
-            <div class="me-grid-title" id="gridTitle">Student Roster</div>
+            <div>
+                <div class="me-ctx-line" id="ctxLine">—</div>
+                <div class="me-ctx-scale" id="ctxScale">—</div>
+            </div>
             <div class="me-grid-actions">
-                <button type="button" class="me-bulk-btn" id="btnMarkAllPresent">
-                    <i class="bx bx-user-check"></i> All Present
-                </button>
+                <span class="me-lock-chip" id="lockChip" style="display:none;">
+                    <i class="bx bx-lock-alt"></i> Finalized
+                </span>
+                @if (isAdmin)
+                {
+                    <button type="button" class="me-bulk-btn" id="btnReopen" style="display:none;">
+                        <i class="bx bx-lock-open-alt"></i> Unlock
+                    </button>
+                }
                 <button type="button" class="me-bulk-btn" id="btnClearAll">
-                    <i class="bx bx-reset"></i> Clear Marks
+                    <i class="bx bx-reset"></i> Clear marks
                 </button>
             </div>
-        </div>
-
-        <!-- Finalized notice -->
-        <div class="me-finalized-notice" id="finalizedNotice">
-            <i class="bx bx-lock-alt"></i>
-            <span id="finalizedText">These marks are finalized. Contact School Admin to make changes.</span>
-            @if (isAdmin)
-            {
-                <button type="button" class="me-bulk-btn ms-auto" id="btnReopen">
-                    <i class="bx bx-lock-open-alt"></i> Unlock
-                </button>
-            }
         </div>
 
         <!-- Desktop table -->
@@ -197,13 +122,10 @@
             <table class="me-tbl">
                 <thead>
                     <tr>
-                        <th style="width:52px;">#</th>
+                        <th style="width:56px;">#</th>
                         <th>Student</th>
-                        <th style="width:80px; text-align:center;">Absent</th>
-                        <th style="width:110px; text-align:center;">Marks <span id="thMax" style="font-weight:600;opacity:.7;"></span></th>
-                        <th style="width:70px; text-align:center;">%</th>
-                        <th style="width:64px; text-align:center;">Grade</th>
-                        <th style="width:90px; text-align:center;">Result</th>
+                        <th style="width:90px; text-align:center;">Absent</th>
+                        <th style="width:130px; text-align:center;">Marks <span id="thMax" style="font-weight:600;opacity:.7;"></span></th>
                     </tr>
                 </thead>
                 <tbody id="markTableBody"></tbody>
@@ -213,16 +135,16 @@
         <!-- Mobile cards -->
         <div class="me-mob-list" id="mobList"></div>
 
-        <!-- Empty state (shown before load) -->
+        <!-- Shown before a sheet is opened -->
         <div class="me-empty" id="meEmpty">
             <div class="me-empty-ic"><i class="bx bx-spreadsheet"></i></div>
-            <div class="me-empty-title">No students loaded</div>
-            <div class="me-empty-sub">Select an exam, class, section and subject above, then click Load Students.</div>
+            <div class="me-empty-title">No sheet open</div>
+            <div class="me-empty-sub">Pick an exam, class, section and subject above, then choose Open sheet.</div>
         </div>
 
     </div>
 
-    <!-- ── ⑤ Sticky action bar (same UI as Student Attendance) ── -->
+    <!-- ── Sticky action bar ── -->
     <div class="me-bar" id="meBar">
         <div class="me-bar-inner">
             <div class="me-bar-info">
@@ -231,10 +153,10 @@
             </div>
             <div class="me-bar-actions">
                 <button type="button" class="btn-me-draft" id="btnDraft">
-                    <i class="bx bx-save"></i> Save Draft
+                    <i class="bx bx-save"></i> Save
                 </button>
                 <button type="button" class="btn-me-finalize" id="btnFinalize">
-                    <i class="bx bx-lock-alt"></i> Finalize &amp; Lock
+                    <i class="bx bx-lock-alt"></i> Finalize
                 </button>
             </div>
         </div>
@@ -243,39 +165,32 @@
   </div>
 </div>
 
-<!-- ── Finalize confirm modal ─────────────────── -->
+<!-- ── Finalize confirm ── -->
 <div class="modal fade me-modal" id="finalizeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
         <div class="modal-content">
             <div class="modal-header">
                 <h6 class="modal-title">
-                    <i class="bx bx-lock-alt me-2" style="color:var(--ec-primary);"></i>
-                    Finalize &amp; Lock Marks
+                    <i class="bx bx-lock-alt me-2" style="color:var(--ec-primary);"></i>Finalize this sheet
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" style="padding:1.25rem 1.5rem;">
-                <p style="font-size:.88rem;font-weight:650;color:var(--ec-text);margin-bottom:1rem;">
-                    You are about to finalize marks for:
-                </p>
-                <div style="background:var(--ec-primary-light);border-radius:12px;padding:.85rem 1rem;margin-bottom:1rem;">
-                    <div style="font-weight:900;color:var(--ec-text-dark);" id="modalExamDesc">—</div>
-                    <div style="font-size:.78rem;color:var(--ec-text-muted);margin-top:.2rem;" id="modalSubDesc">—</div>
-                </div>
-                <p style="font-size:.83rem;font-weight:650;color:#842029;background:#fde8e8;border-radius:10px;padding:.75rem 1rem;margin:0;">
+            <div class="modal-body" style="padding:1.15rem 1.4rem;">
+                <div style="font-weight:900;color:var(--ec-text-dark);" id="modalDesc">—</div>
+                <p style="font-size:.83rem;font-weight:650;color:#842029;background:#fde8e8;border-radius:10px;padding:.7rem .9rem;margin:.9rem 0 0;">
                     <i class="bx bx-error-circle me-1"></i>
-                    Once finalized, marks cannot be edited without School Admin approval.
+                    Once finalized, only a school admin can reopen it.
                 </p>
-                <div id="modalPendingWarn" class="d-none mt-3"
-                     style="font-size:.82rem;font-weight:700;color:#856404;background:#fff3cd;border-radius:10px;padding:.75rem 1rem;">
+                <div id="modalPendingWarn" class="d-none mt-2"
+                     style="font-size:.82rem;font-weight:700;color:#856404;background:#fff3cd;border-radius:10px;padding:.7rem .9rem;">
                     <i class="bx bx-error me-1"></i>
-                    <span id="modalPendingCount">0</span> student(s) have no marks entered. They will be recorded as Absent.
+                    <span id="modalPendingCount">0</span> student(s) have no marks. They will be recorded Absent.
                 </div>
             </div>
-            <div class="modal-footer" style="border-top:1px solid var(--ec-border);padding:1rem 1.5rem;gap:.5rem;">
+            <div class="modal-footer" style="border-top:1px solid var(--ec-border);padding:.9rem 1.4rem;gap:.5rem;">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" id="confirmFinalizeBtn">
-                    <i class="bx bx-lock-alt me-1"></i> Yes, Finalize
+                    <i class="bx bx-lock-alt me-1"></i> Finalize
                 </button>
             </div>
         </div>
@@ -287,58 +202,25 @@
 $(document).ready(function () {
 'use strict';
 
-// ── Config ────────────────────────────────────────────────────────────────
 var urls = {
     classes: '@Url.Action("ExamClasses", "Exam", new { area = "ERP" })',
     setup:   '@Url.Action("ClassSetup", "Exam", new { area = "ERP" })',
-    sheet:  '@Url.Action("Sheet", "Exam", new { area = "ERP" })',
-    save:   '@Url.Action("SaveMarks", "Exam", new { area = "ERP" })',
-    reopen: '@Url.Action("ReopenSheet", "Exam", new { area = "ERP" })'
+    sheet:   '@Url.Action("Sheet", "Exam", new { area = "ERP" })',
+    save:    '@Url.Action("SaveMarks", "Exam", new { area = "ERP" })',
+    reopen:  '@Url.Action("ReopenSheet", "Exam", new { area = "ERP" })'
 };
 
 var CAN_MANAGE = @(canManage ? "true" : "false");
 
-// Exams for this academic year, straight from the server.
-var EXAM_LIST = @Html.Raw(examsJson);
-var EXAMS = {};
-$.each(EXAM_LIST, function (i, e) { EXAMS[e.id] = e; });
-
-// Display-only grade scale. Grades are NOT stored — no configurable grade scheme
-// exists yet, so this must stay a presentation concern.
-const GRADE_SCALE = [
-    { min: 91, grade: 'A+', cls: 'g-aplus' },
-    { min: 81, grade: 'A',  cls: 'g-a'     },
-    { min: 71, grade: 'B+', cls: 'g-bplus' },
-    { min: 61, grade: 'B',  cls: 'g-b'     },
-    { min: 51, grade: 'C',  cls: 'g-c'     },
-    { min: 41, grade: 'D',  cls: 'g-d'     },
-    { min: 33, grade: 'E',  cls: 'g-e'     },
-    { min: 0,  grade: 'F',  cls: 'g-f'     }
-];
-
-const AVATAR_COLORS = [
-    'bg-label-primary text-primary',
-    'bg-label-success text-success',
-    'bg-label-info text-info',
-    'bg-label-warning text-warning',
-    'bg-label-danger text-danger'
-];
-
-var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-// ── State ─────────────────────────────────────────────────────────────────
 var state = {
     examId: 0, classId: 0, subjectId: 0, section: '',
-    className: '', subjectName: '', examDate: null,
+    examName: '', session: '', className: '', subjectName: '',
     maxMarks: 100, passMarks: 35,
-    rows: [],          // { studentId, roll, name, gender, marks, absent, hadMark }
-    finalized: false,
-    loaded: false
+    examDate: '', startTime: '', endTime: '',
+    rows: [],          // { studentId, roll, name, marks, absent, hadMark }
+    finalized: false
 };
 
-var SUBJECTS = {};     // subjectId -> { name, date, maxMarks, passMarks }
-
-// ── DOM refs ──────────────────────────────────────────────────────────────
 var selExam    = document.getElementById('selExam');
 var selClass   = document.getElementById('selClass');
 var selSection = document.getElementById('selSection');
@@ -349,14 +231,6 @@ function token() {
     return $('input[name="__RequestVerificationToken"]').first().val();
 }
 
-// 2026-09-12 -> 12 Sep 2026
-function fmtDate(iso) {
-    if (!iso) return '—';
-    var p = String(iso).split('-');
-    if (p.length !== 3) return iso;
-    return parseInt(p[2], 10) + ' ' + MONTHS[parseInt(p[1], 10) - 1] + ' ' + p[0];
-}
-
 // 78.00 -> "78",  78.50 -> "78.5",  null -> ""
 function fmtMarks(v) {
     if (v === null || v === undefined || v === '') return '';
@@ -365,53 +239,46 @@ function fmtMarks(v) {
 }
 
 // ── Selector cascade ──────────────────────────────────────────────────────
-function clearSheet() {
+function closeSheet() {
     state.rows = [];
-    state.loaded = false;
     state.finalized = false;
-    document.getElementById('meContext').style.display  = 'none';
-    document.getElementById('meSummary').style.display  = 'none';
-    document.getElementById('meBar').style.display      = 'none';
-    document.getElementById('markTableBody').innerHTML  = '';
-    document.getElementById('mobList').innerHTML        = '';
-    document.getElementById('finalizedNotice').style.display = 'none';
-    document.getElementById('meEmpty').style.display    = 'flex';
+    document.getElementById('markTableBody').innerHTML = '';
+    document.getElementById('mobList').innerHTML       = '';
+    document.getElementById('meEmpty').style.display   = 'flex';
+    document.getElementById('meBar').style.display     = 'none';
+    document.getElementById('lockChip').style.display  = 'none';
+    $('#btnReopen').hide();
+    $('#ctxLine').text('—');
+    $('#ctxScale').text('—');
 }
 
-$(selExam).on('change', function () {
-    state.examId  = EC.num(this.value);
-    state.classId = 0;
-    state.className = '';
-
-    resetBelowExam();
-    updateLoadBtn();
-
-    if (!state.examId) return;
-    loadClasses(state.examId);
-});
-
-// Everything under Exam depends on the exam, so clear it in one place.
 function resetBelowExam() {
-    SUBJECTS = {};
     selClass.innerHTML   = '<option value="">Class</option>';
     selSection.innerHTML = '<option value="">Sec</option>';
     selSubject.innerHTML = '<option value="">Select Subject</option>';
-    selClass.disabled    = true;
-    selSection.disabled  = true;
-    selSubject.disabled  = true;
-    clearSheet();
+    selClass.disabled = selSection.disabled = selSubject.disabled = true;
+    closeSheet();
 }
 
 function resetBelowClass() {
-    SUBJECTS = {};
     selSection.innerHTML = '<option value="">Sec</option>';
     selSubject.innerHTML = '<option value="">Select Subject</option>';
-    selSection.disabled  = true;
-    selSubject.disabled  = true;
-    clearSheet();
+    selSection.disabled = selSubject.disabled = true;
+    closeSheet();
 }
 
-// The classes this exam covers.
+$(selExam).on('change', function () {
+    var $opt = $(this).find('option:selected');
+    state.examId   = EC.num(this.value);
+    state.examName = this.value ? $opt.text().trim() : '';
+    // Which session this exam belongs to, so the sheet says so out loud.
+    state.session  = this.value ? ($opt.data('session') || '') : '';
+    state.classId  = 0;
+    resetBelowExam();
+    updateLoadBtn();
+    if (state.examId) loadClasses(state.examId);
+});
+
 function loadClasses(examId) {
     EC.showLoader();
     $.get(urls.classes, { examId: examId })
@@ -425,27 +292,21 @@ function loadClasses(examId) {
             if (!list.length) {
                 ecToast('error', 'This exam has no classes on its datesheet.');
             } else if (list.length === 1) {
-                // Only one class sits it — pick it so the teacher does not have to.
                 selClass.value = String(list[0].id);
                 $(selClass).trigger('change');
             }
             updateLoadBtn();
         })
-        .fail(function () {
-            ecToast('error', 'Could not load the classes for this exam. Please retry.');
-        })
+        .fail(function () { ecToast('error', 'Could not load the classes for this exam.'); })
         .always(EC.hideLoader);
 }
 
 $(selClass).on('change', function () {
     state.classId   = EC.num(this.value);
     state.className = this.value ? $(this).find('option:selected').text().trim() : '';
-
     resetBelowClass();
     updateLoadBtn();
-
-    if (!state.classId) return;
-    loadSetup(state.examId, state.classId);
+    if (state.classId) loadSetup(state.examId, state.classId);
 });
 
 function loadSetup(examId, classId) {
@@ -460,7 +321,6 @@ function loadSetup(examId, classId) {
                 selSection.innerHTML += '<option value="' + EC.esc(s.name) + '">' + EC.esc(label) + '</option>';
             });
             $.each(subjects, function (i, s) {
-                SUBJECTS[s.id] = { name: s.name, date: s.date, maxMarks: s.maxMarks, passMarks: s.passMarks };
                 selSubject.innerHTML += '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
             });
 
@@ -469,25 +329,23 @@ function loadSetup(examId, classId) {
 
             if (!sections.length) {
                 ecToast('error', 'No students are enrolled in this class for the exam\'s academic year.');
-            } else if (!subjects.length) {
-                ecToast('error', 'This exam has no subjects on its datesheet.');
+            } else if (sections.length === 1) {
+                selSection.value = sections[0].name;
             }
             updateLoadBtn();
         })
-        .fail(function () {
-            ecToast('error', 'Could not load the exam. Please retry.');
-        })
+        .fail(function () { ecToast('error', 'Could not load this class. Please retry.'); })
         .always(EC.hideLoader);
 }
 
-$(selSection).on('change', function () { clearSheet(); updateLoadBtn(); });
-$(selSubject).on('change', function () { clearSheet(); updateLoadBtn(); });
+$(selSection).on('change', function () { closeSheet(); updateLoadBtn(); });
+$(selSubject).on('change', function () { closeSheet(); updateLoadBtn(); });
 
 function updateLoadBtn() {
     loadBtn.disabled = !(selExam.value && selClass.value && selSection.value !== '' && selSubject.value);
 }
 
-// ── Load the sheet ────────────────────────────────────────────────────────
+// ── Open the sheet ────────────────────────────────────────────────────────
 $(loadBtn).on('click', function () {
     var $btn = $(this);
     state.examId    = EC.num(selExam.value);
@@ -495,23 +353,23 @@ $(loadBtn).on('click', function () {
     state.subjectId = EC.num(selSubject.value);
     state.section   = selSection.value;
 
-    EC.buttonBusy($btn, 'Loading…');
+    EC.buttonBusy($btn, 'Opening…');
     $.get(urls.sheet, {
-        examId:    state.examId,
-        classId:   state.classId,
-        subjectId: state.subjectId,
-        section:   state.section
+        examId: state.examId, classId: state.classId,
+        subjectId: state.subjectId, section: state.section
     })
         .done(function (d) {
             if (!d || !d.success) {
-                ecToast('error', (d && d.message) || 'Could not load the sheet.');
+                ecToast('error', (d && d.message) || 'Could not open the sheet.');
                 return;
             }
 
             state.maxMarks    = EC.num(d.maxMarks) || 100;
             state.passMarks   = EC.num(d.passMarks);
-            state.examDate    = d.examDate;
             state.subjectName = d.subjectName;
+            state.examDate    = d.examDate || '';
+            state.startTime   = d.startTime || '';
+            state.endTime     = d.endTime || '';
             state.finalized   = !!d.isFinalized;
 
             state.rows = $.map(d.students || [], function (s) {
@@ -519,157 +377,77 @@ $(loadBtn).on('click', function () {
                     studentId: s.id,
                     roll:      s.roll || '',
                     name:      s.name,
-                    gender:    s.gender || '',
                     marks:     (s.marks === null || s.marks === undefined) ? null : Number(s.marks),
                     absent:    !!s.absent,
                     hadMark:   !!s.hasMark
                 };
             });
-            state.loaded = true;
 
             if (!state.rows.length) {
-                clearSheet();
-                document.getElementById('meEmpty').querySelector('.me-empty-title').textContent = 'No students in this section';
-                document.getElementById('meEmpty').querySelector('.me-empty-sub').textContent =
-                    'Nobody is enrolled in this class and section for the exam\'s academic year.';
-                document.getElementById('meGridCard').style.display = 'block';
+                closeSheet();
+                $('#meEmpty .me-empty-title').text('Nobody in this section');
+                $('#meEmpty .me-empty-sub').text('No students are enrolled in this class and section for the exam\'s academic year.');
                 return;
             }
 
-            renderContext();
-            renderSummary();
             renderGrid();
-            showUI();
+            document.getElementById('meBar').style.display = 'block';
         })
-        .fail(function () {
-            ecToast('error', 'Could not load the sheet. Please retry.');
-        })
+        .fail(function () { ecToast('error', 'Could not open the sheet. Please retry.'); })
         .always(function () { EC.buttonReset($btn); });
 });
 
-// ── Render context banner ─────────────────────────────────────────────────
+// ── Context line ──────────────────────────────────────────────────────────
 function renderContext() {
-    var exam = EXAMS[state.examId] || {};
-    var sectionLabel = state.section ? ' – ' + state.section : '';
+    var where = state.className + (state.section ? '-' + state.section : '');
+    $('#ctxLine').html(
+        '<strong>' + EC.esc(state.examName) + '</strong>' +
+        (state.session ? ' <span class="me-ctx-session">' + EC.esc(state.session) + '</span>' : '') +
+        ' &middot; ' + EC.esc(where) + ' &middot; ' + EC.esc(state.subjectName));
 
-    document.getElementById('ctxExamName').textContent = exam.name || '—';
-    document.getElementById('ctxTypeBadge').innerHTML  =
-        '<i class="bx bx-award"></i> ' + EC.esc(exam.typeLabel || '—');
-    document.getElementById('ctxSub').textContent =
-        state.subjectName + ' · ' + state.className + sectionLabel;
-    document.getElementById('ctxDate').textContent = fmtDate(state.examDate);
-    document.getElementById('ctxMax').textContent  = fmtMarks(state.maxMarks);
-    document.getElementById('ctxPass').textContent = fmtMarks(state.passMarks);
-    document.getElementById('thMax').textContent   = '/ ' + fmtMarks(state.maxMarks);
+    var when = state.startTime && state.endTime
+        ? state.startTime + '–' + state.endTime
+        : (state.startTime || state.endTime || '');
 
-    updateProgress();
+    $('#ctxScale').text(
+        (when ? when + ' · ' : '') +
+        'Max ' + fmtMarks(state.maxMarks) + ' · Pass ' + fmtMarks(state.passMarks) +
+        ' · ' + entered() + ' of ' + state.rows.length + ' entered');
 
-    document.getElementById('modalExamDesc').textContent = exam.name || '—';
-    document.getElementById('modalSubDesc').textContent  =
-        state.subjectName + ' · ' + state.className + sectionLabel;
+    $('#thMax').text('/ ' + fmtMarks(state.maxMarks));
+
+    $('#lockChip').toggle(state.finalized);
+    $('#btnReopen').toggle(state.finalized);
+
+    $('#modalDesc').text(state.examName + (state.session ? ' (' + state.session + ')' : '') +
+                        ' · ' + where + ' · ' + state.subjectName);
+    $('#barInfoText').html(EC.esc(where + ' · ' + state.subjectName) +
+        ' &middot; ' + entered() + '/' + state.rows.length + ' entered');
 }
 
-function updateProgress() {
-    var total  = state.rows.length;
-    var marked = state.rows.filter(function (r) { return r.absent || r.marks !== null; }).length;
-    var pct    = total ? Math.round(marked / total * 100) : 0;
-
-    document.getElementById('ctxProgressBar').style.width  = pct + '%';
-    document.getElementById('ctxProgressLabel').textContent = marked + ' / ' + total + ' students marked';
-
-    var statusEl = document.getElementById('ctxStatus');
-    var cls = 'ms-pending', label = 'Pending';
-    if (state.finalized) { cls = 'ms-finalized'; label = 'Finalized'; }
-    else if (marked === total && total > 0) { cls = 'ms-completed'; label = 'Completed'; }
-    else if (marked > 0) { cls = 'ms-progress'; label = 'In Progress'; }
-    statusEl.className = 'me-status-badge ' + cls;
-    statusEl.textContent = label;
+function entered() {
+    return state.rows.filter(function (r) { return r.absent || r.marks !== null; }).length;
 }
 
-// ── Render summary strip ──────────────────────────────────────────────────
-function renderSummary() {
-    var rows      = state.rows;
-    var absent    = rows.filter(function (r) { return r.absent; }).length;
-    var present   = rows.length - absent;
-    var withMarks = rows.filter(function (r) { return !r.absent && r.marks !== null; });
-    var pending   = rows.filter(function (r) { return !r.absent && r.marks === null; }).length;
-    var scores    = withMarks.map(function (r) { return r.marks; });
-    var pass      = withMarks.filter(function (r) { return r.marks >= state.passMarks; }).length;
-    var fail      = withMarks.length - pass;
-
-    document.getElementById('sumPresent').textContent = present;
-    document.getElementById('sumAbsent').textContent  = absent;
-    document.getElementById('sumPending').textContent = pending;
-    document.getElementById('sumPass').textContent    = pass;
-    document.getElementById('sumFail').textContent    = fail;
-
-    if (scores.length) {
-        var sum = scores.reduce(function (a, b) { return a + b; }, 0);
-        // Percentage of the paper's max, not of 100 — a 50-mark paper must not
-        // read as half the average it really is.
-        var avgPct = (sum / scores.length) / state.maxMarks * 100;
-        document.getElementById('sumAvg').textContent  = avgPct.toFixed(1) + '%';
-        document.getElementById('sumHigh').textContent = fmtMarks(Math.max.apply(null, scores));
-        document.getElementById('sumLow').textContent  = fmtMarks(Math.min.apply(null, scores));
-    } else {
-        document.getElementById('sumAvg').textContent  = '—';
-        document.getElementById('sumHigh').textContent = '—';
-        document.getElementById('sumLow').textContent  = '—';
-    }
-}
-
-// ── Compute grade ─────────────────────────────────────────────────────────
-function getGradeInfo(marks, max, pass) {
-    if (marks === null) return { pct: null, grade: '—', cls: 'g-ab', result: 'pending' };
-    var pct = Math.round(marks / max * 100);
-    if (marks < pass) return { pct: pct, grade: 'F', cls: 'g-f', result: 'fail' };
-    var found = GRADE_SCALE.find(function (g) { return pct >= g.min; });
-    return { pct: pct, grade: found ? found.grade : 'F', cls: found ? found.cls : 'g-f', result: 'pass' };
-}
-
-function rowInfo(row) {
-    return row.absent
-        ? { pct: null, grade: 'AB', cls: 'g-ab', result: 'abs' }
-        : getGradeInfo(row.marks, state.maxMarks, state.passMarks);
-}
-
-function initialsOf(name) {
-    return String(name || '?').split(' ')
-        .map(function (p) { return p[0]; })
-        .slice(0, 2).join('').toUpperCase();
-}
-
-function resultHtml(gi) {
-    if (gi.result === 'abs')  return '<span class="me-result r-abs">ABS</span>';
-    if (gi.result === 'pass') return '<span class="me-result r-pass"><i class="bx bx-check"></i> PASS</span>';
-    if (gi.result === 'fail') return '<span class="me-result r-fail"><i class="bx bx-x"></i> FAIL</span>';
-    return '<span style="color:var(--ec-text-muted);font-size:.78rem;font-weight:700;">—</span>';
-}
-
-// Marks and the absent toggle are locked once the sheet is finalized, and for
-// anyone without exams.manage.
+// Marks and the absent toggle are locked once finalized, and for anyone
+// without exams.manage.
 function locked() { return state.finalized || !CAN_MANAGE; }
 
-// ── Render desktop table row ──────────────────────────────────────────────
+// Pass/fail shows as a row tint, so it needs no column of its own.
+function rowClass(row) {
+    if (row.absent) return 'me-row-abs';
+    if (row.marks === null) return '';
+    return row.marks >= state.passMarks ? 'me-row-pass' : 'me-row-fail';
+}
+
+// ── Grid ──────────────────────────────────────────────────────────────────
 function buildTableRow(row, idx) {
-    var gi  = rowInfo(row);
-    var pct = row.absent ? '—' : (gi.pct !== null ? gi.pct + '%' : '—');
-    var avCol = AVATAR_COLORS[idx % AVATAR_COLORS.length];
-    var rowCls = row.absent ? 'me-row-abs' : (gi.result === 'pass' ? 'me-row-pass' : gi.result === 'fail' ? 'me-row-fail' : '');
     var ro  = (locked() || row.absent) ? 'readonly' : '';
     var dis = locked() ? 'disabled' : '';
 
-    return '<tr class="' + rowCls + '" data-idx="' + idx + '" data-id="' + row.studentId + '">' +
-        '<td><span style="font-weight:800;color:var(--ec-text-muted);">' + EC.esc(row.roll) + '</span></td>' +
-        '<td>' +
-            '<div class="d-flex align-items-center gap-2">' +
-                '<div class="me-av ' + avCol + '">' + EC.esc(initialsOf(row.name)) + '</div>' +
-                '<div>' +
-                    '<div class="me-nm">' + EC.esc(row.name) + '</div>' +
-                    '<div class="me-rl">' + EC.esc(row.gender || '') + '</div>' +
-                '</div>' +
-            '</div>' +
-        '</td>' +
+    return '<tr class="' + rowClass(row) + '" data-idx="' + idx + '">' +
+        '<td><span class="me-roll">' + EC.esc(row.roll) + '</span></td>' +
+        '<td><span class="me-nm">' + EC.esc(row.name) + '</span></td>' +
         '<td style="text-align:center;">' +
             '<label class="me-abs-toggle">' +
                 '<input type="checkbox" class="abs-chk" data-idx="' + idx + '" ' + (row.absent ? 'checked' : '') + ' ' + dis + '>' +
@@ -681,28 +459,19 @@ function buildTableRow(row, idx) {
                    'min="0" max="' + state.maxMarks + '" step="0.5" placeholder="—" ' +
                    'value="' + (row.absent ? '' : fmtMarks(row.marks)) + '" ' + ro + '>' +
         '</td>' +
-        '<td style="text-align:center;font-weight:800;color:var(--ec-text-muted);font-size:.84rem;">' + pct + '</td>' +
-        '<td style="text-align:center;"><span class="me-grade ' + gi.cls + '">' + (row.absent ? 'AB' : gi.grade) + '</span></td>' +
-        '<td style="text-align:center;">' + resultHtml(gi) + '</td>' +
         '</tr>';
 }
 
-// ── Render mobile card ────────────────────────────────────────────────────
 function buildMobCard(row, idx) {
-    var gi = rowInfo(row);
-    var avCol = AVATAR_COLORS[idx % AVATAR_COLORS.length];
-    var mobCls = row.absent ? 'mob-abs' : (gi.result === 'pass' ? 'mob-pass' : gi.result === 'fail' ? 'mob-fail' : '');
     var ro  = (locked() || row.absent) ? 'readonly' : '';
     var dis = locked() ? 'disabled' : '';
 
-    return '<div class="me-mob-card ' + mobCls + '" data-idx="' + idx + '">' +
+    return '<div class="me-mob-card ' + rowClass(row) + '" data-idx="' + idx + '">' +
         '<div class="me-mob-top">' +
-            '<div class="me-av ' + avCol + '">' + EC.esc(initialsOf(row.name)) + '</div>' +
             '<div class="flex-grow-1">' +
                 '<div class="me-nm">' + EC.esc(row.name) + '</div>' +
-                '<div class="me-rl">Roll: ' + EC.esc(row.roll) + (row.gender ? ' · ' + EC.esc(row.gender) : '') + '</div>' +
+                '<div class="me-rl">Roll: ' + EC.esc(row.roll) + '</div>' +
             '</div>' +
-            '<span class="me-grade ' + gi.cls + '" style="flex-shrink:0;">' + (row.absent ? 'AB' : gi.grade) + '</span>' +
         '</div>' +
         '<div class="me-mob-inp-row">' +
             '<div>' +
@@ -718,57 +487,32 @@ function buildMobCard(row, idx) {
                        'min="0" max="' + state.maxMarks + '" step="0.5" placeholder="—" style="width:90px;" ' +
                        'value="' + (row.absent ? '' : fmtMarks(row.marks)) + '" ' + ro + '>' +
             '</div>' +
-            (!row.absent && gi.pct !== null
-                ? '<div><span class="me-mob-inp-lbl">%</span>' +
-                  '<span style="font-size:.95rem;font-weight:900;color:var(--ec-text-dark);">' + gi.pct + '%</span></div>'
-                : '') +
         '</div>' +
         '</div>';
 }
 
-// ── Render full grid ──────────────────────────────────────────────────────
 function renderGrid() {
-    var tbody   = document.getElementById('markTableBody');
-    var mobList = document.getElementById('mobList');
-    var empty   = document.getElementById('meEmpty');
-    var fin     = document.getElementById('finalizedNotice');
-    var title   = document.getElementById('gridTitle');
+    if (!state.rows.length) { closeSheet(); return; }
 
-    title.textContent = state.className + (state.section ? ' – ' + state.section : '') +
-                        ' · ' + state.subjectName + ' (' + state.rows.length + ' students)';
-
-    if (state.rows.length === 0) {
-        tbody.innerHTML = '';
-        mobList.innerHTML = '';
-        empty.style.display = 'flex';
-        return;
-    }
-    empty.style.display = 'none';
-
-    tbody.innerHTML   = state.rows.map(buildTableRow).join('');
-    mobList.innerHTML = state.rows.map(buildMobCard).join('');
-
-    fin.style.display = state.finalized ? 'flex' : 'none';
+    document.getElementById('meEmpty').style.display = 'none';
+    document.getElementById('markTableBody').innerHTML = state.rows.map(buildTableRow).join('');
+    document.getElementById('mobList').innerHTML       = state.rows.map(buildMobCard).join('');
 
     var lock = locked();
-    document.getElementById('btnDraft').disabled          = lock;
-    document.getElementById('btnFinalize').disabled       = lock;
-    document.getElementById('btnMarkAllPresent').disabled = lock;
-    document.getElementById('btnClearAll').disabled       = lock;
+    document.getElementById('btnDraft').disabled    = lock;
+    document.getElementById('btnFinalize').disabled = lock;
+    document.getElementById('btnClearAll').disabled = lock;
 
     attachRowEvents();
-    updateProgress();
-    updateBarInfo();
+    renderContext();
 }
 
-// ── Attach events to rows ─────────────────────────────────────────────────
 function attachRowEvents() {
     $('.abs-chk').on('change', function () {
         var idx = parseInt(this.dataset.idx, 10);
         state.rows[idx].absent = this.checked;
         if (this.checked) state.rows[idx].marks = null;
         renderGrid();
-        renderSummary();
     });
 
     $('.marks-inp').on('input', function () {
@@ -780,14 +524,11 @@ function attachRowEvents() {
         if (val !== null && val > state.maxMarks) { val = state.maxMarks; this.value = state.maxMarks; }
 
         state.rows[idx].marks = val;
-
         refreshRow(idx);
-        renderSummary();
-        updateProgress();
-        updateBarInfo();
+        renderContext();
     });
 
-    // Enter / Tab moves to the next enterable box
+    // Enter / Tab moves to the next box
     $('.marks-inp').on('keydown', function (e) {
         if (e.key === 'Enter' || e.key === 'Tab') {
             e.preventDefault();
@@ -798,67 +539,26 @@ function attachRowEvents() {
     });
 }
 
-// ── Refresh a single row (no full re-render) ──────────────────────────────
+// Only the row tint changes as marks are typed — no cells to rewrite.
 function refreshRow(idx) {
-    var row = state.rows[idx];
-    var gi  = rowInfo(row);
-
+    var cls = rowClass(state.rows[idx]);
     var tr = document.querySelector('#markTableBody tr[data-idx="' + idx + '"]');
-    if (tr) {
-        tr.className = row.absent ? 'me-row-abs' : (gi.result === 'pass' ? 'me-row-pass' : gi.result === 'fail' ? 'me-row-fail' : '');
-        var cells = tr.querySelectorAll('td');
-        cells[4].textContent = row.absent ? '—' : (gi.pct !== null ? gi.pct + '%' : '—');
-        cells[5].innerHTML = '<span class="me-grade ' + gi.cls + '">' + (row.absent ? 'AB' : gi.grade) + '</span>';
-        cells[6].innerHTML = resultHtml(gi);
-    }
-
+    if (tr) tr.className = cls;
     var mc = document.querySelector('#mobList .me-mob-card[data-idx="' + idx + '"]');
-    if (mc) {
-        mc.className = 'me-mob-card ' + (row.absent ? 'mob-abs' : gi.result === 'pass' ? 'mob-pass' : gi.result === 'fail' ? 'mob-fail' : '');
-        var gradeEl = mc.querySelector('.me-grade');
-        if (gradeEl) { gradeEl.className = 'me-grade ' + gi.cls; gradeEl.textContent = row.absent ? 'AB' : gi.grade; }
-    }
+    if (mc) mc.className = 'me-mob-card ' + cls;
 }
-
-// ── Bulk actions ──────────────────────────────────────────────────────────
-$('#btnMarkAllPresent').on('click', function () {
-    state.rows.forEach(function (r) { r.absent = false; });
-    renderGrid();
-    renderSummary();
-});
 
 $('#btnClearAll').on('click', function () {
     EC.confirm({
-        title:   'Clear all entered marks?',
-        message: 'Every mark on this sheet will be cleared. You still have to save for it to take effect.',
+        title:   'Clear all marks on this sheet?',
+        message: 'You still have to Save for it to take effect.',
         okText:  'Clear marks'
     }).then(function (ok) {
         if (!ok) return;
         state.rows.forEach(function (r) { r.marks = null; r.absent = false; });
         renderGrid();
-        renderSummary();
-        updateProgress();
     });
 });
-
-// ── Show UI panels ────────────────────────────────────────────────────────
-function showUI() {
-    document.getElementById('meContext').style.display  = 'block';
-    document.getElementById('meSummary').style.display  = 'flex';
-    document.getElementById('meGridCard').style.display = 'block';
-    document.getElementById('meBar').style.display      = 'block';
-    document.getElementById('meEmpty').style.display    = 'none';
-}
-
-// ── Bar info text ─────────────────────────────────────────────────────────
-function updateBarInfo() {
-    var exam   = EXAMS[state.examId] || {};
-    var total  = state.rows.length;
-    var marked = state.rows.filter(function (r) { return r.absent || r.marks !== null; }).length;
-    document.getElementById('barInfoText').innerHTML =
-        '<strong>' + EC.esc(exam.name || '') + '</strong> · ' + EC.esc(state.subjectName) + ' · ' +
-        EC.esc(state.className + (state.section ? ' – ' + state.section : '')) + ' · ' + marked + '/' + total + ' marked';
-}
 
 // ── Save ──────────────────────────────────────────────────────────────────
 // Send a row when it carries something, or when it already had a saved row —
@@ -895,20 +595,15 @@ function postSheet($btn, finalize) {
             return;
         }
         ecToast('success', d.message || 'Marks saved.');
-
-        // Reload from the server so the sheet reflects exactly what was stored
-        // (finalize turns blanks into Absent server-side).
+        // Reload so the sheet shows exactly what was stored (finalize turns
+        // blanks into Absent server-side).
         loadBtn.click();
     })
-    .fail(function () {
-        ecToast('error', 'Could not save the marks. Please retry.');
-    })
+    .fail(function () { ecToast('error', 'Could not save the marks. Please retry.'); })
     .always(function () { EC.buttonReset($btn); });
 }
 
-$('#btnDraft').on('click', function () {
-    postSheet($(this), false);
-});
+$('#btnDraft').on('click', function () { postSheet($(this), false); });
 
 $('#btnFinalize').on('click', function () {
     var pending = state.rows.filter(function (r) { return !r.absent && r.marks === null; }).length;
@@ -928,15 +623,15 @@ $('#confirmFinalizeBtn').on('click', function () {
     postSheet($('#btnFinalize'), true);
 });
 
-// ── Unlock a finalized sheet (school admin only; the server checks too) ────
+// ── Unlock (school admin only; the server checks too) ──────────────────────
 $('#btnReopen').on('click', function () {
     var $btn = $(this);
 
     EC.confirm({
         title:   'Unlock this sheet?',
-        name:    state.subjectName + ' · ' + state.className + (state.section ? ' – ' + state.section : ''),
+        name:    state.className + (state.section ? '-' + state.section : '') + ' · ' + state.subjectName,
         message: 'The teacher will be able to edit these marks again.',
-        okText:  'Unlock sheet',
+        okText:  'Unlock',
         danger:  false
     }).then(function (ok) {
         if (!ok) return;
@@ -947,10 +642,8 @@ $('#btnReopen').on('click', function () {
             type: 'POST',
             headers: { 'RequestVerificationToken': token() },
             data: {
-                examId:    state.examId,
-                classId:   state.classId,
-                subjectId: state.subjectId,
-                section:   state.section
+                examId: state.examId, classId: state.classId,
+                subjectId: state.subjectId, section: state.section
             }
         })
         .done(function (d) {
@@ -961,16 +654,12 @@ $('#btnReopen').on('click', function () {
             ecToast('success', d.message || 'Sheet reopened.');
             loadBtn.click();
         })
-        .fail(function () {
-            ecToast('error', 'Could not unlock the sheet. Please retry.');
-        })
+        .fail(function () { ecToast('error', 'Could not unlock the sheet. Please retry.'); })
         .always(function () { EC.buttonReset($btn); });
     });
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────
-// An exam preselected in the query string (e.g. from the schedule page) loads
-// its sections and subjects straight away.
 if (selExam.value) $(selExam).trigger('change');
 updateLoadBtn();
 

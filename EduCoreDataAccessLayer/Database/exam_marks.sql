@@ -216,7 +216,8 @@ BEGIN
 
         -- That class's datesheet — the Subject dropdown and its marks scale.
         OPEN p_result FOR
-        SELECT es.subject_id, s.subject_name, es.exam_date, es.max_marks, es.pass_marks
+        SELECT es.subject_id, s.subject_name, es.exam_date, es.start_time, es.end_time,
+               es.max_marks, es.pass_marks
         FROM academic.exam_subjects es
         JOIN academic.school_subjects s ON s.subject_id = es.subject_id
         WHERE es.exam_id           = p_exam_id
@@ -225,7 +226,9 @@ BEGIN
           AND es.school_id         = p_school_id
         ORDER BY es.display_order, s.subject_name;
 
-        -- Sections that actually have students enrolled in this class that year.
+        -- Sections that actually have students enrolled in this class that year,
+        -- narrowed to the exam's chosen sections when it targets specific ones.
+        -- No exam_class_sections rows for this (exam, class) = the whole class.
         OPEN p_result2 FOR
         SELECT COALESCE(TRIM(e.section), '') AS section, COUNT(*)::int AS student_count
         FROM core.student_enrolment e
@@ -234,6 +237,13 @@ BEGIN
           AND e.academic_year_id  = v_year_id
           AND e.academic_class_id = p_academic_class_id
           AND COALESCE(e.status, '') <> 'Left'
+          AND (NOT EXISTS (SELECT 1 FROM academic.exam_class_sections x
+                           WHERE x.exam_id = p_exam_id
+                             AND x.academic_class_id = p_academic_class_id)
+               OR EXISTS (SELECT 1 FROM academic.exam_class_sections x
+                          WHERE x.exam_id = p_exam_id
+                            AND x.academic_class_id = p_academic_class_id
+                            AND x.section = COALESCE(TRIM(e.section), '')))
         GROUP BY COALESCE(TRIM(e.section), '')
         ORDER BY 1;
 
@@ -272,6 +282,14 @@ BEGIN
              WHERE es.exam_id = p_exam_id
                AND es.academic_class_id = p_academic_class_id
                AND es.subject_id = p_subject_id) AS exam_date,
+            (SELECT es.start_time FROM academic.exam_subjects es
+             WHERE es.exam_id = p_exam_id
+               AND es.academic_class_id = p_academic_class_id
+               AND es.subject_id = p_subject_id) AS start_time,
+            (SELECT es.end_time FROM academic.exam_subjects es
+             WHERE es.exam_id = p_exam_id
+               AND es.academic_class_id = p_academic_class_id
+               AND es.subject_id = p_subject_id) AS end_time,
             (SELECT s.subject_name FROM academic.school_subjects s
              WHERE s.subject_id = p_subject_id) AS subject_name,
             COALESCE(sh.is_finalized, FALSE) AS is_finalized,

@@ -1,4 +1,5 @@
 using educore.Helpers;
+using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -15,17 +16,32 @@ namespace educore.Areas.ERP.Controllers
         private readonly ISubjectService _subject;
         private readonly IReferenceDataService _referenceData;
         private readonly EduCoreDataAccessLayer.Services.IPermissionService _permission;
+        private readonly IBaseService _baseService;
 
         public ExamController(
             IExamService exam,
             ISubjectService subject,
             IReferenceDataService referenceData,
-            EduCoreDataAccessLayer.Services.IPermissionService permission)
+            EduCoreDataAccessLayer.Services.IPermissionService permission,
+            IBaseService baseService)
         {
             _exam = exam;
             _subject = subject;
             _referenceData = referenceData;
             _permission = permission;
+            _baseService = baseService;
+        }
+
+        // The school's sessions for the picker. config.sp_dropdown_common already
+        // flags the current one as IsSelected, so the page needs no extra call.
+        private async Task<List<SelectListItem>> SessionsAsync()
+        {
+            try
+            {
+                return await _baseService.GetSelectListAsync(
+                    "config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
+            }
+            catch { return new List<SelectListItem>(); }
         }
 
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -42,32 +58,45 @@ namespace educore.Areas.ERP.Controllers
         // An exam is school-wide; each class it covers gets its own datesheet.
 
         [HttpGet]
-        public async Task<IActionResult> CreateExam()
+        public async Task<IActionResult> CreateExam(int sessionId = 0)
         {
-            ViewBag.Classes = await _subject.GetClassesAsync(TenantId(), SchoolId(), UserId());
+            var sessions = await SessionsAsync();
+            ViewBag.Sessions = sessions;
+            ViewBag.SessionId = sessionId > 0 ? sessionId : CurrentSessionId(sessions);
+
+            ViewBag.Classes = await _subject.GetClassesAsync(
+                TenantId(), SchoolId(), UserId(), (int)ViewBag.SessionId);
 
             try { ViewBag.ExamTypes = await _referenceData.GetOptionsAsync("ExamType", TenantId(), SchoolId()); }
             catch { ViewBag.ExamTypes = new List<SelectListItem>(); }
 
-            var list = await _exam.GetExamsAsync(TenantId(), SchoolId(), UserId());
+            var list = await _exam.GetExamsAsync(TenantId(), SchoolId(), UserId(), (int)ViewBag.SessionId);
             ViewBag.AcademicYearName = list.AcademicYearName;
 
             return View();
         }
 
+        // The session flagged current by config.sp_dropdown_common.
+        private static int CurrentSessionId(List<SelectListItem> sessions)
+        {
+            var cur = sessions.FirstOrDefault(x => x.Selected) ?? sessions.FirstOrDefault();
+            return cur != null && int.TryParse(cur.Value, out var id) ? id : 0;
+        }
+
         // Subjects the class studies — the datesheet rows. Reads Subject Management.
         [HttpGet]
-        public async Task<IActionResult> Subjects(int classId)
+        public async Task<IActionResult> Subjects(int classId, int sessionId = 0)
         {
-            var subjects = await _subject.GetClassSubjectsAsync(classId, TenantId(), SchoolId(), UserId());
+            var subjects = await _subject.GetClassSubjectsAsync(
+                classId, TenantId(), SchoolId(), UserId(), sessionId);
             return Json(subjects.Select(s => new { id = s.SubjectId, name = s.SubjectName }));
         }
 
         // This year's exams — also refreshes the list after a save or delete.
         [HttpGet]
-        public async Task<IActionResult> Exams()
+        public async Task<IActionResult> Exams(int sessionId = 0)
         {
-            var data = await _exam.GetExamsAsync(TenantId(), SchoolId(), UserId());
+            var data = await _exam.GetExamsAsync(TenantId(), SchoolId(), UserId(), sessionId);
             return Json(new
             {
                 academicYear = data.AcademicYearName,
@@ -107,11 +136,14 @@ namespace educore.Areas.ERP.Controllers
                     {
                         classId   = c.AcademicClassId,
                         className = c.ClassName,
+                        sections  = c.Sections,
                         subjects  = c.Subjects.Select(s => new
                         {
                             id        = s.SubjectId,
                             name      = s.SubjectName,
                             date      = s.ExamDate,
+                            startTime = s.StartTime,
+                            endTime   = s.EndTime,
                             maxMarks  = s.MaxMarks,
                             passMarks = s.PassMarks
                         })
@@ -138,39 +170,89 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = result.Success, message = result.Message });
         }
 
-        // ── Datesheet ──
+        // The class-wise list: one row per class, or per section when the exam
+        // targets specific sections. Drafts are included here (and only here).
+        [HttpGet]
+        public async Task<IActionResult> ExamList(int sessionId = 0)
+        {
+            var rows = await _exam.GetExamListAsync(TenantId(), SchoolId(), UserId(), sessionId);
+            return Json(rows.Select(r => new
+            {
+                examId       = r.ExamId,
+                examName     = r.ExamName,
+                typeLabel    = r.TypeLabel,
+                academicYear = r.AcademicYearName,
+                classId      = r.AcademicClassId,
+                className    = r.ClassName,
+                section      = r.Section,
+                startDate    = r.StartDate,
+                endDate      = r.EndDate,
+                status       = r.Status,
+                subjectCount = r.SubjectCount
+            }));
+        }
+
+        // Sections of a class that have students — the optional section chooser.
+        [HttpGet]
+        public async Task<IActionResult> ClassSections(int classId, int sessionId = 0)
+        {
+            var rows = await _exam.GetClassSectionsAsync(
+                classId, TenantId(), SchoolId(), UserId(), sessionId);
+            return Json(rows.Select(r => new { name = r.Section, students = r.StudentCount }));
+        }
+
+        [HttpPost]
+        [HasPermission("exams.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SetExamStatus(int id, string status)
+        {
+            var result = await _exam.SetExamStatusAsync(id, status, TenantId(), SchoolId(), UserId());
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        // -- Datesheet --
         // "What is 1st class sitting, and on which date" — the printable view.
 
         [HttpGet]
-        public async Task<IActionResult> Datesheet()
+        public async Task<IActionResult> Datesheet(int sessionId = 0)
         {
-            ViewBag.Classes = await _subject.GetClassesAsync(TenantId(), SchoolId(), UserId());
+            var sessions = await SessionsAsync();
+            ViewBag.Sessions = sessions;
+            ViewBag.SessionId = sessionId > 0 ? sessionId : CurrentSessionId(sessions);
 
-            var list = await _exam.GetExamsAsync(TenantId(), SchoolId(), UserId());
-            ViewBag.Exams            = list.Exams;
+            ViewBag.Classes = await _subject.GetClassesAsync(
+                TenantId(), SchoolId(), UserId(), (int)ViewBag.SessionId);
+
+            var list = await _exam.GetExamsAsync(TenantId(), SchoolId(), UserId(), (int)ViewBag.SessionId);
+            ViewBag.Exams            = list.Exams.Where(e => e.Status == "Published").ToList();
             ViewBag.AcademicYearName = list.AcademicYearName;
 
             return View();
         }
 
         [HttpGet]
-        public async Task<IActionResult> DatesheetRows(int classId, int examId)
+        public async Task<IActionResult> DatesheetRows(int classId, int examId, int sessionId = 0)
         {
-            var data = await _exam.GetDatesheetAsync(classId, examId, TenantId(), SchoolId(), UserId());
+            var data = await _exam.GetDatesheetAsync(
+                classId, examId, TenantId(), SchoolId(), UserId(), sessionId);
             return Json(new
             {
                 academicYear = data.AcademicYearName,
                 rows = data.Rows.Select(r => new
                 {
                     date      = r.ExamDate,
+                    startTime = r.StartTime,
+                    endTime   = r.EndTime,
                     classId   = r.AcademicClassId,
                     className = r.ClassName,
+                    sections  = r.SectionList,
                     subject   = r.SubjectName,
                     maxMarks  = r.MaxMarks,
                     passMarks = r.PassMarks,
                     examId    = r.ExamId,
                     examName  = r.ExamName,
-                    typeLabel = r.TypeLabel
+                    typeLabel = r.TypeLabel,
+                    clash     = r.HasClash
                 })
             });
         }
@@ -181,9 +263,39 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> MarkEntry(int examId = 0)
         {
-            var list = await _exam.GetExamsAsync(TenantId(), SchoolId(), UserId());
-            ViewBag.Exams            = list.Exams;
-            ViewBag.AcademicYearName = list.AcademicYearName;
+            // Marks can be entered for ANY session's exam — results are often
+            // finalised after the year rolls over. The dropdown groups exams by
+            // session rather than adding a picker, because the exam already
+            // determines the session (the marks proc reads it off the exam).
+            var sessions = await SessionsAsync();
+            var current  = CurrentSessionId(sessions);
+            var groups   = new List<ExamSessionGroup>();
+
+            foreach (var sn in sessions)
+            {
+                if (!int.TryParse(sn.Value, out var yearId)) continue;
+
+                var data = await _exam.GetExamsAsync(TenantId(), SchoolId(), UserId(), yearId);
+                // A draft datesheet is still being built, so marks cannot be
+                // entered against it. GetDatesheet enforces the same rule proc-side.
+                var published = data.Exams.Where(e => e.Status == "Published").ToList();
+                if (published.Count == 0) continue;          // no empty headings
+
+                groups.Add(new ExamSessionGroup
+                {
+                    AcademicYearId = yearId,
+                    SessionName    = string.IsNullOrWhiteSpace(data.AcademicYearName)
+                                        ? sn.Text : data.AcademicYearName,
+                    IsCurrent      = yearId == current,
+                    Exams          = published
+                });
+            }
+
+            ViewBag.ExamGroups       = groups
+                .OrderByDescending(g => g.IsCurrent)
+                .ThenByDescending(g => g.AcademicYearId)
+                .ToList();
+            ViewBag.AcademicYearName = groups.FirstOrDefault(g => g.IsCurrent)?.SessionName ?? string.Empty;
             ViewBag.SelectedExamId   = examId;
 
             // Only a school admin may reopen a finalized sheet.

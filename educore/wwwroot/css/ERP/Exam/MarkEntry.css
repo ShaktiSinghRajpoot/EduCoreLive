@@ -46,92 +46,9 @@
     white-space:nowrap;
 }
 .me-load-btn:hover{ transform:translateY(-1px); box-shadow:0 6px 16px rgba(255,138,0,.28); }
-.me-load-btn:disabled{ opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
-
-/* ── Context banner ─────────────────────────── */
-.me-context{
-    border:1px solid var(--ec-border);
-    border-radius:var(--ec-radius);
-    background:linear-gradient(135deg,var(--ec-primary-soft) 0%,#fff 60%);
-    padding:.7rem .95rem;
-    margin-bottom:1rem;
-    display:none;
-}
-.me-ctx-row{
-    display:flex; align-items:center; flex-wrap:wrap; gap:.45rem .6rem;
-}
-.me-ctx-row .me-status-badge{ margin-left:auto; }
-.me-ctx-exam{ font-size:.98rem; font-weight:900; color:var(--ec-text-dark); }
-.me-ctx-sub{
-    font-size:.8rem; font-weight:700; color:var(--ec-text-muted);
-    padding-left:.6rem; border-left:1px solid var(--ec-border);
-}
-.me-ctx-prog{
-    display:flex; align-items:center; gap:.6rem; margin-top:.55rem;
-}
-.me-ctx-prog .me-progress-wrap{ flex:1 1 auto; margin-top:0; }
-.me-ctx-prog .me-prog-label{ margin-top:0; white-space:nowrap; flex:0 0 auto; }
-.me-type-badge{
-    display:inline-flex; align-items:center; gap:.3rem;
-    background:var(--ec-primary-light);
-    color:var(--ec-primary);
-    border-radius:999px; padding:.25rem .7rem;
-    font-size:.72rem; font-weight:800;
-}
-.me-meta-pill{
-    display:inline-flex; align-items:center; gap:.3rem;
-    background:#f5f4f2; border:1px solid var(--ec-border);
-    border-radius:8px; padding:.28rem .65rem;
-    font-size:.78rem; font-weight:700; color:var(--ec-text);
-    white-space:nowrap;
-}
-.me-meta-pill i{ color:var(--ec-primary); font-size:.9rem; }
-.me-progress-wrap{
-    height:7px; background:#ede8e3;
-    border-radius:999px; overflow:hidden; margin-top:.65rem;
-}
-.me-progress-fill{
-    height:100%; border-radius:inherit;
-    background:linear-gradient(90deg,#ff8a00,#ffb347);
-    transition:width .5s ease;
-}
-.me-prog-label{
-    font-size:.75rem; font-weight:800; color:var(--ec-text-muted); margin-top:.35rem;
-}
-.me-status-badge{
-    display:inline-flex; align-items:center; gap:.35rem;
-    border-radius:999px; padding:.3rem .8rem;
-    font-size:.73rem; font-weight:900; white-space:nowrap;
-}
-.ms-pending   { background:#fff3cd; color:#856404; }
-.ms-progress  { background:#cfe2ff; color:#084298; }
-.ms-completed { background:#d1f0e0; color:#0a5a35; }
-.ms-finalized { background:#d4edda; color:#155724; }
-
+.me-load-btn:disabled{ opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }/* ── Context banner ─────────────────────────── */
 /* ── Summary strip ──────────────────────────── */
-.me-summary{
-    display:flex; align-items:center; gap:.5rem .85rem;
-    flex-wrap:wrap;
-    border:1px solid var(--ec-border);
-    border-radius:var(--ec-radius);
-    background:#fff;
-    padding:.85rem 1.25rem;
-    margin-bottom:1.25rem;
-    display:none;
-}
-.me-sum-item{
-    display:flex; align-items:center; gap:.4rem;
-    font-size:.82rem;
-}
-.me-sum-dot{
-    width:9px; height:9px; border-radius:50%; flex-shrink:0;
-}
-.me-sum-val{ font-weight:900; color:var(--ec-text-dark); }
-.me-sum-lbl{ font-weight:700; color:var(--ec-text-muted); font-size:.76rem; }
-.me-sum-div{
-    width:1px; height:18px; background:var(--ec-border);
-    flex-shrink:0;
-}
+
 
 /* ── Entry grid card ────────────────────────── */
 .me-grid-card{
@@ -140,7 +57,6 @@
     background:#fff;
     overflow:hidden;
     margin-bottom:1.25rem;
-    display:none;
 }
 .me-grid-hdr{
     display:flex; align-items:center; justify-content:space-between;
@@ -149,7 +65,6 @@
     border-bottom:1px solid var(--ec-border);
     background:#fafaf8;
 }
-.me-grid-title{ font-size:.88rem; font-weight:900; color:var(--ec-text-dark); }
 .me-grid-actions{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 .me-bulk-btn{
     height:32px; padding:0 .85rem;
@@ -160,14 +75,6 @@
     transition:var(--ec-transition);
 }
 .me-bulk-btn:hover{ background:var(--ec-primary-light); border-color:rgba(255,138,0,.3); color:var(--ec-primary); }
-.me-finalized-notice{
-    display:none;
-    padding:.65rem 1.25rem;
-    background:#d4edda; color:#0a5a35;
-    font-size:.8rem; font-weight:800;
-    border-bottom:1px solid #b7dfca;
-    align-items:center; gap:.5rem;
-}
 
 /* ── Table ──────────────────────────────────── */
 .me-tbl-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -192,15 +99,8 @@
 .me-tbl tbody tr:hover td{ background:#fffaf3; }
 .me-tbl tbody tr.me-row-pass td{ background:#f0fdf4; }
 .me-tbl tbody tr.me-row-fail td{ background:#fff5f5; }
-.me-tbl tbody tr.me-row-abs  td{ background:#f8f9fa; }
+.me-tbl tbody tr.me-row-abs  td{ background:#f8f9fa; }/* student cell */
 
-/* student cell */
-.me-av{
-    width:34px; height:34px; flex:0 0 34px;
-    border-radius:50%;
-    display:inline-flex; align-items:center; justify-content:center;
-    font-size:.69rem; font-weight:800;
-}
 .me-nm{ font-weight:800; color:var(--ec-text-dark); font-size:.85rem; }
 .me-rl{ font-size:.72rem; color:var(--ec-text-muted); }
 
@@ -242,32 +142,8 @@
     box-shadow:0 0 0 3px rgba(255,138,0,.13);
 }
 .me-marks-inp.inp-error{ border-color:#ea5455; background:#fff5f5; }
-.me-marks-inp[readonly]{ background:#f5f4f2; color:var(--ec-text-muted); cursor:not-allowed; border-color:var(--ec-border); box-shadow:none; }
+.me-marks-inp[readonly]{ background:#f5f4f2; color:var(--ec-text-muted); cursor:not-allowed; border-color:var(--ec-border); box-shadow:none; }/* grade & result badges */
 
-/* grade & result badges */
-.me-grade{
-    display:inline-flex; align-items:center; justify-content:center;
-    width:34px; height:34px; border-radius:50%;
-    font-size:.78rem; font-weight:900;
-}
-.g-aplus { background:#bbf7d0; color:#14532d; }
-.g-a     { background:#d1fae5; color:#065f46; }
-.g-bplus { background:#bfdbfe; color:#1e40af; }
-.g-b     { background:#dbeafe; color:#1e40af; }
-.g-c     { background:#fef9c3; color:#713f12; }
-.g-d     { background:#fed7aa; color:#7c2d12; }
-.g-e     { background:#e0e7ff; color:#3730a3; }
-.g-f     { background:#fee2e2; color:#991b1b; }
-.g-ab    { background:#f1f5f9; color:#475569; }
-
-.me-result{
-    display:inline-flex; align-items:center; gap:.25rem;
-    border-radius:999px; padding:.22rem .65rem;
-    font-size:.68rem; font-weight:900; white-space:nowrap;
-}
-.r-pass{ background:#d1f0e0; color:#0a5a35; }
-.r-fail{ background:#fde8e8; color:#842029; }
-.r-abs { background:#e2e3e5; color:#495057; }
 
 /* ── Mobile card view ───────────────────────── */
 .me-mob-list{ display:none; padding:1rem; }
@@ -278,9 +154,6 @@
     margin-bottom:.65rem;
     transition:var(--ec-transition);
 }
-.me-mob-card.mob-pass{ border-color:#d1f0e0; background:#f0fdf4; }
-.me-mob-card.mob-fail{ border-color:#fde8e8; background:#fff5f5; }
-.me-mob-card.mob-abs { border-color:var(--ec-border); background:#f8f9fa; }
 .me-mob-top{ display:flex; align-items:center; gap:.75rem; margin-bottom:.75rem; }
 .me-mob-inp-row{ display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
 .me-mob-inp-lbl{ font-size:.68rem; font-weight:800; text-transform:uppercase; color:var(--ec-text-muted); letter-spacing:.04em; display:block; margin-bottom:.25rem; }
@@ -359,5 +232,27 @@
 }
 @media (max-width:575.98px){
     .me-selector .row{ gap:.5rem 0; }
-    .me-context{ padding:.9rem 1rem; }
 }
+
+/* ── One-line context above the sheet ───────── */
+.me-ctx-line{ font-size:.9rem; font-weight:800; color:var(--ec-text); }
+.me-ctx-line strong{ color:var(--ec-text-dark); font-weight:900; }
+.me-ctx-scale{ font-size:.76rem; font-weight:700; color:var(--ec-text-muted); margin-top:.15rem; }
+.me-lock-chip{
+    display:inline-flex; align-items:center; gap:.3rem;
+    font-size:.72rem; font-weight:900; border-radius:8px; padding:.25rem .55rem;
+    background:#d4edda; color:#155724;
+}
+.me-roll{ font-weight:800; color:var(--ec-text-muted); font-size:.82rem; }
+
+/* Row tint carries pass/fail, so the grid needs no Grade or Result column. */
+.me-mob-card.me-row-pass{ border-color:#d1f0e0; background:#f0fdf4; }
+.me-mob-card.me-row-fail{ border-color:#fde8e8; background:#fff5f5; }
+.me-mob-card.me-row-abs { border-color:var(--ec-border); background:#f8f9fa; }
+
+    /* Which session this sheet belongs to — marks are often entered after rollover. */
+    .me-ctx-session {
+        display: inline-block; border-radius: 8px; padding: .1rem .4rem; margin-left: .15rem;
+        font-size: .68rem; font-weight: 900; letter-spacing: .02em;
+        background: var(--ec-primary-light); color: var(--ec-primary);
+    }

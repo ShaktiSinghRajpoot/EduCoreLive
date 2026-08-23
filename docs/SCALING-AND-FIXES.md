@@ -1052,6 +1052,165 @@ configurable grade scheme belongs. Max marks on the create form still accepts up
 
 ---
 
+### [2026-08-22] Exams: simplified the three pages, then added timing, sections and publish
+
+**Files changed**
+- `EduCoreDataAccessLayer/Database/exam_timing_sections_status.sql` (new migration)
+- `EduCoreDataAccessLayer/Database/{exam_schedule,exam_marks}.sql`
+- `EduCoreDataAccessLayer/Models/ERP/ExamModel.cs` · `Services/{Contract,Repository}/ERP/*ExamService*`
+- `educore/Areas/ERP/Controllers/ExamController.cs`
+- `educore/Areas/ERP/Views/Exam/{CreateExam,MarkEntry,Datesheet}.cshtml`
+- `educore/wwwroot/css/ERP/Exam/{CreateExam,MarkEntry,Datesheet}.css`
+
+**Part 1 — the pages were too heavy.** Reported as "looks complex". Marks Entry had an
+8-metric summary strip, six badges/pills, a progress bar and a **7-column** grid, for a job that
+is typing one number per student. It is now one context line (`Unit Test 1 · 1st-A · English` /
+`10:00–13:00 · Max 100 · Pass 35 · 3 of 5 entered`) and **4 columns**; pass/fail shows as a row
+tint rather than three extra columns, and "All Present" went because rows already default to
+present. Exam Schedule lost its Step 1/2/3 wizard numbering and its copy sub-panel (toggle →
+checkbox list → Apply/Cancel) in favour of one **"Same dates for all classes"** tick, and marks
+moved from every subject row to **one setting for the exam** — on live data that is 28 boxes down
+to 2. `MarkEntry.css` 363 → 251 lines. Datesheet was already lean and was left alone.
+
+Note the trap this created and fixed: `.me-grid-card` was `display:none` in CSS, revealed by a
+`showUI()` that the rewrite deleted — the sheet would never have appeared.
+
+**Part 2 — three things the pages were missing.**
+
+*Timing.* `exam_subjects` gains `start_time` / `end_time`, set once for the exam with the same
+"different for some subjects" escape hatch as marks. Shows on the Datesheet as a chip and on the
+Marks Entry context line. A `CHECK` plus a proc rule reject a finish before the start.
+
+*Optional sections.* New `academic.exam_class_sections`. **No rows for a (exam, class) means the
+whole class** — the default and the common case — so the feature costs nothing when unused.
+Ticking sections narrows the exam, and Marks Entry's Section dropdown narrows with it. Unticking
+them all reverts to the whole class.
+
+*Publish status.* `exams.status` is `Draft | Published`. A new exam saves as **Draft**, visible
+only on the Exam Schedule page; `GetDatesheet` filters `status = 'Published'` proc-side and the
+Marks Entry / Datesheet exam dropdowns filter in the controller. Verified end to end: the live
+exam's 14 papers vanish from the datesheet as a draft and return on publish. Editing an exam does
+not silently change its status, and publishing an exam with no datesheet is refused. Existing
+exams were backfilled to `Published` — defaulting them to Draft would have made live datesheets
+and marks sheets disappear.
+
+**The list is now class-wise**, as asked: a table of Exam Name (with academic year) · Class &
+Section · Dates · Status · Actions, **one row per class-section**, from a new `GetExamList` op.
+A class with no section targeting yields one row marked "all sections". The exam name, year and
+actions render once per exam and the continuation rows leave those cells blank, since Edit /
+Publish / Delete act on the whole exam.
+
+**A trap worth recording:** Npgsql maps a Postgres `time` to **TimeOnly**, which is not
+`IConvertible` — exactly the same crash as `DateOnly` earlier in this work. `NullTimeStr` uses the
+same cast ladder, and the format string is a const `"HH\\:mm"` so a culture's time separator
+cannot change it.
+
+**Verified**: 11 assertions for timing/sections/status plus the earlier 16 multi-class ones, all
+against the local database; the migration run end to end; three views build-checked and their
+inline JS syntax-checked. **Not applied to Railway** — this is mid-iteration feature work and
+local is now the dev database.
+
+**Part 3 — the same-dates simplification went too far, and was buggy.** "Same dates for all
+classes" was added as a toggle, with a per-class mode behind it. Two real defects came out of that
+duality:
+
+- Typing in the exam-level Max / Pass / Time boxes ran `renderSheet()` **per keystroke**, rebuilding
+  the table and destroying the caret — you could type `1` but never `00`.
+- The toggle's change handler called `captureSheet()`, which read the **new** mode while the rows on
+  screen were still rendered in the **old** one, writing the wrong rows into the wrong classes and
+  silently clobbering per-class dates.
+
+Removing the toggle fixed both, but then a normal request — *1st sits English on 22 Aug, 2nd on
+25 Aug* — was not expressible. That was the wrong trade: in a real school, dates stagger because the
+same teachers invigilate, **max marks differ by level** (1st English 50, 10th 100), duration differs
+(juniors 2h, seniors 3h) and subject lists differ. Per-class variation is the model, not the
+exception — and `exam_subjects` was already keyed per (exam, class, subject) with its own date, time
+and marks, so **the database supported all of it; only the UI could not express it.** No migration
+was needed to fix this.
+
+The datesheet is now a **grid: subjects down, classes across**, with a switcher for what the cells
+hold (Dates / Times / Max / Pass) so the layout never changes. A dash marks a subject the class does
+not study. The convenience that the toggle was trying to provide became a per-row **copy-across**
+button — an action, not a mode, so it cannot desynchronise state. The `advanced` per-subject
+override mode was deleted too: the grid covers it. The four boxes above the grid now only seed new
+subjects and deliberately re-render nothing.
+
+Verified with 11 assertions covering exactly the reported scenario: same subject on different dates
+per class, 50-mark and 100-mark papers in one exam, different start times, subject lists that differ
+per class, all under a single exam row, with the outside-the-window date guard still firing.
+
+**Part 4 — a class cannot sit two papers at once.** Reported from the Datesheet, where one class
+showed several subjects on the same date at the same time. Two causes:
+
+- **No guard.** Nothing stopped it, in the UI or the proc.
+- **A bad default.** Seeding every subject with the exam's start date put a whole class's papers in
+  one slot. On live data that produced **59 of 84 papers clashing** — class 4th had all 7 subjects
+  at 09:30–12:30 on 23 Aug.
+
+`SaveExam` now refuses a clash, in two passes. Within the exam: same class, same day, papers whose
+times overlap — or where **either time is missing**, since an unspecified time cannot be
+distinguished from an overlap; if two papers share a day, say when each runs. Across exams: the same
+check against every other non-deleted exam in the year, so "Q1 Test" and "Q2 Test" cannot both put
+4th class on 23 Aug at 09:30. Both are **section-aware** via `fn_exam_sections_overlap` — 1st-A and
+1st-B may sit different papers in the same slot, because no `exam_class_sections` rows means the
+whole class and an empty set overlaps everything.
+
+The default now **staggers papers onto consecutive days** from the start date, leaving anything past
+the end date blank rather than piling it up; the start-date handler re-staggers instead of
+collapsing everything back onto day one, which was the same bug in another place.
+
+Existing bad rows predate the guard, so `GetDatesheet` returns a computed `has_clash` per row and
+the Datesheet flags each one plus a count at the top — the data is shown as broken rather than
+quietly rendered.
+
+Verified with 8 assertions: identical times, partial overlap and missing times all refused;
+**morning-plus-afternoon on one day allowed**; two different classes in the same slot allowed;
+cross-exam clash refused; 1st-B allowed alongside 1st-A; the same section double-booked refused.
+Fixing the 59 existing rows is the school's call — the page now shows which ones.
+
+**Part 5 — a session picker on Exam Schedule and Datesheet.** Both pages were hard-wired to the
+current academic year. They now carry a **SESSION** dropdown with a badge reading `CURRENT` or
+`NOT CURRENT`, so it is obvious when you are looking at another year.
+
+Almost no new code was needed: `sp_school_admin_exam_manage` already took `p_academic_year_id` and
+only defaulted to `is_current` because every caller passed null, and `config.sp_dropdown_common
+'AcademicYear'` already returns the school's sessions with the current one flagged `IsSelected`. So
+the work was threading an optional `academicYearId` (0 = current) through `IExamService` and
+`ISubjectService` — added as **optional parameters** so `SchoolSettingsController`, which shares
+`GetClassesAsync`/`GetClassSubjectsAsync`, is untouched.
+
+Changing the session **reloads the page** rather than refreshing in place: the class list, the
+subject lists, the exam list and the datesheet all belong to one session, and a partial refresh
+would mix two sessions on screen. The class/subject reads take the session too, so picking a past
+year shows *that* year's classes — not the current year's against old exams. Empty-state messages
+now name the session instead of saying "the current academic year", which was wrong the moment a
+different one could be selected.
+
+Verified against live data: `GetExamList` for session 11 returns that session's exam, session 15
+returns nothing — same proc, different `p_academic_year_id`.
+
+**Marks Entry deliberately has NO session picker.** It is structurally different: Exam Schedule
+*creates* (so it must be told the session) and Datesheet *browses* (so it must be given a scope),
+but Marks Entry starts from an **exam**, and an exam belongs to exactly one session. The session is
+derived, not chosen — `sp_school_admin_exam_marks_manage` reads `academic_year_id` off the exam and
+`fn_exam_sheet_roster` uses it, which is why a past session's sheet lists who was in that class
+*then*. A picker would be a fifth selector on the page, redundant, and able to disagree with the
+exam.
+
+The gap was that the exam dropdown filtered to the current session, so marks for a past exam could
+not be entered or corrected — common, because results are often finalised after rollover. Fixed with
+no new controls: the dropdown is **grouped by session** with native `<optgroup>` headings (current
+session first, sessions with no published exam omitted so there are no empty headings), and the
+session now shows as a chip on the sheet's context line and in the finalize dialog, so nobody marks
+the wrong year by accident. No SQL change — the controller calls `GetExamsAsync` once per session.
+
+A note for the next person: the local test data has classes with `is_deleted = true` whose ids are
+still referenced by `exam_subjects` (the FK does not check the flag). A test written against a
+hard-coded `academic_class_id` will start failing with "A selected class does not belong to this
+school" after classes are recreated — resolve ids by name instead.
+
+---
+
 # Glossary (quick reference)
 
 | Term | Plain meaning |

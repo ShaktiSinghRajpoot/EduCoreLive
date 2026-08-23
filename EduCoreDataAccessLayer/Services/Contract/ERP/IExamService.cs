@@ -11,7 +11,7 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
     public interface IExamService
     {
         /// <summary>This year's exams, plus the academic year they belong to.</summary>
-        Task<ExamListData> GetExamsAsync(int tenantId, int schoolId, int actionUserId);
+        Task<ExamListData> GetExamsAsync(int tenantId, int schoolId, int actionUserId, int academicYearId = 0);
 
         /// <summary>One exam with every class's datesheet — the edit form. Null if not found.</summary>
         Task<ExamDetail?> GetExamAsync(int examId, int tenantId, int schoolId, int actionUserId);
@@ -22,9 +22,23 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Soft-delete an exam.</summary>
         Task<ExamSaveResult> DeleteExamAsync(int examId, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>
+        /// The class-wise list: one row per class, or per section when the exam
+        /// targets specific sections. Includes Draft exams.
+        /// </summary>
+        Task<List<ExamListRow>> GetExamListAsync(int tenantId, int schoolId, int actionUserId, int academicYearId = 0);
+
+        /// <summary>Sections of a class that have students this year — the optional chooser.</summary>
+        Task<List<ExamSheetSection>> GetClassSectionsAsync(
+            int academicClassId, int tenantId, int schoolId, int actionUserId, int academicYearId = 0);
+
+        /// <summary>Publish an exam ("Published") or pull it back to "Draft".</summary>
+        Task<ExamSaveResult> SetExamStatusAsync(
+            int examId, string status, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>What each class sits and when, in date order. classId/examId 0 = all.</summary>
         Task<ExamDatesheetData> GetDatesheetAsync(
-            int academicClassId, int examId, int tenantId, int schoolId, int actionUserId);
+            int academicClassId, int examId, int tenantId, int schoolId, int actionUserId, int academicYearId = 0);
 
         // ── Marks Entry: a SHEET is one (exam, class, section, subject) ──
 
