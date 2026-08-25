@@ -80,7 +80,7 @@ namespace educore.Areas.ERP.Controllers
             // dropdown order above, which is newest-class-first and would walk
             // the school downwards. Null year = the current session; the page
             // reloads the ladder from the target session once one is chosen.
-            ViewBag.ClassLadder = await _admissionService.GetClassLadderAsync(TenantId(), SchoolId(), UserId());
+            ViewBag.ClassLadder = await _admissionService.GetClassLadderDetailedAsync(TenantId(), SchoolId(), UserId());
 
             return View();
         }
@@ -95,8 +95,8 @@ namespace educore.Areas.ERP.Controllers
                 TenantId(), SchoolId(), UserId(), academicYearName: year);
 
             var ladder = info.IsReady
-                ? await _admissionService.GetClassLadderAsync(TenantId(), SchoolId(), UserId(), year)
-                : new List<string>();
+                ? await _admissionService.GetClassLadderDetailedAsync(TenantId(), SchoolId(), UserId(), year)
+                : new List<ClassLadderItem>();
 
             return Json(new
             {
@@ -106,7 +106,7 @@ namespace educore.Areas.ERP.Controllers
                 sectionCount   = info.SectionCount,
                 canCopy        = info.CanCopy,
                 sourceYearName = info.SourceYearName,
-                ladder
+                ladder = ladder.Select(c => new { name = c.Name, order = c.Order })
             });
         }
 
@@ -121,10 +121,10 @@ namespace educore.Areas.ERP.Controllers
         // The class ladder is exactly that list, so reuse it rather than adding a proc.
         public async Task<IActionResult> PromotionClasses(string? year)
         {
-            var ladder = await _admissionService.GetClassLadderAsync(
+            var ladder = await _admissionService.GetClassLadderDetailedAsync(
                 TenantId(), SchoolId(), UserId(), year);
 
-            return Json(ladder);
+            return Json(ladder.Select(c => new { name = c.Name, order = c.Order }));
         }
 
         // Sections that have active students in a class — fills the Section dropdown.

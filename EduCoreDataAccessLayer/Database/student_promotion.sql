@@ -1,4 +1,4 @@
--- ============================================================================
+﻿-- ============================================================================
 -- Bulk student promotion — moving a class into the next academic session.
 --
 -- core.students holds ONE row per student: class_name, section and
@@ -98,8 +98,13 @@ BEGIN
         RETURN;
     END IF;
 
+    -- display_order comes back too: the Promotion page needs it to work out the
+    -- next class exactly the way this proc's caller does (order from the SOURCE
+    -- session, then the first higher class in the TARGET). Names alone are not
+    -- enough once the two sessions hold different classes. Additive column —
+    -- existing consumers read by name, so they are unaffected.
     OPEN p_result FOR
-    SELECT class_name
+    SELECT class_name, display_order
     FROM academic.academic_classes
     WHERE tenant_id = p_tenant_id
       AND school_id = p_school_id

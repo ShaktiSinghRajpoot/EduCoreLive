@@ -491,6 +491,35 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return classes;
         }
 
+        public async Task<List<ClassLadderItem>> GetClassLadderDetailedAsync(
+            int tenantId, int schoolId, int actionUserId, string? academicYearName = null)
+        {
+            var rungs = new List<ClassLadderItem>();
+            if (tenantId <= 1 || schoolId <= 0) return rungs;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_academic_year_name", NpgsqlDbType.Varchar)
+                    { Value = string.IsNullOrWhiteSpace(academicYearName) ? DBNull.Value : academicYearName },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "class_ladder_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpClassLadder, parameters);
+            if (ds.Tables.Count == 0) return rungs;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                var name = NullStr(row, "class_name");
+                if (!string.IsNullOrWhiteSpace(name))
+                    rungs.Add(new ClassLadderItem { Name = name!, Order = IntVal(row, "display_order") });
+            }
+            return rungs;
+        }
+
         public async Task<StudentPromotionResult> PromoteStudentsAsync(
             StudentPromotionRequest request, int tenantId, int schoolId, int actionUserId)
         {

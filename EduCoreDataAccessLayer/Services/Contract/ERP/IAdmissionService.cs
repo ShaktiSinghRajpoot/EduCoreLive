@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Models.ERP;
+﻿using EduCoreDataAccessLayer.Models.ERP;
 
 namespace EduCoreDataAccessLayer.Services.Contract.ERP
 {
@@ -64,6 +64,11 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             int tenantId, int schoolId, int actionUserId, string? academicYearName = null);
 
         /// <summary>Bulk promote/retain/pass out. Students that cannot move are reported, not fatal.</summary>
+        // Same ladder, with each class's display_order — the Promotion page needs the
+        // orders to preview the target class the way the proc computes it.
+        Task<List<ClassLadderItem>> GetClassLadderDetailedAsync(
+            int tenantId, int schoolId, int actionUserId, string? academicYearName = null);
+
         Task<StudentPromotionResult> PromoteStudentsAsync(
             StudentPromotionRequest request, int tenantId, int schoolId, int actionUserId);
 

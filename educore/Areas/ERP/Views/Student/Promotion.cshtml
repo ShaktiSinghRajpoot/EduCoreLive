@@ -3,9 +3,13 @@
     ViewData["Title"] = "Promote Students";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 
-    // Teaching order (display_order), not the class dropdown's newest-first order.
-    var _ladder = ViewBag.ClassLadder as List<string> ?? new List<string>();
-    var _classOrderJson = System.Text.Json.JsonSerializer.Serialize(_ladder);
+    // Teaching order with each class's display_order. The page compares orders
+    // across two sessions the same way the promotion proc does, so names alone
+    // would not be enough.
+    var _ladder = ViewBag.ClassLadder as List<EduCoreDataAccessLayer.Models.ERP.ClassLadderItem>
+                  ?? new List<EduCoreDataAccessLayer.Models.ERP.ClassLadderItem>();
+    var _classOrderJson = System.Text.Json.JsonSerializer.Serialize(
+        _ladder.Select(c => new { name = c.Name, order = c.Order }));
 }
 
 @section PageStyles {
@@ -104,7 +108,13 @@
         <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mt-3">
           <label class="pr-opt mb-0">
             <input type="checkbox" class="form-check-input mt-0" id="carryDues" checked>
-            Carry forward pending fee dues to the new session
+            <span>
+              Promote students who still owe fees
+              <span class="d-block text-muted" style="font-size:.75rem;">
+                Untick to hold them back instead. Dues follow the student either way —
+                the fee ledger is not session-wise, so nothing is written off here.
+              </span>
+            </span>
           </label>
           <button class="btn btn-primary d-flex align-items-center justify-content-center gap-1" id="loadBtn">
             <i class="bx bx-list-ul"></i><span>Load Students</span>
@@ -260,11 +270,11 @@
         <div class="pr-sum-line"><span class="pr-chip promote"><i class="bx bx-up-arrow-circle"></i>Promote</span><span class="v" id="mPromote">0</span></div>
         <div class="pr-sum-line"><span class="pr-chip retain"><i class="bx bx-revision"></i>Retain in class</span><span class="v" id="mRetain">0</span></div>
         <div class="pr-sum-line"><span class="pr-chip passout"><i class="bx bx-graduation"></i>Pass out / Graduate</span><span class="v" id="mPassout">0</span></div>
-        <div class="pr-sum-line"><span><i class="bx bx-wallet me-1"></i>Carry forward dues</span><span class="v" id="mDues">—</span></div>
+        <div class="pr-sum-line"><span><i class="bx bx-wallet me-1"></i>Students who owe fees</span><span class="v" id="mDues">—</span></div>
         <div class="alert alert-danger d-flex align-items-start gap-2 mt-3 mb-0" id="mDuesWarn" style="display:none;border-radius:12px;font-size:.82rem;">
           <i class="bx bx-wallet fs-5"></i>
-          <span><strong id="mDuesCount">0</strong> selected student(s) have pending dues and will be <strong>skipped</strong>, because
-                "Carry forward pending fee dues" is unticked. Tick it to move them anyway, or settle their dues first.</span>
+          <span><strong id="mDuesCount">0</strong> selected student(s) have pending dues and will be <strong>held back</strong>
+                (not promoted). Tick "Promote students who still owe fees" to move them anyway, or settle the dues first.</span>
         </div>
         <div class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0" style="border-radius:12px;font-size:.82rem;">
           <i class="bx bx-error-circle fs-5"></i>
@@ -287,8 +297,14 @@
 /* ── Class ladders. LADDER is the TARGET session's, because that is the one the
       proc reads the next class from. SRC_LADDER is the source session's and fills
       the Class dropdown, so it only ever offers classes that session really has. ── */
-var LADDER=@Html.Raw(_classOrderJson);
-var SRC_LADDER=LADDER.slice();
+var LADDER=@Html.Raw(_classOrderJson);      // TARGET session: [{name, order}]
+var SRC_LADDER=LADDER.slice();               // SOURCE session: same shape
+
+function names(ladder){ return ladder.map(function(x){ return x.name; }); }
+function orderOf(ladder, c){
+  for(var i=0;i<ladder.length;i++) if(ladder[i].name===c) return ladder[i].order;
+  return null;
+}
 
 /* Three different answers, and they must stay separate:
      a class name  -> the next class up
@@ -296,10 +312,19 @@ var SRC_LADDER=LADDER.slice();
      undefined     -> the class does not exist in the target session at all
    Returning null for the last two together is what used to mark a whole class
    as "Pass out / Graduate" when the target session simply had not been set up. */
+/* The same computation core.sp_student_promote does:
+     1. take the class's display_order from the SOURCE session (falling back to
+        the target, exactly like the proc's COALESCE),
+     2. move to the first class in the TARGET session with a HIGHER order.
+   Comparing orders, not list positions, is the whole point — the two sessions
+   can hold different classes, so index i+1 would be wrong. */
 function nextClass(c){
-  var i=LADDER.indexOf(c);
-  if(i<0) return undefined;
-  return i===LADDER.length-1 ? null : LADDER[i+1];
+  var o=orderOf(SRC_LADDER, c);
+  if(o===null) o=orderOf(LADDER, c);
+  if(o===null) return undefined;              // in neither session
+
+  for(var i=0;i<LADDER.length;i++) if(LADDER[i].order>o) return LADDER[i].name;
+  return null;                                 // nothing higher = final class
 }
 /* Two different situations, and only one of them is an error:
 
@@ -314,8 +339,19 @@ function nextClass(c){
                            cannot compute that here (display_order is not exposed
                            to the page), so say the target decides — do not guess,
                            and do not block. */
-function classUnknown(c){    return !!c && LADDER.indexOf(c)<0 && SRC_LADDER.indexOf(c)<0; }
-function classOnlyInSource(c){ return !!c && LADDER.indexOf(c)<0 && SRC_LADDER.indexOf(c)>=0; }
+function classUnknown(c){ return !!c && orderOf(LADDER,c)===null && orderOf(SRC_LADDER,c)===null; }
+
+/* Where the student lands, section included. "keep" means the proc uses the
+   student's own section (COALESCE(v_sec, s.section)) — and it SKIPS anyone whose
+   section does not exist in the new class, so showing it is worth doing. */
+function targetSection(s){
+  var v=document.getElementById('tgtSection').value;
+  return (!v || v==='keep') ? (s.sec||'') : v;
+}
+function targetLabel(s, nc){
+  var sec=targetSection(s);
+  return sec ? nc+' – '+sec : nc;
+}
 
 var SEC_URL='@Url.Action("PromotionSections","Student",new{area="ERP"})';
 var CLASSES_URL='@Url.Action("PromotionClasses","Student",new{area="ERP"})';
@@ -329,7 +365,6 @@ var PALETTE=['primary','info','success','warning','danger','secondary'];
 
 var roster=[];          // currently loaded students (from the server)
 var outcome={};         // id -> 'promote' | 'retain' | 'passout'
-var carry=true;
 
 /* ── Helpers ─────────────────────────────────── */
 function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
@@ -351,8 +386,8 @@ function loadSourceClasses(){
 
   return $.getJSON(CLASSES_URL, { year:yr }).done(function(list){
     SRC_LADDER=list||[];
-    fillSelect(sel, SRC_LADDER, 'Select class', '');
-    if(keep && SRC_LADDER.indexOf(keep)>=0) sel.value=keep;
+    fillSelect(sel, names(SRC_LADDER), 'Select class', '');
+    if(keep && orderOf(SRC_LADDER, keep)!==null) sel.value=keep;
     sel.dispatchEvent(new Event('change'));
   });
 }
@@ -414,9 +449,7 @@ document.getElementById('loadBtn').addEventListener('click', function(){
       roster.length+' student'+(roster.length!==1?'s':'')+' in '+cls+(sec?' – '+sec:'')+
       (nc ? (' → promoting to '+nc)
           : nc===null ? ' (final class)'
-          : classOnlyInSource(cls)
-              ? ' → next class decided by '+document.getElementById('tgtYear').value
-              : ' — this class is not set up in either session');
+          : ' — this class is not set up in either session');
 
     render();
     if(roster.length) document.getElementById('rosterCard').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -437,7 +470,6 @@ function seg(id, val){
 
 /* ── Render desktop + mobile ─────────────────── */
 function render(){
-  carry=document.getElementById('carryDues').checked;
   var tb=document.getElementById('tblBody'),
       mob=document.getElementById('mobList'),
       empty=document.getElementById('emptyState');
@@ -452,11 +484,9 @@ function render(){
     var nc=nextClass(s.cls), oc=outcome[s.id];
     var ncTxt = oc==='passout' ? '<span class="text-info fw-bold">Graduate</span>'
               : oc==='retain'  ? '<span class="text-muted">Stays in '+EC.esc(s.cls)+'</span>'
-              : nc ? '<span class="fw-bold">'+EC.esc(nc)+'</span>'
+              : nc ? '<span class="fw-bold">'+EC.esc(targetLabel(s, nc))+'</span>'
               : nc===null ? '<span class="text-muted">—</span>'
-              : classOnlyInSource(s.cls)
-                  ? '<span class="text-muted" title="The target session decides which class this becomes">Set by session</span>'
-                  : '<span class="text-danger fw-bold" title="Not set up in either session">Not set up</span>';
+              : '<span class="text-danger fw-bold" title="Not set up in either session">Not set up</span>';
     return '<tr class="'+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input pr-pick" data-id="'+s.id+'" checked></td>'
       +'<td><div class="d-flex align-items-center gap-2">'
@@ -475,9 +505,8 @@ function render(){
     var nc=nextClass(s.cls), oc=outcome[s.id];
     var ncTxt = oc==='passout' ? 'Graduate'
               : oc==='retain'  ? 'Stays in '+EC.esc(s.cls)
-              : nc ? EC.esc(nc)
-              : nc===null ? '—'
-              : classOnlyInSource(s.cls) ? 'Set by session' : 'Not set up';
+              : nc ? EC.esc(targetLabel(s, nc))
+              : nc===null ? '—' : 'Not set up';
     return '<div class="pr-mob-card '+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<div class="pr-mob-top">'
       +  '<input type="checkbox" class="form-check-input pr-pick mt-0" data-id="'+s.id+'" checked>'
@@ -554,9 +583,17 @@ document.getElementById('selAll').addEventListener('change', function(){
   updateCounts();
 });
 
-/* ── Carry dues toggle ───────────────────────── */
+// The target section is part of the per-student preview, so redraw on change.
+document.getElementById('tgtSection').addEventListener('change', function(){
+  if(roster.length) render();
+});
+
+/* ── "Promote students who owe fees" toggle ───
+   It does not move money — the fee ledger is not year-scoped, so dues follow the
+   student either way. Unticking it makes the proc HOLD BACK anyone who still
+   owes, which is the only thing this flag actually controls. */
 document.getElementById('carryDues').addEventListener('change', function(){
-  document.getElementById('mDues').textContent = this.checked ? 'Yes' : 'No';
+  document.getElementById('mDues').textContent = this.checked ? 'Yes, promote them' : 'No, hold them back';
 });
 
 /* ── Reset ───────────────────────────────────── */
@@ -679,9 +716,9 @@ function showErr(msg){
 }
 function clearErr(){ document.getElementById('promoteError').style.display='none'; }
 
-/* Unticking "carry dues" makes the proc skip anyone who owes money (a pass-out is
-   exempt). Count them here so the confirm modal can say so instead of the office
-   finding out from the skipped list afterwards. */
+/* Unticking the fees box makes the proc hold back anyone who owes money (a
+   pass-out is exempt). Count them here so the confirm modal can say so instead of
+   the office finding out from the skipped list afterwards. */
 function duesSkipCount(){
   if(document.getElementById('carryDues').checked) return 0;
   return picked().filter(function(s){
@@ -700,7 +737,8 @@ document.getElementById('reviewBtn').addEventListener('click', function(){
       tgtY=document.getElementById('tgtYear').value,
       cls=document.getElementById('srcClass').value;
   document.getElementById('confirmFlow').textContent=cls+' · '+srcY+'  →  '+tgtY;
-  document.getElementById('mDues').textContent=document.getElementById('carryDues').checked?'Yes':'No';
+  document.getElementById('mDues').textContent=
+    document.getElementById('carryDues').checked ? 'Yes, promote them' : 'No, hold them back';
 
   var dn=duesSkipCount();
   document.getElementById('mDuesCount').textContent=dn;

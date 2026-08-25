@@ -1786,3 +1786,56 @@ Verified against the real ladders: `core.sp_class_ladder` returns
 `1st 2nd 3rd 4th 5th 6th` for 2027-2028 and `2nd` for 2028-2029 on the same
 school. View checks as before — extracted script through `node --check`, all ids
 matched, every `Url.Action` target confirmed to exist on the controller.
+
+---
+
+### [2026-08-25] Promotion: a checkbox that lied, and a preview that guessed
+
+**The fee checkbox did not do what it said.** "Carry forward pending fee dues to
+the new session" described an action that does not exist. `p_carry_dues` appears
+in exactly one place in the whole proc:
+
+    IF NOT p_carry_dues AND v_dues > 0 AND v_outcome <> 'PassOut' THEN
+        v_skipped := ... (pending dues);  CONTINUE;
+
+There is no ledger write anywhere — the proc's own comment explains why: *"The
+ledger is not year-scoped, so dues follow the student no matter what."* So
+ticking it did nothing at all, and unticking it quietly **held students back**.
+On the page it was worse: the `carry` variable was assigned in `render()` and
+never read — a dead variable, so toggling the box changed nothing on screen
+either. Which is exactly why it looked broken.
+
+Relabelled to what it actually controls — **"Promote students who still owe
+fees"**, with a line saying dues follow the student either way and nothing is
+written off. The dead variable is gone. The wire name stays `carryDues` to match
+`p_carry_dues`; the model property now carries a comment saying what it really
+means.
+
+**The "next class" preview was guessing, so it stopped guessing.** The page only
+had class *names*, while the proc works in `display_order`: it takes the order
+from the SOURCE session and moves the student to the first class in the TARGET
+session with a higher order. With names alone that is not computable, which is
+why the previous pass showed "Set by session" as an honest placeholder.
+
+`core.sp_class_ladder` now returns `display_order` alongside `class_name`
+(additive; existing consumers read by name), the page carries both ladders as
+`[{name, order}]`, and `nextClass()` does the proc's computation exactly. The
+preview also shows the **section** now — the chosen one, or the student's own
+when "Keep same section" is selected, which is what `COALESCE(v_sec, s.section)`
+does — so a row reads "3rd – A". Changing the section dropdown redraws it.
+
+Verified by running the page's own `nextClass()` in node against the real ladders
+of a school whose two sessions differ (2027-2028 holds 1st–6th, 2028-2029 holds
+only 2nd):
+
+| class | page says | proc does |
+|---|---|---|
+| 1st | 2nd | order 1 → first target class above 1 → 2nd |
+| 2nd | final class → Pass Out | no target class above 2 → skip "mark Pass Out" |
+| 6th | final class → Pass Out | same |
+| Nursery | in neither session → blocked | would skip "not in the session setup" |
+
+**Still not supported, deliberately:** moving one student two rungs (1st → 3rd).
+The target class is computed in the proc and not accepted from the page, so this
+needs a signature change plus per-student validation. Today's workaround is to
+promote normally and then edit that student.
