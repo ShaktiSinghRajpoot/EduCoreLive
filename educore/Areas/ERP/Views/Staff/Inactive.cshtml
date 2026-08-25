@@ -81,7 +81,7 @@
                     <th>Emp ID</th>
                     <th><a class="text-reset text-decoration-none" href="@SortUrl("designation")">Designation <i class="@SortIcon("designation")"></i></a></th>
                     <th><a class="text-reset text-decoration-none" href="@SortUrl("department")">Department <i class="@SortIcon("department")"></i></a></th>
-                    <th>Contact</th><th class="text-end">Action</th>
+                    <th>Contact</th><th>Deactivated On</th><th class="text-end">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -93,8 +93,13 @@
                       <td>@(string.IsNullOrWhiteSpace(s.Designation) ? "—" : s.Designation)</td>
                       <td>@(string.IsNullOrWhiteSpace(s.Department) ? "—" : s.Department)</td>
                       <td>@(string.IsNullOrWhiteSpace(s.Mobile) ? "—" : s.Mobile)</td>
+                      <td>@(s.StatusChangedAt.HasValue ? s.StatusChangedAt.Value.ToString("dd MMM yyyy") : "—")</td>
                       <td class="text-end">
-                        <form asp-area="ERP" asp-controller="Staff" asp-action="Reactivate" method="post" class="d-inline">
+                        <form asp-area="ERP" asp-controller="Staff" asp-action="Reactivate" method="post" class="d-inline"
+                              data-ec-confirm="Reactivate this staff member?"
+                              data-ec-confirm-name="@s.FullName"
+                              data-ec-confirm-message="They move back to the active staff list, and if they have a login it starts working again."
+                              data-ec-confirm-ok="Reactivate">
                           @Html.AntiForgeryToken()
                           <input type="hidden" name="id" value="@s.PublicId" />
                           <button type="submit" class="btn btn-sm btn-primary">

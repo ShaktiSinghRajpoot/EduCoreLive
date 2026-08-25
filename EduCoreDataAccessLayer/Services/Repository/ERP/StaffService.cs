@@ -46,6 +46,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 {
                     StaffId      = IntVal(row, "staff_id"),
                     PublicId     = GuidVal(row, "public_id"),
+                    StatusChangedAt = DateVal(row, "status_changed_at"),
                     EmployeeCode = NullStr(row, "employee_code"),
                     FullName     = Str(row, "full_name"),
                     Gender       = NullStr(row, "gender"),
@@ -97,6 +98,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 {
                     StaffId      = IntVal(row, "staff_id"),
                     PublicId     = GuidVal(row, "public_id"),
+                    StatusChangedAt = DateVal(row, "status_changed_at"),
                     EmployeeCode = NullStr(row, "employee_code"),
                     FullName     = Str(row, "full_name"),
                     Gender       = NullStr(row, "gender"),

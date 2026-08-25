@@ -1651,3 +1651,37 @@ not against real data. Build: 0 errors.
 `transfer_certificate.sql` / `student_list.sql` / `staff_list.sql` /
 `sp_staff_manage.sql`, and only then deploy the app. Reversed, every converted
 link resolves to `Guid.Empty` and bounces to the list page.
+
+---
+
+### [2026-08-25] A stale duplicate of sp_dropdown_common, deleted before it fired
+
+Two scripts in `Database/` defined **the same procedure**,
+`config.sp_dropdown_common`:
+
+- `reference_data_lookup.sql` — the current one, and what the database actually
+  runs (verified against both local and Railway).
+- `dropdown_academicyear_current_first.sql` — an older revision of the same proc,
+  referenced by nothing.
+
+The old one is missing two things the live version has:
+
+    AND tenant_id = v_tenant AND school_id = v_school   -- multi-tenant scope
+
+on both the AcademicYear and Class branches, and the Class de-duplication
+(`GROUP BY class_name ... ORDER BY MIN(display_order)`) that stops the list
+reading "1st, 1st, 2nd, 2nd" once a school has a second session.
+
+Nothing was broken — but running that file, which looks like a perfectly
+reasonable thing to do when re-applying scripts, would have `CREATE OR REPLACE`d
+the good version with one that shows **every school's** sessions and classes in
+every school's dropdowns. A loaded gun in the scripts folder. Deleted; git keeps
+the history, and `reference_data_lookup.sql` is a strict superset (same
+current-session-first ordering and `IsSelected` flag).
+
+**The lesson worth keeping:** the repo is not automatically the source of truth
+for what a proc does. This one drifted because a later fix edited a different
+file. Before reasoning about proc behaviour, read it from the database
+(`pg_get_functiondef`), not from whichever `.sql` happens to have a matching
+name — and when two scripts define one proc, delete the loser rather than
+leaving both.

@@ -43,7 +43,7 @@ BEGIN
         WITH filtered AS (
             SELECT s.staff_id, s.public_id, s.employee_code, s.full_name, s.gender,
                    s.mobile, s.email, s.staff_type, s.department, s.designation,
-                   s.joining_date, s.status, s.user_id
+                   s.joining_date, s.status, s.user_id, s.status_changed_at
             FROM   core.staff s
             WHERE  s.tenant_id  = p_tenant_id
               AND  s.school_id  = p_school_id
@@ -59,6 +59,7 @@ BEGIN
         )
         SELECT staff_id, public_id, employee_code, full_name, gender, mobile, email,
                staff_type, department, designation, joining_date, status, user_id,
+               status_changed_at,
                COUNT(*) OVER() AS total_count
         FROM filtered
         ORDER BY

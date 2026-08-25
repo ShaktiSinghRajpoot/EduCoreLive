@@ -102,6 +102,10 @@ namespace EduCoreDataAccessLayer.Models
     {
         public int StaffId { get; set; }
         public Guid PublicId { get; set; }
+
+        // When the active/inactive state last flipped. NULL for anyone deactivated
+        // before the column existed — the Inactive list shows a dash for those.
+        public DateTime? StatusChangedAt { get; set; }
         public string? EmployeeCode { get; set; }
         public string FullName { get; set; } = string.Empty;
         public string? Gender { get; set; }

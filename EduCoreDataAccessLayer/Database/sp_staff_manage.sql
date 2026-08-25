@@ -121,6 +121,7 @@ BEGIN
     IF p_operation = 'DELETE' THEN
         UPDATE core.staff
         SET    status = 'Inactive', is_active = FALSE,
+               status_changed_at = now(),
                updated_by = p_action_user_id, updated_at = now()
         WHERE  tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
         OPEN p_result FOR SELECT p_staff_id AS staff_id;
@@ -131,6 +132,7 @@ BEGIN
     IF p_operation = 'REACTIVATE' THEN
         UPDATE core.staff
         SET    status = 'Active', is_active = TRUE,
+               status_changed_at = now(),
                updated_by = p_action_user_id, updated_at = now()
         WHERE  tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
         OPEN p_result FOR SELECT p_staff_id AS staff_id;
