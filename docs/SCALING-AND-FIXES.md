@@ -1685,3 +1685,56 @@ file. Before reasoning about proc behaviour, read it from the database
 (`pg_get_functiondef`), not from whichever `.sql` happens to have a matching
 name — and when two scripts define one proc, delete the loser rather than
 leaving both.
+
+---
+
+### [2026-08-25] Promote Students — the validation ran too late to help
+
+The page worked, but only if you already knew what it wanted. Five problems, all
+of them the same shape: the page knew something was wrong and told you at the
+worst possible moment.
+
+**1. The default state was invalid.** Both session selects are built from the
+same list and the current session is ordered first, but only `srcYear` carried
+`selected`. So the page opened with From and To both set to the current session —
+a combination that can never run. `initTargetYear()` now picks the first session
+that is not the source.
+
+**2. And if there is no other session, it now says so.** A school with a single
+academic year (which is the common case early on) had no way to learn that
+promotion is impossible for it yet — the page looked ready. It now disables the
+button and points at Settings → Academic Year.
+
+**3. The confirm modal opened before anything was checked.** `reviewBtn` carried
+`data-bs-toggle="modal"`, so Bootstrap opened it unconditionally; every check
+lived in the commit handler. Clicking "Confirm & Promote" with nothing selected
+fired a toast *behind* the open modal and left it sitting there — which reads as
+"the button is broken". The toggle is gone, `validate()` runs first, and failures
+render inline above the buttons where the user is already looking. The commit
+handler keeps the same check as a backstop, because the roster stays interactive
+while the modal is open.
+
+**4. Unticking "carry forward dues" silently dropped people.** It does not mean
+"promote them and clear the dues" — the proc *skips* every student who owes money
+(pass-outs excepted). The page already knows each student's dues, so the confirm
+modal now says "N selected student(s) have pending dues and will be skipped"
+before the office commits, rather than after.
+
+**5. The skipped list vanished.** The proc names everyone it could not move —
+pending dues, already left, not in the source session, already in the final class
+— and that list is a work queue for the office. It was being shown in a toast
+that disappears in 3.5 seconds. There is now a Promotion Result card that stays
+on the page, one name per line, with a Dismiss button.
+
+Also: `.fail()` said "Something went wrong." for every failure. It now separates
+an expired antiforgery token (400), an expired session (401), a permissions
+problem (403) and an unreachable server, and always says that nothing was
+changed.
+
+No backend change — the proc's validation was already thorough and correct; this
+is entirely about surfacing it at the right moment.
+
+**Checked the way this repo has to check views:** `dotnet build` reports 0 errors
+on a `.cshtml` whose `<script>` is broken, so the block was extracted, its Razor
+expressions stubbed, and run through `node --check`; and every id the script
+looks up (40 of them) was matched against the markup.

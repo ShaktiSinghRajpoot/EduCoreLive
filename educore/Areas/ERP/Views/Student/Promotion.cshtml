@@ -1,4 +1,4 @@
-@using System.Linq
+﻿@using System.Linq
 @{
     ViewData["Title"] = "Promote Students";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -192,17 +192,48 @@
           <p class="text-muted small mb-0">Pick a different class/section and load again.</p>
         </div>
 
+        <!-- Why the promotion cannot run yet. Inline rather than a toast: the old
+             code toasted from inside the confirm modal, so the message appeared
+             behind it and the modal just sat there looking broken. -->
+        <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" id="promoteError" style="display:none;border-radius:12px;font-size:.85rem;">
+          <i class="bx bx-error-circle fs-5"></i><span id="promoteErrorText"></span>
+        </div>
+
         <!-- Actions -->
         <div class="pr-actions">
           <div class="hint"><i class="bx bx-info-circle me-1"></i>Review outcomes, then preview before committing. This action updates student records.</div>
           <div class="d-flex flex-column flex-sm-row gap-2">
             <button class="btn btn-outline-secondary px-4" id="resetBtn"><i class="bx bx-reset me-1"></i>Reset</button>
-            <button class="btn btn-primary px-4" id="reviewBtn" data-bs-toggle="modal" data-bs-target="#confirmModal">
+            <button class="btn btn-primary px-4" id="reviewBtn">
               <i class="bx bx-up-arrow-circle me-1"></i>Review &amp; Promote
             </button>
           </div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- Result of the last run. The proc names everyone it could not move, and the
+         office has to act on that list — a 3.5s toast was the wrong place for it. -->
+    <div class="ec-card mb-4" id="resultCard" style="display:none;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-check-circle"></i></span>
+          <div>
+            <div class="ec-section-title">Promotion Result</div>
+            <div class="ec-section-subtitle" id="resultSummary">—</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="resultClose">
+          <i class="bx bx-x me-1"></i>Dismiss
+        </button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4 pt-0" id="resultSkipWrap" style="display:none;">
+        <div class="fw-bold mb-2" style="font-size:.9rem;">
+          <i class="bx bx-error-circle me-1 text-warning"></i>
+          <span id="resultSkipCount">0</span> student(s) were not moved
+        </div>
+        <ul class="mb-0 small" id="resultSkipList" style="padding-left:1.1rem;"></ul>
       </div>
     </div>
 
@@ -230,6 +261,11 @@
         <div class="pr-sum-line"><span class="pr-chip retain"><i class="bx bx-revision"></i>Retain in class</span><span class="v" id="mRetain">0</span></div>
         <div class="pr-sum-line"><span class="pr-chip passout"><i class="bx bx-graduation"></i>Pass out / Graduate</span><span class="v" id="mPassout">0</span></div>
         <div class="pr-sum-line"><span><i class="bx bx-wallet me-1"></i>Carry forward dues</span><span class="v" id="mDues">—</span></div>
+        <div class="alert alert-danger d-flex align-items-start gap-2 mt-3 mb-0" id="mDuesWarn" style="display:none;border-radius:12px;font-size:.82rem;">
+          <i class="bx bx-wallet fs-5"></i>
+          <span><strong id="mDuesCount">0</strong> selected student(s) have pending dues and will be <strong>skipped</strong>, because
+                "Carry forward pending fee dues" is unticked. Tick it to move them anyway, or settle their dues first.</span>
+        </div>
         <div class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0" style="border-radius:12px;font-size:.82rem;">
           <i class="bx bx-error-circle fs-5"></i>
           <span>This will move the selected students into the new academic session. Make sure exam results are finalised first.</span>
@@ -497,27 +533,133 @@ function checkTargetSession(){
   });
 }
 document.getElementById('tgtYear').addEventListener('change', checkTargetSession);
-checkTargetSession();
+
+/* ── Pick a sensible target session on load ───
+   Both selects are built from the same list, and the current session is ordered
+   first, so without this BOTH default to the current year — a combination that is
+   always invalid. Pick the first session that is not the source; if there is no
+   such session, the school has to create one before it can promote at all. */
+function initTargetYear(){
+  var src=document.getElementById('srcYear'),
+      tgt=document.getElementById('tgtYear'),
+      other=null, i;
+
+  for(i=0;i<tgt.options.length;i++){
+    if(tgt.options[i].value!==src.value){ other=tgt.options[i].value; break; }
+  }
+
+  if(other===null){
+    targetReady=false;
+    document.getElementById('reviewBtn').setAttribute('disabled','disabled');
+    document.getElementById('tgtNotReadyText').textContent =
+      'This school has only one academic session (' + src.value + '), so there is nowhere to promote students into. '
+      + 'Create the next session first under Settings → Academic Year, then set up its classes and sections.';
+    document.getElementById('tgtNotReady').style.display='';
+    return;
+  }
+
+  tgt.value=other;
+  checkTargetSession();
+}
+initTargetYear();
+document.getElementById('srcYear').addEventListener('change', function(){
+  if(document.getElementById('srcYear').value===document.getElementById('tgtYear').value) initTargetYear();
+});
+
+/* ── Can this run at all? ─────────────────────
+   Every reason the promotion cannot proceed, in one place, checked BEFORE the
+   confirm modal opens. Returns '' when it is safe to go. */
+function validate(){
+  var srcY=document.getElementById('srcYear').value,
+      tgtY=document.getElementById('tgtYear').value;
+
+  if(!roster.length)      return 'Load a class first — there are no students on screen.';
+  if(!picked().length)    return 'No students are selected. Tick at least one, or use Select all.';
+  if(!tgtY)               return 'Choose the academic session to promote into.';
+  if(srcY===tgtY)         return 'The new session must be different from the current one. Right now both say ' + srcY + '.';
+  if(!targetReady)        return 'Session ' + tgtY + ' has no classes or sections yet, so nobody can be moved into it.';
+  return '';
+}
+
+function showErr(msg){
+  document.getElementById('promoteErrorText').textContent=msg;
+  document.getElementById('promoteError').style.display='';
+}
+function clearErr(){ document.getElementById('promoteError').style.display='none'; }
+
+/* Unticking "carry dues" makes the proc skip anyone who owes money (a pass-out is
+   exempt). Count them here so the confirm modal can say so instead of the office
+   finding out from the skipped list afterwards. */
+function duesSkipCount(){
+  if(document.getElementById('carryDues').checked) return 0;
+  return picked().filter(function(s){
+    return (s.due||0) > 0 && outcome[s.id] !== 'passout';
+  }).length;
+}
 
 /* ── Review modal fill ───────────────────────── */
 document.getElementById('reviewBtn').addEventListener('click', function(){
+  var err=validate();
+  if(err){ showErr(err); return; }
+  clearErr();
+
   updateCounts();
   var srcY=document.getElementById('srcYear').value,
       tgtY=document.getElementById('tgtYear').value,
       cls=document.getElementById('srcClass').value;
   document.getElementById('confirmFlow').textContent=cls+' · '+srcY+'  →  '+tgtY;
   document.getElementById('mDues').textContent=document.getElementById('carryDues').checked?'Yes':'No';
+
+  var dn=duesSkipCount();
+  document.getElementById('mDuesCount').textContent=dn;
+  document.getElementById('mDuesWarn').style.display = dn>0 ? '' : 'none';
+
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).show();
 });
+
+document.getElementById('resultClose').addEventListener('click', function(){
+  document.getElementById('resultCard').style.display='none';
+});
+
+/* ── Result panel ─────────────────────────────
+   skipped_detail arrives '; '-joined from the proc; split it so each name is its
+   own line the office can work through. */
+function showResult(res){
+  document.getElementById('resultSummary').textContent =
+    res.promoted+' promoted · '+res.retained+' retained · '+res.passedOut+' passed out · '+res.skipped+' skipped';
+
+  var wrap=document.getElementById('resultSkipWrap'),
+      list=document.getElementById('resultSkipList');
+
+  if(res.skipped>0 && res.skippedDetail){
+    document.getElementById('resultSkipCount').textContent=res.skipped;
+    list.innerHTML = res.skippedDetail.split('; ').map(function(n){
+      return '<li>'+EC.esc(n)+'</li>';
+    }).join('');
+    wrap.style.display='';
+  } else {
+    wrap.style.display='none';
+  }
+
+  var card=document.getElementById('resultCard');
+  card.style.display='';
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
 
 /* ── Commit ──────────────────────────────────── */
 document.getElementById('commitBtn').addEventListener('click', function(){
-  var sel=picked();
-  if(!sel.length){ ecToast('warning','No students selected.'); return; }
+  // Backstop: the Review button already blocked this, but the selection can change
+  // while the modal is open (it does not cover the roster).
+  var err=validate();
+  if(err){
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();
+    showErr(err);
+    return;
+  }
 
-  var srcY=document.getElementById('srcYear').value,
+  var sel=picked(),
+      srcY=document.getElementById('srcYear').value,
       tgtY=document.getElementById('tgtYear').value;
-  if(srcY===tgtY){ ecToast('warning','Pick a different session to promote into.'); return; }
-  if(!targetReady){ ecToast('warning','Set up classes and sections for '+tgtY+' first.'); return; }
 
   var btn=this;
   EC.buttonBusy(btn,'Promoting…');
@@ -535,21 +677,37 @@ document.getElementById('commitBtn').addEventListener('click', function(){
     })
   })
   .done(function(res){
-    if(!res || !res.success){ ecToast('error', (res && res.message) || 'Could not promote.'); return; }
+    // A refused run (dues gate, session not set up, nothing matched) comes back
+    // success=false with the proc's own wording — keep it on screen, not in a toast.
+    if(!res || !res.success){
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();
+      showErr((res && res.message) || 'Could not promote.');
+      return;
+    }
 
-    var modalEl=document.getElementById('confirmModal');
-    var inst=bootstrap.Modal.getInstance(modalEl); if(inst) inst.hide();
-
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();
+    clearErr();
     ecToast('success', res.message);
-    // Anyone the proc could not move is named, so the office can fix and re-run.
-    if(res.skipped>0) ecToast('warning', res.skipped+' skipped — '+res.skippedDetail);
+    showResult(res);
 
     // The students have moved to the new session, so this roster is stale.
     roster=[]; outcome={};
     document.getElementById('sumSection').style.display='none';
     document.getElementById('rosterCard').style.display='none';
   })
-  .fail(function(){ ecToast('error','Something went wrong.'); })
+  .fail(function(xhr){
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();
+    // Say what actually went wrong. 'Something went wrong.' sent people to us with
+    // nothing to go on; the status code at least separates "signed out" from "bug".
+    var code = xhr ? xhr.status : 0;
+    var msg;
+    if(code===400)      msg='The page has gone stale (security token expired). Reload and try again.';
+    else if(code===401) msg='Your session has expired. Sign in again.';
+    else if(code===403) msg='You do not have permission to promote students.';
+    else if(code)       msg='The server returned an error (HTTP '+code+'). Nothing was changed.';
+    else                msg='Could not reach the server. Nothing was changed.';
+    showErr(msg);
+  })
   .always(function(){ EC.buttonReset(btn); });
 });
 
