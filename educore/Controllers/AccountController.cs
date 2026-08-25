@@ -8,6 +8,7 @@ using EduCoreDataAccessLayer.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -25,12 +26,23 @@ namespace educore.Controllers
         private readonly INotificationService _notificationService;
         private readonly IPermissionService _perms;
 
-        public AccountController(ILoginService loginService, IBaseService baseService, INotificationService notificationService, IPermissionService perms)
+        // Encrypts/decrypts values that leave the server (query strings, custom cookies).
+        // Built once here — CreateProtector is cheap but the purpose string must be the same
+        // every time or the resulting protector cannot read what an earlier one wrote.
+        // Always wrap Unprotect in try/catch (CryptographicException) when the token came from
+        // outside the app — a tampered or stale token is an invalid value, not a crash.
+        private readonly IDataProtector _dataProtector;
+
+        // Session key for the half-logged-in user waiting on the multi-role picker.
+        private const string PendingUserIdKey = "PendingUserId";
+
+        public AccountController(ILoginService loginService, IBaseService baseService, INotificationService notificationService, IPermissionService perms, IDataProtectionProvider dataProtectionProvider, IOptions<AppSettings> appSettings)
         {
             _loginService = loginService;
             _baseService = baseService;
             _notificationService = notificationService;
             _perms = perms;
+            _dataProtector = dataProtectionProvider.CreateProtector(appSettings.Value.ProtectorValue);
         }
 
         // ── Multi-role "focus" switch ────────────────────────────────────────────
@@ -182,7 +194,7 @@ namespace educore.Controllers
                 return RedirectByRole(user.RoleName);
             }
 
-            HttpContext.Session.SetInt32("PendingUserId", user.UserId);
+            HttpContext.Session.SetString(PendingUserIdKey, _dataProtector.Protect(user.UserId.ToString()));
             HttpContext.Session.SetString("PendingEmail", model.Email);
             HttpContext.Session.SetString("RememberMe", model.RememberMe.ToString());
 
@@ -192,7 +204,7 @@ namespace educore.Controllers
         [HttpGet]
         public async Task<IActionResult> ChooseRole()
         {
-            var userId = HttpContext.Session.GetInt32("PendingUserId");
+            var userId = ReadProtectedUserId(PendingUserIdKey);
 
             if (userId == null)
                 return RedirectToAction("Login");
@@ -212,7 +224,7 @@ namespace educore.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ContinueAs(string roleCode)
         {
-            var userId = HttpContext.Session.GetInt32("PendingUserId");
+            var userId = ReadProtectedUserId(PendingUserIdKey);
             var email = HttpContext.Session.GetString("PendingEmail");
 
             if (userId == null || string.IsNullOrWhiteSpace(email))
@@ -262,7 +274,7 @@ namespace educore.Controllers
             await _loginService.SaveLoginAttemptAsync(email, true, null);
             await _loginService.SaveUserSessionAsync(user.UserId, HttpContext);
 
-            HttpContext.Session.Remove("PendingUserId");
+            HttpContext.Session.Remove(PendingUserIdKey);
             HttpContext.Session.Remove("PendingEmail");
             HttpContext.Session.Remove("RememberMe");
 
@@ -393,9 +405,31 @@ namespace educore.Controllers
 
             return View(model);
         }
+        // Reads a user id that was stored protected. Returns null when it is missing, was
+        // tampered with, or was protected by a key ring this instance no longer has (a deploy
+        // that lost the keys, an old session). Callers treat null as "start over" and bounce
+        // to Login — an unreadable token is an invalid value, never a crash.
+        private int? ReadProtectedUserId(string sessionKey)
+        {
+            var token = HttpContext.Session.GetString(sessionKey);
+
+            if (string.IsNullOrEmpty(token))
+                return null;
+
+            try
+            {
+                return int.TryParse(_dataProtector.Unprotect(token), out var userId) ? userId : null;
+            }
+            catch (CryptographicException)
+            {
+                HttpContext.Session.Remove(sessionKey);   // stale or tampered — drop it
+                return null;
+            }
+        }
+
         private void SaveUserDataToSession(UserViewModel user)
         {
-            HttpContext.Session.SetInt32("UserId", user.UserId);
+            HttpContext.Session.SetString("UserId", _dataProtector.Protect(user.UserId.ToString()));
             HttpContext.Session.SetString("Email", user.Email ?? string.Empty);
             HttpContext.Session.SetString("UserName", user.FullName ?? string.Empty);
             HttpContext.Session.SetString("RoleCode", user.RoleCode ?? string.Empty);
@@ -429,7 +463,7 @@ namespace educore.Controllers
 
             // Always proceed to the verify page (never reveal whether the account exists). When the
             // identifier matched nobody we store user id 0 so any code entered just fails as invalid.
-            HttpContext.Session.SetInt32(ResetUserIdKey, user?.UserId ?? 0);
+            HttpContext.Session.SetString(ResetUserIdKey, _dataProtector.Protect((user?.UserId ?? 0).ToString()));
 
             if (user != null && user.UserId > 0)
             {
@@ -451,7 +485,7 @@ namespace educore.Controllers
         [HttpGet]
         public IActionResult VerifyOtp()
         {
-            if (HttpContext.Session.GetInt32(ResetUserIdKey) == null)
+            if (ReadProtectedUserId(ResetUserIdKey) == null)
                 return RedirectToAction(nameof(ForgotPassword));
 
             return View(new VerifyOtpViewModel());
@@ -462,7 +496,7 @@ namespace educore.Controllers
         [EnableRateLimiting("login")]
         public async Task<IActionResult> VerifyOtp(VerifyOtpViewModel model)
         {
-            var userId = HttpContext.Session.GetInt32(ResetUserIdKey);
+            var userId = ReadProtectedUserId(ResetUserIdKey);
             if (userId == null)
                 return RedirectToAction(nameof(ForgotPassword));
 

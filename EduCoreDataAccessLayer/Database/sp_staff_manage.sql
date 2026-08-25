@@ -1,4 +1,4 @@
--- ============================================================================
+﻿-- ============================================================================
 -- sp_staff_manage.sql  —  CRUD for core.staff (HR/Staff module)
 --
 -- Operations (p_operation):
@@ -81,7 +81,7 @@ BEGIN
     -- ---------------------------------------------------------------- LIST
     IF p_operation = 'LIST' THEN
         OPEN p_result FOR
-        SELECT s.staff_id, s.employee_code, s.full_name, s.gender, s.dob,
+        SELECT s.staff_id, s.public_id, s.employee_code, s.full_name, s.gender, s.dob,
                s.mobile, s.alt_mobile, s.email, s.blood_group, s.address,
                s.staff_type, s.department, s.designation, s.joining_date,
                s.qualification, s.experience_years, s.status,
@@ -103,7 +103,7 @@ BEGIN
     -- ----------------------------------------------------------------- GET
     IF p_operation = 'GET' THEN
         OPEN p_result FOR
-        SELECT s.staff_id, s.employee_code, s.full_name, s.gender, s.dob,
+        SELECT s.staff_id, s.public_id, s.employee_code, s.full_name, s.gender, s.dob,
                s.mobile, s.alt_mobile, s.email, s.blood_group, s.address,
                s.staff_type, s.department, s.designation, s.joining_date,
                s.qualification, s.experience_years, s.status,

@@ -1360,3 +1360,294 @@ Two things that make this less obvious than it looks:
 a shared database once every build talking to it sends the new shape. Ship the
 compatible signature first, deploy, then remove the shim. Remove this one when
 the deployed build is on 10 params.
+
+---
+
+### [2026-08-25] Data Protection wired up explicitly (half of Fix #1, without Redis)
+
+`Program.cs` had **no DataProtection configuration at all** (1.5, Fix #1). ASP.NET
+still worked, because it silently generates a key ring in a per-machine path — on
+Linux `~/.aspnet/DataProtection-Keys`, inside the container. That path is part of
+the image's writable layer, so **every Railway deploy threw the keys away** and
+every `EduCore.Auth` cookie issued before it became undecryptable: users were
+being signed out on each deploy, and it read as a session bug rather than a
+key-ring one.
+
+Now registered explicitly:
+
+- `SetApplicationName("EduCore")` — the name is baked into every protected
+  payload. It must never change, or previously protected values stop opening.
+- `PersistKeysToFileSystem(...)` — path from `DataProtection:KeyPath`, defaulting
+  to `App_Data/keys` and resolved against the content root so the same relative
+  value works on Windows dev and in the Linux container. Git-ignored: those XML
+  files *are* the keys that sign the auth cookie.
+- `AppSettings.ProtectorValue` (a fixed GUID in `appsettings.json`, bound via
+  `IOptions<AppSettings>`) is the **purpose string** for `CreateProtector`, not a
+  key. Same rule as the app name: fixed forever.
+- `AccountController` takes `IDataProtectionProvider` + `IOptions<AppSettings>`
+  and builds `_dataProtector` once.
+
+**Applied to: the login-flow user id.** `PendingUserId` — the half-logged-in user
+waiting on the multi-role picker, the only live user id the login flow keeps in
+session — is now written with `Protect` and read back through
+`ReadProtectedUserId`, which catches `CryptographicException`, drops the bad
+value and returns null so the caller bounces to Login. A stale token (an old
+session, a deploy that lost the key ring) is an invalid value, not a 500. The
+`Session["UserId"]` copy in `SaveUserDataToSession` is protected the same way.
+
+Worth recording, because it was invisible until we went looking: **everything
+`SaveUserDataToSession` writes is write-only.** Nothing in the repo reads
+`Session["UserId"]`, `"Email"`, `"UserName"`, `"RoleCode"`, `"RoleName"`,
+`"TenantId"` or `"SchoolId"` — identity is read from **claims**
+(`Common.SK_UserId` and friends), and the only session value read outside
+`AccountController` is `SK_ActiveRoleId`. So that whole method is a leftover, and
+protecting its user id changes nothing observable. It is a deletion candidate,
+not a security fix. Left in place here because removing it is a separate call.
+
+The forgot-password `ResetUserId` (`ForgotPassword` → `VerifyOtp`) goes through
+the same helper. One property had to survive the change: that flow deliberately
+stores **id 0** when the identifier matched nobody, so the verify page looks
+identical whether or not the account exists (anti-enumeration). `0` protects and
+unprotects like any other id, so the page still cannot tell the two apart — and
+`ReadProtectedUserId` returning null only ever means "no reset in progress or an
+unreadable token", never "no such user".
+
+After this, the only `SetInt32` values left in session are `SK_ActiveRoleId` (a
+role id, read by the menu and `HasPermissionAttribute`) and the dead
+`TenantId`/`SchoolId` writes described above.
+
+Two things to know before relying on it:
+
+- **Production still needs a mounted volume.** The `Dockerfile` has none, so
+  `App_Data/keys` inside the container is as ephemeral as the default path was.
+  Attach a Railway volume and point `DataProtection__KeyPath` at it (e.g.
+  `/app/keys`); until then this fixes local dev only.
+- **The first deploy after this signs everyone out once**, because the new key
+  ring cannot read cookies encrypted with the old discarded keys. Once.
+
+This is Fix #1's key-ring half done with a shared *folder* instead of Redis —
+which 1.5 lists as an acceptable form. The session half (`AddSession()` is still
+in-memory) is untouched, so the app is still single-instance.
+
+---
+
+### [2026-08-25] Protected ids in URLs — built, audited, then REVERTED
+
+Ids were briefly converted to `IDataProtector` tokens in URLs across 13
+controllers (49 parameters, a `[ProtectedId]` model binder, `Url.ProtectId` in
+views). **That work was reverted the same day.** Recording why, so nobody rebuilds
+it.
+
+**What the measurement showed.** `Protect()` is deliberately non-deterministic —
+the same id produces a different 134-character token on every call:
+
+    token1 : CfDJ8PobHlMPbP9LnslLOBNZsphOhu_pDiDkb9SSLJKq8Oqj...
+    token2 : CfDJ8PobHlMPbP9LnslLOBNZspj_qrByUR7FB4Coq9WJ3uH6...
+    same id, same token? False   -> both decrypt to 12
+
+So one record has unlimited URLs (breaks caching, analytics, comparison), a route
+with three ids runs to ~400 characters, and **every URL dies whenever the key ring
+is lost** — which on Railway is every deploy until a volume is mounted. Bookmarked
+and emailed links would break permanently, not just log users out.
+
+**The audit that settled it.** All 49 id-taking actions were checked for tenant
+scope:
+
+| | count | verdict |
+|---|---|---|
+| tenant + school scoped | 41 | correct |
+| tenant only, `[Authorize(Roles = SuperAdmin)]` | 2 | correct by design — SuperAdmin manages schools |
+| unimplemented stubs (no DB call at all) | 4 | Leave Approve/Reject, Payroll MarkPaid, EditStudent POST |
+| view-only (`ViewBag` + `return View()`, data loads via scoped ajax) | 2 | Student Dashboard, EditStudent GET |
+
+**Zero missing tenant filters.** Defence in depth is real and three layers deep —
+controller reads tenant/school from claims, the service refuses early
+(`if (tenantId <= 1 || schoolId <= 0 ...) return null`), and the proc filters:
+
+    WHERE s.tenant_id = p_tenant_id
+      AND s.school_id = p_school_id
+      AND s.staff_id  = p_staff_id
+
+That is what stops one school reading another's record, and it holds whether the
+URL says `12` or `CfDJ8…`. The token layer added obscurity on top of working
+authorization, at the cost of unreadable URLs and a permanent migration flag —
+and with `AllowRawIds: true` (needed because 37 URLs are built in JavaScript,
+which the compiler cannot check) it added nothing at all while looking like it
+did. That false impression is the main reason it is gone rather than parked.
+
+**Two things the audit did leave behind, worth doing:**
+
+- The 4 stubs must get tenant/school scope when their SPs are written. Nothing
+  leaks today because they touch no data, but they are the obvious place for the
+  first real hole to appear.
+- `Student/Dashboard/{id}` and `EditStudent/{id}` render for any id; the page is
+  empty because the ajax behind it is scoped. Harmless, slightly untidy.
+
+**If the number itself ever needs hiding** (leaking how many students a school
+has, or a URL that travels outside the app), the answer is a `public_id uuid`
+column — stable, non-guessable, survives key rotation — not encryption. See the
+UUID notes.
+
+**Kept from this work:** Data Protection registration + persisted key ring, and
+the login/reset-flow session protection in the entry above. Those solve real
+problems. Deleted: `IdProtector`, `ProtectedIdAttribute`, `UrlHelperExtensions`,
+and the `AllowRawIds` flag.
+
+---
+
+### [2026-08-25] `public_id uuid` for students and staff
+
+The replacement for the reverted token scheme, and the reason it is a better
+answer: a uuid is **stable**. It survives key rotation, redeploys and a lost Data
+Protection key ring, so a bookmarked or emailed link still works next year. A
+`Protect()` token does not — and on Railway, where the key ring currently lives
+on an unmounted container path, it would break on the next deploy.
+
+To be clear about what this buys: the integer id was never a security hole. The
+audit above found zero missing tenant filters across all 49 id-taking actions.
+What the integer leaks is **volume** — `/Student/4700` rendering a page tells you
+roughly how many students a school has, and that ids are sequential. The uuid
+closes that, nothing more.
+
+**`Database/public_id_students_staff.sql`** (new):
+
+- `public_id uuid NOT NULL DEFAULT gen_random_uuid()` on `core.students` and
+  `core.staff`, each with a **UNIQUE** index. Unique matters: a duplicate would
+  let one school's URL resolve to another school's row.
+- The integer PK is untouched. `public_id` is for the outside world only — making
+  uuid the PK would bloat every index and every join for no gain.
+- `core.fn_public_id_to_id(entity, public_id, tenant_id, school_id)` resolves a
+  uuid to the internal id **with the tenant check built in**, returning NULL when
+  the row is not that school's. Plus `core.sp_resolve_public_id`, a thin
+  refcursor wrapper, because PgExec speaks procedures and has no scalar-function
+  shape.
+
+Verified on the local copy (19 students, 14 staff) — **not** on Railway:
+
+| call | result |
+|---|---|
+| correct tenant + school | `53` (the real id) |
+| wrong school | NULL |
+| wrong tenant | NULL |
+| tenant 1 (platform) | NULL |
+| unknown uuid | NULL |
+| re-running the whole script | clean (idempotent) |
+
+Unknown-uuid and wrong-school both return NULL, so the response cannot be used to
+probe which uuids are real.
+
+**Additive proc changes** — `student_list.sql`, `staff_list.sql` and
+`sp_staff_manage.sql` (LIST *and* GET branches) now also return `public_id`. This
+is deliberately result-set-only: no signature changed, nothing dropped, so the
+build currently deployed on Railway — which knows nothing about the column —
+keeps working untouched. That is the lesson from the 42883 incident applied up
+front rather than after the outage.
+
+**Two things about running it:**
+
+- `ADD COLUMN` with a **volatile** default (`gen_random_uuid()`) cannot take
+  PostgreSQL's catalog fast path. The table is rewritten so each row gets its own
+  uuid, under an ACCESS EXCLUSIVE lock. At this size that is seconds, but it is a
+  lock — use a quiet window. For a very large table: add nullable, backfill in
+  batches, then SET NOT NULL.
+- Local dev and Railway **share one database**. Applying this to Railway is a
+  production change; it has only been run against the stale local copy here.
+
+**App wiring — done for STAFF only.** `/ERP/Staff/StaffProfile/12` is now
+`/ERP/Staff/StaffProfile/36733179-0f7d-4d2f-bc74-449a28bb8f24`:
+
+- `StaffModel` and `StaffListItem` carry `PublicId`; `StaffService` maps
+  `public_id` at all three mapping sites via a `GuidVal` reader that returns
+  `Guid.Empty` when the column is absent (so the code is inert until the SQL runs).
+- `IStaffService.ResolveStaffIdAsync(Guid, tenant, school)` calls
+  `core.sp_resolve_public_id`. Unknown uuid and another school's uuid both come
+  back as **0** — indistinguishable, so it cannot be used to probe for real ids.
+- `StaffProfile`, `EditStaff` (GET + POST), `Reactivate`, `Deactivate` take a
+  `Guid`, resolve it, and redirect to the list on 0. The action bodies below that
+  line are unchanged — they still work on the internal int.
+- Links converted: StaffList (2), StaffProfile (Edit link + the Deactivate form's
+  hidden id), EditStaff (3), Inactive (the Reactivate form's hidden id).
+- After a save the internal id is what comes back, so `RedirectToProfileAsync`
+  reads the row once to get its uuid for the redirect URL.
+
+**Left on int deliberately:** the Attendance / Leave / Payroll links on the
+profile page — those controllers still take an int, and Leave/Payroll are
+unimplemented stubs anyway.
+
+**Student side NOT wired, and this is the reason:** `Student/Dashboard` and
+`Student/EditStudent` are **mock-ups**. Dashboard's JS matches the id against a
+hardcoded 10-student array (`students.find(x => x.id === STUDENT_ID)`) and
+`EditStudent.cshtml` says "Mock student data — replace with API/ViewBag call";
+the POST is a stub. Wiring a uuid into fake data buys nothing and would break the
+`x.id === STUDENT_ID` comparison. `core.sp_student_list` already returns
+`public_id`, so the column is there and ready — do the wiring when those pages get
+a real backend. (`colors[s.StudentId % colors.Length]` in the list also needs the
+int, which is why `StudentId` stays on the model alongside `PublicId`.)
+
+**Verified on the local copy** (not Railway): the resolver returns the right id
+for the owning school and NULL for wrong school / wrong tenant / unknown uuid;
+re-running the migration is clean; and a **named-argument** `CALL` — the shape
+Npgsql actually sends — resolves without ambiguity, which is the specific trap
+that caused the 42883 outage. Not verified: clicking the pages, which needs a
+login against the shared live database.
+
+**And the rule that does not change:** a uuid hides the number, it does not
+authorise the request. The `tenant_id`/`school_id` filters in every proc are what
+stop one school reading another's data. Anyone who legitimately sees a record can
+copy its uuid, so those filters stay regardless of how unguessable the id looks.
+
+---
+
+### [2026-08-25] `public_id` extended to Student, TC and ID Card
+
+Staff proved the pattern; these three follow it. Everything the outside world can
+open by URL — a student, a staff member, a printed certificate, an ID card — now
+travels as a uuid. Settings-level ids (fee heads, roles, masters) and selector
+ids (`academicYearId`, `sessionId`, `classId`, `stateId`) deliberately stay
+integers: a token there breaks dropdowns and hides nothing worth hiding.
+
+**One resolver, not four.** The `ResolveStaffIdAsync` written for staff was moved
+out of `StaffService` into **`IPublicIdService.ResolveAsync(entity, uuid, tenant,
+school)`** with `Student`/`Staff`/`Tc` name constants. Four copies of the same
+twenty lines would have drifted; entity names now exist in one place, next to the
+guard. `StaffController` was repointed at it, so there is exactly one
+implementation.
+
+| Entity | Column | Notes |
+|---|---|---|
+| Student | `core.students.public_id` | already added in the first migration |
+| Staff | `core.staff.public_id` | done previously |
+| **TC** | `core.tc_register.public_id` | **new** — the Print branch is `SELECT r.*`, so it picks the column up automatically; only the List projection needed it added |
+| **ID Card** | — | **no new column**: `IdCard/Single`'s id is a *student* id, so it resolves through the `student` entity |
+
+**Converted:** `Student` Dashboard / EditStudent (GET + POST) / EnrolmentHistory /
+UploadPhoto, `Tc/Print`, `IdCard/Single`. Links: StudentList (2 dashboard links +
+2 photo buttons), Dashboard, EditStudent (4), Tc/Register (the Print link).
+
+**Left on int on purpose:**
+
+- `Student/Exit` and `Tc/Void` — the id rides in a **JSON body**, not a URL, and
+  both are already tenant-scoped. Nothing leaks by browsing.
+- `colors[s.StudentId % colors.Length]` in the list needs a number, which is why
+  `StudentId` stays on the model beside `PublicId`.
+- `Areas/ERP/Views/Admission/Dashboard.cshtml` is an orphan — no action renders
+  it — so it was left untouched.
+
+**Note on the pages themselves.** `Student/Dashboard` and `EditStudent` are still
+**mock-ups** (a hardcoded 10-student array; the POST is a stub). Only the session-
+history card reads real data. The uuid plumbing is now correct and the URLs are
+clean, but do not read "student dashboard works" into this — the page still shows
+mock content until it gets a real backend. `UploadPhoto` and `EnrolmentHistory`
+are real and do work.
+
+**Verified on the local copy:** the student uuid resolves to its real id through
+`sp_resolve_public_id` using a **named-argument** CALL (the shape Npgsql sends),
+wrong school returns NULL, the `tc` branch executes, and an unknown entity raises
+`22023`. The local copy holds no TC rows, so the TC path is verified as SQL but
+not against real data. Build: 0 errors.
+
+**Deployment order is unchanged and still matters:** run
+`public_id_students_staff.sql` (now also touching `core.tc_register`), then
+`transfer_certificate.sql` / `student_list.sql` / `staff_list.sql` /
+`sp_staff_manage.sql`, and only then deploy the app. Reversed, every converted
+link resolves to `Guid.Empty` and bounces to the list page.

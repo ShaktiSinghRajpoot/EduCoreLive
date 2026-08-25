@@ -1,4 +1,4 @@
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @using System.Linq
 @using Microsoft.AspNetCore.Http
 @using Microsoft.AspNetCore.Mvc.Rendering
@@ -96,7 +96,7 @@
                       <td class="text-end">
                         <form asp-area="ERP" asp-controller="Staff" asp-action="Reactivate" method="post" class="d-inline">
                           @Html.AntiForgeryToken()
-                          <input type="hidden" name="id" value="@s.StaffId" />
+                          <input type="hidden" name="id" value="@s.PublicId" />
                           <button type="submit" class="btn btn-sm btn-primary">
                             <i class="bx bx-refresh me-1"></i>Reactivate
                           </button>

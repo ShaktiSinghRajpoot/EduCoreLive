@@ -1,7 +1,7 @@
-@{
+﻿@{
     ViewData["Title"] = "Student Dashboard";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
-    int studentId = ViewBag.StudentId ?? 1;
+    Guid studentPublicId = ViewBag.StudentPublicId ?? Guid.Empty;
 }
 
 @section VendorScripts {
@@ -201,7 +201,7 @@
                 <div class="sd-pane" id="tab-profile">
                     <div class="mb-3 text-end">
                         <a asp-area="ERP" asp-controller="Student" asp-action="EditStudent"
-                           asp-route-id="@studentId"
+                           asp-route-id="@studentPublicId"
                            class="btn btn-primary btn-sm">
                             <i class="bx bx-edit me-1"></i>Edit Profile
                         </a>
@@ -255,7 +255,7 @@
 (function(){
 'use strict';
 
-var STUDENT_ID = @studentId;
+var STUDENT_ID = '@studentPublicId';   // uuid, so quoted
 var ENROL_HISTORY_URL = '@Url.Action("EnrolmentHistory","Student",new{area="ERP"})';
 var charts = {};
 

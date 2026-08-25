@@ -1,4 +1,4 @@
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model EduCoreDataAccessLayer.Models.StaffModel
 @{
     ViewData["Title"] = "Staff Profile";
@@ -43,7 +43,7 @@
       </div>
       <div class="d-flex gap-2">
         <a class="btn btn-primary d-flex align-items-center gap-1"
-           asp-area="ERP" asp-controller="Staff" asp-action="EditStaff" asp-route-id="@staffId">
+           asp-area="ERP" asp-controller="Staff" asp-action="EditStaff" asp-route-id="@Model.PublicId">
           <i class="bx bx-edit"></i><span>Edit Profile</span>
         </a>
         @if (Model.Status != "Inactive")
@@ -54,7 +54,7 @@
                 data-ec-confirm-message="They will move to the inactive list. You can reactivate them later."
                 data-ec-confirm-ok="Deactivate">
             @Html.AntiForgeryToken()
-            <input type="hidden" name="id" value="@staffId" />
+            <input type="hidden" name="id" value="@Model.PublicId" />
             <button type="submit" class="btn btn-outline-danger d-flex align-items-center gap-1">
               <i class="bx bx-user-x"></i><span>Deactivate</span>
             </button>

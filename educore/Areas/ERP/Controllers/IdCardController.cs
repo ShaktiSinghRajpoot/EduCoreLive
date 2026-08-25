@@ -1,4 +1,4 @@
-using educore.Helpers;
+﻿using educore.Helpers;
 using educore.Models;
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
@@ -17,12 +17,14 @@ namespace educore.Areas.ERP.Controllers
         private readonly IIdCardService _cards;
         private readonly ISchoolSettingsService _settings;
         private readonly IBaseService _baseService;
+        private readonly IPublicIdService _publicIds;
 
-        public IdCardController(IIdCardService cards, ISchoolSettingsService settings, IBaseService baseService)
+        public IdCardController(IIdCardService cards, ISchoolSettingsService settings, IBaseService baseService, IPublicIdService publicIds)
         {
             _cards = cards;
             _settings = settings;
             _baseService = baseService;
+            _publicIds = publicIds;
         }
 
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -62,9 +64,13 @@ namespace educore.Areas.ERP.Controllers
 
         // One student's card (from the directory / dashboard).
         [HttpGet]
-        public async Task<IActionResult> Single(int id, string? format)
+        // NOTE: this id is the STUDENT's, not a card's — hence the student entity.
+        public async Task<IActionResult> Single(Guid id, string? format)
         {
-            var one = await _cards.GetOneAsync(id, TenantId(), SchoolId(), UserId());
+            var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
+            if (studentId == 0) return NotFound();
+
+            var one = await _cards.GetOneAsync(studentId, TenantId(), SchoolId(), UserId());
             var list = one == null ? new List<IdCardStudent>() : new List<IdCardStudent> { one };
             var model = await BuildModel(list, format, isPreview: false);
             return View("Print", model);

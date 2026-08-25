@@ -1,7 +1,7 @@
-@{
+﻿@{
     ViewData["Title"] = "Edit Student";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
-    int studentId = ViewBag.StudentId ?? 0;
+    Guid studentPublicId = ViewBag.StudentPublicId ?? Guid.Empty;
 }
 
 @section PageStyles {
@@ -17,7 +17,7 @@
             <i class="bx bx-group"></i> All Students
         </a>
         <i class="bx bx-chevron-right" style="font-size:.85rem;"></i>
-        <a asp-area="ERP" asp-controller="Student" asp-action="Dashboard" asp-route-id="@studentId">
+        <a asp-area="ERP" asp-controller="Student" asp-action="Dashboard" asp-route-id="@studentPublicId">
             <span id="bc-name">Student Profile</span>
         </a>
         <i class="bx bx-chevron-right" style="font-size:.85rem;"></i>
@@ -37,7 +37,7 @@
                 </div>
             </div>
             <a asp-area="ERP" asp-controller="Student" asp-action="Dashboard"
-               asp-route-id="@studentId"
+               asp-route-id="@studentPublicId"
                class="btn btn-outline-secondary d-flex align-items-center gap-1">
                 <i class="bx bx-arrow-back"></i><span class="d-none d-sm-inline">Back to Profile</span>
             </a>
@@ -46,11 +46,11 @@
 
     <form id="editStudentForm" method="post"
           asp-area="ERP" asp-controller="Student" asp-action="EditStudent"
-          asp-route-id="@studentId"
+          asp-route-id="@studentPublicId"
           enctype="multipart/form-data"
           novalidate>
         @Html.AntiForgeryToken()
-        <input type="hidden" name="StudentId" id="hStudentId" value="@studentId" />
+        <input type="hidden" name="StudentId" id="hStudentId" value="@studentPublicId" />
         <input type="hidden" name="StudentStatus" id="hStatus" value="Active" />
 
         <div class="row g-4">
@@ -378,7 +378,7 @@
                         </div>
                         <div class="es-info-row">
                             <span class="es-info-lbl">Student ID</span>
-                            <span class="es-info-val">#<span id="pi-id">@studentId</span></span>
+                            <span class="es-info-val"><span id="pi-id">@studentPublicId</span></span>
                         </div>
 
                         <!-- Change summary -->
@@ -403,7 +403,7 @@
             </div>
             <div class="d-flex gap-2">
                 <a asp-area="ERP" asp-controller="Student" asp-action="Dashboard"
-                   asp-route-id="@studentId"
+                   asp-route-id="@studentPublicId"
                    class="es-btn-cancel">
                     Cancel
                 </a>
@@ -423,7 +423,7 @@
 
     // ── Mock student data — replace with API/ViewBag call ───────────────
     const student = {
-        id:          @studentId,
+        id:          '@studentPublicId',
         admNo:       "ADM-2026-004",
         name:        "Akash Verma",
         admDate:     "12 Apr 2026",

@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
@@ -584,6 +584,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static StudentListModel MapListRow(DataRow row) => new()
         {
             StudentId      = IntVal(row, "student_id"),
+            PublicId       = GuidVal(row, "public_id"),
             AdmissionNo    = Str(row, "admission_no"),
             RollNo         = NullStr(row, "roll_no"),
             StudentName    = Str(row, "student_name"),
@@ -606,6 +607,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         // ── Tiny helpers (same style as EnquiryService) ──────────
         private static bool      Has(DataRow r, string col)     => r.Table.Columns.Contains(col);
         private static int       IntVal(DataRow r, string col)  => Has(r, col) && r[col] != DBNull.Value ? Convert.ToInt32(r[col]) : 0;
+        // Guid.Empty when the column is absent — i.e. before public_id_students_staff.sql runs.
+        private static Guid      GuidVal(DataRow r, string col) => Has(r, col) && r[col] != DBNull.Value ? (Guid)r[col] : Guid.Empty;
         private static decimal   DecVal(DataRow r, string col)  => Has(r, col) && r[col] != DBNull.Value ? Convert.ToDecimal(r[col]) : 0m;
         private static string    Str(DataRow r, string col)     => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString()! : string.Empty;
         private static string?   NullStr(DataRow r, string col) => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString() : null;

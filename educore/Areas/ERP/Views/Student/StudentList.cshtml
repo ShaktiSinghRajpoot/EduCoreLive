@@ -1,4 +1,4 @@
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @using System.Linq
 @using Microsoft.AspNetCore.Http
 @using Microsoft.AspNetCore.Mvc.Rendering
@@ -225,7 +225,7 @@
                   var color = colors[s.StudentId % colors.Length];
                   var roll = string.IsNullOrEmpty(s.RollNo) ? s.AdmissionNo : s.RollNo;
                   var gm = GenderMeta(s.Gender);
-                  var dashUrl = Url.Action("Dashboard", "Student", new { area = "ERP", id = s.StudentId });
+                  var dashUrl = Url.Action("Dashboard", "Student", new { area = "ERP", id = s.PublicId });
                   <tr>
                     <td>
                       <a href="@dashUrl" class="d-flex align-items-center gap-2 text-decoration-none" style="cursor:pointer;">
@@ -251,7 +251,7 @@
                       <div class="d-inline-flex gap-1 align-items-center">
                         <a href="@dashUrl" class="sl-view-btn"><i class="bx bx-layout"></i>Dashboard</a>
                         <button type="button" class="btn btn-sm btn-icon btn-outline-secondary btn-photo"
-                                title="Upload photo" data-id="@s.StudentId" data-name="@s.StudentName">
+                                title="Upload photo" data-id="@s.PublicId" data-name="@s.StudentName">
                           <i class="bx bx-camera"></i>
                         </button>
                         <button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-exit"
@@ -283,7 +283,7 @@
           {
               var color = colors[s.StudentId % colors.Length];
               var roll = string.IsNullOrEmpty(s.RollNo) ? s.AdmissionNo : s.RollNo;
-              var dashUrl = Url.Action("Dashboard", "Student", new { area = "ERP", id = s.StudentId });
+              var dashUrl = Url.Action("Dashboard", "Student", new { area = "ERP", id = s.PublicId });
               <div class="sl-mob-card">
                 <div class="sl-mob-top">
                   @if (!string.IsNullOrWhiteSpace(s.PhotoUrl))
@@ -314,7 +314,7 @@
                   <a href="@dashUrl" class="btn btn-sm btn-primary flex-grow-1"><i class="bx bx-layout me-1"></i>View Dashboard</a>
                   <button type="button" class="btn btn-sm btn-outline-secondary btn-photo flex-shrink-0"
                           title="Upload photo" aria-label="Upload photo"
-                          data-id="@s.StudentId" data-name="@s.StudentName">
+                          data-id="@s.PublicId" data-name="@s.StudentName">
                     <i class="bx bx-camera"></i>
                   </button>
                 </div>
@@ -562,7 +562,7 @@ document.getElementById('btnPdf').addEventListener('click',function(){window.pri
             if (!photoFile) { ecToast('error', 'Choose an image.'); return; }
 
             var fd = new FormData();
-            fd.append('id', photoId);
+            fd.append('publicId', photoId);
             fd.append('photo', photoFile);
             fd.append('__RequestVerificationToken', $('input[name="__RequestVerificationToken"]').first().val());
 

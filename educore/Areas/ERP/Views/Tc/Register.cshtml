@@ -1,4 +1,4 @@
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @using Microsoft.AspNetCore.Mvc.ViewFeatures
 @model EduCoreDataAccessLayer.Models.ERP.TcListModel
 @{
@@ -94,7 +94,7 @@
                     <td class="text-end">
                       @if (!t.IsVoid)
                       {
-                          <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Print", "Tc", new { area = "ERP", id = t.TcId })" target="_blank">
+                          <a class="btn btn-sm btn-outline-primary" href="@Url.Action("Print", "Tc", new { area = "ERP", id = t.PublicId })" target="_blank">
                             <i class="bx bx-printer me-1"></i>Print
                           </a>
                           <button type="button" class="btn btn-sm btn-outline-danger btn-tc-void"

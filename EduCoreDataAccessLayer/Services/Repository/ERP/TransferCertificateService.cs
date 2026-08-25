@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -91,6 +91,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 query.Items.Add(new TcListModel
                 {
                     TcId          = IntVal(row, "tc_id"),
+                    PublicId      = GuidVal(row, "public_id"),
                     TcNo          = Str(row, "tc_no"),
                     Format        = Str(row, "format"),
                     IssueDate     = DateVal(row, "issue_date"),
@@ -216,6 +217,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         // ── readers (same tolerant helpers as AdmissionService) ──
         private static bool Has(DataRow r, string col) => r.Table.Columns.Contains(col);
         private static int      IntVal(DataRow r, string col)  => Has(r, col) && r[col] != DBNull.Value ? Convert.ToInt32(r[col]) : 0;
+        // Guid.Empty when the column is absent — i.e. before public_id_students_staff.sql runs.
+        private static Guid     GuidVal(DataRow r, string col) => Has(r, col) && r[col] != DBNull.Value ? (Guid)r[col] : Guid.Empty;
         private static decimal  DecVal(DataRow r, string col)  => Has(r, col) && r[col] != DBNull.Value ? Convert.ToDecimal(r[col]) : 0m;
         private static bool     BoolVal(DataRow r, string col) => Has(r, col) && r[col] != DBNull.Value && Convert.ToBoolean(r[col]);
         private static string   Str(DataRow r, string col)     => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString()! : string.Empty;

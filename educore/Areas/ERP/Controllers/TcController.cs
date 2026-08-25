@@ -1,4 +1,4 @@
-using educore.Helpers;
+﻿using educore.Helpers;
 using educore.Models;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
@@ -15,11 +15,13 @@ namespace educore.Areas.ERP.Controllers
     {
         private readonly ITransferCertificateService _tc;
         private readonly ISchoolSettingsService _settings;
+        private readonly IPublicIdService _publicIds;
 
-        public TcController(ITransferCertificateService tc, ISchoolSettingsService settings)
+        public TcController(ITransferCertificateService tc, ISchoolSettingsService settings, IPublicIdService publicIds)
         {
             _tc = tc;
             _settings = settings;
+            _publicIds = publicIds;
         }
 
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -40,9 +42,12 @@ namespace educore.Areas.ERP.Controllers
         // The printable certificate. Opens full-page and prints itself. Serving it
         // marks it printed, so every reprint after the first is stamped DUPLICATE.
         [HttpGet]
-        public async Task<IActionResult> Print(int id)
+        public async Task<IActionResult> Print(Guid id)
         {
-            var cert = await _tc.GetForPrintAsync(id, TenantId(), SchoolId(), UserId());
+            var tcId = await _publicIds.ResolveAsync(IPublicIdService.Tc, id, TenantId(), SchoolId());
+            if (tcId == 0) return NotFound();
+
+            var cert = await _tc.GetForPrintAsync(tcId, TenantId(), SchoolId(), UserId());
             if (cert == null) return NotFound();
 
             var model = await BuildPrintModel(cert, isPreview: false);

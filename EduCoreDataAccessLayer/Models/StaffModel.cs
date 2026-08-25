@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace EduCoreDataAccessLayer.Models
@@ -11,6 +11,11 @@ namespace EduCoreDataAccessLayer.Models
     public class StaffModel
     {
         public int StaffId { get; set; }
+
+        // The id URLs carry. Stable and non-guessable, unlike StaffId which is
+        // sequential and leaks how many staff a school has. Internal code, foreign
+        // keys and procs all still use StaffId — see Database/public_id_students_staff.sql.
+        public Guid PublicId { get; set; }
 
         // ── Personal ───────────────────────────────────────────────
         public string? EmployeeCode { get; set; }
@@ -96,6 +101,7 @@ namespace EduCoreDataAccessLayer.Models
     public class StaffListItem : ListModelBase
     {
         public int StaffId { get; set; }
+        public Guid PublicId { get; set; }
         public string? EmployeeCode { get; set; }
         public string FullName { get; set; } = string.Empty;
         public string? Gender { get; set; }

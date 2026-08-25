@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Infrastructure;
+﻿using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -45,6 +45,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 items.Add(new StaffListItem
                 {
                     StaffId      = IntVal(row, "staff_id"),
+                    PublicId     = GuidVal(row, "public_id"),
                     EmployeeCode = NullStr(row, "employee_code"),
                     FullName     = Str(row, "full_name"),
                     Gender       = NullStr(row, "gender"),
@@ -95,6 +96,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 query.Items.Add(new StaffListItem
                 {
                     StaffId      = IntVal(row, "staff_id"),
+                    PublicId     = GuidVal(row, "public_id"),
                     EmployeeCode = NullStr(row, "employee_code"),
                     FullName     = Str(row, "full_name"),
                     Gender       = NullStr(row, "gender"),
@@ -124,6 +126,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var model = new StaffModel
             {
                 StaffId         = IntVal(row, "staff_id"),
+                PublicId        = GuidVal(row, "public_id"),
                 EmployeeCode    = NullStr(row, "employee_code"),
                 FullName        = Str(row, "full_name"),
                 Gender          = NullStr(row, "gender"),
@@ -405,6 +408,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         // ── DataRow read helpers (tolerate missing/NULL columns) ──
         private static bool Has(DataRow r, string c) => r.Table.Columns.Contains(c);
         private static int IntVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? Convert.ToInt32(r[c]) : 0;
+        // Guid.Empty when the column is missing — i.e. before public_id_students_staff.sql
+        // has been applied. Resolving Guid.Empty just fails as "not found".
+        private static Guid GuidVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? (Guid)r[c] : Guid.Empty;
         private static int? NullIntVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? Convert.ToInt32(r[c]) : (int?)null;
         private static decimal? NullDecVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? Convert.ToDecimal(r[c]) : (decimal?)null;
         private static string Str(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;

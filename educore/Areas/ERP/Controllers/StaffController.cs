@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Helpers;
+﻿using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models;
 using EduCoreDataAccessLayer.Services;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -14,11 +14,13 @@ namespace educore.Areas.ERP.Controllers
     {
         private readonly IStaffService _staffService;
         private readonly IPermissionService _perms;
+        private readonly IPublicIdService _publicIds;
 
-        public StaffController(IStaffService staffService, IPermissionService perms)
+        public StaffController(IStaffService staffService, IPermissionService perms, IPublicIdService publicIds)
         {
             _staffService = staffService;
             _perms = perms;
+            _publicIds = publicIds;
         }
 
         // ── GET: /ERP/Staff/StaffList ────────────────────────────
@@ -53,9 +55,12 @@ namespace educore.Areas.ERP.Controllers
         [HttpPost]
         [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Reactivate(int id)
+        public async Task<IActionResult> Reactivate(Guid id)
         {
-            var (ok, message) = await _staffService.ReactivateAsync(id, TenantId(), SchoolId(), UserId());
+            var staffId = await _publicIds.ResolveAsync(IPublicIdService.Staff, id, TenantId(), SchoolId());
+            if (staffId == 0) return RedirectToAction("Inactive");
+
+            var (ok, message) = await _staffService.ReactivateAsync(staffId, TenantId(), SchoolId(), UserId());
             TempData[ok > 0 ? "SuccessMessage" : "ErrorMessage"] = ok > 0 ? "Staff member re-activated successfully." : message;
             return RedirectToAction("Inactive");
         }
@@ -63,9 +68,12 @@ namespace educore.Areas.ERP.Controllers
         [HttpPost]
         [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Deactivate(int id)
+        public async Task<IActionResult> Deactivate(Guid id)
         {
-            var (ok, message) = await _staffService.DeactivateAsync(id, TenantId(), SchoolId(), UserId());
+            var staffId = await _publicIds.ResolveAsync(IPublicIdService.Staff, id, TenantId(), SchoolId());
+            if (staffId == 0) return RedirectToAction("StaffList");
+
+            var (ok, message) = await _staffService.DeactivateAsync(staffId, TenantId(), SchoolId(), UserId());
             TempData[ok > 0 ? "SuccessMessage" : "ErrorMessage"] =
                 ok > 0 ? "Staff member deactivated." : message;
             return RedirectToAction("StaffList");
@@ -102,13 +110,19 @@ namespace educore.Areas.ERP.Controllers
             }
 
             TempData["SuccessMessage"] = "Staff member added successfully.";
-            return RedirectToAction("StaffProfile", new { id });
+            return await RedirectToProfileAsync(id);
         }
 
-        // ── GET: /ERP/Staff/StaffProfile/{id} ────────────────────
-        public async Task<IActionResult> StaffProfile(int id = 0)
+        // ── GET: /ERP/Staff/StaffProfile/{publicId} ──────────────
+        // The URL carries the uuid; ResolveStaffIdAsync turns it into the internal id and
+        // enforces the tenant/school check while doing so. An unknown uuid and another
+        // school's uuid both come back as 0, so this cannot be used to probe for real ids.
+        public async Task<IActionResult> StaffProfile(Guid id)
         {
-            var model = await _staffService.GetStaffByIdAsync(id, TenantId(), SchoolId(), UserId());
+            var staffId = await _publicIds.ResolveAsync(IPublicIdService.Staff, id, TenantId(), SchoolId());
+            if (staffId == 0) return RedirectToAction("StaffList");
+
+            var model = await _staffService.GetStaffByIdAsync(staffId, TenantId(), SchoolId(), UserId());
             if (model == null) return RedirectToAction("StaffList");
 
             // Resolve the person's role IDs into readable names for the profile.
@@ -138,9 +152,12 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── GET: /ERP/Staff/EditStaff/{id} ───────────────────────
-        public async Task<IActionResult> EditStaff(int id = 0)
+        public async Task<IActionResult> EditStaff(Guid id)
         {
-            var model = await _staffService.GetStaffByIdAsync(id, TenantId(), SchoolId(), UserId());
+            var staffId = await _publicIds.ResolveAsync(IPublicIdService.Staff, id, TenantId(), SchoolId());
+            if (staffId == 0) return RedirectToAction("StaffList");
+
+            var model = await _staffService.GetStaffByIdAsync(staffId, TenantId(), SchoolId(), UserId());
             if (model == null) return RedirectToAction("StaffList");
             await FillDropdownsAsync(model);
             return View(model);
@@ -149,9 +166,12 @@ namespace educore.Areas.ERP.Controllers
         [HttpPost]
         [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditStaff(int id, StaffModel model)
+        public async Task<IActionResult> EditStaff(Guid id, StaffModel model)
         {
-            model.StaffId = id;
+            var staffId = await _publicIds.ResolveAsync(IPublicIdService.Staff, id, TenantId(), SchoolId());
+            if (staffId == 0) return RedirectToAction("StaffList");
+
+            model.StaffId = staffId;
             ValidateLogin(model);
             if (!ModelState.IsValid)
             {
@@ -174,11 +194,21 @@ namespace educore.Areas.ERP.Controllers
                 _perms.InvalidateUser(TenantId(), SchoolId(), uid);
 
             TempData["SuccessMessage"] = "Staff profile updated successfully.";
-            return RedirectToAction("StaffProfile", new { id });
+            return await RedirectToProfileAsync(savedId);
         }
 
         // Departments & Designations masters now live under Settings
         // (Admin/SchoolSettings/StaffMasters).
+
+        // Save gives us the internal id; the profile URL needs the uuid, so read the row
+        // back for it. One extra proc call on save only — StaffProfile would fetch anyway.
+        private async Task<IActionResult> RedirectToProfileAsync(int staffId)
+        {
+            var saved = await _staffService.GetStaffByIdAsync(staffId, TenantId(), SchoolId(), UserId());
+            if (saved == null) return RedirectToAction("StaffList");
+
+            return RedirectToAction("StaffProfile", new { id = saved.PublicId });
+        }
 
         // ── helpers ──────────────────────────────────────────────
         // Fill the model's dropdown sources (CRM-style Model.XList) so the view

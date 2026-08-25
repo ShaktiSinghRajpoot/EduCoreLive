@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Models;
+﻿using EduCoreDataAccessLayer.Models;
 
 namespace EduCoreDataAccessLayer.Models.ERP
 {
@@ -99,6 +99,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class TcListModel : ListModelBase
     {
         public int       TcId          { get; set; }
+        public Guid      PublicId      { get; set; }
         public string    TcNo          { get; set; } = string.Empty;
         public string    Format        { get; set; } = "Standard";
         public DateOnly? IssueDate     { get; set; }

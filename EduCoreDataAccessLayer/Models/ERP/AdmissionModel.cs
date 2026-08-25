@@ -1,4 +1,4 @@
-namespace EduCoreDataAccessLayer.Models.ERP
+﻿namespace EduCoreDataAccessLayer.Models.ERP
 {
     // ── A single fee head, frozen into the student's plan at admission ──
     public class StudentFeePlanItem
@@ -92,6 +92,10 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class StudentListModel : ListModelBase
     {
         public int       StudentId      { get; set; }
+
+        // The id URLs carry — stable and non-guessable, unlike the sequential StudentId
+        // which leaks how many students a school has. See public_id_students_staff.sql.
+        public Guid      PublicId       { get; set; }
         public string    AdmissionNo    { get; set; } = string.Empty;
         public string?   RollNo         { get; set; }
         public string    StudentName    { get; set; } = string.Empty;

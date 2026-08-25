@@ -21,6 +21,11 @@ appsettings.Development.json
 # Back these up separately: they are the only way to recover a purged school.
 educore/App_Data/school-archives/
 
+# Data Protection key ring. The XML files in here ARE the encryption keys that sign the
+# auth cookie and protect any IDataProtector value — committing them would let anyone
+# forge both. Each environment generates its own; production keeps them on a mounted volume.
+educore/App_Data/keys/
+
 # OS noise
 Thumbs.db
 .DS_Store

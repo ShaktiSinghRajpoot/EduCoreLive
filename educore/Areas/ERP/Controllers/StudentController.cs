@@ -17,13 +17,17 @@ namespace educore.Areas.ERP.Controllers
         private readonly ISchoolSettingsService _schoolSettingsService;
         private readonly IWebHostEnvironment _env;
 
+        private readonly IPublicIdService _publicIds;
+
         public StudentController(
             IBaseService baseService,
             IAdmissionService admissionService,
             IAdmissionWorkflowService admissionWorkflowService,
             ISchoolSettingsService schoolSettingsService,
+            IPublicIdService publicIds,
             IWebHostEnvironment env)
         {
+            _publicIds = publicIds;
             _baseService = baseService;
             _admissionService = admissionService;
             _admissionWorkflowService = admissionWorkflowService;
@@ -165,8 +169,9 @@ namespace educore.Areas.ERP.Controllers
         [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
         [RequestSizeLimit(3 * 1024 * 1024)]
-        public async Task<IActionResult> UploadPhoto(int id, IFormFile? photo)
+        public async Task<IActionResult> UploadPhoto(Guid publicId, IFormFile? photo)
         {
+            var id = await _publicIds.ResolveAsync(IPublicIdService.Student, publicId, TenantId(), SchoolId());
             if (id <= 0) return Json(new { success = false, message = "Unknown student." });
             if (photo == null || photo.Length == 0) return Json(new { success = false, message = "Choose an image." });
 
@@ -223,18 +228,26 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
-        public IActionResult Dashboard(int id = 0)
+        // The URL carries the student's uuid. Resolving it here is what enforces the
+        // tenant/school check — an unknown uuid and another school's uuid both give 0.
+        public async Task<IActionResult> Dashboard(Guid id)
         {
-            ViewBag.StudentId = id;
+            if (await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId()) == 0)
+                return RedirectToAction("StudentList");
+
+            ViewBag.StudentPublicId = id;   // the page's own ajax calls pass this straight back
             return View();
         }
 
         // A student's session-by-session timeline. core.students only holds their
         // present position, so this comes from core.student_enrolment.
-        public async Task<IActionResult> EnrolmentHistory(int id = 0)
+        public async Task<IActionResult> EnrolmentHistory(Guid id)
         {
+            var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
+            if (studentId == 0) return Json(Array.Empty<object>());
+
             var items = await _admissionService.GetEnrolmentHistoryAsync(
-                id, TenantId(), SchoolId(), UserId());
+                studentId, TenantId(), SchoolId(), UserId());
 
             return Json(items.Select(e => new
             {
@@ -247,17 +260,23 @@ namespace educore.Areas.ERP.Controllers
             }));
         }
 
-        public IActionResult EditStudent(int id = 0)
+        public async Task<IActionResult> EditStudent(Guid id)
         {
-            ViewBag.StudentId = id;
+            if (await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId()) == 0)
+                return RedirectToAction("StudentList");
+
+            ViewBag.StudentPublicId = id;
             return View();
         }
 
         [HttpPost]
         [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
-        public IActionResult EditStudent(int id, IFormCollection form)
+        public async Task<IActionResult> EditStudent(Guid id, IFormCollection form)
         {
+            if (await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId()) == 0)
+                return RedirectToAction("StudentList");
+
             // Replace with real service call once SP is ready
             TempData["SuccessMessage"] = "Student profile updated successfully.";
             return RedirectToAction("Dashboard", new { id });

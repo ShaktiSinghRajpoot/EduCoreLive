@@ -1,4 +1,4 @@
--- ============================================================================
+﻿-- ============================================================================
 -- Transfer Certificate (TC) — issue, register and reprint.
 --
 -- A TC is a LEGAL document. Once issued it must reprint identically forever, so
@@ -336,7 +336,7 @@ BEGIN
 
         OPEN p_result_cur FOR
         WITH filtered AS (
-            SELECT r.tc_id, r.tc_no, r.format, r.issue_date, r.student_id,
+            SELECT r.tc_id, r.public_id, r.tc_no, r.format, r.issue_date, r.student_id,
                    r.admission_no, r.student_name, r.class_name, r.section,
                    r.academic_year, r.date_of_leaving, r.is_void, r.print_count
             FROM core.tc_register r
@@ -346,7 +346,7 @@ BEGIN
                    OR LOWER(r.tc_no)        LIKE '%' || LOWER(TRIM(p_search)) || '%'
                    OR LOWER(COALESCE(r.admission_no, '')) LIKE '%' || LOWER(TRIM(p_search)) || '%')
         )
-        SELECT tc_id, tc_no, format, issue_date, student_id, admission_no,
+        SELECT tc_id, public_id, tc_no, format, issue_date, student_id, admission_no,
                student_name, class_name, section, academic_year, date_of_leaving,
                is_void, print_count,
                COUNT(*) OVER() AS total_count

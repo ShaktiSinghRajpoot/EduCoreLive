@@ -1,4 +1,5 @@
-﻿using educore.Services;
+﻿using educore.Models;
+using educore.Services;
 using educore.Services.Notifications;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Infrastructure;
@@ -11,6 +12,7 @@ using EduCoreDataAccessLayer.Services.Repository.ERP;
 using EduCoreDataAccessLayer.Services.Repository.SuperAdmin;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Npgsql;
@@ -138,6 +140,28 @@ builder.Services.AddSingleton<PgExec>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<AppCache>();
 
+// WHY: register Data Protection explicitly so IDataProtector can encrypt/decrypt values we
+// hand outside the app (query strings, cookies). Without this call ASP.NET still works, but it
+// generates the key ring in a per-machine/per-container temp path that is LOST on every deploy —
+// which silently invalidates the EduCore.Auth cookie and any value protected before the deploy.
+//   SetApplicationName    — must stay "EduCore" forever; changing it breaks existing tokens.
+//   PersistKeysToFileSystem — one folder every instance can read, so keys survive restarts and
+//                             would be shared if this app is ever scaled to more than one instance.
+// Path comes from config: App_Data/keys locally, DataProtection__KeyPath (a mounted volume) in
+// production. A relative value resolves against the content root so it works on Windows and Linux.
+var keyPath = builder.Configuration["DataProtection:KeyPath"] ?? "App_Data/keys";
+var keyDirectory = Path.IsPathRooted(keyPath)
+    ? keyPath
+    : Path.Combine(builder.Environment.ContentRootPath, keyPath);
+Directory.CreateDirectory(keyDirectory);
+
+builder.Services.AddDataProtection()
+    .SetApplicationName("EduCore")
+    .PersistKeysToFileSystem(new DirectoryInfo(keyDirectory));
+
+// Purpose string for CreateProtector — see Models/AppSettings.cs.
+builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("AppSettings"));
+
 // WHY: SMTP sender for transactional mail (e.g. new-school-admin welcome credentials).
 // Stateless over the bound EmailSettings, so singleton. Settings come from the "Email"
 // config section; secrets live in appsettings.Development.json / Email__* env vars.
@@ -178,6 +202,10 @@ builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<IFeePaymentService, FeePaymentService>();
 builder.Services.AddScoped<ITransportService, TransportService>();
 builder.Services.AddScoped<IStaffService, StaffService>();
+
+// Resolves the uuid a URL carries back into the internal id (see
+// Database/public_id_students_staff.sql). Used by Student, Staff, Tc and IdCard.
+builder.Services.AddScoped<IPublicIdService, PublicIdService>();
 builder.Services.AddScoped<IRbacService, RbacService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 

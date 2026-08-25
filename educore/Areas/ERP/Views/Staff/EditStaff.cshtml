@@ -1,4 +1,4 @@
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model EduCoreDataAccessLayer.Models.StaffModel
 @{
     ViewData["Title"] = "Edit Staff";
@@ -23,14 +23,14 @@
             <div class="es-breadcrumb">
               <a asp-area="ERP" asp-controller="Staff" asp-action="StaffList">All Staff</a>
               <i class="bx bx-chevron-right"></i>
-              <a asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@staffId">Profile</a>
+              <a asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">Profile</a>
               <i class="bx bx-chevron-right"></i><span>Edit</span>
             </div>
             <h4 class="ec-page-title mb-0">Edit Staff Member</h4>
           </div>
         </div>
         <a class="btn btn-outline-secondary d-flex align-items-center gap-1"
-           asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@staffId">
+           asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">
           <i class="bx bx-arrow-back"></i><span>Back</span>
         </a>
       </div>
@@ -255,7 +255,7 @@
       }
 
       <div class="es-sticky">
-        <a class="btn btn-outline-secondary px-4" asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@staffId">Cancel</a>
+        <a class="btn btn-outline-secondary px-4" asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">Cancel</a>
         <button type="submit" class="btn btn-primary px-4"><i class="bx bx-check me-1"></i>Save Changes</button>
       </div>
 

@@ -1,4 +1,4 @@
--- ============================================================================
+﻿-- ============================================================================
 -- core.sp_student_list
 -- Server-side listing for the "All Students" page (Student/StudentList).
 --
@@ -48,7 +48,7 @@ BEGIN
     OPEN p_result FOR
         WITH filtered AS (
             SELECT
-                s.student_id, s.admission_no, s.roll_no, s.student_name,
+                s.student_id, s.public_id, s.admission_no, s.roll_no, s.student_name,
                 s.gender,
                 -- When a session is asked for, report the class/section the
                 -- student held IN THAT SESSION, not their present one.
@@ -104,7 +104,7 @@ BEGIN
             WHERE (p_filter_fee IS NULL OR TRIM(p_filter_fee) = '' OR LOWER(f.fee_status) = LOWER(TRIM(p_filter_fee)))
         )
         SELECT
-            student_id, admission_no, roll_no, student_name, gender,
+            student_id, public_id, admission_no, roll_no, student_name, gender,
             class_name, section, academic_year, admission_date,
             guardian_name, mobile, annual_total, status, approval_status,
             enquiry_id, fee_status, fee_due, photo_url,

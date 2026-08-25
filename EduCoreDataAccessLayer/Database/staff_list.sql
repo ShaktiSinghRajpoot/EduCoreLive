@@ -1,4 +1,4 @@
--- ============================================================================
+﻿-- ============================================================================
 -- core.sp_staff_list
 -- Server-side listing for the "All Staff" page (Staff/StaffList).
 --
@@ -41,7 +41,7 @@ BEGIN
 
     OPEN p_result FOR
         WITH filtered AS (
-            SELECT s.staff_id, s.employee_code, s.full_name, s.gender,
+            SELECT s.staff_id, s.public_id, s.employee_code, s.full_name, s.gender,
                    s.mobile, s.email, s.staff_type, s.department, s.designation,
                    s.joining_date, s.status, s.user_id
             FROM   core.staff s
@@ -57,7 +57,7 @@ BEGIN
                     OR s.designation   ILIKE '%' || TRIM(p_search) || '%'
                     OR COALESCE(s.mobile,'') ILIKE '%' || TRIM(p_search) || '%')
         )
-        SELECT staff_id, employee_code, full_name, gender, mobile, email,
+        SELECT staff_id, public_id, employee_code, full_name, gender, mobile, email,
                staff_type, department, designation, joining_date, status, user_id,
                COUNT(*) OVER() AS total_count
         FROM filtered
