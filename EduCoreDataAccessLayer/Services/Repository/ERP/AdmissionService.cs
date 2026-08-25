@@ -530,8 +530,15 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 return new StudentPromotionResult { Message = "No students were selected." };
 
             // camelCase keys — the proc reads them with quoted identifiers.
+            // toClass rides inside the SAME jsonb payload rather than a new parameter, so
+            // the proc signature is unchanged and an older deployed build keeps working.
             string studentsJson = JsonSerializer.Serialize(
-                request.Students.Select(s => new { studentId = s.StudentId, outcome = s.Outcome }));
+                request.Students.Select(s => new
+                {
+                    studentId = s.StudentId,
+                    outcome   = s.Outcome,
+                    toClass   = string.IsNullOrWhiteSpace(s.ToClass) ? null : s.ToClass.Trim()
+                }));
 
             var parameters = new NpgsqlParameter[]
             {

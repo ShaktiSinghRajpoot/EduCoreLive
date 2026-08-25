@@ -1839,3 +1839,46 @@ only 2nd):
 The target class is computed in the proc and not accepted from the page, so this
 needs a signature change plus per-student validation. Today's workaround is to
 promote normally and then edit that student.
+
+---
+
+### [2026-08-25] Promotion: moving a student more than one class up
+
+Until now the target class was always the next rung, computed inside the proc and
+not accepted from the page. A student who needed to jump (1st → 3rd) had to be
+promoted normally and then edited by hand.
+
+**The signature did not have to change**, which is the whole reason this was safe
+to do. `p_students` is already `jsonb`, so the per-student class rides inside the
+existing payload as a new key:
+
+    [{"studentId": 53, "outcome": "promote", "toClass": "7"}]
+
+`jsonb_to_recordset` simply yields NULL for `toClass` when an older build omits
+it, so the deployed app kept working while this went out — no shim, no 42883.
+A new parameter would have needed one.
+
+**Guard rails, because a bulk screen is the wrong place to be loose.** A chosen
+class must exist in the TARGET session, and must be strictly **above** the
+student's current one. Moving a student *down* is a correction, not a promotion,
+and belongs on that student's own page where it is one deliberate act rather than
+something buried in a run of forty.
+
+On the page, the Next Class cell becomes a picker offering every class above the
+student, defaulting to "Next (X)". It only appears when there is actually a
+choice to make (two or more classes above them) and only for a *promote* outcome
+— switching a student to Retain or Pass Out drops their chosen class. No
+re-render on change, so picking a class on a long roster does not throw away the
+user's scroll position.
+
+Verified against real data on the local copy, inside a transaction that was rolled
+back (school 34 has one session, so a second one was created for the test):
+
+| sent | result |
+|---|---|
+| `toClass: "7"` from class 5 | promoted straight to **7** |
+| `toClass: "2"` from class 5 | refused — *"2 is not above 5"* |
+| `toClass: "12th"` | refused — *"chosen class 12th is not set up in FY 27-28"* |
+| no `toClass` at all | auto next rung → **6** (old payload still works) |
+
+Applied to local and Railway.

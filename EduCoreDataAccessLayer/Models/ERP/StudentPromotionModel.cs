@@ -33,6 +33,12 @@
         public int    StudentId { get; set; }
         /// <summary>promote | retain | passout</summary>
         public string Outcome   { get; set; } = string.Empty;
+
+        /// <summary>Optional: send this student to a specific class instead of the next
+        /// rung (a double promotion, 1st → 3rd). Null means "next class up". Only read
+        /// for Outcome = promote; the proc still requires the class to exist in the
+        /// target session and to be ABOVE the student's current one.</summary>
+        public string? ToClass  { get; set; }
     }
 
     public class StudentPromotionResult

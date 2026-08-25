@@ -145,6 +145,7 @@ DECLARE
     v_tgt_year_id integer;
     v_tgt_classes integer := 0;
     v_cur_order   integer;
+    v_pick_order  integer;   -- display_order of an explicitly chosen target class
     v_outcome     varchar;
     v_next        varchar;
     v_to_class    varchar;
@@ -215,8 +216,10 @@ BEGIN
     FOR r IN
         -- Column names are quoted so they match the camelCase JSON keys exactly —
         -- unquoted identifiers fold to lowercase and would never match "studentId".
-        SELECT x."studentId" AS student_id, LOWER(TRIM(COALESCE(x.outcome, ''))) AS outcome
-        FROM jsonb_to_recordset(p_students) AS x("studentId" integer, outcome text)
+        SELECT x."studentId"                             AS student_id,
+               LOWER(TRIM(COALESCE(x.outcome, '')))       AS outcome,
+               NULLIF(TRIM(COALESCE(x."toClass", '')), '') AS to_class
+        FROM jsonb_to_recordset(p_students) AS x("studentId" integer, outcome text, "toClass" text)
     LOOP
         DECLARE
             s core.students%ROWTYPE;
@@ -302,18 +305,51 @@ BEGIN
                     CONTINUE;
                 END IF;
 
-                -- Read the next class from the TARGET session, so a student can
-                -- only ever be moved into a class that exists there.
-                SELECT class_name INTO v_next
-                FROM   academic.academic_classes
-                WHERE  tenant_id = p_tenant_id
-                  AND  school_id = p_school_id
-                  AND  academic_year_id = v_tgt_year_id
-                  AND  COALESCE(is_deleted, FALSE) = FALSE
-                  AND  COALESCE(is_active,  TRUE)  = TRUE
-                  AND  display_order > v_cur_order
-                ORDER BY display_order, academic_class_id
-                LIMIT 1;
+                IF r.to_class IS NOT NULL THEN
+                    -- The office asked for a specific class (a double promotion,
+                    -- 1st -> 3rd). Still has to be a real class in the TARGET
+                    -- session, and still has to be ABOVE where they are now: this
+                    -- operation only ever moves students up. Moving someone down
+                    -- is a correction, and belongs on the student's own page where
+                    -- it is one deliberate act rather than a bulk one.
+                    SELECT display_order INTO v_pick_order
+                    FROM   academic.academic_classes
+                    WHERE  tenant_id = p_tenant_id
+                      AND  school_id = p_school_id
+                      AND  academic_year_id = v_tgt_year_id
+                      AND  class_name = r.to_class
+                      AND  COALESCE(is_deleted, FALSE) = FALSE
+                      AND  COALESCE(is_active,  TRUE)  = TRUE
+                    ORDER BY display_order, academic_class_id
+                    LIMIT 1;
+
+                    IF v_pick_order IS NULL THEN
+                        v_skipped := v_skipped ||
+                            (s.student_name || ' (chosen class ' || r.to_class || ' is not set up in ' || v_tgt || ')');
+                        CONTINUE;
+                    END IF;
+
+                    IF v_pick_order <= v_cur_order THEN
+                        v_skipped := v_skipped ||
+                            (s.student_name || ' (' || r.to_class || ' is not above ' || s.class_name || ')');
+                        CONTINUE;
+                    END IF;
+
+                    v_next := r.to_class;
+                ELSE
+                    -- Default: the next rung up. Read from the TARGET session, so a
+                    -- student can only ever be moved into a class that exists there.
+                    SELECT class_name INTO v_next
+                    FROM   academic.academic_classes
+                    WHERE  tenant_id = p_tenant_id
+                      AND  school_id = p_school_id
+                      AND  academic_year_id = v_tgt_year_id
+                      AND  COALESCE(is_deleted, FALSE) = FALSE
+                      AND  COALESCE(is_active,  TRUE)  = TRUE
+                      AND  display_order > v_cur_order
+                    ORDER BY display_order, academic_class_id
+                    LIMIT 1;
+                END IF;
 
                 IF v_next IS NULL THEN
                     v_skipped := v_skipped || (s.student_name || ' (already in the final class — mark Pass Out)');

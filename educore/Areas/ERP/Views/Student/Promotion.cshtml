@@ -437,7 +437,7 @@ document.getElementById('loadBtn').addEventListener('click', function(){
     roster=(list||[]).map(function(s,i){
       return {id:s.id, name:s.name, roll:s.roll||'', cls:s.cls, sec:s.sec||'', due:s.due||0, color:PALETTE[i%PALETTE.length]};
     });
-    outcome={};
+    outcome={}; targetClass={};
     roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
 
     document.getElementById('sumSection').style.display='';
@@ -457,6 +457,36 @@ document.getElementById('loadBtn').addEventListener('click', function(){
   .fail(function(){ ecToast('error','Could not load students for this class.'); })
   .always(function(){ btn.disabled=false; });
 });
+
+/* ── Per-student target class ─────────────────
+   Normally the target is the next rung up. The office sometimes needs to move one
+   student further (1st -> 3rd), so the Next Class cell becomes a picker offering
+   every class in the TARGET session ABOVE their current one. Empty = auto.
+   Only ever moves a student UP: going down is a correction, not a promotion, and
+   belongs on that student's own page rather than in a bulk run. */
+var targetClass={};
+
+function classChoices(s){
+  var o=orderOf(SRC_LADDER, s.cls);
+  if(o===null) o=orderOf(LADDER, s.cls);
+  if(o===null) return [];
+  return LADDER.filter(function(x){ return x.order>o; });
+}
+
+function classPicker(s, nc){
+  var opts=classChoices(s);
+  // Nothing above them, or nothing to choose between — keep it as plain text.
+  if(opts.length<2) return '<span class="fw-bold">'+EC.esc(targetLabel(s, nc))+'</span>';
+
+  var picked=targetClass[s.id]||'';
+  var html='<select class="pr-sel pr-nc" data-id="'+s.id+'" style="min-width:120px;">'
+         + '<option value=""'+(picked?'':' selected')+'>Next ('+EC.esc(nc)+')</option>';
+  opts.forEach(function(x){
+    if(x.name===nc) return;               // already offered as the default above
+    html+='<option value="'+EC.esc(x.name)+'"'+(picked===x.name?' selected':'')+'>'+EC.esc(x.name)+'</option>';
+  });
+  return html+'</select>';
+}
 
 /* ── Outcome segmented control markup ────────── */
 function seg(id, val){
@@ -484,7 +514,7 @@ function render(){
     var nc=nextClass(s.cls), oc=outcome[s.id];
     var ncTxt = oc==='passout' ? '<span class="text-info fw-bold">Graduate</span>'
               : oc==='retain'  ? '<span class="text-muted">Stays in '+EC.esc(s.cls)+'</span>'
-              : nc ? '<span class="fw-bold">'+EC.esc(targetLabel(s, nc))+'</span>'
+              : nc ? classPicker(s, nc)
               : nc===null ? '<span class="text-muted">—</span>'
               : '<span class="text-danger fw-bold" title="Not set up in either session">Not set up</span>';
     return '<tr class="'+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
@@ -505,7 +535,7 @@ function render(){
     var nc=nextClass(s.cls), oc=outcome[s.id];
     var ncTxt = oc==='passout' ? 'Graduate'
               : oc==='retain'  ? 'Stays in '+EC.esc(s.cls)
-              : nc ? EC.esc(targetLabel(s, nc))
+              : nc ? classPicker(s, nc)
               : nc===null ? '—' : 'Not set up';
     return '<div class="pr-mob-card '+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<div class="pr-mob-top">'
@@ -532,11 +562,21 @@ function bindSegs(){
     r.addEventListener('change', function(){
       var id=parseInt(this.closest('.pr-seg').dataset.id,10);
       outcome[id]=this.value;
+      // A chosen class only means anything for a promotion.
+      if(this.value!=='promote') delete targetClass[id];
       render();
     });
   });
   document.querySelectorAll('.pr-pick').forEach(function(c){
     c.addEventListener('change', updateCounts);
+  });
+  // No re-render here: the select already shows what was picked, and redrawing
+  // would drop the user's focus mid-scroll on a long roster.
+  document.querySelectorAll('.pr-nc').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      var id=parseInt(this.dataset.id,10);
+      if(this.value) targetClass[id]=this.value; else delete targetClass[id];
+    });
   });
 }
 
@@ -598,7 +638,7 @@ document.getElementById('carryDues').addEventListener('change', function(){
 
 /* ── Reset ───────────────────────────────────── */
 document.getElementById('resetBtn').addEventListener('click', function(){
-  roster=[]; outcome={};
+  roster=[]; outcome={}; targetClass={};
   document.getElementById('sumSection').style.display='none';
   document.getElementById('rosterCard').style.display='none';
   document.getElementById('srcClass').value='';
@@ -682,7 +722,7 @@ document.getElementById('srcYear').addEventListener('change', function(){
   if(document.getElementById('srcYear').value===document.getElementById('tgtYear').value) initTargetYear();
 
   // Classes belong to a session, so the list and any loaded roster are now stale.
-  roster=[]; outcome={};
+  roster=[]; outcome={}; targetClass={};
   document.getElementById('sumSection').style.display='none';
   document.getElementById('rosterCard').style.display='none';
   loadSourceClasses();
@@ -803,7 +843,9 @@ document.getElementById('commitBtn').addEventListener('click', function(){
       targetYear:    tgtY,
       targetSection: document.getElementById('tgtSection').value,
       carryDues:     document.getElementById('carryDues').checked,
-      students:      sel.map(function(s){ return { studentId:s.id, outcome:outcome[s.id] }; })
+      students:      sel.map(function(s){
+        return { studentId:s.id, outcome:outcome[s.id], toClass:targetClass[s.id]||null };
+      })
     })
   })
   .done(function(res){
@@ -821,7 +863,7 @@ document.getElementById('commitBtn').addEventListener('click', function(){
     showResult(res);
 
     // The students have moved to the new session, so this roster is stale.
-    roster=[]; outcome={};
+    roster=[]; outcome={}; targetClass={};
     document.getElementById('sumSection').style.display='none';
     document.getElementById('rosterCard').style.display='none';
   })
