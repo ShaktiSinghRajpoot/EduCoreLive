@@ -50,9 +50,14 @@
             <div class="text-muted" style="font-size:.8rem">@Model.TotalCount staff member@(Model.TotalCount == 1 ? "" : "s")</div>
           </div>
         </div>
-        <a class="btn btn-primary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Staff" asp-action="AddStaff">
-          <i class="bx bx-user-plus"></i><span>Add Staff</span>
-        </a>
+        <div class="d-flex align-items-center gap-2">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Staff" asp-action="Inactive">
+            <i class="bx bx-user-x"></i><span>Inactive Staff</span>
+          </a>
+          <a class="btn btn-primary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Staff" asp-action="AddStaff">
+            <i class="bx bx-user-plus"></i><span>Add Staff</span>
+          </a>
+        </div>
       </div>
     </div>
 

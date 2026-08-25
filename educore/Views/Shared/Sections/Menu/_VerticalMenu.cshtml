@@ -1,4 +1,4 @@
-@using EduCoreDataAccessLayer.Helpers
+﻿@using EduCoreDataAccessLayer.Helpers
 @using EduCoreDataAccessLayer.Services.Contract.ERP
 @using System.Security.Claims
 @inject IAdmissionWorkflowService AdmissionWorkflowService
@@ -157,7 +157,7 @@
         @* ---- Students ---- *@
         @if (gStudents)
         {
-        <li class='menu-item @Open("StudentList","EditStudent","Promotion","Inactive","Tc/Register","IdCard")'>
+        <li class='menu-item @Open("StudentList","EditStudent","Promotion","Student/Inactive","Tc/Register","IdCard")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-plus ic-students"></i>
                 <div class="text-truncate">Students</div>
@@ -165,7 +165,7 @@
             <ul class="menu-sub">
                 <li class='menu-item @On("StudentList")'><a asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Student Directory</div></a></li>
                 <li class='menu-item @On("Promotion")'><a asp-area="ERP" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
-                <li class='menu-item @On("Inactive")'><a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
+                <li class='menu-item @On("Student/Inactive")'><a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
                 <li class='menu-item @On("Tc/Register")'><a asp-area="ERP" asp-controller="Tc" asp-action="Register" class="menu-link"><i class="bx bx-award submenu-icon c-teal"></i><div class="text-truncate">TC Register</div></a></li>
                 <li class='menu-item @On("IdCard")'><a asp-area="ERP" asp-controller="IdCard" asp-action="Index" class="menu-link"><i class="bx bx-id-card submenu-icon c-purple"></i><div class="text-truncate">ID Cards</div></a></li>
             </ul>
@@ -246,13 +246,14 @@
 
         @if (gStaff)
         {
-        <li class='menu-item @Open("StaffList","AddStaff","EditStaff","StaffProfile","LeaveManagement","PayrollManagement")'>
+        <li class='menu-item @Open("StaffList","AddStaff","EditStaff","StaffProfile","Staff/Inactive","LeaveManagement","PayrollManagement")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-group ic-hr"></i>
                 <div class="text-truncate">Staff</div>
             </a>
             <ul class="menu-sub">
                 <li class='menu-item @On("StaffList")'><a asp-area="ERP" asp-controller="Staff" asp-action="StaffList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Staff Directory</div></a></li>
+                <li class='menu-item @On("Staff/Inactive")'><a asp-area="ERP" asp-controller="Staff" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive Staff</div></a></li>
                 @if (showPayroll)
                 {
                 <li class='menu-item @On("LeaveManagement")'><a asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement" class="menu-link"><i class="bx bx-calendar-minus submenu-icon c-pink"></i><div class="text-truncate">Leave Management</div></a></li>
