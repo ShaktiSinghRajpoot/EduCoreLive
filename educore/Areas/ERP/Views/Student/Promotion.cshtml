@@ -284,11 +284,41 @@
 (function(){
 'use strict';
 
-/* ── Class ladder from the school's real classes (display order) ── */
+/* ── Class ladders. LADDER is the TARGET session's, because that is the one the
+      proc reads the next class from. SRC_LADDER is the source session's and fills
+      the Class dropdown, so it only ever offers classes that session really has. ── */
 var LADDER=@Html.Raw(_classOrderJson);
-function nextClass(c){ var i=LADDER.indexOf(c); return (i<0||i===LADDER.length-1)?null:LADDER[i+1]; }
+var SRC_LADDER=LADDER.slice();
+
+/* Three different answers, and they must stay separate:
+     a class name  -> the next class up
+     null          -> this IS the final class (Pass Out is correct)
+     undefined     -> the class does not exist in the target session at all
+   Returning null for the last two together is what used to mark a whole class
+   as "Pass out / Graduate" when the target session simply had not been set up. */
+function nextClass(c){
+  var i=LADDER.indexOf(c);
+  if(i<0) return undefined;
+  return i===LADDER.length-1 ? null : LADDER[i+1];
+}
+/* Two different situations, and only one of them is an error:
+
+     in NEITHER ladder  -> the proc cannot find a display_order for it at all and
+                           skips every student ("class X is not in the session
+                           setup"). Worth blocking on.
+
+     in the source but not the target -> perfectly normal. The proc takes the
+                           order from the SOURCE session and moves the student to
+                           the first higher class that exists in the target, so
+                           1st -> 2nd works even when the target has only 2nd. We
+                           cannot compute that here (display_order is not exposed
+                           to the page), so say the target decides — do not guess,
+                           and do not block. */
+function classUnknown(c){    return !!c && LADDER.indexOf(c)<0 && SRC_LADDER.indexOf(c)<0; }
+function classOnlyInSource(c){ return !!c && LADDER.indexOf(c)<0 && SRC_LADDER.indexOf(c)>=0; }
 
 var SEC_URL='@Url.Action("PromotionSections","Student",new{area="ERP"})';
+var CLASSES_URL='@Url.Action("PromotionClasses","Student",new{area="ERP"})';
 var ROSTER_URL='@Url.Action("PromotionRoster","Student",new{area="ERP"})';
 var PROMOTE_URL='@Url.Action("Promote","Student",new{area="ERP"})';
 var CHECK_URL='@Url.Action("PromotionSessionCheck","Student",new{area="ERP"})';
@@ -311,6 +341,22 @@ function fillSelect(sel, list, firstLabel, firstVal){
   var o0=document.createElement('option'); o0.value=firstVal; o0.textContent=firstLabel; sel.appendChild(o0);
   (list||[]).forEach(function(x){ var o=document.createElement('option'); o.value=x; o.textContent=x; sel.appendChild(o); });
 }
+/* ── Class list for the SOURCE session ────────
+   Refilled whenever the source session changes, so the dropdown can only offer
+   classes that session actually has. Keeps the current pick if it survives. */
+function loadSourceClasses(){
+  var yr=document.getElementById('srcYear').value,
+      sel=document.getElementById('srcClass'),
+      keep=sel.value;
+
+  return $.getJSON(CLASSES_URL, { year:yr }).done(function(list){
+    SRC_LADDER=list||[];
+    fillSelect(sel, SRC_LADDER, 'Select class', '');
+    if(keep && SRC_LADDER.indexOf(keep)>=0) sel.value=keep;
+    sel.dispatchEvent(new Event('change'));
+  });
+}
+
 document.getElementById('srcClass').addEventListener('change', function(){
   var cls=this.value, nc=nextClass(cls);
   if(!cls){
@@ -318,6 +364,16 @@ document.getElementById('srcClass').addEventListener('change', function(){
     fillSelect(document.getElementById('tgtSection'), [], 'Keep same section', 'keep');
     return;
   }
+  // The proc reads the next class from the TARGET session. If this class does not
+  // exist there, every student in it gets skipped — say so now, not after the run.
+  if(classUnknown(cls)){
+    showErr('Class ' + cls + ' is not set up in ' + document.getElementById('srcYear').value +
+            ' or ' + document.getElementById('tgtYear').value +
+            '. Every student in it would be skipped. Check Settings → Classes & Sections.');
+  } else {
+    clearErr();
+  }
+
   $.getJSON(SEC_URL, { 'class':cls }).done(function(list){
     fillSelect(document.getElementById('srcSection'), list, 'All sections', '');
   });
@@ -329,6 +385,7 @@ document.getElementById('srcClass').addEventListener('change', function(){
 /* ── Default outcome: graduate the final class, otherwise promote.
       (Retain-by-result needs the exam module, which isn't wired yet.) ── */
 function defaultOutcome(s){
+  // undefined (class not in the target session) must NOT become Pass Out.
   return nextClass(s.cls)===null ? 'passout' : 'promote';
 }
 
@@ -355,7 +412,11 @@ document.getElementById('loadBtn').addEventListener('click', function(){
     var nc=nextClass(cls);
     document.getElementById('rosterSub').textContent=
       roster.length+' student'+(roster.length!==1?'s':'')+' in '+cls+(sec?' – '+sec:'')+
-      (nc?(' → promoting to '+nc):' (final class)');
+      (nc ? (' → promoting to '+nc)
+          : nc===null ? ' (final class)'
+          : classOnlyInSource(cls)
+              ? ' → next class decided by '+document.getElementById('tgtYear').value
+              : ' — this class is not set up in either session');
 
     render();
     if(roster.length) document.getElementById('rosterCard').scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -391,7 +452,11 @@ function render(){
     var nc=nextClass(s.cls), oc=outcome[s.id];
     var ncTxt = oc==='passout' ? '<span class="text-info fw-bold">Graduate</span>'
               : oc==='retain'  ? '<span class="text-muted">Stays in '+EC.esc(s.cls)+'</span>'
-              : (nc? '<span class="fw-bold">'+EC.esc(nc)+'</span>' : '<span class="text-muted">—</span>');
+              : nc ? '<span class="fw-bold">'+EC.esc(nc)+'</span>'
+              : nc===null ? '<span class="text-muted">—</span>'
+              : classOnlyInSource(s.cls)
+                  ? '<span class="text-muted" title="The target session decides which class this becomes">Set by session</span>'
+                  : '<span class="text-danger fw-bold" title="Not set up in either session">Not set up</span>';
     return '<tr class="'+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input pr-pick" data-id="'+s.id+'" checked></td>'
       +'<td><div class="d-flex align-items-center gap-2">'
@@ -408,7 +473,11 @@ function render(){
 
   mob.innerHTML=roster.map(function(s){
     var nc=nextClass(s.cls), oc=outcome[s.id];
-    var ncTxt = oc==='passout'?'Graduate':oc==='retain'?'Stays in '+EC.esc(s.cls):(nc?EC.esc(nc):'—');
+    var ncTxt = oc==='passout' ? 'Graduate'
+              : oc==='retain'  ? 'Stays in '+EC.esc(s.cls)
+              : nc ? EC.esc(nc)
+              : nc===null ? '—'
+              : classOnlyInSource(s.cls) ? 'Set by session' : 'Not set up';
     return '<div class="pr-mob-card '+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<div class="pr-mob-top">'
       +  '<input type="checkbox" class="form-check-input pr-pick mt-0" data-id="'+s.id+'" checked>'
@@ -520,6 +589,16 @@ function checkTargetSession(){
       banner.style.display='none';
       reviewBtn.removeAttribute('disabled');
       if(res.ladder && res.ladder.length){ LADDER=res.ladder; }
+      // The reachable classes just changed — re-evaluate the picked one and the
+      // per-student "next class" preview against the new ladder.
+      var cls=document.getElementById('srcClass').value;
+      if(classUnknown(cls)){
+        showErr('Class ' + cls + ' is not set up in ' + document.getElementById('srcYear').value
+              + ' or ' + tgtY + '. Every student in it would be skipped.');
+      } else {
+        clearErr();
+      }
+      if(roster.length) render();
       return;
     }
 
@@ -564,7 +643,14 @@ function initTargetYear(){
 initTargetYear();
 document.getElementById('srcYear').addEventListener('change', function(){
   if(document.getElementById('srcYear').value===document.getElementById('tgtYear').value) initTargetYear();
+
+  // Classes belong to a session, so the list and any loaded roster are now stale.
+  roster=[]; outcome={};
+  document.getElementById('sumSection').style.display='none';
+  document.getElementById('rosterCard').style.display='none';
+  loadSourceClasses();
 });
+loadSourceClasses();
 
 /* ── Can this run at all? ─────────────────────
    Every reason the promotion cannot proceed, in one place, checked BEFORE the
@@ -578,6 +664,12 @@ function validate(){
   if(!tgtY)               return 'Choose the academic session to promote into.';
   if(srcY===tgtY)         return 'The new session must be different from the current one. Right now both say ' + srcY + '.';
   if(!targetReady)        return 'Session ' + tgtY + ' has no classes or sections yet, so nobody can be moved into it.';
+
+  var cls=document.getElementById('srcClass').value;
+  if(classUnknown(cls))
+    return 'Class ' + cls + ' is not set up in ' + srcY + ' or ' + tgtY
+         + ', so every student in it would be skipped. Check Settings → Classes & Sections.';
+
   return '';
 }
 

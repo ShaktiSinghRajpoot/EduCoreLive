@@ -1738,3 +1738,51 @@ is entirely about surfacing it at the right moment.
 on a `.cshtml` whose `<script>` is broken, so the block was extracted, its Razor
 expressions stubbed, and run through `node --check`; and every id the script
 looks up (40 of them) was matched against the markup.
+
+---
+
+### [2026-08-25] Promotion: the Class list ignored the session, and one class could graduate itself
+
+Two related problems on the same page, found by asking a simple question — is the
+Class dropdown tied to the Academic Year? It was not.
+
+**1. The Class list was session-less.** It came from the shared
+`config.sp_dropdown_common` 'Class' activity, which deliberately collapses every
+session's classes to one row per name so filters on past sessions keep working.
+Right for the directory, wrong here. School 33 shows why:
+
+| session | classes |
+|---|---|
+| 2027-2028 | 1st, 2nd, 3rd, 4th, 5th, 6th |
+| 2028-2029 | **2nd only** |
+
+With the source set to 2028-2029 the dropdown still offered all six; picking any
+of the other five returned an empty roster with no explanation. New
+`Student/PromotionClasses(year)` returns the class **ladder** for the chosen
+session — that list already exists and is in teaching order — and the dropdown is
+refilled whenever the source session changes. The shared dropdown proc was left
+alone on purpose: other pages depend on its session-less behaviour.
+
+**2. `nextClass()` conflated "final class" with "class not in the target
+session".** Both returned `null`, and `defaultOutcome()` reads `null` as *Pass
+Out*. So loading a class the target session did not contain pre-selected **Pass
+Out for every student on screen** — and Confirm would have graduated a whole
+class instead of promoting it. The bulk "promote all" button had the same
+conflation. `nextClass` now returns the class name, `null` for a genuine final
+class, and `undefined` for not-in-target; only `null` means Pass Out.
+
+**The correction worth recording:** the first version of this fix blocked any
+class missing from the target session. That was wrong, and re-reading the proc is
+what caught it — it takes the student's `display_order` from the **source**
+session and moves them to the first higher class that exists in the **target**,
+so 1st → 2nd is valid even when the target holds only 2nd. Blocking it would have
+stopped a legitimate promotion. Now only a class in **neither** ladder is an error
+(the proc genuinely cannot place those); a class present in the source but not the
+target is normal and the preview says "Set by session" rather than inventing a
+target class the page cannot actually compute — `display_order` is not exposed to
+the client, so guessing it would sometimes be wrong.
+
+Verified against the real ladders: `core.sp_class_ladder` returns
+`1st 2nd 3rd 4th 5th 6th` for 2027-2028 and `2nd` for 2028-2029 on the same
+school. View checks as before — extracted script through `node --check`, all ids
+matched, every `Url.Action` target confirmed to exist on the controller.

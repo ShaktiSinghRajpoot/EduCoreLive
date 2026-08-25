@@ -110,6 +110,23 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
+        // Classes that exist IN ONE SESSION, in teaching order.
+        //
+        // The shared config.sp_dropdown_common 'Class' list is deliberately session-less:
+        // it collapses every session's classes to one row per name so filters on past
+        // sessions keep working. That is right for the directory, wrong here — this page
+        // has to show the classes the CHOSEN session actually has, or the office picks a
+        // class that session never had and the roster comes back empty with no reason.
+        //
+        // The class ladder is exactly that list, so reuse it rather than adding a proc.
+        public async Task<IActionResult> PromotionClasses(string? year)
+        {
+            var ladder = await _admissionService.GetClassLadderAsync(
+                TenantId(), SchoolId(), UserId(), year);
+
+            return Json(ladder);
+        }
+
         // Sections that have active students in a class — fills the Section dropdown.
         public async Task<IActionResult> PromotionSections(string @class)
         {
