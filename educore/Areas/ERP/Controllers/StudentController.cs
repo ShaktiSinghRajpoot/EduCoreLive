@@ -20,6 +20,7 @@ namespace educore.Areas.ERP.Controllers
         private readonly IPublicIdService _publicIds;
         private readonly IFeePaymentService _feeService;
         private readonly IAttendanceService _attendanceService;
+        private readonly ITimetableService _timetableService;
 
         public StudentController(
             IBaseService baseService,
@@ -29,11 +30,13 @@ namespace educore.Areas.ERP.Controllers
             IPublicIdService publicIds,
             IFeePaymentService feeService,
             IAttendanceService attendanceService,
+            ITimetableService timetableService,
             IWebHostEnvironment env)
         {
             _publicIds = publicIds;
             _feeService = feeService;
             _attendanceService = attendanceService;
+            _timetableService = timetableService;
             _baseService = baseService;
             _admissionService = admissionService;
             _admissionWorkflowService = admissionWorkflowService;
@@ -265,8 +268,8 @@ namespace educore.Areas.ERP.Controllers
         // Everything the dashboard shows, in one call — the page used to build this
         // from a hardcoded array of ten students.
         //
-        // Timetable and exam results are NOT here: there is still no per-student getter
-        // for those, and the page says so rather than inventing numbers.
+        // Exam results are NOT here: there is still no per-student marks getter, and
+        // the page says so rather than inventing numbers.
         public async Task<IActionResult> DashboardData(Guid id, int? month = null, int? year = null)
         {
             var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
@@ -282,6 +285,18 @@ namespace educore.Areas.ERP.Controllers
             // that comes back and asks again, so we do not guess which one it wants.
             var att = await _attendanceService.GetStudentAttendanceAsync(
                 studentId, TenantId(), SchoolId(), UserId(), student.AcademicYear, month, year);
+
+            // The student's timetable IS their section's. Resolve class+section to a
+            // section id through the setup, which already lists them for this session —
+            // a student whose section has no timetable simply gets an empty week.
+            var setup = await _timetableService.GetSetupAsync(TenantId(), SchoolId(), UserId());
+            var mySection = setup.Sections.FirstOrDefault(x =>
+                string.Equals(x.ClassName, student.ClassName, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(x.SectionName ?? "", student.Section ?? "", StringComparison.OrdinalIgnoreCase));
+
+            var grid = mySection == null
+                ? new TimetableGrid()
+                : await _timetableService.GetGridAsync(mySection.SectionId, TenantId(), SchoolId(), UserId());
 
             return Json(new
             {
@@ -339,6 +354,28 @@ namespace educore.Areas.ERP.Controllers
                     percent    = att.Percent,
                     months     = att.Months.Select(m => new { m.Month, m.Year, m.SchoolDays, m.Present }),
                     days       = att.Days
+                },
+                timetable = new
+                {
+                    // null section = this class/section has no timetable setup at all,
+                    // which the page reports differently from "set up but empty".
+                    hasSection = mySection != null,
+                    periods = setup.Periods.Select(pd => new
+                    {
+                        seq   = pd.PeriodSeq,
+                        label = pd.Label,
+                        type  = pd.PeriodType,       // break/lunch rows are not subjects
+                        start = pd.StartTime,
+                        end   = pd.EndTime
+                    }),
+                    days = setup.Days.Select(dy => new { dow = dy.DayOfWeek, label = dy.DayLabel }),
+                    entries = grid.Entries.Select(e => new
+                    {
+                        dow     = e.DayOfWeek,
+                        seq     = e.PeriodSeq,
+                        subject = e.SubjectName,
+                        teacher = e.StaffName
+                    })
                 },
                 receipts = history.Select(h => new
                 {

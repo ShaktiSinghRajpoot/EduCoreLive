@@ -298,9 +298,9 @@ function buildDetail(api){
         occupation:'—', income:'—', email:'—',
         prevSchool:st.prevSchool, prevBoard:'—', prevClass:'—', tcNo:'—', tcDate:'—',
 
-        /* no per-student getter for these yet — see the honest empty states below */
-        rank:null, avgScore:null, marks:[], classAvg:[], attSubj:[],
-        tt:[], todayIdx:0, days:[], periods:[], ttColors:[],
+        /* Exam results have no per-student getter yet — the tab says so.
+           Attendance and the timetable are attached from the API in loadDashboard. */
+        rank:null, avgScore:null, marks:[], classAvg:[],
 
         feeStructure: Object.keys(feeStructure).map(function(k){ return feeStructure[k]; }),
         feeHistory: (api.receipts || []).map(function(r){
@@ -339,6 +339,7 @@ function loadDashboard(){
 
         STUDENT=s; DETAIL=buildDetail(api);
         DETAIL.attendance = api.attendance;
+        DETAIL.timetable  = api.timetable;
 
         // Open on the most recent month that has a register.
         var ms=(api.attendance && api.attendance.months) || [];
@@ -357,7 +358,7 @@ function loadDashboard(){
         renderFee(s,DETAIL);
         renderProfile(s,DETAIL);
         renderAttendance(s,DETAIL);
-        notYet('ttHead',       'The timetable is not wired to this page yet.', 'ttBody');
+        renderTimetable(DETAIL);
         notYet('examContent',  'Exam results per student are not available yet.');
         activateTab('overview');
     })
@@ -552,29 +553,60 @@ function buildCalendar(marks, month, year){
 
 /* ── Tab 4: Timetable ───────────────────────── */
 function renderTimetable(d){
-    var pLabels=['8:00–8:45','8:45–9:30','9:30–10:15','Break','10:30–11:15','11:15–12:00','12:00–12:45','Lunch'];
-    var thead='<tr><th>Period</th>'+d.days.map(function(day,i){
-        return '<th'+(i===d.todayIdx?' style="color:var(--ec-primary);background:var(--ec-primary-light);"':'')+'>'
-            +day+(i===d.todayIdx?' ★':'')+'</th>';
-    }).join('')+'</tr>';
-    document.getElementById('ttHead').innerHTML=thead;
+    var tt=d.timetable, head=document.getElementById('ttHead'), body=document.getElementById('ttBody');
 
-    var tbody=pLabels.map(function(p,pi){
+    // Two different nothings, and the office needs to tell them apart: the class
+    // has no timetable setup at all, vs it has one and no periods are filled.
+    if(!tt || !tt.hasSection){
+        head.innerHTML='';
+        body.innerHTML='<tr><td class="text-muted small p-3">'
+            +'This class and section do not appear in the timetable setup, so there is no week to show.</td></tr>';
+        return;
+    }
+    if(!tt.periods.length || !tt.days.length){
+        head.innerHTML='';
+        body.innerHTML='<tr><td class="text-muted small p-3">'
+            +'No periods have been set up yet (Settings → Period Structure).</td></tr>';
+        return;
+    }
+
+    // JS getDay(): 0 = Sunday, matching TimetableDay.DayOfWeek.
+    var todayDow=new Date().getDay();
+
+    head.innerHTML='<tr><th>Period</th>'+tt.days.map(function(dy){
+        var isToday=dy.dow===todayDow;
+        return '<th'+(isToday?' style="color:var(--ec-primary);background:var(--ec-primary-light);"':'')+'>'
+             + EC.esc(dy.label)+(isToday?' ★':'')+'</th>';
+    }).join('')+'</tr>';
+
+    // Index the week once — the grid is days × periods and a linear scan per cell
+    // would be O(n²) on a full timetable.
+    var byCell={};
+    (tt.entries||[]).forEach(function(e){ byCell[e.dow+':'+e.seq]=e; });
+
+    body.innerHTML=tt.periods.map(function(pd){
+        var time=(pd.start&&pd.end) ? pd.start+'–'+pd.end : pd.label;
+
+        // A break or lunch is not a subject — span it instead of drawing dashes.
+        if(pd.type && pd.type.toLowerCase()!=='class'){
+            return '<tr><td class="fw-bold text-muted" style="font-size:.75rem;white-space:nowrap;">'+EC.esc(time)+'</td>'
+                 + '<td colspan="'+tt.days.length+'" class="text-center text-muted" style="font-size:.75rem;">'
+                 + EC.esc(pd.label)+'</td></tr>';
+        }
+
         return '<tr>'
-            +'<td class="fw-bold text-muted" style="font-size:.75rem;white-space:nowrap;">'+p+'</td>'
-            +d.days.map(function(day,di){
-                var cell=d.tt[di][pi];
-                var bg=d.ttColors[cell.subj]||'#f5f5f5';
-                var todayCls=di===d.todayIdx?'border-left:2px solid var(--ec-primary);':'';
-                if(!cell.subj||cell.subj==='—') return '<td style="'+todayCls+'"><span class="text-muted" style="font-size:.75rem;">—</span></td>';
+            +'<td class="fw-bold text-muted" style="font-size:.75rem;white-space:nowrap;">'+EC.esc(time)+'</td>'
+            +tt.days.map(function(dy){
+                var cell=byCell[dy.dow+':'+pd.seq];
+                var todayCls=dy.dow===todayDow?'border-left:2px solid var(--ec-primary);':'';
+                if(!cell) return '<td style="'+todayCls+'"><span class="text-muted" style="font-size:.75rem;">—</span></td>';
                 return '<td style="'+todayCls+'">'
-                    +'<span class="sd-subj-cell" style="background:'+bg+'">'+cell.subj+'</span>'
-                    +'<div class="text-muted mt-1" style="font-size:.68rem;">'+cell.teacher+'</div>'
+                    +'<span class="sd-subj-cell" style="background:#f5f5f5;">'+EC.esc(cell.subject)+'</span>'
+                    +(cell.teacher ? '<div class="text-muted mt-1" style="font-size:.68rem;">'+EC.esc(cell.teacher)+'</div>' : '')
                     +'</td>';
             }).join('')
             +'</tr>';
     }).join('');
-    document.getElementById('ttBody').innerHTML=tbody;
 }
 
 /* ── Tab 5: Exam Results ─────────────────────── */

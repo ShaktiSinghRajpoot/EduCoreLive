@@ -2026,3 +2026,35 @@ invented numbers. It comes back if attendance is ever taken per period.
 
 Timetable and Exam Results still say they are not wired; neither has a
 per-student source yet.
+
+---
+
+### [2026-08-25] The student's timetable is their section's
+
+No new SQL for this one — `GetSetupAsync` (periods, days, sections) and
+`GetGridAsync(sectionId)` already existed for the timetable editor. The only
+missing piece was the link from a student to a section: the dashboard resolves
+class + section against the setup's section list, then reads that section's week.
+
+**Three states, and the page distinguishes all three** — the old version drew a
+randomly generated week for every one of them:
+
+| situation | what it shows |
+|---|---|
+| class/section not in the timetable setup | "does not appear in the timetable setup, so there is no week to show" |
+| set up, but no periods defined | "No periods have been set up yet (Settings → Period Structure)" |
+| set up with empty slots | the real grid, with — in the unfilled cells |
+
+Also better than the mock it replaced: period rows come from the school's own
+**Period Structure** (real times, e.g. 08:00–08:45) rather than a hardcoded
+eight-period day; a **break or lunch row spans the week** instead of drawing
+dashes under every day, because it is not a subject; and today's column is
+highlighted off `getDay()` matched against `TimetableDay.DayOfWeek` — both use
+0 = Sunday — rather than the old `getDay()-1` arithmetic that put the star on the
+wrong column on Sundays.
+
+The week is indexed into a `dow:seq` map once instead of scanning the entry list
+per cell, which is O(n²) on a full grid.
+
+Exam Results is the last tab still saying it has no source; there is no
+per-student marks getter yet.
