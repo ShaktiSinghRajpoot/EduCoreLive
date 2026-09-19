@@ -32,6 +32,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         Task<AdmissionModel?> GetStudentByIdAsync(int studentId, int tenantId, int schoolId, int actionUserId);
 
+        // Edits an existing student's details. SaveAdmissionAsync is INSERT-only, so
+        // this is the update path. It deliberately does NOT touch the fee plan or the
+        // ledger — changing what a student owes is a money operation and belongs in the
+        // fee module, where it leaves a trail.
+        Task<(bool Success, string Message)> UpdateStudentAsync(
+            AdmissionModel model, int tenantId, int schoolId, int actionUserId);
+
         Task<int> DeleteStudentAsync(int studentId, int tenantId, int schoolId, int actionUserId);
 
         // ── Student exit (backs Student/Inactive, and the TC module on top of it) ──

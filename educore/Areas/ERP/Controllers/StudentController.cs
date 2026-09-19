@@ -18,6 +18,7 @@ namespace educore.Areas.ERP.Controllers
         private readonly IWebHostEnvironment _env;
 
         private readonly IPublicIdService _publicIds;
+        private readonly IFeePaymentService _feeService;
 
         public StudentController(
             IBaseService baseService,
@@ -25,9 +26,11 @@ namespace educore.Areas.ERP.Controllers
             IAdmissionWorkflowService admissionWorkflowService,
             ISchoolSettingsService schoolSettingsService,
             IPublicIdService publicIds,
+            IFeePaymentService feeService,
             IWebHostEnvironment env)
         {
             _publicIds = publicIds;
+            _feeService = feeService;
             _baseService = baseService;
             _admissionService = admissionService;
             _admissionWorkflowService = admissionWorkflowService;
@@ -256,6 +259,79 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
+        // Everything the dashboard shows, in one call — the page used to build this
+        // from a hardcoded array of ten students.
+        //
+        // Attendance, timetable and exam results are NOT here: there is no per-student
+        // getter for them yet. The page shows an honest "not available" for those
+        // rather than the random numbers it used to invent, which looked like data.
+        public async Task<IActionResult> DashboardData(Guid id)
+        {
+            var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
+            if (studentId == 0) return Json(new { found = false });
+
+            var student = await _admissionService.GetStudentByIdAsync(studentId, TenantId(), SchoolId(), UserId());
+            if (student == null) return Json(new { found = false });
+
+            var dues    = await _feeService.GetStudentDuesAsync(studentId, TenantId(), SchoolId(), UserId());
+            var history = await _feeService.GetPaymentHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
+
+            return Json(new
+            {
+                found = true,
+                student = new
+                {
+                    name      = student.StudentName,
+                    roll      = student.RollNo ?? "—",
+                    admNo     = student.AdmissionNo ?? "—",
+                    cls       = student.ClassName,
+                    sec       = student.Section ?? "—",
+                    gender    = student.Gender ?? "—",
+                    dob       = student.DateOfBirth?.ToString("dd MMM yyyy") ?? "—",
+                    admDate   = student.AdmissionDate?.ToString("dd MMM yyyy") ?? "—",
+                    year      = student.AcademicYear,
+                    guardian  = student.GuardianName ?? "—",
+                    mother    = student.MotherName ?? "—",
+                    mobile    = student.MobileNumber ?? "—",
+                    altMobile = student.AlternateMobile ?? "—",
+                    address   = student.Address ?? "—",
+                    blood     = student.BloodGroup ?? "—",
+                    religion  = student.Religion ?? "—",
+                    category  = student.Category ?? "—",
+                    nation    = student.Nationality ?? "—",
+                    idProof   = student.IdProofNo ?? "—",
+                    prevSchool= student.PrevSchoolName ?? "—"
+                },
+                fee = new
+                {
+                    // Outstanding is what the ledger says, not a recomputation here —
+                    // core.student_ledger stays the single source of truth for money.
+                    totalDue    = dues.Sum(d => d.AmountDue),
+                    totalPaid   = dues.Sum(d => d.AmountPaid),
+                    concession  = dues.Sum(d => d.Concession),
+                    outstanding = dues.Sum(d => d.Outstanding),
+                    rows = dues.Select(d => new
+                    {
+                        head        = d.FeeHeadName,
+                        frequency   = d.Frequency,
+                        installment = d.InstallmentLabel ?? "—",
+                        dueDate     = d.DueDate?.ToString("dd MMM yyyy") ?? "—",
+                        due         = d.AmountDue,
+                        paid        = d.AmountPaid,
+                        outstanding = d.Outstanding
+                    })
+                },
+                receipts = history.Select(h => new
+                {
+                    receiptNo = h.ReceiptNo,
+                    date      = h.PaymentDate?.ToString("dd MMM yyyy") ?? "—",
+                    amount    = h.Amount,
+                    mode      = h.PaymentMode,
+                    cancelled = h.IsCancelled      // a cancelled receipt still shows, marked
+                })
+            });
+        }
+
         // A student's session-by-session timeline. core.students only holds their
         // present position, so this comes from core.student_enrolment.
         public async Task<IActionResult> EnrolmentHistory(Guid id)
@@ -279,24 +355,67 @@ namespace educore.Areas.ERP.Controllers
 
         public async Task<IActionResult> EditStudent(Guid id)
         {
-            if (await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId()) == 0)
-                return RedirectToAction("StudentList");
+            var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
+            if (studentId == 0) return RedirectToAction("StudentList");
+
+            var model = await _admissionService.GetStudentByIdAsync(studentId, TenantId(), SchoolId(), UserId());
+            if (model == null) return RedirectToAction("StudentList");
 
             ViewBag.StudentPublicId = id;
-            return View();
+            await FillEditDropdownsAsync(model.ClassName);
+            return View(model);
         }
 
         [HttpPost]
         [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditStudent(Guid id, IFormCollection form)
+        public async Task<IActionResult> EditStudent(Guid id, AdmissionModel model)
         {
-            if (await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId()) == 0)
-                return RedirectToAction("StudentList");
+            var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
+            if (studentId == 0) return RedirectToAction("StudentList");
 
-            // Replace with real service call once SP is ready
-            TempData["SuccessMessage"] = "Student profile updated successfully.";
+            // The id comes from the URL, never from the posted form — otherwise the
+            // form could name a different student than the one the URL authorised.
+            model.StudentId = studentId;
+
+            if (!ModelState.IsValid)
+            {
+                ViewBag.StudentPublicId = id;
+                await FillEditDropdownsAsync(model.ClassName);
+                return View(model);
+            }
+
+            var (ok, message) = await _admissionService.UpdateStudentAsync(
+                model, TenantId(), SchoolId(), UserId());
+
+            if (!ok)
+            {
+                // Business rules come back as the proc's own wording (unknown class,
+                // not this school's student) — show it on the form, not a toast that
+                // disappears while they are still reading the field it refers to.
+                ModelState.AddModelError(string.Empty, message);
+                ViewBag.StudentPublicId = id;
+                await FillEditDropdownsAsync(model.ClassName);
+                return View(model);
+            }
+
+            TempData["SuccessMessage"] = message;
             return RedirectToAction("Dashboard", new { id });
+        }
+
+        // Class list + the sections that class actually has, for the edit form.
+        private async Task FillEditDropdownsAsync(string? className)
+        {
+            try
+            {
+                ViewBag.ClassList = await _baseService.GetSelectListAsync(
+                    "config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString());
+            }
+            catch { ViewBag.ClassList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+
+            ViewBag.SectionList = string.IsNullOrWhiteSpace(className)
+                ? new List<string>()
+                : await _admissionService.GetClassSectionsAsync(className, TenantId(), SchoolId(), UserId());
         }
     }
 }

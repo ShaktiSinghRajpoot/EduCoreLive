@@ -1930,3 +1930,62 @@ before the session (₹3,87,000) and 48 correct ones (₹42,000). Nothing has be
 paid, conceded or refunded against any of them, so the bad rows carry no payment
 history — but deleting rows from a live fee ledger is the school's call, not a
 side effect of a code fix.
+
+---
+
+### [2026-08-25] Student Dashboard and Edit Student, off the mock data
+
+Both pages looked finished and neither was. Edit Student could not save at all,
+and the Dashboard filled seven tabs from a hardcoded array of ten students plus
+`Math.random()`.
+
+**Edit Student had no save path, and that was not a stale TODO.**
+`sp_admission_manage`'s `SaveAdmission` is INSERT-only — there is no update
+branch — so the controller's "replace once the SP is ready" comment was accurate.
+New `core.sp_student_update` provides it.
+
+What it deliberately does **not** touch:
+
+- **the fee plan and `core.student_ledger`.** Changing what a student owes is a
+  money operation and belongs in the fee module, where it leaves a concession or
+  adjustment trail. Regenerating the ledger from an edit screen would wipe paid
+  installments. Verified in a rolled-back transaction: 481 ledger rows before the
+  update, 481 after.
+- **`admission_no`** — the school's permanent reference, printed on receipts and
+  the TC. Re-issuing one is not an edit.
+
+Guards, both verified: another school's student id raises "Student not found"
+(indistinguishable from a bad id), and a class that is not in the school's setup
+is refused by name rather than leaving the student on a class no roster,
+timetable or promotion ladder knows about.
+
+**The mapper was also quietly incomplete.** `GetStudentByIdAsync` selects `s.*`
+but only read about half the columns, so blood group, religion, category,
+nationality, ID proof and previous school could never be shown or edited — they
+were in the result set the whole time. Now mapped.
+
+**Dashboard.** The mock roster and `getDetail()` are gone. A new
+`Student/DashboardData` returns the student, the fee ledger and the receipts in
+one call; `buildDetail()` shapes it into the keys the existing render functions
+already used, so nothing below the data layer changed.
+
+**Three tabs now say they have no data instead of inventing it.** Attendance,
+Timetable and Exam Results have no per-student getter yet. They used to show
+`rand(1,40)` ranks, random subject marks and a randomly generated weekly
+timetable — numbers that read as real and were not. They now render one line
+saying the data is not wired up. A blank with a reason is worth more than a
+convincing fabrication, and it stops anyone making a decision on a random number.
+
+Also fixed on the form: three field names never bound to the model
+(`AadharNo`→`IdProofNo`, `PreviousSchool`→`PrevSchoolName`, `Email`→
+`FatherEmail`), so those inputs silently discarded what was typed; the class list
+was a hardcoded CBSE ladder rather than the school's own classes; sections did
+not follow the chosen class; and a hidden `StudentId` posted a uuid into an int
+property. The id now comes only from the URL — a form field could otherwise name
+a different student than the one the URL authorised.
+
+Checked as views have to be checked here: `dotnet build` reports 0 errors on a
+`.cshtml` with a broken `<script>`, so both script blocks were extracted, their
+Razor stubbed, and run through `node --check`; all 50 element ids the two scripts
+look up were matched against the markup; and every `Url.Action` target confirmed
+to exist on the controller.

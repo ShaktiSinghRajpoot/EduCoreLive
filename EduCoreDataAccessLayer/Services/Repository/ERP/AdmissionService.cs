@@ -239,6 +239,23 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 MobileNumber     = NullStr(row, "mobile"),
                 AlternateMobile  = NullStr(row, "alt_mobile"),
                 Address          = NullStr(row, "address"),
+
+                // The proc selects s.*, so these were available all along — the
+                // mapper simply never read them, which is why Edit Student could
+                // not show a student's blood group, category or previous school.
+                BloodGroup       = NullStr(row, "blood_group"),
+                Religion         = NullStr(row, "religion"),
+                Category         = NullStr(row, "category"),
+                Nationality      = NullStr(row, "nationality"),
+                MotherTongue     = NullStr(row, "mother_tongue"),
+                IdProofNo        = NullStr(row, "id_proof_no"),
+                ApaarId          = NullStr(row, "apaar_id"),
+                UdiseStudentId   = NullStr(row, "udise_student_id"),
+                PrevSchoolName   = NullStr(row, "prev_school_name"),
+                PrevBoard        = NullStr(row, "prev_board"),
+                PrevClass        = NullStr(row, "prev_class"),
+                PrevTcNo         = NullStr(row, "prev_tc_no"),
+
                 PayTodayTotal    = DecVal(row, "pay_today_total"),
                 MonthlyTotal     = DecVal(row, "monthly_total"),
                 YearlyTotal      = DecVal(row, "yearly_total"),
@@ -490,6 +507,61 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             return classes;
         }
+
+        public async Task<(bool Success, string Message)> UpdateStudentAsync(
+            AdmissionModel model, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || model.StudentId <= 0)
+                return (false, "Invalid school scope.");
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",     NpgsqlDbType.Integer) { Value = model.StudentId },
+                Txt("p_student_name",  model.StudentName),
+                Txt("p_roll_no",       model.RollNo),
+                Txt("p_gender",        model.Gender),
+                new("p_dob", NpgsqlDbType.Date)
+                    { Value = model.DateOfBirth.HasValue ? model.DateOfBirth.Value : (object)DBNull.Value },
+                Txt("p_class_name",    model.ClassName),
+                Txt("p_section",       model.Section),
+                Txt("p_guardian_name", model.GuardianName),
+                Txt("p_mother_name",   model.MotherName),
+                Txt("p_mobile",        model.MobileNumber),
+                Txt("p_alt_mobile",    model.AlternateMobile),
+                Txt("p_address",       model.Address),
+                Txt("p_blood_group",   model.BloodGroup),
+                Txt("p_religion",      model.Religion),
+                Txt("p_category",      model.Category),
+                Txt("p_nationality",   model.Nationality),
+                Txt("p_id_proof_no",   model.IdProofNo),
+                Txt("p_prev_school",   model.PrevSchoolName),
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "student_update_cursor" }
+            };
+
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_student_update", p);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return (false, "Nothing was updated.");
+
+                var row = ds.Tables[0].Rows[0];
+                return (true, Str(row, "message"));
+            }
+            catch (PostgresException ex)
+            {
+                // A proc RAISE is a business rule (unknown class, not this school's
+                // student), so the office sees its wording — same as the other
+                // catches in this service, which has no logger injected.
+                return (false, ex.MessageText);
+            }
+        }
+
+        private static NpgsqlParameter Txt(string name, string? value) =>
+            new(name, NpgsqlDbType.Text) { Value = (object?)value ?? DBNull.Value };
 
         public async Task<List<ClassLadderItem>> GetClassLadderDetailedAsync(
             int tenantId, int schoolId, int actionUserId, string? academicYearName = null)

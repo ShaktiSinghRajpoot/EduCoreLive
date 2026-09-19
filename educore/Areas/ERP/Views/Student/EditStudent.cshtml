@@ -1,7 +1,42 @@
-﻿@{
+﻿@model EduCoreDataAccessLayer.Models.ERP.AdmissionModel
+@{
     ViewData["Title"] = "Edit Student";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     Guid studentPublicId = ViewBag.StudentPublicId ?? Guid.Empty;
+
+    // Shaped for the page's existing populate(): same key names the mock used, so
+    // nothing below the data source had to change. Dates go out as yyyy-MM-dd for
+    // <input type="date">, and the display-only admission date in its printed form.
+    var _studentJson = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        id          = studentPublicId,
+        admNo       = Model.AdmissionNo ?? "",
+        name        = Model.StudentName ?? "",
+        admDate     = Model.AdmissionDate?.ToString("dd MMM yyyy") ?? "",
+        acYear      = Model.AcademicYear ?? "",
+        className   = Model.ClassName ?? "",
+        section     = Model.Section ?? "",
+        gender      = Model.Gender ?? "",
+        dob         = Model.DateOfBirth?.ToString("yyyy-MM-dd") ?? "",
+        guardian    = Model.GuardianName ?? "",
+        mother      = Model.MotherName ?? "",
+        mobile      = Model.MobileNumber ?? "",
+        altMobile   = Model.AlternateMobile ?? "",
+        email       = Model.FatherEmail ?? "",
+        whatsapp    = "",
+        address     = Model.Address ?? "",
+        bloodGroup  = Model.BloodGroup ?? "",
+        religion    = Model.Religion ?? "",
+        category    = Model.Category ?? "",
+        nationality = Model.Nationality ?? "",
+        caste       = "",
+        aadhar      = Model.IdProofNo ?? "",
+        prevSchool  = Model.PrevSchoolName ?? "",
+        remarks     = "",
+        rollNo      = Model.RollNo ?? "",
+        status      = "Active",
+        photo       = ""
+    });
 }
 
 @section PageStyles {
@@ -50,7 +85,6 @@
           enctype="multipart/form-data"
           novalidate>
         @Html.AntiForgeryToken()
-        <input type="hidden" name="StudentId" id="hStudentId" value="@studentPublicId" />
         <input type="hidden" name="StudentStatus" id="hStatus" value="Active" />
 
         <div class="row g-4">
@@ -68,6 +102,14 @@
                         </div>
                     </div>
                     <div class="es-card-body">
+                        @* Business rules come back from the proc — show them on the form,
+                           next to the fields they are about. *@
+                        @if (!ViewData.ModelState.IsValid)
+                        {
+                            <div class="alert alert-danger" role="alert">
+                                <div asp-validation-summary="All" class="mb-0"></div>
+                            </div>
+                        }
                         <div class="es-locked-note">
                             <i class="bx bx-lock-alt"></i>
                             Admission No, Admission Date and Academic Year cannot be changed after admission.
@@ -77,7 +119,7 @@
                                 <label class="es-label">Admission No</label>
                                 <div class="es-readonly-wrap">
                                     <input type="text" class="form-control es-readonly" id="fAdmNo" readonly
-                                           value="ADM-2026-004">
+                                           value="@Model.AdmissionNo">
                                     <i class="bx bx-lock-alt es-lock-ic"></i>
                                 </div>
                             </div>
@@ -96,29 +138,34 @@
                                 <label class="es-label">Academic Year</label>
                                 <div class="es-readonly-wrap">
                                     <input type="text" class="form-control es-readonly" id="fAcYear" readonly
-                                           value="2025-26">
+                                           value="@Model.AcademicYear">
                                     <i class="bx bx-lock-alt es-lock-ic"></i>
                                 </div>
                             </div>
                             <div class="col-12 col-md-4">
                                 <label class="es-label required">Class</label>
+                                @* The school's own classes, not a hardcoded CBSE ladder — a
+                                   class that is not in the setup is rejected by the proc. *@
                                 <select name="ClassName" id="fClass" class="form-select" required>
                                     <option value="">Select Class</option>
-                                    <option>1st</option><option>2nd</option><option>3rd</option>
-                                    <option>4th</option><option>5th</option><option>6th</option>
-                                    <option>7th</option><option>8th</option><option>9th</option>
-                                    <option>10th</option><option>11th Science</option>
-                                    <option>11th Commerce</option><option>12th Science</option>
-                                    <option>12th Commerce</option>
+                                    @foreach (var c in ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                                                       ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                                    {
+                                        <option value="@c.Text" selected="@(c.Text == Model.ClassName)">@c.Text</option>
+                                    }
                                 </select>
                                 <div class="invalid-feedback">Please select a class.</div>
                             </div>
                             <div class="col-12 col-md-4">
                                 <label class="es-label required">Section</label>
+                                @* Sections this class actually has. Reloaded over ajax when the
+                                   class changes — see the script block. *@
                                 <select name="Section" id="fSection" class="form-select" required>
                                     <option value="">Select</option>
-                                    <option>A</option><option>B</option><option>C</option>
-                                    <option>D</option><option>E</option>
+                                    @foreach (var sec in ViewBag.SectionList as IEnumerable<string> ?? Enumerable.Empty<string>())
+                                    {
+                                        <option value="@sec" selected="@(sec == Model.Section)">@sec</option>
+                                    }
                                 </select>
                                 <div class="invalid-feedback">Please select a section.</div>
                             </div>
@@ -188,7 +235,7 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="es-label">Email Address</label>
-                                <input type="email" name="Email" id="fEmail" class="form-control"
+                                <input type="email" name="FatherEmail" id="fEmail" class="form-control"
                                        placeholder="parent@email.com">
                             </div>
                             <div class="col-12 col-md-6">
@@ -261,14 +308,14 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="es-label">Aadhar Number</label>
-                                <input type="text" name="AadharNo" id="fAadhar" class="form-control"
+                                <input type="text" name="IdProofNo" id="fAadhar" class="form-control"
                                        maxlength="12" pattern="[0-9]{12}"
                                        placeholder="12-digit Aadhar number">
                                 <div class="invalid-feedback">Aadhar must be 12 digits.</div>
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="es-label">Previous School</label>
-                                <input type="text" name="PreviousSchool" id="fPrevSchool" class="form-control"
+                                <input type="text" name="PrevSchoolName" id="fPrevSchool" class="form-control"
                                        placeholder="Name of last school attended">
                             </div>
                             <div class="col-12">
@@ -421,36 +468,30 @@
 <script>
 (function () {
 
-    // ── Mock student data — replace with API/ViewBag call ───────────────
-    const student = {
-        id:          '@studentPublicId',
-        admNo:       "ADM-2026-004",
-        name:        "Akash Verma",
-        admDate:     "12 Apr 2026",
-        acYear:      "2025-26",
-        className:   "9th",
-        section:     "A",
-        gender:      "Male",
-        dob:         "2012-08-15",
-        guardian:    "Bhukal Verma",
-        mother:      "",
-        mobile:      "7571870995",
-        altMobile:   "",
-        email:       "",
-        whatsapp:    "",
-        address:     "123 Main Road, Delhi",
-        bloodGroup:  "B+",
-        religion:    "Hindu",
-        category:    "General",
-        nationality: "Indian",
-        caste:       "",
-        aadhar:      "",
-        prevSchool:  "",
-        remarks:     "",
-        rollNo:      "24",
-        status:      "Active",
-        photo:       ""
-    };
+    // The real student, serialized from the model the controller loaded. Everything
+    // below (populate, validation, avatar) is unchanged — only the data source is.
+    const student = @Html.Raw(_studentJson);
+
+    // Sections belong to a class, so the list has to follow the picked class —
+    // otherwise the form offers a section the new class does not have and the save
+    // is refused. Same endpoint the promotion page uses.
+    const SECTIONS_URL = '@Url.Action("PromotionSections", "Student", new { area = "ERP" })';
+
+    document.getElementById("fClass").addEventListener("change", function () {
+        const cls = this.value, sel = document.getElementById("fSection");
+        if (!cls) { sel.innerHTML = '<option value="">Select</option>'; return; }
+
+        fetch(SECTIONS_URL + '?class=' + encodeURIComponent(cls))
+            .then(function (r) { return r.json(); })
+            .then(function (list) {
+                var html = '<option value="">Select</option>';
+                (list || []).forEach(function (x) {
+                    html += '<option value="' + EC.esc(x) + '">' + EC.esc(x) + '</option>';
+                });
+                sel.innerHTML = html;
+            })
+            .catch(function () { /* leave what is there; the proc validates on save */ });
+    });
 
     // ── Populate form ────────────────────────────────────────────────────
     function populate() {
