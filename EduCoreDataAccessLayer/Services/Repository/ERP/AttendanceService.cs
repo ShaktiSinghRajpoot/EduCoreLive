@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
@@ -12,6 +12,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     {
         private readonly PgExec _db;
         private const string SpSections = "core.sp_class_active_sections";
+        private const string SpStudent  = "core.sp_attendance_student";
         private const string SpRoster   = "core.sp_attendance_roster";
         private const string SpSave     = "core.sp_attendance_save";
         private const string SpMonth    = "core.sp_attendance_month_register";
@@ -44,6 +45,66 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 if (!string.IsNullOrWhiteSpace(sec)) sections.Add(sec);
             }
             return sections;
+        }
+
+        public async Task<StudentAttendanceSummary> GetStudentAttendanceAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId,
+            string? academicYear = null, int? month = null, int? year = null)
+        {
+            var result = new StudentAttendanceSummary();
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0) return result;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",     NpgsqlDbType.Integer) { Value = studentId },
+                new("p_academic_year",  NpgsqlDbType.Varchar)
+                    { Value = string.IsNullOrWhiteSpace(academicYear) ? DBNull.Value : academicYear },
+                new("p_month", NpgsqlDbType.Integer) { Value = (object?)month ?? DBNull.Value },
+                new("p_year",  NpgsqlDbType.Integer) { Value = (object?)year  ?? DBNull.Value },
+                new("p_summary", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "as_summary" },
+                new("p_months",  NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "as_months" },
+                new("p_days",    NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "as_days" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpStudent, parameters);
+
+            // Three cursors: summary, month list, day grid.
+            if (ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                var row = ds.Tables[0].Rows[0];
+                result.SchoolDays = IntVal(row, "school_days");
+                result.Present    = IntVal(row, "present");
+                result.Absent     = IntVal(row, "absent");
+                result.LeaveDays  = IntVal(row, "leave_days");
+                result.Percent    = Has(row, "percent") && row["percent"] != DBNull.Value
+                                      ? Convert.ToDecimal(row["percent"]) : 0m;
+            }
+
+            if (ds.Tables.Count > 1)
+            {
+                foreach (DataRow row in ds.Tables[1].Rows)
+                    result.Months.Add(new StudentAttendanceMonth
+                    {
+                        Month      = IntVal(row, "month"),
+                        Year       = IntVal(row, "year"),
+                        SchoolDays = IntVal(row, "school_days"),
+                        Present    = IntVal(row, "present")
+                    });
+            }
+
+            if (ds.Tables.Count > 2)
+            {
+                foreach (DataRow row in ds.Tables[2].Rows)
+                    result.Days[IntVal(row, "day")] = Str(row, "mark");
+            }
+
+            return result;
         }
 
         public async Task<List<AttendanceStudent>> GetRosterAsync(

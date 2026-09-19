@@ -19,6 +19,7 @@ namespace educore.Areas.ERP.Controllers
 
         private readonly IPublicIdService _publicIds;
         private readonly IFeePaymentService _feeService;
+        private readonly IAttendanceService _attendanceService;
 
         public StudentController(
             IBaseService baseService,
@@ -27,10 +28,12 @@ namespace educore.Areas.ERP.Controllers
             ISchoolSettingsService schoolSettingsService,
             IPublicIdService publicIds,
             IFeePaymentService feeService,
+            IAttendanceService attendanceService,
             IWebHostEnvironment env)
         {
             _publicIds = publicIds;
             _feeService = feeService;
+            _attendanceService = attendanceService;
             _baseService = baseService;
             _admissionService = admissionService;
             _admissionWorkflowService = admissionWorkflowService;
@@ -262,10 +265,9 @@ namespace educore.Areas.ERP.Controllers
         // Everything the dashboard shows, in one call — the page used to build this
         // from a hardcoded array of ten students.
         //
-        // Attendance, timetable and exam results are NOT here: there is no per-student
-        // getter for them yet. The page shows an honest "not available" for those
-        // rather than the random numbers it used to invent, which looked like data.
-        public async Task<IActionResult> DashboardData(Guid id)
+        // Timetable and exam results are NOT here: there is still no per-student getter
+        // for those, and the page says so rather than inventing numbers.
+        public async Task<IActionResult> DashboardData(Guid id, int? month = null, int? year = null)
         {
             var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
             if (studentId == 0) return Json(new { found = false });
@@ -275,6 +277,11 @@ namespace educore.Areas.ERP.Controllers
 
             var dues    = await _feeService.GetStudentDuesAsync(studentId, TenantId(), SchoolId(), UserId());
             var history = await _feeService.GetPaymentHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
+
+            // month/year null on the first load: the page picks a month from the list
+            // that comes back and asks again, so we do not guess which one it wants.
+            var att = await _attendanceService.GetStudentAttendanceAsync(
+                studentId, TenantId(), SchoolId(), UserId(), student.AcademicYear, month, year);
 
             return Json(new
             {
@@ -320,6 +327,18 @@ namespace educore.Areas.ERP.Controllers
                         paid        = d.AmountPaid,
                         outstanding = d.Outstanding
                     })
+                },
+                attendance = new
+                {
+                    // A day nobody marked is not an absence, so the percentage is over
+                    // days this student's class actually held a register.
+                    schoolDays = att.SchoolDays,
+                    present    = att.Present,
+                    absent     = att.Absent,
+                    leave      = att.LeaveDays,
+                    percent    = att.Percent,
+                    months     = att.Months.Select(m => new { m.Month, m.Year, m.SchoolDays, m.Present }),
+                    days       = att.Days
                 },
                 receipts = history.Select(h => new
                 {

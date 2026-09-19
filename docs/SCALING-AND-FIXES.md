@@ -1989,3 +1989,40 @@ Checked as views have to be checked here: `dotnet build` reports 0 errors on a
 Razor stubbed, and run through `node --check`; all 50 element ids the two scripts
 look up were matched against the markup; and every `Url.Action` target confirmed
 to exist on the controller.
+
+---
+
+### [2026-08-25] Per-student attendance, and the number that must not be invented
+
+`core.sp_attendance_month_register` answers "the whole class, one month" — the
+register grid. The Student Dashboard needs the other axis: one student, a whole
+session. New `core.sp_attendance_student` returns three cursors — a session
+summary, the months that have a register (for the picker), and the day marks for
+one month (the calendar).
+
+**It follows the register's conventions exactly**, so the two screens can never
+disagree about the same student:
+
+- a **school day** is a day a register was actually taken for that class
+  (`COUNT(DISTINCT attendance_date)`), not a calendar day;
+- Sundays are excluded (`EXTRACT(DOW) <> 0`);
+- status folds the same way — Absent → A, Leave → L, Present and Late both → P.
+
+**The rule that drove the design: a day nobody marked is not an absence.** The
+percentage is computed over days the student's own class actually held a
+register, so a student who joined in August is not marked down for July, and a
+class whose register was never taken shows "No attendance has been marked for
+this class yet" rather than a red 0%. The calendar draws an unmarked day as a
+blank with the tooltip "No register", never as absent.
+
+Verified on seeded data — 24 school days in April 2026 (Sundays excluded), 20
+present, 3 absent, 1 leave → **83.3%**, and the day grid skipped the 5th, 12th,
+19th and 26th correctly.
+
+**Subject-wise attendance was deleted rather than left empty.**
+`core.student_attendance` holds one row per student per day, with no period or
+subject column — there is nothing to group by. That table was being filled with
+invented numbers. It comes back if attendance is ever taken per period.
+
+Timetable and Exam Results still say they are not wired; neither has a
+per-student source yet.

@@ -109,15 +109,10 @@
                         </div>
                         <div class="sd-cal" id="attCal"></div>
                     </div>
-                    <div class="ec-detail-box mb-0">
-                        <div class="ec-detail-title">Subject-wise Attendance</div>
-                        <div class="table-responsive">
-                            <table class="table sd-tbl align-middle mb-0">
-                                <thead><tr><th>Subject</th><th>Total Classes</th><th>Present</th><th>Absent</th><th>Attendance %</th></tr></thead>
-                                <tbody id="attSubjBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
+                    @* Subject-wise attendance is not possible today: core.student_attendance
+                       records ONE row per student per day, not per period, so there is no
+                       subject to group by. The table used to be filled with invented
+                       numbers. It comes back when attendance is taken per period. *@
                 </div>
 
                 <div class="sd-pane" id="tab-timetable">
@@ -343,6 +338,11 @@ function loadDashboard(){
         };
 
         STUDENT=s; DETAIL=buildDetail(api);
+        DETAIL.attendance = api.attendance;
+
+        // Open on the most recent month that has a register.
+        var ms=(api.attendance && api.attendance.months) || [];
+        if(ms.length){ ATT_MONTH=ms[0].month; ATT_YEAR=ms[0].year; }
 
         var av=document.getElementById('sdAv');
         av.textContent=ini(s.name);
@@ -356,7 +356,7 @@ function loadDashboard(){
         renderAcademic(s,DETAIL);
         renderFee(s,DETAIL);
         renderProfile(s,DETAIL);
-        notYet('att-metrics',  'Attendance for one student is not wired up yet.');
+        renderAttendance(s,DETAIL);
         notYet('ttHead',       'The timetable is not wired to this page yet.', 'ttBody');
         notYet('examContent',  'Exam results per student are not available yet.');
         activateTab('overview');
@@ -473,41 +473,81 @@ function renderAcademic(s,d){
 
 /* ── Tab 3: Attendance ───────────────────────── */
 function renderAttendance(s,d){
-    if(s.attend<75) document.getElementById('att-warn').classList.remove('d-none');
-    else document.getElementById('att-warn').classList.add('d-none');
+    var a=d.attendance;
+
+    // No register taken yet is not 0% attendance — say so instead of scaring
+    // the office with a red zero.
+    if(!a || !a.schoolDays){
+        document.getElementById('att-warn').classList.add('d-none');
+        document.getElementById('att-metrics').innerHTML=
+            '<div class="text-muted small p-3">No attendance has been marked for this class yet.</div>';
+        document.getElementById('attCal').innerHTML='';
+        fillMonthSelector([]);
+        return;
+    }
+
+    if(a.percent<75) document.getElementById('att-warn').classList.remove('d-none');
+    else             document.getElementById('att-warn').classList.add('d-none');
 
     document.getElementById('att-metrics').innerHTML=
-        mc('Attendance',s.attend+'%',(s.attend>=75?'bg-label-success text-success':'bg-label-danger text-danger'),'bx-user-check')
-       +mc('Present','22 days','bg-label-success text-success','bx-check-circle')
-       +mc('Absent','5 days','bg-label-danger text-danger','bx-x-circle')
-       +mc('Half Day','2 days','bg-label-warning text-warning','bx-time');
+        mc('Attendance',a.percent+'%',(a.percent>=75?'bg-label-success text-success':'bg-label-danger text-danger'),'bx-user-check')
+       +mc('Present',a.present+' of '+a.schoolDays,'bg-label-success text-success','bx-check-circle')
+       +mc('Absent', a.absent+' days','bg-label-danger text-danger','bx-x-circle')
+       +mc('Leave',  a.leave+' days','bg-label-warning text-warning','bx-time');
 
-    buildCalendar(s);
-
-    document.getElementById('attSubjBody').innerHTML=d.attSubj.map(function(r){
-        var p=pct(r.present,r.total);
-        return '<tr>'
-            +'<td class="fw-bold">'+r.subject+'</td>'
-            +'<td>'+r.total+'</td>'
-            +'<td class="text-success fw-bold">'+r.present+'</td>'
-            +'<td class="text-danger fw-bold">'+r.absent+'</td>'
-            +'<td>'+attHtml(p)+'</td>'
-            +'</tr>';
-    }).join('');
-
-    if(charts.att){charts.att.destroy();charts.att=null;}
+    fillMonthSelector(a.months||[]);
+    buildCalendar(a.days||{}, ATT_MONTH, ATT_YEAR);
 }
 
-function buildCalendar(){
-    var statuses=['W','W','W','P','P','P','P','A','P','P','H','P','P','W','W','P','P','P','A','P','P','W','W','L','P','P','P','P','P','P','W','W','W'];
-    var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var MONTH_NAMES=['January','February','March','April','May','June',
+                 'July','August','September','October','November','December'];
+var ATT_MONTH=null, ATT_YEAR=null;
+
+// Only months that actually have a register — an empty month in the list would
+// open a calendar with nothing in it and no way to tell why.
+function fillMonthSelector(months){
+    var sel=document.getElementById('attMonSel');
+    if(!months.length){ sel.innerHTML='<option>No attendance yet</option>'; return; }
+
+    sel.innerHTML=months.map(function(m){
+        return '<option value="'+m.year+'-'+m.month+'"'+(m.month===ATT_MONTH&&m.year===ATT_YEAR?' selected':'')+'>'
+             + MONTH_NAMES[m.month-1]+' '+m.year+'</option>';
+    }).join('');
+}
+
+document.getElementById('attMonSel').addEventListener('change',function(){
+    var parts=String(this.value).split('-');
+    if(parts.length!==2) return;
+    // Re-ask the server for that month's day grid rather than caching every month.
+    $.getJSON(DATA_URL,{ id:STUDENT_ID, year:parts[0], month:parts[1] })
+     .done(function(api){
+        if(!api||!api.found||!api.attendance) return;
+        ATT_YEAR=parseInt(parts[0],10); ATT_MONTH=parseInt(parts[1],10);
+        buildCalendar(api.attendance.days||{}, ATT_MONTH, ATT_YEAR);
+     });
+});
+
+/* Real month grid. A day with no mark is a day no register was taken — drawn as
+   a blank, never as an absence. */
+function buildCalendar(marks, month, year){
     var cal=document.getElementById('attCal');
-    cal.innerHTML=days.map(function(d){return '<div class="sd-day aW">'+d+'</div>';}).join('');
-    statuses.slice(0,31).forEach(function(st,i){
-        var cls=st==='P'?'aP':st==='A'?'aA':st==='H'?'aL':st==='L'?'aL':'aH';
-        if(st==='W')cls='aW';
-        cal.innerHTML+='<div class="sd-day '+cls+'">'+(st==='W'?'':i+1)+'</div>';
-    });
+    var names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var html=names.map(function(d){return '<div class="sd-day aW">'+d+'</div>';}).join('');
+
+    if(!month||!year){ cal.innerHTML=html; return; }
+
+    var first=new Date(year, month-1, 1).getDay();
+    var total=new Date(year, month, 0).getDate();
+
+    for(var i=0;i<first;i++) html+='<div class="sd-day aW"></div>';
+
+    for(var day=1;day<=total;day++){
+        var mk=marks[day]||marks[String(day)];
+        var cls = mk==='P' ? 'aP' : mk==='A' ? 'aA' : mk==='L' ? 'aL' : 'aH';
+        html+='<div class="sd-day '+cls+'" title="'+
+              (mk==='P'?'Present':mk==='A'?'Absent':mk==='L'?'Leave':'No register')+'">'+day+'</div>';
+    }
+    cal.innerHTML=html;
 }
 
 /* ── Tab 4: Timetable ───────────────────────── */
