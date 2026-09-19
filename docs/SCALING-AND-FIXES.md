@@ -2262,3 +2262,49 @@ already cancelled", which is the better design: already-cancelled is a state, no
 an error. The test was wrong, not the code, and it now asserts what actually
 matters — that the ledger is not reversed twice and the original cancel reason
 survives.
+
+---
+
+### [2026-08-25] Enquiry + Registration test suite
+
+`Database/tests/enquiry_registration_tests.sql` — 30 checks over the enquiry CRM,
+follow-ups, registration and the enquiry → registration → admission chain. Same
+shape as the fee suite: one transaction, rolled back, safe against any database.
+Run against local and Railway — 30 passed on both.
+
+**What it found: a revived lead kept the reason it was once lost for.**
+`UpdateStatus` wrote
+
+    lost_reason = CASE WHEN p_status IN ('Not Interested','Dropped')
+                       THEN COALESCE(p_lost_reason, lost_reason)
+                       ELSE lost_reason END          -- <- kept the old value
+
+so an enquiry marked "Not Interested — too far" and later moved back to
+Interested still carried "too far", and would still carry it after being
+admitted. `lost_reason` on the row means *why this enquiry is lost right now* —
+the full trail already lives in `core.enquiry_status_history`, which is what that
+table is for. Nothing displays the stale value today, but the first
+why-do-we-lose-leads report would have counted won students among the losses.
+Fixed in both branches that write it (`SaveEnquiry` and `UpdateStatus`).
+
+**What the suite confirmed is already right:**
+
+- an enquiry is created as New and active, and is invisible to another school;
+- every status change is written to `enquiry_status_history` with what it came
+  *from*, and re-setting the same status adds no duplicate row;
+- a follow-up is logged and its next date is carried onto the enquiry;
+- registration mints a number, stamps the date, and **re-registering returns the
+  same number** rather than minting a second;
+- another school cannot register your enquiry, and asking for a number with
+  auto-generate off and none supplied is refused;
+- the registration fee books against the **enquiry**, not a student — there is no
+  student yet — and its receipt number now has no space (the same
+  `fn_receipt_year` fix as the fee module);
+- admitting from an enquiry links the two, and after that the enquiry can be
+  neither re-registered nor have its status walked backwards from
+  "Admission Confirmed".
+
+**Note on writing these:** `sp_enquiry_crm_manage` takes **53 parameters**. The
+first version of the suite called it positionally and was unreadable and wrong;
+it is now called with named arguments throughout, which also survives a parameter
+being added in the middle.

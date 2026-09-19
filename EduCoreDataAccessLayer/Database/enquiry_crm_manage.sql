@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 -- Enquiry CRM — list ordering + server-side sorting
 --
 -- GetEnquiries used to order as a follow-up work queue (overdue first,
@@ -262,8 +262,14 @@ BEGIN
                 priority              = COALESCE(p_priority,            priority),
                 status                = COALESCE(p_status,              status),
                 assigned_to_id        = p_assigned_to_id,
+                -- lost_reason means "why this enquiry is lost RIGHT NOW". Keeping the
+                -- old value when a lead is revived left an Interested — or eventually
+                -- Admitted — enquiry still carrying "too far", which any why-we-lose-leads
+                -- report would count. The full trail lives in enquiry_status_history;
+                -- this column tracks the current state.
                 lost_reason           = CASE WHEN p_status IN ('Not Interested','Dropped')
                                              THEN COALESCE(p_lost_reason, lost_reason)
+                                             WHEN p_status IS NOT NULL THEN NULL
                                              ELSE lost_reason END,
                 next_followup_date    = p_next_followup_date,
                 notes                 = p_notes,
@@ -315,9 +321,10 @@ BEGIN
 
         UPDATE core.enquiries SET
             status      = p_status,
+            -- Same rule as SaveEnquiry: a revived lead stops being "lost for" anything.
             lost_reason = CASE WHEN p_status IN ('Not Interested','Dropped')
                                THEN COALESCE(p_lost_reason, lost_reason)
-                               ELSE lost_reason END,
+                               ELSE NULL END,
             updated_by  = p_action_user_id,
             updated_at  = NOW()
         WHERE enquiry_id = p_enquiry_id
