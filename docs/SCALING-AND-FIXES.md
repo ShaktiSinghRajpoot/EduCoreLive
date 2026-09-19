@@ -1882,3 +1882,51 @@ back (school 34 has one session, so a second one was created for the test):
 | no `toClass` at all | auto next rung → **6** (old payload still works) |
 
 Applied to local and Railway.
+
+---
+
+### [2026-08-25] Fees: a back-dated admission billed ten years of tuition
+
+Found by looking at live data, not by reading code: the school's one active
+student had **481 ledger rows totalling ₹4,29,000**, against a fee plan worth
+about ₹42,000 for the year.
+
+    admission_date : 2017-04-20
+    session        : FY 26-27  (2026-04-01 .. 2027-03-31)
+    monthly charges: Apr 2017 .. Mar 2027   = 120 installments, not 12
+
+`core.sp_admission_manage` bills monthly heads from the admission month up to the
+session end month. That rule exists for a **mid-session joiner** — admitted in
+August, bill Aug–Mar — and it is correct for that. But when the admission date is
+*earlier than the session*, the same rule walks backwards: an existing student
+carried forward, or a back-dated entry, gets billed every month since they first
+joined. Ten years here, and it scales with how old the admission date is.
+
+Fix: clamp the first billing month to the session start. A session can now only
+ever bill its own months.
+
+    IF v_sess_start IS NOT NULL AND v_month_start < DATE_TRUNC('month', v_sess_start)::DATE THEN
+        v_month_start := DATE_TRUNC('month', v_sess_start)::DATE;
+    END IF;
+
+Verified on the local copy, in a rolled-back transaction, that the fix does not
+break the case the rule was written for:
+
+| admitted | installments | range |
+|---|---|---|
+| 2017-04-20 (back-dated) | **12** (was 120) | Apr 2026 – Mar 2027 |
+| 2026-08-10 (mid-session) | 8 | Aug 2026 – Mar 2027 — unchanged |
+| 2026-04-05 (normal) | 12 | Apr 2026 – Mar 2027 |
+
+Applied to local and Railway.
+
+**This matters most for migration.** Today it affects one student, but every
+existing student imported with their real admission date would have been
+over-charged the moment their fee plan was applied — which is exactly what a
+school does when it starts using the system.
+
+**The existing bad data is a separate decision.** Student 53 has 433 rows dated
+before the session (₹3,87,000) and 48 correct ones (₹42,000). Nothing has been
+paid, conceded or refunded against any of them, so the bad rows carry no payment
+history — but deleting rows from a live fee ledger is the school's call, not a
+side effect of a code fix.

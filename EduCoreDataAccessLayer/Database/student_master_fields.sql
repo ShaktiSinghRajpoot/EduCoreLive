@@ -1,4 +1,4 @@
--- ============================================================
+﻿-- ============================================================
 --  Student master expansion — real-ERP admission record
 --  Adds identity/demographics, previous school, full parent
 --  details, and a documents checklist to core.students, and
@@ -276,6 +276,18 @@ BEGIN
                         v_month_start := DATE_TRUNC('month', v_sess_start)::DATE;
                     ELSE
                         v_month_start := DATE_TRUNC('month', v_adm_date)::DATE;
+                    END IF;
+
+                    -- Never bill before the session starts. "First month = admission
+                    -- month" exists for a MID-session joiner (admitted in August, bill
+                    -- Aug-Mar). When the admission date is EARLIER than the session —
+                    -- an existing student carried forward, or a back-dated entry — that
+                    -- same rule walks backwards for years: a student admitted in 2017
+                    -- sitting in the 2026-27 session was billed 120 monthly
+                    -- installments instead of 12, a 10x overcharge. Clamp to the
+                    -- session start so a session can only ever bill its own months.
+                    IF v_sess_start IS NOT NULL AND v_month_start < DATE_TRUNC('month', v_sess_start)::DATE THEN
+                        v_month_start := DATE_TRUNC('month', v_sess_start)::DATE;
                     END IF;
 
                     -- Last billing month = session end month; fall back to 11 months on
