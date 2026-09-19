@@ -2162,3 +2162,44 @@ nowhere.
 **Noted while here:** `StaffProfile.cshtml` links to `Attendance/StaffAttendance`,
 which does not exist. There is no staff attendance register at all, which is why
 LOP is derived from leave rather than from absences.
+
+---
+
+### [2026-08-25] The landing dashboard — the most-seen page in the app was entirely fake
+
+`DashboardsController` was twelve lines with no service call, and every figure in
+its 576-line view was a literal. Every school saw the same **₹13,201** collected
+today, the same **₹1,41,912** outstanding, the same four invented notices and the
+same three birthdays. This is the first page after sign-in.
+
+New `core.sp_dashboard_summary` returns nine cursors in one round trip — a dozen
+cards would otherwise be a dozen calls on every sign-in.
+
+**Now real:** the four KPI cards, the greeting banner, today's attendance gauge,
+the 7-day collection trend, class strength, collection by payment mode, top fee
+defaulters, recent receipts, pending leave approvals, upcoming calendar entries,
+birthdays (students and staff, matched on day+month so leap years do not matter),
+and the Student Fee Matrix — whose rows now link to the real student dashboard.
+
+**Removed rather than faked**, the same rule as the last few commits:
+
+| card | why it is gone |
+|---|---|
+| Income vs Expense | there is no expense module; half the chart could only be invented, and income alone under that title misleads |
+| Collection Target | no target is configured anywhere, so the ring was progress towards a made-up number |
+| Notice Board | no notices table, and its Post button linked to /ERP/NoticeBoard, which does not exist |
+| Student/Staff/Due sparklines | those totals are not snapshotted anywhere, so seven points of history were pure invention. The collection sparkline stayed — the 7-day trend is real |
+| "Due Cleared" trend series | a second invented line on the collection chart |
+| Week / Month / Download buttons | never wired to anything |
+| Approve + Reject buttons on approvals | both just opened the leave page — two buttons that looked like decisions. One "Review" link now |
+| "Wish" button on birthdays | there is no message to send and no record of sending one |
+| Staff attendance bar | there is no staff attendance register at all |
+
+**Conventions kept in step with the rest of the app:** a cancelled receipt is
+never counted as collection; outstanding comes from `core.student_ledger` and is
+never recomputed from payments; and today's attendance is a percentage of
+students *actually marked*, because a class nobody marked is not a class that was
+absent — the card says so when nothing has been marked, instead of showing 0%.
+
+The KPI trend lines say only what can be supported. "+12.5% vs yesterday" is now
+"nothing collected yesterday" on a day that is true.
