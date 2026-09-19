@@ -21,6 +21,7 @@ namespace educore.Areas.ERP.Controllers
         private readonly IFeePaymentService _feeService;
         private readonly IAttendanceService _attendanceService;
         private readonly ITimetableService _timetableService;
+        private readonly IExamService _examService;
 
         public StudentController(
             IBaseService baseService,
@@ -31,12 +32,14 @@ namespace educore.Areas.ERP.Controllers
             IFeePaymentService feeService,
             IAttendanceService attendanceService,
             ITimetableService timetableService,
+            IExamService examService,
             IWebHostEnvironment env)
         {
             _publicIds = publicIds;
             _feeService = feeService;
             _attendanceService = attendanceService;
             _timetableService = timetableService;
+            _examService = examService;
             _baseService = baseService;
             _admissionService = admissionService;
             _admissionWorkflowService = admissionWorkflowService;
@@ -268,9 +271,7 @@ namespace educore.Areas.ERP.Controllers
         // Everything the dashboard shows, in one call — the page used to build this
         // from a hardcoded array of ten students.
         //
-        // Exam results are NOT here: there is still no per-student marks getter, and
-        // the page says so rather than inventing numbers.
-        public async Task<IActionResult> DashboardData(Guid id, int? month = null, int? year = null)
+        public async Task<IActionResult> DashboardData(Guid id, int? month = null, int? year = null, int? examId = null)
         {
             var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
             if (studentId == 0) return Json(new { found = false });
@@ -297,6 +298,11 @@ namespace educore.Areas.ERP.Controllers
             var grid = mySection == null
                 ? new TimetableGrid()
                 : await _timetableService.GetGridAsync(mySection.SectionId, TenantId(), SchoolId(), UserId());
+
+            // Published exams only, and absences are excluded from the totals — see
+            // core.sp_exam_result_student. examId null = their latest published exam.
+            var exam = await _examService.GetStudentResultAsync(
+                studentId, TenantId(), SchoolId(), UserId(), examId);
 
             return Json(new
             {
@@ -376,6 +382,32 @@ namespace educore.Areas.ERP.Controllers
                         subject = e.SubjectName,
                         teacher = e.StaffName
                     })
+                },
+                exams = new
+                {
+                    options = exam.Exams.Select(e => new
+                    {
+                        id   = e.ExamId,
+                        name = e.ExamName,
+                        type = e.ExamType ?? "",
+                        date = e.StartDate?.ToString("dd MMM yyyy") ?? ""
+                    }),
+                    subjects = exam.Subjects.Select(x => new
+                    {
+                        subject  = x.Subject,
+                        obtained = x.Obtained,     // null when absent
+                        max      = x.MaxMarks,
+                        pass     = x.PassMarks,
+                        absent   = x.IsAbsent,
+                        passed   = x.Passed,       // null = cannot say, not "failed"
+                        percent  = x.Percent
+                    }),
+                    subjectCount = exam.SubjectCount,
+                    obtained     = exam.Obtained,
+                    total        = exam.Total,
+                    percent      = exam.Percent,
+                    absentCount  = exam.AbsentCount,
+                    failedCount  = exam.FailedCount
                 },
                 receipts = history.Select(h => new
                 {

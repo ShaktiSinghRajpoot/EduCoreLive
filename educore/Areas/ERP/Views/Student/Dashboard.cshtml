@@ -62,27 +62,18 @@
                 </div>
 
                 <div class="sd-pane" id="tab-academic">
+                    @* This tab used to chart Term 1 / Term 2 / Annual marks against a
+                       "class average", with letter grades. None of that exists: the exam
+                       module records marks per EXAM, not per term, and there is no grading
+                       scale in the school's settings to derive a letter from. It was all
+                       generated. Exam Results shows the real marks, exam by exam. *@
                     <div class="ec-detail-box mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div class="ec-detail-title mb-0">Term-wise Performance</div>
-                            <small class="text-muted">— Class Average</small>
-                        </div>
-                        <canvas id="acChart" height="230"></canvas>
+                        <div class="ec-detail-title">Exam performance</div>
+                        <div id="ac-exams" class="mt-2"></div>
                     </div>
                     <div class="ec-detail-box mb-0">
-                        <div class="ec-detail-title">Subject-wise Grades</div>
-                        <div class="table-responsive">
-                            <table class="table sd-tbl align-middle mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Subject</th><th>Term 1</th><th>Term 2</th>
-                                        <th>Annual</th><th>Total/300</th><th>Grade</th>
-                                        <th>vs Last Term</th><th>Result</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="acGradeBody"></tbody>
-                            </table>
-                        </div>
+                        <div class="ec-detail-title">Current placement</div>
+                        <div id="ac-placement" class="mt-2"></div>
                     </div>
                 </div>
 
@@ -133,31 +124,22 @@
                 <div class="sd-pane" id="tab-exams">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
                         <div class="ec-detail-title mb-0">Exam Results</div>
-                        <select class="form-select form-select-sm" id="examSel" style="width:auto;">
-                            <option value="final">Annual Exam 2025–26</option>
-                            <option value="mid">Mid-Term Exam</option>
-                            <option value="unit1">Unit Test 1</option>
-                        </select>
+                        @* Filled from the student's own PUBLISHED exams — see the script. *@
+                        <select class="form-select form-select-sm" id="examSel" style="width:auto;"></select>
                     </div>
                     <div class="row g-2 mb-4" id="exam-summary"></div>
                     <div class="ec-detail-box mb-4">
                         <div class="ec-detail-title">Subject-wise Results</div>
                         <div class="table-responsive">
                             <table class="table sd-tbl align-middle mb-0">
-                                <thead><tr><th>Subject</th><th>Max Marks</th><th>Obtained</th><th>%</th><th>Grade</th><th>Class Rank</th><th>Result</th></tr></thead>
+                                <thead><tr><th>Subject</th><th>Max Marks</th><th>Obtained</th><th>%</th><th>Result</th></tr></thead>
                                 <tbody id="examBody"></tbody>
                             </table>
                         </div>
                     </div>
-                    <div class="ec-detail-box mb-0">
-                        <div class="ec-detail-title">Previous Exam Comparison</div>
-                        <div class="table-responsive">
-                            <table class="table sd-tbl align-middle mb-0">
-                                <thead><tr><th>Subject</th><th>Current</th><th>Previous</th><th>Change</th></tr></thead>
-                                <tbody id="examCompBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
+                    @* "Previous Exam Comparison" needs two exams' marks side by side and was
+                       being filled with invented deltas. The exam picker above already lets
+                       the office look at either one. *@
                 </div>
 
                 <div class="sd-pane" id="tab-fee">
@@ -298,9 +280,7 @@ function buildDetail(api){
         occupation:'—', income:'—', email:'—',
         prevSchool:st.prevSchool, prevBoard:'—', prevClass:'—', tcNo:'—', tcDate:'—',
 
-        /* Exam results have no per-student getter yet — the tab says so.
-           Attendance and the timetable are attached from the API in loadDashboard. */
-        rank:null, avgScore:null, marks:[], classAvg:[],
+        /* attendance, timetable and exams are attached from the API in loadDashboard */
 
         feeStructure: Object.keys(feeStructure).map(function(k){ return feeStructure[k]; }),
         feeHistory: (api.receipts || []).map(function(r){
@@ -331,7 +311,7 @@ function loadDashboard(){
         // The shape the render functions expect, from real values.
         var s={
             id:STUDENT_ID, name:st.name, roll:st.roll, cls:st.cls, sec:st.sec,
-            gender:st.gender, guardian:st.guardian, status:'Active',
+            gender:st.gender, guardian:st.guardian, status:'Active', admDate:st.admDate,
             feeDue:api.fee.outstanding,
             feeSt:api.fee.outstanding<=0 ? 'Paid' : (api.fee.totalPaid>0 ? 'Partial' : 'Pending'),
             attend:null, color:'primary'
@@ -340,6 +320,7 @@ function loadDashboard(){
         STUDENT=s; DETAIL=buildDetail(api);
         DETAIL.attendance = api.attendance;
         DETAIL.timetable  = api.timetable;
+        DETAIL.exams      = api.exams;
 
         // Open on the most recent month that has a register.
         var ms=(api.attendance && api.attendance.months) || [];
@@ -359,7 +340,7 @@ function loadDashboard(){
         renderProfile(s,DETAIL);
         renderAttendance(s,DETAIL);
         renderTimetable(DETAIL);
-        notYet('examContent',  'Exam results per student are not available yet.');
+        renderExams(s,DETAIL);
         activateTab('overview');
     })
     .fail(function(){
@@ -368,53 +349,48 @@ function loadDashboard(){
     });
 }
 
-/* An honest placeholder. The page used to fill these three tabs with
-   Math.random() values, which read as real data — a blank with a reason is
-   better than a convincing number that means nothing. */
-function notYet(id, msg, alsoClear){
-    var el=document.getElementById(id);
-    if(el) el.innerHTML='<div class="text-muted small p-3">'+EC.esc(msg)+'</div>';
-    if(alsoClear){ var el2=document.getElementById(alsoClear); if(el2) el2.innerHTML=''; }
-}
-
-/* ── Tabs ────────────────────────────────────── */
-function activateTab(name){
-    document.querySelectorAll('.sd-tab-btn').forEach(function(b){b.classList.toggle('active',b.dataset.tab===name);});
-    document.querySelectorAll('.sd-pane').forEach(function(p){p.classList.toggle('active',p.id==='tab-'+name);});
-    if(name==='academic' && charts.ac) charts.ac.resize();
-    if(name==='attendance' && charts.att) charts.att.resize();
-}
-document.getElementById('sdTabNav').addEventListener('click',function(e){
-    var btn=e.target.closest('.sd-tab-btn');
-    if(btn) activateTab(btn.dataset.tab);
-});
-
 /* ── Tab 1: Overview ─────────────────────────── */
 function renderOverview(s,d){
+    var att=d.attendance, ex=d.exams;
+
+    // Class Rank is gone: ranking needs every classmate's marks, which this page
+    // does not fetch. It used to show rand(1,40).
     document.getElementById('ov-metrics').innerHTML=
-        mc('Attendance',s.attend+'%','bg-label-success text-success','bx-user-check')
-       +mc('Avg Score',  d.avgScore+'%','bg-label-info text-info','bx-book-open')
-       +mc('Class Rank', '#'+d.rank,'bg-label-warning text-warning','bx-medal')
+        mc('Attendance', (att&&att.schoolDays) ? att.percent+'%' : '—',
+           (att&&att.schoolDays&&att.percent>=75?'bg-label-success text-success':'bg-label-warning text-warning'),'bx-user-check')
+       +mc('Last Exam',  (ex&&ex.options.length) ? ex.percent+'%' : '—','bg-label-info text-info','bx-book-open')
+       +mc('Subjects',   (ex&&ex.options.length) ? String(ex.subjectCount) : '—','bg-label-primary text-primary','bx-list-check')
        +mc('Fee Due',    inr(s.feeDue),(s.feeDue>0?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-wallet');
 
-    document.getElementById('ov-bars').innerHTML=d.marks.map(function(m){
-        var col=m.pct>=85?'#28c76f':m.pct>=70?'#2196f3':m.pct>=55?'#ff9f43':'#ea5455';
-        return '<div class="sd-subj-row">'
-            +'<div class="sd-subj-hd"><span>'+m.subject+'</span><span>'+m.pct+'%</span></div>'
-            +'<div class="sd-bar-wrap"><div class="sd-bar-fill" style="width:'+m.pct+'%;background:'+col+'"></div></div>'
-            +'</div>';
-    }).join('');
+    // Subject bars come from the latest published exam's real marks; absent
+    // subjects have no percentage, so they are not drawn as a zero-length bar.
+    var bars=(ex&&ex.subjects||[]).filter(function(m){ return m.percent!=null; });
+    document.getElementById('ov-bars').innerHTML = bars.length
+      ? bars.map(function(m){
+            var col=m.percent>=85?'#28c76f':m.percent>=70?'#2196f3':m.percent>=55?'#ff9f43':'#ea5455';
+            return '<div class="sd-subj-row">'
+                +'<div class="sd-subj-hd"><span>'+EC.esc(m.subject)+'</span><span>'+m.percent+'%</span></div>'
+                +'<div class="sd-bar-wrap"><div class="sd-bar-fill" style="width:'+m.percent+'%;background:'+col+'"></div></div>'
+                +'</div>';
+        }).join('')
+      : '<div class="text-muted small">No published exam marks yet.</div>';
 
-    document.getElementById('ov-activity').innerHTML=
-        ai('bx-file','bg-label-info text-info','Last Exam: Annual Exam','Score: '+d.avgScore+'% · 15 May 2026')
-       +ai('bx-wallet','bg-label-success text-success','Last Fee Payment','Paid '+inr(2500)+' · 05 May 2026')
-       +ai('bx-user-x','bg-label-danger text-danger','Last Absent','18 May 2026')
-       +ai('bx-user-plus','bg-label-primary text-primary','Admission',fmtDate(s.admDate));
+    // Only facts we actually hold. The old version listed a made-up last payment
+    // and a made-up absence date.
+    var acts='';
+    if(ex&&ex.options.length) acts+=ai('bx-file','bg-label-info text-info',
+        'Last exam: '+EC.esc(ex.options[0].name), ex.percent+'%'+(ex.options[0].date?' · '+EC.esc(ex.options[0].date):''));
+    if(d.feeHistory.length)   acts+=ai('bx-wallet','bg-label-success text-success',
+        'Last fee payment', inr(d.feeHistory[0].amt)+' · '+EC.esc(d.feeHistory[0].date));
+    if(att&&att.schoolDays)   acts+=ai('bx-user-check','bg-label-primary text-primary',
+        'Attendance this session', att.present+' of '+att.schoolDays+' days');
+    acts+=ai('bx-user-plus','bg-label-primary text-primary','Admission', EC.esc(d.dob ? s.admDate||'—' : '—'));
+    document.getElementById('ov-activity').innerHTML = acts;
 
     document.getElementById('ov-qinfo').innerHTML=
-        ic('DOB',d.dob)+ic('Age',d.age)+ic('Blood Group',d.blood)+ic('Religion',d.religion)
+        ic('DOB',d.dob)+ic('Blood Group',d.blood)+ic('Religion',d.religion)
        +ic('Category',d.category)+ic('Nationality',d.nationality)
-       +ic('Aadhaar No',d.aadhaar)+ic('Mother Tongue',d.motherTongue);
+       +ic('ID Proof',d.aadhaar)+ic('Guardian',d.guardianName);
 }
 function mc(lbl,val,cls,icon){
     return '<div class="col-6 col-sm-3"><div class="sd-metric">'
@@ -435,41 +411,20 @@ function ic(lbl,val){
 
 /* ── Tab 2: Academic ─────────────────────────── */
 function renderAcademic(s,d){
-    if(charts.ac){charts.ac.destroy();charts.ac=null;}
-    var ctx=document.getElementById('acChart').getContext('2d');
-    charts.ac=new Chart(ctx,{
-        type:'bar',
-        data:{
-            labels:subjs.map(function(x){return x.slice(0,5)+'.';}),
-            datasets:[
-                {type:'bar',  label:'Term 1', data:d.marks.map(function(m){return m.t1;}),   backgroundColor:'rgba(105,108,255,.75)',borderRadius:4},
-                {type:'bar',  label:'Term 2', data:d.marks.map(function(m){return m.t2;}),   backgroundColor:'rgba(40,199,111,.75)', borderRadius:4},
-                {type:'bar',  label:'Annual', data:d.marks.map(function(m){return m.annual;}),backgroundColor:'rgba(255,159,67,.75)',borderRadius:4},
-                {type:'line', label:'Class Avg',data:d.classAvg,borderColor:'#ea5455',backgroundColor:'transparent',borderWidth:2,pointRadius:4,tension:.4}
-            ]
-        },
-        options:{
-            responsive:true,
-            plugins:{legend:{position:'bottom',labels:{boxWidth:10,font:{size:11}}}},
-            scales:{y:{beginAtZero:true,max:100,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}
-        }
-    });
+    // Every published exam this student has marks in — the list the Exam Results
+    // picker is built from, so the two tabs can never disagree.
+    var ex=d.exams;
+    document.getElementById('ac-exams').innerHTML =
+        (ex && ex.options.length)
+          ? '<ul class="mb-0 small" style="padding-left:1.1rem;">'
+            + ex.options.map(function(o){
+                return '<li>'+EC.esc(o.name)+(o.type?' <span class="text-muted">('+EC.esc(o.type)+')</span>':'')
+                     + (o.date?' — '+EC.esc(o.date):'')+'</li>'; }).join('')
+            + '</ul><div class="text-muted small mt-2">Open the Exam Results tab for subject-wise marks.</div>'
+          : '<div class="text-muted small">No published exam results yet.</div>';
 
-    document.getElementById('acGradeBody').innerHTML=d.marks.map(function(m){
-        var trend=m.pct>m.prevPct
-            ?'<span class="text-success fw-bold">&#8593; +'+Math.abs(m.pct-m.prevPct)+'%</span>'
-            :(m.pct<m.prevPct
-                ?'<span class="text-danger fw-bold">&#8595; -'+Math.abs(m.pct-m.prevPct)+'%</span>'
-                :'<span class="text-muted">—</span>');
-        return '<tr>'
-            +'<td class="fw-bold">'+m.subject+'</td>'
-            +'<td>'+m.t1+'</td><td>'+m.t2+'</td><td>'+m.annual+'</td>'
-            +'<td class="fw-bold">'+m.total+' <span class="text-muted fw-normal">/300</span></td>'
-            +'<td><span class="sd-bdg g'+m.grade+'">'+m.grade+'</span></td>'
-            +'<td>'+trend+'</td>'
-            +'<td>'+(m.pass?'<span class="sd-bdg b-active">Pass</span>':'<span class="sd-bdg b-pending">Fail</span>')+'</td>'
-            +'</tr>';
-    }).join('');
+    document.getElementById('ac-placement').innerHTML =
+        ic('Class', s.cls) + ic('Section', s.sec) + ic('Roll No', s.roll);
 }
 
 /* ── Tab 3: Attendance ───────────────────────── */
@@ -611,38 +566,69 @@ function renderTimetable(d){
 
 /* ── Tab 5: Exam Results ─────────────────────── */
 function renderExams(s,d){
-    var totalObt=d.marks.reduce(function(a,m){return a+m.annual;},0);
-    var totalMax=d.marks.length*100;
-    var overallPct=pct(totalObt,totalMax);
-    var division=overallPct>=60?'First Division':overallPct>=48?'Second Division':overallPct>=36?'Third Division':'Fail';
-    var passed=d.marks.every(function(m){return m.pass;});
+    var ex=d.exams, sel=document.getElementById('examSel');
 
+    if(!ex || !ex.options.length){
+        sel.innerHTML='<option>No published results</option>';
+        document.getElementById('exam-summary').innerHTML=
+            '<div class="text-muted small p-3">No published exam results for this student yet. '
+           +'Results appear here once the exam is published.</div>';
+        document.getElementById('examBody').innerHTML='';
+        return;
+    }
+
+    if(!sel.options.length || sel.dataset.filled!=='1'){
+        sel.innerHTML=ex.options.map(function(o){
+            return '<option value="'+o.id+'">'+EC.esc(o.name)+(o.date?' · '+EC.esc(o.date):'')+'</option>';
+        }).join('');
+        sel.dataset.filled='1';
+    }
+
+    // Absences are out of the totals, so say how many there were — otherwise
+    // "2 subjects" on a 3-subject exam looks like missing data.
     document.getElementById('exam-summary').innerHTML=
-        mc('Total Marks',totalObt+'/'+totalMax,'bg-label-primary text-primary','bx-calculator')
-       +mc('Percentage',  overallPct+'%','bg-label-info text-info','bx-bar-chart-alt')
-       +mc('Division',    division,'bg-label-warning text-warning','bx-trophy')
-       +mc('Result',      passed?'PASS':'FAIL',(passed?'bg-label-success text-success':'bg-label-danger text-danger'),'bx-check-shield');
+        mc('Percentage', ex.percent+'%',(ex.percent>=33?'bg-label-success text-success':'bg-label-danger text-danger'),'bx-bar-chart-alt-2')
+       +mc('Marks', ex.obtained+' / '+ex.total,'bg-label-primary text-primary','bx-calculator')
+       +mc('Subjects', ex.subjectCount+(ex.absentCount?' (+'+ex.absentCount+' absent)':''),'bg-label-info text-info','bx-book')
+       +mc('Failed', ex.failedCount+(ex.failedCount===1?' subject':' subjects'),
+           (ex.failedCount?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-error-circle');
 
-    document.getElementById('examBody').innerHTML=d.marks.map(function(m,i){
+    document.getElementById('examBody').innerHTML=ex.subjects.map(function(r){
+        // Absent is not zero and not a fail — it is its own outcome.
+        if(r.absent){
+            return '<tr>'
+                +'<td class="fw-bold">'+EC.esc(r.subject)+'</td>'
+                +'<td>'+(r.max!=null?r.max:'—')+'</td>'
+                +'<td class="text-muted">—</td>'
+                +'<td class="text-muted">—</td>'
+                +'<td><span class="sd-bdg b-inactive">Absent</span></td>'
+                +'</tr>';
+        }
+        var res = r.passed===true  ? '<span class="sd-bdg b-active">Pass</span>'
+                : r.passed===false ? '<span class="sd-bdg b-inactive" style="background:#fde8e8;color:#842029;">Fail</span>'
+                : '<span class="text-muted small" title="No pass mark set for this subject">—</span>';
         return '<tr>'
-            +'<td class="fw-bold">'+m.subject+'</td>'
-            +'<td>100</td>'
-            +'<td class="fw-bold">'+m.annual+'</td>'
-            +'<td>'+m.pct+'%</td>'
-            +'<td><span class="sd-bdg g'+m.grade+'">'+m.grade+'</span></td>'
-            +'<td>'+rand(1,40)+'</td>'
-            +'<td>'+(m.pass?'<span class="sd-bdg b-active">Pass</span>':'<span class="sd-bdg b-pending">Fail</span>')+'</td>'
+            +'<td class="fw-bold">'+EC.esc(r.subject)+'</td>'
+            +'<td>'+(r.max!=null?r.max:'—')+'</td>'
+            +'<td class="fw-bold">'+(r.obtained!=null?r.obtained:'—')+'</td>'
+            +'<td>'+(r.percent!=null?r.percent+'%':'—')+'</td>'
+            +'<td>'+res+'</td>'
             +'</tr>';
-    }).join('');
-
-    document.getElementById('examCompBody').innerHTML=d.marks.map(function(m){
-        var diff=m.pct-m.prevPct;
-        var arrow=diff>0?'<span class="text-success">&#8593; +'+diff+'%</span>':diff<0?'<span class="text-danger">&#8595; '+diff+'%</span>':'<span class="text-muted">—</span>';
-        return '<tr><td class="fw-bold">'+m.subject+'</td><td>'+m.pct+'%</td><td>'+m.prevPct+'%</td><td>'+arrow+'</td></tr>';
     }).join('');
 }
 
-/* ── Tab 6: Fee ──────────────────────────────── */
+// Switching exam re-asks the server rather than caching every exam's marks.
+document.getElementById('examSel').addEventListener('change',function(){
+    var id=this.value;
+    if(!id||isNaN(id)) return;
+    $.getJSON(DATA_URL,{ id:STUDENT_ID, examId:id })
+     .done(function(api){
+        if(!api||!api.found||!api.exams) return;
+        DETAIL.exams=api.exams;
+        renderExams(STUDENT,DETAIL);
+     });
+});
+
 function renderFee(s,d){
     document.getElementById('fee-metrics').innerHTML=
         mc('Total Fee', inr(d.totalFee),'bg-label-primary text-primary','bx-calculator')

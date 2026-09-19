@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Models.ERP;
+﻿using EduCoreDataAccessLayer.Models.ERP;
 
 namespace EduCoreDataAccessLayer.Services.Contract.ERP
 {
@@ -56,6 +56,12 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Save a sheet as draft, or finalize it (unmarked students become Absent).</summary>
+        // One student, every subject of one PUBLISHED exam — the Student Dashboard's
+        // view. Marks entry answers the other axis (one exam, one subject, one section).
+        // examId null = their most recent published exam.
+        Task<StudentExamResult> GetStudentResultAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId, int? examId = null);
+
         Task<ExamMarksSaveResult> SaveMarksAsync(
             ExamMarksSaveRequest request, int tenantId, int schoolId, int actionUserId);
 

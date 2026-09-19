@@ -1,4 +1,4 @@
-using System.Data;
+﻿using System.Data;
 using System.Globalization;
 using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
@@ -15,6 +15,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string Sp      = "academic.sp_school_admin_exam_manage";
         private const string TimeFmt = "HH\\:mm";
         private const string SpMarks = "academic.sp_school_admin_exam_marks_manage";
+        private const string SpStudentResult = "core.sp_exam_result_student";
 
         public ExamService(PgExec db)
         {
@@ -451,6 +452,68 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
 
             return sheet;
+        }
+
+        public async Task<StudentExamResult> GetStudentResultAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId, int? examId = null)
+        {
+            var result = new StudentExamResult();
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0) return result;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",     NpgsqlDbType.Integer) { Value = studentId },
+                new("p_exam_id",        NpgsqlDbType.Integer) { Value = (object?)examId ?? DBNull.Value },
+                new("p_exams",   NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "er_exams" },
+                new("p_marks",   NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "er_marks" },
+                new("p_summary", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "er_summary" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpStudentResult, parameters);
+
+            if (ds.Tables.Count > 0)
+                foreach (DataRow row in ds.Tables[0].Rows)
+                    result.Exams.Add(new StudentExamOption
+                    {
+                        ExamId    = IntVal(row, "exam_id"),
+                        ExamName  = Str(row, "exam_name"),
+                        ExamType  = Has(row, "exam_type") && row["exam_type"] != DBNull.Value
+                                      ? row["exam_type"].ToString() : null,
+                        StartDate = Has(row, "start_date") && row["start_date"] != DBNull.Value
+                                      ? DateOnly.FromDateTime(Convert.ToDateTime(row["start_date"])) : null
+                    });
+
+            if (ds.Tables.Count > 1)
+                foreach (DataRow row in ds.Tables[1].Rows)
+                    result.Subjects.Add(new StudentExamSubject
+                    {
+                        Subject   = Str(row, "subject"),
+                        Obtained  = DecValN(row, "obtained"),
+                        MaxMarks  = DecValN(row, "max_marks"),
+                        PassMarks = DecValN(row, "pass_marks"),
+                        IsAbsent  = BoolVal(row, "is_absent"),
+                        // Tri-state on purpose: null means "cannot say" (absent, or the
+                        // exam has no pass mark), which is not the same as failed.
+                        Passed    = Has(row, "passed") && row["passed"] != DBNull.Value
+                                      ? Convert.ToBoolean(row["passed"]) : null,
+                        Percent   = DecValN(row, "percent")
+                    });
+
+            if (ds.Tables.Count > 2 && ds.Tables[2].Rows.Count > 0)
+            {
+                var row = ds.Tables[2].Rows[0];
+                result.SubjectCount = IntVal(row, "subjects");
+                result.Obtained     = DecVal(row, "obtained", 0m);
+                result.Total        = DecVal(row, "total", 0m);
+                result.Percent      = DecVal(row, "percent", 0m);
+                result.AbsentCount  = IntVal(row, "absent_count");
+                result.FailedCount  = IntVal(row, "failed_count");
+            }
+
+            return result;
         }
 
         public async Task<ExamMarksSaveResult> SaveMarksAsync(

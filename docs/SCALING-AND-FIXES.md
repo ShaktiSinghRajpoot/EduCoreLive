@@ -2058,3 +2058,48 @@ per cell, which is O(n²) on a full grid.
 
 Exam Results is the last tab still saying it has no source; there is no
 per-student marks getter yet.
+
+---
+
+### [2026-08-25] Exam results per student — and the Dashboard is off the mocks entirely
+
+`core.sp_exam_result_student` is the last of the three per-student getters: one
+student, every subject of one exam, plus the list of exams to pick from.
+
+Two rules the schema itself argued for:
+
+**Published exams only.** `academic.exams.status` is `'Draft'` until the school
+publishes, and a draft is a sheet a teacher is still typing into — half-entered
+marks are not a result. Marks Entry is where unpublished work belongs; this is
+the parent-facing view. Verified: a Draft exam with marks in it does not appear
+in the picker at all.
+
+**Absent is not zero.** The table already says so —
+`CHECK (NOT (is_absent AND marks_obtained IS NOT NULL))` forces marks to be NULL
+when absent. So an absent subject is reported as absent, excluded from the totals
+and the percentage, and counted separately. One missed paper does not read as a
+failed one. Verified on seeded marks: 78/100, absent, 10/50 → **2 subjects,
+88/150, 58.7%, 1 absent, 1 failed** — the absent subject's 100 max marks are not
+in the denominator.
+
+`passed` is deliberately **tri-state**: true, false, or null when it cannot be
+said (absent, or the exam has no pass mark configured). Null is not "failed".
+
+**What was deleted rather than faked**, continuing the pattern of the last three
+commits:
+
+| removed | why |
+|---|---|
+| Grade column | no grading scale exists in settings; a letter would be invented |
+| Class Rank column, "Class Rank" metric | ranking needs every classmate's marks, which this page does not fetch. It was `rand(1,40)` |
+| Previous Exam Comparison table | needs two exams side by side; the picker already lets you look at either |
+| Academic tab's term chart + grade table | the exam module records marks per EXAM, not per term — "Term 1 / Term 2 / Annual" never existed |
+| Overview's "last payment"/"last absent" activity | both were hardcoded dates |
+
+The Academic tab now lists the student's published exams and their current
+placement; the Overview's subject bars come from the latest published exam's real
+marks, skipping absent subjects rather than drawing them as zero-length bars.
+
+**With this, no tab on the Student Dashboard renders invented data.** Every
+render function reads from `Student/DashboardData`, and the dead `notYet()`
+placeholder is gone because nothing needs it any more.
