@@ -724,9 +724,9 @@ function docsSection(docs){
 // Exam results have no per-student source yet, so the selector has nothing to
 // switch between. Left in place for when the exam module exposes one.
 
-/* ── Session history (real data) ──────────────
-   Everything else on this page is still mock; this card reads
-   core.student_enrolment through the server. */
+/* ── Session history ──────────────────────────
+   Loaded separately from the rest of the page: the dashboard payload is per
+   student, this is their whole timeline out of core.student_enrolment. */
 function loadEnrolmentHistory(){
   var body=document.getElementById('enrolHistoryBody');
   if(!body) return;
