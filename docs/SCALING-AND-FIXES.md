@@ -2356,3 +2356,53 @@ Three suites now exist and can be run at any time:
     Database/tests/fee_module_tests.sql             28
     Database/tests/enquiry_registration_tests.sql   30
     Database/tests/attendance_exam_tests.sql        28
+
+---
+
+### [2026-08-25] Transport + TC + ID Card test suite
+
+`Database/tests/transport_tc_tests.sql` — 31 checks. **31 passed on local and
+Railway, nothing to fix in the product.** Two of the tests were weak and were
+strengthened; that is the whole finding.
+
+**Transport:** a route needs a name; a stop carries its own fare, so assigning a
+student to the far stop bills 6 × ₹900 rather than a flat route rate; an unknown
+stop is refused (nobody ends up on a bus that does not run); and re-assigning
+leaves exactly one active row rather than putting a child on two buses.
+
+**Removing an assignment does the right thing in two directions**, which is the
+part worth having a test for: the month already **paid** for survives — taking a
+child off the bus does not unbill the months they rode — while the unpaid future
+months are **dropped**, so nobody is chased for a bus they no longer take.
+
+**TC gates, all enforced:** a still-enrolled student is refused ("mark them as
+left first"); a student with an unpaid balance is refused by amount ("Clear the
+pending dues of 2,500.00"); only one live certificate per student, with a second
+attempt told to use reprint instead.
+
+**The TC is a frozen snapshot** — renaming the student afterwards does not change
+the issued certificate, which is the whole reason `tc_register` copies the
+student's details rather than joining to them.
+
+**Print and void:** the first print is counted and a reprint increments it, which
+is what stamps a copy as DUPLICATE; voiding retires the number rather than
+deleting the row, so a mistaken certificate leaves a trail; voiding twice is
+refused; and after a void the student is eligible for a fresh certificate.
+
+**ID cards** come back for the class roster, exclude a student who has left, and
+return nothing at all to another school.
+
+**What the failure actually taught.** D3 ("TC refused while dues are pending")
+failed at first, and the gate looked broken. It was not: the test issued the TC
+to the bus rider whose dues had just been deleted by `RemoveAssignment` two
+sections earlier. The test now uses a student with a real unpaid balance. And
+C2 was worse than wrong — it asserted `chk(..., TRUE, ...)`, which passes
+unconditionally. It now pays one month, removes the assignment, and checks both
+halves separately.
+
+Four suites now exist, 117 checks in total:
+
+    Database/tests/fee_module_tests.sql             28
+    Database/tests/enquiry_registration_tests.sql   30
+    Database/tests/attendance_exam_tests.sql        28
+    Database/tests/transport_tc_tests.sql           31
