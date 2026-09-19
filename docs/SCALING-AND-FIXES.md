@@ -2308,3 +2308,51 @@ Fixed in both branches that write it (`SaveEnquiry` and `UpdateStatus`).
 first version of the suite called it positionally and was unreadable and wrong;
 it is now called with named arguments throughout, which also survives a parameter
 being added in the middle.
+
+---
+
+### [2026-08-25] Attendance + Exam test suite
+
+`Database/tests/attendance_exam_tests.sql` — 28 checks. Same shape as the other
+two: one transaction, rolled back, safe against any database. **28 passed on
+local and Railway, with nothing to fix** — both modules hold up.
+
+**Attendance guards, all confirmed:** a future date is refused (nobody knows who
+will turn up tomorrow); **Sundays are refused**, the same definition of a school
+day the leave module, payroll and the per-student view all use; a date past the
+school's back-date window is locked, so last term's absence cannot be quietly
+rewritten; and an empty register is refused rather than silently recording
+nothing.
+
+**One row per student per day** is a unique index, and re-saving a day
+**corrects** rather than duplicating — a teacher fixing a mistake does not leave
+two rows for one child on one day.
+
+**The rule that matters most, verified twice:** a day nobody marked is not an
+absence. A student marked present on the one day their class took a register
+reads **100%**, not 1/30th. A student whose class has never taken one reads
+"0 school days" rather than a red 0%.
+
+**Exam marks:** marks above the paper's maximum and negative marks are both
+refused by name; an absent student is flagged absent and stored with **NULL
+marks, not zero**, which the table's own CHECK constraint insists on; a finalised
+sheet is locked with a message telling the teacher to ask for a reopen; and
+reopening lets the edit through.
+
+**Per-student results:** a **Draft** exam does not appear at all, and an absent
+paper is counted as an absence and left out of both the numerator and the
+denominator — a student absent in their only subject shows 0 out of 0 rather than
+a 0% that reads like a fail.
+
+**Two notes on writing it.** The absent flag is sent as `"absent"`, not
+`"isAbsent"` — the test had it wrong and four checks failed in a way that looked
+like a product bug; `ExamService` had it right all along. And the suite picks its
+own test date (yesterday, or the day before if that is a Sunday) so it stays
+inside whatever back-date window the school has configured rather than assuming
+one.
+
+Three suites now exist and can be run at any time:
+
+    Database/tests/fee_module_tests.sql             28
+    Database/tests/enquiry_registration_tests.sql   30
+    Database/tests/attendance_exam_tests.sql        28
