@@ -1,3 +1,13 @@
+﻿-- ============================================================================
+-- SUPERSEDED. This file contains an EARLIER revision of
+-- core.sp_fee_payment_collect. The live definition is in fee_payment_tenders.sql
+-- (it takes p_tenders and p_advance_used, which this one does not).
+--
+-- Re-running this file would CREATE OR REPLACE the proc with the older shape and
+-- silently drop split-tender payments and advance adjustment. Kept only for the
+-- history of how the fee flow was built up.
+-- ============================================================================
+
 -- ============================================================================
 -- Fee Collection — full counter flow (ERP → Fee → Manage Fee)
 --
@@ -127,7 +137,9 @@ BEGIN
     END IF;
 
     v_date := COALESCE(p_payment_date, CURRENT_DATE);
-    v_year := left(COALESCE(NULLIF(trim(p_fin_year), ''), to_char(v_date, 'YYYY')), 4);
+    -- Was left(session_name, 4), which turned a session called "FY 26-27" into
+    -- "FY 2" and put a space in every receipt number. See receipt_number_year.sql.
+    v_year := core.fn_receipt_year(p_tenant_id, p_school_id, p_fin_year, v_date);
 
     -- Validate every line and add up the totals BEFORE writing anything, so a
     -- bad line aborts the whole receipt (all-or-nothing).

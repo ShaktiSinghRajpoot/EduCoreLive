@@ -1,3 +1,12 @@
+﻿-- ============================================================================
+-- NOTE ON core.sp_fee_payment_collect IN THIS FILE.
+-- This defines the 16-parameter overload (no p_advance_used). fee_advance.sql
+-- later added a 17-parameter one, and BOTH now exist in the database — the app
+-- calls the 17-param version. Any change to the collect logic has to be made in
+-- both, or the two drift apart. The other procs in this file (day close,
+-- collection register) are the live definitions.
+-- ============================================================================
+
 -- ============================================================================
 -- Fee Collection — SPLIT TENDER (multiple payment modes on one receipt)
 --
@@ -99,7 +108,9 @@ BEGIN
     END IF;
 
     v_date := COALESCE(p_payment_date, CURRENT_DATE);
-    v_year := left(COALESCE(NULLIF(trim(p_fin_year), ''), to_char(v_date, 'YYYY')), 4);
+    -- Was left(session_name, 4), which turned a session called "FY 26-27" into
+    -- "FY 2" and put a space in every receipt number. See receipt_number_year.sql.
+    v_year := core.fn_receipt_year(p_tenant_id, p_school_id, p_fin_year, v_date);
 
     IF v_has_items THEN
         FOR v_item IN SELECT * FROM jsonb_array_elements(p_items)

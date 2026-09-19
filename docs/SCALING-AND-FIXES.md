@@ -2203,3 +2203,62 @@ absent — the card says so when nothing has been marked, instead of showing 0%.
 
 The KPI trend lines say only what can be supported. "+12.5% vs yesterday" is now
 "nothing collected yesterday" on a day that is true.
+
+---
+
+### [2026-08-25] Fee module: a test suite, and what it found
+
+`Database/tests/fee_module_tests.sql` — 28 checks over ledger generation,
+collection, cancellation, the collect-at-admission allocation and receipt
+numbering. It runs in one transaction and **rolls back**, so it is safe to point
+at any database; it was run against both the local copy and Railway.
+
+Each check prints PASS/FAIL with the numbers behind it, so a failure says what it
+expected and what it got rather than just stopping.
+
+**What it found.**
+
+**1. Receipt numbers were malformed for most schools.** The number was built as
+
+    v_year := left(COALESCE(NULLIF(trim(p_fin_year),''), to_char(v_date,'YYYY')), 4);
+
+— the first four characters of the session **name**. That only works if the
+school happens to call it "2026-2027". This school calls it **"FY 26-27"**, so
+every receipt read:
+
+    RCP-FY 2-0001
+
+A space in the middle of a number handed to a parent, and a prefix that means
+nothing. It is also the key of `core.receipt_counters`, so the sequence hung off
+a truncated label. New `core.fn_receipt_year` resolves it the way a human would:
+the session's own `start_date` year, else a four-digit run in the name, else a
+two-digit run read as 20xx, else the payment date. Verified across all four
+paths. Receipts now read `RCP-2026-0001`. **Existing receipts are not
+renumbered** — a receipt number is printed, filed and quoted, and rewriting old
+ones would break every reference to them.
+
+**2. `sp_fee_payment_collect` exists as TWO overloads in the database** — a
+16-parameter one from `fee_payment_tenders.sql` and a 17-parameter one (with
+`p_advance_used`) from `fee_advance.sql`. The app calls the 17-param version.
+This cost real time: the fix was applied to the wrong one first, and the tests
+kept failing while the proc looked fixed. Both are now marked in their files
+saying which is which and that a change to collection logic has to be made in
+both. Three further files hold superseded revisions of the same proc and are
+marked SUPERSEDED, so re-running one cannot silently downgrade the live proc —
+the same loaded-gun problem as the `sp_dropdown_common` duplicate.
+
+**What the suite confirmed is already right**, which is most of it: the
+back-dated-admission fix holds (9-year-old admission date still bills 12 months,
+mid-session joiner bills 8); overpaying a line, a negative amount, an empty
+selection and a cross-school collection are all refused; a concession is recorded
+on the row without cash moving; cancelling a receipt puts the ledger back exactly
+and a second cancel reports failure without reversing twice or overwriting the
+audit trail; the admission-point charge is settled before scheduled dues; and no
+ledger row anywhere ends up over-paid or negative.
+
+**A note on C4.** The first version of that test asserted that cancelling twice
+*raises*. It does not — it returns `success = false` with "Receipt not found or
+already cancelled", which is the better design: already-cancelled is a state, not
+an error. The test was wrong, not the code, and it now asserts what actually
+matters — that the ledger is not reversed twice and the original cancel reason
+survives.

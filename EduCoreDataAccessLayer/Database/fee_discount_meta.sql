@@ -1,3 +1,13 @@
+﻿-- ============================================================================
+-- SUPERSEDED. This file contains an EARLIER revision of
+-- core.sp_fee_payment_collect. The live definition is in fee_payment_tenders.sql
+-- (it takes p_tenders and p_advance_used, which this one does not).
+--
+-- Re-running this file would CREATE OR REPLACE the proc with the older shape and
+-- silently drop split-tender payments and advance adjustment. Kept only for the
+-- history of how the fee flow was built up.
+-- ============================================================================
+
 -- ============================================================================
 -- Fee Collection — persist the DISCOUNT metadata (type + value + reason)
 --
