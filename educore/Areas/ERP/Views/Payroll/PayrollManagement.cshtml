@@ -1,4 +1,4 @@
-@{
+﻿@{
     ViewData["Title"] = "Payroll & Salary";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 }
@@ -33,10 +33,12 @@
     <div class="pr-toolbar">
       <div>
         <div class="pr-field-label">PAY PERIOD</div>
+        @* Last twelve months from the controller — payroll is never run ahead. *@
         <select class="form-select" id="fMonth">
-          <option value="2026-06" selected>June 2026</option>
-          <option value="2026-05">May 2026</option>
-          <option value="2026-04">April 2026</option>
+          @foreach (var m in ViewBag.Months as IEnumerable<dynamic> ?? Enumerable.Empty<dynamic>())
+          {
+              <option value="@m.value">@m.label</option>
+          }
         </select>
       </div>
       <div>
@@ -125,80 +127,65 @@
 <script>
 $(document).ready(function () {
 
+    const LIST_URL = '@Url.Action("List","Payroll",new{area="ERP"})';
+    const RUN_URL  = '@Url.Action("RunPayroll","Payroll",new{area="ERP"})';
+    const PAID_URL = '@Url.Action("MarkPaid","Payroll",new{area="ERP"})';
+    function token(){ return $('input[name="__RequestVerificationToken"]').first().val(); }
+    function period(){ const v=($('#fMonth').val()||'').split('-'); return { year:+v[0], month:+v[1] }; }
+    function ini(n){ return (n||'').split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase(); }
+
     const COLORS = ['bg-label-primary text-primary','bg-label-info text-info','bg-label-success text-success','bg-label-warning text-warning','bg-label-danger text-danger'];
     function inr(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
 
-    /* ── Salary structures + monthly attendance (mock; from Staff/Attendance/Leave modules) ──
-       attendance: working = working days in month; absent, half, unpaidLeave feed Loss of Pay.
-       paidLeave is informational (no LOP).                                                     */
-    const STAFF = [
-      { id:1,  name:'Sunita Rao',    emp:'EMP-001', desig:'Principal',        dept:'Administration', av:'SR', basic:60000, conveyance:1600, medical:1250, special:9000, att:{working:26,present:26,half:0,paidLeave:0,absent:0,unpaidLeave:0}, status:'paid' },
-      { id:2,  name:'Rakesh Mehta',  emp:'EMP-002', desig:'Vice Principal',   dept:'Administration', av:'RM', basic:48000, conveyance:1600, medical:1250, special:7000, att:{working:26,present:25,half:0,paidLeave:1,absent:0,unpaidLeave:0}, status:'paid' },
-      { id:3,  name:'Anita Desai',   emp:'EMP-003', desig:'Senior Teacher',   dept:'Teaching',       av:'AD', basic:38000, conveyance:1600, medical:1250, special:5000, att:{working:26,present:25,half:0,paidLeave:1,absent:0,unpaidLeave:0}, status:'pending' },
-      { id:4,  name:'Vikram Joshi',  emp:'EMP-004', desig:'Maths Teacher',    dept:'Teaching',       av:'VJ', basic:32000, conveyance:1600, medical:1250, special:4000, att:{working:26,present:24,half:1,paidLeave:0,absent:1,unpaidLeave:0}, status:'pending' },
-      { id:5,  name:'Pooja Nair',    emp:'EMP-005', desig:'Science Teacher',  dept:'Teaching',       av:'PN', basic:30000, conveyance:1600, medical:1250, special:3500, att:{working:26,present:21,half:0,paidLeave:2,absent:0,unpaidLeave:3}, status:'pending' },
-      { id:6,  name:'Arun Kumar',    emp:'EMP-006', desig:'Accountant',       dept:'Accounts',       av:'AK', basic:28000, conveyance:1600, medical:1250, special:3000, att:{working:26,present:26,half:0,paidLeave:0,absent:0,unpaidLeave:0}, status:'pending' },
-      { id:7,  name:'Meena Iyer',    emp:'EMP-007', desig:'Librarian',        dept:'Library',        av:'MI', basic:22000, conveyance:1600, medical:1250, special:2500, att:{working:26,present:25,half:2,paidLeave:0,absent:0,unpaidLeave:0}, status:'pending' },
-      { id:8,  name:'Deepak Verma',  emp:'EMP-012', desig:'Bus Driver',       dept:'Transport',      av:'DV', basic:16000, conveyance:1600, medical:1250, special:1500, att:{working:26,present:24,half:0,paidLeave:0,absent:2,unpaidLeave:0}, status:'pending' },
-      { id:9,  name:'Gopal Das',     emp:'EMP-016', desig:'Peon',             dept:'Support Staff',  av:'GD', basic:13000, conveyance:1600, medical:1250, special:1200, att:{working:26,present:26,half:0,paidLeave:0,absent:0,unpaidLeave:0}, status:'pending' }
-    ];
+    /* Rows come from the server, already computed.
 
-    /* ── India new-regime TDS (FY 24-25), monthly estimate ── */
-    function annualTDS(monthlyGross){
-        const annual = monthlyGross * 12;
-        let taxable = Math.max(0, annual - 50000);        // standard deduction
-        if (taxable <= 700000) return 0;                  // 87A rebate (new regime)
-        const slabs = [[300000,0],[400000,.05],[300000,.10],[200000,.15],[300000,.20],[Infinity,.30]];
-        let rem = taxable, tax = 0;
-        for (const [width,rate] of slabs){ if(rem<=0) break; const part=Math.min(rem,width); tax+=part*rate; rem-=part; }
-        return tax * 1.04;                                 // + 4% cess
-    }
-
-    /* ── Core payroll computation (the real logic) ── */
-    function compute(s){
-        const hra = Math.round(s.basic * 0.40);            // HRA 40% of basic
-        const da  = Math.round(s.basic * 0.10);            // DA 10% of basic
-        const gross = s.basic + hra + da + s.conveyance + s.medical + s.special;
-
-        const epf = Math.min(Math.round(s.basic * 0.12), 1800);          // 12% basic, ₹15k cap → ₹1,800
-        const esi = gross <= 21000 ? Math.round(gross * 0.0075) : 0;       // 0.75% if gross ≤ ₹21k
-        const pt  = 200;                                                   // professional tax
-        const tds = Math.round(annualTDS(gross) / 12);                    // monthly TDS
-
-        const lopDays = s.att.absent + s.att.half * 0.5 + s.att.unpaidLeave;
-        const perDay  = gross / s.att.working;
-        const lop     = Math.round(perDay * lopDays);
-
-        const totalDed = epf + esi + pt + tds + lop;
-        const net = gross - totalDed;
-        return { hra, da, gross, epf, esi, pt, tds, lopDays, lop, totalDed, net };
-    }
+       WHAT IS NOT HERE, and why. The mock this replaced split pay into basic /
+       HRA / DA / conveyance / medical / special and deducted EPF, ESI,
+       professional tax and TDS off hardcoded income-tax slabs. None of that is
+       configured anywhere in the app: core.staff holds ONE monthly_salary
+       figure, and there is no salary-component or statutory-rate table.
+       Hardcoding tax slabs into a page would be wrong for most schools and
+       stale after any budget. So the payslip shows what the school actually
+       recorded — gross, Loss of Pay, net — and a component breakdown can come
+       when there is a salary structure to read it from. */
+    let ROWS = [];
 
     function periodLabel(){ return $('#fMonth option:selected').text(); }
 
-    function visible(){
-        const dept = $('#fDept').val();
-        return STAFF.filter(s => !dept || s.dept === dept);
-    }
+    // The department filter is applied by the proc, so the page just draws what
+    // came back — no second filtering rule to drift out of step.
+    function visible(){ return ROWS; }
 
     function render(){
         const rows = visible();
         let totNet = 0, totDed = 0, paid = 0, pend = 0;
 
+        if(!rows.length){
+            // No payslips is not the same as zero pay — the month simply has not
+            // been run yet.
+            $('#prBody').html('<tr><td colspan="7" class="text-muted small p-3">'
+                + 'No payslips for this month yet. Press <strong>Run Payroll</strong> to generate them.</td></tr>');
+            $('#kNet').text(inr(0)); $('#kDed').text(inr(0)); $('#kPaid').text(0); $('#kPend').text(0);
+            return;
+        }
+
         $('#prBody').html(rows.map(function(s){
-            const c = compute(s);
-            totNet += c.net; totDed += c.totalDed;
-            s.status === 'paid' ? paid++ : pend++;
-            const lopCls = c.lopDays > 0 ? 'has' : 'zero';
-            const col = COLORS[s.id % COLORS.length];
+            const isPaid = (s.status||'').toLowerCase() === 'paid';
+            totNet += s.net; totDed += s.deductions;
+            isPaid ? paid++ : pend++;
+            const lopCls = s.lopDays > 0 ? 'has' : 'zero';
+            const col = COLORS[s.staffId % COLORS.length];
             return ''
               + '<tr>'
-              +   '<td><div class="pr-staff"><div class="pr-av '+col+'">'+s.av+'</div><div><div class="pr-nm">'+s.name+'</div><div class="pr-sub">'+s.emp+' · '+s.desig+'</div></div></div></td>'
-              +   '<td class="text-end pr-amt">'+inr(c.gross)+'</td>'
-              +   '<td class="text-end pr-amt ded">−'+inr(c.totalDed)+'</td>'
-              +   '<td class="text-center"><span class="pr-lop '+lopCls+'"><i class="bx bx-calendar-x"></i>'+c.lopDays+'</span></td>'
-              +   '<td class="text-end pr-amt net">'+inr(c.net)+'</td>'
-              +   '<td class="text-center"><span class="pr-status '+(s.status==='paid'?'ps-paid':'ps-pending')+'">'+(s.status==='paid'?'Paid':'Pending')+'</span></td>'
+              +   '<td><div class="pr-staff"><div class="pr-av '+col+'">'+EC.esc(ini(s.name))+'</div><div>'
+              +     '<div class="pr-nm">'+EC.esc(s.name)+'</div>'
+              +     '<div class="pr-sub">'+EC.esc(s.code||'—')+' · '+EC.esc(s.designation||'—')+'</div></div></div></td>'
+              +   '<td class="text-end pr-amt">'+inr(s.gross)+'</td>'
+              +   '<td class="text-end pr-amt ded">'+(s.deductions>0?'−'+inr(s.deductions):inr(0))+'</td>'
+              +   '<td class="text-center"><span class="pr-lop '+lopCls+'" title="Approved unpaid leave days in this month">'
+              +     '<i class="bx bx-calendar-x"></i>'+s.lopDays+'</span></td>'
+              +   '<td class="text-end pr-amt net">'+inr(s.net)+'</td>'
+              +   '<td class="text-center"><span class="pr-status '+(isPaid?'ps-paid':'ps-pending')+'">'+(isPaid?'Paid':'Pending')+'</span></td>'
               +   '<td class="text-center"><button class="pr-view" data-id="'+s.id+'"><i class="bx bx-receipt"></i>View</button></td>'
               + '</tr>';
         }).join(''));
@@ -212,32 +199,29 @@ $(document).ready(function () {
     /* ── Payslip modal ── */
     let activeId = null;
     function openPayslip(s){
+        const isPaid = (s.status||'').toLowerCase()==='paid';
         activeId = s.id;
-        const c = compute(s);
-        $('#psAv').attr('class','pr-av '+COLORS[s.id % COLORS.length]).text(s.av);
+        $('#psAv').attr('class','pr-av '+COLORS[s.staffId % COLORS.length]).text(ini(s.name));
         $('#psName').text(s.name);
-        $('#psSub').text(s.emp + ' · ' + s.desig + ' · ' + s.dept);
+        $('#psSub').text((s.code||'—') + ' · ' + (s.designation||'—') + (s.department?' · '+s.department:''));
         $('#psPeriod').text(periodLabel());
 
-        $('#psAtt').html(
-            chip('Working', s.att.working) + chip('Present', s.att.present) + chip('Half', s.att.half) +
-            chip('Paid Lv', s.att.paidLeave) + chip('LOP Days', c.lopDays, c.lopDays>0)
-        );
+        // LOP days is the only attendance figure this payslip actually has —
+        // there is no staff attendance register, so present/half/paid-leave
+        // counts would be invented.
+        $('#psAtt').html(chip('LOP Days', s.lopDays, s.lopDays>0));
 
         $('#psEarn').html(
-            line('Basic', s.basic) + line('HRA (40%)', c.hra) + line('DA (10%)', c.da) +
-            line('Conveyance', s.conveyance) + line('Medical', s.medical) + line('Special Allowance', s.special) +
-            lineTotal('Gross Earnings', c.gross)
+            line('Monthly salary', s.gross) + lineTotal('Gross Earnings', s.gross)
         );
         $('#psDed').html(
-            line('EPF (12% basic)', c.epf) + line('ESI', c.esi) + line('Professional Tax', c.pt) +
-            line('TDS', c.tds) + line('Loss of Pay ('+c.lopDays+'d)', c.lop) +
-            lineTotal('Total Deductions', c.totalDed)
+            (s.lopDays > 0 ? line('Loss of Pay ('+s.lopDays+'d)', s.lopAmount) : '')
+            + lineTotal('Total Deductions', s.deductions)
         );
-        $('#psNet').text(inr(c.net));
+        $('#psNet').text(inr(s.net));
 
-        $('#psMarkPaid').prop('disabled', s.status==='paid').html(
-            s.status==='paid' ? '<i class="bx bx-check-double me-1"></i>Already Paid' : '<i class="bx bx-check me-1"></i>Mark Paid'
+        $('#psMarkPaid').prop('disabled', isPaid).html(
+            isPaid ? '<i class="bx bx-check-double me-1"></i>Already Paid' : '<i class="bx bx-check me-1"></i>Mark Paid'
         );
         new bootstrap.Modal(document.getElementById('payslipModal')).show();
     }
@@ -245,28 +229,78 @@ $(document).ready(function () {
     function line(l,v){ return '<div class="ps-line"><span>'+l+'</span><span>'+inr(v)+'</span></div>'; }
     function lineTotal(l,v){ return '<div class="ps-line total"><span>'+l+'</span><span>'+inr(v)+'</span></div>'; }
 
-    $('#prBody').on('click','.pr-view',function(){ const s=STAFF.find(x=>x.id===Number($(this).data('id'))); if(s) openPayslip(s); });
+    $('#prBody').on('click','.pr-view',function(){
+        const s=ROWS.find(x=>x.id===Number($(this).data('id'))); if(s) openPayslip(s);
+    });
 
+    // The server refuses to pay a payslip twice, so the button reports what it says.
     $('#psMarkPaid').on('click',function(){
-        const s = STAFF.find(x=>x.id===activeId); if(!s) return;
-        s.status='paid'; render();
-        bootstrap.Modal.getInstance(document.getElementById('payslipModal')).hide();
-        ecToast('success', s.name+"'s salary marked as paid.");
+        const $btn=$(this);
+        EC.buttonBusy($btn,'Saving…');
+        $.ajax({ url:PAID_URL, type:'POST',
+                 headers:{ 'RequestVerificationToken': token() }, data:{ id: activeId } })
+        .done(function(res){
+            if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not mark paid.'); return; }
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('payslipModal')).hide();
+            ecToast('success', res.message);
+            load();
+        })
+        .fail(function(xhr){
+            ecToast('error', xhr && xhr.status===403
+                ? 'You do not have permission to mark payslips paid.'
+                : 'Could not reach the server. Nothing was changed.');
+        })
+        .always(function(){ EC.buttonReset($btn); });
     });
     $('#psPrint').on('click',function(){ window.print(); });
 
-    $('#fMonth, #fDept').on('change', render);
-    $('#btnRun').on('click', function(){ render(); ecToast('success','Payroll computed for '+periodLabel()+'.'); });
+    $('#fMonth, #fDept').on('change', load);
+
+    $('#btnRun').on('click', function(){
+        const p=period(), $btn=$(this);
+        EC.buttonBusy($btn,'Running…');
+        $.ajax({ url:RUN_URL, type:'POST',
+                 headers:{ 'RequestVerificationToken': token() },
+                 data:{ month:p.month, year:p.year } })
+        .done(function(res){
+            if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not run payroll.'); return; }
+            // The proc reports how many it generated and how many it left alone
+            // because they were already paid — repeat it verbatim.
+            ecToast('success', res.message);
+            load();
+        })
+        .fail(function(xhr){
+            ecToast('error', xhr && xhr.status===403
+                ? 'You do not have permission to run payroll.'
+                : 'Could not reach the server. Nothing was generated.');
+        })
+        .always(function(){ EC.buttonReset($btn); });
+    });
     $('#btnExport').on('click', function(){
-        const rows = visible().map(function(s){ const c=compute(s); return [s.emp,s.name,s.dept,c.gross,c.epf,c.esi,c.pt,c.tds,c.lop,c.totalDed,c.net,s.status]; });
-        const hdr = ['Emp','Name','Dept','Gross','EPF','ESI','PT','TDS','LOP','TotalDeductions','NetPay','Status'];
+        if(!ROWS.length){ ecToast('warning','Nothing to export — run the payroll first.'); return; }
+        // The old export had EPF/ESI/PT/TDS columns computed in the browser and
+        // stored nowhere. These are the figures the payslip actually holds.
+        const rows = ROWS.map(function(s){
+            return [s.code,s.name,s.department,s.gross,s.lopDays,s.lopAmount,s.deductions,s.net,s.status]; });
+        const hdr = ['Emp','Name','Department','Gross','LOP Days','LOP Amount','Deductions','NetPay','Status'];
         const csv = '﻿'+[hdr].concat(rows).map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(',')).join('\r\n');
         const a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
         a.download='payroll_'+$('#fMonth').val()+'.csv'; a.click();
         ecToast('success','Payroll exported.');
     });
 
-    render();
+    function load(){
+        const p=period();
+        $('#prBody').html('<tr><td colspan="7" class="text-muted small p-3">Loading…</td></tr>');
+        $.getJSON(LIST_URL,{ month:p.month, year:p.year, department:$('#fDept').val()||null })
+         .done(function(rows){ ROWS=rows||[]; render(); })
+         .fail(function(){
+            ROWS=[];
+            $('#prBody').html('<tr><td colspan="7" class="text-muted small p-3">Could not load payroll.</td></tr>');
+         });
+    }
+
+    load();
 });
 </script>
 }

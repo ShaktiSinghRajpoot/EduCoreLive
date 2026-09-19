@@ -1,4 +1,4 @@
-@{
+﻿@{
     ViewData["Title"] = "Leave Management";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 }
@@ -106,19 +106,21 @@
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <form asp-area="ERP" asp-controller="Leave" asp-action="ApplyLeave" method="post" novalidate>
+      @* Posted over ajax so the proc's own wording (overlapping dates, a range that
+         is all Sundays) lands on the modal instead of a page reload losing it. *@
+      <form id="applyLeaveForm" novalidate>
         @Html.AntiForgeryToken()
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-12">
               <label class="form-label">Staff Member</label>
-              <select name="StaffId" class="form-select" required>
+              <select name="StaffId" id="lvStaff" class="form-select" required>
                 <option value="">Select staff</option>
-                <option value="3">Anita Desai · EMP-003</option>
-                <option value="4">Vikram Joshi · EMP-004</option>
-                <option value="5">Pooja Nair · EMP-005</option>
-                <option value="8">Sanjay Patil · EMP-008</option>
-                <option value="9">Kavya Reddy · EMP-009</option>
+                @foreach (var st in ViewBag.StaffList as IEnumerable<EduCoreDataAccessLayer.Models.StaffListItem>
+                                    ?? Enumerable.Empty<EduCoreDataAccessLayer.Models.StaffListItem>())
+                {
+                    <option value="@st.StaffId">@st.FullName@(string.IsNullOrWhiteSpace(st.EmployeeCode) ? "" : " · " + st.EmployeeCode)</option>
+                }
               </select>
             </div>
             <div class="col-12">
@@ -127,6 +129,8 @@
                 <option value="">Select type</option>
                 <option>Casual</option><option>Sick</option><option>Earned</option>
                 <option>Maternity</option><option>Comp-off</option>
+                @* The only type payroll charges as Loss of Pay — see staff_payroll.sql *@
+                <option>Unpaid</option>
               </select>
             </div>
             <div class="col-6">
@@ -162,25 +166,34 @@
 <script>
 $(document).ready(function () {
 
-    const COLORS = { primary:'bg-label-primary text-primary', info:'bg-label-info text-info', success:'bg-label-success text-success', warning:'bg-label-warning text-warning', danger:'bg-label-danger text-danger' };
-    const TYPE = { Casual:'t-casual', Sick:'t-sick', Earned:'t-earned', Maternity:'t-maternity', 'Comp-off':'t-comp' };
+    const LIST_URL    = '@Url.Action("List","Leave",new{area="ERP"})';
+    const APPLY_URL   = '@Url.Action("ApplyLeave","Leave",new{area="ERP"})';
+    const APPROVE_URL = '@Url.Action("Approve","Leave",new{area="ERP"})';
+    const REJECT_URL  = '@Url.Action("Reject","Leave",new{area="ERP"})';
 
-    let requests = [
-        { id:1, name:'Pooja Nair',   emp:'EMP-005', desig:'Science Teacher', av:'PN', c:'danger',  type:'Sick',     from:'2026-06-10', to:'2026-06-12', reason:'Viral fever, doctor advised rest.', status:'pending' },
-        { id:2, name:'Vikram Joshi', emp:'EMP-004', desig:'Maths Teacher',   av:'VJ', c:'warning', type:'Casual',   from:'2026-06-15', to:'2026-06-15', reason:'Personal work.', status:'pending' },
-        { id:3, name:'Lata Sharma',  emp:'EMP-011', desig:'PT Teacher',      av:'LS', c:'danger',  type:'Earned',   from:'2026-06-18', to:'2026-06-22', reason:'Family function out of town.', status:'pending' },
-        { id:4, name:'Anita Desai',  emp:'EMP-003', desig:'Senior Teacher',  av:'AD', c:'success', type:'Casual',   from:'2026-06-05', to:'2026-06-05', reason:'Bank work.', status:'approved' },
-        { id:5, name:'Kavya Reddy',  emp:'EMP-009', desig:'Hindi Teacher',   av:'KR', c:'success', type:'Sick',     from:'2026-06-02', to:'2026-06-03', reason:'Migraine.', status:'approved' },
-        { id:6, name:'Sanjay Patil', emp:'EMP-008', desig:'English Teacher', av:'SP', c:'info',    type:'Earned',   from:'2026-05-28', to:'2026-05-30', reason:'Vacation.', status:'approved' },
-        { id:7, name:'Neha Kapoor',  emp:'EMP-013', desig:'Computer Teacher',av:'NK', c:'primary', type:'Casual',   from:'2026-06-01', to:'2026-06-01', reason:'Late application, denied.', status:'rejected' }
-    ];
+
+    const TYPE = { Casual:'t-casual', Sick:'t-sick', Earned:'t-earned', Maternity:'t-maternity',
+                   'Comp-off':'t-comp', Unpaid:'t-comp' };
+
+    // Loaded from the server; the page filters and counts in the browser because a
+    // school's leave register is small.
+    let requests = [];
 
     let curFilter = 'all', curSearch = '';
     const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    function fmt(d){ const x=new Date(d); return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]; }
-    function days(a,b){ return Math.round((new Date(b)-new Date(a))/86400000)+1; }
+    // Working days, Sundays excluded — the same rule core.fn_working_days applies
+    // on save. A plain date subtraction would preview 7 for Mon–Sun and then save 6.
+    function workingDays(a,b){
+        let n=0; const d=new Date(a), end=new Date(b);
+        while(d<=end){ if(d.getDay()!==0) n++; d.setDate(d.getDate()+1); }
+        return n;
+    }
     function todayIso(){ return new Date().toISOString().slice(0,10); }
     function isOnLeaveToday(r){ const t=todayIso(); return r.status==='approved' && r.from<=t && r.to>=t; }
+
+    // The DB stores Pending/Approved/Rejected; the page's tabs and CSS use lowercase.
+    function st(r){ return (r.status||'').toLowerCase(); }
+    function ini(n){ return (n||'').split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase(); }
 
     function statusBadge(s){
         const m={ pending:['st-pending','Pending'], approved:['st-approved','Approved'], rejected:['st-rejected','Rejected'] };
@@ -188,39 +201,46 @@ $(document).ready(function () {
     }
 
     function updateKpis(){
-        $('#kpiPending').text(requests.filter(r=>r.status==='pending').length);
-        $('#kpiToday').text(requests.filter(isOnLeaveToday).length);
-        $('#kpiApproved').text(requests.filter(r=>r.status==='approved').length);
+        // onLeaveToday is decided server-side so every caller agrees on "today".
+        $('#kpiPending').text(requests.filter(r=>st(r)==='pending').length);
+        $('#kpiToday').text(requests.filter(r=>r.onLeaveToday).length);
+        $('#kpiApproved').text(requests.filter(r=>st(r)==='approved').length);
         $('#kpiRequests').text(requests.length);
         $('#cAll').text(requests.length);
-        $('#cPending').text(requests.filter(r=>r.status==='pending').length);
-        $('#cApproved').text(requests.filter(r=>r.status==='approved').length);
-        $('#cRejected').text(requests.filter(r=>r.status==='rejected').length);
+        $('#cPending').text(requests.filter(r=>st(r)==='pending').length);
+        $('#cApproved').text(requests.filter(r=>st(r)==='approved').length);
+        $('#cRejected').text(requests.filter(r=>st(r)==='rejected').length);
     }
 
     function render(){
         let list = requests.slice();
-        if(curFilter!=='all') list = list.filter(r=>r.status===curFilter);
-        if(curSearch) list = list.filter(r=>r.name.toLowerCase().includes(curSearch) || r.emp.toLowerCase().includes(curSearch));
+        if(curFilter!=='all') list = list.filter(r=>st(r)===curFilter);
+        if(curSearch) list = list.filter(r=>r.name.toLowerCase().includes(curSearch)
+                                         || (r.code||'').toLowerCase().includes(curSearch));
 
         if(!list.length){ $('#lmList').html(''); $('#lmEmpty').removeClass('d-none'); updateKpis(); return; }
         $('#lmEmpty').addClass('d-none');
 
         $('#lmList').html(list.map(function(r){
-            const d = days(r.from,r.to);
-            const range = r.from===r.to ? fmt(r.from) : fmt(r.from)+' → '+fmt(r.to);
-            const actions = r.status==='pending'
+            // days comes from the server — it excludes Sundays, which a
+            // date subtraction in the browser would not.
+            const d = r.days;
+            const range = r.from===r.to ? r.from : r.from+' → '+r.to;
+            const actions = st(r)==='pending'
               ? '<div class="lm-actions">'
                 + '<button class="lm-btn lm-btn-approve" data-act="approve" data-id="'+r.id+'"><i class="bx bx-check"></i>Approve</button>'
                 + '<button class="lm-btn lm-btn-reject" data-act="reject" data-id="'+r.id+'"><i class="bx bx-x"></i>Reject</button>'
                 + '</div>'
-              : '<div class="lm-actions">'+statusBadge(r.status)+'</div>';
+              : '<div class="lm-actions">'+statusBadge(st(r))+'</div>';
             return ''
-              + '<div class="lm-card is-'+r.status+'">'
-              +   '<div class="lm-av '+COLORS[r.c]+'">'+r.av+'</div>'
-              +   '<div class="lm-who"><div class="lm-name">'+r.name+'</div><div class="lm-meta">'+r.emp+' · '+r.desig+'</div></div>'
-              +   '<div><span class="lm-type '+(TYPE[r.type]||'t-casual')+'"><i class="bx bx-bookmark"></i>'+r.type+'</span></div>'
-              +   '<div class="lm-dates"><div class="lm-range"><i class="bx bx-calendar"></i>'+range+'</div><div class="lm-days">'+d+' day'+(d>1?'s':'')+' · <span class="lm-reason">'+r.reason+'</span></div></div>'
+              + '<div class="lm-card is-'+st(r)+'">'
+              +   '<div class="lm-av bg-label-primary text-primary">'+EC.esc(ini(r.name))+'</div>'
+              +   '<div class="lm-who"><div class="lm-name">'+EC.esc(r.name)+'</div><div class="lm-meta">'
+              +     EC.esc(r.code||'—')+' · '+EC.esc(r.designation||'—')+'</div></div>'
+              +   '<div><span class="lm-type '+(TYPE[r.type]||'t-casual')+'"><i class="bx bx-bookmark"></i>'+EC.esc(r.type)
+              +     (r.unpaid?' <span title="Payroll charges these days as Loss of Pay">(LOP)</span>':'')+'</span></div>'
+              +   '<div class="lm-dates"><div class="lm-range"><i class="bx bx-calendar"></i>'+EC.esc(range)+'</div>'
+              +     '<div class="lm-days">'+d+' working day'+(d>1?'s':'')+' · <span class="lm-reason">'+EC.esc(r.reason||'—')+'</span></div></div>'
               +   actions
               + '</div>';
         }).join(''));
@@ -235,25 +255,91 @@ $(document).ready(function () {
     // Search
     $('#lmSearch').on('input',function(){ curSearch = this.value.toLowerCase().trim(); render(); });
 
-    // Approve / Reject (front-end demo — real action posts to LeaveController)
+    // Approve / Reject — the server decides, and refuses a second decision on a
+    // request that was already approved or rejected.
     $('#lmList').on('click','.lm-btn',function(){
         const id = Number($(this).data('id')), act = $(this).data('act');
-        const r = requests.find(x=>x.id===id); if(!r) return;
-        r.status = act==='approve' ? 'approved' : 'rejected';
-        render();
-        ecToast(act==='approve'?'success':'warning', r.name+"'s leave "+(act==='approve'?'approved':'rejected')+'.');
+        const $btn = $(this);
+        EC.buttonBusy($btn, act === 'approve' ? 'Approving…' : 'Rejecting…');
+
+        $.ajax({
+            url: act === 'approve' ? APPROVE_URL : REJECT_URL,
+            type: 'POST',
+            headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+            data: { id: id }
+        })
+        .done(function (res) {
+            if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not update.'); return; }
+            ecToast(act === 'approve' ? 'success' : 'warning', res.message);
+            load();
+        })
+        .fail(function (xhr) {
+            ecToast('error', xhr && xhr.status === 403
+                ? 'You do not have permission to decide leave.'
+                : 'Could not reach the server. Nothing was changed.');
+        })
+        .always(function () { EC.buttonReset($btn); });
     });
+
+    // Apply
+    $('#applyLeaveForm').on('submit', function (e) {
+        e.preventDefault();
+        const $btn = $(this).find('button[type=submit]');
+        EC.buttonBusy($btn, 'Submitting…');
+
+        $.ajax({
+            url: APPLY_URL,
+            type: 'POST',
+            headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+            data: {
+                staffId:   $('#lvStaff').val(),
+                leaveType: $('[name=LeaveType]').val(),
+                fromDate:  $('#lvFrom').val(),
+                toDate:    $('#lvTo').val(),
+                reason:    $('[name=Reason]').val()
+            }
+        })
+        .done(function (res) {
+            if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not apply.'); return; }
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('applyLeaveModal')).hide();
+            document.getElementById('applyLeaveForm').reset();
+            $('#lvDays').text('— days');
+            ecToast('success', res.message);
+            load();
+        })
+        .fail(function (xhr) {
+            ecToast('error', xhr && xhr.status === 403
+                ? 'You do not have permission to apply for leave.'
+                : 'Could not reach the server. Nothing was saved.');
+        })
+        .always(function () { EC.buttonReset($btn); });
+    });
+
+    function load(){
+        EC.listLoading && EC.listLoading('#lmList');
+        $.getJSON(LIST_URL).done(function (rows) {
+            requests = rows || [];
+            render();
+        }).fail(function () {
+            $('#lmList').html('');
+            $('#lmEmpty').removeClass('d-none');
+            ecToast('error', 'Could not load leave requests.');
+        });
+    }
 
     // Modal duration
     function calcDays(){
         const f=$('#lvFrom').val(), t=$('#lvTo').val();
-        if(f&&t&&new Date(t)>=new Date(f)){ const d=days(f,t); $('#lvDays').text(d+' day'+(d>1?'s':'')); }
+        if(f&&t&&new Date(t)>=new Date(f)){
+            const d=workingDays(f,t);
+            $('#lvDays').text(d ? d+' working day'+(d>1?'s':'') : 'no working days');
+        }
         else $('#lvDays').text('— days');
     }
     $('#lvFrom,#lvTo').on('change', calcDays);
     $('#lvFrom').attr('min', todayIso());
 
-    render();
+    load();
 });
 </script>
 }

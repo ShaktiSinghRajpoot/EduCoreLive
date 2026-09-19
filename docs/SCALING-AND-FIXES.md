@@ -2103,3 +2103,62 @@ marks, skipping absent subjects rather than drawing them as zero-length bars.
 **With this, no tab on the Student Dashboard renders invented data.** Every
 render function reads from `Student/DashboardData`, and the dead `notYet()`
 placeholder is gone because nothing needs it any more.
+
+---
+
+### [2026-08-25] Leave and Payroll — two pages that had no backend at all
+
+Both screens were fully designed and completely inert: Apply, Approve, Reject,
+Run Payroll and Mark Paid each set a TempData message and changed nothing. Zero
+service calls between them. This builds the modules.
+
+**`core.staff_leave` + `sp_staff_leave_manage`** (LIST / APPLY / DECIDE)
+
+- **Days exclude Sundays**, via a new `core.fn_working_days` — the same rule the
+  attendance register uses. A Monday-to-Saturday leave is 6 days, not 7. The
+  modal's day preview was recomputed in the browser to match; it previously used
+  a plain date subtraction and would have shown 7 where the server saved 6.
+- **Overlap is refused.** Two live requests over the same day would be charged
+  twice by payroll and almost always mean a duplicate entry.
+- **A decided request cannot be decided again** — approve/reject record who and
+  when, and a second decision would overwrite that.
+
+**`core.staff_payroll` + `sp_staff_payroll_manage`** (LIST / RUN / MARK_PAID)
+
+- **Gross is snapshotted** from `core.staff.monthly_salary` onto the payroll row.
+  A later salary revision must not silently rewrite a payslip the school has
+  already issued — that is why the amount is stored rather than joined.
+- **LOP is approved `'Unpaid'` leave** overlapping the month, counted through the
+  same `fn_working_days`. A *pending* unpaid leave costs nothing until someone
+  approves it. That one leave type is the entire link between the two modules —
+  deliberately not a separate LOP register that could drift.
+- **Per-day rate is gross ÷ working days in THAT month**, not a flat 30.
+  February days are worth more than July days and staff notice.
+- **A paid month cannot be re-run**; those rows are reported as skipped. One row
+  per staff per month is a unique index, not a convention.
+
+End-to-end on real data, rolled back:
+
+| step | result |
+|---|---|
+| apply Mon 1 – Sat 6 Jun | **6 working days** (Sunday excluded) |
+| overlapping application | refused |
+| payroll with the leave still **pending** | LOP 0, net full ₹30,000 |
+| after approving | LOP 6, rate ₹1153.85 (30000 ÷ 26), net **₹23,076.90** |
+| deciding twice | refused |
+| re-run after Mark Paid | "5 generated. 1 already paid and left untouched." |
+| paying twice | refused |
+
+**What the payroll page no longer pretends to know.** The mock split pay into
+basic / HRA / DA / conveyance / medical / special and deducted EPF, ESI,
+professional tax and TDS computed off **hardcoded income-tax slabs**. None of
+that is configured anywhere: `core.staff` holds one `monthly_salary`, and there
+is no salary-component or statutory-rate table. Slabs baked into a page would be
+wrong for most schools and stale after any budget. The payslip now shows what
+the school actually recorded — gross, Loss of Pay, net — and the CSV export
+matches, instead of exporting four columns computed in the browser and stored
+nowhere.
+
+**Noted while here:** `StaffProfile.cshtml` links to `Attendance/StaffAttendance`,
+which does not exist. There is no staff attendance register at all, which is why
+LOP is derived from leave rather than from absences.

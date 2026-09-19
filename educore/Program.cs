@@ -206,6 +206,11 @@ builder.Services.AddScoped<IStaffService, StaffService>();
 // Resolves the uuid a URL carries back into the internal id (see
 // Database/public_id_students_staff.sql). Used by Student, Staff, Tc and IdCard.
 builder.Services.AddScoped<IPublicIdService, PublicIdService>();
+
+// Staff leave and payroll. Both pages existed with no backend at all until now —
+// Apply/Approve/Run/Mark Paid only set a TempData message.
+builder.Services.AddScoped<IStaffLeaveService, StaffLeaveService>();
+builder.Services.AddScoped<IStaffPayrollService, StaffPayrollService>();
 builder.Services.AddScoped<IRbacService, RbacService>();
 builder.Services.AddScoped<IPermissionService, PermissionService>();
 
