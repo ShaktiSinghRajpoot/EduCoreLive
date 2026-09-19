@@ -1,4 +1,4 @@
-@{
+﻿@{
     ViewData["Title"] = "Academic Years";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var years = ViewBag.Years as List<EduCoreDataAccessLayer.Models.ERP.AcademicYearModel>
@@ -143,6 +143,9 @@
   </div>
 </div>
 
+@* The token the post() helper below reads. *@
+@Html.AntiForgeryToken()
+
 @section PageScripts {
 <script>
 (function(){
@@ -158,11 +161,15 @@ var editId = null;
 // jQuery AJAX (app standard). $.ajax returns a thenable and parses the JSON
 // response, so callers keep using .then(res => ...) unchanged.
 function post(url, body){
+  // Every other page sends the antiforgery token; this one did not, so its
+  // save/delete/set-current actions could not be [ValidateAntiForgeryToken].
+  var tok = document.querySelector('input[name="__RequestVerificationToken"]');
   return $.ajax({
     url:         url,
     type:        'POST',
     contentType: 'application/json',
-    headers:     { 'X-Requested-With': 'XMLHttpRequest' },
+    headers:     { 'X-Requested-With': 'XMLHttpRequest',
+                   'RequestVerificationToken': tok ? tok.value : '' },
     data:        JSON.stringify(body)
   });
 }

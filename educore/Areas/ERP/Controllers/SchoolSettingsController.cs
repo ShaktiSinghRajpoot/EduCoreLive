@@ -658,6 +658,7 @@ namespace educore.Areas.ERP.Controllers
         // Persists the full structure for one academic year (replace-all),
         // matching the stored procedure's semantics.
         [HttpPost]
+        [ValidateAntiForgeryToken]
         [HasPermission("academics.manage")]
         public async Task<IActionResult> SaveClassSection([FromBody] ClassSectionSaveDto dto)
         {
@@ -731,6 +732,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         [HasPermission("settings.manage")]
         public async Task<IActionResult> SaveAcademicYear([FromBody] AcademicYearSaveDto dto)
         {
@@ -762,6 +764,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         [HasPermission("settings.manage")]
         public async Task<IActionResult> SetCurrentAcademicYear([FromBody] AcademicYearIdDto dto)
         {
@@ -781,6 +784,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         [HasPermission("settings.manage")]
         public async Task<IActionResult> DeleteAcademicYear([FromBody] AcademicYearIdDto dto)
         {
@@ -1057,6 +1061,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         [HasPermission("academics.manage")]
         public async Task<IActionResult> SavePeriodStructure([FromBody] PeriodStructureSaveDto dto)
         {

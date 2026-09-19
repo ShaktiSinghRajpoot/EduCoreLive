@@ -2406,3 +2406,52 @@ Four suites now exist, 117 checks in total:
     Database/tests/enquiry_registration_tests.sql   30
     Database/tests/attendance_exam_tests.sql        28
     Database/tests/transport_tc_tests.sql           31
+
+---
+
+### [2026-08-25] Page-by-page audit — CSRF gaps and three dead procedures
+
+`educore/docs/PAGE-CHECKLIST.md` — all 64 pages, each rated on whether it shows
+real data, whether the **server** refuses bad input, whether every read and write
+is tenant-scoped, whether mutating POSTs carry an antiforgery token, and whether
+a test suite covers it. The open TODOs live there too.
+
+The audit was mechanical, not by eye: one script walks every controller and
+flags any `[HttpPost]` without `[ValidateAntiForgeryToken]` or without a
+permission gate; one query walks every mutating proc and flags any without
+validation or without a tenant filter. Both are in the doc so the audit can be
+re-run rather than re-done.
+
+**Found: five settings mutations had no CSRF protection.** `SaveClassSection`,
+`SaveAcademicYear`, `SetCurrentAcademicYear`, `DeleteAcademicYear` and
+`SavePeriodStructure`. Two of the three views were already sending the token, so
+only the attribute was missing; the Academic Years page was not sending one at
+all and now does. 86 POST actions were audited; these five were the only gaps.
+
+**Found: three procedures nothing calls.** The query flagged them as having no
+validation, which was true, but the real problem was that they were dead:
+
+- `core.sp_admission_manage1` — an orphaned copy of the admission proc from a
+  rewrite. It predates the back-dated-admission fix, so it still bills a student
+  every month since they joined.
+- `config.sp_role_permission_management` — reached only by `RolePermissionService`,
+  which was never registered in DI. The live path is `config.sp_role_manage` +
+  `sp_role_permissions_save`, both scoped and validated.
+- `core.sp_school_user_management` — creates and updates **logins**, with no
+  scope guard, called by nothing.
+
+Dropped in both databases, and the dead service, contract and DTO deleted.
+Leaving them was the risk: each looks like live security surface, and the next
+person needing "save role permissions" or "create a user" would reasonably wire
+one up and inherit its missing guards — the same trap as the superseded
+`sp_fee_payment_collect` revisions and the stale `sp_dropdown_common`.
+
+**Two false positives worth recording**, because the next person running the
+audit will hit them: `SchoolsController.Create/Edit/Purge` look ungated but the
+class carries `[Authorize(Roles = SuperAdmin)]`; and `Account.ContinueAs`,
+`VerifyOtp` and `Logout` are part of the login flow and cannot require an
+authenticated user. Likewise a proc with zero `RAISE EXCEPTION` is not
+automatically unguarded — several report a refusal as `success = false` with a
+message, which is the better shape for "already cancelled".
+
+All four suites still pass on both databases after the removals: 28 / 30 / 28 / 31.
