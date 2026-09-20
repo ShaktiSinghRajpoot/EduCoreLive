@@ -81,7 +81,7 @@
                             </div>
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Date of Birth</label>
-                                <input type="date" name="DateOfBirth" class="form-control" value="@(ViewBag.PreDob is DateOnly d ? d.ToString("yyyy-MM-dd") : "")" required>
+                                <input type="date" name="DateOfBirth" class="form-control" value="@(ViewBag.PreDob is DateOnly d ? d.ToString("yyyy-MM-dd") : "")" max="@DateTime.Today.ToString("yyyy-MM-dd")" required>
                             </div>
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Academic Year</label>
@@ -112,7 +112,10 @@
 
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Admission Date</label>
-                                <input type="date" id="admissionDate" name="AdmissionDate" class="form-control" required>
+                                <input type="date" id="admissionDate" name="AdmissionDate" class="form-control"
+                                       value="@DateTime.Today.ToString("yyyy-MM-dd")"
+                                       max="@DateTime.Today.ToString("yyyy-MM-dd")" required>
+                                <div class="form-text">Change it only for a student who joined earlier.</div>
                             </div>
                             <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label">Admission No</label>
