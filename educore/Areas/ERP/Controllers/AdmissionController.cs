@@ -512,6 +512,23 @@ namespace educore.Areas.ERP.Controllers
         };
 
         // ── GET: /ERP/Admission/GetSections (AJAX) ───────────────
+        // The number the next admission WOULD get, for the form to show as a hint.
+        // It reads the counter without touching it, so this is a preview and not
+        // a reservation: two clerks with the form open both see the same number
+        // and whoever saves first takes it. The box therefore stays empty and
+        // this goes in the placeholder — a filled-in value would look promised.
+        [HttpGet]
+        public async Task<IActionResult> NextAdmissionNo(string? academicYear)
+        {
+            if (string.IsNullOrWhiteSpace(academicYear))
+                return Json(new { success = false });
+
+            var next = await _admissionService.PeekNextAdmissionNoAsync(
+                academicYear, TenantId(), SchoolId(), UserId());
+
+            return Json(new { success = !string.IsNullOrEmpty(next), admissionNo = next });
+        }
+
         // Classes belong to a session. config.sp_dropdown_common deliberately
         // returns every class name the school has EVER used, collapsed across
         // sessions, which is right for a filter but wrong for this form: it

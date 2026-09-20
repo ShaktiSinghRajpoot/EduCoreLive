@@ -117,7 +117,7 @@
                             <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label">Admission No</label>
                                 <input type="text" name="AdmissionNo" id="adm_AdmissionNo" class="form-control" placeholder="Auto-generated if blank">
-                                <div class="form-text">Leave blank for ADM-2026-0001.</div>
+                                <div class="form-text">Leave blank to use the next number.</div>
                             </div>
 
                             <div class="col-12"><hr class="my-1 opacity-25"></div>
@@ -479,10 +479,31 @@ $(function () {
     var URL_FEES     = '@Url.Action("GetFeeStructure", "Admission", new { area = "ERP" })';
     var URL_SECTIONS = '@Url.Action("GetSections", "Admission", new { area = "ERP" })';
     var URL_CLASSES  = '@Url.Action("GetClasses", "Admission", new { area = "ERP" })';
+    var URL_NEXTADM  = '@Url.Action("NextAdmissionNo", "Admission", new { area = "ERP" })';
     var URL_SAVE     = '@Url.Action("SaveAdmission", "Admission", new { area = "ERP" })';
     var URL_LIST     = '@Url.Action("StudentList", "Student", new { area = "ERP" })';
 
     var fees = [];   // fee rows for the selected class + year
+
+    /* ── admission number: show what is coming, without promising it ──
+       The counter is per school AND per session, so this follows the year.
+       It goes in the PLACEHOLDER, not the value: the box staying empty is what
+       tells the server to generate one, and a filled-in number would look
+       reserved when it is not — two clerks with the form open see the same one
+       and whoever saves first takes it. */
+    function loadNextAdmissionNo() {
+        var $adm = $('#adm_AdmissionNo');
+        var year = $year.val();
+        if (!year) { $adm.attr('placeholder', 'Auto-generated if blank'); return; }
+
+        $.getJSON(URL_NEXTADM, { academicYear: year })
+            .done(function (res) {
+                $adm.attr('placeholder', (res && res.success && res.admissionNo)
+                    ? res.admissionNo + '  (auto)'
+                    : 'Auto-generated if blank');
+            })
+            .fail(function () { $adm.attr('placeholder', 'Auto-generated if blank'); });
+    }
 
     /* ── classes: belong to a session ─────────────────────────────
        The list rendered on load comes from every session the school has ever
@@ -714,7 +735,7 @@ $(function () {
     }
 
     /* ── events ──────────────────────────────────────── */
-    $year.on('change',  function () { loadFees(); loadClasses(); });
+    $year.on('change',  function () { loadFees(); loadClasses(); loadNextAdmissionNo(); });
     $class.on('change', function () { loadFees(); loadSections(); });
     $admDate.add($discType).add($discApply).on('change', renderFees);
     $discValue.add($discReason).on('input', renderFees);
@@ -925,7 +946,7 @@ $(function () {
     })();
     </text>
 }
-    if ($year.val()) loadClasses();
+    if ($year.val()) { loadClasses(); loadNextAdmissionNo(); }
 });
 </script>
 }

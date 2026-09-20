@@ -523,3 +523,44 @@ BEGIN
 
 END;
 $procedure$;
+
+-- ============================================================================
+-- The admission number the next save WOULD generate.
+--
+-- Read-only: it does not touch core.admission_counters. The admission form shows
+-- it as a placeholder so the office knows what is coming, but it is a preview
+-- and not a reservation — two clerks with the form open see the same number and
+-- whoever saves first takes it. The number is only allocated inside
+-- sp_admission_manage, under the counter's own ON CONFLICT.
+--
+-- Kept beside that generator deliberately: the two must agree on the format, and
+-- they will not if they live apart. Both use core.fn_receipt_year, which reads
+-- the session's real start year rather than the first four characters of its
+-- name (that produced ADM-FY 2-0001).
+-- ============================================================================
+CREATE OR REPLACE PROCEDURE core.sp_next_admission_no(
+    IN  p_tenant_id      integer,
+    IN  p_school_id      integer,
+    IN  p_action_user_id integer,
+    IN  p_academic_year  varchar,
+    INOUT p_result       refcursor DEFAULT 'next_adm_cursor'
+)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
+        RAISE EXCEPTION 'Invalid school scope.';
+    END IF;
+
+    OPEN p_result FOR
+    SELECT 'ADM-'
+        || core.fn_receipt_year(p_tenant_id, p_school_id, p_academic_year, CURRENT_DATE)
+        || '-'
+        || LPAD((COALESCE(c.last_seq, 0) + 1)::text, 4, '0') AS admission_no
+    FROM (SELECT 1) x
+    LEFT JOIN core.admission_counters c
+           ON c.tenant_id     = p_tenant_id
+          AND c.school_id     = p_school_id
+          AND c.academic_year = COALESCE(TRIM(p_academic_year), '');
+END;
+$$;

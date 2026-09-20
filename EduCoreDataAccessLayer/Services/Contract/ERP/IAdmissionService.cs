@@ -55,6 +55,12 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             StudentExitListModel query, int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Sets (or clears) a student's photo URL after the file is saved.</summary>
+        /// The admission number the next save would generate, read WITHOUT
+        /// advancing the counter. A preview for the form to hint at, never a
+        /// reservation — the number is only taken when an admission is saved.
+        Task<string?> PeekNextAdmissionNoAsync(
+            string academicYear, int tenantId, int schoolId, int actionUserId);
+
         Task<(bool Success, string Message, string? PhotoUrl)> SetStudentPhotoAsync(
             int studentId, string? photoUrl, int tenantId, int schoolId, int actionUserId);
 

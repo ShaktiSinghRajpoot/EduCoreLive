@@ -417,6 +417,29 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return query;
         }
 
+        public async Task<string?> PeekNextAdmissionNoAsync(
+            string academicYear, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(academicYear))
+                return null;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_academic_year",  NpgsqlDbType.Varchar) { Value = academicYear.Trim() },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "next_adm_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_next_admission_no", parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
+
+            var value = ds.Tables[0].Rows[0]["admission_no"];
+            return value == DBNull.Value ? null : value.ToString();
+        }
+
         public async Task<(bool Success, string Message, string? PhotoUrl)> SetStudentPhotoAsync(
             int studentId, string? photoUrl, int tenantId, int schoolId, int actionUserId)
         {
