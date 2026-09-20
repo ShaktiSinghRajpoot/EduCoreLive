@@ -112,7 +112,7 @@
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label">Admission No</label>
                                 <input type="text" name="AdmissionNo" id="adm_AdmissionNo" class="form-control" placeholder="Auto-generated if blank">
-                                <div class="form-text">Leave blank to use the next number.</div>
+                                <div class="form-text" id="admNoHint">Leave blank to use the next number.</div>
                             </div>
 
 
@@ -488,6 +488,35 @@ $(function () {
     var URL_LIST     = '@Url.Action("StudentList", "Student", new { area = "ERP" })';
 
     var fees = [];   // fee rows for the selected class + year
+
+    /* ── admission number: warn when a typed one leaves the house format ──
+       Manual entry stays, because a school arriving with its own existing
+       numbers needs it. But every number in this database came from the
+       generator, so one typed by hand is far more likely to be a slip than a
+       deliberate choice — say so while it can still be corrected, rather than
+       leaving one odd number sitting among thousands. The server normalises
+       case and spacing either way, so ADM-2026-1 and adm-2026-1 cannot become
+       two different students. */
+    var HOUSE_FORMAT = /^ADM-\d{4}-\d{4}$/;
+
+    $('#adm_AdmissionNo').on('input blur', function () {
+        var $hint = $('#admNoHint');
+        var typed = $.trim(this.value).toUpperCase().replace(/\s+/g, ' ');
+
+        if (!typed) {
+            $hint.text('Leave blank to use the next number.')
+                 .removeClass('text-warning').addClass('form-text');
+            $(this).removeClass('is-warning');
+            return;
+        }
+        if (HOUSE_FORMAT.test(typed)) {
+            $hint.text('Matches the school format.').removeClass('text-warning');
+        } else {
+            $hint.text('This does not match the school format (ADM-YYYY-NNNN). '
+                     + 'It will be saved as "' + typed + '".')
+                 .addClass('text-warning');
+        }
+    });
 
     /* ── admission number: show what is coming, without promising it ──
        The counter is per school AND per session, so this follows the year.

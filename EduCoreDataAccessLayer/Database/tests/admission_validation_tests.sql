@@ -209,6 +209,30 @@ BEGIN
     PERFORM pg_temp.chk('D2 ...and the first child was NOT overwritten',
                         r_msg = 'ZZ Backdated', format('still %s', r_msg));
 
+    -- Case and spacing must not make a second student with the same number.
+    -- Before this was normalised, ADM-... and adm-... passed the collision check
+    -- as different strings and two children ended up sharing one number.
+    c := 'd2b';
+    CALL core.sp_admission_manage('SaveAdmission', c_tenant, c_school, c_user, NULL,
+         'ZZ-CASE-1', NULL, 'ZZ Case One', 'Male', DATE '2015-01-01',
+         v_class, v_sec, v_year, CURRENT_DATE, p_result => c);
+    FETCH c INTO r_sid, r_ok, r_msg, r_adm;
+    PERFORM pg_temp.chk('D2b a typed number is stored upper-cased',
+                        r_adm = 'ZZ-CASE-1', format('stored as %s', r_adm));
+
+    c := 'd2c';
+    CALL core.sp_admission_manage('SaveAdmission', c_tenant, c_school, c_user, NULL,
+         'zz-case-1', NULL, 'ZZ Case Two', 'Male', DATE '2015-01-01',
+         v_class, v_sec, v_year, CURRENT_DATE, p_result => c);
+    FETCH c INTO r_sid, r_ok, r_msg, r_adm;
+    PERFORM pg_temp.chk('D2c the same number in another case is refused',
+                        COALESCE(r_ok,1) = 0, r_msg);
+
+    SELECT COUNT(*) INTO v_n FROM core.students
+     WHERE tenant_id = c_tenant AND school_id = c_school
+       AND UPPER(TRIM(admission_no)) = 'ZZ-CASE-1';
+    PERFORM pg_temp.chk_eq('D2d only one student holds that number', v_n, 1);
+
     -- Blank means "give me one", which is how the form is meant to be used.
     c := 'd3';
     CALL core.sp_admission_manage('SaveAdmission', c_tenant, c_school, c_user, NULL,
@@ -244,7 +268,7 @@ BEGIN
     -- Exactly the four good ones exist: C3, C6, D3's auto-numbered one, and E1.
     SELECT COUNT(*) INTO v_n FROM core.students
      WHERE tenant_id = c_tenant AND school_id = c_school;
-    PERFORM pg_temp.chk_eq('E4 exactly four students were created', v_n - v_before, 4);
+    PERFORM pg_temp.chk_eq('E4 exactly five students were created', v_n - v_before, 5);
 END
 $suite$;
 

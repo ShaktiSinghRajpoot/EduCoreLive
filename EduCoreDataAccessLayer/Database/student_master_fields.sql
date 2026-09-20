@@ -247,11 +247,20 @@ BEGIN
                 core.fn_receipt_year(p_tenant_id, p_school_id, v_year, v_adm_date) ||
                 '-' || LPAD(v_seq::TEXT, 4, '0');
         ELSE
-            v_admission_no := TRIM(p_admission_no);
-            -- Reject collision with an existing admission number
+            -- Normalise a typed number before it becomes this child's identity.
+            -- TRIM alone was not enough: 'ADM-2026-0099' and 'adm-2026-0099'
+            -- passed the collision check as different strings, so two students
+            -- ended up holding the same admission number. Upper-case it and
+            -- collapse any inner run of spaces, then compare the same way.
+            v_admission_no := UPPER(REGEXP_REPLACE(TRIM(p_admission_no), '\s+', ' ', 'g'));
+
+            -- Reject collision with an existing admission number. Compared on
+            -- the normalised form so an old row typed in another case still
+            -- counts as taken.
             IF EXISTS (SELECT 1 FROM core.students
                        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
-                         AND admission_no = v_admission_no) THEN
+                         AND UPPER(REGEXP_REPLACE(TRIM(admission_no), '\s+', ' ', 'g'))
+                             = v_admission_no) THEN
                 OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
                     'Admission number already in use.' AS message,
                     v_admission_no AS admission_no;
