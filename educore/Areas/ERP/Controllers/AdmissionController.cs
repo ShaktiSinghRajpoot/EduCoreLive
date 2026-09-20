@@ -113,13 +113,40 @@ namespace educore.Areas.ERP.Controllers
 
                     // Prefill values rendered straight into the form fields (normal
                     // binding) — no JSON blob for the client to parse.
+                    //
+                    // The enquiry already asked the family most of this. Carrying
+                    // over only six of the answers meant the office retyped the
+                    // rest at the desk, including the date of birth and address,
+                    // which the admission form makes mandatory. Anything the
+                    // enquiry holds and this form asks for is now carried.
                     ViewBag.PrefillEnquiryId = enquiry.EnquiryId;
                     ViewBag.PreStudentName   = enquiry.StudentName;
                     ViewBag.PreGender        = enquiry.Gender;
+                    ViewBag.PreDob           = enquiry.Dob;
                     ViewBag.PreClassName     = enquiry.ClassName;
                     ViewBag.PreAcademicYear  = enquiry.Session;
+
                     ViewBag.PreGuardianName  = enquiry.FatherName ?? enquiry.MotherName;
-                    ViewBag.PreMobile        = enquiry.Mobile;
+                    ViewBag.PreMotherName    = enquiry.MotherName;
+
+                    // The enquiry keeps a primary number plus the parents' own.
+                    // Prefer the primary for the main field and offer whichever
+                    // other number is not already showing as the alternate.
+                    ViewBag.PreMobile        = enquiry.Mobile ?? enquiry.FatherMobile ?? enquiry.MotherMobile;
+                    ViewBag.PreAltMobile     = FirstDifferent(
+                        (string?)ViewBag.PreMobile,
+                        enquiry.AltMobile, enquiry.FatherMobile,
+                        enquiry.MotherMobile, enquiry.WhatsAppNumber);
+
+                    ViewBag.PreFatherEmail   = enquiry.ParentEmail;
+
+                    // City and locality are two boxes on the enquiry and one on
+                    // the admission form; join them rather than dropping one.
+                    ViewBag.PreAddress       = JoinParts(enquiry.AreaLocality, enquiry.City);
+
+                    ViewBag.PrePrevSchool    = enquiry.CurrentSchool;
+                    ViewBag.PrePrevClass     = enquiry.CurrentClass;
+                    ViewBag.PreTransport     = enquiry.TransportRequired;
                 }
             }
             return View("Create");
@@ -512,6 +539,29 @@ namespace educore.Areas.ERP.Controllers
         };
 
         // ── GET: /ERP/Admission/GetSections (AJAX) ───────────────
+        // The first value that is present and is not the one already shown, so the
+        // alternate-mobile box never repeats the main number.
+        private static string? FirstDifferent(string? already, params string?[] options)
+        {
+            foreach (var o in options)
+            {
+                var v = o?.Trim();
+                if (!string.IsNullOrEmpty(v) &&
+                    !string.Equals(v, already?.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return v;
+            }
+            return null;
+        }
+
+        // Joins the parts of an address that were filled in, skipping the blanks.
+        private static string? JoinParts(params string?[] parts)
+        {
+            var kept = parts.Select(p => p?.Trim())
+                            .Where(p => !string.IsNullOrEmpty(p))
+                            .ToList();
+            return kept.Count == 0 ? null : string.Join(", ", kept);
+        }
+
         // The number the next admission WOULD get, for the form to show as a hint.
         // It reads the counter without touching it, so this is a preview and not
         // a reservation: two clerks with the form open both see the same number

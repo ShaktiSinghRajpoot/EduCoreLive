@@ -81,7 +81,7 @@
                             </div>
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Date of Birth</label>
-                                <input type="date" name="DateOfBirth" class="form-control" required>
+                                <input type="date" name="DateOfBirth" class="form-control" value="@(ViewBag.PreDob is DateOnly d ? d.ToString("yyyy-MM-dd") : "")" required>
                             </div>
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Academic Year</label>
@@ -193,7 +193,7 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Mother Name</label>
-                                <input type="text" name="MotherName" class="form-control" placeholder="Optional">
+                                <input type="text" name="MotherName" class="form-control" placeholder="Optional" value="@ViewBag.PreMotherName">
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label required">Mobile Number</label>
@@ -201,7 +201,7 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Alternate Mobile</label>
-                                <input type="tel" name="AlternateMobile" maxlength="10" pattern="[0-9]{10}" class="form-control" placeholder="Optional">
+                                <input type="tel" name="AlternateMobile" maxlength="10" pattern="[0-9]{10}" class="form-control" placeholder="Optional" value="@ViewBag.PreAltMobile">
                             </div>
 
                             <div class="col-12"><hr class="my-1 opacity-25"></div>
@@ -223,7 +223,7 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Father Email</label>
-                                <input type="email" name="FatherEmail" class="form-control" placeholder="Optional">
+                                <input type="email" name="FatherEmail" class="form-control" placeholder="Optional" value="@ViewBag.PreFatherEmail">
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Mother Email</label>
@@ -236,7 +236,7 @@
 
                             <div class="col-12">
                                 <label class="form-label required">Address</label>
-                                <textarea name="Address" class="form-control" rows="3" placeholder="Complete address" required></textarea>
+                                <textarea name="Address" class="form-control" rows="3" placeholder="Complete address" required>@ViewBag.PreAddress</textarea>
                             </div>
                         </div>
                     </div>
@@ -253,7 +253,7 @@
                         <div class="row g-3">
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Previous School Name</label>
-                                <input type="text" name="PrevSchoolName" class="form-control" placeholder="Optional">
+                                <input type="text" name="PrevSchoolName" class="form-control" placeholder="Optional" value="@ViewBag.PrePrevSchool">
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Board</label>
@@ -261,7 +261,7 @@
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">Last Class Attended</label>
-                                <input type="text" name="PrevClass" class="form-control" placeholder="Optional">
+                                <input type="text" name="PrevClass" class="form-control" placeholder="Optional" value="@ViewBag.PrePrevClass">
                             </div>
                             <div class="col-12 col-md-6">
                                 <label class="form-label">TC Number</label>
@@ -397,7 +397,7 @@
                         <div class="fee-group-title d-flex align-items-center justify-content-between">
                             <span><i class="bx bx-bus me-1"></i>School Transport</span>
                             <div class="form-check form-switch m-0">
-                                <input class="form-check-input" type="checkbox" id="usesTransport">
+                                <input class="form-check-input" type="checkbox" id="usesTransport" checked="@(ViewBag.PreTransport is true)">
                             </div>
                         </div>
                         <div class="fee-summary d-none" id="transportFields">
@@ -943,6 +943,8 @@ $(function () {
     <text>
     (function () {
         if ($class.val() && $year.val()) { loadFees(); loadClasses(); }
+        // The switch may be on from the enquiry; show the fields it reveals.
+        if ($('#usesTransport').is(':checked')) $('#transportFields').removeClass('d-none');
     })();
     </text>
 }
