@@ -110,13 +110,6 @@
                                 </select>
                             </div>
 
-                            <div class="col-12 col-sm-6 col-lg-3">
-                                <label class="form-label required">Admission Date</label>
-                                <input type="date" id="admissionDate" name="AdmissionDate" class="form-control"
-                                       value="@DateTime.Today.ToString("yyyy-MM-dd")"
-                                       max="@DateTime.Today.ToString("yyyy-MM-dd")" required>
-                                <div class="form-text">Change it only for a student who joined earlier.</div>
-                            </div>
                             <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label">Admission No</label>
                                 <input type="text" name="AdmissionNo" id="adm_AdmissionNo" class="form-control" placeholder="Auto-generated if blank">
@@ -466,7 +459,11 @@ $(function () {
     var $year       = $('#academicYearSelect');
     var $class      = $('#classSelect');
     var $section    = $('#adm_Section');
-    var $admDate    = $('#admissionDate');
+    // The Admission Date field was removed from this form; the database dates
+    // an admission on the day it is entered. The fee preview still needs that
+    // date to know how many months to bill, so it uses the server's today —
+    // the same value sp_admission_manage will fall back to.
+    var ADMISSION_DATE = '@DateTime.Today.ToString("yyyy-MM-dd")';
     var $feeBox     = $('#feeContent');
     var $annual     = $('#annualTotalText');
     var $annualRef  = $('#annualRefText');
@@ -745,7 +742,7 @@ $(function () {
         $ledger.val(JSON.stringify({
             academicYear: $year.val(),
             className: $class.val(),
-            admissionDate: $admDate.val(),
+            admissionDate: ADMISSION_DATE,
             selectedFees: $.map(fees, function (f) {
                 return f.selected
                     ? { feeHeadId: f.id, feeHeadName: f.name, frequency: f.cycle, amount: f.amount, mandatory: f.mandatory }
@@ -762,7 +759,7 @@ $(function () {
     /* ── events ──────────────────────────────────────── */
     $year.on('change',  function () { loadFees(); loadClasses(); loadNextAdmissionNo(); });
     $class.on('change', function () { loadFees(); loadSections(); });
-    $admDate.add($discType).add($discApply).on('change', renderFees);
+    $discType.add($discApply).on('change', renderFees);
     $discValue.add($discReason).on('input', renderFees);
     $feeBox.on('change', '.optional-fee-checkbox', function () {
         fees[Number($(this).data('index'))].selected = this.checked;

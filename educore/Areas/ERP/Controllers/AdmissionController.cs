@@ -221,14 +221,17 @@ namespace educore.Areas.ERP.Controllers
             else if (form.DateOfBirth.Value > today)
                 errors.Add("Date of birth cannot be in the future.");
 
-            if (!form.AdmissionDate.HasValue)
-                errors.Add("Admission date is required.");
-            else if (form.AdmissionDate.Value > today)
+            // The Admission Date field was removed from the form: an admission is
+            // dated by the database on the day it is entered
+            // (sp_admission_manage falls back to CURRENT_DATE). It is still
+            // checked when something else supplies one.
+            if (form.AdmissionDate.HasValue && form.AdmissionDate.Value > today)
                 errors.Add("Admission date cannot be in the future.");
 
             // Born after the day they joined is not a typo anyone should keep.
-            if (form.DateOfBirth.HasValue && form.AdmissionDate.HasValue &&
-                form.DateOfBirth.Value > form.AdmissionDate.Value)
+            // With no date posted, the joining day is today.
+            var joined = form.AdmissionDate ?? today;
+            if (form.DateOfBirth.HasValue && form.DateOfBirth.Value > joined)
                 errors.Add("Date of birth cannot be after the admission date.");
 
             var (feePlan, totals, concession) = ParseLedger(form);
