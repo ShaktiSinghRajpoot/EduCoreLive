@@ -2874,3 +2874,81 @@ defensible — but it is the one thing that still writes to the ledger on that
 screen when collection is off.
 
 Twelve suites now exist, **410 checks**, identical on local and Railway.
+
+---
+
+### [2026-09-20] New Admission: validation at all three layers, a photo, and a name bug
+
+A full audit of `/ERP/Admission/Create`, then fixes at every layer. Two things I
+first reported as missing turned out to be already right, and are recorded here so
+the audit is not remembered wrongly: the red asterisks **do** render
+(`.required::after { content:" *" }` in `Create.css`), and they match the inputs'
+`required` attribute exactly — ten fields, no drift. A duplicate admission number
+was **already** refused with a clear message, and does not overwrite the first
+child.
+
+**Fixed: pressing Save could appear to do nothing.** The handler was
+`if (!this.checkValidity()) { $form.addClass('was-validated'); return; }` — a red
+border and nothing else. On a form this long the empty field is usually off
+screen, so the office pressed Save and saw no reaction at all. It now scrolls to
+the first invalid field, focuses it, and says which one by name.
+
+**Fixed: seven of the ten starred fields were not checked server-side.** Only
+name, class and academic year were. Section, gender, date of birth, admission
+date, father/guardian name and address could all be posted blank — and **mobile
+was only format-checked when present**, so a blank one passed the server even
+though the form demands it. A school with no way to reach the parent has a
+record, not a contact. All ten are now re-checked, along with the alternate
+mobile's format, a date of birth after the admission date, and an admission date
+in the future.
+
+**Fixed: the proc accepted almost anything.** Each of these was reproduced as a
+successful admission before the guard was written:
+
+- a student whose **name was three spaces**;
+- a student sitting in **a class that does not exist** — an orphan no class list
+  shows, no fee structure matches and promotion cannot move;
+- an admission dated **2027-10-25**, which also lands the first instalment in a
+  month the session has not reached;
+- a child **born after the day they joined**.
+
+All four are refused by name now, while a *back-dated* admission — a real student
+entered late — still goes through, because that is a legitimate thing to do.
+
+**Found while reading the test output: admission numbers said `ADM-FY 2-0001`.**
+The generator was `LEFT(v_year, 4)` on the session's *name*, so "FY 26-27" became
+"FY 2". This is the same bug `core.fn_receipt_year` was written for when receipt
+numbers hit it; the admission number had been left on the old expression. Now
+`ADM-2026-0001`. **One existing student on Railway carries the old format** — an
+admission number is identity and is referenced by receipts and certificates, so it
+is deliberately left alone rather than rewritten.
+
+**Added: a student photo at admission.** The upload endpoint, storage folder and
+limits already existed for the profile page; the admission form now offers the
+same thing at the point the child is standing at the desk. It is a square drop
+target beside the name — the photo is part of identifying a student, not a
+separate section — with live preview, drag-and-drop, a remove button, and the
+JPG/PNG/WEBP and 2 MB checks mirrored client-side so the office is told before
+filling in the rest of the form. The file rides along in the form's existing
+`FormData`, and is filed after the student has an id. **A photo that fails never
+fails the admission:** the child is admitted and the picture can be added later.
+
+**Removed: Roll No.** Roll numbers are assigned per class once admissions close,
+usually alphabetically, so at admission the field was always blank or a guess. The
+column and the directory's Roll No stay, so existing numbers are untouched.
+
+**Resequenced.** The form used to open with two reference numbers — one that
+auto-generates and one that should not be set yet — before it asked the child's
+name. Now the photo and the name lead, and Admission No sits with the placement
+fields it belongs to, under a hint that says leaving it blank is normal.
+
+`Database/tests/admission_validation_tests.sql` — 18 checks over the proc layer,
+including that a refused admission leaves no half-written student and that
+exactly the valid ones were created.
+
+**Two of my own checks in `workflow_billing_tests` failed after this work**, and
+were right to: they admitted a student in the last month of the session, which is
+March 2027 — a date the new guard now refuses because it has not happened. They
+now test the latest month that *has* happened, plus the refusal itself.
+
+Thirteen suites, **430 checks**, identical on local and Railway.

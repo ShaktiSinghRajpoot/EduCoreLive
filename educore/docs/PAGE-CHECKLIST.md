@@ -25,7 +25,7 @@ refresh it.
 | Student Directory | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Student Dashboard | ✅ | ✅ | ✅ | n/a | ✅ |
 | Edit Student | ✅ | ✅ unknown class refused, another school's id is "not found" | ✅ | ✅ | ✅ |
-| New Admission | ✅ | ✅ duplicate admission no, concession cap, fee plan | ✅ | ✅ | ✅ 28 |
+| New Admission | ✅ | ✅ all 10 starred fields re-checked server-side; proc refuses blank name, unknown class, impossible dates | ✅ | ✅ | ✅ 18 |
 | Inactive / Left | ✅ | ✅ exit status must be one of four, already-left refused | ✅ | ✅ | ✅ |
 | Promote Students | ✅ | ✅ session, ladder, dues, per-student target class | ✅ | ✅ | ✅ 17 |
 
@@ -148,6 +148,18 @@ Open items, roughly in the order they are worth doing.
       `SavePeriodStructure` had no `[ValidateAntiForgeryToken]`. Two of the three
       views were already sending the token, so the attribute was all that was
       missing; the Academic Years page was not sending one at all and now does.
+- [x] **New Admission page hardened** — the ten starred fields are now all
+      re-checked in the controller (seven were not), the proc refuses a blank
+      name, a class that does not exist and impossible dates, and pressing Save
+      with something missing now scrolls to the field and names it instead of
+      appearing to do nothing.
+- [x] **Student photo at admission** — drop target beside the name, with preview,
+      drag-and-drop and the same limits the server applies.
+- [x] **Roll No removed from admission** — it is assigned per class after
+      admissions close, so at admission it was always blank or a guess.
+- [x] **Admission numbers said `ADM-FY 2-0001`** — the generator took the first
+      four characters of the session NAME. Now uses `core.fn_receipt_year`, the
+      helper written when receipt numbers hit the same bug.
 - [x] **Workflow billing suite** — 28 checks proving `charge_fees_from` really
       drives the money, and recording which workflow settings the database
       enforces (one) versus which the application enforces (the rest).

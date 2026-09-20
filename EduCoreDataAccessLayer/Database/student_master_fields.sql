@@ -142,6 +142,55 @@ BEGIN
         v_year     := COALESCE(p_academic_year, '');
         v_adm_date := COALESCE(p_admission_date, CURRENT_DATE);
 
+        -- ── What a student record must have to be a student ──────────────────
+        -- The screen asks for these and the controller re-checks them, but the
+        -- proc is the last thing between a request and a real child's record, and
+        -- it used to accept anything. Each refusal below was reproduced first: a
+        -- student with a blank name, one sitting in a class that does not exist,
+        -- one admitted in 2027, and one born after the day they joined.
+        IF COALESCE(TRIM(p_student_name), '') = '' THEN
+            OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                'Student name is required.' AS message, NULL::TEXT AS admission_no;
+            RETURN;
+        END IF;
+
+        -- A student in a class that does not exist is an orphan: no class list
+        -- shows them, no fee structure matches, and promotion cannot move them.
+        IF COALESCE(TRIM(p_class_name), '') = '' OR NOT EXISTS (
+               SELECT 1 FROM academic.academic_classes ac
+               JOIN academic.academic_years ay
+                 ON ay.academic_year_id = ac.academic_year_id
+               WHERE ac.tenant_id = p_tenant_id AND ac.school_id = p_school_id
+                 AND ac.class_name = TRIM(p_class_name)
+                 AND ay.academic_year_name = v_year
+                 AND COALESCE(ac.is_deleted, FALSE) = FALSE) THEN
+            OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                format('%s is not a class in %s.', COALESCE(NULLIF(TRIM(p_class_name),''),'(blank)'), v_year) AS message,
+                NULL::TEXT AS admission_no;
+            RETURN;
+        END IF;
+
+        -- Nobody is admitted for a day that has not happened. A future date also
+        -- lands the first instalment outside the session it belongs to.
+        IF v_adm_date > CURRENT_DATE THEN
+            OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                'Admission date cannot be in the future.' AS message, NULL::TEXT AS admission_no;
+            RETURN;
+        END IF;
+
+        IF p_dob IS NOT NULL AND p_dob > CURRENT_DATE THEN
+            OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                'Date of birth cannot be in the future.' AS message, NULL::TEXT AS admission_no;
+            RETURN;
+        END IF;
+
+        IF p_dob IS NOT NULL AND p_dob > v_adm_date THEN
+            OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                'Date of birth cannot be after the admission date.' AS message,
+                NULL::TEXT AS admission_no;
+            RETURN;
+        END IF;
+
         -- Session window for this academic year — drives session-end-aware billing
         -- (a mid-session joiner is billed only up to the session's end month).
         SELECT start_date, end_date
@@ -188,8 +237,14 @@ BEGIN
             DO UPDATE SET last_seq = core.admission_counters.last_seq + 1
             RETURNING last_seq INTO v_seq;
 
+            -- LEFT(v_year, 4) took the first four characters of the session's
+            -- NAME, so "FY 26-27" produced ADM-FY 2-0002. core.fn_receipt_year
+            -- was written for exactly this when receipt numbers hit it; the
+            -- admission number was left on the old expression. It reads the
+            -- session's real start date, falls back to any four-digit year in the
+            -- name, then to the admission date.
             v_admission_no := 'ADM-' ||
-                COALESCE(NULLIF(LEFT(v_year, 4), ''), TO_CHAR(v_adm_date, 'YYYY')) ||
+                core.fn_receipt_year(p_tenant_id, p_school_id, v_year, v_adm_date) ||
                 '-' || LPAD(v_seq::TEXT, 4, '0');
         ELSE
             v_admission_no := TRIM(p_admission_no);

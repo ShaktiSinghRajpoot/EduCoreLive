@@ -161,9 +161,22 @@ BEGIN
     PERFORM pg_temp.chk('A2b ...billed back to the session start, not their month',
         r.first_due = DATE_TRUNC('month', v_start)::date, format('first %s', r.first_due));
 
+    -- The latest month that has actually happened. Dating an admission in a
+    -- month the session has not reached is refused outright now, which A3b
+    -- checks; until then "late joiner" can only mean this month.
     SELECT * INTO r FROM pg_temp.admit(c_tenant, c_school, c_user, 'ZZ-SS-LATE',
-        v_class, v_sec, v_year, DATE_TRUNC('month', v_end)::date, c_fee);
-    PERFORM pg_temp.chk_eq('A3 joins in the LAST month     -> still full session', r.months, v_months_in_session);
+        v_class, v_sec, v_year, CURRENT_DATE, c_fee);
+    PERFORM pg_temp.chk_eq('A3 joins TODAY                 -> still full session', r.months, v_months_in_session);
+
+    DECLARE cl refcursor := 'a3b'; g_sid int; g_ok int; g_msg text; g_adm text;
+    BEGIN
+        CALL core.sp_admission_manage('SaveAdmission', c_tenant, c_school, c_user, NULL,
+             'ZZ-SS-FUTURE', NULL, 'ZZ Future Joiner', 'Male', DATE '2015-01-01',
+             v_class, v_sec, v_year, DATE_TRUNC('month', v_end)::date, p_result => cl);
+        FETCH cl INTO g_sid, g_ok, g_msg, g_adm;
+        PERFORM pg_temp.chk('A3b a month the session has not reached is refused',
+                            COALESCE(g_ok,1) = 0, g_msg);
+    END;
 
     SELECT * INTO r FROM pg_temp.admit(c_tenant, c_school, c_user, 'ZZ-SS-OLD',
         v_class, v_sec, v_year, DATE '2017-04-20', c_fee);
@@ -188,9 +201,19 @@ BEGIN
         r.first_due = DATE_TRUNC('month', (v_start + INTERVAL '5 months')::date)::date,
         format('first %s', r.first_due));
 
-    SELECT * INTO r FROM pg_temp.admit(c_tenant, c_school, c_user, 'ZZ-AM-LATE',
-        v_class, v_sec, v_year, DATE_TRUNC('month', v_end)::date, c_fee);
-    PERFORM pg_temp.chk_eq('B3 joins in the LAST month     -> a single instalment', r.months, 1);
+    -- Under AdmissionMonth a joiner is billed from their own month to the
+    -- session end, so joining today leaves exactly the months still to come.
+    DECLARE v_left integer;
+    BEGIN
+        v_left := (EXTRACT(YEAR FROM v_end)::int * 12 + EXTRACT(MONTH FROM v_end)::int)
+                - (EXTRACT(YEAR FROM CURRENT_DATE)::int * 12 + EXTRACT(MONTH FROM CURRENT_DATE)::int) + 1;
+        SELECT * INTO r FROM pg_temp.admit(c_tenant, c_school, c_user, 'ZZ-AM-LATE',
+            v_class, v_sec, v_year, CURRENT_DATE, c_fee);
+        PERFORM pg_temp.chk_eq('B3 joins TODAY                 -> only the months left',
+                               r.months, v_left);
+        PERFORM pg_temp.chk('B3b ...and the first one is this month',
+            r.first_due = DATE_TRUNC('month', CURRENT_DATE)::date, format('first %s', r.first_due));
+    END;
 
     -- The rule that cost a real school 4,29,000: "first month = admission month"
     -- walking backwards for years.

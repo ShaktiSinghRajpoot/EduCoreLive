@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models;
@@ -22,8 +22,11 @@ namespace educore.Areas.ERP.Controllers
         private readonly IBaseService _baseService;
         private readonly ITransportService _transportService;
 
-        public AdmissionController(IAdmissionService admissionService, IEnquiryService enquiryService, ISchoolSettingsService schoolSettingsService, IAdmissionWorkflowService admissionWorkflowService, IFeePaymentService feePaymentService, IBaseService baseService, ITransportService transportService)
+        private readonly IWebHostEnvironment _env;
+
+        public AdmissionController(IAdmissionService admissionService, IEnquiryService enquiryService, ISchoolSettingsService schoolSettingsService, IAdmissionWorkflowService admissionWorkflowService, IFeePaymentService feePaymentService, IBaseService baseService, ITransportService transportService, IWebHostEnvironment env)
         {
+            _env = env;
             _admissionService = admissionService;
             _enquiryService = enquiryService;
             _schoolSettingsService = schoolSettingsService;
@@ -122,24 +125,84 @@ namespace educore.Areas.ERP.Controllers
             return View("Create");
         }
 
+        // Stores an admission-time photo under the same folder and the same
+        // constraints as Student/UploadPhoto, so the directory avatar and the ID
+        // card find it in the one place they already look. Returns quietly on a
+        // bad file — see the call site for why that is deliberate.
+        private async Task SaveStudentPhotoAsync(
+            int studentId, IFormFile photo, int tenantId, int schoolId, int userId)
+        {
+            var ext = Path.GetExtension(photo.FileName).ToLowerInvariant();
+            string[] allowed = { ".jpg", ".jpeg", ".png", ".webp" };
+            if (!allowed.Contains(ext) || photo.Length > 2 * 1024 * 1024) return;
+
+            var folder = Path.Combine(_env.WebRootPath, "uploads", "students",
+                                      tenantId.ToString(), schoolId.ToString());
+            Directory.CreateDirectory(folder);
+
+            var fileName = $"student_{studentId}_{DateTime.Now:yyyyMMddHHmmssfff}{ext}";
+            var fullPath = Path.Combine(folder, fileName);
+            using (var stream = new FileStream(fullPath, FileMode.Create))
+                await photo.CopyToAsync(stream);
+
+            var url = $"/uploads/students/{tenantId}/{schoolId}/{fileName}";
+            var (ok, _, _) = await _admissionService.SetStudentPhotoAsync(
+                studentId, url, tenantId, schoolId, userId);
+
+            // Don't leave an orphan file if the row never took the URL.
+            if (!ok) { try { System.IO.File.Delete(fullPath); } catch { } }
+        }
+
         // ── POST: /ERP/Admission/SaveAdmission ───────────────────
         [HttpPost]
         [HasPermission("students.manage")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SaveAdmission(AdmissionFormModel form)
+        public async Task<IActionResult> SaveAdmission(AdmissionFormModel form, IFormFile? photo)
         {
             int tenantId = TenantId(), schoolId = SchoolId(), userId = UserId();
 
             // ── Server-side validation ──
+            // Every field the form marks with a * is re-checked here. The browser's
+            // own `required` only protects a user with JavaScript on and the form
+            // rendered — it is a courtesy, not a guarantee. Three of these ten were
+            // checked before; the other seven could be posted blank.
             var errors = new List<string>();
-            if (string.IsNullOrWhiteSpace(form.StudentName)) errors.Add("Student name is required.");
-            if (string.IsNullOrWhiteSpace(form.ClassName))   errors.Add("Class is required.");
-            if (string.IsNullOrWhiteSpace(form.AcademicYear))errors.Add("Academic year is required.");
-            if (!string.IsNullOrWhiteSpace(form.MobileNumber) &&
-                !System.Text.RegularExpressions.Regex.IsMatch(form.MobileNumber, @"^\d{10}$"))
+            var today  = DateOnly.FromDateTime(DateTime.Today);
+
+            if (string.IsNullOrWhiteSpace(form.StudentName))  errors.Add("Student name is required.");
+            if (string.IsNullOrWhiteSpace(form.AcademicYear)) errors.Add("Academic year is required.");
+            if (string.IsNullOrWhiteSpace(form.ClassName))    errors.Add("Class is required.");
+            if (string.IsNullOrWhiteSpace(form.Section))      errors.Add("Section is required.");
+            if (string.IsNullOrWhiteSpace(form.Gender))       errors.Add("Gender is required.");
+            if (string.IsNullOrWhiteSpace(form.GuardianName)) errors.Add("Father / guardian name is required.");
+            if (string.IsNullOrWhiteSpace(form.Address))      errors.Add("Address is required.");
+
+            // A school with no way to reach the parent has a record, not a contact.
+            // This used to check the format only when a number was supplied, so a
+            // blank mobile passed the server even though the form demands one.
+            if (string.IsNullOrWhiteSpace(form.MobileNumber))
+                errors.Add("Mobile number is required.");
+            else if (!System.Text.RegularExpressions.Regex.IsMatch(form.MobileNumber, @"^\d{10}$"))
                 errors.Add("Mobile number must be 10 digits.");
-            if (form.DateOfBirth.HasValue && form.DateOfBirth.Value > DateOnly.FromDateTime(DateTime.Today))
+
+            if (!string.IsNullOrWhiteSpace(form.AlternateMobile) &&
+                !System.Text.RegularExpressions.Regex.IsMatch(form.AlternateMobile, @"^\d{10}$"))
+                errors.Add("Alternate mobile must be 10 digits.");
+
+            if (!form.DateOfBirth.HasValue)
+                errors.Add("Date of birth is required.");
+            else if (form.DateOfBirth.Value > today)
                 errors.Add("Date of birth cannot be in the future.");
+
+            if (!form.AdmissionDate.HasValue)
+                errors.Add("Admission date is required.");
+            else if (form.AdmissionDate.Value > today)
+                errors.Add("Admission date cannot be in the future.");
+
+            // Born after the day they joined is not a typo anyone should keep.
+            if (form.DateOfBirth.HasValue && form.AdmissionDate.HasValue &&
+                form.DateOfBirth.Value > form.AdmissionDate.Value)
+                errors.Add("Date of birth cannot be after the admission date.");
 
             var (feePlan, totals, concession) = ParseLedger(form);
 
@@ -170,7 +233,6 @@ namespace educore.Areas.ERP.Controllers
             var model = new AdmissionModel
             {
                 AdmissionNo      = NullIfEmpty(form.AdmissionNo),
-                RollNo           = NullIfEmpty(form.RollNo),
                 StudentName      = form.StudentName!.Trim(),
                 Gender           = NullIfEmpty(form.Gender),
                 DateOfBirth      = form.DateOfBirth,
@@ -216,6 +278,13 @@ namespace educore.Areas.ERP.Controllers
             };
 
             var result = await _admissionService.SaveAdmissionAsync(model, tenantId, schoolId, userId);
+
+            // The photo can only be filed once the student has an id, so it is
+            // saved after the admission, with the same rules as the profile-page
+            // uploader. A photo that fails never fails the admission: the child is
+            // admitted and the office can add the picture from the profile.
+            if (result.Success && result.StudentId > 0 && photo is { Length: > 0 })
+                await SaveStudentPhotoAsync(result.StudentId, photo, tenantId, schoolId, userId);
 
             // ── Record concession + collect fee at admission ──
             // Both the cash collected now AND any admission-time concession are pushed
