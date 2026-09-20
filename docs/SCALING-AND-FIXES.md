@@ -2654,3 +2654,71 @@ A one-statement rollback (the two ids and their previous value) is in this
 session's scratchpad as `feehead_collection_point_rollback.sql`. The `\copy`
 backup attempted first failed on its output path; the before-state is recorded in
 that file and in this entry instead, which is enough to reverse a two-row change.
+
+---
+
+### [2026-09-20] Inventory module
+
+The two Inventory pages were shells: they rendered, saved nothing, and drew their
+rows from `wwwroot/js/inventory-catalog.js`, a hardcoded array of ten invented
+items whose own header said *"When a backend exists, replace the items array with
+an API fetch."* The backend now exists, so that file is deleted and both pages
+read from the database.
+
+**`Database/inventory.sql`** — `inventory_items`, `inventory_suppliers`,
+`inventory_purchases` + `_purchase_items`, and `inventory_stock_ledger`, behind
+`sp_inventory_manage` and `sp_inventory_purchase_manage`.
+
+**The central decision: stock is a LEDGER, not a number.** Every change writes a
+row saying what moved, how much, why and who did it. `current_stock` on the item
+is a running total kept in the same transaction — a cache for the list screen,
+never the source of truth — and `Recount` rebuilds it from the ledger, so the two
+can be reconciled rather than argued about. The test breaks the cache on purpose
+and proves Recount repairs it. This is the fee-ledger lesson applied: a balance
+you only ever UPDATE drifts, and nobody can say when or why.
+
+**Opening stock is a movement too**, so the very first figure on the shelf has a
+date and an author like every later one.
+
+**Stock cannot go below zero.** Issuing more than is there is refused by name and
+amount — *"Only 25.00 Piece of ZZ School Tie left"* — because a negative stock
+figure is never a thing that really happened; it is always a mistake someone must
+correct at the time, not discover at audit.
+
+**A purchase is immutable once saved.** It can be cancelled, which writes matching
+negative movements and keeps both the invoice and its reversal on the record, but
+never edited. Cancelling twice is refused, and cancelling a purchase whose goods
+have already been issued is refused with the arithmetic in the message: *"only
+0.00 Piece of ZZ School Tie left, and this purchase brought in 10.00."*
+
+Also guarded: duplicate item names and duplicate SKUs (a blank SKU is fine, and
+several items may have none); one invoice number per supplier, so the same bill
+cannot be entered twice; a future-dated purchase; a purchase with no lines; and a
+line naming an item from another school — checked before anything is written, so
+a bad line cannot leave a half-purchase behind. Deleting an item still holding
+stock is refused; once empty it soft-deletes, its movement history survives, and
+its name becomes available again.
+
+**Beyond the shells.** The two pages only had item master and purchase entry,
+which between them can only make stock go *up*. Issue / Return / Damage /
+Adjustment are added, with a stock-history view per item — without them the module
+would not be an inventory system.
+
+**Shell fields that needed a home rather than deletion.** The item form already
+drew Cost Price, Selling Price, Brand, Model, Description and a Status toggle, and
+the list had a Value column and a Stock Value card. Rather than delete half the
+designed form, those columns were added; cost price is what gives Value a real
+source. The four summary cards are computed in the page from the same rows the
+table draws, so they cannot disagree with the list under them — and the
+server-side summary I had written for them was removed rather than shipped as a
+second source for the same number.
+
+**A trap worth recording.** `CREATE OR REPLACE PROCEDURE` cannot change a
+parameter list, so adding the pricing parameters left the old overload in place
+and every call failed with *"is not unique"*. Worse, three tests **passed for the
+wrong reason** — they expected a refusal, and the ambiguity error was a refusal.
+Both procs now drop every existing signature by name before creating themselves.
+Same shape as the two `sp_fee_payment_collect` revisions.
+
+`Database/tests/inventory_tests.sql` — 49 checks. Ten suites now exist,
+**284 checks**, identical on local and Railway.

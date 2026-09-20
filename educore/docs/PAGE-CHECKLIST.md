@@ -73,6 +73,13 @@ refresh it.
 | TC Register / Print | ✅ | ✅ must have left, dues clear, one live TC | ✅ | ✅ | ✅ |
 | ID Cards | ✅ | read-only, excludes students who left | ✅ | n/a | ✅ |
 
+## Store
+
+| Page | Real | Guards | Scope | CSRF | Tests |
+|---|---|---|---|---|---|
+| Inventory Items | ✅ | ✅ name, SKU, stock floor at zero, delete needs empty | ✅ | ✅ | ✅ 49 |
+| Purchase Entry | ✅ | ✅ future date, empty lines, duplicate invoice, cancel-once | ✅ | ✅ | ✅ |
+
 ## Settings
 
 | Page | Real | Guards | Scope | CSRF | Tests |
@@ -101,7 +108,6 @@ refresh it.
 
 | Page | State |
 |---|---|
-| **Inventory** (Items, Purchase Entry) | Shell. 0 service calls. Needs a whole module: items, stock, suppliers, purchases. |
 | **Payment Verification** | Shell. The view holds a hardcoded C# array. Needs a table for online payments awaiting verification — and a decision first: payment-gateway integration, or manual UPI/NEFT reference checking? |
 | **Staff attendance** | Does not exist. `StaffProfile` links to `Attendance/StaffAttendance`, which is not an action — a dead link. This is also why payroll derives Loss of Pay from unpaid leave rather than from absences. |
 
@@ -113,7 +119,6 @@ Open items, roughly in the order they are worth doing.
 
 - [ ] **Payment Verification** — decide gateway vs manual, then build it. Until
       then the menu item leads to invented data.
-- [ ] **Inventory** — a module-sized piece of work.
 - [ ] **Staff attendance register** — would let payroll compute LOP from actual
       absences, and would fix the dead link on the staff profile.
 - [ ] **Salary structure** — `core.staff` holds one `monthly_salary`. A payslip
@@ -143,6 +148,9 @@ Open items, roughly in the order they are worth doing.
       `SavePeriodStructure` had no `[ValidateAntiForgeryToken]`. Two of the three
       views were already sending the token, so the attribute was all that was
       missing; the Academic Years page was not sending one at all and now does.
+- [x] **Inventory module built** — items, suppliers, purchases and a stock
+      movement ledger, replacing two shells that saved nothing and showed a
+      hardcoded catalog. 49 checks.
 - [x] **The two unmigrated fee heads are migrated** — school 33 "Annually
       Function" and school 34 "Admission Fee" were `One Time` heads still marked
       `collection_point = 'Recurring'`, so they were offered as scheduled

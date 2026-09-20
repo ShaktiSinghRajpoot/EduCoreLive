@@ -1,4 +1,4 @@
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Purchase Entry";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -74,12 +74,18 @@
                 <div class="row g-3">
                     <div class="col-12 col-md-6 col-lg-3">
                         <label class="form-label">Supplier</label>
-                        <select class="form-select" id="supplierId">
+                        <div class="d-flex gap-1">
+                          <select class="form-select" id="supplierId">
                             <option value="">Select Supplier</option>
-                            <option>ABC Uniform House</option>
-                            <option>NCERT Distributor</option>
-                            <option>Sports World</option>
-                        </select>
+@foreach (var s in (List<EduCoreDataAccessLayer.Models.ERP.InventorySupplier>)(ViewBag.Suppliers ?? new List<EduCoreDataAccessLayer.Models.ERP.InventorySupplier>()))
+{
+                            <option value="@s.SupplierId">@s.SupplierName</option>
+}
+                          </select>
+                          <button type="button" class="btn btn-outline-secondary" id="addSupplierBtn" title="Add supplier">
+                            <i class="bx bx-plus"></i>
+                          </button>
+                        </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
                         <label class="form-label">Purchase Date</label>
@@ -180,130 +186,360 @@
     </div>
 </div>
 
+<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold">Purchase History</h5>
+          <small class="text-muted">A saved purchase is never edited — it can only be cancelled, which reverses its stock.</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Date</th><th>Supplier</th><th>Invoice</th><th>Mode</th>
+                <th class="text-end">Items</th><th class="text-end">Total</th>
+                <th>Status</th><th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="supplierModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Add Supplier</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Supplier Name</label>
+            <input type="text" class="form-control" id="spName" placeholder="ABC Uniform House">
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">Contact Person</label>
+            <input type="text" class="form-control" id="spContact">
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">Mobile</label>
+            <input type="text" class="form-control" id="spMobile">
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" id="spEmail">
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">GSTIN</label>
+            <input type="text" class="form-control" id="spGstin">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Address</label>
+            <textarea class="form-control" id="spAddress" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer flex-column flex-sm-row">
+        <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary w-100 w-sm-auto" id="saveSupplierBtn">
+          <i class="bx bx-save me-1"></i> Save Supplier
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
 @section PageScripts {
-<script src="~/js/inventory-catalog.js" asp-append-version="true"></script>
 <script>
-$(document).ready(function () {
+(function () {
+    'use strict';
 
-    var purchaseRows = [];
+    var SAVE_URL      = '@Url.Action("SavePurchase", "Inventory", new { area = "ERP" })';
+    var LIST_URL      = '@Url.Action("Purchases", "Inventory", new { area = "ERP" })';
+    var CANCEL_URL    = '@Url.Action("CancelPurchase", "Inventory", new { area = "ERP" })';
+    var SUPPLIER_URL  = '@Url.Action("SaveSupplier", "Inventory", new { area = "ERP" })';
+    var SUPPLIERS_URL = '@Url.Action("Suppliers", "Inventory", new { area = "ERP" })';
 
-    /* Item list comes from the shared inventory catalog (single source of truth). */
-    var catalog = (window.EduInventory ? window.EduInventory.all() : []);
-    var itemOptions = catalog.map(function (i) { return i.name; });
+    // The item catalog is rendered by the server from the same list the item
+    // master shows — the page used to carry its own hardcoded copy.
+    var ITEMS = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        ((List<EduCoreDataAccessLayer.Models.ERP.InventoryItem>)(ViewBag.Items
+            ?? new List<EduCoreDataAccessLayer.Models.ERP.InventoryItem>()))
+        .Select(i => new { id = i.ItemId, name = i.ItemName, unit = i.UnitType, cost = i.CostPrice })));
 
+    var rows = [];      // the lines being entered
+    var seq  = 0;
 
-    function rowTotals(row){
-        var amount=Number(row.qty)*Number(row.rate);
-        var tax=amount*(Number(row.tax)/100);
-        return { amount:amount, tax:tax, total:amount+tax };
+    function token() {
+        return $('input[name="__RequestVerificationToken"]').first().val();
     }
 
-    function addRow(){
-        purchaseRows.push({ id:Date.now()+Math.random(), item:"", qty:1, rate:0, tax:0 });
-        renderRows();
-    }
-
-    function renderRows(){
-        var html="";
-        purchaseRows.forEach(function(row){
-            var t=rowTotals(row);
-            html += '<tr data-id="'+row.id+'">'
-                + '<td><div class="d-flex align-items-center gap-2">'
-                +   '<div class="purchase-item-thumb"><i class="bx bx-package"></i></div>'
-                +   '<div class="flex-grow-1"><select class="form-select item-select"><option value="">Select Item</option>'
-                +     itemOptions.map(function(x){return '<option value="'+x+'" '+(x===row.item?'selected':'')+'>'+x+'</option>';}).join('')
-                +   '</select></div></div></td>'
-                + '<td><input type="number" class="form-control qty-input" min="1" value="'+row.qty+'"></td>'
-                + '<td><input type="number" class="form-control rate-input" min="0" value="'+row.rate+'"></td>'
-                + '<td><input type="number" class="form-control tax-input" min="0" value="'+row.tax+'"></td>'
-                + '<td><div class="fw-bold row-total">'+EC.money(t.total)+'</div><small class="text-muted row-tax">Tax: '+EC.money(t.tax)+'</small></td>'
-                + '<td class="text-center"><button type="button" class="grid-remove-btn remove-row-btn"><i class="bx bx-trash"></i></button></td>'
-                + '</tr>';
+    function postJson(url, body) {
+        return $.ajax({
+            url: url, type: 'POST', contentType: 'application/json',
+            headers: { 'RequestVerificationToken': token(), 'X-Requested-With': 'XMLHttpRequest' },
+            data: JSON.stringify(body)
         });
-        if(!html){
-            html = '<tr><td colspan="6" class="text-center py-5">'
-                 + '<div class="text-muted fw-bold mb-2">No items added yet</div>'
-                 + '<button type="button" class="btn btn-primary" id="emptyAddRowBtn"><i class="bx bx-plus me-1"></i>Add Purchase Item</button>'
-                 + '</td></tr>';
+    }
+
+    function itemOptions(selected) {
+        var html = '<option value="">Select item</option>';
+        ITEMS.forEach(function (i) {
+            html += '<option value="' + i.id + '"' + (i.id === selected ? ' selected' : '') + '>' +
+                    EC.esc(i.name) + '</option>';
+        });
+        return html;
+    }
+
+    function lineTotal(r) {
+        // Tax is a percentage ON the line, the same arithmetic the proc uses, so
+        // the figure on screen matches the one that gets saved.
+        return EC.num(r.qty) * EC.num(r.price) * (1 + EC.num(r.tax) / 100);
+    }
+
+    function renderGrid() {
+        if (!rows.length) {
+            $('#purchaseGridBody').html(
+                '<tr><td colspan="6" class="text-center py-4">' +
+                '<div class="text-muted mb-2">No items added yet.</div>' +
+                '<button type="button" class="btn btn-primary" id="emptyAddRowBtn">' +
+                '<i class="bx bx-plus me-1"></i>Add Purchase Item</button></td></tr>');
+            totals();
+            return;
         }
-        $("#purchaseGridBody").html(html);
-        calculateTotals();
+
+        $('#purchaseGridBody').html(rows.map(function (r) {
+            var it = ITEMS.find(function (x) { return x.id === r.itemId; });
+            return '<tr data-id="' + r.id + '">' +
+                '<td><select class="form-select form-select-sm" data-f="itemId">' + itemOptions(r.itemId) + '</select>' +
+                    (it ? '<div class="text-muted small mt-1">' + EC.esc(it.unit) + '</div>' : '') + '</td>' +
+                '<td><input type="number" class="form-control form-control-sm" data-f="qty" min="0" step="0.01" value="' + r.qty + '"></td>' +
+                '<td><input type="number" class="form-control form-control-sm" data-f="price" min="0" step="0.01" value="' + r.price + '"></td>' +
+                '<td><input type="number" class="form-control form-control-sm" data-f="tax" min="0" max="100" step="0.01" value="' + r.tax + '"></td>' +
+                '<td class="fw-semibold">' + EC.money(lineTotal(r)) + '</td>' +
+                '<td class="text-end"><button type="button" class="btn btn-sm btn-icon btn-text-danger" data-drop="' + r.id + '">' +
+                    '<i class="bx bx-trash"></i></button></td>' +
+            '</tr>';
+        }).join(''));
+        totals();
     }
 
-    function calculateTotals(){
-        var subTotal=0, taxTotal=0;
-        purchaseRows.forEach(function(row){ var t=rowTotals(row); subTotal+=t.amount; taxTotal+=t.tax; });
-        $("#subTotalAmount").text(EC.money(subTotal));
-        $("#taxAmount").text(EC.money(taxTotal));
-        $("#grandTotalAmount").text(EC.money(subTotal+taxTotal));
+    function totals() {
+        var sub = 0, tax = 0;
+        rows.forEach(function (r) {
+            var base = EC.num(r.qty) * EC.num(r.price);
+            sub += base;
+            tax += base * EC.num(r.tax) / 100;
+        });
+        $('#subTotalAmount').text(EC.money(sub));
+        $('#taxAmount').text(EC.money(tax));
+        $('#grandTotalAmount').text(EC.money(sub + tax));
     }
 
-    $(document).on("click", "#addPurchaseRowBtn, #emptyAddRowBtn", addRow);
-
-    $(document).on("click", ".remove-row-btn", function(){
-        var rowId=Number($(this).closest("tr").data("id"));
-        purchaseRows=purchaseRows.filter(function(x){return x.id!==rowId;});
-        renderRows();
-    });
-
-    /* Update the model + ONLY the affected row's total cell — no full re-render,
-       so the input keeps focus while typing. */
-    $(document).on("input", ".qty-input, .rate-input, .tax-input", function(){
-        var tr=$(this).closest("tr"), rowId=Number(tr.data("id"));
-        var row=purchaseRows.find(function(x){return x.id===rowId;});
-        if(!row) return;
-        row.qty=Number(tr.find(".qty-input").val()||0);
-        row.rate=Number(tr.find(".rate-input").val()||0);
-        row.tax=Number(tr.find(".tax-input").val()||0);
-        var t=rowTotals(row);
-        tr.find(".row-total").text(EC.money(t.total));
-        tr.find(".row-tax").text("Tax: "+EC.money(t.tax));
-        calculateTotals();
-    });
-
-    $(document).on("change", ".item-select", function(){
-        var tr=$(this).closest("tr"), rowId=Number(tr.data("id"));
-        var row=purchaseRows.find(function(x){return x.id===rowId;});
-        if(!row) return;
-        row.item=tr.find(".item-select").val();
-        /* Pre-fill unit price with the item's cost price (purchases are at cost). */
-        var cat=catalog.find(function(c){return c.name===row.item;});
-        if(cat && (!row.rate || row.rate<=0)){
-            row.rate=Number(cat.cost||0);
-            renderRows();
+    function addRow() {
+        if (!ITEMS.length) {
+            ecToast('warning', 'Add an item in the Item Master first.');
+            return;
         }
+        rows.push({ id: ++seq, itemId: 0, qty: 1, price: 0, tax: 0 });
+        renderGrid();
+    }
+
+    $(document)
+        .on('click', '#addPurchaseRowBtn, #emptyAddRowBtn', addRow)
+        .on('click', '[data-drop]', function () {
+            var id = EC.num($(this).data('drop'));
+            rows = rows.filter(function (r) { return r.id !== id; });
+            renderGrid();
+        })
+        .on('change input', '#purchaseGridBody [data-f]', function () {
+            var $el = $(this);
+            var id  = EC.num($el.closest('tr').data('id'));
+            var r   = rows.find(function (x) { return x.id === id; });
+            if (!r) return;
+
+            var field = $el.data('f');
+            if (field === 'itemId') {
+                r.itemId = EC.num($el.val());
+                // Prefill the price from the item's standard cost, which the
+                // buyer can still override with what the invoice actually says.
+                var it = ITEMS.find(function (x) { return x.id === r.itemId; });
+                if (it && EC.num(r.price) === 0) r.price = EC.num(it.cost);
+                renderGrid();
+                return;
+            }
+            r[field] = EC.numPos($el.val());
+            // Only the affected line and the totals change, so the inputs keep
+            // focus while the user is typing.
+            $el.closest('tr').find('td').eq(4).text(EC.money(lineTotal(r)));
+            totals();
+        });
+
+    // ── Save ────────────────────────────────────────────────────────────────
+    $('#savePurchaseBtn').on('click', function () {
+        var $btn = $(this);
+        var date = $('#purchaseDate').val();
+        if (!date) { ecToast('warning', 'Choose the purchase date.'); $('#purchaseDate').focus(); return; }
+
+        var lines = rows.filter(function (r) { return r.itemId > 0 && EC.num(r.qty) > 0; });
+        if (!lines.length) { ecToast('warning', 'Add at least one item with a quantity.'); return; }
+
+        EC.buttonBusy($btn, 'Saving…');
+        postJson(SAVE_URL, {
+            supplierId:   EC.num($('#supplierId').val()) || null,
+            purchaseDate: date,
+            invoiceNo:    $.trim($('#invoiceNumber').val()),
+            paymentMode:  $('#paymentMode').val(),
+            remarks:      $.trim($('#purchaseRemarks').val()),
+            items: lines.map(function (r) {
+                return {
+                    itemId:     r.itemId,
+                    quantity:   EC.numPos(r.qty),
+                    unitPrice:  EC.numPos(r.price),
+                    taxPercent: EC.numPos(r.tax)
+                };
+            })
+        })
+        .done(function (res) {
+            if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not save.'); return; }
+            ecToast('success', res.message + ' Stock has been updated.');
+            resetForm();
+        })
+        .fail(function () { ecToast('error', 'Could not save the purchase.'); })
+        .always(function () { EC.buttonReset($btn); });
     });
 
-    $("#savePurchaseBtn").on("click", function(){
-        if(!$("#supplierId").val()){ ecToast('error', "Please select supplier."); return; }
-        if(!$("#purchaseDate").val()){ ecToast('error', "Please select purchase date."); return; }
-        if(!purchaseRows.length){ ecToast('error', "Please add at least one item."); return; }
-        var invalid=purchaseRows.some(function(x){return !x.item || x.qty<=0 || x.rate<=0;});
-        if(invalid){ ecToast('error', "Please complete all purchase item rows."); return; }
-        ecToast('success', "Purchase entry saved successfully.");
-        console.log({
-            supplier:$("#supplierId").val(), purchaseDate:$("#purchaseDate").val(),
-            invoiceNumber:$("#invoiceNumber").val(), paymentMode:$("#paymentMode").val(),
-            remarks:$("#purchaseRemarks").val(), items:purchaseRows
+    function resetForm() {
+        rows = [];
+        $('#invoiceNumber,#purchaseRemarks').val('');
+        $('#supplierId').val('');
+        $('#purchaseDate').val(new Date().toISOString().slice(0, 10));
+        renderGrid();
+    }
+
+    $('#cancelPurchaseBtn').on('click', function () {
+        EC.confirm({
+            title: 'Clear this purchase?',
+            body: 'Everything typed on this form will be discarded.',
+            confirmText: 'Clear'
+        }).then(function (ok) { if (ok) resetForm(); });
+    });
+
+    // ── History ─────────────────────────────────────────────────────────────
+    $('#historyBtn').on('click', function () {
+        EC.listLoading('#historyBody', 'Loading purchases…');
+        new bootstrap.Modal(document.getElementById('historyModal')).show();
+
+        $.get(LIST_URL)
+            .done(function (d) {
+                if (!d || !d.length) {
+                    EC.listEmpty('#historyBody', 'No purchases recorded yet.', 'bx-receipt');
+                    return;
+                }
+                $('#historyBody').html(d.map(function (p) {
+                    return '<tr' + (p.cancelled ? ' class="text-muted"' : '') + '>' +
+                        '<td>' + EC.esc(p.date) + '</td>' +
+                        '<td>' + EC.esc(p.supplier || '—') + '</td>' +
+                        '<td>' + EC.esc(p.invoice || '—') + '</td>' +
+                        '<td>' + EC.esc(p.mode || '—') + '</td>' +
+                        '<td class="text-end">' + p.lines + '</td>' +
+                        '<td class="text-end fw-semibold">' + EC.money(p.total) + '</td>' +
+                        '<td>' + (p.cancelled
+                            ? '<span class="badge bg-label-danger">Cancelled</span>'
+                            : '<span class="badge bg-label-success">Saved</span>') + '</td>' +
+                        '<td class="text-end">' + (p.cancelled ? '' :
+                            '<button class="btn btn-sm btn-text-danger" data-cancel="' + p.id + '">Cancel</button>') +
+                        '</td></tr>';
+                }).join(''));
+            })
+            .fail(function () {
+                EC.listEmpty('#historyBody', 'Could not load purchases.', 'bx-error-circle');
+            });
+    });
+
+    $(document).on('click', '[data-cancel]', function () {
+        var id = EC.num($(this).data('cancel'));
+        EC.prompt({
+            title: 'Cancel this purchase?',
+            body: 'The stock it brought in will be taken back out. The invoice stays on the record with its reversal.',
+            label: 'Why is it being cancelled?',
+            required: true,
+            confirmText: 'Cancel purchase',
+            confirmClass: 'btn-danger'
+        }).then(function (reason) {
+            if (reason === null) return;
+            EC.showLoader();
+            postJson(CANCEL_URL, { id: id, reason: reason })
+                .done(function (res) {
+                    // Refused when the goods have already been issued — the proc
+                    // says which item and by how much.
+                    if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not cancel.'); return; }
+                    ecToast('success', res.message);
+                    $('#historyBtn').trigger('click');
+                })
+                .fail(function () { ecToast('error', 'Could not cancel the purchase.'); })
+                .always(EC.hideLoader);
         });
     });
 
-    $("#cancelPurchaseBtn").on("click", function(){
-        EC.confirm({ title:"Discard this purchase entry?", icon:'bx-x-circle',
-                     message:"Everything typed on this form will be cleared.",
-                     okText:"Discard" }).then(function(ok){
-            if(!ok) return;
-            $("#supplierId, #paymentMode").prop("selectedIndex",0);
-            $("#purchaseDate, #invoiceNumber, #purchaseRemarks").val("");
-            purchaseRows=[]; addRow();
-        });
+    // ── Supplier ────────────────────────────────────────────────────────────
+    $('#addSupplierBtn').on('click', function () {
+        $('#spName,#spContact,#spMobile,#spEmail,#spGstin,#spAddress').val('');
+        new bootstrap.Modal(document.getElementById('supplierModal')).show();
     });
 
-    $("#printBtn").on("click", function(){ window.print(); });
-    $("#historyBtn").on("click", function(){ ecToast('error', "Purchase History screen is coming soon."); });
+    $('#saveSupplierBtn').on('click', function () {
+        var $btn = $(this);
+        var name = $.trim($('#spName').val());
+        if (!name) { ecToast('warning', 'Enter the supplier name.'); $('#spName').focus(); return; }
 
+        EC.buttonBusy($btn, 'Saving…');
+        postJson(SUPPLIER_URL, {
+            supplierId:    0,
+            supplierName:  name,
+            contactPerson: $.trim($('#spContact').val()),
+            mobile:        $.trim($('#spMobile').val()),
+            email:         $.trim($('#spEmail').val()),
+            gstin:         $.trim($('#spGstin').val()),
+            address:       $.trim($('#spAddress').val())
+        })
+        .done(function (res) {
+            if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not save.'); return; }
+            ecToast('success', res.message);
+            bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();
 
-    addRow();
-});
+            // Refresh the picker and select what was just added.
+            $.get(SUPPLIERS_URL).done(function (list) {
+                var html = '<option value="">Select Supplier</option>';
+                (list || []).forEach(function (s) {
+                    html += '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
+                });
+                $('#supplierId').html(html).val(res.id);
+            });
+        })
+        .fail(function () { ecToast('error', 'Could not save the supplier.'); })
+        .always(function () { EC.buttonReset($btn); });
+    });
+
+    // Printing a purchase was never built in the shell and still is not.
+    $('#printBtn').on('click', function () {
+        ecToast('info', 'Purchase printing is not built yet.');
+    });
+
+    $('#purchaseDate').val(new Date().toISOString().slice(0, 10));
+    renderGrid();
+})();
 </script>
 }
