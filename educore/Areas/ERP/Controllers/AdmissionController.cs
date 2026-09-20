@@ -512,6 +512,27 @@ namespace educore.Areas.ERP.Controllers
         };
 
         // ── GET: /ERP/Admission/GetSections (AJAX) ───────────────
+        // Classes belong to a session. config.sp_dropdown_common deliberately
+        // returns every class name the school has EVER used, collapsed across
+        // sessions, which is right for a filter but wrong for this form: it
+        // offered classes that do not exist in the year being admitted into, and
+        // the section list then came back empty with no explanation. Sections
+        // were already year-aware; the class list now is too.
+        [HttpGet]
+        public async Task<IActionResult> GetClasses(int academicYearId)
+        {
+            if (academicYearId <= 0)
+                return Json(new { success = false, classes = Array.Empty<string>() });
+
+            var setup = await _schoolSettingsService.GetAcademicSetupAsync(
+                TenantId(), SchoolId(), academicYearId, UserId());
+
+            // ClassSections is keyed by class name and already ordered by the
+            // ladder, so its keys are this session's classes in teaching order.
+            var classes = setup?.ClassSections?.Keys.ToList() ?? new List<string>();
+            return Json(new { success = true, classes });
+        }
+
         // Sections are configured per-class, per-year in Academic Setup.
         // Returns the sections for the chosen academic year + class.
         [HttpGet]

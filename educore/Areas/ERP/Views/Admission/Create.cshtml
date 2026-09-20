@@ -479,12 +479,48 @@ $(function () {
 
     var URL_FEES     = '@Url.Action("GetFeeStructure", "Admission", new { area = "ERP" })';
     var URL_SECTIONS = '@Url.Action("GetSections", "Admission", new { area = "ERP" })';
+    var URL_CLASSES  = '@Url.Action("GetClasses", "Admission", new { area = "ERP" })';
     var URL_SAVE     = '@Url.Action("SaveAdmission", "Admission", new { area = "ERP" })';
     var URL_LIST     = '@Url.Action("StudentList", "Student", new { area = "ERP" })';
 
     var fees = [];   // fee rows for the selected class + year
 
 
+
+    /* ── classes: belong to a session ─────────────────────────────
+       The list rendered on load comes from every session the school has ever
+       run, so it could offer a class the chosen year does not have — and then
+       the section list came back empty with nothing explaining why. Reload it
+       for the selected year, keeping the current pick when that year has it. */
+    function loadClasses() {
+        var ayid = $year.find('option:selected').data('ayid');
+        if (!ayid) {
+            $class.html('<option value="">Select year first</option>');
+            loadSections();
+            return;
+        }
+        var keep = $class.val();
+        $class.html('<option value="">Loading…</option>');
+
+        $.getJSON(URL_CLASSES, { academicYearId: ayid })
+            .done(function (res) {
+                var list = (res && res.classes) || [];
+                if (!list.length) {
+                    $class.html('<option value="">No classes set up for this year</option>');
+                } else {
+                    var html = '<option value="">Select Class</option>';
+                    list.forEach(function (c) {
+                        html += '<option value="' + EC.esc(c) + '"' +
+                                (c === keep ? ' selected' : '') + '>' + EC.esc(c) + '</option>';
+                    });
+                    $class.html(html);
+                }
+            })
+            .fail(function () {
+                $class.html('<option value="">Could not load classes</option>');
+            })
+            .always(function () { loadSections(); });
+    }
 
     /* ── sections: configured per class + year in Academic Setup ── */
     function loadSections() {
@@ -681,7 +717,8 @@ $(function () {
     }
 
     /* ── events ──────────────────────────────────────── */
-    $year.add($class).on('change', function () { loadFees(); loadSections(); });
+    $year.on('change',  function () { loadFees(); loadClasses(); });
+    $class.on('change', function () { loadFees(); loadSections(); });
     $admDate.add($discType).add($discApply).on('change', renderFees);
     $discValue.add($discReason).on('input', renderFees);
     $feeBox.on('change', '.optional-fee-checkbox', function () {
@@ -887,10 +924,11 @@ $(function () {
 {
     <text>
     (function () {
-        if ($class.val() && $year.val()) { loadFees(); loadSections(); }
+        if ($class.val() && $year.val()) { loadFees(); loadClasses(); }
     })();
     </text>
 }
+    if ($year.val()) loadClasses();
 });
 </script>
 }
