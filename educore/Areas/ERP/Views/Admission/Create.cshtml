@@ -111,8 +111,8 @@
                             </div>
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label">Admission No</label>
-                                <input type="text" name="AdmissionNo" id="adm_AdmissionNo" class="form-control" placeholder="Auto-generated if blank">
-                                <div class="form-text" id="admNoHint">Leave blank to use the next number.</div>
+                                <input type="text" name="AdmissionNo" id="adm_AdmissionNo" class="form-control">
+                                <div class="form-text d-none" id="admNoHint"></div>
                             </div>
 
 
@@ -480,6 +480,10 @@ $(function () {
     // off the dropdown, because the dropdown is emptied while its options load.
     var prefillClass = '@(Convert.ToString(ViewBag.PreClassName) ?? "")';
 
+    // What the counter would give next. Shown in the box, but sent blank unless
+    // the clerk changes it — see the submit handler.
+    var suggestedNo  = '';
+
     var URL_FEES     = '@Url.Action("GetFeeStructure", "Admission", new { area = "ERP" })';
     var URL_SECTIONS = '@Url.Action("GetSections", "Admission", new { area = "ERP" })';
     var URL_CLASSES  = '@Url.Action("GetClasses", "Admission", new { area = "ERP" })';
@@ -503,19 +507,18 @@ $(function () {
         var $hint = $('#admNoHint');
         var typed = $.trim(this.value).toUpperCase().replace(/\s+/g, ' ');
 
-        if (!typed) {
-            $hint.text('Leave blank to use the next number.')
-                 .removeClass('text-warning').addClass('form-text');
-            $(this).removeClass('is-warning');
+        // Nothing to say while the box holds the number we put there, or is
+        // empty — a hint under every admission is just noise.
+        if (!typed || typed === suggestedNo || HOUSE_FORMAT.test(typed)) {
+            $hint.addClass('d-none').removeClass('text-warning').text('');
             return;
         }
-        if (HOUSE_FORMAT.test(typed)) {
-            $hint.text('Matches the school format.').removeClass('text-warning');
-        } else {
-            $hint.text('This does not match the school format (ADM-YYYY-NNNN). '
-                     + 'It will be saved as "' + typed + '".')
-                 .addClass('text-warning');
-        }
+
+        // Only speaks up for a number that has been changed to something the
+        // school does not use, and shows exactly what will be stored.
+        $hint.removeClass('d-none').addClass('text-warning')
+             .text('Not the usual format (ADM-YYYY-NNNN). Will be saved as "'
+                   + typed + '".');
     });
 
     /* ── admission number: show what is coming, without promising it ──
@@ -527,15 +530,21 @@ $(function () {
     function loadNextAdmissionNo() {
         var $adm = $('#adm_AdmissionNo');
         var year = $year.val();
-        if (!year) { $adm.attr('placeholder', 'Auto-generated if blank'); return; }
+        if (!year) { suggestedNo = ''; $adm.val(''); return; }
 
         $.getJSON(URL_NEXTADM, { academicYear: year })
             .done(function (res) {
-                $adm.attr('placeholder', (res && res.success && res.admissionNo)
-                    ? res.admissionNo + '  (auto)'
-                    : 'Auto-generated if blank');
+                if (res && res.success && res.admissionNo) {
+                    // Filled in, as asked. Remembered so the submit handler can
+                    // tell an untouched number from one the clerk typed.
+                    suggestedNo = res.admissionNo;
+                    $adm.val(suggestedNo);
+                } else {
+                    suggestedNo = '';
+                    $adm.val('');
+                }
             })
-            .fail(function () { $adm.attr('placeholder', 'Auto-generated if blank'); });
+            .fail(function () { suggestedNo = ''; });
     }
 
     /* ── classes: belong to a session ─────────────────────────────
@@ -937,6 +946,14 @@ $(function () {
             ecToast('error', 'Amount to collect cannot exceed ' + EC.money(payTodayMax) + ' (due now). For advance / prepay use the Fee counter.');
             return;
         }
+
+        // The admission number is shown filled in, but it is still only what
+        // the counter WOULD give. Untouched, it is sent blank so the database
+        // allocates at save time; two clerks with the form open therefore get
+        // consecutive numbers instead of the second being told theirs is taken.
+        // A number the clerk actually changed is sent as typed.
+        var $admNo = $('#adm_AdmissionNo');
+        if (suggestedNo && $.trim($admNo.val()) === suggestedNo) $admNo.val('');
 
         // Documents checklist → [{name, status}] for every listed document.
         $('#documentsJson').val(JSON.stringify($('.doc-chk').map(function () {
