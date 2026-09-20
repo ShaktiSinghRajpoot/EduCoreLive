@@ -27,7 +27,7 @@ refresh it.
 | Edit Student | ✅ | ✅ unknown class refused, another school's id is "not found" | ✅ | ✅ | ✅ |
 | New Admission | ✅ | ✅ duplicate admission no, concession cap, fee plan | ✅ | ✅ | ✅ 28 |
 | Inactive / Left | ✅ | ✅ exit status must be one of four, already-left refused | ✅ | ✅ | ✅ |
-| Promote Students | ✅ | ✅ session, ladder, dues, per-student target class | ✅ | ✅ | — |
+| Promote Students | ✅ | ✅ session, ladder, dues, per-student target class | ✅ | ✅ | ✅ 17 |
 
 ## Fees
 
@@ -62,8 +62,8 @@ refresh it.
 | Staff Directory / Profile | ✅ | ✅ | ✅ | ✅ | — |
 | Add / Edit Staff | ✅ | ✅ | ✅ | ✅ | — |
 | Inactive Staff | ✅ | ✅ confirm on both directions, deactivated-on date | ✅ | ✅ | — |
-| Leave Management | ✅ | ✅ overlap refused, decided-once, Sundays not counted | ✅ | ✅ | — |
-| Payroll | ✅ | ✅ paid month not re-run, paid twice refused | ✅ | ✅ | — |
+| Leave Management | ✅ | ✅ overlap refused, decided-once, Sundays not counted | ✅ | ✅ | ✅ 29 |
+| Payroll | ✅ | ✅ paid month not re-run, paid twice refused | ✅ | ✅ | ✅ |
 
 ## Transport, documents
 
@@ -124,8 +124,8 @@ Open items, roughly in the order they are worth doing.
       result screens show marks and pass/fail but no letter grade.
 - [ ] **Class rank** — needs a class-wide comparison the dashboard does not
       currently fetch.
-- [ ] Test suites for **Promotion**, **Leave/Payroll**, **Settings** and
-      **Roles** — the four areas with real guards but no suite yet.
+- [ ] Test suites for **Settings** and **Roles** — the two areas with real
+      guards but no suite yet.
 - [ ] **Module flags and partial saves** — `sp_school_admin_admission_workflow_manage`
       reads each module flag as `COALESCE(p_enable_x, TRUE)`, so a save that omits
       one switches it back ON. Not reachable today (the form posts all five and
@@ -144,6 +144,8 @@ Open items, roughly in the order they are worth doing.
       `SavePeriodStructure` had no `[ValidateAntiForgeryToken]`. Two of the three
       views were already sending the token, so the attribute was all that was
       missing; the Academic Years page was not sending one at all and now does.
+- [x] **Promotion and Leave/Payroll suites** — 17 and 29 checks. Nothing to fix
+      in either; both modules hold up.
 - [x] **Registrations menu item now honours its own flag** — four of the five
       module toggles hid their menu section; `enable_registration` was read by the
       Registration *page* but ignored by the menu, so a school that switched

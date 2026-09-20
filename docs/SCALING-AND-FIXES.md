@@ -2508,3 +2508,56 @@ Five suites now exist, 140 checks:
     attendance_exam_tests.sql        28
     transport_tc_tests.sql           31
     admission_workflow_tests.sql     23
+
+---
+
+### [2026-08-25] Promotion and Leave/Payroll test suites
+
+`Database/tests/promotion_tests.sql` (17) and `leave_payroll_tests.sql` (29).
+**Both passed clean on local and Railway with nothing to fix.** These were the
+last two modules with real guards and no suite.
+
+**Promotion** moves a whole cohort in one click, so a wrong rule is not one bad
+row — it is every student in the school. Confirmed: promoting into the same
+session, into an unknown session, or with nobody selected are all refused; a
+promoted student moves up exactly one class and into the new session while
+keeping their **section**, their **admission number** and their Active status;
+`retain` keeps the class but still advances the session; `passout` leaves the
+school; a per-student `toClass` allows a genuine double promotion (1 straight to
+3) while **promoting downwards is refused** — "1 is not above 3" — so a mis-click
+in the dropdown cannot quietly demote a child; and a debt survives promotion when
+carry-forward is on.
+
+**Leave and payroll** are tested together because the rules that matter live in
+the join: an approved unpaid leave becomes Loss of Pay, and LOP is money.
+Confirmed: backwards dates, a missing type and an unknown staff member are all
+refused; a **Sunday-only range has no working days in it** and cannot be leave;
+a calendar week counts 6 working days, from the one shared `fn_working_days` the
+student register also uses; an overlapping request is refused while the first is
+live, so the same days cannot be charged twice; a decision must be approve or
+reject, is recorded with **who** made it, and cannot be re-made afterwards.
+
+On the money itself: gross comes from the staff record, three unpaid days give
+three LOP days, LOP is gross ÷ working days × LOP days (₹3,461.55 on a ₹30,000
+salary over 26 days), net is gross − LOP − deductions and never negative.
+**Approved *casual* leave costs nothing** and a **pending** unpaid request is not
+deducted — only an approved unpaid one is. Re-running a month updates rather than
+stacking payslips, a payslip is marked paid once with who paid it, paying twice
+is refused, and — the one that matters most — **a re-run leaves an already-PAID
+payslip alone**, so the record keeps matching the bank transfer.
+
+**Two fixture lessons.** Section names here are per class: the pre-primary
+classes use "Kid A" while class 1 upwards use "A", so the suite now picks three
+consecutive classes that *share* a section rather than assuming one. And a target
+session needs its classes **and their sections** copied, or every promotion fails
+with "section A does not exist".
+
+Seven suites now exist, **186 checks**, identical on local and Railway:
+
+    fee_module_tests.sql             28
+    enquiry_registration_tests.sql   30
+    attendance_exam_tests.sql        28
+    transport_tc_tests.sql           31
+    admission_workflow_tests.sql     23
+    promotion_tests.sql              17
+    leave_payroll_tests.sql          29
