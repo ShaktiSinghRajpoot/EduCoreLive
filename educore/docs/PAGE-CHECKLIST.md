@@ -124,11 +124,7 @@ Open items, roughly in the order they are worth doing.
       result screens show marks and pass/fail but no letter grade.
 - [ ] **Class rank** — needs a class-wide comparison the dashboard does not
       currently fetch.
-- [ ] **Two unmigrated fee heads** — `fee_collection_point.sql` moves One Time
-      heads from `Recurring` to `Admission`, and two rows on Railway have not had
-      it applied: school 33 "Annually Function" and school 34 "Admission Fee".
-      Running the migration file fixes them; it was deliberately not run as part
-      of the proc fix, since that was not what was asked for.
+
 - [ ] **Module flags and partial saves** — `sp_school_admin_admission_workflow_manage`
       reads each module flag as `COALESCE(p_enable_x, TRUE)`, so a save that omits
       one switches it back ON. Not reachable today (the form posts all five and
@@ -147,6 +143,12 @@ Open items, roughly in the order they are worth doing.
       `SavePeriodStructure` had no `[ValidateAntiForgeryToken]`. Two of the three
       views were already sending the token, so the attribute was all that was
       missing; the Academic Years page was not sending one at all and now does.
+- [x] **The two unmigrated fee heads are migrated** — school 33 "Annually
+      Function" and school 34 "Admission Fee" were `One Time` heads still marked
+      `collection_point = 'Recurring'`, so they were offered as scheduled
+      instalments instead of at the admission desk. Both are now `'Admission'`,
+      and nothing on Railway is left unmigrated. No ledger row changed: neither
+      `sp_admission_manage` nor `core.student_ledger` reads `collection_point`.
 - [x] **Fee head names are now required** — `sp_school_admin_fee_head_manage`
       was the only settings proc with no name guard, so an empty string and a
       whitespace string both created invisible fee heads that reach student

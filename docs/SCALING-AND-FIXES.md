@@ -2627,3 +2627,30 @@ checklist TODO.
     transport_tc_tests.sql           31
     admission_workflow_tests.sql     23      TOTAL                      235
     promotion_tests.sql              17
+
+---
+
+### [2026-09-20] The pending fee-head collection-point migration, run on Railway
+
+The two rows left behind by the previous entry are migrated. School 33 "Annually
+Function" (`fee_head_id` 54) and school 34 "Admission Fee" (61) were `One Time`
+heads still carrying `collection_point = 'Recurring'`; both are now `'Admission'`,
+and nothing on Railway is unmigrated.
+
+**What that actually changes.** `collection_point` decides how the admission
+screen treats a head: `'Admission'` puts it in the "One Time Payable Now" group
+with stage `Admission`, while `'Recurring'` schedules it as an instalment. So an
+"Admission Fee" marked Recurring was being offered as a scheduled due rather than
+collected at the desk, which is precisely the state the migration exists to fix.
+
+**What it does not change: any money already owed.** Checked before running —
+`sp_admission_manage` never reads `collection_point` and `core.student_ledger`
+has no such column, so no existing ledger row, receipt or balance is affected.
+Only how those two heads are grouped for *future* admissions.
+
+All nine suites re-run on Railway afterwards: **235 checks, 0 failed**, unchanged.
+
+A one-statement rollback (the two ids and their previous value) is in this
+session's scratchpad as `feehead_collection_point_rollback.sql`. The `\copy`
+backup attempted first failed on its output path; the before-state is recorded in
+that file and in this entry instead, which is enough to reverse a two-row change.
