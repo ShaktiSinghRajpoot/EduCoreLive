@@ -2722,3 +2722,93 @@ Same shape as the two `sp_fee_payment_collect` revisions.
 
 `Database/tests/inventory_tests.sql` — 49 checks. Ten suites now exist,
 **284 checks**, identical on local and Railway.
+
+---
+
+### [2026-09-20] The money trail, and a real bug in receipt cancellation
+
+`Database/tests/money_trail_tests.sql` — 98 checks. Every other suite tests one
+module; this one follows a single child through the whole financial life of a
+school place — enquiry, registration fee, admission, a concession, an
+overpayment, paying from the wallet, two cancellations, the bus, a refund,
+promotion, and leaving with a TC — and after **every step** re-proves the same
+five equations.
+
+**Found: cancelling a receipt did not reverse the advance wallet.** The collect
+proc moves the wallet in two directions on one receipt — a surplus is credited,
+and anything drawn from the wallet is used — but `sp_fee_receipt_cancel` only
+reversed the ledger. That lost real money **in both directions**:
+
+- Cancel a receipt that had **credited** the wallet (parent overpaid, then the
+  cheque bounced) and the family kept the credit. Proven: 500 survived a
+  cancelled receipt. **The school loses.**
+- Cancel a receipt that had been **settled from** the wallet and the balance was
+  never returned. Proven: 500 the parent had already handed over simply vanished.
+  **The family loses.**
+
+Cancel now applies the exact mirror — `balance - advance_credit + advance_used`.
+Both directions verified before and after. **No live data was affected:** a
+reconciliation over Railway found zero wallets disagreeing with their receipts,
+and zero cancelled receipts that had ever touched a wallet, so the bug was latent
+rather than realised.
+
+**The five equations, re-checked at every stage**
+
+1. `SUM(ledger.amount_paid)` equals the lines on live receipts — the office and
+   the cash book agree.
+2. Concession agrees the same way. A concession is money deliberately not
+   collected, and it must be visible in exactly one place.
+3. Wallet balance equals credits minus uses over live receipts. *This is the one
+   that was broken.*
+4. No ledger row shows more paid than it was due, and the wallet never goes
+   negative.
+5. **The till reconciles two ways.**
+
+**What equation 5 pins down, and why it matters.** `fee_payments.amount` is what
+was **settled on the ledger**, not what crossed the counter: a parent handing over
+2,500 against a 1,000 due leaves `amount = 1000` and `advance_credit = 1500`. Real
+cash is therefore `amount + advance_credit - advance_used`. Day close counts the
+same money a second way, from `v_fee_tender_lines`, which falls back to the
+header's mode and amount when a payment has no explicit tender split. Both
+routes were checked against three shapes — plain cash with no tenders, an
+explicit over-tender, and a payment funded entirely from the wallet — and agree
+at 3,500. **The drawer reconciles.** Two of my own checks failed here first,
+because I had assumed `amount` was the till; it is not, and the suite now says so
+by name.
+
+**What the walk confirms about the rest of the trail**
+
+- A registration fee is booked against the **enquiry**, and stays there. It is not
+  quietly pulled onto the student's ledger at admission, where it would look like
+  a tuition payment nobody could trace to its receipt.
+- Cash and concession settle a due together, and the receipt is for the **cash
+  only** — the concession is not money that moved.
+- Adding the bus raises new dues and touches nothing already collected.
+- Taking a student off the bus drops the months they will not ride but keeps the
+  month they **paid** for, and — the part worth stating — the receipt for it stays
+  in the cash book.
+- A refund is recorded against the ledger row and in the refund register, and does
+  **not** rewrite the original receipt. Both facts stay true: 600 was taken, 200
+  went back.
+- Promotion carries the debt and disturbs neither the collections nor the wallet.
+- A TC is refused while money is owed, and issued once the account reaches zero.
+- Cancelled receipts stay on file for audit and count as nothing.
+
+At the end the books close: **billed 17,600 = paid 16,600 + concession 1,000**,
+receipts equal what the ledger says was paid, no wallet balance is left behind for
+a student who has gone, and the 200 refunded is accounted for separately.
+
+**Reconciliation query**, for checking a live database at any time:
+
+```sql
+SELECT a.school_id, a.student_id, a.balance AS wallet_says,
+       COALESCE((SELECT SUM(COALESCE(p.advance_credit,0) - COALESCE(p.advance_used,0))
+                 FROM core.fee_payments p
+                 WHERE p.student_id = a.student_id AND NOT p.is_cancelled), 0) AS should_be
+FROM core.student_advance a
+WHERE a.balance <> COALESCE((SELECT SUM(COALESCE(p.advance_credit,0) - COALESCE(p.advance_used,0))
+                             FROM core.fee_payments p
+                             WHERE p.student_id = a.student_id AND NOT p.is_cancelled), 0);
+```
+
+Eleven suites now exist, **382 checks**, identical on local and Railway.

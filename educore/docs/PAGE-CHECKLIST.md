@@ -33,7 +33,7 @@ refresh it.
 
 | Page | Real | Guards | Scope | CSRF | Tests |
 |---|---|---|---|---|---|
-| Collect Fee | ✅ | ✅ over-payment, negative, empty selection all refused | ✅ | ✅ | ✅ 28 |
+| Collect Fee | ✅ | ✅ over-payment, negative, empty selection all refused | ✅ | ✅ | ✅ 28 + 98 |
 | Fee Due Reminders | ✅ | ✅ | ✅ | ✅ | — |
 | Day Close | ✅ | ✅ | ✅ | ✅ | — |
 | Fee Reports | ✅ | read-only | ✅ | n/a | — |
@@ -148,6 +148,11 @@ Open items, roughly in the order they are worth doing.
       `SavePeriodStructure` had no `[ValidateAntiForgeryToken]`. Two of the three
       views were already sending the token, so the attribute was all that was
       missing; the Academic Years page was not sending one at all and now does.
+- [x] **Cancelling a receipt now reverses the advance wallet** — it used to
+      reverse the ledger and leave the wallet untouched, which lost real money in
+      both directions. Found by the money-trail suite; no live data was affected.
+- [x] **Money trail suite** — 98 checks following one student from enquiry to
+      Transfer Certificate, re-proving five equations after every step.
 - [x] **Inventory module built** — items, suppliers, purchases and a stock
       movement ledger, replacing two shells that saved nothing and showed a
       hardcoded catalog. 49 checks.

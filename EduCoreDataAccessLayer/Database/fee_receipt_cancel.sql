@@ -1,4 +1,4 @@
--- ============================================================================
+﻿-- ============================================================================
 -- Fee receipt CANCEL (void) — ERP → Fee → Manage Fee → Payment History
 --
 -- Cancelling a receipt must REVERSE exactly what core.sp_fee_payment_collect
@@ -34,6 +34,9 @@ AS $procedure$
 DECLARE
     v_payment_id integer;
     v_amount     numeric(12,2);
+    v_student_id integer;
+    v_adv_credit numeric(12,2);
+    v_adv_used   numeric(12,2);
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 OR p_receipt_no IS NULL THEN
         RAISE EXCEPTION 'Invalid request.';
@@ -43,7 +46,9 @@ BEGIN
     END IF;
 
     -- Lock the receipt so two cashiers can't cancel/collect it at once.
-    SELECT payment_id, amount INTO v_payment_id, v_amount
+    SELECT payment_id, amount, student_id,
+           COALESCE(advance_credit, 0), COALESCE(advance_used, 0)
+      INTO v_payment_id, v_amount, v_student_id, v_adv_credit, v_adv_used
     FROM core.fee_payments
     WHERE tenant_id = p_tenant_id AND school_id = p_school_id
       AND receipt_no = p_receipt_no
@@ -71,6 +76,22 @@ BEGIN
       AND sl.ledger_id = d.ledger_id
       AND sl.tenant_id = p_tenant_id
       AND sl.school_id = p_school_id;
+
+    -- Put the advance wallet back where it was. The collect proc moves it in two
+    -- directions on one receipt: a surplus is CREDITED, and anything drawn from
+    -- the wallet is USED. Cancelling used to reverse the ledger and leave both
+    -- alone, which lost real money in both directions — a cancelled overpayment
+    -- left the student holding credit they had never paid for, and cancelling a
+    -- receipt that had been settled from the wallet destroyed the balance the
+    -- parent had already handed over. Reversing is the exact mirror: take the
+    -- credit back out, put the used amount back in.
+    IF v_student_id IS NOT NULL AND (v_adv_credit <> 0 OR v_adv_used <> 0) THEN
+        UPDATE core.student_advance
+           SET balance    = balance - v_adv_credit + v_adv_used,
+               updated_at = NOW()
+         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+           AND student_id = v_student_id;
+    END IF;
 
     -- Mark the receipt cancelled (kept on record for audit).
     UPDATE core.fee_payments
