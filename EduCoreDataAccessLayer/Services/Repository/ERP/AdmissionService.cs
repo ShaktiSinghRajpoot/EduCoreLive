@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using EduCoreDataAccessLayer.Helpers;
 using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
@@ -229,11 +230,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 RollNo           = NullStr(row, "roll_no"),
                 StudentName      = Str(row, "student_name"),
                 Gender           = NullStr(row, "gender"),
-                DateOfBirth      = DateVal(row, "dob"),
+                DateOfBirth      = DbRead.Date(row, "dob"),
                 ClassName        = Str(row, "class_name"),
                 Section          = NullStr(row, "section"),
                 AcademicYear     = Str(row, "academic_year"),
-                AdmissionDate    = DateVal(row, "admission_date"),
+                AdmissionDate    = DbRead.Date(row, "admission_date"),
                 GuardianName     = NullStr(row, "guardian_name"),
                 MotherName       = NullStr(row, "mother_name"),
                 MobileNumber     = NullStr(row, "mobile"),
@@ -406,8 +407,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     AcademicYear  = NullStr(row, "academic_year"),
                     GuardianName  = NullStr(row, "guardian_name"),
                     Mobile        = NullStr(row, "mobile"),
-                    AdmissionDate = DateVal(row, "admission_date"),
-                    DateOfLeaving = DateVal(row, "date_of_leaving"),
+                    AdmissionDate = DbRead.Date(row, "admission_date"),
+                    DateOfLeaving = DbRead.Date(row, "date_of_leaving"),
                     Status        = Str(row, "status"),
                     LeavingReason = NullStr(row, "leaving_reason"),
                     Outstanding   = DecVal(row, "outstanding")
@@ -723,7 +724,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             ClassName      = Str(row, "class_name"),
             Section        = NullStr(row, "section"),
             AcademicYear   = Str(row, "academic_year"),
-            AdmissionDate  = DateVal(row, "admission_date"),
+            AdmissionDate  = DbRead.Date(row, "admission_date"),
             GuardianName   = NullStr(row, "guardian_name"),
             Mobile         = NullStr(row, "mobile"),
             AnnualTotal    = DecVal(row, "annual_total"),
@@ -743,23 +744,5 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static decimal   DecVal(DataRow r, string col)  => Has(r, col) && r[col] != DBNull.Value ? Convert.ToDecimal(r[col]) : 0m;
         private static string    Str(DataRow r, string col)     => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString()! : string.Empty;
         private static string?   NullStr(DataRow r, string col) => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString() : null;
-        private static DateOnly? DateVal(DataRow r, string col)
-        {
-            if (!Has(r, col) || r[col] == DBNull.Value)
-                return null;
-
-            var value = r[col];
-
-            if (value is DateOnly d)
-                return d;
-
-            if (value is DateTime dt)
-                return DateOnly.FromDateTime(dt);
-
-            if (value is string s && DateTime.TryParse(s, out var parsed))
-                return DateOnly.FromDateTime(parsed);
-
-            throw new InvalidCastException($"Unsupported date type: {value.GetType()}");
-        }
     }
 }

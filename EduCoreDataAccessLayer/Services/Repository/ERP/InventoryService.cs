@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using EduCoreDataAccessLayer.Helpers;
 using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
@@ -99,7 +100,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 rows.Add(new StockMovement
                 {
                     MovementId   = IntVal(r, "movement_id"),
-                    MovementDate = DateVal(r, "movement_date") ?? default,
+                    MovementDate = DbRead.Date(r, "movement_date") ?? default,
                     MovementType = Str(r, "movement_type"),
                     Quantity     = DecVal(r, "quantity"),
                     BalanceAfter = DecVal(r, "balance_after"),
@@ -176,7 +177,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 list.Add(new PurchaseListItem
                 {
                     PurchaseId   = IntVal(r, "purchase_id"),
-                    PurchaseDate = DateVal(r, "purchase_date") ?? default,
+                    PurchaseDate = DbRead.Date(r, "purchase_date") ?? default,
                     SupplierName = Str(r, "supplier_name"),
                     InvoiceNo    = Str(r, "invoice_no"),
                     PaymentMode  = Str(r, "payment_mode"),
@@ -204,7 +205,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var detail = new PurchaseDetail
             {
                 PurchaseId   = IntVal(h, "purchase_id"),
-                PurchaseDate = DateVal(h, "purchase_date") ?? default,
+                PurchaseDate = DbRead.Date(h, "purchase_date") ?? default,
                 SupplierId   = IntVal(h, "supplier_id") is var sid && sid > 0 ? sid : null,
                 SupplierName = Str(h, "supplier_name"),
                 InvoiceNo    = Str(h, "invoice_no"),
@@ -398,7 +399,5 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static decimal DecVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? Convert.ToDecimal(r[c]) : 0m;
         private static bool BoolVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value && Convert.ToBoolean(r[c]);
         private static string Str(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
-        private static DateOnly? DateVal(DataRow r, string c) =>
-            Has(r, c) && r[c] != DBNull.Value ? DateOnly.FromDateTime(Convert.ToDateTime(r[c])) : null;
     }
 }

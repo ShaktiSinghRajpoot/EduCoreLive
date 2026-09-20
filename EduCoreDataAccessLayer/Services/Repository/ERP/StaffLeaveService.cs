@@ -1,4 +1,5 @@
-using System.Data;
+﻿using System.Data;
+using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -38,14 +39,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     EmployeeCode   = NullStr(row, "employee_code"),
                     Designation    = NullStr(row, "designation"),
                     LeaveType      = Str(row, "leave_type"),
-                    FromDate       = DateVal(row, "from_date"),
-                    ToDate         = DateVal(row, "to_date"),
+                    FromDate       = DbRead.Date(row, "from_date"),
+                    ToDate         = DbRead.Date(row, "to_date"),
                     Days           = IntVal(row, "days"),
                     Reason         = NullStr(row, "reason"),
                     Status         = Str(row, "status"),
                     DecisionRemark = NullStr(row, "decision_remark"),
-                    AppliedAt      = TimeVal(row, "applied_at"),
-                    DecidedAt      = TimeVal(row, "decided_at"),
+                    AppliedAt      = DbRead.DateTimeN(row, "applied_at"),
+                    DecidedAt      = DbRead.DateTimeN(row, "decided_at"),
                     OnLeaveToday   = BoolVal(row, "on_leave_today")
                 });
 
@@ -129,10 +130,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static bool BoolVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value && Convert.ToBoolean(r[c]);
         private static string Str(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
         private static string? NullStr(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
-        private static DateOnly? DateVal(DataRow r, string c) =>
-            Has(r, c) && r[c] != DBNull.Value ? DateOnly.FromDateTime(Convert.ToDateTime(r[c])) : null;
-        private static DateTime? TimeVal(DataRow r, string c) =>
-            Has(r, c) && r[c] != DBNull.Value ? Convert.ToDateTime(r[c]) : null;
     }
 
 
@@ -175,7 +172,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     OtherDeduct  = DecVal(row, "other_deduct"),
                     NetPay       = DecVal(row, "net_pay"),
                     Status       = Str(row, "status"),
-                    PaidAt       = TimeVal(row, "paid_at")
+                    PaidAt       = DbRead.DateTimeN(row, "paid_at")
                 });
 
             return items;
@@ -247,7 +244,5 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static decimal DecVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? Convert.ToDecimal(r[c]) : 0m;
         private static string Str(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
         private static string? NullStr(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
-        private static DateTime? TimeVal(DataRow r, string c) =>
-            Has(r, c) && r[c] != DBNull.Value ? Convert.ToDateTime(r[c]) : null;
     }
 }

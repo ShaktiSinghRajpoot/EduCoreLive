@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Infrastructure;
+﻿using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.Extensions.Configuration;
@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using System.Data;
+using EduCoreDataAccessLayer.Helpers;
 
 namespace EduCoreDataAccessLayer.Services.Repository.ERP
 {
@@ -61,7 +62,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     {
                         EnquiryId           = IntVal(row, "enquiry_id"),
                         RegistrationNumber  = NullStr(row, "registration_number"),
-                        RegistrationDate    = DateVal(row, "registration_date"),
+                        RegistrationDate    = DbRead.Date(row, "registration_date"),
                         RegistrationFeePaid = BoolVal(row, "registration_fee_paid"),
                         StudentName         = Str(row, "student_name"),
                         ClassName           = NullStr(row, "class_name"),
@@ -167,14 +168,5 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static bool      BoolVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value && Convert.ToBoolean(r[c]);
         private static string    Str(DataRow r, string c)     => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
         private static string?   NullStr(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
-        private static DateOnly? DateVal(DataRow r, string c)
-        {
-            if (!Has(r, c) || r[c] == DBNull.Value) return null;
-            var v = r[c];
-            // Npgsql maps a Postgres `date` column to DateOnly; handle both forms.
-            if (v is DateOnly d) return d;
-            if (v is DateTime dt) return DateOnly.FromDateTime(dt);
-            return DateOnly.TryParse(v.ToString(), out var p) ? p : null;
-        }
     }
 }

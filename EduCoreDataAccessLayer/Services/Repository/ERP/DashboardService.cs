@@ -1,4 +1,5 @@
-using System.Data;
+﻿using System.Data;
+using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -57,7 +58,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
             foreach (var row in Rows(ds, 1))
                 result.Trend.Add(new DashboardTrendPoint
-                    { Date = DateVal(row, "d") ?? default, Amount = DecVal(row, "amount") });
+                    { Date = DbRead.Date(row, "d") ?? default, Amount = DecVal(row, "amount") });
 
             foreach (var row in Rows(ds, 2))
                 result.Classes.Add(new DashboardClassCount
@@ -78,7 +79,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     Total       = DecVal(row, "total"),
                     Paid        = DecVal(row, "paid"),
                     Due         = DecVal(row, "due"),
-                    LastPayment = DateVal(row, "last_payment")
+                    LastPayment = DbRead.Date(row, "last_payment")
                 });
 
             foreach (var row in Rows(ds, 5))
@@ -87,7 +88,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     ReceiptNo   = Str(row, "receipt_no"),
                     Amount      = DecVal(row, "amount"),
                     Mode        = NullStr(row, "payment_mode"),
-                    PaymentDate = DateVal(row, "payment_date"),
+                    PaymentDate = DbRead.Date(row, "payment_date"),
                     StudentName = Str(row, "student_name"),
                     ClassName   = NullStr(row, "class_name")
                 });
@@ -98,15 +99,15 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     LeaveId   = IntVal(row, "leave_id"),
                     FullName  = Str(row, "full_name"),
                     LeaveType = Str(row, "leave_type"),
-                    FromDate  = DateVal(row, "from_date"),
-                    ToDate    = DateVal(row, "to_date"),
+                    FromDate  = DbRead.Date(row, "from_date"),
+                    ToDate    = DbRead.Date(row, "to_date"),
                     Days      = IntVal(row, "days")
                 });
 
             foreach (var row in Rows(ds, 7))
                 result.Events.Add(new DashboardEvent
                 {
-                    Date    = DateVal(row, "calendar_date") ?? default,
+                    Date    = DbRead.Date(row, "calendar_date") ?? default,
                     Title   = Str(row, "title"),
                     DayType = NullStr(row, "day_type")
                 });
@@ -136,7 +137,5 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static string Str(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
         private static string? NullStr(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
         private static Guid GuidVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? (Guid)r[c] : Guid.Empty;
-        private static DateOnly? DateVal(DataRow r, string c) =>
-            Has(r, c) && r[c] != DBNull.Value ? DateOnly.FromDateTime(Convert.ToDateTime(r[c])) : null;
     }
 }

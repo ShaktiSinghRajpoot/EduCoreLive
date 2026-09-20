@@ -1,4 +1,5 @@
-using System.Data;
+﻿using System.Data;
+using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -98,7 +99,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     ClassName    = NullStr(row, "class_name"),
                     Section      = NullStr(row, "section"),
                     AcademicYear = NullStr(row, "academic_year"),
-                    Dob          = DateVal(row, "dob"),
+                    Dob          = DbRead.Date(row, "dob"),
                     BloodGroup   = NullStr(row, "blood_group"),
                     Gender       = NullStr(row, "gender"),
                     GuardianName = NullStr(row, "guardian_name"),
@@ -115,14 +116,5 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static int     IntVal(DataRow r, string col)  => Has(r, col) && r[col] != DBNull.Value ? Convert.ToInt32(r[col]) : 0;
         private static string  Str(DataRow r, string col)     => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString()! : string.Empty;
         private static string? NullStr(DataRow r, string col) => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString() : null;
-        private static DateOnly? DateVal(DataRow r, string col)
-        {
-            if (!Has(r, col) || r[col] == DBNull.Value) return null;
-            var value = r[col];
-            if (value is DateOnly d) return d;
-            if (value is DateTime dt) return DateOnly.FromDateTime(dt);
-            if (value is string s && DateTime.TryParse(s, out var parsed)) return DateOnly.FromDateTime(parsed);
-            throw new InvalidCastException($"Unsupported date type: {value.GetType()}");
-        }
     }
 }

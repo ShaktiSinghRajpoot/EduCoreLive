@@ -1,3 +1,4 @@
+﻿using System.Data;
 using Npgsql;
 
 namespace EduCoreDataAccessLayer.Helpers
@@ -55,5 +56,33 @@ namespace EduCoreDataAccessLayer.Helpers
 
         public static DateTime? DateTimeN(NpgsqlDataReader r, HashSet<string> cols, string c)
             => cols.Contains(c) && r[c] != DBNull.Value ? Convert.ToDateTime(r[c]) : null;
+
+        // ── DataRow overloads ────────────────────────────────────────────────
+        // Most services still map from a DataSet, and each had grown its own
+        // private DateVal. They were not the same: half checked the runtime type
+        // first, half went straight to Convert.ToDateTime(row[col]) — which
+        // THROWS when the value is already a DateOnly, and Npgsql returns
+        // DateOnly for a `date` column. That is the read error; the column type
+        // was never the problem. One reader, written once, ends it.
+
+        /// <summary>A date column, whatever shape the driver hands back. Missing or null gives null.</summary>
+        public static DateOnly? Date(DataRow r, string c)
+        {
+            if (!r.Table.Columns.Contains(c) || r[c] == DBNull.Value) return null;
+            var v = r[c];
+            if (v is DateOnly d)  return d;
+            if (v is DateTime dt) return DateOnly.FromDateTime(dt);
+            return DateOnly.TryParse(v.ToString(), out var p) ? p : null;
+        }
+
+        /// <summary>A timestamp column. Same tolerance; keeps the time of day.</summary>
+        public static DateTime? DateTimeN(DataRow r, string c)
+        {
+            if (!r.Table.Columns.Contains(c) || r[c] == DBNull.Value) return null;
+            var v = r[c];
+            if (v is DateTime dt) return dt;
+            if (v is DateOnly d)  return d.ToDateTime(TimeOnly.MinValue);
+            return DateTime.TryParse(v.ToString(), out var p) ? p : null;
+        }
     }
 }

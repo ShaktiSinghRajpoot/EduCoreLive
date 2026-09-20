@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -94,14 +95,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     PublicId      = GuidVal(row, "public_id"),
                     TcNo          = Str(row, "tc_no"),
                     Format        = Str(row, "format"),
-                    IssueDate     = DateVal(row, "issue_date"),
+                    IssueDate     = DbRead.Date(row, "issue_date"),
                     StudentId     = IntVal(row, "student_id"),
                     AdmissionNo   = NullStr(row, "admission_no"),
                     StudentName   = Str(row, "student_name"),
                     ClassName     = NullStr(row, "class_name"),
                     Section       = NullStr(row, "section"),
                     AcademicYear  = NullStr(row, "academic_year"),
-                    DateOfLeaving = DateVal(row, "date_of_leaving"),
+                    DateOfLeaving = DbRead.Date(row, "date_of_leaving"),
                     IsVoid        = BoolVal(row, "is_void"),
                     PrintCount    = IntVal(row, "print_count")
                 });
@@ -178,19 +179,19 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             TcId          = IntVal(row, "tc_id"),
             TcNo          = Str(row, "tc_no"),
             Format        = Str(row, "format"),
-            IssueDate     = DateVal(row, "issue_date"),
+            IssueDate     = DbRead.Date(row, "issue_date"),
             StudentId     = IntVal(row, "student_id"),
             AdmissionNo   = NullStr(row, "admission_no"),
             StudentName   = Str(row, "student_name"),
             Gender        = NullStr(row, "gender"),
-            Dob           = DateVal(row, "dob"),
+            Dob           = DbRead.Date(row, "dob"),
             FatherName    = NullStr(row, "father_name"),
             MotherName    = NullStr(row, "mother_name"),
             ClassName     = NullStr(row, "class_name"),
             Section       = NullStr(row, "section"),
             AcademicYear  = NullStr(row, "academic_year"),
-            AdmissionDate = DateVal(row, "admission_date"),
-            DateOfLeaving = DateVal(row, "date_of_leaving"),
+            AdmissionDate = DbRead.Date(row, "admission_date"),
+            DateOfLeaving = DbRead.Date(row, "date_of_leaving"),
             Religion      = NullStr(row, "religion"),
             Category      = NullStr(row, "category"),
             Nationality   = NullStr(row, "nationality"),
@@ -208,7 +209,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             WorkingDays     = Has(row, "working_days") && row["working_days"] != DBNull.Value ? IntVal(row, "working_days") : null,
             DaysPresent     = Has(row, "days_present") && row["days_present"] != DBNull.Value ? IntVal(row, "days_present") : null,
             Activities      = NullStr(row, "activities"),
-            ApplicationDate = DateVal(row, "application_date"),
+            ApplicationDate = DbRead.Date(row, "application_date"),
             PrintCount    = IntVal(row, "print_count"),
             IsVoid        = BoolVal(row, "is_void"),
             WasDuplicate  = BoolVal(row, "was_duplicate")
@@ -223,14 +224,5 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static bool     BoolVal(DataRow r, string col) => Has(r, col) && r[col] != DBNull.Value && Convert.ToBoolean(r[col]);
         private static string   Str(DataRow r, string col)     => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString()! : string.Empty;
         private static string?  NullStr(DataRow r, string col) => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString() : null;
-        private static DateOnly? DateVal(DataRow r, string col)
-        {
-            if (!Has(r, col) || r[col] == DBNull.Value) return null;
-            var value = r[col];
-            if (value is DateOnly d) return d;
-            if (value is DateTime dt) return DateOnly.FromDateTime(dt);
-            if (value is string s && DateTime.TryParse(s, out var parsed)) return DateOnly.FromDateTime(parsed);
-            throw new InvalidCastException($"Unsupported date type: {value.GetType()}");
-        }
     }
 }

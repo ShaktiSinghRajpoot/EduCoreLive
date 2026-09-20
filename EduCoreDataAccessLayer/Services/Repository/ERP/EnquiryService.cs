@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Infrastructure;
+﻿using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.Extensions.Configuration;
@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using System.Data;
+using EduCoreDataAccessLayer.Helpers;
 
 namespace EduCoreDataAccessLayer.Services.Repository.ERP
 {
@@ -382,7 +383,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     FollowupType = row["followup_type"] == DBNull.Value ? "Call": row["followup_type"].ToString()!,
                     Outcome=row["outcome"]== DBNull.Value ? null: row["outcome"].ToString(),
                     Notes  = row["notes"]               == DBNull.Value ? null                  : row["notes"].ToString(),
-                    NextFollowupDate  = DateVal(row, "next_followup_date"),
+                    NextFollowupDate  = DbRead.Date(row, "next_followup_date"),
                     StatusBefore      = row["status_before"]       == DBNull.Value ? null                  : row["status_before"].ToString(),
                     StatusAfter       = row["status_after"]        == DBNull.Value ? null                  : row["status_after"].ToString(),
                     CreatedBy         = IntVal(row, "created_by"),
@@ -479,7 +480,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             m.SchoolId              = schoolId;
             m.StudentName           = Str(row, "student_name");
             m.Gender                = NullStr(row, "gender");
-            m.Dob                   = DateVal(row, "dob");
+            m.Dob                   = DbRead.Date(row, "dob");
             m.ClassName             = Str(row, "class_name");
             m.Session               = Str(row, "session");
             m.InterestedStream      = NullStr(row, "interested_stream");
@@ -506,8 +507,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             m.AssignedToId          = Has(row,"assigned_to_id") && row["assigned_to_id"] != DBNull.Value
                                         ? Convert.ToInt32(row["assigned_to_id"]) : null;
             m.LostReason            = NullStr(row, "lost_reason");
-            m.EnquiryDate           = DateVal(row, "enquiry_date") ?? DateOnly.FromDateTime(DateTime.Today);
-            m.NextFollowupDate      = DateVal(row, "next_followup_date");
+            m.EnquiryDate           = DbRead.Date(row, "enquiry_date") ?? DateOnly.FromDateTime(DateTime.Today);
+            m.NextFollowupDate      = DbRead.Date(row, "next_followup_date");
             m.Notes                 = NullStr(row, "notes");
             m.EstimatedFee          = Has(row,"estimated_fee") && row["estimated_fee"] != DBNull.Value
                                         ? Convert.ToDecimal(row["estimated_fee"]) : null;
@@ -535,7 +536,5 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         // A Postgres `date` arrives as DateOnly, which does NOT implement IConvertible —
         // Convert.ToDateTime on it throws InvalidCastException. Always cast, never Convert.
-        private static DateOnly? DateVal(DataRow r, string col) =>
-            Has(r, col) && r[col] != DBNull.Value ? (DateOnly)r[col] : null;
     }
 }

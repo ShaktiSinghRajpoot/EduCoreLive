@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using System.Data;
+using EduCoreDataAccessLayer.Helpers;
 
 namespace EduCoreDataAccessLayer.Services.Repository.ERP
 {
@@ -46,7 +47,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 {
                     StaffId      = IntVal(row, "staff_id"),
                     PublicId     = GuidVal(row, "public_id"),
-                    StatusChangedAt = DateVal(row, "status_changed_at"),
+                    StatusChangedAt = DbRead.DateTimeN(row, "status_changed_at"),
                     EmployeeCode = NullStr(row, "employee_code"),
                     FullName     = Str(row, "full_name"),
                     Gender       = NullStr(row, "gender"),
@@ -55,7 +56,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     StaffType    = NullStr(row, "staff_type"),
                     Department   = NullStr(row, "department"),
                     Designation  = NullStr(row, "designation"),
-                    JoiningDate  = DateVal(row, "joining_date"),
+                    JoiningDate  = DbRead.DateTimeN(row, "joining_date"),
                     Status       = Str(row, "status"),
                     HasLogin     = row.Table.Columns.Contains("user_id") && row["user_id"] != DBNull.Value
                 });
@@ -98,7 +99,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 {
                     StaffId      = IntVal(row, "staff_id"),
                     PublicId     = GuidVal(row, "public_id"),
-                    StatusChangedAt = DateVal(row, "status_changed_at"),
+                    StatusChangedAt = DbRead.DateTimeN(row, "status_changed_at"),
                     EmployeeCode = NullStr(row, "employee_code"),
                     FullName     = Str(row, "full_name"),
                     Gender       = NullStr(row, "gender"),
@@ -107,7 +108,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     StaffType    = NullStr(row, "staff_type"),
                     Department   = NullStr(row, "department"),
                     Designation  = NullStr(row, "designation"),
-                    JoiningDate  = DateVal(row, "joining_date"),
+                    JoiningDate  = DbRead.DateTimeN(row, "joining_date"),
                     Status       = Str(row, "status"),
                     HasLogin     = row.Table.Columns.Contains("user_id") && row["user_id"] != DBNull.Value
                 });
@@ -132,7 +133,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 EmployeeCode    = NullStr(row, "employee_code"),
                 FullName        = Str(row, "full_name"),
                 Gender          = NullStr(row, "gender"),
-                DateOfBirth     = DateVal(row, "dob"),
+                DateOfBirth     = DbRead.DateTimeN(row, "dob"),
                 Mobile          = NullStr(row, "mobile"),
                 AltMobile       = NullStr(row, "alt_mobile"),
                 Email           = NullStr(row, "email"),
@@ -141,7 +142,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 StaffType       = NullStr(row, "staff_type"),
                 Department      = NullStr(row, "department"),
                 Designation     = NullStr(row, "designation"),
-                JoiningDate     = DateVal(row, "joining_date"),
+                JoiningDate     = DbRead.DateTimeN(row, "joining_date"),
                 Qualification   = NullStr(row, "qualification"),
                 ExperienceYears = NullIntVal(row, "experience_years"),
                 Status          = Str(row, "status"),
@@ -420,16 +421,5 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         // Postgres `date` comes back as DateOnly (Npgsql) or DateTime depending on
         // the path — handle both so DOB / joining date read back correctly.
-        private static DateTime? DateVal(DataRow r, string c)
-        {
-            if (!Has(r, c) || r[c] == DBNull.Value) return null;
-            var v = r[c];
-            return v switch
-            {
-                DateTime dt => dt,
-                DateOnly d  => d.ToDateTime(TimeOnly.MinValue),
-                _           => Convert.ToDateTime(v)
-            };
-        }
     }
 }
