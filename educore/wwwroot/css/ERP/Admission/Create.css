@@ -59,6 +59,13 @@
    or the hint text floats away from the picture. */
 .student-admission-page .adm-photo-col{ align-self:flex-start; }
 
+/* Below lg the fields beside the photo stack, so the column holding them needs
+   a sensible floor - otherwise the photo's 132px squeezes them to nothing on a
+   narrow tablet. */
+@media (min-width:768px){
+    .student-admission-page .adm-photo-col + .col-md{ min-width:320px; }
+}
+
 .student-admission-page .adm-photo-drop{
     display:flex; align-items:center; justify-content:center;
     width:132px; height:132px; cursor:pointer; overflow:hidden;
