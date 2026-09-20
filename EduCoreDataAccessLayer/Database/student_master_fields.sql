@@ -435,6 +435,24 @@ BEGIN
             INSERT INTO core.admission_audit (tenant_id, school_id, student_id, action, detail, action_by)
             VALUES (p_tenant_id, p_school_id, v_student_id, 'ConvertedFromEnquiry',
                     'Linked from enquiry #' || p_enquiry_id::TEXT, p_action_user_id);
+
+            -- Money the family already paid follows them onto the student record.
+            -- A registration fee is taken before any student exists, so its
+            -- receipt is booked against the enquiry with student_id NULL. Nothing
+            -- pointed it at the student afterwards, and the fee history reads
+            -- student_id only — so the amount they had paid was invisible on the
+            -- child's record and could only be found by going back to the enquiry.
+            --
+            -- enquiry_id is deliberately left in place: the receipt really was
+            -- taken against the enquiry, and that is where it came from. This adds
+            -- the second half of a link that only ever existed one way, since the
+            -- student row already carries the enquiry it came from.
+            UPDATE core.fee_payments
+               SET student_id = v_student_id
+             WHERE tenant_id  = p_tenant_id
+               AND school_id  = p_school_id
+               AND enquiry_id = p_enquiry_id
+               AND student_id IS NULL;
         END IF;
 
         OPEN p_result FOR

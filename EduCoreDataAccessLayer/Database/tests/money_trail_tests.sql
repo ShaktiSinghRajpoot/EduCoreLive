@@ -244,12 +244,23 @@ BEGIN
     SELECT COALESCE(SUM(amount_paid),0) INTO v_dec FROM core.student_ledger WHERE student_id = v_sid;
     PERFORM pg_temp.chk_eq('2.3 nothing paid yet against the student', v_dec, 0);
 
-    -- The registration fee stays with the enquiry. It is NOT silently pulled
-    -- forward onto the student's ledger, which would make it look like a
-    -- tuition payment nobody can trace back to its receipt.
-    SELECT COUNT(*) INTO v_n FROM core.fee_payments
-     WHERE student_id = v_sid AND COALESCE(is_cancelled, FALSE) = FALSE;
-    PERFORM pg_temp.chk_eq('2.4 the registration receipt did not move to the student', v_n, 0);
+    -- Admission points the registration receipt at the new student, so money the
+    -- family already paid is visible on the child's record. It keeps its
+    -- enquiry_id: the receipt really was taken against the enquiry, and that is
+    -- where it came from.
+    SELECT student_id, enquiry_id INTO v_n, v_txt FROM core.fee_payments
+     WHERE enquiry_id = v_eid AND COALESCE(is_cancelled, FALSE) = FALSE;
+    PERFORM pg_temp.chk_eq('2.4 the registration receipt now names the student', v_n, v_sid);
+    PERFORM pg_temp.chk('2.4b ...and still names the enquiry it came from',
+                        v_txt::int = v_eid, format('enquiry_id %s', v_txt));
+
+    -- What it must NOT do is invent a ledger row. The registration fee was never
+    -- a billed due on this student, and turning it into one would make it look
+    -- like a tuition payment nobody can trace back to its receipt.
+    SELECT COUNT(*) INTO v_n FROM core.fee_payment_details d
+      JOIN core.fee_payments p ON p.payment_id = d.payment_id
+     WHERE p.enquiry_id = v_eid AND d.ledger_id IS NOT NULL;
+    PERFORM pg_temp.chk_eq('2.4c ...without inventing a ledger line for it', v_n, 0);
 
     PERFORM pg_temp.balances('2.5', v_sid);
 
@@ -330,11 +341,11 @@ BEGIN
     SELECT COALESCE(SUM(amount + COALESCE(advance_credit,0) - COALESCE(advance_used,0)),0)
       INTO v_dec FROM core.fee_payments
      WHERE student_id = v_sid AND COALESCE(is_cancelled, FALSE) = FALSE;
-    PERFORM pg_temp.chk_eq('5.3 the till did not move: no new cash', v_dec, 6500);
+    PERFORM pg_temp.chk_eq('5.3 the till did not move: no new cash', v_dec, 7000);
 
     SELECT COALESCE(SUM(amount),0) INTO v_dec FROM core.fee_payments
      WHERE student_id = v_sid AND COALESCE(is_cancelled, FALSE) = FALSE;
-    PERFORM pg_temp.chk_eq('5.3b ...though 6000 is now settled on the ledger', v_dec, 6000);
+    PERFORM pg_temp.chk_eq('5.3b ...though 6500 is now settled on the ledger', v_dec, 6500);
 
     PERFORM pg_temp.balances('5.4', v_sid);
 
@@ -357,7 +368,7 @@ BEGIN
     SELECT COALESCE(SUM(amount + COALESCE(advance_credit,0) - COALESCE(advance_used,0)),0)
       INTO v_dec FROM core.fee_payments
      WHERE student_id = v_sid AND COALESCE(is_cancelled, FALSE) = FALSE;
-    PERFORM pg_temp.chk_eq('6.3 real cash taken is unchanged by this cancel', v_dec, 6500);
+    PERFORM pg_temp.chk_eq('6.3 real cash taken is unchanged by this cancel', v_dec, 7000);
 
     PERFORM pg_temp.balances('6.4', v_sid);
 
@@ -380,7 +391,7 @@ BEGIN
 
     SELECT COALESCE(SUM(amount),0) INTO v_dec FROM core.fee_payments
      WHERE student_id = v_sid AND COALESCE(is_cancelled, FALSE) = FALSE;
-    PERFORM pg_temp.chk_eq('7.2 only the 4000 admission receipt is still live', v_dec, 4000);
+    PERFORM pg_temp.chk_eq('7.2 only the registration 500 and admission 4000 are live', v_dec, 4500);
 
     PERFORM pg_temp.balances('7.3', v_sid);
 
@@ -441,7 +452,7 @@ BEGIN
     -- RECEIPT for the month that was paid, or the cash book loses 600.
     SELECT COALESCE(SUM(amount),0) INTO v_dec FROM core.fee_payments
      WHERE student_id = v_sid AND COALESCE(is_cancelled, FALSE) = FALSE;
-    PERFORM pg_temp.chk_eq('9.3 the bus payment is still in the cash book', v_dec, 4600);
+    PERFORM pg_temp.chk_eq('9.3 the bus payment is still in the cash book', v_dec, 5100);
 
     PERFORM pg_temp.balances('9.4', v_sid);
 
@@ -467,10 +478,10 @@ BEGIN
     -- was taken; the refund says 200 went back. Both are true and both are kept.
     SELECT COALESCE(SUM(amount),0) INTO v_dec FROM core.fee_payments
      WHERE student_id = v_sid AND COALESCE(is_cancelled, FALSE) = FALSE;
-    PERFORM pg_temp.chk_eq('10.3 the original receipt is not rewritten', v_dec, 4600);
+    PERFORM pg_temp.chk_eq('10.3 the original receipt is not rewritten', v_dec, 5100);
 
     -- Net cash the school is holding from this student.
-    PERFORM pg_temp.chk_eq('10.4 net held = collected - refunded', v_dec - 200, 4400);
+    PERFORM pg_temp.chk_eq('10.4 net held = collected - refunded', v_dec - 200, 4900);
 
     PERFORM pg_temp.balances('10.5', v_sid);
 
@@ -529,7 +540,7 @@ BEGIN
 
     SELECT COALESCE(SUM(amount),0) INTO v_dec FROM core.fee_payments
      WHERE student_id = v_sid AND COALESCE(is_cancelled, FALSE) = FALSE;
-    PERFORM pg_temp.chk_eq('11.3 and did not disturb what was collected', v_dec, 4600);
+    PERFORM pg_temp.chk_eq('11.3 and did not disturb what was collected', v_dec, 5100);
 
     PERFORM pg_temp.balances('11.4', v_sid);
 
@@ -595,8 +606,15 @@ BEGIN
           INTO v_paid, v_conc, v_refund
           FROM core.student_ledger WHERE student_id = v_sid;
 
-        SELECT COALESCE(SUM(amount),0) INTO v_receipts FROM core.fee_payments
-         WHERE student_id = v_sid AND COALESCE(is_cancelled, FALSE) = FALSE;
+        -- Only the receipts that actually settled a ledger line. The
+        -- registration fee is money for something this ledger never billed, so
+        -- counting it here would make the two sides disagree by exactly that
+        -- amount — which is what happened when it was first linked.
+        SELECT COALESCE(SUM(d.amount),0) INTO v_receipts
+          FROM core.fee_payment_details d
+          JOIN core.fee_payments p ON p.payment_id = d.payment_id
+         WHERE p.student_id = v_sid AND COALESCE(p.is_cancelled, FALSE) = FALSE
+           AND d.ledger_id IS NOT NULL;
 
         SELECT COALESCE(balance,0) INTO v_wallet FROM core.student_advance WHERE student_id = v_sid;
 
@@ -608,8 +626,20 @@ BEGIN
                                v_dec, v_paid + v_conc);
 
         -- Every rupee on a live receipt is on the ledger, and vice versa.
-        PERFORM pg_temp.chk_eq('13.2 receipts = what the ledger says was paid',
+        PERFORM pg_temp.chk_eq('13.2 ledger-settling receipts = what the ledger says was paid',
                                v_receipts, v_paid);
+
+        -- ...and the registration fee is accounted for beside it, not inside it.
+        DECLARE v_nonledger numeric;
+        BEGIN
+            SELECT COALESCE(SUM(p.amount),0) INTO v_nonledger
+              FROM core.fee_payments p
+             WHERE p.student_id = v_sid AND COALESCE(p.is_cancelled, FALSE) = FALSE
+               AND NOT EXISTS (SELECT 1 FROM core.fee_payment_details d
+                               WHERE d.payment_id = p.payment_id AND d.ledger_id IS NOT NULL);
+            PERFORM pg_temp.chk_eq('13.2b the registration fee sits outside the ledger',
+                                   v_nonledger, 500);
+        END;
 
         -- A wallet left with money at the end is money the school is holding
         -- for a student who has gone.
