@@ -16,16 +16,18 @@
     // Per-school module visibility. The Transport menu is hidden for schools that
     // turned the module off in Admission Workflow settings. Defaults to visible if
     // the school scope or settings can't be resolved (matches pre-toggle behaviour).
-    // One read, four flags. A module a school turned off is hidden from the menu
+    // One read, five flags. A module a school turned off is hidden from the menu
     // entirely — that is how a small school keeps a short menu without us
     // guessing what it needs. Defaults to visible if the scope or settings cannot
     // be resolved (matches pre-toggle behaviour).
     bool showTransport = true, showExams = true, showInventory = true, showPayroll = true;
+    bool showRegistration = true;
     if (_tId > 1 && _sId > 0)
     {
         try
         {
             var _mods = await AdmissionWorkflowService.GetAdmissionWorkflowAsync(_tId, _sId, _uId);
+            showRegistration = _mods.EnableRegistration;
             showTransport = _mods.EnableTransport;
             showExams     = _mods.EnableExams;
             showInventory = _mods.EnableInventory;
@@ -142,7 +144,7 @@
                 {
                 <li class='menu-item @On("EnquiryCRM")'><a asp-area="ERP" asp-controller="Enquiry" asp-action="EnquiryCRM" class="menu-link"><i class="bx bx-message-square-detail submenu-icon c-pink"></i><div class="text-truncate">Enquiries</div><span class="ec-badge ec-badge-hot">CRM</span></a></li>
                 }
-                @if (Can("registration.view"))
+                @if (showRegistration && Can("registration.view"))
                 {
                 <li class='menu-item @On("Registration")'><a asp-area="ERP" asp-controller="Registration" asp-action="Index" class="menu-link"><i class="bx bx-clipboard submenu-icon c-orange"></i><div class="text-truncate">Registrations</div></a></li>
                 }

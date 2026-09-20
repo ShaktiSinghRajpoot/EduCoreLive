@@ -1,4 +1,4 @@
-# Page checklist
+﻿# Page checklist
 
 Every page in the app, what state it is in, and what is left to do.
 
@@ -86,7 +86,7 @@ refresh it.
 | Staff Masters | ✅ | ✅ | ✅ | ✅ | — |
 | Roles & Permissions | ✅ | ✅ | ✅ | ✅ | — |
 | Documents / Smart Bell | ✅ | ✅ | ✅ | ✅ | — |
-| Admission Workflow | ✅ | ✅ | ✅ | ✅ | — |
+| Admission Workflow | ✅ | ✅ | ✅ | ✅ | ✅ 23 |
 
 ## Account
 
@@ -126,6 +126,16 @@ Open items, roughly in the order they are worth doing.
       currently fetch.
 - [ ] Test suites for **Promotion**, **Leave/Payroll**, **Settings** and
       **Roles** — the four areas with real guards but no suite yet.
+- [ ] **Module flags and partial saves** — `sp_school_admin_admission_workflow_manage`
+      reads each module flag as `COALESCE(p_enable_x, TRUE)`, so a save that omits
+      one switches it back ON. Not reachable today (the form posts all five and
+      the service sends plain bools), but a future quick-toggle endpoint would
+      trip on it. Pinned by check B7.
+- [ ] **Two dead model properties** — `RegistrationFeeAmount` and
+      `SecurityFeeAmount` exist on `AdmissionWorkflowModel` and as columns, but no
+      view field sets them, no proc parameter accepts them and nothing reads them.
+      The registration amount is typed at collection time and the security amount
+      comes from the fee head. Remove, or wire up.
 
 ### Done in this pass
 
@@ -134,6 +144,10 @@ Open items, roughly in the order they are worth doing.
       `SavePeriodStructure` had no `[ValidateAntiForgeryToken]`. Two of the three
       views were already sending the token, so the attribute was all that was
       missing; the Academic Years page was not sending one at all and now does.
+- [x] **Registrations menu item now honours its own flag** — four of the five
+      module toggles hid their menu section; `enable_registration` was read by the
+      Registration *page* but ignored by the menu, so a school that switched
+      registration off still saw the item. Now gated like the other four.
 - [x] **Three dead procedures dropped** — `core.sp_admission_manage1` (an
       orphaned copy of the admission proc, predating the back-dating fix),
       `config.sp_role_permission_management` and `core.sp_school_user_management`

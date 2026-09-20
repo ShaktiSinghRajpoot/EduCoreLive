@@ -2455,3 +2455,56 @@ automatically unguarded — several report a refusal as `success = false` with a
 message, which is the better shape for "already cancelled".
 
 All four suites still pass on both databases after the removals: 28 / 30 / 28 / 31.
+
+---
+
+### [2026-08-25] Admission Workflow test suite, and the menu flag it was ignoring
+
+`Database/tests/admission_workflow_tests.sql` — 23 checks. These settings are a
+school's on/off switches, and getting one wrong does not throw: it quietly
+changes what the school is billed or what its office can reach.
+
+**Found: the Registrations menu item ignored its own toggle.** The menu reads
+five module flags' worth of settings but gated only four of them — Transport,
+Exams, Inventory and Payroll each hid their section, while `enable_registration`
+was honoured by the Registration *page* and ignored by the menu. A school that
+switched registration off still saw "Registrations" in the sidebar, leading to a
+page that had been turned off. Now gated the same way as the other four.
+
+**Confirmed correct — `charge_fees_from`, the setting with real money behind it.**
+Same student, same plan, same joining date, only the policy differs:
+`SessionStart` bills all 12 months of the session; `AdmissionMonth` bills 7, from
+the month they actually arrived. And under either policy a back-dated admission
+still bills 12 months, never one per month since 2017 — the regression guard for
+the back-dating bug, now checked from the settings side too.
+
+Also confirmed: settings round-trip through the proc the app actually calls; a
+second save updates rather than inserting a second row; dependent flags collapse
+(registration off leaves neither "required before admission" nor a registration
+fee set); another school's row is untouched; and a platform-scope write is
+refused.
+
+**Two things pinned rather than changed.** A save that leaves a module flag NULL
+resets it to ON, because the proc reads `COALESCE(p_enable_x, TRUE)` and cannot
+tell "no opinion" from "switch it on". The app never hits this — the form posts
+all five (`asp-for` on a bool emits the hidden false companion) and the service
+sends plain bools — so check B7 documents the behaviour instead of a speculative
+fix, for whoever later adds a quick-toggle endpoint. And
+`RegistrationFeeAmount` / `SecurityFeeAmount` are dead: on the model and in the
+table, but no view field, no proc parameter, no reader. The registration amount
+is typed at collection time; the security amount comes from the fee head.
+
+**A note on writing it:** the first run failed three module-flag checks and it
+looked like the flags were not saving. They were — the suite's own partial save
+two checks earlier had reset them through exactly the COALESCE path above. Same
+shape as the transport/TC suite, where a removed assignment had cleared the dues
+a later check depended on. A test that mutates shared state is a test that can
+lie about the code.
+
+Five suites now exist, 140 checks:
+
+    fee_module_tests.sql             28
+    enquiry_registration_tests.sql   30
+    attendance_exam_tests.sql        28
+    transport_tc_tests.sql           31
+    admission_workflow_tests.sql     23
