@@ -108,7 +108,6 @@ refresh it.
 
 | Page | State |
 |---|---|
-| **Payment Verification** | Shell. The view holds a hardcoded C# array. Needs a table for online payments awaiting verification — and a decision first: payment-gateway integration, or manual UPI/NEFT reference checking? |
 | **Staff attendance** | Does not exist. `StaffProfile` links to `Attendance/StaffAttendance`, which is not an action — a dead link. This is also why payroll derives Loss of Pay from unpaid leave rather than from absences. |
 
 ---
@@ -117,8 +116,6 @@ refresh it.
 
 Open items, roughly in the order they are worth doing.
 
-- [ ] **Payment Verification** — decide gateway vs manual, then build it. Until
-      then the menu item leads to invented data.
 - [ ] **Staff attendance register** — would let payroll compute LOP from actual
       absences, and would fix the dead link on the staff profile.
 - [ ] **Salary structure** — `core.staff` holds one `monthly_salary`. A payslip
@@ -168,6 +165,10 @@ Open items, roughly in the order they are worth doing.
       both directions. Found by the money-trail suite; no live data was affected.
 - [x] **Money trail suite** — 98 checks following one student from enquiry to
       Transfer Certificate, re-proving five equations after every step.
+- [x] **Payment Verification removed** — the page showed a hardcoded array and
+      only made sense behind a payment gateway, which is not being built. The
+      controller, view, stylesheet and menu entry are gone; nothing else
+      referenced it and it had no permission key of its own.
 - [x] **Inventory module built** — items, suppliers, purchases and a stock
       movement ledger, replacing two shells that saved nothing and showed a
       hardcoded catalog. 49 checks.

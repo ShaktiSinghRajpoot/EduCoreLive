@@ -224,7 +224,7 @@
 
         @if (gFees)
         {
-        <li class='menu-item @Open("ManageFee","PaymentVerification","FeeDueReminders","Fee/Reports","DayClose")'>
+        <li class='menu-item @Open("ManageFee","FeeDueReminders","Fee/Reports","DayClose")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-wallet ic-fees"></i>
                 <div class="text-truncate">Fees</div>
@@ -232,7 +232,6 @@
             <ul class="menu-sub">
                 @* Fee Heads / Fee Structure are one-time setup → School Settings. *@
                 <li class='menu-item @On("ManageFee")'><a asp-area="ERP" asp-controller="Fee" asp-action="ManageFee" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Collect Fees</div></a></li>
-                <li class='menu-item @On("PaymentVerification")'><a asp-area="ERP" asp-controller="PaymentVerification" asp-action="Index" class="menu-link"><i class="bx bx-check-shield submenu-icon c-indigo"></i><div class="text-truncate">Payment Verification</div></a></li>
                 <li class='menu-item @On("FeeDueReminders")'><a asp-area="ERP" asp-controller="FeeDueReminders" asp-action="Index" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Due Reminders</div></a></li>
                 <li class='menu-item @On("DayClose")'><a asp-area="ERP" asp-controller="Fee" asp-action="DayClose" class="menu-link"><i class="bx bx-lock-alt submenu-icon c-teal"></i><div class="text-truncate">Day Close</div></a></li>
                 <li class='menu-item @On("Fee/Reports")'><a asp-area="ERP" asp-controller="Fee" asp-action="Reports" class="menu-link"><i class="bx bx-bar-chart-alt-2 submenu-icon c-blue"></i><div class="text-truncate">Fee Reports</div></a></li>
