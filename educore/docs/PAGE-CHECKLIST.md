@@ -93,7 +93,7 @@ refresh it.
 | Staff Masters | ✅ | ✅ | ✅ | ✅ | — |
 | Roles & Permissions | ✅ | ✅ built-ins protected, in-use role kept, soft revoke | ✅ | ✅ | ✅ 23 |
 | Documents / Smart Bell | ✅ | ✅ | ✅ | ✅ | — |
-| Admission Workflow | ✅ | ✅ | ✅ | ✅ | ✅ 23 |
+| Admission Workflow | ✅ | ✅ | ✅ | ✅ | ✅ 23 + 28 |
 
 ## Account
 
@@ -148,6 +148,9 @@ Open items, roughly in the order they are worth doing.
       `SavePeriodStructure` had no `[ValidateAntiForgeryToken]`. Two of the three
       views were already sending the token, so the attribute was all that was
       missing; the Academic Years page was not sending one at all and now does.
+- [x] **Workflow billing suite** — 28 checks proving `charge_fees_from` really
+      drives the money, and recording which workflow settings the database
+      enforces (one) versus which the application enforces (the rest).
 - [x] **Cancelling a receipt now reverses the advance wallet** — it used to
       reverse the ledger and leave the wallet untouched, which lost real money in
       both directions. Found by the money-trail suite; no live data was affected.

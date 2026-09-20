@@ -2812,3 +2812,65 @@ WHERE a.balance <> COALESCE((SELECT SUM(COALESCE(p.advance_credit,0) - COALESCE(
 ```
 
 Eleven suites now exist, **382 checks**, identical on local and Railway.
+
+---
+
+### [2026-09-20] Do the Admission Workflow settings actually control the money?
+
+`Database/tests/workflow_billing_tests.sql` — 28 checks. The workflow page offers
+a school switches like *charge fees from* and *collect fee at admission*. This
+suite asks the only question that matters about them: when the switch is flipped,
+does the school's money change, and by exactly the right amount?
+
+**Yes, for `charge_fees_from` — and it is enforced in the database.**
+`sp_admission_manage` reads it, so the policy holds no matter what reaches the
+proc. Tested across both policies and four joining dates:
+
+| Joins | SessionStart | AdmissionMonth |
+|---|---|---|
+| day one of the session | 12 instalments | 12 |
+| 5 months in | **12** (billed back to April) | **7** (from their own month) |
+| the last month | 12 | **1** |
+| years before the session | 12 | 12 |
+
+Same child, same ₹1,000 a month, joining five months in: **SessionStart bills
+₹12,000, AdmissionMonth bills ₹7,000** — the switch is worth ₹5,000 to that one
+family, and the difference is exactly the five months skipped.
+
+The last row is the back-dating regression guard seen from the settings side: a
+child admitted in 2017 sitting in the 2026-27 session is billed **12** months, not
+120, under **either** policy. That bug once billed ₹4,29,000 instead of ₹42,000.
+
+**Other frequencies ignore the policy**, as they must: a One Time admission fee
+and a Yearly charge are each billed once and for the same money whichever way the
+switch is set. Only the monthly schedule moves.
+
+**A session bills only its own months.** Across every case in the suite, no
+instalment falls before the session starts or after it ends.
+
+**The honest part, which the settings page does not say.** Of the settings on that
+screen, exactly **one** is enforced inside the database:
+
+- `charge_fees_from` — **enforced in the proc**. Verified by counting references
+  in `sp_admission_manage`, so the claim cannot quietly go stale.
+- `collect_fee_at_admission` — **application only**. `Create.cshtml` hides the
+  collection panel and `AdmissionController` zeroes `payAmount` regardless of what
+  was posted, so the screen genuinely cannot collect. The proc never reads it.
+- `registration_required_before_admission` — **application only**.
+  `AdmissionController.Create` refuses a walk-in; the proc will still admit one.
+- `enable_security_fee` — **application only**; the controller filters the fee
+  list, the proc bills whatever plan it is handed.
+- The five module toggles — **application only**; menu and page gating.
+
+That is defence at the app layer, not a constraint on the data: anything reaching
+the procedures another way — a script, an import, a future endpoint — will not be
+stopped by the four app-only settings. Checks F4 to F7 state this per setting, so
+the day one of them moves into SQL the note gets updated rather than silently
+becoming wrong.
+
+One nuance worth knowing: with collection switched off, a **concession** can still
+be recorded at admission. That is a waiver, not money changing hands, so it is
+defensible — but it is the one thing that still writes to the ledger on that
+screen when collection is off.
+
+Twelve suites now exist, **410 checks**, identical on local and Railway.
