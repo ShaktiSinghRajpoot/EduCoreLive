@@ -1,4 +1,4 @@
-/* Create page styles — extracted from Areas/ERP/Views/Admission/Create.cshtml */
+﻿/* Create page styles — extracted from Areas/ERP/Views/Admission/Create.cshtml */
 .student-admission-page{
     --ec-primary:#ff8a00;--ec-primary-soft:#fff4e6;--ec-cream:#fff7ed;
     --ec-soft-bg:#f8f7f5;--ec-panel:#ffffff;--ec-border:#ececf5;
@@ -54,6 +54,10 @@
    the student's name rather than in a separate section, because the photo IS
    part of identifying the child. */
 .student-admission-page .adm-photo{ width:132px; }
+
+/* The photo column must not stretch to the height of the four fields beside it,
+   or the hint text floats away from the picture. */
+.student-admission-page .adm-photo-col{ align-self:flex-start; }
 
 .student-admission-page .adm-photo-drop{
     display:flex; align-items:center; justify-content:center;
