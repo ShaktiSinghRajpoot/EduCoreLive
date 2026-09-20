@@ -261,6 +261,28 @@ if (requireHttps)
 
 app.UseStaticFiles();
 
+// Uploaded files (student photos, school logos). They are served from the same
+// /uploads URL as before, but the folder behind it is configurable: on a
+// container host it points at a MOUNTED VOLUME, because anything inside the
+// published app is replaced on every deploy — which is how every student photo
+// vanished each time the app shipped, leaving the database pointing at files
+// that no longer existed. When Uploads:Root is not set this resolves to
+// wwwroot/uploads, which UseStaticFiles above already covers, so it is skipped
+// rather than serving the same folder twice.
+var uploadRoot = educore.Helpers.UploadPaths.Root(builder.Configuration, builder.Environment);
+if (!string.Equals(
+        Path.TrimEndingDirectorySeparator(Path.GetFullPath(uploadRoot)),
+        Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(app.Environment.WebRootPath, "uploads"))),
+        StringComparison.OrdinalIgnoreCase))
+{
+    Directory.CreateDirectory(uploadRoot);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadRoot),
+        RequestPath  = educore.Helpers.UploadPaths.RequestPath
+    });
+}
+
 app.UseRouting();
 
 // WHY: must sit after UseRouting so endpoint-specific policies (the "login" policy) resolve.

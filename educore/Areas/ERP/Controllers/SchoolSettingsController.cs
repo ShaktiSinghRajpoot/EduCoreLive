@@ -18,17 +18,19 @@ namespace educore.Areas.ERP.Controllers
         private readonly ISchoolSettingsService _schoolSettingsService;
         private readonly IBaseService _baseService;
         private readonly IWebHostEnvironment _webHostEnvironment;
+        private readonly IConfiguration _config;
         private readonly IStaffService _staffService;
         private readonly IClassTeacherService _classTeacherService;
         private readonly ISchoolCalendarService _schoolCalendarService;
         private readonly ISubjectService _subjectService;
         private readonly ITimetableService _timetableService;
 
-        public SchoolSettingsController(ISchoolSettingsService schoolSettingsService, IBaseService BaseService, IWebHostEnvironment webHostEnvironment, IStaffService staffService, IClassTeacherService classTeacherService, ISchoolCalendarService schoolCalendarService, ISubjectService subjectService, ITimetableService timetableService)
+        public SchoolSettingsController(ISchoolSettingsService schoolSettingsService, IBaseService BaseService, IWebHostEnvironment webHostEnvironment, IStaffService staffService, IClassTeacherService classTeacherService, ISchoolCalendarService schoolCalendarService, ISubjectService subjectService, ITimetableService timetableService, IConfiguration config)
         {
             _schoolSettingsService = schoolSettingsService;
             _baseService = BaseService;
             _webHostEnvironment = webHostEnvironment;
+            _config = config;
             _staffService = staffService;
             _classTeacherService = classTeacherService;
             _schoolCalendarService = schoolCalendarService;
@@ -144,8 +146,7 @@ namespace educore.Areas.ERP.Controllers
 
             if (!allowedExtensions.Contains(extension)) throw new InvalidOperationException("Only JPG, JPEG, PNG and WEBP images are allowed.");
 
-            string folderPath = Path.Combine(_webHostEnvironment.WebRootPath, "uploads", "schools", tenantId.ToString(), schoolId.ToString());
-            if (!Directory.Exists(folderPath)) Directory.CreateDirectory(folderPath);
+            string folderPath = UploadPaths.FolderFor(_config, _webHostEnvironment, "schools", tenantId, schoolId);
 
             string fileName = imageType + "_" + DateTime.Now.ToString("yyyyMMddHHmmssfff") + extension;
             string fullPath = Path.Combine(folderPath, fileName);
@@ -155,7 +156,7 @@ namespace educore.Areas.ERP.Controllers
                 await file.CopyToAsync(stream);
             }
 
-            return "/uploads/schools/" + tenantId + "/" + schoolId + "/" + fileName;
+            return UploadPaths.UrlFor("schools", tenantId, schoolId, fileName);
         }
 
         private async Task FillDropdowns(SchoolManageModel model, int tenantId, int schoolId)

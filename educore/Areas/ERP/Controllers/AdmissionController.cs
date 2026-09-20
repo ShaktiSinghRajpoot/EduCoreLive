@@ -23,10 +23,12 @@ namespace educore.Areas.ERP.Controllers
         private readonly ITransportService _transportService;
 
         private readonly IWebHostEnvironment _env;
+        private readonly IConfiguration _config;
 
-        public AdmissionController(IAdmissionService admissionService, IEnquiryService enquiryService, ISchoolSettingsService schoolSettingsService, IAdmissionWorkflowService admissionWorkflowService, IFeePaymentService feePaymentService, IBaseService baseService, ITransportService transportService, IWebHostEnvironment env)
+        public AdmissionController(IAdmissionService admissionService, IEnquiryService enquiryService, ISchoolSettingsService schoolSettingsService, IAdmissionWorkflowService admissionWorkflowService, IFeePaymentService feePaymentService, IBaseService baseService, ITransportService transportService, IWebHostEnvironment env, IConfiguration config)
         {
             _env = env;
+            _config = config;
             _admissionService = admissionService;
             _enquiryService = enquiryService;
             _schoolSettingsService = schoolSettingsService;
@@ -163,16 +165,14 @@ namespace educore.Areas.ERP.Controllers
             string[] allowed = { ".jpg", ".jpeg", ".png", ".webp" };
             if (!allowed.Contains(ext) || photo.Length > 2 * 1024 * 1024) return;
 
-            var folder = Path.Combine(_env.WebRootPath, "uploads", "students",
-                                      tenantId.ToString(), schoolId.ToString());
-            Directory.CreateDirectory(folder);
+            var folder = UploadPaths.FolderFor(_config, _env, "students", tenantId, schoolId);
 
             var fileName = $"student_{studentId}_{DateTime.Now:yyyyMMddHHmmssfff}{ext}";
             var fullPath = Path.Combine(folder, fileName);
             using (var stream = new FileStream(fullPath, FileMode.Create))
                 await photo.CopyToAsync(stream);
 
-            var url = $"/uploads/students/{tenantId}/{schoolId}/{fileName}";
+            var url = UploadPaths.UrlFor("students", tenantId, schoolId, fileName);
             var (ok, _, _) = await _admissionService.SetStudentPhotoAsync(
                 studentId, url, tenantId, schoolId, userId);
 

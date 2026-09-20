@@ -16,6 +16,7 @@ namespace educore.Areas.ERP.Controllers
         private readonly IAdmissionWorkflowService _admissionWorkflowService;
         private readonly ISchoolSettingsService _schoolSettingsService;
         private readonly IWebHostEnvironment _env;
+        private readonly IConfiguration _config;
 
         private readonly IPublicIdService _publicIds;
         private readonly IFeePaymentService _feeService;
@@ -33,7 +34,7 @@ namespace educore.Areas.ERP.Controllers
             IAttendanceService attendanceService,
             ITimetableService timetableService,
             IExamService examService,
-            IWebHostEnvironment env)
+            IWebHostEnvironment env, IConfiguration config)
         {
             _publicIds = publicIds;
             _feeService = feeService;
@@ -45,6 +46,7 @@ namespace educore.Areas.ERP.Controllers
             _admissionWorkflowService = admissionWorkflowService;
             _schoolSettingsService = schoolSettingsService;
             _env = env;
+            _config = config;
         }
 
         public IActionResult StudentAttendance()
@@ -209,8 +211,7 @@ namespace educore.Areas.ERP.Controllers
             if (!allowed.Contains(ext)) return Json(new { success = false, message = "Only JPG, PNG or WEBP images are allowed." });
             if (photo.Length > 2 * 1024 * 1024) return Json(new { success = false, message = "Image must be under 2 MB." });
 
-            var folder = Path.Combine(_env.WebRootPath, "uploads", "students", TenantId().ToString(), SchoolId().ToString());
-            Directory.CreateDirectory(folder);
+            var folder = UploadPaths.FolderFor(_config, _env, "students", TenantId(), SchoolId());
 
             var fileName = $"student_{id}_{DateTime.Now:yyyyMMddHHmmssfff}{ext}";
             var fullPath = Path.Combine(folder, fileName);
@@ -219,7 +220,7 @@ namespace educore.Areas.ERP.Controllers
                 await photo.CopyToAsync(stream);
             }
 
-            var url = $"/uploads/students/{TenantId()}/{SchoolId()}/{fileName}";
+            var url = UploadPaths.UrlFor("students", TenantId(), SchoolId(), fileName);
             var (ok, message, photoUrl) = await _admissionService.SetStudentPhotoAsync(id, url, TenantId(), SchoolId(), UserId());
 
             // If the DB update failed, don't leave an orphan file behind.
