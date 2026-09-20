@@ -476,6 +476,10 @@ $(function () {
     var $form       = $('#admissionForm');
     var payTodayMax = 0;   // max cash collectable at admission = amount due now
 
+    // Set when an enquiry is being converted. Held here rather than read back
+    // off the dropdown, because the dropdown is emptied while its options load.
+    var prefillClass = '@(Convert.ToString(ViewBag.PreClassName) ?? "")';
+
     var URL_FEES     = '@Url.Action("GetFeeStructure", "Admission", new { area = "ERP" })';
     var URL_SECTIONS = '@Url.Action("GetSections", "Admission", new { area = "ERP" })';
     var URL_CLASSES  = '@Url.Action("GetClasses", "Admission", new { area = "ERP" })';
@@ -517,7 +521,10 @@ $(function () {
             loadSections();
             return;
         }
-        var keep = $class.val();
+        // Prefer the enquiry's class on the first load, then whatever the user
+        // has picked since.
+        var keep = prefillClass || $class.val();
+        prefillClass = '';
         $class.html('<option value="">Loading…</option>');
 
         $.getJSON(URL_CLASSES, { academicYearId: ayid })
@@ -532,12 +539,27 @@ $(function () {
                                 (c === keep ? ' selected' : '') + '>' + EC.esc(c) + '</option>';
                     });
                     $class.html(html);
+
+                    // An enquiry can name a class the chosen session does not run
+                    // — it was raised for a different year, or the ladder changed
+                    // since. Say so, rather than leaving the clerk to notice that
+                    // the class they expected quietly did not carry over.
+                    if (keep && list.indexOf(keep) < 0) {
+                        ecToast('warning', 'The enquiry asked for ' + keep +
+                                ', which is not a class in ' + ($year.val() || 'this year') +
+                                '. Please choose the class.');
+                    }
                 }
             })
             .fail(function () {
                 $class.html('<option value="">Could not load classes</option>');
             })
-            .always(function () { loadSections(); });
+            .always(function () {
+                // The class may have just been restored from the enquiry, so the
+                // sections for it have to be fetched now rather than on a change
+                // the user never makes.
+                loadSections();
+            });
     }
 
     /* ── sections: configured per class + year in Academic Setup ── */
@@ -942,7 +964,7 @@ $(function () {
 {
     <text>
     (function () {
-        if ($class.val() && $year.val()) { loadFees(); loadClasses(); }
+        if ($class.val() && $year.val()) { loadFees(); }
         // The switch may be on from the enquiry; show the fields it reveals.
         if ($('#usesTransport').is(':checked')) $('#transportFields').removeClass('d-none');
     })();
