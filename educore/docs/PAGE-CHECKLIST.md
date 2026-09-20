@@ -37,7 +37,7 @@ refresh it.
 | Fee Due Reminders | ✅ | ✅ | ✅ | ✅ | — |
 | Day Close | ✅ | ✅ | ✅ | ✅ | — |
 | Fee Reports | ✅ | read-only | ✅ | n/a | — |
-| Fee Heads / Structure | ✅ | ✅ blank name refused, cascade delete guarded | ✅ | ✅ | — |
+| Fee Heads / Structure | ✅ | ✅ blank name **fixed**, upsert by name, cascade delete | ✅ | ✅ | ✅ 26 |
 
 ## Enquiry & registration
 
@@ -78,13 +78,13 @@ refresh it.
 | Page | Real | Guards | Scope | CSRF | Tests |
 |---|---|---|---|---|---|
 | Basic Profile | ✅ | ✅ (the only page with full `asp-validation` markup) | ✅ | ✅ | — |
-| Academic Years | ✅ | ✅ blank name, end-before-start, duplicate name | ✅ | ✅ **fixed** | — |
-| Classes & Sections | ✅ | ✅ | ✅ | ✅ **fixed** | — |
+| Academic Years | ✅ | ✅ blank name, end-before-start, duplicate name | ✅ | ✅ | ✅ 26 |
+| Classes & Sections | ✅ | ✅ a class with enrolled students cannot be removed | ✅ | ✅ | ✅ |
 | Period Structure | ✅ | ✅ | ✅ | ✅ **fixed** | — |
-| Subjects / Calendar / Timetable | ✅ | ✅ | ✅ | ✅ | — |
-| Fee Heads / Structure | ✅ | ✅ | ✅ | ✅ | — |
+| Subjects / Calendar / Timetable | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Fee Heads / Structure | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Staff Masters | ✅ | ✅ | ✅ | ✅ | — |
-| Roles & Permissions | ✅ | ✅ | ✅ | ✅ | — |
+| Roles & Permissions | ✅ | ✅ built-ins protected, in-use role kept, soft revoke | ✅ | ✅ | ✅ 23 |
 | Documents / Smart Bell | ✅ | ✅ | ✅ | ✅ | — |
 | Admission Workflow | ✅ | ✅ | ✅ | ✅ | ✅ 23 |
 
@@ -124,8 +124,11 @@ Open items, roughly in the order they are worth doing.
       result screens show marks and pass/fail but no letter grade.
 - [ ] **Class rank** — needs a class-wide comparison the dashboard does not
       currently fetch.
-- [ ] Test suites for **Settings** and **Roles** — the two areas with real
-      guards but no suite yet.
+- [ ] **Two unmigrated fee heads** — `fee_collection_point.sql` moves One Time
+      heads from `Recurring` to `Admission`, and two rows on Railway have not had
+      it applied: school 33 "Annually Function" and school 34 "Admission Fee".
+      Running the migration file fixes them; it was deliberately not run as part
+      of the proc fix, since that was not what was asked for.
 - [ ] **Module flags and partial saves** — `sp_school_admin_admission_workflow_manage`
       reads each module flag as `COALESCE(p_enable_x, TRUE)`, so a save that omits
       one switches it back ON. Not reachable today (the form posts all five and
@@ -144,6 +147,12 @@ Open items, roughly in the order they are worth doing.
       `SavePeriodStructure` had no `[ValidateAntiForgeryToken]`. Two of the three
       views were already sending the token, so the attribute was all that was
       missing; the Academic Years page was not sending one at all and now does.
+- [x] **Fee head names are now required** — `sp_school_admin_fee_head_manage`
+      was the only settings proc with no name guard, so an empty string and a
+      whitespace string both created invisible fee heads that reach student
+      ledgers and print as blank receipt lines. The name is now trimmed and
+      refused when empty.
+- [x] **Settings and Roles suites** — 26 and 23 checks.
 - [x] **Promotion and Leave/Payroll suites** — 17 and 29 checks. Nothing to fix
       in either; both modules hold up.
 - [x] **Registrations menu item now honours its own flag** — four of the five

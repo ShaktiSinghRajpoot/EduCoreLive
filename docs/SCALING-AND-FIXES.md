@@ -2561,3 +2561,69 @@ Seven suites now exist, **186 checks**, identical on local and Railway:
     admission_workflow_tests.sql     23
     promotion_tests.sql              17
     leave_payroll_tests.sql          29
+
+---
+
+### [2026-08-25] Settings and Roles test suites, and a missing fee-head name guard
+
+`Database/tests/settings_tests.sql` (26) and `roles_tests.sql` (23) — the last
+two areas with real guards and no suite. **Nine suites now exist, 235 checks,
+identical on local and Railway.**
+
+**Found: `sp_school_admin_fee_head_manage` had no name guard.** It was the only
+settings proc without one — academic years, transport routes and roles all refuse
+a blank name. A fee head made of spaces was created happily, and because the
+unique index compares the raw string, an empty name and a whitespace name were
+two *different* blank heads. A blank head reaches student ledgers
+(`student_ledger` identifies its head by name) and prints as an empty line on a
+receipt. The proc now trims the name and refuses it when empty. Applied to both
+databases.
+
+**Settings, confirmed correct.** Sessions refuse a blank name, an end date before
+the start, and a duplicate; setting one current leaves **exactly one** current.
+Fee heads store their amount and their refundable flag (which is how the security
+deposit is modelled), saving an existing name **upserts rather than duplicating**
+— deliberate, since it also revives a head someone had deleted — and a padded
+name is now the same head rather than a second one. Deleting a head cascades its
+unpaid ledger rows, so nobody is left owing against a head that no longer exists.
+Subjects refuse a missing class and a class from another school.
+
+**The guard most worth having:** a class or section with enrolled students
+**cannot be removed** — "Move or promote those students first." A settings
+tidy-up cannot orphan real children.
+
+**Roles, confirmed correct.** Blank and duplicate names refused; a custom role can
+be renamed; **built-in roles cannot be renamed or deleted** (they are identified
+by `role_code`, and the application checks for those five codes, so renaming one
+would silently detach every check that looks it up); a role still assigned to a
+user cannot be deleted. Permission saving is a **replace**, not an append: an
+unticked box really revokes. The revoke is a **soft** delete, so re-ticking
+revives the original row instead of piling up a second grant for the same
+permission — checked both ways. Another tenant can neither grant on nor delete
+our role.
+
+**A note for whoever reads this suite.** Four roles checks failed at first and it
+looked like saving appended instead of replacing. It did not — the proc
+soft-deletes revoked grants, and the test counted every row rather than the live
+ones. That is the third suite in this series where the test was wrong and the code
+was right (after the fee cancel-twice check and the transport dues check). When a
+check fails, read the proc before believing the test.
+
+I also suspected `sp_role_permissions_save` of a cross-school hole, because its
+role lookup filters on `tenant_id` but not `school_id`. It is not a hole:
+`config.roles.school_id` is NULL for every real tenant, so roles are tenant-scoped
+and the tenant check is the real boundary.
+
+**Left alone deliberately:** two fee heads on Railway still have
+`collection_point = 'Recurring'` on a `One Time` frequency, which
+`fee_collection_point.sql` migrates to `'Admission'` — school 33 "Annually
+Function" and school 34 "Admission Fee". Only the procedure change was applied
+there; running a pending data migration was not what was asked for. Noted in the
+checklist TODO.
+
+    fee_module_tests.sql             28      leave_payroll_tests.sql     29
+    enquiry_registration_tests.sql   30      settings_tests.sql          26
+    attendance_exam_tests.sql        28      roles_tests.sql             23
+    transport_tc_tests.sql           31
+    admission_workflow_tests.sql     23      TOTAL                      235
+    promotion_tests.sql              17

@@ -1,4 +1,4 @@
--- ============================================================================
+﻿-- ============================================================================
 -- Fee Collection Point
 --  Adds a lifecycle "collection point" and a refundable flag to fee heads, so
 --  every charge knows WHEN it is first due (Registration / Admission / Recurring)
@@ -52,6 +52,17 @@ AS $procedure$
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
+    END IF;
+
+    -- A fee head with a blank name reaches student ledgers and prints as an empty
+    -- line on a receipt, and because the unique index compares the raw string,
+    -- '' and '   ' are two different blank heads. Every comparable proc already
+    -- guards its name (academic year, transport route, role); this one did not.
+    IF p_operation IN ('SaveFeeHead', 'AddFeeHead', 'UpdateFeeHead') THEN
+        p_fee_head_name := NULLIF(TRIM(COALESCE(p_fee_head_name, '')), '');
+        IF p_fee_head_name IS NULL THEN
+            RAISE EXCEPTION 'Fee head name is required.';
+        END IF;
     END IF;
 
     IF p_operation = 'GetFeeHead' THEN
