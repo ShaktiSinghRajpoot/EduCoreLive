@@ -55,7 +55,7 @@ BEGIN
                 COALESCE(e.class_name,    s.class_name)    AS class_name,
                 COALESCE(e.section,       s.section)       AS section,
                 COALESCE(e.academic_year, s.academic_year) AS academic_year,
-                s.admission_date, s.guardian_name, s.mobile,
+                s.admission_date, s.created_at, s.guardian_name, s.mobile,
                 s.annual_total, s.status, s.approval_status, s.enquiry_id,
                 s.photo_url,
                 COALESCE((
@@ -121,8 +121,13 @@ BEGIN
             CASE WHEN v_col = 'class'   AND NOT v_asc  THEN class_name      END DESC,
             CASE WHEN v_col = 'admdate' AND v_asc      THEN admission_date  END ASC,
             CASE WHEN v_col = 'admdate' AND NOT v_asc  THEN admission_date  END DESC,
-            -- Default / tie-breaker: newest admission first.
-            admission_date DESC, student_id DESC
+            -- Default: the most recently ENTERED record first, not the most
+            -- recent admission date. The two are not the same — a student who
+            -- joined in 2023 and is being entered today is the newest row in
+            -- this list, and sorting on admission_date buried them near the
+            -- bottom where whoever just typed them could not find them.
+            -- Sorting by admission date is still available as 'admdate'.
+            created_at DESC, student_id DESC
         LIMIT  COALESCE(p_page_size, 10)
         OFFSET v_offset;
     RETURN;
