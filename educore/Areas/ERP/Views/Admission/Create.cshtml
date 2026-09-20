@@ -46,8 +46,7 @@
                     </div>
                     <div class="ec-card-body p-3 p-lg-4 pt-0">
                         <div class="row g-3">
-                            <div class="col-12 col-md-auto adm-photo-col">
-                                <label class="form-label d-block">Photo</label>
+                            <div class="col-12 adm-photo-row">
                                 <div class="adm-photo">
                                     <label for="adm_Photo" class="adm-photo-drop" id="admPhotoDrop" title="Choose a photo">
                                         <img id="admPhotoPreview" alt="" class="d-none">
@@ -60,44 +59,17 @@
                                     <button type="button" class="btn btn-sm btn-text-danger d-none" id="admPhotoClear">
                                         <i class="bx bx-x"></i> Remove
                                     </button>
-                                    <div class="adm-photo-hint">JPG / PNG, under 2 MB.<br>Can be added later too.</div>
+                                    <div class="adm-photo-text">
+                                        <div class="adm-photo-title">Student photo</div>
+                                        <div class="adm-photo-hint">JPG, PNG or WEBP, under 2 MB. Can be added later from the student's profile.</div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="col-12 col-md">
-                              <div class="row g-3">
-                            <div class="col-12">
+                            <div class="col-12 col-lg-6">
                                 <label class="form-label required">Student Full Name</label>
                                 <input type="text" name="StudentName" id="adm_StudentName" class="form-control" placeholder="Enter full name" value="@ViewBag.PreStudentName" required>
                             </div>
-                            <div class="col-12 col-lg-4">
-                                <label class="form-label required">Academic Year</label>
-                                <select id="academicYearSelect" name="AcademicYear" class="form-select" required>
-                                    <option value="">Select Year</option>
-                                    @foreach (var s in (ViewBag.Sessions as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
-                                    {
-                                        <option value="@s.Text" data-ayid="@s.Value" selected="@(s.Selected || s.Text == Convert.ToString(ViewBag.PreAcademicYear))">@s.Text</option>
-                                    }
-                                </select>
-                            </div>
-                            <div class="col-12 col-lg-4">
-                                <label class="form-label required">Class</label>
-                                <select id="classSelect" name="ClassName" class="form-select" required>
-                                    <option value="">Select Class</option>
-                                    @foreach (var c in (ViewBag.Classes as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
-                                    {
-                                        <option value="@c.Text" selected="@(c.Text == Convert.ToString(ViewBag.PreClassName))">@c.Text</option>
-                                    }
-                                </select>
-                            </div>
-                            <div class="col-12 col-lg-4">
-                                <label class="form-label required">Section</label>
-                                <select name="Section" id="adm_Section" class="form-select" required>
-                                    <option value="">Select year &amp; class first</option>
-                                </select>
-                            </div>
-                              </div>
-                            </div>
-                            <div class="col-12 col-sm-6 col-md-3">
+                            <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Gender</label>
                                 @{ var preG = Convert.ToString(ViewBag.PreGender); }
                                 <select name="Gender" id="adm_Gender" class="form-select" required>
@@ -107,29 +79,56 @@
                                     <option selected="@(preG == "Other")">Other</option>
                                 </select>
                             </div>
-                            <div class="col-12 col-sm-6 col-md-3">
+                            <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Date of Birth</label>
                                 <input type="date" name="DateOfBirth" class="form-control" required>
                             </div>
-                            <div class="col-12 col-sm-6 col-md-3">
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label required">Academic Year</label>
+                                <select id="academicYearSelect" name="AcademicYear" class="form-select" required>
+                                    <option value="">Select Year</option>
+                                    @foreach (var s in (ViewBag.Sessions as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
+                                    {
+                                        <option value="@s.Text" data-ayid="@s.Value" selected="@(s.Selected || s.Text == Convert.ToString(ViewBag.PreAcademicYear))">@s.Text</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label required">Class</label>
+                                <select id="classSelect" name="ClassName" class="form-select" required>
+                                    <option value="">Select Class</option>
+                                    @foreach (var c in (ViewBag.Classes as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
+                                    {
+                                        <option value="@c.Text" selected="@(c.Text == Convert.ToString(ViewBag.PreClassName))">@c.Text</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label required">Section</label>
+                                <select name="Section" id="adm_Section" class="form-select" required>
+                                    <option value="">Select year &amp; class first</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Admission Date</label>
                                 <input type="date" id="admissionDate" name="AdmissionDate" class="form-control" required>
                             </div>
-                            <div class="col-12 col-sm-6 col-md-3">
+                            <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label">Admission No</label>
                                 <input type="text" name="AdmissionNo" id="adm_AdmissionNo" class="form-control" placeholder="Auto-generated if blank">
                                 <div class="form-text">Leave blank for ADM-2026-0001.</div>
                             </div>
 
                             <div class="col-12"><hr class="my-1 opacity-25"></div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label">Category</label>
                                 <select name="Category" class="form-select">
                                     <option value="">Select</option>
                                     <option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>EWS</option>
                                 </select>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label">Blood Group</label>
                                 <select name="BloodGroup" class="form-select">
                                     <option value="">Select</option>
@@ -137,15 +136,15 @@
                                     <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
                                 </select>
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label">Religion</label>
                                 <input type="text" name="Religion" class="form-control" placeholder="Optional">
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label">Nationality</label>
                                 <input type="text" name="Nationality" class="form-control" placeholder="e.g. Indian">
                             </div>
-                            <div class="col-12 col-md-4">
+                            <div class="col-12 col-sm-6 col-md-4">
                                 <label class="form-label">Mother Tongue</label>
                                 <input type="text" name="MotherTongue" class="form-control" placeholder="Optional">
                             </div>
@@ -484,8 +483,6 @@ $(function () {
     var URL_LIST     = '@Url.Action("StudentList", "Student", new { area = "ERP" })';
 
     var fees = [];   // fee rows for the selected class + year
-
-
 
     /* ── classes: belong to a session ─────────────────────────────
        The list rendered on load comes from every session the school has ever
