@@ -437,11 +437,6 @@ namespace educore.Controllers
             HttpContext.Session.SetInt32("TenantId", user.TenantId ?? 0);
             HttpContext.Session.SetInt32("SchoolId", user.SchoolId ?? 0);
         }
-        public IActionResult Error404()
-        {
-            return View();
-        }
-
         private const string ResetUserIdKey = "ResetUserId";
 
         [HttpGet]

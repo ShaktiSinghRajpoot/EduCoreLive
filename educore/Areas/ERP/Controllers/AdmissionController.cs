@@ -519,10 +519,6 @@ namespace educore.Areas.ERP.Controllers
 
         private static bool IsAdmissionPoint(string? collectionPoint) =>
             string.Equals(collectionPoint, "Admission", StringComparison.OrdinalIgnoreCase);
-        public IActionResult ManageAdmission()
-        {
-            return View();
-        }
         private static string GroupForFrequency(string? freq) => freq switch
         {
             "One Time"    => "One Time Payable Now",

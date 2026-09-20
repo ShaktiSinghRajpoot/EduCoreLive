@@ -108,7 +108,7 @@ refresh it.
 
 | Page | State |
 |---|---|
-| **Staff attendance** | Does not exist. `StaffProfile` links to `Attendance/StaffAttendance`, which is not an action — a dead link. This is also why payroll derives Loss of Pay from unpaid leave rather than from absences. |
+| **Staff attendance** | Does not exist. The dead link to it has been removed from `StaffProfile`; this is also why payroll derives Loss of Pay from unpaid leave rather than from absences. |
 
 ---
 
@@ -165,6 +165,13 @@ Open items, roughly in the order they are worth doing.
       both directions. Found by the money-trail suite; no live data was affected.
 - [x] **Money trail suite** — 98 checks following one student from enquiry to
       Transfer Certificate, re-proving five equations after every step.
+- [x] **Three broken links fixed** — the dashboard's "New Admission" button and
+      quick tile both pointed at `Admission/ManageAdmission`, an action whose view
+      does not exist, so the main landing page's most obvious button returned a
+      500. They now go to `Admission/Create`. `Account/Error404` had the same
+      shape and no caller. The dead `Attendance/StaffAttendance` link is gone
+      from the staff profile. The whole app now has zero dead links and zero
+      actions returning a view that does not exist — the scan is below.
 - [x] **Payment Verification removed** — the page showed a hardcoded array and
       only made sense behind a payment gateway, which is not being built. The
       controller, view, stylesheet and menu entry are gone; nothing else
@@ -219,6 +226,35 @@ for root, _, names in os.walk("educore"):
             if "[HttpPost]" not in a: continue
             if "ValidateAntiForgeryToken" not in a: print("no CSRF :", n, name)
             if "[HasPermission" not in a and "[Authorize" not in a and not cls: print("no gate :", n, name)
+EOF
+```
+
+Dead links, and actions returning a view that does not exist:
+
+```bash
+python - <<'EOF'
+import os, re, io
+actions, views = set(), set()
+for root, _, names in os.walk("educore"):
+    r = root.replace("\\","/")
+    if "/bin/" in r or "/obj/" in r: continue
+    for n in names:
+        if n.endswith(".cshtml"): views.add((os.path.basename(root).lower(), n[:-7].lower()))
+        if n.endswith("Controller.cs") and "Controllers" in r:
+            c = n[:-len("Controller.cs")]
+            s = io.open(os.path.join(root,n), encoding="utf-8-sig", errors="replace").read()
+            for m in re.finditer(r'public\s+(?:async\s+)?(?:Task<)?IActionResult>?\s+(\w+)\s*\(', s):
+                actions.add((c.lower(), m.group(1).lower()))
+for root, _, names in os.walk("educore"):
+    r = root.replace("\\","/")
+    if "/bin/" in r or "/obj/" in r: continue
+    for n in [x for x in names if x.endswith(".cshtml")]:
+        s = re.sub(r'//.*', '', io.open(os.path.join(root,n), encoding="utf-8-sig", errors="replace").read())
+        for m in re.finditer(r'asp-controller="(\w+)"\s+asp-action="(\w+)"', s):
+            if (m.group(1).lower(), m.group(2).lower()) not in actions: print("dead:", n, m.group(1), m.group(2))
+        for m in re.finditer(r'["']/(?:ERP|SuperAdmin)/(\w+)/(\w+)', s):
+            c, a = m.group(1).lower(), m.group(2).lower()
+            if (c,a) not in actions and any(cc==c for cc,_ in actions): print("dead:", n, c, a)
 EOF
 ```
 

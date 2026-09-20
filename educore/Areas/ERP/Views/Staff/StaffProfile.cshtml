@@ -174,11 +174,11 @@
           </div>
           <div class="sp-card-body">
             <div class="d-flex flex-column gap-2">
-              <a class="sp-link" asp-area="ERP" asp-controller="Attendance" asp-action="StaffAttendance" asp-route-id="@staffId">
-                <span class="sp-link-ic" style="background:#e7f0ff;color:#3b82f6;"><i class="bx bx-user-voice"></i></span>
-                <span class="sp-link-txt"><span class="sp-link-t">Staff Attendance</span><span class="sp-link-s">View daily attendance</span></span>
-                <i class="bx bx-chevron-right sp-link-go"></i>
-              </a>
+              @* Staff Attendance used to sit here, pointing at
+                 Attendance/StaffAttendance - an action that does not exist, so it
+                 404'd. There is no staff attendance register yet; that is also why
+                 payroll works out Loss of Pay from unpaid leave rather than from
+                 absences. The link comes back when the register does. *@
               <a class="sp-link" asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement" asp-route-id="@staffId">
                 <span class="sp-link-ic" style="background:#fce7f3;color:#be185d;"><i class="bx bx-calendar-minus"></i></span>
                 <span class="sp-link-txt"><span class="sp-link-t">Leave History</span><span class="sp-link-s">Requests &amp; balance</span></span>
