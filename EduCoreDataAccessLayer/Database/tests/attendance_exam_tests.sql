@@ -159,11 +159,11 @@ BEGIN
              jsonb_build_object('studentId', v_sid2, 'status', 'Absent')), c);
 
     SELECT COUNT(*) INTO v_n FROM core.student_attendance
-     WHERE attendance_date = v_mon AND student_id IN (v_sid, v_sid2);
+     WHERE attendance_date::date = v_mon AND student_id IN (v_sid, v_sid2);
     PERFORM pg_temp.chk_eq('B1 both students marked', v_n, 2);
 
     SELECT status INTO v_txt FROM core.student_attendance
-     WHERE attendance_date = v_mon AND student_id = v_sid2;
+     WHERE attendance_date::date = v_mon AND student_id = v_sid2;
     PERFORM pg_temp.chk('B2 the absent one is Absent', v_txt = 'Absent', format('got %s', v_txt));
 
     -- Re-saving the same day must CORRECT, not duplicate — a teacher fixing a
@@ -173,11 +173,11 @@ BEGIN
          jsonb_build_array(jsonb_build_object('studentId', v_sid2, 'status', 'Present')), c);
 
     SELECT COUNT(*) INTO v_n FROM core.student_attendance
-     WHERE attendance_date = v_mon AND student_id = v_sid2;
+     WHERE attendance_date::date = v_mon AND student_id = v_sid2;
     PERFORM pg_temp.chk_eq('B3 correcting does not duplicate the row', v_n, 1);
 
     SELECT status INTO v_txt FROM core.student_attendance
-     WHERE attendance_date = v_mon AND student_id = v_sid2;
+     WHERE attendance_date::date = v_mon AND student_id = v_sid2;
     PERFORM pg_temp.chk('B4 the correction stuck', v_txt = 'Present', format('got %s', v_txt));
 
     -- ══════════════════════════════════════════════════════════════════════

@@ -143,15 +143,15 @@ BEGIN
             -- LOP: approved UNPAID leave, only the part inside this month, in
             -- working days. Pending leave costs nothing until it is approved.
             SELECT COALESCE(SUM(core.fn_working_days(
-                        GREATEST(l.from_date, v_start),
-                        LEAST(l.to_date,   v_end))), 0)
+                        GREATEST(l.from_date::date, v_start),
+                        LEAST(l.to_date::date,   v_end))), 0)
               INTO v_lop
             FROM core.staff_leave l
             WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
               AND l.staff_id  = r.staff_id
               AND l.status    = 'Approved'
               AND LOWER(l.leave_type) = 'unpaid'
-              AND l.from_date <= v_end AND l.to_date >= v_start;
+              AND l.from_date::date <= v_end AND l.to_date::date >= v_start;
 
             -- Per-day on THIS month's working days, not a flat 30.
             v_rate    := ROUND(r.gross / v_work, 2);

@@ -1,4 +1,4 @@
-using educore.Models;
+﻿using educore.Models;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -589,7 +589,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return v switch
             {
                 DateTime dt                                      => dt,
-                DateOnly d                                       => d.ToDateTime(TimeOnly.MinValue),
                 string s when DateTime.TryParse(s, out var p)    => p,
                 _                                                => Convert.ToDateTime(v)
             };
@@ -681,8 +680,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_action_user_id",     NpgsqlDbType.Integer) { Value = actionUserId },
                 new("p_academic_year_id",   NpgsqlDbType.Integer) { Value = (object?)academicYearId ?? DBNull.Value },
                 new("p_academic_year_name", NpgsqlDbType.Varchar) { Value = (object?)name ?? DBNull.Value },
-                new("p_start_date",         NpgsqlDbType.Date)    { Value = (object?)startDate ?? DBNull.Value },
-                new("p_end_date",           NpgsqlDbType.Date)    { Value = (object?)endDate ?? DBNull.Value },
+                new("p_start_date",         NpgsqlDbType.Unknown)    { Value = (object?)startDate ?? DBNull.Value },
+                new("p_end_date",           NpgsqlDbType.Unknown)    { Value = (object?)endDate ?? DBNull.Value },
                 new("p_is_current",         NpgsqlDbType.Boolean) { Value = isCurrent },
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = cursorName }
             };

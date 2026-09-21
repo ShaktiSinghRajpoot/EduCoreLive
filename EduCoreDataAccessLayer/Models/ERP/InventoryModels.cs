@@ -54,7 +54,7 @@
     public class StockMovement
     {
         public int      MovementId   { get; set; }
-        public DateOnly MovementDate { get; set; }
+        public string MovementDate { get; set; }
         public string   MovementType { get; set; } = string.Empty;
 
         /// Signed: positive came in, negative went out.
@@ -91,7 +91,7 @@
     public class PurchaseListItem
     {
         public int      PurchaseId   { get; set; }
-        public DateOnly PurchaseDate { get; set; }
+        public string PurchaseDate { get; set; }
         public string   SupplierName { get; set; } = string.Empty;
         public string   InvoiceNo    { get; set; } = string.Empty;
         public string   PaymentMode  { get; set; } = string.Empty;
@@ -115,7 +115,7 @@
     public class PurchaseDetail
     {
         public int      PurchaseId   { get; set; }
-        public DateOnly PurchaseDate { get; set; }
+        public string PurchaseDate { get; set; }
         public int?     SupplierId   { get; set; }
         public string   SupplierName { get; set; } = string.Empty;
         public string   InvoiceNo    { get; set; } = string.Empty;
@@ -133,7 +133,7 @@
     public class PurchaseInput
     {
         public int?      SupplierId   { get; set; }
-        public DateOnly? PurchaseDate { get; set; }
+        public string? PurchaseDate { get; set; }
         public string?   InvoiceNo    { get; set; }
         public string?   PaymentMode  { get; set; }
         public string?   Remarks      { get; set; }

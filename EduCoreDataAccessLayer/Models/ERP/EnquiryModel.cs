@@ -1,4 +1,6 @@
-using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using Microsoft.AspNetCore.Mvc.Rendering;
+
+using EduCoreDataAccessLayer.Helpers;
 
 namespace EduCoreDataAccessLayer.Models.ERP
 {
@@ -11,7 +13,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         // Student
         public string    StudentName            { get; set; } = string.Empty;
         public string?   Gender                 { get; set; }
-        public DateOnly? Dob                    { get; set; }
+        public string? Dob                    { get; set; }
         public string    ClassName              { get; set; } = string.Empty;
         public string    Session                { get; set; } = string.Empty;
         public string?   InterestedStream       { get; set; }   // Science / Commerce / Arts
@@ -36,13 +38,13 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string?   LostReason             { get; set; }
         public string?   LostToSchool           { get; set; }
         // Dates
-        public DateOnly  EnquiryDate            { get; set; } = DateOnly.FromDateTime(DateTime.Today);
-        public DateOnly? NextFollowupDate        { get; set; }
+        public string  EnquiryDate            { get; set; } = Dates.Today;
+        public string? NextFollowupDate        { get; set; }
         public string?   Notes                  { get; set; }
         // Fee / Registration
         public decimal?  EstimatedFee           { get; set; }
         public string?   RegistrationNumber     { get; set; }
-        public DateOnly? RegistrationDate       { get; set; }
+        public string? RegistrationDate       { get; set; }
         public bool      RegistrationFeePaid    { get; set; }
         // Conversion
         public int?      AdmissionId            { get; set; }
@@ -126,20 +128,25 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public bool IsClosed => Status is "Admission Confirmed" or "Not Interested" or "Dropped";
 
         // Days from today to the next follow-up: negative = overdue, 0 = today.
-        private int? DaysToFollowup => NextFollowupDate.HasValue
-            ? NextFollowupDate.Value.DayNumber - DateOnly.FromDateTime(DateTime.Today).DayNumber
-            : null;
+        private int? DaysToFollowup
+        {
+            get
+            {
+                var next = Dates.Parse(NextFollowupDate);
+                return next == null ? null : (int)(next.Value.Date - DateTime.Today).TotalDays;
+            }
+        }
 
         public string FollowupCssClass =>
             IsClosed  ? "followup-done"     :
             IsOverdue ? "followup-overdue"  :
             IsToday   ? "followup-today"    :
-            NextFollowupDate.HasValue ? "followup-upcoming" : "followup-none";
+            NextFollowupDate != null ? "followup-upcoming" : "followup-none";
 
         public string FollowupDisplay =>
             IsClosed ? "—" :
-            NextFollowupDate.HasValue ? NextFollowupDate.Value.ToString("dd MMM yyyy")
-                                      : "Not scheduled";
+            NextFollowupDate != null ? Dates.Show(NextFollowupDate)
+                                     : "Not scheduled";
 
         public bool IsVisitScheduled => Status == "Campus Visit Scheduled";
 
@@ -148,7 +155,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
             IsOverdue ? "bx-error-circle"  :
             IsToday   ? "bx-time"          :
             IsVisitScheduled ? "bx-building" :
-            NextFollowupDate.HasValue ? string.Empty : "bx-calendar-x";
+            NextFollowupDate != null ? string.Empty : "bx-calendar-x";
 
         // Subtext is pure date arithmetic, so it is always true about the date itself.
         // The red/amber styling above stays driven by the proc's is_overdue/is_today,
@@ -266,7 +273,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string    FollowupType       { get; set; } = "Call";
         public string?   Outcome            { get; set; }
         public string?   Notes              { get; set; }
-        public DateOnly? NextFollowupDate   { get; set; }
+        public string? NextFollowupDate   { get; set; }
         public string?   StatusBefore       { get; set; }
         public string?   StatusAfter        { get; set; }
         public int       CreatedBy          { get; set; }

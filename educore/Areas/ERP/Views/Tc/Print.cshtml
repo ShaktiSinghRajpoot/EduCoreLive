@@ -1,4 +1,4 @@
-@model educore.Models.TcPrintModel
+﻿@model educore.Models.TcPrintModel
 @{
     Layout = null;
     var tc = Model.Tc;
@@ -8,7 +8,7 @@
     var addr = string.Join(", ", new[] { sc.AddressLine1, sc.AddressLine2, sc.City, sc.District, sc.State, sc.Pincode }
         .Where(p => !string.IsNullOrWhiteSpace(p)));
 
-    string D(DateOnly? d) => d?.ToString("dd MMM yyyy") ?? "—";
+    string D(string? d) => string.IsNullOrWhiteSpace(d) ? "—" : Dates.Show(d);
     string V(string? s)   => string.IsNullOrWhiteSpace(s) ? "—" : s;
     string N(int? n)      => n?.ToString() ?? "—";
 
@@ -24,7 +24,7 @@
     };
     if (board)
     {
-        rows.Add(("Date of Birth (words)", tc.Dob.HasValue ? DobInWords(tc.Dob.Value) : "—"));
+        rows.Add(("Date of Birth (words)", Dates.Parse(tc.Dob) is { } dobDate ? DobInWords(dobDate) : "—"));
     }
     rows.Add(("Gender",              V(tc.Gender)));
     rows.Add(("Nationality",         V(tc.Nationality)));
@@ -77,7 +77,7 @@
     }
 
     // "Twelfth April, Two Thousand Thirteen"
-    static string DobInWords(DateOnly d) =>
+    static string DobInWords(DateTime d) =>
         $"{DayOrd[d.Day]} {d:MMMM}, {YearWords(d.Year)}";
 }
 <!DOCTYPE html>

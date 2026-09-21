@@ -1,4 +1,4 @@
-using educore.Services;
+﻿using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
@@ -140,7 +140,7 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> GetStudentDues(int studentId)
         {
             var dues = await _feePaymentService.GetStudentDuesAsync(studentId, TenantId(), SchoolId(), UserId());
-            var today = DateOnly.FromDateTime(DateTime.Today);
+            var today = Dates.Today;
 
             object Map(IEnumerable<EduCoreDataAccessLayer.Models.ERP.StudentDueItem> items) =>
                 items.Select(d => new
@@ -149,9 +149,9 @@ namespace educore.Areas.ERP.Controllers
                     label    = string.IsNullOrWhiteSpace(d.InstallmentLabel)
                                  ? d.FeeHeadName
                                  : $"{d.FeeHeadName} — {d.InstallmentLabel}",
-                    dueDate  = d.DueDate?.ToString("yyyy-MM-dd"),
+                    dueDate  = d.DueDate,
                     amount   = d.Outstanding,           // payable now (due − paid − concession)
-                    overdue  = d.DueDate.HasValue && d.DueDate.Value < today
+                    overdue  = d.DueDate != null && string.CompareOrdinal(d.DueDate, today) < 0
                 }).ToList();
 
             // Monthly / Quarterly buckets keep their cycle; everything else (Yearly,
@@ -221,7 +221,7 @@ namespace educore.Areas.ERP.Controllers
                 receiptNo       = result.ReceiptNo,
                 amount          = result.Amount,
                 concessionTotal = result.ConcessionTotal,
-                paymentDate     = result.PaymentDate?.ToString("yyyy-MM-dd")
+                paymentDate     = result.PaymentDate
             });
         }
 
@@ -270,7 +270,7 @@ namespace educore.Areas.ERP.Controllers
             return Json(history.Select(h => new
             {
                 receiptNo    = h.ReceiptNo,
-                date         = h.PaymentDate?.ToString("yyyy-MM-dd"),
+                date         = h.PaymentDate,
                 amount       = h.Amount,
                 concession   = h.ConcessionTotal,
                 mode         = h.PaymentMode,
@@ -361,11 +361,11 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> GetDayCollection(string? date = null)
         {
-            DateOnly? d = DateOnly.TryParse(date, out var parsed) ? parsed : null;
+            var d = Dates.Norm(date);
             var day = await _feePaymentService.GetDayCollectionAsync(d, TenantId(), SchoolId(), UserId());
             return Json(new
             {
-                date           = day.Date.ToString("yyyy-MM-dd"),
+                date           = day.Date,
                 totalCollected = day.TotalCollected,
                 receiptCount   = day.ReceiptCount,
                 cancelledCount = day.CancelledCount,
@@ -390,7 +390,7 @@ namespace educore.Areas.ERP.Controllers
             if (req == null)
                 return Json(new { success = false, message = "Invalid request." });
 
-            DateOnly? d = DateOnly.TryParse(req.Date, out var parsed) ? parsed : null;
+            var d = Dates.Norm(req.Date);
             var (ok, msg, expected, diff) = await _feePaymentService.CloseDayAsync(
                 d, req.CountedCash, NullIfEmpty(req.Remarks), TenantId(), SchoolId(), UserId());
 
@@ -425,8 +425,8 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> GetCollectionRegister(string? from = null, string? to = null)
         {
-            DateOnly? f = DateOnly.TryParse(from, out var pf) ? pf : null;
-            DateOnly? t = DateOnly.TryParse(to,   out var pt) ? pt : null;
+            var f = Dates.Norm(from);
+            var t = Dates.Norm(to);
             var reg = await _feePaymentService.GetCollectionRegisterAsync(f, t, TenantId(), SchoolId(), UserId());
 
             // Money OUT for the same range. A register that only counts money in
@@ -435,15 +435,15 @@ namespace educore.Areas.ERP.Controllers
 
             return Json(new
             {
-                from  = reg.From.ToString("yyyy-MM-dd"),
-                to    = reg.To.ToString("yyyy-MM-dd"),
+                from  = reg.From,
+                to    = reg.To,
                 total = reg.Total,
                 refundTotal = refunds.Total,
                 net         = reg.Total - refunds.Total,
                 refunds = refunds.Rows.Select(r => new
                 {
                     refundNo   = r.RefundNo,
-                    date       = r.RefundedAt?.ToString("yyyy-MM-dd"),
+                    date       = r.RefundedAt,
                     student    = r.StudentName,
                     admNo      = r.AdmissionNo,
                     cls        = string.IsNullOrWhiteSpace(r.ClassName) ? "" : $"{r.ClassName}{(string.IsNullOrWhiteSpace(r.Section) ? "" : " - " + r.Section)}",
@@ -457,7 +457,7 @@ namespace educore.Areas.ERP.Controllers
                 receipts = reg.Receipts.Select(r => new
                 {
                     receiptNo = r.ReceiptNo,
-                    date      = r.Date?.ToString("yyyy-MM-dd"),
+                    date      = r.Date,
                     student   = r.StudentName,
                     admNo     = r.AdmissionNo,
                     cls       = string.IsNullOrWhiteSpace(r.ClassName) ? "" : $"{r.ClassName}{(string.IsNullOrWhiteSpace(r.Section) ? "" : " - " + r.Section)}",
@@ -477,15 +477,15 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> GetConcessionCancelRegister(string? from = null, string? to = null)
         {
-            DateOnly? f = DateOnly.TryParse(from, out var pf) ? pf : null;
-            DateOnly? t = DateOnly.TryParse(to,   out var pt) ? pt : null;
+            var f = Dates.Norm(from);
+            var t = Dates.Norm(to);
             var (concessions, cancels) = await _feePaymentService.GetConcessionCancelRegisterAsync(f, t, TenantId(), SchoolId(), UserId());
             return Json(new
             {
                 concessions = concessions.Select(c => new
                 {
                     receiptNo = c.ReceiptNo,
-                    date      = c.Date?.ToString("yyyy-MM-dd"),
+                    date      = c.Date,
                     student   = c.Student,
                     admNo     = c.AdmNo,
                     amount    = c.Concession,
@@ -495,11 +495,11 @@ namespace educore.Areas.ERP.Controllers
                 cancels = cancels.Select(c => new
                 {
                     receiptNo = c.ReceiptNo,
-                    date      = c.Date?.ToString("yyyy-MM-dd"),
+                    date      = c.Date,
                     student   = c.Student,
                     admNo     = c.AdmNo,
                     amount    = c.Amount,
-                    cancelledAt = c.CancelledAt?.ToString("yyyy-MM-dd"),
+                    cancelledAt = c.CancelledAt,
                     authorisedBy = c.AuthorizedBy,
                     reason    = c.Reason
                 })
@@ -557,7 +557,7 @@ namespace educore.Areas.ERP.Controllers
                 school,
                 format,
                 receiptNo   = r.ReceiptNo,
-                date        = r.PaymentDate?.ToString("yyyy-MM-dd"),
+                date        = r.PaymentDate,
                 amount      = r.Amount,
                 concession  = r.ConcessionTotal,
                 mode        = r.PaymentMode,

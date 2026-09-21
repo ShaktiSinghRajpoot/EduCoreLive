@@ -1,4 +1,6 @@
-using EduCoreDataAccessLayer.Models;
+﻿using EduCoreDataAccessLayer.Models;
+
+using EduCoreDataAccessLayer.Helpers;
 
 namespace EduCoreDataAccessLayer.Models.ERP
 {
@@ -16,8 +18,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string?  AcademicYear   { get; set; }
         public string?  GuardianName   { get; set; }
         public string?  Mobile         { get; set; }
-        public DateOnly? AdmissionDate  { get; set; }
-        public DateOnly? DateOfLeaving  { get; set; }
+        public string? AdmissionDate  { get; set; }
+        public string? DateOfLeaving  { get; set; }
 
         /// <summary>Transfer | Passout | Struck Off | Withdrawn.</summary>
         public string   Status         { get; set; } = string.Empty;
@@ -37,7 +39,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
 
         public string ClassDisplay =>
             string.IsNullOrWhiteSpace(Section) ? (ClassName ?? "—") : $"{ClassName} - {Section}";
-        public string DateOfLeavingDisplay => DateOfLeaving?.ToString("dd MMM yyyy") ?? "—";
+        public string DateOfLeavingDisplay => string.IsNullOrWhiteSpace(DateOfLeaving) ? "—" : Dates.Show(DateOfLeaving);
         public bool   DuesPending          => Outstanding > 0;
     }
 
@@ -46,7 +48,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
     {
         public int      StudentId     { get; set; }
         public string   Status        { get; set; } = string.Empty;   // Transfer | Passout | Struck Off | Withdrawn
-        public DateOnly? DateOfLeaving { get; set; }
+        public string? DateOfLeaving { get; set; }
         public string?  Reason        { get; set; }
     }
 

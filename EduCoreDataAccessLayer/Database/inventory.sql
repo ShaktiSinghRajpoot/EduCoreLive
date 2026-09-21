@@ -628,8 +628,8 @@ BEGIN
                  WHERE pi.purchase_id = p.purchase_id)::int AS line_count
         FROM core.inventory_purchases p
         WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
-          AND (p_from_date IS NULL OR p.purchase_date >= p_from_date)
-          AND (p_to_date   IS NULL OR p.purchase_date <= p_to_date)
+          AND (p_from_date IS NULL OR p.purchase_date::date >= p_from_date)
+          AND (p_to_date   IS NULL OR p.purchase_date::date <= p_to_date)
         ORDER BY p.purchase_date DESC, p.purchase_id DESC;
         RETURN;
 

@@ -1,3 +1,5 @@
+﻿using EduCoreDataAccessLayer.Helpers;
+
 namespace EduCoreDataAccessLayer.Models.ERP
 {
     /// <summary>
@@ -13,7 +15,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string?  ClassName    { get; set; }
         public string?  Section      { get; set; }
         public string?  AcademicYear { get; set; }
-        public DateOnly? Dob         { get; set; }
+        public string? Dob         { get; set; }
         public string?  BloodGroup   { get; set; }
         public string?  Gender       { get; set; }
         public string?  GuardianName { get; set; }
@@ -23,6 +25,6 @@ namespace EduCoreDataAccessLayer.Models.ERP
 
         public string ClassDisplay =>
             string.IsNullOrWhiteSpace(Section) ? (ClassName ?? "—") : $"{ClassName} - {Section}";
-        public string DobDisplay => Dob?.ToString("dd MMM yyyy") ?? "—";
+        public string DobDisplay => string.IsNullOrWhiteSpace(Dob) ? "—" : Dates.Show(Dob);
     }
 }

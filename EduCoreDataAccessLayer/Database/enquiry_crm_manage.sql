@@ -75,17 +75,17 @@ BEGIN
                     e.whatsapp_number,
                     e.created_at,
                     e.updated_at,
-                    (v_today - e.enquiry_date)              AS days_since_enquiry,
+                    (v_today - e.enquiry_date::date)              AS days_since_enquiry,
                     (SELECT COUNT(*)::INTEGER
                        FROM core.enquiry_followups f
                       WHERE f.enquiry_id = e.enquiry_id)   AS followup_count,
                     CASE
-                        WHEN e.next_followup_date < v_today
+                        WHEN e.next_followup_date::date < v_today
                              AND e.status NOT IN ('Admission Confirmed','Not Interested','Dropped')
                         THEN TRUE ELSE FALSE
                     END AS is_overdue,
                     CASE
-                        WHEN e.next_followup_date = v_today THEN TRUE ELSE FALSE
+                        WHEN e.next_followup_date::date = v_today THEN TRUE ELSE FALSE
                     END AS is_today
                 FROM core.enquiries e
                 WHERE e.tenant_id = p_tenant_id
@@ -116,9 +116,9 @@ BEGIN
                   )
                   AND (
                       NOT COALESCE(p_filter_overdue, FALSE) OR
-                      (e.next_followup_date < v_today AND e.status NOT IN ('Admission Confirmed','Not Interested','Dropped'))
+                      (e.next_followup_date::date < v_today AND e.status NOT IN ('Admission Confirmed','Not Interested','Dropped'))
                   )
-                  AND (NOT COALESCE(p_filter_today, FALSE) OR e.next_followup_date = v_today)
+                  AND (NOT COALESCE(p_filter_today, FALSE) OR e.next_followup_date::date = v_today)
             )
             SELECT *, COUNT(*) OVER() AS total_count
             FROM filtered
@@ -148,8 +148,8 @@ BEGIN
         OPEN p_result FOR
             SELECT
                 COUNT(*) AS total_leads,
-                COUNT(*) FILTER (WHERE next_followup_date = v_today) AS due_today,
-                COUNT(*) FILTER (WHERE next_followup_date < v_today
+                COUNT(*) FILTER (WHERE next_followup_date::date = v_today) AS due_today,
+                COUNT(*) FILTER (WHERE next_followup_date::date < v_today
                                    AND status NOT IN ('Admission Confirmed','Not Interested','Dropped')) AS overdue_count,
                 COUNT(*) FILTER (WHERE status = 'Campus Visit Scheduled') AS campus_visits,
                 COUNT(*) FILTER (WHERE status = 'Admission Confirmed') AS admitted,
@@ -174,7 +174,7 @@ BEGIN
             SELECT
                 e.*,
                 COALESCE(e.father_name, e.parent_name) AS derived_parent_name,
-                (v_today - e.enquiry_date)              AS days_since_enquiry,
+                (v_today - e.enquiry_date::date)              AS days_since_enquiry,
                 (SELECT COUNT(*)::INTEGER FROM core.enquiry_followups f
                   WHERE f.enquiry_id = e.enquiry_id)   AS followup_count,
                 FALSE AS is_overdue,
@@ -243,7 +243,7 @@ BEGIN
             UPDATE core.enquiries SET
                 student_name          = COALESCE(p_student_name,        student_name),
                 gender                = COALESCE(p_gender,              gender),
-                dob                   = COALESCE(p_dob,                 dob),
+                dob                   = COALESCE(p_dob::text,                 dob),
                 class_name            = COALESCE(p_class_name,          class_name),
                 session               = COALESCE(p_session,             session),
                 interested_stream     = p_interested_stream,
@@ -275,7 +275,7 @@ BEGIN
                 notes                 = p_notes,
                 estimated_fee         = p_estimated_fee,
                 registration_number   = COALESCE(p_registration_number, registration_number),
-                registration_date     = COALESCE(p_registration_date,   registration_date),
+                registration_date     = COALESCE(p_registration_date::text,   registration_date),
                 registration_fee_paid = COALESCE(p_registration_fee_paid, registration_fee_paid),
                 parent_email          = p_parent_email,
                 current_class         = p_current_class,

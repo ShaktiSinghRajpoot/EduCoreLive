@@ -58,16 +58,16 @@ BEGIN
         v_date AS close_date,
         (SELECT COALESCE(SUM(amount),0) FROM core.fee_payments
            WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND created_by=p_action_user_id
-             AND payment_date=v_date AND is_cancelled=FALSE)                                   AS total_collected,
+             AND payment_date::date=v_date AND is_cancelled=FALSE)                                   AS total_collected,
         (SELECT COUNT(*) FROM core.fee_payments
            WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND created_by=p_action_user_id
-             AND payment_date=v_date AND is_cancelled=FALSE)                                   AS receipt_count,
+             AND payment_date::date=v_date AND is_cancelled=FALSE)                                   AS receipt_count,
         (SELECT COUNT(*) FROM core.fee_payments
            WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND created_by=p_action_user_id
-             AND payment_date=v_date AND is_cancelled=TRUE)                                    AS cancelled_count,
+             AND payment_date::date=v_date AND is_cancelled=TRUE)                                    AS cancelled_count,
         (SELECT COALESCE(SUM(amount),0) FROM core.fee_payments
            WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND created_by=p_action_user_id
-             AND payment_date=v_date AND is_cancelled=FALSE AND payment_mode='Cash')           AS cash_collected,
+             AND payment_date::date=v_date AND is_cancelled=FALSE AND payment_mode='Cash')           AS cash_collected,
         (SELECT COALESCE(SUM(amount),0) FROM core.fee_refunds
            WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND refunded_by=p_action_user_id
              AND refunded_at::date=v_date)                                                     AS total_refunded,
@@ -82,13 +82,13 @@ BEGIN
     FROM (SELECT 1) x
     LEFT JOIN core.fee_day_close dc
            ON dc.tenant_id=p_tenant_id AND dc.school_id=p_school_id
-          AND dc.close_date=v_date AND dc.cashier_id=p_action_user_id;
+          AND dc.close_date::date=v_date AND dc.cashier_id=p_action_user_id;
 
     OPEN p_modes FOR
     SELECT payment_mode, SUM(amount) AS amount, COUNT(*) AS cnt
     FROM core.fee_payments
     WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND created_by=p_action_user_id
-      AND payment_date=v_date AND is_cancelled=FALSE
+      AND payment_date::date=v_date AND is_cancelled=FALSE
     GROUP BY payment_mode
     ORDER BY payment_mode;
 END;
@@ -126,7 +126,7 @@ BEGIN
       INTO v_collected, v_cash_collected
     FROM core.fee_payments
     WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND created_by=p_action_user_id
-      AND payment_date=v_date AND is_cancelled=FALSE;
+      AND payment_date::date=v_date AND is_cancelled=FALSE;
 
     SELECT COALESCE(SUM(amount),0),
            COALESCE(SUM(amount) FILTER (WHERE refund_mode='Cash'),0)
@@ -142,7 +142,7 @@ BEGIN
                 FROM (SELECT payment_mode, SUM(amount) AS amt
                       FROM core.fee_payments
                       WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND created_by=p_action_user_id
-                        AND payment_date=v_date AND is_cancelled=FALSE
+                        AND payment_date::date=v_date AND is_cancelled=FALSE
                       GROUP BY payment_mode) t);
 
     INSERT INTO core.fee_day_close

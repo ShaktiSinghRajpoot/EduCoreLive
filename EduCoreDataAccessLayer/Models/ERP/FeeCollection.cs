@@ -34,14 +34,14 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? ReceiptNo       { get; set; }
         public decimal Amount          { get; set; }
         public decimal ConcessionTotal { get; set; }
-        public DateOnly? PaymentDate   { get; set; }
+        public string? PaymentDate   { get; set; }
     }
 
     /// <summary>One receipt in a student's payment history.</summary>
     public class FeePaymentHistoryItem
     {
         public string    ReceiptNo       { get; set; } = string.Empty;
-        public DateOnly? PaymentDate     { get; set; }
+        public string? PaymentDate     { get; set; }
         public decimal   Amount          { get; set; }
         public decimal   ConcessionTotal { get; set; }
         public string    PaymentMode     { get; set; } = string.Empty;
@@ -53,7 +53,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
     /// <summary>A cashier's day collection summary + mode-wise breakup for reconciliation.</summary>
     public class DayCollection
     {
-        public DateOnly         Date           { get; set; }
+        public string         Date           { get; set; }
         public decimal          TotalCollected { get; set; }
         public int              ReceiptCount   { get; set; }
         public int              CancelledCount { get; set; }
@@ -78,8 +78,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
     /// <summary>Collection register for a date range: receipts + mode + head summaries.</summary>
     public class CollectionRegister
     {
-        public DateOnly                 From     { get; set; }
-        public DateOnly                 To       { get; set; }
+        public string                 From     { get; set; }
+        public string                 To       { get; set; }
         public List<RegisterReceipt>    Receipts { get; set; } = new();
         public List<DayModeRow>         Modes    { get; set; } = new();
         public List<HeadCollectRow>     Heads    { get; set; } = new();
@@ -89,7 +89,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class RegisterReceipt
     {
         public string    ReceiptNo   { get; set; } = string.Empty;
-        public DateOnly? Date        { get; set; }
+        public string? Date        { get; set; }
         public decimal   Amount      { get; set; }
         public string    Mode        { get; set; } = string.Empty;
         public string    StudentName { get; set; } = string.Empty;
@@ -165,7 +165,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class ConcessionRow
     {
         public string    ReceiptNo     { get; set; } = string.Empty;
-        public DateOnly? Date          { get; set; }
+        public string? Date          { get; set; }
         public decimal   Concession    { get; set; }
         public string?   DiscountType  { get; set; }
         public decimal   DiscountValue { get; set; }
@@ -178,7 +178,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class CancellationRow
     {
         public string     ReceiptNo    { get; set; } = string.Empty;
-        public DateOnly?   Date         { get; set; }
+        public string?   Date         { get; set; }
         public decimal     Amount       { get; set; }
         public string?     Reason       { get; set; }
         public string?     AuthorizedBy { get; set; }
@@ -203,7 +203,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class FeeReceipt
     {
         public string    ReceiptNo       { get; set; } = string.Empty;
-        public DateOnly? PaymentDate     { get; set; }
+        public string? PaymentDate     { get; set; }
         public decimal   Amount          { get; set; }
         public decimal   ConcessionTotal { get; set; }
         public string    PaymentMode     { get; set; } = string.Empty;

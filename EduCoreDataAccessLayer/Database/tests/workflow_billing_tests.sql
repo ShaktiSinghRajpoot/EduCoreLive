@@ -308,8 +308,8 @@ BEGIN
      WHERE student_id IN (SELECT student_id FROM core.students
                           WHERE admission_no LIKE 'ZZ-SS-%' OR admission_no LIKE 'ZZ-AM-%')
        AND frequency = 'Monthly'
-       AND (due_date < DATE_TRUNC('month', v_start)::date
-            OR due_date > DATE_TRUNC('month', v_end)::date + INTERVAL '1 month');
+       AND (due_date::date < DATE_TRUNC('month', v_start)::date
+            OR due_date::date > DATE_TRUNC('month', v_end)::date + INTERVAL '1 month');
     PERFORM pg_temp.chk_eq('E2 across every case, nothing falls outside the session', v_n, 0);
 
     -- ══════════════════════════════════════════════════════════════════════

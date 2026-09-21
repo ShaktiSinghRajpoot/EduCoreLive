@@ -108,7 +108,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<List<AttendanceStudent>> GetRosterAsync(
-            string className, string? section, DateOnly date, int tenantId, int schoolId, int actionUserId)
+            string className, string? section, string date, int tenantId, int schoolId, int actionUserId)
         {
             var roster = new List<AttendanceStudent>();
             if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(className)) return roster;
@@ -120,7 +120,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
                 new("p_class",          NpgsqlDbType.Varchar) { Value = className },
                 new("p_section",        NpgsqlDbType.Varchar) { Value = (object?)section ?? DBNull.Value },
-                new("p_date",           NpgsqlDbType.Date)    { Value = date },
+                new("p_date",           NpgsqlDbType.Unknown)    { Value = date },
                 new("p_result", NpgsqlDbType.Refcursor)
                     { Direction = ParameterDirection.InputOutput, Value = "attendance_roster_cursor" }
             };
@@ -147,7 +147,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<AttendanceSaveResult> SaveAsync(
-            DateOnly date, List<AttendanceMark> marks, int tenantId, int schoolId, int actionUserId)
+            string date, List<AttendanceMark> marks, int tenantId, int schoolId, int actionUserId)
         {
             if (tenantId <= 1 || schoolId <= 0)
                 return new AttendanceSaveResult { Message = "Invalid school context." };
@@ -167,7 +167,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
-                new("p_date",           NpgsqlDbType.Date)    { Value = date },
+                new("p_date",           NpgsqlDbType.Unknown)    { Value = date },
                 new("p_items",          NpgsqlDbType.Jsonb)   { Value = itemsJson },
                 new("p_result", NpgsqlDbType.Refcursor)
                     { Direction = ParameterDirection.InputOutput, Value = "attendance_save_cursor" }

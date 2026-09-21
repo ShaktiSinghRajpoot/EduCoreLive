@@ -27,7 +27,7 @@ namespace EduCoreDataAccessLayer.Models
         public string? Gender { get; set; }
 
         [DataType(DataType.Date)]
-        public DateTime? DateOfBirth { get; set; }
+        public string? DateOfBirth { get; set; }
 
         [RegularExpression(@"^[6-9][0-9]{9}$", ErrorMessage = "Enter a valid 10-digit mobile number.")]
         public string? Mobile { get; set; }
@@ -46,7 +46,7 @@ namespace EduCoreDataAccessLayer.Models
         public string? Designation { get; set; }
 
         [DataType(DataType.Date)]
-        public DateTime? JoiningDate { get; set; }
+        public string? JoiningDate { get; set; }
 
         public string? Qualification { get; set; }
         public int? ExperienceYears { get; set; }
@@ -114,7 +114,7 @@ namespace EduCoreDataAccessLayer.Models
         public string? StaffType { get; set; }
         public string? Department { get; set; }
         public string? Designation { get; set; }
-        public DateTime? JoiningDate { get; set; }
+        public string? JoiningDate { get; set; }
         public string Status { get; set; } = "Active";
         public bool HasLogin { get; set; }
 

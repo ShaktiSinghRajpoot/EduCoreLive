@@ -316,8 +316,8 @@ namespace educore.Areas.ERP.Controllers
                     cls       = student.ClassName,
                     sec       = student.Section ?? "—",
                     gender    = student.Gender ?? "—",
-                    dob       = student.DateOfBirth?.ToString("dd MMM yyyy") ?? "—",
-                    admDate   = student.AdmissionDate?.ToString("dd MMM yyyy") ?? "—",
+                    dob       = string.IsNullOrWhiteSpace(student.DateOfBirth) ? "—" : Dates.Show(student.DateOfBirth, "dd MMM yyyy"),
+                    admDate   = string.IsNullOrWhiteSpace(student.AdmissionDate) ? "—" : Dates.Show(student.AdmissionDate, "dd MMM yyyy"),
                     year      = student.AcademicYear,
                     guardian  = student.GuardianName ?? "—",
                     mother    = student.MotherName ?? "—",
@@ -344,7 +344,7 @@ namespace educore.Areas.ERP.Controllers
                         head        = d.FeeHeadName,
                         frequency   = d.Frequency,
                         installment = d.InstallmentLabel ?? "—",
-                        dueDate     = d.DueDate?.ToString("dd MMM yyyy") ?? "—",
+                        dueDate     = string.IsNullOrWhiteSpace(d.DueDate) ? "—" : Dates.Show(d.DueDate, "dd MMM yyyy"),
                         due         = d.AmountDue,
                         paid        = d.AmountPaid,
                         outstanding = d.Outstanding
@@ -391,7 +391,7 @@ namespace educore.Areas.ERP.Controllers
                         id   = e.ExamId,
                         name = e.ExamName,
                         type = e.ExamType ?? "",
-                        date = e.StartDate?.ToString("dd MMM yyyy") ?? ""
+                        date = string.IsNullOrWhiteSpace(e.StartDate) ? "" : Dates.Show(e.StartDate, "dd MMM yyyy")
                     }),
                     subjects = exam.Subjects.Select(x => new
                     {
@@ -413,7 +413,7 @@ namespace educore.Areas.ERP.Controllers
                 receipts = history.Select(h => new
                 {
                     receiptNo = h.ReceiptNo,
-                    date      = h.PaymentDate?.ToString("dd MMM yyyy") ?? "—",
+                    date      = string.IsNullOrWhiteSpace(h.PaymentDate) ? "—" : Dates.Show(h.PaymentDate, "dd MMM yyyy"),
                     amount    = h.Amount,
                     mode      = h.PaymentMode,
                     cancelled = h.IsCancelled      // a cancelled receipt still shows, marked

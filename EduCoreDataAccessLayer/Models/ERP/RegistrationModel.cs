@@ -1,4 +1,6 @@
-using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using Microsoft.AspNetCore.Mvc.Rendering;
+
+using EduCoreDataAccessLayer.Helpers;
 
 namespace EduCoreDataAccessLayer.Models.ERP
 {
@@ -7,7 +9,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
     {
         public int       EnquiryId           { get; set; }
         public string?   RegistrationNumber  { get; set; }
-        public DateOnly? RegistrationDate    { get; set; }
+        public string? RegistrationDate    { get; set; }
         public bool      RegistrationFeePaid { get; set; }
         public string    StudentName         { get; set; } = string.Empty;
         public string?   ClassName           { get; set; }
@@ -23,7 +25,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         // Convenience flags for the UI.
         public bool IsAdmitted => AdmissionId.HasValue;
         public string RegistrationDateDisplay =>
-            RegistrationDate?.ToString("dd MMM yyyy") ?? "—";
+            string.IsNullOrWhiteSpace(RegistrationDate) ? "—" : Dates.Show(RegistrationDate);
     }
 
     public class RegistrationStats

@@ -36,7 +36,7 @@ BEGIN
     LEFT JOIN core.enquiries e ON e.enquiry_id = p.enquiry_id
     WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
       AND p.is_cancelled = FALSE AND p.concession_total > 0
-      AND p.payment_date BETWEEN v_from AND v_to
+      AND p.payment_date::date BETWEEN v_from AND v_to
     ORDER BY p.payment_date, p.payment_id;
 
     OPEN p_cancels FOR

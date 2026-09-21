@@ -1,5 +1,7 @@
 ﻿using EduCoreDataAccessLayer.Models;
 
+using EduCoreDataAccessLayer.Helpers;
+
 namespace EduCoreDataAccessLayer.Models.ERP
 {
     /// <summary>What the issue form sends to mint a Transfer Certificate.</summary>
@@ -20,7 +22,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int?    WorkingDays     { get; set; }
         public int?    DaysPresent     { get; set; }
         public string? Activities      { get; set; }
-        public DateOnly? ApplicationDate { get; set; }
+        public string? ApplicationDate { get; set; }
     }
 
     public class TcIssueResult
@@ -47,20 +49,20 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int       TcId          { get; set; }
         public string    TcNo          { get; set; } = string.Empty;
         public string    Format        { get; set; } = "Standard";
-        public DateOnly? IssueDate     { get; set; }
+        public string? IssueDate     { get; set; }
         public int       StudentId     { get; set; }
 
         public string?   AdmissionNo   { get; set; }
         public string    StudentName   { get; set; } = string.Empty;
         public string?   Gender        { get; set; }
-        public DateOnly? Dob           { get; set; }
+        public string? Dob           { get; set; }
         public string?   FatherName    { get; set; }
         public string?   MotherName    { get; set; }
         public string?   ClassName     { get; set; }
         public string?   Section       { get; set; }
         public string?   AcademicYear  { get; set; }
-        public DateOnly? AdmissionDate { get; set; }
-        public DateOnly? DateOfLeaving { get; set; }
+        public string? AdmissionDate { get; set; }
+        public string? DateOfLeaving { get; set; }
         public string?   Religion      { get; set; }
         public string?   Category      { get; set; }
         public string?   Nationality   { get; set; }
@@ -81,7 +83,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int?      WorkingDays     { get; set; }
         public int?      DaysPresent     { get; set; }
         public string?   Activities      { get; set; }
-        public DateOnly? ApplicationDate { get; set; }
+        public string? ApplicationDate { get; set; }
 
         public bool IsBoard => string.Equals(Format, "Board", StringComparison.OrdinalIgnoreCase);
 
@@ -102,14 +104,14 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public Guid      PublicId      { get; set; }
         public string    TcNo          { get; set; } = string.Empty;
         public string    Format        { get; set; } = "Standard";
-        public DateOnly? IssueDate     { get; set; }
+        public string? IssueDate     { get; set; }
         public int       StudentId     { get; set; }
         public string?   AdmissionNo   { get; set; }
         public string    StudentName   { get; set; } = string.Empty;
         public string?   ClassName     { get; set; }
         public string?   Section       { get; set; }
         public string?   AcademicYear  { get; set; }
-        public DateOnly? DateOfLeaving { get; set; }
+        public string? DateOfLeaving { get; set; }
         public bool      IsVoid        { get; set; }
         public int       PrintCount    { get; set; }
 
@@ -117,6 +119,6 @@ namespace EduCoreDataAccessLayer.Models.ERP
 
         public string ClassDisplay =>
             string.IsNullOrWhiteSpace(Section) ? (ClassName ?? "—") : $"{ClassName} - {Section}";
-        public string IssueDateDisplay => IssueDate?.ToString("dd MMM yyyy") ?? "—";
+        public string IssueDateDisplay => string.IsNullOrWhiteSpace(IssueDate) ? "—" : Dates.Show(IssueDate);
     }
 }

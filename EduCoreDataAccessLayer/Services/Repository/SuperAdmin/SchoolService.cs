@@ -43,8 +43,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 new NpgsqlParameter("p_status_id", (object?)statusId ?? DBNull.Value),
                 new NpgsqlParameter("p_board_id", (object?)boardId ?? DBNull.Value),
                 new NpgsqlParameter("p_school_type_id", (object?)schoolTypeId ?? DBNull.Value),
-                new NpgsqlParameter("p_from_date", NpgsqlDbType.Date) { Value = (object?)fromDate ?? DBNull.Value },
-                new NpgsqlParameter("p_to_date", NpgsqlDbType.Date) { Value = (object?)toDate ?? DBNull.Value },
+                new NpgsqlParameter("p_from_date", NpgsqlDbType.Unknown) { Value = (object?)fromDate ?? DBNull.Value },
+                new NpgsqlParameter("p_to_date", NpgsqlDbType.Unknown) { Value = (object?)toDate ?? DBNull.Value },
                 new NpgsqlParameter("p_page_no", pageNo),
                 new NpgsqlParameter("p_page_size", pageSize),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "school_list_cursor" }

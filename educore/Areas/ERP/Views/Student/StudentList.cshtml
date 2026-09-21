@@ -242,7 +242,7 @@
                     </td>
                     <td><span class="fw-bold">@s.ClassName</span> <span class="text-muted">– @s.Section</span></td>
                     <td><span class="sl-gen @gm.cls"><i class="bx @gm.ic"></i>@s.Gender</span></td>
-                    <td>@(s.AdmissionDate?.ToString("dd MMM yyyy") ?? "—")</td>
+                    <td>@(string.IsNullOrWhiteSpace(s.AdmissionDate) ? "—" : Dates.Show(s.AdmissionDate, "dd MMM yyyy"))</td>
                     <td>@(string.IsNullOrEmpty(s.GuardianName) ? "—" : s.GuardianName)</td>
                     <td>@(string.IsNullOrEmpty(s.Mobile) ? "—" : s.Mobile)</td>
                     <td><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></td>
@@ -303,7 +303,7 @@
                 <div class="sl-mob-grid">
                   <div class="sl-mob-field"><label>Guardian</label><span>@(string.IsNullOrEmpty(s.GuardianName) ? "—" : s.GuardianName)</span></div>
                   <div class="sl-mob-field"><label>Contact</label><span>@(string.IsNullOrEmpty(s.Mobile) ? "—" : s.Mobile)</span></div>
-                  <div class="sl-mob-field"><label>Admitted</label><span>@(s.AdmissionDate?.ToString("dd MMM yyyy") ?? "—")</span></div>
+                  <div class="sl-mob-field"><label>Admitted</label><span>@(string.IsNullOrWhiteSpace(s.AdmissionDate) ? "—" : Dates.Show(s.AdmissionDate, "dd MMM yyyy"))</span></div>
                   <div class="sl-mob-field"><label>Gender</label><span>@s.Gender</span></div>
                   <div class="sl-mob-field"><label>Fee Status</label><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></div>
                   <div class="sl-mob-field"><label>Class</label><span>@s.ClassName @s.Section</span></div>

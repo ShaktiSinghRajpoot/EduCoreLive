@@ -76,7 +76,7 @@ BEGIN
           AND a.academic_year = v_year
           AND LOWER(a.class_name)            = LOWER(v_cls)
           AND LOWER(COALESCE(a.section, '')) = LOWER(v_sec)
-          AND EXTRACT(DOW FROM a.attendance_date) <> 0
+          AND EXTRACT(DOW FROM a.attendance_date::date) <> 0
     ),
     mine AS (
         SELECT a.attendance_date,
@@ -85,7 +85,7 @@ BEGIN
         WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
           AND a.student_id = p_student_id
           AND a.academic_year = v_year
-          AND EXTRACT(DOW FROM a.attendance_date) <> 0
+          AND EXTRACT(DOW FROM a.attendance_date::date) <> 0
     )
     SELECT (SELECT COUNT(*) FROM held)::int                                  AS school_days,
            COUNT(*) FILTER (WHERE mark = 'P')::int                           AS present,
@@ -98,15 +98,15 @@ BEGIN
 
     -- ── 2. Month by month, for the page's month picker ──────────────────────
     OPEN p_months FOR
-    SELECT EXTRACT(MONTH FROM a.attendance_date)::int AS month,
-           EXTRACT(YEAR  FROM a.attendance_date)::int AS year,
+    SELECT EXTRACT(MONTH FROM a.attendance_date::date)::int AS month,
+           EXTRACT(YEAR  FROM a.attendance_date::date)::int AS year,
            COUNT(*)::int                               AS school_days,
            COUNT(*) FILTER (WHERE a.status NOT IN ('Absent', 'Leave'))::int AS present
     FROM core.student_attendance a
     WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
       AND a.student_id = p_student_id
       AND a.academic_year = v_year
-      AND EXTRACT(DOW FROM a.attendance_date) <> 0
+      AND EXTRACT(DOW FROM a.attendance_date::date) <> 0
     GROUP BY 1, 2
     ORDER BY year DESC, month DESC;
 
@@ -120,13 +120,13 @@ BEGIN
     v_end   := (v_start + INTERVAL '1 month' - INTERVAL '1 day')::date;
 
     OPEN p_days FOR
-    SELECT EXTRACT(DAY FROM a.attendance_date)::int AS day,
+    SELECT EXTRACT(DAY FROM a.attendance_date::date)::int AS day,
            CASE a.status WHEN 'Absent' THEN 'A' WHEN 'Leave' THEN 'L' ELSE 'P' END AS mark
     FROM core.student_attendance a
     WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
       AND a.student_id = p_student_id
-      AND a.attendance_date BETWEEN v_start AND v_end
-      AND EXTRACT(DOW FROM a.attendance_date) <> 0
+      AND a.attendance_date::date BETWEEN v_start AND v_end
+      AND EXTRACT(DOW FROM a.attendance_date::date) <> 0
     ORDER BY day;
 END;
 $procedure$;

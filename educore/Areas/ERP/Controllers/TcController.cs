@@ -109,18 +109,18 @@ namespace educore.Areas.ERP.Controllers
         {
             Format        = format is "Board" or "Basic" ? format : "Basic",
             TcNo          = "TC-0000-0000",
-            IssueDate     = DateOnly.FromDateTime(DateTime.Today),
+            IssueDate     = Dates.Today,
             AdmissionNo   = "ADM-0000-0001",
             StudentName   = "Aarav Sharma",
             Gender        = "Male",
-            Dob           = new DateOnly(2013, 4, 12),
+            Dob           = "2013-04-12",
             FatherName    = "Rajesh Sharma",
             MotherName    = "Priya Sharma",
             ClassName     = "Class V",
             Section        = "A",
             AcademicYear  = "2026-2027",
-            AdmissionDate = new DateOnly(2021, 4, 1),
-            DateOfLeaving = DateOnly.FromDateTime(DateTime.Today),
+            AdmissionDate = "2021-04-01",
+            DateOfLeaving = Dates.Today,
             Religion      = "Hindu",
             Category      = "General",
             Nationality   = "Indian",
@@ -138,7 +138,7 @@ namespace educore.Areas.ERP.Controllers
             WorkingDays     = 220,
             DaysPresent     = 210,
             Activities      = "Scouts; School football team",
-            ApplicationDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-2))
+            ApplicationDate = Dates.Norm(DateTime.Today.AddDays(-2).ToString(Dates.Iso))
         };
     }
 }

@@ -10,8 +10,8 @@
         .Take(2).Select(w => w[0])).ToUpper();
     if (string.IsNullOrEmpty(initials)) { initials = "—"; }
     string statusClass = Model.Status == "Active" ? "b-active" : "b-active";
-    string dob = Model.DateOfBirth?.ToString("dd MMM yyyy") ?? "—";
-    string joinDate = Model.JoiningDate?.ToString("dd MMM yyyy") ?? "—";
+    string dob = string.IsNullOrWhiteSpace(Model.DateOfBirth) ? "—" : Dates.Show(Model.DateOfBirth, "dd MMM yyyy");
+    string joinDate = string.IsNullOrWhiteSpace(Model.JoiningDate) ? "—" : Dates.Show(Model.JoiningDate, "dd MMM yyyy");
     string exp = Model.ExperienceYears.HasValue ? $"{Model.ExperienceYears} yrs" : "—";
 }
 

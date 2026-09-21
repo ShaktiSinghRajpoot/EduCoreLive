@@ -21,11 +21,11 @@
         public string?   RollNo           { get; set; }
         public string    StudentName      { get; set; } = string.Empty;
         public string?   Gender           { get; set; }
-        public DateOnly? DateOfBirth      { get; set; }
+        public string? DateOfBirth      { get; set; }
         public string    ClassName        { get; set; } = string.Empty;
         public string?   Section          { get; set; }
         public string    AcademicYear     { get; set; } = string.Empty;
-        public DateOnly? AdmissionDate    { get; set; }
+        public string? AdmissionDate    { get; set; }
         // Parent / contact
         public string?   GuardianName     { get; set; }
         public string?   MotherName       { get; set; }
@@ -103,7 +103,7 @@
         public string    ClassName      { get; set; } = string.Empty;
         public string?   Section        { get; set; }
         public string    AcademicYear   { get; set; } = string.Empty;
-        public DateOnly? AdmissionDate  { get; set; }
+        public string? AdmissionDate  { get; set; }
         public string?   GuardianName   { get; set; }
         public string?   Mobile         { get; set; }
         public decimal   AnnualTotal    { get; set; }

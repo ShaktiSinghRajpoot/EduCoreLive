@@ -43,7 +43,7 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<(int Success, string Message, string? RegistrationNumber)> RegisterEnquiryAsync(
             int       enquiryId,
             string?   registrationNumber,
-            DateOnly? registrationDate,
+            string? registrationDate,
             bool      registrationFeePaid,
             bool      autoGenerate,
             string?   prefix,
@@ -57,7 +57,7 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             string   followupType,
             string?  outcome,
             string?  notes,
-            DateOnly? nextFollowupDate,
+            string? nextFollowupDate,
             string?  newStatus,
             string?  lostReason,
             int      tenantId,

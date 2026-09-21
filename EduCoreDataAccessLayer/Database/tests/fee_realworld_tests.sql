@@ -302,8 +302,8 @@ BEGIN
         SELECT COUNT(*) INTO bad FROM core.student_ledger l
          WHERE l.student_id IN (SELECT student_id FROM core.students
                                 WHERE admission_no LIKE 'ZZ-RW-%')
-           AND (l.due_date < DATE_TRUNC('month', v_start)::date
-                OR l.due_date > DATE_TRUNC('month', v_end)::date + INTERVAL '1 month');
+           AND (l.due_date::date < DATE_TRUNC('month', v_start)::date
+                OR l.due_date::date > DATE_TRUNC('month', v_end)::date + INTERVAL '1 month');
         PERFORM pg_temp.chk_eq('5.2 no instalment fell outside the session', bad, 0);
 
         -- The ledger and the receipts agree for every one of them.

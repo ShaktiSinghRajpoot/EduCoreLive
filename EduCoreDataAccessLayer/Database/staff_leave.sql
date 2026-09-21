@@ -101,7 +101,7 @@ BEGIN
                -- "on leave today" for the page KPI, decided here so every caller
                -- agrees on what today means.
                (l.status = 'Approved'
-                AND CURRENT_DATE BETWEEN l.from_date AND l.to_date) AS on_leave_today
+                AND CURRENT_DATE BETWEEN l.from_date::date AND l.to_date::date) AS on_leave_today
         FROM core.staff_leave l
         JOIN core.staff s ON s.staff_id = l.staff_id
         WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
@@ -146,7 +146,7 @@ BEGIN
             WHERE tenant_id = p_tenant_id AND school_id = p_school_id
               AND staff_id  = p_staff_id
               AND status IN ('Pending', 'Approved')
-              AND from_date <= p_to_date AND to_date >= p_from_date
+              AND from_date::date <= p_to_date AND to_date::date >= p_from_date
         ) THEN
             RAISE EXCEPTION 'This staff member already has a pending or approved leave overlapping those dates.';
         END IF;

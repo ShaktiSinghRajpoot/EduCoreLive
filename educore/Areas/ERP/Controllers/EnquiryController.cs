@@ -141,7 +141,7 @@ namespace educore.Areas.ERP.Controllers
                     enquiryId        = e.EnquiryId,
                     studentName      = e.StudentName,
                     gender           = e.Gender,
-                    dob              = e.Dob?.ToString("yyyy-MM-dd"),
+                    dob              = e.Dob,
                     className        = e.ClassName,
                     session          = e.Session,
                     currentSchool    = e.CurrentSchool,
@@ -160,7 +160,7 @@ namespace educore.Areas.ERP.Controllers
                     referrerName     = e.ReferrerName,
                     referrerMobile   = e.ReferrerMobile,
                     assignedToId     = e.AssignedToId,
-                    nextFollowupDate = e.NextFollowupDate?.ToString("yyyy-MM-dd"),
+                    nextFollowupDate = e.NextFollowupDate,
                     transportRequired = e.TransportRequired,
                     notes            = e.Notes
                 }
@@ -260,10 +260,7 @@ namespace educore.Areas.ERP.Controllers
             if (req.NewStatus is "Not Interested" or "Dropped" && string.IsNullOrWhiteSpace(req.LostReason))
                 return Json(new { success = false, message = "Please provide a reason for marking Not Interested." });
 
-            DateOnly? nextDate = null;
-            if (!string.IsNullOrWhiteSpace(req.NextFollowupDate) &&
-                DateOnly.TryParse(req.NextFollowupDate, out var parsed))
-                nextDate = parsed;
+            var nextDate = Dates.Norm(req.NextFollowupDate);
 
             var result = await _enquiryService.LogFollowupAsync(
                 req.EnquiryId,
@@ -417,10 +414,7 @@ namespace educore.Areas.ERP.Controllers
             if (registrationFeePaid && discountValue > 0 && string.IsNullOrWhiteSpace(discountReason))
                 return (false, "Please provide a reason for the registration discount.", null, null);
 
-            DateOnly? regDate = null;
-            if (!string.IsNullOrWhiteSpace(registrationDate) &&
-                DateOnly.TryParse(registrationDate, out var parsed))
-                regDate = parsed;
+            var regDate = Dates.Norm(registrationDate);
 
             var (success, message, regNo) = await _enquiryService.RegisterEnquiryAsync(
                 enquiryId,

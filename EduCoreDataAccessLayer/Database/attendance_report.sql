@@ -51,8 +51,8 @@ BEGIN
     FROM core.student_attendance a
     WHERE a.tenant_id = p_tenant_id
       AND a.school_id = p_school_id
-      AND a.attendance_date BETWEEN v_start AND v_end
-      AND EXTRACT(DOW FROM a.attendance_date) <> 0
+      AND a.attendance_date::date BETWEEN v_start AND v_end
+      AND EXTRACT(DOW FROM a.attendance_date::date) <> 0
       AND LOWER(a.class_name)              = LOWER(TRIM(p_class))
       AND LOWER(COALESCE(a.section, ''))   = LOWER(TRIM(COALESCE(p_section, '')));
 
@@ -73,7 +73,7 @@ BEGIN
     OPEN p_marks FOR
     SELECT
         a.student_id,
-        EXTRACT(DAY FROM a.attendance_date)::int AS day,
+        EXTRACT(DAY FROM a.attendance_date::date)::int AS day,
         CASE a.status
             WHEN 'Absent' THEN 'A'
             WHEN 'Leave'  THEN 'L'
@@ -86,7 +86,7 @@ BEGIN
      AND s.school_id  = a.school_id
     WHERE a.tenant_id = p_tenant_id
       AND a.school_id = p_school_id
-      AND a.attendance_date BETWEEN v_start AND v_end
+      AND a.attendance_date::date BETWEEN v_start AND v_end
       AND s.is_active = TRUE
       AND LOWER(s.class_name)            = LOWER(TRIM(p_class))
       AND LOWER(COALESCE(s.section, '')) = LOWER(TRIM(COALESCE(p_section, '')));

@@ -87,7 +87,7 @@ BEGIN
     SET student_name   = v_name,
         roll_no        = NULLIF(TRIM(COALESCE(p_roll_no, '')), ''),
         gender         = NULLIF(TRIM(COALESCE(p_gender, '')), ''),
-        dob            = COALESCE(p_dob, dob),
+        dob            = COALESCE(p_dob::text, dob),
         class_name     = COALESCE(v_cls, class_name),
         section        = NULLIF(TRIM(COALESCE(p_section, '')), ''),
         guardian_name  = NULLIF(TRIM(COALESCE(p_guardian_name, '')), ''),

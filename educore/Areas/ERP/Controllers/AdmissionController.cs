@@ -194,7 +194,7 @@ namespace educore.Areas.ERP.Controllers
             // rendered — it is a courtesy, not a guarantee. Three of these ten were
             // checked before; the other seven could be posted blank.
             var errors = new List<string>();
-            var today  = DateOnly.FromDateTime(DateTime.Today);
+            var today  = Dates.Today;
 
             if (string.IsNullOrWhiteSpace(form.StudentName))  errors.Add("Student name is required.");
             if (string.IsNullOrWhiteSpace(form.AcademicYear)) errors.Add("Academic year is required.");
@@ -216,22 +216,28 @@ namespace educore.Areas.ERP.Controllers
                 !System.Text.RegularExpressions.Regex.IsMatch(form.AlternateMobile, @"^\d{10}$"))
                 errors.Add("Alternate mobile must be 10 digits.");
 
-            if (!form.DateOfBirth.HasValue)
+            // Dates arrive as text and are normalised to ISO here, so a value the
+            // browser never validated is caught before it reaches the database.
+            var dob = Dates.Norm(form.DateOfBirth);
+            if (string.IsNullOrWhiteSpace(form.DateOfBirth))
                 errors.Add("Date of birth is required.");
-            else if (form.DateOfBirth.Value > today)
+            else if (dob == null)
+                errors.Add("Date of birth is not a valid date.");
+            else if (string.CompareOrdinal(dob, today) > 0)
                 errors.Add("Date of birth cannot be in the future.");
 
             // The Admission Date field was removed from the form: an admission is
             // dated by the database on the day it is entered
             // (sp_admission_manage falls back to CURRENT_DATE). It is still
             // checked when something else supplies one.
-            if (form.AdmissionDate.HasValue && form.AdmissionDate.Value > today)
+            var admission = Dates.Norm(form.AdmissionDate);
+            if (admission != null && string.CompareOrdinal(admission, today) > 0)
                 errors.Add("Admission date cannot be in the future.");
 
             // Born after the day they joined is not a typo anyone should keep.
             // With no date posted, the joining day is today.
-            var joined = form.AdmissionDate ?? today;
-            if (form.DateOfBirth.HasValue && form.DateOfBirth.Value > joined)
+            var joined = admission ?? today;
+            if (dob != null && string.CompareOrdinal(dob, joined) > 0)
                 errors.Add("Date of birth cannot be after the admission date.");
 
             var (feePlan, totals, concession) = ParseLedger(form);
@@ -265,11 +271,11 @@ namespace educore.Areas.ERP.Controllers
                 AdmissionNo      = NullIfEmpty(form.AdmissionNo),
                 StudentName      = form.StudentName!.Trim(),
                 Gender           = NullIfEmpty(form.Gender),
-                DateOfBirth      = form.DateOfBirth,
+                DateOfBirth      = Dates.Norm(form.DateOfBirth),
                 ClassName        = form.ClassName!.Trim(),
                 Section          = NullIfEmpty(form.Section),
                 AcademicYear     = form.AcademicYear!.Trim(),
-                AdmissionDate    = form.AdmissionDate ?? DateOnly.FromDateTime(DateTime.Today),
+                AdmissionDate    = Dates.Norm(form.AdmissionDate) ?? Dates.Today,
                 GuardianName     = NullIfEmpty(form.GuardianName),
                 MotherName       = NullIfEmpty(form.MotherName),
                 MobileNumber     = NullIfEmpty(form.MobileNumber),
@@ -382,7 +388,7 @@ namespace educore.Areas.ERP.Controllers
             // through the end of the academic year, just like the mid-year Assign page.
             if (result.Success && result.StudentId > 0 && form.TransportRouteId is > 0 && form.TransportStopId is > 0)
             {
-                var admDate = model.AdmissionDate ?? DateOnly.FromDateTime(DateTime.Today);
+                var admDate = model.AdmissionDate ?? Dates.Today;
                 int months = MonthsToYearEnd(model.AcademicYear, admDate);
                 await _transportService.SaveAssignmentAsync(
                     result.StudentId, form.TransportRouteId.Value, form.TransportStopId.Value,
@@ -432,7 +438,7 @@ namespace educore.Areas.ERP.Controllers
                     className    = s.ClassName,
                     section      = s.Section,
                     academicYear = s.AcademicYear,
-                    admissionDate = s.AdmissionDate?.ToString("yyyy-MM-dd"),
+                    admissionDate = s.AdmissionDate,
                     guardianName = s.GuardianName,
                     mobile       = s.Mobile,
                     annualTotal  = s.AnnualTotal,
@@ -699,8 +705,12 @@ namespace educore.Areas.ERP.Controllers
 
         // Bill transport from the admission month through the end of the academic
         // year (Indian April–March), capped at 12. Falls back to 12 if unparsable.
-        private static int MonthsToYearEnd(string? academicYear, DateOnly start)
+        private static int MonthsToYearEnd(string? academicYear, string? startIso)
         {
+            // Dates travel as ISO text now, so this is the one spot that turns the
+            // start back into a real date - the month count is genuine arithmetic.
+            var start = Dates.Parse(startIso) ?? DateTime.Today;
+
             int endYear;
             if (!string.IsNullOrWhiteSpace(academicYear) && academicYear.Length >= 4 &&
                 int.TryParse(academicYear.Substring(0, 4), out var firstYear))
@@ -708,7 +718,7 @@ namespace educore.Areas.ERP.Controllers
             else
                 endYear = start.Month >= 4 ? start.Year + 1 : start.Year;
 
-            var yearEnd = new DateOnly(endYear, 3, 31);
+            var yearEnd = new DateTime(endYear, 3, 31);
             if (yearEnd < start) return 1;
             int months = (yearEnd.Year - start.Year) * 12 + (yearEnd.Month - start.Month) + 1;
             return Math.Clamp(months, 1, 12);
@@ -727,7 +737,7 @@ namespace educore.Areas.ERP.Controllers
             var ordered = dues
                 .Where(d => d.Outstanding > 0)
                 .OrderByDescending(d => string.Equals(d.InstallmentLabel, "Admission", StringComparison.OrdinalIgnoreCase))
-                .ThenBy(d => d.DueDate ?? DateOnly.MaxValue)
+                .ThenBy(d => d.DueDate ?? "9999-12-31")
                 .ThenBy(d => d.LedgerId)
                 .ToList();
 

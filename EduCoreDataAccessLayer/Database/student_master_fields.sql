@@ -220,7 +220,7 @@ BEGIN
           AND is_active = TRUE
           AND regexp_replace(LOWER(TRIM(student_name)), '\s+', ' ', 'g')
               = regexp_replace(LOWER(TRIM(COALESCE(p_student_name, ''))), '\s+', ' ', 'g')
-          AND COALESCE(dob, DATE '1900-01-01') = COALESCE(p_dob, DATE '1900-01-01')
+          AND COALESCE(dob::date, DATE '1900-01-01') = COALESCE(p_dob, DATE '1900-01-01')
           AND COALESCE(mobile, '') = COALESCE(p_mobile, '');
         IF v_dup > 0 THEN
             OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,

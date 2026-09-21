@@ -27,7 +27,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public List<DashboardBirthday>    Birthdays  { get; set; } = new();
     }
 
-    public class DashboardTrendPoint { public DateOnly Date { get; set; } public decimal Amount { get; set; } }
+    public class DashboardTrendPoint { public string Date { get; set; } public decimal Amount { get; set; } }
     public class DashboardClassCount  { public string ClassName { get; set; } = ""; public int Students { get; set; } }
     public class DashboardModeTotal   { public string Mode { get; set; } = ""; public decimal Amount { get; set; } }
 
@@ -41,7 +41,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal   Total       { get; set; }
         public decimal   Paid        { get; set; }
         public decimal   Due         { get; set; }
-        public DateOnly? LastPayment { get; set; }
+        public string? LastPayment { get; set; }
     }
 
     public class DashboardReceipt
@@ -49,7 +49,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string    ReceiptNo   { get; set; } = "";
         public decimal   Amount      { get; set; }
         public string?   Mode        { get; set; }
-        public DateOnly? PaymentDate { get; set; }
+        public string? PaymentDate { get; set; }
         public string    StudentName { get; set; } = "";
         public string?   ClassName   { get; set; }
     }
@@ -59,14 +59,14 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int       LeaveId   { get; set; }
         public string    FullName  { get; set; } = "";
         public string    LeaveType { get; set; } = "";
-        public DateOnly? FromDate  { get; set; }
-        public DateOnly? ToDate    { get; set; }
+        public string? FromDate  { get; set; }
+        public string? ToDate    { get; set; }
         public int       Days      { get; set; }
     }
 
     public class DashboardEvent
     {
-        public DateOnly Date    { get; set; }
+        public string Date    { get; set; }
         public string   Title   { get; set; } = "";
         public string?  DayType { get; set; }
     }

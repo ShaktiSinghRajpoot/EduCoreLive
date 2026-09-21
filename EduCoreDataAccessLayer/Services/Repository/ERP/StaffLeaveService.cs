@@ -39,8 +39,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     EmployeeCode   = NullStr(row, "employee_code"),
                     Designation    = NullStr(row, "designation"),
                     LeaveType      = Str(row, "leave_type"),
-                    FromDate       = DbRead.Date(row, "from_date"),
-                    ToDate         = DbRead.Date(row, "to_date"),
+                    FromDate       = DbRead.NStr(row, "from_date"),
+                    ToDate         = DbRead.NStr(row, "to_date"),
                     Days           = IntVal(row, "days"),
                     Reason         = NullStr(row, "reason"),
                     Status         = Str(row, "status"),
@@ -54,7 +54,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<StaffLeaveResult> ApplyAsync(
-            int staffId, string leaveType, DateOnly fromDate, DateOnly toDate, string? reason,
+            int staffId, string leaveType, string fromDate, string toDate, string? reason,
             int tenantId, int schoolId, int actionUserId)
         {
             if (tenantId <= 1 || schoolId <= 0)
@@ -106,7 +106,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static NpgsqlParameter[] Params(
             string operation, int tenantId, int schoolId, int actionUserId,
             int? leaveId = null, int? staffId = null, string? leaveType = null,
-            DateOnly? fromDate = null, DateOnly? toDate = null, string? reason = null,
+            string? fromDate = null, string? toDate = null, string? reason = null,
             string? status = null, string? remark = null) => new NpgsqlParameter[]
         {
             new("p_operation",      NpgsqlDbType.Text)    { Value = operation },
@@ -116,8 +116,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             new("p_leave_id",       NpgsqlDbType.Integer) { Value = (object?)leaveId ?? DBNull.Value },
             new("p_staff_id",       NpgsqlDbType.Integer) { Value = (object?)staffId ?? DBNull.Value },
             new("p_leave_type",     NpgsqlDbType.Text)    { Value = (object?)leaveType ?? DBNull.Value },
-            new("p_from_date",      NpgsqlDbType.Date)    { Value = fromDate.HasValue ? fromDate.Value : (object)DBNull.Value },
-            new("p_to_date",        NpgsqlDbType.Date)    { Value = toDate.HasValue ? toDate.Value : (object)DBNull.Value },
+            new("p_from_date",      NpgsqlDbType.Unknown)    { Value = (object?)fromDate ?? DBNull.Value },
+            new("p_to_date",        NpgsqlDbType.Unknown)    { Value = (object?)toDate ?? DBNull.Value },
             new("p_reason",         NpgsqlDbType.Text)    { Value = (object?)reason ?? DBNull.Value },
             new("p_status",         NpgsqlDbType.Text)    { Value = (object?)status ?? DBNull.Value },
             new("p_remark",         NpgsqlDbType.Text)    { Value = (object?)remark ?? DBNull.Value },

@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Infrastructure;
+﻿using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.Extensions.Configuration;
@@ -249,22 +249,22 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 RouteId      = ToInt(r["route_id"]),
                 StopId       = ToInt(r["stop_id"]),
                 MonthlyFare  = r["monthly_fare"] == DBNull.Value ? 0 : Convert.ToDecimal(r["monthly_fare"]),
-                // A Postgres `date` is DateOnly — cast it, never Convert.ToDateTime.
-                StartDate    = r["start_date"] == DBNull.Value ? null : (DateOnly)r["start_date"],
+                // A date column is ISO text; keep it as text.
+                StartDate    = r["start_date"] == DBNull.Value ? null : (string)r["start_date"],
                 RouteName    = r["route_name"] == DBNull.Value ? null : r["route_name"].ToString(),
                 StopName     = r["stop_name"] == DBNull.Value ? null : r["stop_name"].ToString()
             };
         }
 
         public async Task<(bool, string, decimal, int)> SaveAssignmentAsync(
-            int studentId, int routeId, int stopId, string? academicYear, DateOnly? startDate, int months,
+            int studentId, int routeId, int stopId, string? academicYear, string? startDate, int months,
             int tenantId, int schoolId, int actionUserId)
         {
             var p = AssignParams("SaveAssignment", tenantId, schoolId, actionUserId, studentId);
             p[5].Value = routeId;
             p[6].Value = stopId;
             p[7].Value = (object?)academicYear ?? DBNull.Value;
-            p[8].Value = startDate.HasValue ? startDate.Value : DBNull.Value;
+            p[8].Value = (object?)startDate ?? DBNull.Value;
             p[9].Value = months > 0 ? months : 12;
             try
             {
@@ -337,7 +337,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             new("p_route_id",       NpgsqlDbType.Integer) { Value = DBNull.Value },
             new("p_stop_id",        NpgsqlDbType.Integer) { Value = DBNull.Value },
             new("p_academic_year",  NpgsqlDbType.Text)    { Value = DBNull.Value },
-            new("p_start_date",     NpgsqlDbType.Date)    { Value = DBNull.Value },
+            new("p_start_date",     NpgsqlDbType.Unknown)    { Value = DBNull.Value },
             new("p_months",         NpgsqlDbType.Integer) { Value = 12 },
             new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
         };

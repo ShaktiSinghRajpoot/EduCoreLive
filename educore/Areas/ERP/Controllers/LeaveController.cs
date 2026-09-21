@@ -1,4 +1,4 @@
-using educore.Helpers;
+﻿using educore.Helpers;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
@@ -46,8 +46,8 @@ namespace educore.Areas.ERP.Controllers
                 code         = r.EmployeeCode ?? "",
                 designation  = r.Designation ?? "",
                 type         = r.LeaveType,
-                from         = r.FromDate?.ToString("dd MMM yyyy") ?? "",
-                to           = r.ToDate?.ToString("dd MMM yyyy") ?? "",
+                from         = string.IsNullOrWhiteSpace(r.FromDate) ? "" : Dates.Show(r.FromDate, "dd MMM yyyy"),
+                to           = string.IsNullOrWhiteSpace(r.ToDate) ? "" : Dates.Show(r.ToDate, "dd MMM yyyy"),
                 days         = r.Days,
                 reason       = r.Reason ?? "",
                 status       = r.Status,
@@ -62,13 +62,13 @@ namespace educore.Areas.ERP.Controllers
         [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ApplyLeave(int staffId, string leaveType,
-                                                    DateOnly? fromDate, DateOnly? toDate, string? reason)
+                                                    string? fromDate, string? toDate, string? reason)
         {
             if (fromDate == null || toDate == null)
                 return Json(new { success = false, message = "Choose both the from and to dates." });
 
             var result = await _leaveService.ApplyAsync(
-                staffId, leaveType, fromDate.Value, toDate.Value, reason,
+                staffId, leaveType, fromDate, toDate, reason,
                 TenantId(), SchoolId(), UserId());
 
             return Json(new { success = result.Success, message = result.Message, days = result.Days });

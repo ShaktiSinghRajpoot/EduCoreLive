@@ -1,4 +1,4 @@
-using educore.Services;
+﻿using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -179,7 +179,7 @@ namespace educore.Areas.ERP.Controllers
                 fare      = a.MonthlyFare,
                 routeName = a.RouteName,
                 stopName  = a.StopName,
-                startDate = a.StartDate?.ToString("yyyy-MM-dd")
+                startDate = a.StartDate
             });
         }
 
@@ -191,8 +191,7 @@ namespace educore.Areas.ERP.Controllers
             if (req == null || req.StudentId <= 0 || req.RouteId <= 0 || req.StopId <= 0)
                 return Json(new { success = false, message = "Pick a student, route and stop." });
 
-            DateOnly start = DateOnly.FromDateTime(DateTime.Today);
-            if (!string.IsNullOrWhiteSpace(req.StartDate) && DateOnly.TryParse(req.StartDate, out var d)) start = d;
+            var start = Dates.Norm(req.StartDate) ?? Dates.Today;
 
             int months = MonthsToYearEnd(req.Session, start);
 
@@ -273,8 +272,12 @@ namespace educore.Areas.ERP.Controllers
         // ── Helpers ──────────────────────────────────────────────
         // Bill from the start month through the end of the academic year (Indian
         // April–March). Falls back to 12 months if the year can't be parsed.
-        private static int MonthsToYearEnd(string? academicYear, DateOnly start)
+        private static int MonthsToYearEnd(string? academicYear, string? startIso)
         {
+            // Dates travel as ISO text now, so this is the one spot that turns the
+            // start back into a real date - the month count is genuine arithmetic.
+            var start = Dates.Parse(startIso) ?? DateTime.Today;
+
             int endYear;
             if (!string.IsNullOrWhiteSpace(academicYear) && academicYear.Length >= 4 &&
                 int.TryParse(academicYear.Substring(0, 4), out var firstYear))
@@ -282,7 +285,7 @@ namespace educore.Areas.ERP.Controllers
             else
                 endYear = start.Month >= 4 ? start.Year + 1 : start.Year;
 
-            var yearEnd = new DateOnly(endYear, 3, 31);
+            var yearEnd = new DateTime(endYear, 3, 31);
             if (yearEnd < start) return 1;
             int months = (yearEnd.Year - start.Year) * 12 + (yearEnd.Month - start.Month) + 1;
             return Math.Clamp(months, 1, 12);

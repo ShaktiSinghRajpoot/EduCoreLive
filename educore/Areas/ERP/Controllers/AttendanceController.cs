@@ -1,4 +1,4 @@
-using educore.Helpers;
+﻿using educore.Helpers;
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
@@ -64,7 +64,7 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> Roster(string @class, string? section, string? date)
         {
-            if (!DateOnly.TryParse(date, out var d)) d = DateOnly.FromDateTime(DateTime.Today);
+            var d = Dates.Norm(date) ?? Dates.Today;
             var roster = await _attendance.GetRosterAsync(@class, section, d, TenantId(), SchoolId(), UserId());
             var canMark = await CanMarkAsync(@class, section);
 
@@ -88,7 +88,8 @@ namespace educore.Areas.ERP.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Save([FromBody] AttendanceSaveRequest request)
         {
-            if (!DateOnly.TryParse(request?.Date, out var d))
+            var d = Dates.Norm(request?.Date);
+            if (d == null)
                 return Json(new { success = false, message = "Choose a valid date." });
 
             // Only the class teacher of this section (or an admin) may save it.

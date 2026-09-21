@@ -1,10 +1,12 @@
-using System.Data;
+﻿using System.Data;
 using System.Globalization;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Npgsql;
 using NpgsqlTypes;
+
+using EduCoreDataAccessLayer.Helpers;
 
 namespace EduCoreDataAccessLayer.Services.Repository.ERP
 {
@@ -25,8 +27,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             if (tenantId <= 1 || schoolId <= 0) return data;
 
             var p = Params("GetCalendar", tenantId, schoolId, actionUserId);
-            p[5].Value = DateOnly.FromDateTime(from);      // p_date
-            p[6].Value = DateOnly.FromDateTime(to);        // p_to_date
+            p[5].Value = from.ToString(Dates.Iso);      // p_date
+            p[6].Value = to.ToString(Dates.Iso);        // p_to_date
 
             var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
             if (ds.Tables.Count == 0) return data;
@@ -56,7 +58,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             if (tenantId <= 1 || schoolId <= 0) return fallback;
 
             var p = Params("GetDayStatus", tenantId, schoolId, actionUserId);
-            p[5].Value = DateOnly.FromDateTime(date);      // p_date
+            p[5].Value = date.ToString(Dates.Iso);      // p_date
 
             var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return fallback;
@@ -84,7 +86,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 return new SchoolCalendarSaveResult { Message = "Pick a valid date." };
 
             var p = Params("SaveEntry", tenantId, schoolId, actionUserId);
-            p[5].Value = DateOnly.FromDateTime(date);                                   // p_date
+            p[5].Value = date.ToString(Dates.Iso);                                   // p_date
             p[7].Value = string.IsNullOrWhiteSpace(entry.DayType)                       // p_day_type
                             ? "holiday" : entry.DayType.Trim().ToLowerInvariant();
             p[8].Value = (object?)(entry.Title ?? string.Empty).Trim() ?? DBNull.Value;  // p_title
@@ -175,8 +177,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
                 new("p_calendar_id",    NpgsqlDbType.Integer) { Value = DBNull.Value },
-                new("p_date",           NpgsqlDbType.Date)    { Value = DBNull.Value },
-                new("p_to_date",        NpgsqlDbType.Date)    { Value = DBNull.Value },
+                new("p_date",           NpgsqlDbType.Unknown)    { Value = DBNull.Value },
+                new("p_to_date",        NpgsqlDbType.Unknown)    { Value = DBNull.Value },
                 new("p_day_type",       NpgsqlDbType.Varchar) { Value = DBNull.Value },
                 new("p_title",          NpgsqlDbType.Varchar) { Value = DBNull.Value },
                 new("p_half_day_end",   NpgsqlDbType.Time)    { Value = DBNull.Value },

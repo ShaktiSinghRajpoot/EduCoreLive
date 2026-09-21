@@ -2952,3 +2952,136 @@ March 2027 — a date the new guard now refuses because it has not happened. The
 now test the latest month that *has* happened, plus the refusal itself.
 
 Thirteen suites, **430 checks**, identical on local and Railway.
+
+### [2026-09-20] Every `date` column is now `varchar`, and C# stopped converting dates
+
+The trigger was one line, copied into nine services:
+
+```csharp
+private static DateOnly? DateVal(DataRow r, string c) =>
+    Has(r, c) && r[c] != DBNull.Value ? DateOnly.FromDateTime(Convert.ToDateTime(r[c])) : null;
+```
+
+Npgsql returns a `DateOnly` for a `date` column, and `Convert.ToDateTime` throws
+`InvalidCastException` on one, because `DateOnly` is not `IConvertible`. Four of
+the nine copies did exactly that. The decision was to take the type out of the
+problem: store dates as ISO text and let the app carry them as strings.
+
+**Schema — `Database/dates_as_text.sql`.** Generated from the catalog, so nothing
+was missed: 30 `date` columns across the three schemas, converted with
+`ALTER … TYPE varchar(10) USING to_char(col,'YYYY-MM-DD')`, with `CURRENT_DATE`
+defaults rewritten to `to_char(CURRENT_DATE,'YYYY-MM-DD')`. The dependent view
+`core.v_fee_tender_lines` and three range check constraints
+(`chk_academic_year_dates`, `chk_exams_dates`, `chk_staff_leave_dates`) are
+dropped first and restored after — they still hold, because ISO text compares and
+sorts in date order. Zero `date` columns remain.
+
+**Procedures — 84 casts across 18 files.** Text comparison and `ORDER BY` were
+already correct on ISO text, so only the places where a column meets a real date
+needed `::date`: `EXTRACT`, `BETWEEN` against a date variable, `CURRENT_DATE`
+arithmetic, `DATE_TRUNC`, and `COALESCE(col, DATE '…')`. Assignments did **not**
+need touching — `SET col = p_date` casts itself. Two rules were verified against
+the server before editing anything, because the whole edit plan rested on them:
+`COALESCE(date, varchar)` fails, and `INSERT … VALUES (CURRENT_DATE)` into a
+varchar column succeeds.
+
+**`sp_enquiry_followup_manage` had no source file.** It was live and called by
+`EnquiryService`, but existed only in the database and in the pre-cleanup backup —
+the repo could not have rebuilt it. Captured as `Database/enquiry_followup.sql`.
+
+**C# — the date types are gone.** `DbRead.Date` is deleted (both overloads) and
+date columns are read with `DbRead.NStr`; `DbRead.DateTimeN` stays, because the
+`*_at` timestamp columns are still timestamps. `DateOnly` no longer appears
+anywhere in the codebase. Model properties, service signatures, interfaces,
+controllers and views all carry `string`.
+
+**`Helpers/Dates.cs` is the one place a date is still parsed**: `Norm` turns
+whatever a browser posted into ISO text (and returns null for anything that is
+not a date, so a bad value is dropped before it reaches the database), `Parse` is
+for genuine arithmetic such as `MonthsToYearEnd`, and `Show` formats for display.
+
+**Parameters.** The procs still declare `date` parameters — changing 27
+signatures would have meant a second wave of edits inside every body. Instead the
+services send `NpgsqlDbType.Unknown` with an ISO string, and PostgreSQL resolves
+it from the signature. Verified two ways: a prepared statement resolves an
+untyped parameter to `date`, and a throwaway Npgsql client proved that
+`Unknown` + `"2026-09-20"` arrives as a real date (`p_d + 10` returned
+`2026-09-30`), that `DBNull` still passes, and that `core.sp_attendance_roster`
+runs end to end.
+
+**One silent bug this created and caught.** `Admission/Create.cshtml` tested
+`ViewBag.PreDob is DateOnly` — legal C#, compiles fine, and would now never match,
+so the date of birth would have quietly stopped pre-filling when converting an
+enquiry. Found by grepping for the last `DateOnly` mentions rather than by the
+compiler, which is the lesson: a runtime type test survives a type change.
+
+All fifteen suites, **481 checks**, passed against the converted database — and
+the dashboard was still broken. See the entry below.
+
+### [2026-09-20] The dashboard broke anyway, and why 481 checks did not notice
+
+Opening the landing dashboard threw
+`42883: operator does not exist: character varying = date`. One line, in the
+seven-day collection trend inside `sp_dashboard_summary`:
+
+```sql
+AND fp.payment_date = g.d::date          -- payment_date is varchar now
+```
+
+**How it got through.** The cast script matched a column followed by a date
+*value*, and separately a column followed by a **bracketed** cast
+(`(expr)::date`). `g.d::date` is a cast with no brackets, so it fell between the
+two rules. It was in my own list of sites needing a cast — I never checked the
+applied diff back against that list, which is the actual mistake. A re-scan with
+a looser rule (any operand ending in `::date`, bracketed or not) found this one
+site and no others, across every procedure, view and source file.
+
+**How it got past the tests.** The dashboard was the one module with no suite.
+Fifteen suites and 481 checks never called `sp_dashboard_summary`, so the most-
+opened page in the app was the least covered. The user found it by opening it.
+
+`Database/tests/dashboard_tests.sql` — 19 checks. The shape matters more than
+the count: **every check FETCHES its cursor.** A refcursor procedure does almost
+nothing until the cursor is read, so a test that only `CALL`s would have passed
+while the page stayed broken. Section A fetches all nine cursors, B pins the
+trend that actually broke (seven days, ending today, starting six days back), C
+asserts the stored text really is `YYYY-MM-DD`, D checks the platform tenant
+gets nothing.
+
+Verified as a regression test the honest way: the bug was put back, the suite
+reproduced the user's exact error, the fix was restored, the suite passed.
+
+Sixteen suites, **500 checks**.
+
+### [2026-09-21] The date-to-text change applied to Railway
+
+`Database/dates_as_text_deploy.sql` — one script: the schema migration, then
+every procedure that touches a date column, then a verification query. Both
+halves are guarded, so a failed run can simply be run again.
+
+**Checked before running.** `dates_as_text.sql` was generated from the *local*
+catalog, so the first question was whether production had a date column the
+script did not know about. Railway reported 31 to local's 30; the extra one was
+`core.v_fee_tender_lines.payment_date`, a view column the script already drops
+and recreates. Coverage was complete.
+
+**Proved nothing moved.** A before-snapshot recorded the row count, minimum and
+maximum of all 30 date columns. The same snapshot after the migration was
+**byte-identical** — same counts, same earliest date, same latest date — and no
+stored value fails `^\d{4}-\d{2}-\d{2}$`. The view came back with its row, and
+all three range constraints are back on.
+
+**Verified after.** Zero `date` columns. Zero uncast sites across every procedure
+and view (the looser scan, the one that should have caught the dashboard the
+first time). All sixteen suites, **500 checks, 0 failed**, against Railway.
+
+Local and Railway now hold the same 110 procedures. One, `sp_school_admin_fee_head_manage`,
+showed a different `pg_get_functiondef` hash — that is PostgreSQL 16 and 18.6
+formatting the same body differently. Whitespace-normalised, the two are
+identical.
+
+**The application code has not been deployed yet**, and does not have to be
+urgently: the procedures take `date` parameters exactly as before, and the old
+reader parses the ISO text fine. The irony is that the failure that started all
+of this — `Convert.ToDateTime` on a `DateOnly` — cannot happen now, because a
+string is `IConvertible` and a `DateOnly` never was.

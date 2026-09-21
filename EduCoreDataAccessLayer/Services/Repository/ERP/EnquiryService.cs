@@ -184,7 +184,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_enquiry_id",             NpgsqlDbType.Integer) { Value = model.EnquiryId > 0 ? model.EnquiryId : DBNull.Value },
                 new("p_student_name",           NpgsqlDbType.Text)    { Value = model.StudentName },
                 new("p_gender",                 NpgsqlDbType.Text)    { Value = (object?)model.Gender                 ?? DBNull.Value },
-                new("p_dob",                    NpgsqlDbType.Date)    { Value = (object?)model.Dob                    ?? DBNull.Value },
+                new("p_dob",                    NpgsqlDbType.Unknown)    { Value = (object?)model.Dob                    ?? DBNull.Value },
                 new("p_class_name",             NpgsqlDbType.Text)    { Value = model.ClassName },
                 new("p_session",                NpgsqlDbType.Text)    { Value = model.Session },
                 new("p_interested_stream",      NpgsqlDbType.Text)    { Value = (object?)model.InterestedStream       ?? DBNull.Value },
@@ -203,11 +203,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_status",                 NpgsqlDbType.Text)    { Value = model.Status },
                 new("p_assigned_to_id",         NpgsqlDbType.Integer) { Value = (object?)model.AssignedToId          ?? DBNull.Value },
                 new("p_lost_reason",            NpgsqlDbType.Text)    { Value = (object?)model.LostReason             ?? DBNull.Value },
-                new("p_next_followup_date",     NpgsqlDbType.Date)    { Value = (object?)model.NextFollowupDate       ?? DBNull.Value },
+                new("p_next_followup_date",     NpgsqlDbType.Unknown)    { Value = (object?)model.NextFollowupDate       ?? DBNull.Value },
                 new("p_notes",                  NpgsqlDbType.Text)    { Value = (object?)model.Notes                  ?? DBNull.Value },
                 new("p_estimated_fee",          NpgsqlDbType.Numeric) { Value = (object?)model.EstimatedFee          ?? DBNull.Value },
                 new("p_registration_number",    NpgsqlDbType.Text)    { Value = (object?)model.RegistrationNumber     ?? DBNull.Value },
-                new("p_registration_date",      NpgsqlDbType.Date)    { Value = (object?)model.RegistrationDate       ?? DBNull.Value },
+                new("p_registration_date",      NpgsqlDbType.Unknown)    { Value = (object?)model.RegistrationDate       ?? DBNull.Value },
                 new("p_registration_fee_paid",  NpgsqlDbType.Boolean) { Value = model.RegistrationFeePaid },
                 new("p_parent_email",           NpgsqlDbType.Text)    { Value = (object?)model.ParentEmail       ?? DBNull.Value },
                 new("p_current_class",          NpgsqlDbType.Text)    { Value = (object?)model.CurrentClass      ?? DBNull.Value },
@@ -260,7 +260,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         // ── Register enquiry ─────────────────────────────────────
         public async Task<(int Success, string Message, string? RegistrationNumber)> RegisterEnquiryAsync(
-            int enquiryId, string? registrationNumber, DateOnly? registrationDate,
+            int enquiryId, string? registrationNumber, string? registrationDate,
             bool registrationFeePaid, bool autoGenerate, string? prefix,
             int tenantId, int schoolId, int actionUserId)
         {
@@ -274,7 +274,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_action_user_id",        NpgsqlDbType.Integer) { Value = actionUserId },
                 new("p_enquiry_id",            NpgsqlDbType.Integer) { Value = enquiryId },
                 new("p_registration_number",   NpgsqlDbType.Text)    { Value = (object?)registrationNumber ?? DBNull.Value },
-                new("p_registration_date",     NpgsqlDbType.Date)    { Value = (object?)registrationDate   ?? DBNull.Value },
+                new("p_registration_date",     NpgsqlDbType.Unknown)    { Value = (object?)registrationDate   ?? DBNull.Value },
                 new("p_registration_fee_paid", NpgsqlDbType.Boolean) { Value = registrationFeePaid },
                 new("p_auto_generate",         NpgsqlDbType.Boolean) { Value = autoGenerate },
                 new("p_prefix",                NpgsqlDbType.Text)    { Value = (object?)prefix ?? DBNull.Value },
@@ -318,7 +318,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             string   followupType,
             string?  outcome,
             string?  notes,
-            DateOnly? nextFollowupDate,
+            string? nextFollowupDate,
             string?  newStatus,
             string?  lostReason,
             int      tenantId,
@@ -337,7 +337,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_followup_type",       NpgsqlDbType.Text)    { Value = followupType },
                 new("p_outcome",             NpgsqlDbType.Text)    { Value = (object?)outcome          ?? DBNull.Value },
                 new("p_notes",               NpgsqlDbType.Text)    { Value = (object?)notes            ?? DBNull.Value },
-                new("p_next_followup_date",  NpgsqlDbType.Date)    { Value = (object?)nextFollowupDate ?? DBNull.Value },
+                new("p_next_followup_date",  NpgsqlDbType.Unknown)    { Value = (object?)nextFollowupDate ?? DBNull.Value },
                 new("p_new_status",          NpgsqlDbType.Text)    { Value = (object?)newStatus        ?? DBNull.Value },
                 new("p_lost_reason",         NpgsqlDbType.Text)    { Value = (object?)lostReason       ?? DBNull.Value },
                 new("p_result", NpgsqlDbType.Refcursor)
@@ -383,7 +383,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     FollowupType = row["followup_type"] == DBNull.Value ? "Call": row["followup_type"].ToString()!,
                     Outcome=row["outcome"]== DBNull.Value ? null: row["outcome"].ToString(),
                     Notes  = row["notes"]               == DBNull.Value ? null                  : row["notes"].ToString(),
-                    NextFollowupDate  = DbRead.Date(row, "next_followup_date"),
+                    NextFollowupDate  = DbRead.NStr(row, "next_followup_date"),
                     StatusBefore      = row["status_before"]       == DBNull.Value ? null                  : row["status_before"].ToString(),
                     StatusAfter       = row["status_after"]        == DBNull.Value ? null                  : row["status_after"].ToString(),
                     CreatedBy         = IntVal(row, "created_by"),
@@ -480,7 +480,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             m.SchoolId              = schoolId;
             m.StudentName           = Str(row, "student_name");
             m.Gender                = NullStr(row, "gender");
-            m.Dob                   = DbRead.Date(row, "dob");
+            m.Dob                   = DbRead.NStr(row, "dob");
             m.ClassName             = Str(row, "class_name");
             m.Session               = Str(row, "session");
             m.InterestedStream      = NullStr(row, "interested_stream");
@@ -507,8 +507,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             m.AssignedToId          = Has(row,"assigned_to_id") && row["assigned_to_id"] != DBNull.Value
                                         ? Convert.ToInt32(row["assigned_to_id"]) : null;
             m.LostReason            = NullStr(row, "lost_reason");
-            m.EnquiryDate           = DbRead.Date(row, "enquiry_date") ?? DateOnly.FromDateTime(DateTime.Today);
-            m.NextFollowupDate      = DbRead.Date(row, "next_followup_date");
+            m.EnquiryDate           = DbRead.NStr(row, "enquiry_date") ?? Dates.Today;
+            m.NextFollowupDate      = DbRead.NStr(row, "next_followup_date");
             m.Notes                 = NullStr(row, "notes");
             m.EstimatedFee          = Has(row,"estimated_fee") && row["estimated_fee"] != DBNull.Value
                                         ? Convert.ToDecimal(row["estimated_fee"]) : null;
@@ -534,7 +534,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static string  Str(DataRow r, string col)      => Has(r,col) && r[col] != DBNull.Value ? r[col].ToString()!        : string.Empty;
         private static string? NullStr(DataRow r, string col)  => Has(r,col) && r[col] != DBNull.Value ? r[col].ToString()         : null;
 
-        // A Postgres `date` arrives as DateOnly, which does NOT implement IConvertible —
-        // Convert.ToDateTime on it throws InvalidCastException. Always cast, never Convert.
+        // Date columns are ISO text, so they are read with the plain string
+        // readers above - nothing converts a date on the way in or out.
     }
 }

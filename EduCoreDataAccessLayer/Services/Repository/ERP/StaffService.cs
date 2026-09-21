@@ -56,7 +56,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     StaffType    = NullStr(row, "staff_type"),
                     Department   = NullStr(row, "department"),
                     Designation  = NullStr(row, "designation"),
-                    JoiningDate  = DbRead.DateTimeN(row, "joining_date"),
+                    JoiningDate  = DbRead.NStr(row, "joining_date"),
                     Status       = Str(row, "status"),
                     HasLogin     = row.Table.Columns.Contains("user_id") && row["user_id"] != DBNull.Value
                 });
@@ -108,7 +108,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     StaffType    = NullStr(row, "staff_type"),
                     Department   = NullStr(row, "department"),
                     Designation  = NullStr(row, "designation"),
-                    JoiningDate  = DbRead.DateTimeN(row, "joining_date"),
+                    JoiningDate  = DbRead.NStr(row, "joining_date"),
                     Status       = Str(row, "status"),
                     HasLogin     = row.Table.Columns.Contains("user_id") && row["user_id"] != DBNull.Value
                 });
@@ -133,7 +133,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 EmployeeCode    = NullStr(row, "employee_code"),
                 FullName        = Str(row, "full_name"),
                 Gender          = NullStr(row, "gender"),
-                DateOfBirth     = DbRead.DateTimeN(row, "dob"),
+                DateOfBirth     = DbRead.NStr(row, "dob"),
                 Mobile          = NullStr(row, "mobile"),
                 AltMobile       = NullStr(row, "alt_mobile"),
                 Email           = NullStr(row, "email"),
@@ -142,7 +142,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 StaffType       = NullStr(row, "staff_type"),
                 Department      = NullStr(row, "department"),
                 Designation     = NullStr(row, "designation"),
-                JoiningDate     = DbRead.DateTimeN(row, "joining_date"),
+                JoiningDate     = DbRead.NStr(row, "joining_date"),
                 Qualification   = NullStr(row, "qualification"),
                 ExperienceYears = NullIntVal(row, "experience_years"),
                 Status          = Str(row, "status"),
@@ -405,7 +405,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static NpgsqlParameter Int(string n, int v) => new(n, NpgsqlDbType.Integer) { Value = v };
         private static NpgsqlParameter NInt(string n, int? v) => new(n, NpgsqlDbType.Integer) { Value = (object?)v ?? DBNull.Value };
         private static NpgsqlParameter NDec(string n, decimal? v) => new(n, NpgsqlDbType.Numeric) { Value = (object?)v ?? DBNull.Value };
-        private static NpgsqlParameter NDate(string n, DateTime? v) => new(n, NpgsqlDbType.Date) { Value = (object?)v ?? DBNull.Value };
+        private static NpgsqlParameter NDate(string n, string? v) => new(n, NpgsqlDbType.Unknown) { Value = (object?)v ?? DBNull.Value };
         private static NpgsqlParameter Bool(string n, bool v) => new(n, NpgsqlDbType.Boolean) { Value = v };
 
         // ── DataRow read helpers (tolerate missing/NULL columns) ──
@@ -419,7 +419,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static string Str(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
         private static string? NullStr(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
 
-        // Postgres `date` comes back as DateOnly (Npgsql) or DateTime depending on
+        // Postgres `date` comes back as string (Npgsql) or DateTime depending on
         // the path — handle both so DOB / joining date read back correctly.
     }
 }

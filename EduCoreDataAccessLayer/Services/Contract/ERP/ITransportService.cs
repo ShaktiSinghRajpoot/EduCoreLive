@@ -27,7 +27,7 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<List<TransportRouteOption>> GetRoutesDropdownAsync(int tenantId, int schoolId, int actionUserId);
         Task<StudentTransportAssignment?> GetAssignmentAsync(int studentId, int tenantId, int schoolId, int actionUserId);
         Task<(bool Success, string Message, decimal MonthlyFare, int MonthsGenerated)> SaveAssignmentAsync(
-            int studentId, int routeId, int stopId, string? academicYear, DateOnly? startDate, int months,
+            int studentId, int routeId, int stopId, string? academicYear, string? startDate, int months,
             int tenantId, int schoolId, int actionUserId);
         Task<(bool Success, string Message)> RemoveAssignmentAsync(int studentId, int tenantId, int schoolId, int actionUserId);
     }

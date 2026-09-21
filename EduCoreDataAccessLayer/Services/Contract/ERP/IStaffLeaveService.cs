@@ -12,7 +12,7 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Applies for leave. The proc counts working days (Sundays excluded)
         /// and refuses a range overlapping an existing pending or approved request.</summary>
         Task<StaffLeaveResult> ApplyAsync(
-            int staffId, string leaveType, DateOnly fromDate, DateOnly toDate, string? reason,
+            int staffId, string leaveType, string fromDate, string toDate, string? reason,
             int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Approve or reject. A request that was already decided is refused,

@@ -10,7 +10,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string    FeeHeadName      { get; set; } = string.Empty;
         public string    Frequency        { get; set; } = string.Empty;
         public string?   InstallmentLabel { get; set; }
-        public DateOnly? DueDate          { get; set; }
+        public string? DueDate          { get; set; }
         public decimal   AmountDue        { get; set; }
         public decimal   AmountPaid       { get; set; }
         public decimal   Concession       { get; set; }

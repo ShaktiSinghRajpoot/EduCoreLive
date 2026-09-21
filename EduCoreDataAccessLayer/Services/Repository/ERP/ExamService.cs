@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using System.Globalization;
+using EduCoreDataAccessLayer.Helpers;
 using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
@@ -129,7 +130,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var end   = ParseDate(request.EndDate);
             if (start == null || end == null)
                 return new ExamSaveResult { Message = "Enter the exam start and end dates." };
-            if (end < start)
+            if (string.CompareOrdinal(end, start) < 0)
                 return new ExamSaveResult { Message = "End date cannot be before the start date." };
 
             // Drop empty classes here so the proc's "class has no subjects" rule only
@@ -150,7 +151,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         .Select(s => new
                         {
                             subjectId = s.SubjectId,
-                            examDate  = ParseDate(s.ExamDate)?.ToString("yyyy-MM-dd") ?? string.Empty,
+                            examDate  = Dates.Norm(s.ExamDate) ?? string.Empty,
                             startTime = CleanTime(s.StartTime),
                             endTime   = CleanTime(s.EndTime),
                             maxMarks  = s.MaxMarks  ?? 100m,
@@ -169,8 +170,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             p[7].Value  = request.ExamName.Trim();                                // p_exam_name
             p[8].Value  = string.IsNullOrWhiteSpace(request.ExamType)             // p_exam_type
                             ? (object)DBNull.Value : request.ExamType.Trim();
-            p[9].Value  = start.Value;                                            // p_start_date
-            p[10].Value = end.Value;                                              // p_end_date
+            p[9].Value  = start;                                            // p_start_date
+            p[10].Value = end;                                              // p_end_date
             p[12].Value = JsonSerializer.Serialize(classes);                      // p_items
 
             try
@@ -483,7 +484,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         ExamType  = Has(row, "exam_type") && row["exam_type"] != DBNull.Value
                                       ? row["exam_type"].ToString() : null,
                         StartDate = Has(row, "start_date") && row["start_date"] != DBNull.Value
-                                      ? DateOnly.FromDateTime(Convert.ToDateTime(row["start_date"])) : null
+                                      ? Dates.Norm(Convert.ToDateTime(row["start_date"]).ToString("yyyy-MM-dd")) : null
                     });
 
             if (ds.Tables.Count > 1)
@@ -618,8 +619,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_exam_id",           NpgsqlDbType.Integer) { Value = DBNull.Value },
                 new("p_exam_name",         NpgsqlDbType.Varchar) { Value = DBNull.Value },
                 new("p_exam_type",         NpgsqlDbType.Varchar) { Value = DBNull.Value },
-                new("p_start_date",        NpgsqlDbType.Date)    { Value = DBNull.Value },
-                new("p_end_date",          NpgsqlDbType.Date)    { Value = DBNull.Value },
+                new("p_start_date",        NpgsqlDbType.Unknown)    { Value = DBNull.Value },
+                new("p_end_date",          NpgsqlDbType.Unknown)    { Value = DBNull.Value },
                 new("p_status",            NpgsqlDbType.Varchar) { Value = DBNull.Value },
                 new("p_items",             NpgsqlDbType.Text)    { Value = DBNull.Value },
                 new("p_result",  NpgsqlDbType.Refcursor)
@@ -658,11 +659,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return p;
         }
 
-        private static DateOnly? ParseDate(string? value)
-        {
-            if (string.IsNullOrWhiteSpace(value)) return null;
-            return DateOnly.TryParse(value, CultureInfo.InvariantCulture, out var d) ? d : null;
-        }
+        // Whatever the form sent, normalised to the ISO text the column stores.
+        private static string? ParseDate(string? value) => Dates.Norm(value);
 
         // ── tolerant readers ──
         private static bool Has(DataRow r, string col) => r.Table.Columns.Contains(col);
@@ -688,7 +686,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         /// <summary>
         /// A time column as HH:mm. Npgsql maps a Postgres `time` to TimeOnly, which
-        /// is NOT IConvertible - the same trap as DateOnly, so cast, never Convert.
+        /// is NOT IConvertible, so cast it, never Convert. Time is still a real
+        /// type here - only the date columns became text.
         /// </summary>
         private static string? NullTimeStr(DataRow r, string col)
         {
@@ -708,21 +707,17 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static string DateStr(DataRow r, string col) => NullDateStr(r, col) ?? string.Empty;
 
         /// <summary>
-        /// Same DateOnly / DateTime / parse ladder as <see cref="EduCoreDataAccessLayer.Helpers.DbRead.Date"/>:
-        /// Npgsql maps a Postgres `date` to DateOnly, which is NOT IConvertible, so
-        /// Convert.ToDateTime on it throws "Unable to cast ... to type System.IConvertible".
+        /// A date column as ISO text. The column already holds "YYYY-MM-DD", so
+        /// this only normalises it and still copes with a timestamp column.
         /// </summary>
         private static string? NullDateStr(DataRow r, string col)
         {
             if (!Has(r, col) || r[col] == DBNull.Value) return null;
 
             var v = r[col];
-            if (v is DateOnly d)  return d.ToString("yyyy-MM-dd");
-            if (v is DateTime dt) return dt.ToString("yyyy-MM-dd");
-
-            return DateOnly.TryParse(v.ToString(), CultureInfo.InvariantCulture, out var p)
-                ? p.ToString("yyyy-MM-dd")
-                : null;
+            // The column is ISO text already; only a legacy timestamp needs shaping.
+            if (v is DateTime dt) return dt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return Dates.Norm(v.ToString());
         }
     }
 }

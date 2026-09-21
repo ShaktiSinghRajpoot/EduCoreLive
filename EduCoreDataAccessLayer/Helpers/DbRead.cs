@@ -45,35 +45,26 @@ namespace EduCoreDataAccessLayer.Helpers
         public static string? NStr(NpgsqlDataReader r, HashSet<string> cols, string c)
             => cols.Contains(c) && r[c] != DBNull.Value ? r[c].ToString() : null;
 
-        public static DateOnly? Date(NpgsqlDataReader r, HashSet<string> cols, string c)
-        {
-            if (!cols.Contains(c) || r[c] == DBNull.Value) return null;
-            var v = r[c];
-            if (v is DateOnly d) return d;
-            if (v is DateTime dt) return DateOnly.FromDateTime(dt);
-            return DateOnly.TryParse(v.ToString(), out var p) ? p : null;
-        }
 
         public static DateTime? DateTimeN(NpgsqlDataReader r, HashSet<string> cols, string c)
             => cols.Contains(c) && r[c] != DBNull.Value ? Convert.ToDateTime(r[c]) : null;
 
         // ── DataRow overloads ────────────────────────────────────────────────
-        // Most services still map from a DataSet, and each had grown its own
-        // private DateVal. They were not the same: half checked the runtime type
-        // first, half went straight to Convert.ToDateTime(row[col]) — which
-        // THROWS when the value is already a DateOnly, and Npgsql returns
-        // DateOnly for a `date` column. That is the read error; the column type
-        // was never the problem. One reader, written once, ends it.
+        // Dates are stored as ISO text (YYYY-MM-DD), so they are read as text —
+        // there is no date reader here any more. Every service used to carry its
+        // own private DateVal built on Convert.ToDateTime(row[col]), which THROWS
+        // when the driver hands back a DateOnly. Reading the string ends that
+        // whole class of error. DateTimeN stays for the real timestamp columns
+        // (created_at, paid_at, …), which are still timestamps.
 
-        /// <summary>A date column, whatever shape the driver hands back. Missing or null gives null.</summary>
-        public static DateOnly? Date(DataRow r, string c)
-        {
-            if (!r.Table.Columns.Contains(c) || r[c] == DBNull.Value) return null;
-            var v = r[c];
-            if (v is DateOnly d)  return d;
-            if (v is DateTime dt) return DateOnly.FromDateTime(dt);
-            return DateOnly.TryParse(v.ToString(), out var p) ? p : null;
-        }
+        /// <summary>Non-null string ("" when missing/null).</summary>
+        public static string Str(DataRow r, string c)
+            => r.Table.Columns.Contains(c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
+
+        /// <summary>Nullable string (null when missing/null).</summary>
+        public static string? NStr(DataRow r, string c)
+            => r.Table.Columns.Contains(c) && r[c] != DBNull.Value ? r[c].ToString() : null;
+
 
         /// <summary>A timestamp column. Same tolerance; keeps the time of day.</summary>
         public static DateTime? DateTimeN(DataRow r, string c)
@@ -81,7 +72,6 @@ namespace EduCoreDataAccessLayer.Helpers
             if (!r.Table.Columns.Contains(c) || r[c] == DBNull.Value) return null;
             var v = r[c];
             if (v is DateTime dt) return dt;
-            if (v is DateOnly d)  return d.ToDateTime(TimeOnly.MinValue);
             return DateTime.TryParse(v.ToString(), out var p) ? p : null;
         }
     }

@@ -38,7 +38,7 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         // ── Purchases ───────────────────────────────────────────────────────
         Task<List<PurchaseListItem>> GetPurchasesAsync(
             int tenantId, int schoolId, int actionUserId,
-            DateOnly? fromDate = null, DateOnly? toDate = null);
+            string? fromDate = null, string? toDate = null);
 
         Task<PurchaseDetail?> GetPurchaseAsync(
             int purchaseId, int tenantId, int schoolId, int actionUserId);

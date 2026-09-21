@@ -62,7 +62,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     {
                         EnquiryId           = IntVal(row, "enquiry_id"),
                         RegistrationNumber  = NullStr(row, "registration_number"),
-                        RegistrationDate    = DbRead.Date(row, "registration_date"),
+                        RegistrationDate    = DbRead.NStr(row, "registration_date"),
                         RegistrationFeePaid = BoolVal(row, "registration_fee_paid"),
                         StudentName         = Str(row, "student_name"),
                         ClassName           = NullStr(row, "class_name"),

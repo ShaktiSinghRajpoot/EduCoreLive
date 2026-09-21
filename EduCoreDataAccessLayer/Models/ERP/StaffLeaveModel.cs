@@ -11,8 +11,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string?   Designation  { get; set; }
 
         public string    LeaveType    { get; set; } = string.Empty;
-        public DateOnly? FromDate     { get; set; }
-        public DateOnly? ToDate       { get; set; }
+        public string? FromDate     { get; set; }
+        public string? ToDate       { get; set; }
         public int       Days         { get; set; }
         public string?   Reason       { get; set; }
 

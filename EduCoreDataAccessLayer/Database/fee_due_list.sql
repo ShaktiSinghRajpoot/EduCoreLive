@@ -60,8 +60,8 @@ BEGIN
                COALESCE(NULLIF(TRIM(s.father_email), ''), NULLIF(TRIM(s.mother_email), '')) AS parent_email,
                SUM(d.outstanding) AS total_outstanding,
                -- days the OLDEST overdue installment is past its due date (0 = nothing overdue yet)
-               COALESCE(MAX(CASE WHEN d.due_date < CURRENT_DATE
-                                 THEN (CURRENT_DATE - d.due_date) END), 0) AS overdue_days
+               COALESCE(MAX(CASE WHEN d.due_date::date < CURRENT_DATE
+                                 THEN (CURRENT_DATE - d.due_date::date) END), 0) AS overdue_days
         FROM dues d
         JOIN core.students s ON s.student_id = d.student_id
         WHERE s.tenant_id = p_tenant_id

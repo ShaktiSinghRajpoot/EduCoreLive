@@ -17,11 +17,11 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             string? academicYear = null, int? month = null, int? year = null);
 
         Task<List<AttendanceStudent>> GetRosterAsync(
-            string className, string? section, DateOnly date, int tenantId, int schoolId, int actionUserId);
+            string className, string? section, string date, int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Upsert the whole class's marks for the date.</summary>
         Task<AttendanceSaveResult> SaveAsync(
-            DateOnly date, List<AttendanceMark> marks, int tenantId, int schoolId, int actionUserId);
+            string date, List<AttendanceMark> marks, int tenantId, int schoolId, int actionUserId);
 
         /// <summary>A class/section's full month of attendance for the report views.</summary>
         Task<AttendanceMonthRegister> GetMonthRegisterAsync(

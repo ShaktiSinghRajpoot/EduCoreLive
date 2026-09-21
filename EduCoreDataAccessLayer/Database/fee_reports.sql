@@ -68,7 +68,7 @@ BEGIN
     LEFT JOIN core.enquiries e ON e.enquiry_id  = p.enquiry_id
     WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
       AND p.is_cancelled = FALSE
-      AND p.payment_date BETWEEN v_from AND v_to
+      AND p.payment_date::date BETWEEN v_from AND v_to
     ORDER BY p.payment_date, p.payment_id;
 
     OPEN p_modes FOR
@@ -76,7 +76,7 @@ BEGIN
     FROM core.fee_payments
     WHERE tenant_id = p_tenant_id AND school_id = p_school_id
       AND is_cancelled = FALSE
-      AND payment_date BETWEEN v_from AND v_to
+      AND payment_date::date BETWEEN v_from AND v_to
     GROUP BY payment_mode
     ORDER BY payment_mode;
 
@@ -91,7 +91,7 @@ BEGIN
         JOIN core.fee_payments p ON p.payment_id = d.payment_id
         WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
           AND p.is_cancelled = FALSE
-          AND p.payment_date BETWEEN v_from AND v_to
+          AND p.payment_date::date BETWEEN v_from AND v_to
         GROUP BY d.fee_head_name
 
         UNION ALL
@@ -101,7 +101,7 @@ BEGIN
         WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
           AND p.is_cancelled = FALSE
           AND p.payment_type = 'Registration'
-          AND p.payment_date BETWEEN v_from AND v_to
+          AND p.payment_date::date BETWEEN v_from AND v_to
         HAVING COUNT(*) > 0
     ) x
     GROUP BY fee_head_name
@@ -141,10 +141,10 @@ BEGIN
            s.section,
            s.roll_no,
            SUM(d.outstanding)                                                                        AS total_outstanding,
-           COALESCE(SUM(d.outstanding) FILTER (WHERE d.due_date IS NULL OR d.due_date >= CURRENT_DATE), 0)              AS not_due,
-           COALESCE(SUM(d.outstanding) FILTER (WHERE d.due_date < CURRENT_DATE AND (CURRENT_DATE - d.due_date) <= 30), 0) AS d0_30,
-           COALESCE(SUM(d.outstanding) FILTER (WHERE (CURRENT_DATE - d.due_date) BETWEEN 31 AND 60), 0)                 AS d31_60,
-           COALESCE(SUM(d.outstanding) FILTER (WHERE (CURRENT_DATE - d.due_date) > 60), 0)                             AS d60_plus
+           COALESCE(SUM(d.outstanding) FILTER (WHERE d.due_date IS NULL OR d.due_date::date >= CURRENT_DATE), 0)              AS not_due,
+           COALESCE(SUM(d.outstanding) FILTER (WHERE d.due_date::date < CURRENT_DATE AND (CURRENT_DATE - d.due_date::date) <= 30), 0) AS d0_30,
+           COALESCE(SUM(d.outstanding) FILTER (WHERE (CURRENT_DATE - d.due_date::date) BETWEEN 31 AND 60), 0)                 AS d31_60,
+           COALESCE(SUM(d.outstanding) FILTER (WHERE (CURRENT_DATE - d.due_date::date) > 60), 0)                             AS d60_plus
     FROM dues d
     JOIN core.students s ON s.student_id = d.student_id
     WHERE (NULLIF(trim(p_class), '')   IS NULL OR s.class_name = p_class)

@@ -22,7 +22,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int       ExamId    { get; set; }
         public string    ExamName  { get; set; } = string.Empty;
         public string?   ExamType  { get; set; }
-        public DateOnly? StartDate { get; set; }
+        public string? StartDate { get; set; }
     }
 
     public class StudentExamSubject

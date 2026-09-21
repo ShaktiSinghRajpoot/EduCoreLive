@@ -100,7 +100,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 rows.Add(new StockMovement
                 {
                     MovementId   = IntVal(r, "movement_id"),
-                    MovementDate = DbRead.Date(r, "movement_date") ?? default,
+                    MovementDate = DbRead.NStr(r, "movement_date") ?? default,
                     MovementType = Str(r, "movement_type"),
                     Quantity     = DecVal(r, "quantity"),
                     BalanceAfter = DecVal(r, "balance_after"),
@@ -163,7 +163,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         // ── Purchases ───────────────────────────────────────────────────────
         public async Task<List<PurchaseListItem>> GetPurchasesAsync(
             int tenantId, int schoolId, int actionUserId,
-            DateOnly? fromDate = null, DateOnly? toDate = null)
+            string? fromDate = null, string? toDate = null)
         {
             var list = new List<PurchaseListItem>();
             if (tenantId <= 1 || schoolId <= 0) return list;
@@ -177,7 +177,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 list.Add(new PurchaseListItem
                 {
                     PurchaseId   = IntVal(r, "purchase_id"),
-                    PurchaseDate = DbRead.Date(r, "purchase_date") ?? default,
+                    PurchaseDate = DbRead.NStr(r, "purchase_date") ?? default,
                     SupplierName = Str(r, "supplier_name"),
                     InvoiceNo    = Str(r, "invoice_no"),
                     PaymentMode  = Str(r, "payment_mode"),
@@ -205,7 +205,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var detail = new PurchaseDetail
             {
                 PurchaseId   = IntVal(h, "purchase_id"),
-                PurchaseDate = DbRead.Date(h, "purchase_date") ?? default,
+                PurchaseDate = DbRead.NStr(h, "purchase_date") ?? default,
                 SupplierId   = IntVal(h, "supplier_id") is var sid && sid > 0 ? sid : null,
                 SupplierName = Str(h, "supplier_name"),
                 InvoiceNo    = Str(h, "invoice_no"),
@@ -370,9 +370,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         private static NpgsqlParameter[] PurchaseParams(
             string operation, int tenantId, int schoolId, int actionUserId,
-            int? purchaseId = null, int? supplierId = null, DateOnly? purchaseDate = null,
+            int? purchaseId = null, int? supplierId = null, string? purchaseDate = null,
             string? invoiceNo = null, string? paymentMode = null, string? remarks = null,
-            string? itemsJson = null, DateOnly? fromDate = null, DateOnly? toDate = null)
+            string? itemsJson = null, string? fromDate = null, string? toDate = null)
             => new NpgsqlParameter[]
         {
             new("p_operation",      NpgsqlDbType.Text)    { Value = operation },
@@ -381,13 +381,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
             new("p_purchase_id",    NpgsqlDbType.Integer) { Value = (object?)purchaseId ?? DBNull.Value },
             new("p_supplier_id",    NpgsqlDbType.Integer) { Value = (object?)supplierId ?? DBNull.Value },
-            new("p_purchase_date",  NpgsqlDbType.Date)    { Value = purchaseDate.HasValue ? purchaseDate.Value : (object)DBNull.Value },
+            new("p_purchase_date",  NpgsqlDbType.Unknown)    { Value = (object?)purchaseDate ?? DBNull.Value },
             new("p_invoice_no",     NpgsqlDbType.Text)    { Value = (object?)invoiceNo ?? DBNull.Value },
             new("p_payment_mode",   NpgsqlDbType.Text)    { Value = (object?)paymentMode ?? DBNull.Value },
             new("p_remarks",        NpgsqlDbType.Text)    { Value = (object?)remarks ?? DBNull.Value },
             new("p_items",          NpgsqlDbType.Jsonb)   { Value = (object?)itemsJson ?? "[]" },
-            new("p_from_date",      NpgsqlDbType.Date)    { Value = fromDate.HasValue ? fromDate.Value : (object)DBNull.Value },
-            new("p_to_date",        NpgsqlDbType.Date)    { Value = toDate.HasValue ? toDate.Value : (object)DBNull.Value },
+            new("p_from_date",      NpgsqlDbType.Unknown)    { Value = (object?)fromDate ?? DBNull.Value },
+            new("p_to_date",        NpgsqlDbType.Unknown)    { Value = (object?)toDate ?? DBNull.Value },
             new("p_result",  NpgsqlDbType.Refcursor)
                 { Direction = ParameterDirection.InputOutput, Value = "purchase_cursor" },
             new("p_result2", NpgsqlDbType.Refcursor)

@@ -67,7 +67,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_payment_mode",   NpgsqlDbType.Text)    { Value = string.IsNullOrWhiteSpace(paymentMode) ? "Cash" : paymentMode },
                 new("p_reference_no",   NpgsqlDbType.Text)    { Value = (object?)referenceNo ?? DBNull.Value },
                 new("p_remarks",        NpgsqlDbType.Text)    { Value = (object?)remarks ?? DBNull.Value },
-                new("p_payment_date",   NpgsqlDbType.Date)    { Value = DBNull.Value },
+                new("p_payment_date",   NpgsqlDbType.Unknown)    { Value = DBNull.Value },
                 new("p_fin_year",        NpgsqlDbType.Text)    { Value = (object?)finYear ?? DBNull.Value },
                 new("p_discount_amount", NpgsqlDbType.Numeric) { Value = discountAmount },
                 new("p_discount_type",   NpgsqlDbType.Text)    { Value = (object?)discountType ?? DBNull.Value },
@@ -272,7 +272,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         FeeHeadName      = DbRead.Str(reader, cols, "fee_head_name"),
                         Frequency        = DbRead.Str(reader, cols, "frequency"),
                         InstallmentLabel = DbRead.NStr(reader, cols, "installment_label"),
-                        DueDate          = DbRead.Date(reader, cols, "due_date"),
+                        DueDate          = DbRead.NStr(reader, cols, "due_date"),
                         AmountDue        = DbRead.Dec(reader, cols, "amount_due"),
                         AmountPaid       = DbRead.Dec(reader, cols, "amount_paid"),
                         Concession       = DbRead.Dec(reader, cols, "concession"),
@@ -329,7 +329,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_payment_mode",   NpgsqlDbType.Text)    { Value = string.IsNullOrWhiteSpace(paymentMode) ? "Cash" : paymentMode },
                 new("p_reference_no",   NpgsqlDbType.Text)    { Value = (object?)referenceNo ?? DBNull.Value },
                 new("p_remarks",        NpgsqlDbType.Text)    { Value = (object?)remarks ?? DBNull.Value },
-                new("p_payment_date",    NpgsqlDbType.Date)    { Value = DBNull.Value },
+                new("p_payment_date",    NpgsqlDbType.Unknown)    { Value = DBNull.Value },
                 new("p_fin_year",        NpgsqlDbType.Text)    { Value = (object?)finYear ?? DBNull.Value },
                 new("p_discount_type",   NpgsqlDbType.Text)    { Value = (object?)discountType ?? DBNull.Value },
                 new("p_discount_value",  NpgsqlDbType.Numeric) { Value = discountValue },
@@ -354,7 +354,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             ReceiptNo       = DbRead.NStr(reader, cols, "receipt_no"),
                             Amount          = DbRead.Dec(reader, cols, "amount"),
                             ConcessionTotal = DbRead.Dec(reader, cols, "concession_total"),
-                            PaymentDate     = DbRead.Date(reader, cols, "payment_date")
+                            PaymentDate     = DbRead.NStr(reader, cols, "payment_date")
                         };
                     }
                 });
@@ -397,7 +397,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     list.Add(new FeePaymentHistoryItem
                     {
                         ReceiptNo       = DbRead.Str(reader, cols, "receipt_no"),
-                        PaymentDate     = DbRead.Date(reader, cols, "payment_date"),
+                        PaymentDate     = DbRead.NStr(reader, cols, "payment_date"),
                         Amount          = DbRead.Dec(reader, cols, "amount"),
                         ConcessionTotal = DbRead.Dec(reader, cols, "concession_total"),
                         PaymentMode     = DbRead.Str(reader, cols, "payment_mode"),
@@ -550,9 +550,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<DayCollection> GetDayCollectionAsync(
-            DateOnly? date, int tenantId, int schoolId, int actionUserId)
+            string? date, int tenantId, int schoolId, int actionUserId)
         {
-            var day = new DayCollection { Date = date ?? DateOnly.FromDateTime(DateTime.Today) };
+            var day = new DayCollection { Date = date ?? Dates.Today };
             if (tenantId <= 1 || schoolId <= 0)
                 return day;
 
@@ -561,7 +561,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
-                new("p_date",           NpgsqlDbType.Date)    { Value = (object?)date ?? DBNull.Value },
+                new("p_date",           NpgsqlDbType.Unknown)    { Value = (object?)date ?? DBNull.Value },
                 new("p_summary", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "summary_cursor" },
                 new("p_modes",   NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "modes_cursor" }
             };
@@ -573,7 +573,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     var cols = reader.Columns();
                     if (await reader.ReadAsync())
                     {
-                        day.Date           = DbRead.Date(reader, cols, "close_date") ?? day.Date;
+                        day.Date           = DbRead.NStr(reader, cols, "close_date") ?? day.Date;
                         day.TotalCollected = DbRead.Dec(reader, cols, "total_collected");
                         day.ReceiptCount   = DbRead.Int(reader, cols, "receipt_count");
                         day.CancelledCount = DbRead.Int(reader, cols, "cancelled_count");
@@ -606,7 +606,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<(bool Success, string Message, decimal ExpectedCash, decimal Difference)> CloseDayAsync(
-            DateOnly? date, decimal countedCash, string? remarks, int tenantId, int schoolId, int actionUserId)
+            string? date, decimal countedCash, string? remarks, int tenantId, int schoolId, int actionUserId)
         {
             if (tenantId <= 1 || schoolId <= 0)
                 return (false, "Invalid request.", 0, 0);
@@ -616,7 +616,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
-                new("p_date",           NpgsqlDbType.Date)    { Value = (object?)date ?? DBNull.Value },
+                new("p_date",           NpgsqlDbType.Unknown)    { Value = (object?)date ?? DBNull.Value },
                 new("p_counted_cash",   NpgsqlDbType.Numeric) { Value = countedCash },
                 new("p_remarks",        NpgsqlDbType.Text)    { Value = (object?)remarks ?? DBNull.Value },
                 new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
@@ -653,12 +653,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<CollectionRegister> GetCollectionRegisterAsync(
-            DateOnly? from, DateOnly? to, int tenantId, int schoolId, int actionUserId)
+            string? from, string? to, int tenantId, int schoolId, int actionUserId)
         {
             var reg = new CollectionRegister
             {
-                From = from ?? DateOnly.FromDateTime(DateTime.Today),
-                To   = to   ?? DateOnly.FromDateTime(DateTime.Today)
+                From = from ?? Dates.Today,
+                To   = to   ?? Dates.Today
             };
             if (tenantId <= 1 || schoolId <= 0)
                 return reg;
@@ -668,8 +668,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
-                new("p_from",           NpgsqlDbType.Date)    { Value = (object?)from ?? DBNull.Value },
-                new("p_to",             NpgsqlDbType.Date)    { Value = (object?)to   ?? DBNull.Value },
+                new("p_from",           NpgsqlDbType.Unknown)    { Value = (object?)from ?? DBNull.Value },
+                new("p_to",             NpgsqlDbType.Unknown)    { Value = (object?)to   ?? DBNull.Value },
                 new("p_receipts", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "receipts_cursor" },
                 new("p_modes",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "modes_cursor" },
                 new("p_heads",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "heads_cursor" }
@@ -684,7 +684,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         reg.Receipts.Add(new RegisterReceipt
                         {
                             ReceiptNo   = DbRead.Str(reader, cols, "receipt_no"),
-                            Date        = DbRead.Date(reader, cols, "payment_date"),
+                            Date        = DbRead.NStr(reader, cols, "payment_date"),
                             Amount      = DbRead.Dec(reader, cols, "amount"),
                             Mode        = DbRead.Str(reader, cols, "payment_mode"),
                             StudentName = DbRead.Str(reader, cols, "student_name"),
@@ -729,7 +729,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<RefundRegister> GetRefundRegisterAsync(
-            DateOnly? from, DateOnly? to, int tenantId, int schoolId, int actionUserId)
+            string? from, string? to, int tenantId, int schoolId, int actionUserId)
         {
             var reg = new RefundRegister();
             if (tenantId <= 1 || schoolId <= 0) return reg;
@@ -739,8 +739,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
-                new("p_from",           NpgsqlDbType.Date)    { Value = (object?)from ?? DBNull.Value },
-                new("p_to",             NpgsqlDbType.Date)    { Value = (object?)to   ?? DBNull.Value },
+                new("p_from",           NpgsqlDbType.Unknown)    { Value = (object?)from ?? DBNull.Value },
+                new("p_to",             NpgsqlDbType.Unknown)    { Value = (object?)to   ?? DBNull.Value },
                 new("p_rows",  NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "refund_rows_cursor" },
                 new("p_modes", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "refund_modes_cursor" }
             };
@@ -782,7 +782,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<(List<ConcessionRow> Concessions, List<CancellationRow> Cancellations)> GetConcessionCancelRegisterAsync(
-            DateOnly? from, DateOnly? to, int tenantId, int schoolId, int actionUserId)
+            string? from, string? to, int tenantId, int schoolId, int actionUserId)
         {
             var concessions = new List<ConcessionRow>();
             var cancels = new List<CancellationRow>();
@@ -794,8 +794,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
-                new("p_from",           NpgsqlDbType.Date)    { Value = (object?)from ?? DBNull.Value },
-                new("p_to",             NpgsqlDbType.Date)    { Value = (object?)to   ?? DBNull.Value },
+                new("p_from",           NpgsqlDbType.Unknown)    { Value = (object?)from ?? DBNull.Value },
+                new("p_to",             NpgsqlDbType.Unknown)    { Value = (object?)to   ?? DBNull.Value },
                 new("p_concessions", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "concessions_cursor" },
                 new("p_cancels",     NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cancels_cursor" }
             };
@@ -809,7 +809,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         concessions.Add(new ConcessionRow
                         {
                             ReceiptNo     = DbRead.Str(reader, cols, "receipt_no"),
-                            Date          = DbRead.Date(reader, cols, "payment_date"),
+                            Date          = DbRead.NStr(reader, cols, "payment_date"),
                             Concession    = DbRead.Dec(reader, cols, "concession_total"),
                             DiscountType  = DbRead.NStr(reader, cols, "discount_type"),
                             DiscountValue = DbRead.Dec(reader, cols, "discount_value"),
@@ -827,7 +827,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         cancels.Add(new CancellationRow
                         {
                             ReceiptNo    = DbRead.Str(reader, cols, "receipt_no"),
-                            Date         = DbRead.Date(reader, cols, "payment_date"),
+                            Date         = DbRead.NStr(reader, cols, "payment_date"),
                             Amount       = DbRead.Dec(reader, cols, "amount"),
                             Reason       = DbRead.NStr(reader, cols, "cancel_reason"),
                             AuthorizedBy = DbRead.NStr(reader, cols, "cancel_authorized_by"),
@@ -937,7 +937,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             receipt = new FeeReceipt
                             {
                                 ReceiptNo       = DbRead.Str(reader, cols, "receipt_no"),
-                                PaymentDate     = DbRead.Date(reader, cols, "payment_date"),
+                                PaymentDate     = DbRead.NStr(reader, cols, "payment_date"),
                                 Amount          = DbRead.Dec(reader, cols, "amount"),
                                 ConcessionTotal = DbRead.Dec(reader, cols, "concession_total"),
                                 PaymentMode     = DbRead.Str(reader, cols, "payment_mode"),

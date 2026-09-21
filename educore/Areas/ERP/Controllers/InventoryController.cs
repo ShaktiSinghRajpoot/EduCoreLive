@@ -123,7 +123,7 @@ namespace educore.Areas.ERP.Controllers
 
             return Json(rows.Select(r => new
             {
-                date    = r.MovementDate.ToString("dd MMM yyyy"),
+                date    = Dates.Show(r.MovementDate),
                 type    = r.MovementType,
                 qty     = r.Quantity,
                 balance = r.BalanceAfter,
@@ -170,14 +170,14 @@ namespace educore.Areas.ERP.Controllers
 
         // ── Purchases ───────────────────────────────────────────────────────
         [HttpGet]
-        public async Task<IActionResult> Purchases(DateOnly? from = null, DateOnly? to = null)
+        public async Task<IActionResult> Purchases(string? from = null, string? to = null)
         {
             var rows = await _inventory.GetPurchasesAsync(TenantId(), SchoolId(), UserId(), from, to);
 
             return Json(rows.Select(r => new
             {
                 id        = r.PurchaseId,
-                date      = r.PurchaseDate.ToString("dd MMM yyyy"),
+                date      = Dates.Show(r.PurchaseDate, "dd MMM yyyy"),
                 supplier  = r.SupplierName,
                 invoice   = r.InvoiceNo,
                 mode      = r.PaymentMode,
@@ -199,7 +199,7 @@ namespace educore.Areas.ERP.Controllers
             {
                 success   = true,
                 id        = p.PurchaseId,
-                date      = p.PurchaseDate.ToString("yyyy-MM-dd"),
+                date      = p.PurchaseDate,
                 supplier  = p.SupplierName,
                 invoice   = p.InvoiceNo,
                 mode      = p.PaymentMode,

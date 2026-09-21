@@ -97,8 +97,8 @@ BEGIN
         FROM academic.school_calendar
         WHERE tenant_id = p_tenant_id
           AND school_id = p_school_id
-          AND calendar_date >= COALESCE(p_date,    date_trunc('year', CURRENT_DATE)::date)
-          AND calendar_date <= COALESCE(p_to_date, (date_trunc('year', CURRENT_DATE) + interval '1 year - 1 day')::date)
+          AND calendar_date::date >= COALESCE(p_date,    date_trunc('year', CURRENT_DATE)::date)
+          AND calendar_date::date <= COALESCE(p_to_date, (date_trunc('year', CURRENT_DATE) + interval '1 year - 1 day')::date)
         ORDER BY calendar_date;
 
         OPEN p_result2 FOR
@@ -124,7 +124,7 @@ BEGIN
         FROM academic.school_calendar
         WHERE tenant_id = p_tenant_id
           AND school_id = p_school_id
-          AND calendar_date = COALESCE(p_date, CURRENT_DATE);
+          AND calendar_date::date = COALESCE(p_date, CURRENT_DATE);
 
         IF FOUND THEN
             -- A dated entry overrides the weekly pattern in both directions.
@@ -203,7 +203,7 @@ BEGIN
         WHERE tenant_id = p_tenant_id
           AND school_id = p_school_id
           AND (   (p_calendar_id IS NOT NULL AND calendar_id   = p_calendar_id)
-               OR (p_calendar_id IS NULL     AND calendar_date = p_date));
+               OR (p_calendar_id IS NULL     AND calendar_date::date = p_date));
 
         OPEN p_result FOR SELECT TRUE AS success, 'Entry removed.' AS message;
         OPEN p_result2 FOR SELECT 1 WHERE FALSE;

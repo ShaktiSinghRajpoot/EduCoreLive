@@ -491,7 +491,7 @@ BEGIN
 
     SELECT academic_year_id, academic_year_name INTO v_nextid, v_next
       FROM academic.academic_years
-     WHERE tenant_id = c_tenant AND school_id = c_school AND start_date > v_start
+     WHERE tenant_id = c_tenant AND school_id = c_school AND start_date::date > v_start
      ORDER BY start_date LIMIT 1;
 
     IF v_next IS NULL THEN

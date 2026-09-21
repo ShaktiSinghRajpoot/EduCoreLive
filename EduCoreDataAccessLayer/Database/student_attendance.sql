@@ -109,12 +109,12 @@ BEGIN
            ON a.student_id      = s.student_id
           AND a.tenant_id       = s.tenant_id
           AND a.school_id       = s.school_id
-          AND a.attendance_date = p_date
+          AND a.attendance_date::date = p_date
     WHERE s.tenant_id = p_tenant_id
       AND s.school_id = p_school_id
       AND s.is_active = TRUE
       -- A student can't be on a register before they were admitted.
-      AND (s.admission_date IS NULL OR s.admission_date <= p_date)
+      AND (s.admission_date IS NULL OR s.admission_date::date <= p_date)
       AND (p_class   IS NULL OR TRIM(p_class)   = '' OR LOWER(s.class_name)          = LOWER(TRIM(p_class)))
       AND (p_section IS NULL OR TRIM(p_section) = '' OR LOWER(COALESCE(s.section,'')) = LOWER(TRIM(p_section)))
     ORDER BY
@@ -191,7 +191,7 @@ BEGIN
      AND s.school_id  = p_school_id
     WHERE TRIM(i.status) IN ('Present', 'Absent', 'Late', 'Leave')
       -- C: never record attendance before a student's admission date.
-      AND (s.admission_date IS NULL OR s.admission_date <= p_date)
+      AND (s.admission_date IS NULL OR s.admission_date::date <= p_date)
     ON CONFLICT (tenant_id, school_id, student_id, attendance_date) DO UPDATE
         SET status     = EXCLUDED.status,
             remarks    = EXCLUDED.remarks,

@@ -99,7 +99,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     ClassName    = NullStr(row, "class_name"),
                     Section      = NullStr(row, "section"),
                     AcademicYear = NullStr(row, "academic_year"),
-                    Dob          = DbRead.Date(row, "dob"),
+                    Dob          = DbRead.NStr(row, "dob"),
                     BloodGroup   = NullStr(row, "blood_group"),
                     Gender       = NullStr(row, "gender"),
                     GuardianName = NullStr(row, "guardian_name"),

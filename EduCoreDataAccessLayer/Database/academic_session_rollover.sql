@@ -90,7 +90,7 @@ BEGIN
       AND  ay.school_id = p_school_id
       AND  ay.academic_year_id <> v_year_id
       AND  COALESCE(ay.is_deleted, FALSE) = FALSE
-      AND  (v_start IS NULL OR ay.start_date IS NULL OR ay.start_date < v_start)
+      AND  (v_start IS NULL OR ay.start_date IS NULL OR ay.start_date::date < v_start)
       AND  EXISTS (
                SELECT 1 FROM academic.academic_classes ac
                WHERE ac.tenant_id = p_tenant_id

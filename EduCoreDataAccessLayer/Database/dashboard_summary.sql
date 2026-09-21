@@ -75,13 +75,13 @@ BEGIN
         -- Cancelled receipts are not collection.
         (SELECT COALESCE(SUM(fp.amount), 0) FROM core.fee_payments fp
           WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
-            AND fp.payment_date = CURRENT_DATE
+            AND fp.payment_date::date = CURRENT_DATE
             AND COALESCE(fp.is_cancelled, FALSE) = FALSE)
             AS today_collection,
 
         (SELECT COALESCE(SUM(fp.amount), 0) FROM core.fee_payments fp
           WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
-            AND fp.payment_date = CURRENT_DATE - 1
+            AND fp.payment_date::date = CURRENT_DATE - 1
             AND COALESCE(fp.is_cancelled, FALSE) = FALSE)
             AS yesterday_collection,
 
@@ -99,19 +99,19 @@ BEGIN
         (SELECT COUNT(*) FROM core.staff_leave sl
           WHERE sl.tenant_id = p_tenant_id AND sl.school_id = p_school_id
             AND sl.status = 'Approved'
-            AND CURRENT_DATE BETWEEN sl.from_date AND sl.to_date)::int
+            AND CURRENT_DATE BETWEEN sl.from_date::date AND sl.to_date::date)::int
             AS on_leave_today,
 
         -- Today's attendance, over students whose class actually took a register.
         (SELECT COUNT(*) FROM core.student_attendance a
           WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
-            AND a.attendance_date = CURRENT_DATE
+            AND a.attendance_date::date = CURRENT_DATE
             AND a.status NOT IN ('Absent', 'Leave'))::int
             AS present_today,
 
         (SELECT COUNT(*) FROM core.student_attendance a
           WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
-            AND a.attendance_date = CURRENT_DATE)::int
+            AND a.attendance_date::date = CURRENT_DATE)::int
             AS marked_today;
 
     -- ── 2. Collection, last 7 days ──────────────────────────────────────────
@@ -121,7 +121,7 @@ BEGIN
     SELECT g.d::date AS d,
            COALESCE((SELECT SUM(fp.amount) FROM core.fee_payments fp
                       WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
-                        AND fp.payment_date = g.d::date
+                        AND fp.payment_date::date = g.d::date
                         AND COALESCE(fp.is_cancelled, FALSE) = FALSE), 0) AS amount
     FROM generate_series(CURRENT_DATE - 6, CURRENT_DATE, INTERVAL '1 day') AS g(d)
     ORDER BY d;
@@ -144,7 +144,7 @@ BEGIN
     FROM core.fee_payments fp
     WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
       AND COALESCE(fp.is_cancelled, FALSE) = FALSE
-      AND fp.payment_date >= DATE_TRUNC('month', CURRENT_DATE)::date
+      AND fp.payment_date::date >= DATE_TRUNC('month', CURRENT_DATE)::date
     GROUP BY 1
     ORDER BY amount DESC;
 
@@ -192,7 +192,7 @@ BEGIN
     SELECT c.calendar_date, c.title, c.day_type
     FROM academic.school_calendar c
     WHERE c.tenant_id = p_tenant_id AND c.school_id = p_school_id
-      AND c.calendar_date >= CURRENT_DATE
+      AND c.calendar_date::date >= CURRENT_DATE
     ORDER BY c.calendar_date
     LIMIT 6;
 
@@ -204,15 +204,15 @@ BEGIN
     FROM core.students s
     WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND s.is_active
       AND s.dob IS NOT NULL
-      AND EXTRACT(MONTH FROM s.dob) = EXTRACT(MONTH FROM CURRENT_DATE)
-      AND EXTRACT(DAY   FROM s.dob) = EXTRACT(DAY   FROM CURRENT_DATE)
+      AND EXTRACT(MONTH FROM s.dob::date) = EXTRACT(MONTH FROM CURRENT_DATE)
+      AND EXTRACT(DAY   FROM s.dob::date) = EXTRACT(DAY   FROM CURRENT_DATE)
     UNION ALL
     SELECT st.full_name, 'Staff', COALESCE(st.designation, '')
     FROM core.staff st
     WHERE st.tenant_id = p_tenant_id AND st.school_id = p_school_id
       AND st.is_deleted = FALSE AND COALESCE(st.status,'Active') = 'Active'
       AND st.dob IS NOT NULL
-      AND EXTRACT(MONTH FROM st.dob) = EXTRACT(MONTH FROM CURRENT_DATE)
-      AND EXTRACT(DAY   FROM st.dob) = EXTRACT(DAY   FROM CURRENT_DATE);
+      AND EXTRACT(MONTH FROM st.dob::date) = EXTRACT(MONTH FROM CURRENT_DATE)
+      AND EXTRACT(DAY   FROM st.dob::date) = EXTRACT(DAY   FROM CURRENT_DATE);
 END;
 $procedure$;

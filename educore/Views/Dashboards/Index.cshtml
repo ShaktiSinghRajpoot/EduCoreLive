@@ -313,7 +313,7 @@
                             </div>
                             <div class="text-end">
                                 <div class="fw-bold" style="color:#16a34a">@Money(t.Amount)</div>
-                                <small class="text-muted">@(t.PaymentDate?.ToString("dd MMM") ?? "")</small>
+                                <small class="text-muted">@(string.IsNullOrWhiteSpace(t.PaymentDate) ? "" : Dates.Show(t.PaymentDate, "dd MMM"))</small>
                             </div>
                         </div>
                     }
@@ -506,7 +506,7 @@
                                             <i class="bx bxs-circle" style="font-size:.5rem"></i>@(partial ? "Partial" : "Pending")
                                         </span>
                                     </td>
-                                    <td>@(r.LastPayment?.ToString("dd MMM") ?? "—")</td>
+                                    <td>@(string.IsNullOrWhiteSpace(r.LastPayment) ? "—" : Dates.Show(r.LastPayment, "dd MMM"))</td>
                                 </tr>
                             }
                         </tbody>
@@ -525,7 +525,7 @@
             // Real figures, serialized once. Anything the app does not record is not
             // charted — see the removed cards above.
             const DASH = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new {
-                trend   = Model.Trend.Select(t => new { label = t.Date.ToString("ddd"), amount = t.Amount }),
+                trend   = Model.Trend.Select(t => new { label = Dates.Show(t.Date, "ddd"), amount = t.Amount }),
                 classes = Model.Classes.Select(c => new { name = c.ClassName, students = c.Students }),
                 modes   = Model.Modes.Select(m => new { name = m.Mode, amount = m.Amount }),
                 attendancePct = Model.MarkedToday == 0 ? 0 : Math.Round(Model.PresentToday * 100.0 / Model.MarkedToday)

@@ -397,7 +397,7 @@ BEGIN
         WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
           AND fee_head_name = 'Transport Fee'
           AND amount_paid = 0 AND concession = 0
-          AND due_date >= DATE_TRUNC('month', v_start)::date;
+          AND due_date::date >= DATE_TRUNC('month', v_start)::date;
 
         INSERT INTO core.student_transport
             (tenant_id, school_id, student_id, route_id, stop_id, monthly_fare,
@@ -413,7 +413,7 @@ BEGIN
                 SELECT 1 FROM core.student_ledger
                 WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
                   AND fee_head_name = 'Transport Fee'
-                  AND due_date = (v_month_start + (v_i || ' month')::interval)::date
+                  AND due_date::date = (v_month_start + (v_i || ' month')::interval)::date
             ) THEN
                 INSERT INTO core.student_ledger
                     (tenant_id, school_id, student_id, fee_head_name, frequency,
@@ -442,7 +442,7 @@ BEGIN
         WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
           AND fee_head_name = 'Transport Fee'
           AND amount_paid = 0 AND concession = 0
-          AND due_date >= DATE_TRUNC('month', CURRENT_DATE)::date;
+          AND due_date::date >= DATE_TRUNC('month', CURRENT_DATE)::date;
 
         OPEN p_result FOR SELECT TRUE AS success, 'Transport removed.' AS message;
 

@@ -54,7 +54,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int       RouteId      { get; set; }
         public int       StopId       { get; set; }
         public decimal   MonthlyFare  { get; set; }
-        public DateOnly? StartDate    { get; set; }
+        public string? StartDate    { get; set; }
         public string?   RouteName    { get; set; }
         public string?   StopName     { get; set; }
     }

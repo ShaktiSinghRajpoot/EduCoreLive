@@ -121,16 +121,16 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         /// <summary>The logged-in cashier's collection for a day (mode-wise) for reconciliation.</summary>
         Task<DayCollection> GetDayCollectionAsync(
-            DateOnly? date, int tenantId, int schoolId, int actionUserId);
+            string? date, int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Closes the cashier's day: records counted cash vs expected and the difference.</summary>
         Task<(bool Success, string Message, decimal ExpectedCash, decimal Difference)> CloseDayAsync(
-            DateOnly? date, decimal countedCash, string? remarks,
+            string? date, decimal countedCash, string? remarks,
             int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Collection register for a date range (receipts + mode + head totals), school-wide.</summary>
         Task<CollectionRegister> GetCollectionRegisterAsync(
-            DateOnly? from, DateOnly? to, int tenantId, int schoolId, int actionUserId);
+            string? from, string? to, int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Students who still owe, with class-wise aging (optionally filtered by class/section).</summary>
         Task<List<DefaulterRow>> GetDefaultersAsync(
@@ -141,10 +141,10 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// with the collection register so the screen can report NET = collected − refunded.
         /// </summary>
         Task<RefundRegister> GetRefundRegisterAsync(
-            DateOnly? from, DateOnly? to, int tenantId, int schoolId, int actionUserId);
+            string? from, string? to, int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Audit register: concessions given + receipts cancelled, in a date range.</summary>
         Task<(List<ConcessionRow> Concessions, List<CancellationRow> Cancellations)> GetConcessionCancelRegisterAsync(
-            DateOnly? from, DateOnly? to, int tenantId, int schoolId, int actionUserId);
+            string? from, string? to, int tenantId, int schoolId, int actionUserId);
     }
 }

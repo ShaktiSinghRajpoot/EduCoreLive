@@ -190,7 +190,7 @@ BEGIN
 
     SELECT next_followup_date INTO v_txt FROM core.enquiries WHERE enquiry_id = v_eid;
     PERFORM pg_temp.chk('C2 next follow-up date carried onto the enquiry',
-                        (SELECT next_followup_date FROM core.enquiries WHERE enquiry_id = v_eid) = CURRENT_DATE + 7,
+                        (SELECT next_followup_date::date FROM core.enquiries WHERE enquiry_id = v_eid) = CURRENT_DATE + 7,
                         format('enquiry says %s', (SELECT next_followup_date FROM core.enquiries WHERE enquiry_id = v_eid)));
 
     -- ══════════════════════════════════════════════════════════════════════
