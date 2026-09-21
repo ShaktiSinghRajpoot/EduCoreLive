@@ -150,11 +150,11 @@
         <div class="row g-3">
           <div class="col-12 col-sm-8">
             <label class="form-label cs-modal-lbl">Class Name</label>
-            <input type="text" class="form-control" id="mClassName" placeholder="e.g. Class 6">
+            <input type="text" class="form-control" id="mClassName" maxlength="50" placeholder="e.g. Class 6">
           </div>
           <div class="col-12 col-sm-4">
             <label class="form-label cs-modal-lbl">Order / Rank</label>
-            <input type="number" class="form-control" id="mClassRank" min="1" placeholder="6">
+            <input type="number" class="form-control" id="mClassRank" min="1" max="999" placeholder="6">
           </div>
           <div class="col-12 col-sm-6">
             <label class="form-label cs-modal-lbl">Stream</label>
@@ -207,15 +207,15 @@
         <div class="row g-3">
           <div class="col-12 col-sm-6">
             <label class="form-label cs-modal-lbl">Section Name</label>
-            <input type="text" class="form-control" id="mSecName" placeholder="e.g. A or Science">
+            <input type="text" class="form-control" id="mSecName" maxlength="20" placeholder="e.g. A or Science">
           </div>
           <div class="col-12 col-sm-6">
             <label class="form-label cs-modal-lbl">Capacity</label>
-            <input type="number" class="form-control" id="mSecCap" min="1" placeholder="40">
+            <input type="number" class="form-control" id="mSecCap" min="1" max="5000" placeholder="40">
           </div>
           <div class="col-12 col-sm-6">
             <label class="form-label cs-modal-lbl">Room No.</label>
-            <input type="text" class="form-control" id="mSecRoom" placeholder="e.g. 204">
+            <input type="text" class="form-control" id="mSecRoom" maxlength="50" placeholder="e.g. 204">
           </div>
           <div class="col-12 col-sm-6">
             <label class="form-label cs-modal-lbl">Class Teacher</label>
@@ -284,7 +284,8 @@ function persist(okMsg){
     url:         URL_SAVE,
     type:        'POST',
     contentType: 'application/json',
-    headers:     { 'X-Requested-With': 'XMLHttpRequest' },
+    headers:     { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val(),
+                   'X-Requested-With': 'XMLHttpRequest' },
     data:        JSON.stringify(payload)
   })
   .done(function(res){
@@ -374,7 +375,7 @@ function render(){
     secCards+='<button class="cs-add-sec js-add-sec" data-c="'+c.id+'"><i class="bx bx-plus-circle"></i>Add Section</button>';
 
     var streamBadge=(c.stream && c.stream!=='gen')
-      ? '<span class="cs-stream '+c.stream+'">'+streamLbl(c.stream)+'</span>' : '';
+      ? '<span class="cs-stream '+EC.esc(c.stream)+'">'+streamLbl(c.stream)+'</span>' : '';
 
     html+='<div class="cs-class'+(isOpen?' open':'')+'" data-c="'+c.id+'">'
       +'<div class="cs-class-head js-toggle" data-c="'+c.id+'">'
@@ -437,6 +438,7 @@ document.getElementById('classSave').addEventListener('click',function(){
   var name=document.getElementById('mClassName').value.trim();
   if(!name){ ecToast('error','Class name is required.'); return; }
   var rank=parseInt(document.getElementById('mClassRank').value,10)||(DATA.length+1);
+  if(rank<1 || rank>999){ ecToast('error','Order must be between 1 and 999.'); return; }
   var stream=document.getElementById('mClassStream').value;
   var coordSel=document.getElementById('mClassCoord');
   var coordStaffId=parseInt(coordSel.value,10)||null;
@@ -487,6 +489,7 @@ document.getElementById('secSave').addEventListener('click',function(){
   var name=document.getElementById('mSecName').value.trim();
   if(!name){ ecToast('error','Section name is required.'); return; }
   var cap=parseInt(document.getElementById('mSecCap').value,10)||0;
+  if(cap<0 || cap>5000){ ecToast('error','Capacity must be between 1 and 5000.'); return; }
   var room=document.getElementById('mSecRoom').value.trim();
   var dup=c.sections.some(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==secCtx.secId;});
   if(dup){ ecToast('warning','This section already exists in '+c.name+'.'); return; }

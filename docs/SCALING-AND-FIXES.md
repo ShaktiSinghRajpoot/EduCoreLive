@@ -3085,3 +3085,94 @@ urgently: the procedures take `date` parameters exactly as before, and the old
 reader parses the ISO text fine. The irony is that the failure that started all
 of this — `Convert.ToDateTime` on a `DateOnly` — cannot happen now, because a
 string is `IConvertible` and a `DateOnly` never was.
+
+### [2026-09-21] Classes & Sections: the save was never reaching the server
+
+**"Save failed. Check your connection."** on `/ERP/SchoolSettings/ClassSection`.
+Nothing was wrong with the connection. `SaveClassSection` carries
+`[ValidateAntiForgeryToken]`, but `persist()` sent only `X-Requested-With` — no
+token — so ASP.NET rejected every save with **400** before the action ran, and
+jQuery's `.fail()` printed the one generic message it has. The page *does* render
+`@Html.AntiForgeryToken()`, and the Copy button *did* send it; only the save call
+was missing the header. That is why copy worked and save did not. Every other
+`.cshtml` with a POST was checked — no other page has the gap.
+
+**Then the validation behind it was audited**, and only three things turned out
+to be enforced server-side: tenant scope, "a year is selected", and the guard
+that refuses to drop a class or section with students still enrolled. Everything
+else — required names, duplicate names, capacity, lengths — lived in the browser,
+so a stale tab or a hand-made POST walked straight past it.
+
+- **Duplicate sections were not blocked anywhere but the page.** The controller
+  de-duplicated class names and not section names, the procedure only checked
+  non-empty, and the tables carry no unique index. Two sections named "A" in one
+  class would persist, and enrolment, attendance and fees all join sections by
+  *name*.
+- **Silent drops were reported as success.** A blank or duplicate class name was
+  skipped with `continue`, then `success = true` came back. The page toasted
+  "Class saved." and did not reload, so the discarded class stayed on screen
+  until the next load and then vanished. Data loss under a success message.
+- **No length checks**, so an over-long name reached PostgreSQL and the user was
+  shown `value too long for type character varying(20)` — the raw SQLSTATE 22001
+  text, passed through by the `PostgresException` handler.
+- **`min="1"` on the number inputs was decorative**: native form validation never
+  runs, because the click handlers read `.value` directly. `parseInt("-5")` gave
+  a negative capacity that nothing rejected.
+- **`stream` was the one value interpolated raw** into markup, and into a class
+  attribute at that, while the name, room and coordinator beside it all went
+  through `EC.esc`. The server accepted any string for it.
+- **`coordinatorStaffId` was stored unchecked.** The procedure looked the *name*
+  up scoped to tenant and school but inserted the id regardless, so another
+  school's id was stored as a dangling reference with no name next to it.
+- **The year id on save was never checked as the caller's.** The year-name lookup
+  had no tenant filter. The foreign key kept the id real and inserted rows still
+  carried the caller's own `tenant_id`, so nothing crossed tenants — but classes
+  could be attached to a session the school does not own.
+
+**The read path was checked too, and had the same loose spot.** `GetAcademicSetup`
+filtered `academic_years` by id alone. Every class, section and staff join under
+it was already scoped, so another school's structure never appeared - proved by
+calling the procedure as tenant 23 for tenant 24's year and getting all-NULL
+columns, against 14 rows for its rightful owner. What did come back was that
+year's own row: start date, end date, is_current. Nothing displayed it (the
+service maps none of those dates, and the year dropdown is tenant-scoped, so the
+id could only be reached by editing the URL), but the filter belongs there, and
+is now on. The same call afterwards returns no rows at all.
+
+**Fixed** by validating in `SaveClassSection` and *rejecting* with a message
+instead of dropping the row: names required, lengths matched to the column widths
+(50/20/150/50, now also `maxlength` on the inputs), duplicate class **and**
+section names refused, rank and capacity range-checked on both sides, and stream
+restricted to the four the dropdown offers. `EC.esc` was put on the stream badge.
+In the procedure, the year lookup is now scoped to tenant and school and raises
+when it finds nothing, and a coordinator staff id that is not this school's is
+dropped to NULL rather than stored.
+
+**Verified against the local database, every call rolled back.** A save into
+another tenant's year now raises, as does a nonexistent year. The real structure
+round-trips unchanged. A coordinator id from school 34 comes back NULL; school
+33's own id comes back with its name. The pre-existing enrolled-students guard
+still fires — it is what refused the first draft of the test.
+
+`Database/academic_class_section_unique.sql` adds the partial unique indexes that
+should have been holding the duplicate rule all along, case-insensitive and over
+live rows only, so the procedure's delete-all-then-reinsert still works inside one
+transaction. **It is not applied yet**: it fails if duplicates already exist, and
+resolving one means renaming a section that students are enrolled under. The
+check query is in the script's header.
+
+`Database/classsection_hardening_deploy.sql` wraps the whole thing for Railway:
+it prints the current procedure first as a rollback copy, lists any duplicates,
+reloads the procedure, and then creates the indexes only if that list came back
+empty - a duplicate makes it warn and name them rather than fail halfway. It ran
+clean against local end to end, all four verification flags true.
+
+**The indexes are now on locally, and the save was re-tested with them in
+place** - the delete-all-then-reinsert still works, because the partial predicate
+ignores the soft-deleted rows inside that transaction, and a section "a" sent
+alongside an existing "A" is now refused by the database itself. That is the
+backstop behind the controller check, not a replacement for it: the controller
+still answers first, with a sentence a human wrote.
+
+Railway has not been touched - the deploy script is written and proven, but the
+connection is not reachable from this session.

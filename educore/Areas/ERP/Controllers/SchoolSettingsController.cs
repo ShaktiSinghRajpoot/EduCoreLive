@@ -656,6 +656,19 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
+        // Limits below match the academic.academic_classes / academic_class_sections
+        // column widths. Without them an over-long name reaches PostgreSQL and the
+        // user is shown the raw "value too long for type character varying(20)".
+        private const int ClassNameMaxLength   = 50;
+        private const int SectionNameMaxLength = 20;
+        private const int CoordinatorMaxLength = 150;
+        private const int RoomMaxLength        = 50;
+        private const int RankMaxValue         = 999;
+        private const int CapacityMaxValue     = 5000;
+
+        // The four values the page's stream dropdown offers.
+        private static readonly string[] AllowedStreams = { "gen", "sci", "com", "art" };
+
         // Persists the full structure for one academic year (replace-all),
         // matching the stored procedure's semantics.
         [HttpPost]
@@ -672,30 +685,66 @@ namespace educore.Areas.ERP.Controllers
 
             var model = new AcademicSetupModel { AcademicYearId = dto.AcademicYearId };
 
+            // The page checks all of this in the browser, but the browser is not
+            // the last word: a stale tab or a hand-made POST reaches the same
+            // action. Reject a bad payload with a message instead of silently
+            // dropping the offending row and reporting success.
             foreach (var c in dto.Classes ?? new List<ClassSectionItemDto>())
             {
                 var name = (c.Name ?? string.Empty).Trim();
-                if (name.Length == 0 ||
-                    model.ClassDetails.Any(x => x.ClassName.Equals(name, StringComparison.OrdinalIgnoreCase)))
-                    continue;
+                if (name.Length == 0)
+                    return Json(new { success = false, message = "Class name is required." });
+                if (name.Length > ClassNameMaxLength)
+                    return Json(new { success = false, message = $"Class name \"{name}\" is longer than {ClassNameMaxLength} characters." });
+                if (model.ClassDetails.Any(x => x.ClassName.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                    return Json(new { success = false, message = $"There are two classes named \"{name}\"." });
+                if (c.Rank < 0 || c.Rank > RankMaxValue)
+                    return Json(new { success = false, message = $"Order for \"{name}\" must be between 1 and {RankMaxValue}." });
 
-                var sections = (c.Sections ?? new List<SectionItemDto>())
-                    .Where(s => !string.IsNullOrWhiteSpace(s.Name))
-                    .Select((s, i) => new AcademicSectionDetail
+                var stream = string.IsNullOrWhiteSpace(c.Stream) ? null : c.Stream!.Trim();
+                // Stream drives a CSS class on the page, so only the four the
+                // dropdown offers are allowed through.
+                if (stream != null && !AllowedStreams.Contains(stream))
+                    return Json(new { success = false, message = $"\"{name}\" has an unknown stream." });
+
+                var coordinator = string.IsNullOrWhiteSpace(c.Coordinator) ? null : c.Coordinator!.Trim();
+                if (coordinator != null && coordinator.Length > CoordinatorMaxLength)
+                    return Json(new { success = false, message = $"Coordinator name for \"{name}\" is longer than {CoordinatorMaxLength} characters." });
+
+                var sections = new List<AcademicSectionDetail>();
+                foreach (var s in c.Sections ?? new List<SectionItemDto>())
+                {
+                    var sectionName = (s.Name ?? string.Empty).Trim();
+                    if (sectionName.Length == 0)
+                        return Json(new { success = false, message = $"A section of \"{name}\" has no name." });
+                    if (sectionName.Length > SectionNameMaxLength)
+                        return Json(new { success = false, message = $"Section name \"{sectionName}\" is longer than {SectionNameMaxLength} characters." });
+                    // Nothing in the database stops this, and everything downstream
+                    // (enrolment, attendance, fees) joins sections by name.
+                    if (sections.Any(x => x.SectionName.Equals(sectionName, StringComparison.OrdinalIgnoreCase)))
+                        return Json(new { success = false, message = $"\"{name}\" has two sections named \"{sectionName}\"." });
+                    if (s.Capacity is <= 0 or > CapacityMaxValue)
+                        return Json(new { success = false, message = $"Capacity for {name} - {sectionName} must be between 1 and {CapacityMaxValue}." });
+
+                    var room = string.IsNullOrWhiteSpace(s.Room) ? null : s.Room!.Trim();
+                    if (room != null && room.Length > RoomMaxLength)
+                        return Json(new { success = false, message = $"Room for {name} - {sectionName} is longer than {RoomMaxLength} characters." });
+
+                    sections.Add(new AcademicSectionDetail
                     {
-                        SectionName  = s.Name!.Trim(),
-                        DisplayOrder = i + 1,
+                        SectionName  = sectionName,
+                        DisplayOrder = sections.Count + 1,
                         Capacity     = s.Capacity,
-                        RoomNo       = string.IsNullOrWhiteSpace(s.Room) ? null : s.Room!.Trim()
-                    })
-                    .ToList();
+                        RoomNo       = room
+                    });
+                }
 
                 model.ClassDetails.Add(new AcademicClassDetail
                 {
                     ClassName    = name,
                     DisplayOrder = c.Rank,
-                    Stream       = string.IsNullOrWhiteSpace(c.Stream) ? null : c.Stream!.Trim(),
-                    Coordinator  = string.IsNullOrWhiteSpace(c.Coordinator) ? null : c.Coordinator!.Trim(),
+                    Stream       = stream,
+                    Coordinator  = coordinator,
                     CoordinatorStaffId = c.CoordinatorStaffId is > 0 ? c.CoordinatorStaffId : null,
                     Sections     = sections
                 });

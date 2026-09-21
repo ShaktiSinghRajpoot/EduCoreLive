@@ -114,6 +114,11 @@ BEGIN
            AND cts.school_id = p_school_id
            AND COALESCE(cts.is_deleted, FALSE) = FALSE
         WHERE ay.academic_year_id = p_academic_year_id
+          -- Scope the year itself as well. The class/section joins below are
+          -- already scoped, so another school's structure never appeared, but
+          -- without this the year row itself was still returned for any id.
+          AND ay.tenant_id = p_tenant_id
+          AND ay.school_id = p_school_id
           AND COALESCE(ay.is_deleted, FALSE) = FALSE
           AND COALESCE(ay.is_active, TRUE) = TRUE
         ORDER BY
@@ -131,9 +136,19 @@ BEGIN
         v_academic_year_id := p_academic_year_id;
         v_setup_json := COALESCE(NULLIF(p_setup_json, ''), '[]')::jsonb;
 
+        -- Scope the year to the caller. Without the tenant/school filter a request
+        -- could attach this school's classes to a session belonging to another
+        -- school, and the enrolled-students guard below would then compare
+        -- against the wrong session name.
         SELECT academic_year_name INTO v_academic_year_name
         FROM academic.academic_years
-        WHERE academic_year_id = v_academic_year_id;
+        WHERE academic_year_id = v_academic_year_id
+          AND tenant_id = p_tenant_id
+          AND school_id = p_school_id;
+
+        IF v_academic_year_name IS NULL THEN
+            RAISE EXCEPTION 'Please select academic year.';
+        END IF;
 
         -- Guard: refuse to drop a class/section that still has enrolled students.
         IF EXISTS (
@@ -222,12 +237,18 @@ BEGIN
 
                 -- Snapshot the coordinator's name from the linked staff row (single
                 -- source); keep any free text only when no staff is linked.
+                -- A staff id that is not this school's is dropped rather than
+                -- stored as a dangling reference with no name beside it.
                 IF COALESCE(v_coord_staff_id, 0) > 0 THEN
                     SELECT full_name INTO v_coordinator
                     FROM   core.staff
                     WHERE  staff_id = v_coord_staff_id
                       AND  tenant_id = p_tenant_id AND school_id = p_school_id
                       AND  COALESCE(is_deleted, FALSE) = FALSE;
+
+                    IF v_coordinator IS NULL THEN
+                        v_coord_staff_id := NULL;
+                    END IF;
                 END IF;
 
                 INSERT INTO academic.academic_classes
