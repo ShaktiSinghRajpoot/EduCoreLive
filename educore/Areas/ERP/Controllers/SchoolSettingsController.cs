@@ -1110,6 +1110,30 @@ namespace educore.Areas.ERP.Controllers
             };
         }
 
+        // Limits for the bell schedule. The label width matches
+        // academic.period_structure.label; the types match its CHECK constraint.
+        private const int PeriodLabelMaxLength = 50;
+        private const int MaxPeriodsPerDay     = 60;
+
+        private static readonly string[] AllowedPeriodTypes =
+            { "class", "assembly", "break", "lunch", "diary" };
+
+        // The page posts "HH:mm" from an <input type="time">. Accept a single-digit
+        // hour and a stray seconds part too, and reject anything else rather than
+        // letting PostgreSQL fail the ::time cast with its own wording.
+        private static bool TryReadClockTime(string? value, out TimeSpan time)
+        {
+            time = TimeSpan.Zero;
+            if (string.IsNullOrWhiteSpace(value)) return false;
+
+            var formats = new[] { @"hh\:mm", @"h\:mm", @"hh\:mm\:ss", @"h\:mm\:ss" };
+            if (!TimeSpan.TryParseExact(value.Trim(), formats,
+                    System.Globalization.CultureInfo.InvariantCulture, out time))
+                return false;
+
+            return time >= TimeSpan.Zero && time < TimeSpan.FromDays(1);
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         [HasPermission("academics.manage")]
@@ -1119,13 +1143,62 @@ namespace educore.Areas.ERP.Controllers
             int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
             int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
-            var items = (dto?.Periods ?? new List<PeriodItemDto>()).Select(p => new PeriodStructureItem
+            var posted = dto?.Periods ?? new List<PeriodItemDto>();
+
+            // This schedule drives the timetable grid AND the Smart Bell kiosk, so
+            // an empty save does not just clear a page - it stops the bell ringing.
+            if (posted.Count == 0)
+                return Json(new { success = false, message = "Add at least one period. An empty schedule stops the bell." });
+            if (posted.Count > MaxPeriodsPerDay)
+                return Json(new { success = false, message = $"A day cannot have more than {MaxPeriodsPerDay} periods." });
+
+            var items = new List<PeriodStructureItem>();
+            foreach (var p in posted)
             {
-                Label      = (p.Name ?? string.Empty).Trim(),
-                StartTime  = p.Start ?? string.Empty,
-                EndTime    = p.End ?? string.Empty,
-                PeriodType = string.IsNullOrWhiteSpace(p.Type) ? "class" : p.Type!.Trim().ToLowerInvariant()
-            }).ToList();
+                var label = (p.Name ?? string.Empty).Trim();
+                if (label.Length == 0)
+                    return Json(new { success = false, message = "Every period needs a label." });
+                if (label.Length > PeriodLabelMaxLength)
+                    return Json(new { success = false, message = $"Label \"{label}\" is longer than {PeriodLabelMaxLength} characters." });
+                // The timetable and the bell both show a period by its label, so two
+                // periods with the same name are indistinguishable on screen.
+                if (items.Any(x => x.Label.Equals(label, StringComparison.OrdinalIgnoreCase)))
+                    return Json(new { success = false, message = $"There are two periods called \"{label}\"." });
+
+                if (!TryReadClockTime(p.Start, out var start))
+                    return Json(new { success = false, message = $"\"{label}\" has an invalid start time." });
+                if (!TryReadClockTime(p.End, out var end))
+                    return Json(new { success = false, message = $"\"{label}\" has an invalid end time." });
+                if (end <= start)
+                    return Json(new { success = false, message = $"\"{label}\" ends before it starts." });
+
+                var type = string.IsNullOrWhiteSpace(p.Type) ? "class" : p.Type!.Trim().ToLowerInvariant();
+                // An unknown type used to be quietly rewritten to "class", which hid
+                // the mistake until someone noticed the wrong colour on the timeline.
+                if (!AllowedPeriodTypes.Contains(type))
+                    return Json(new { success = false, message = $"\"{label}\" has an unknown period type." });
+
+                items.Add(new PeriodStructureItem
+                {
+                    Label      = label,
+                    StartTime  = start.ToString(@"hh\:mm"),
+                    EndTime    = end.ToString(@"hh\:mm"),
+                    PeriodType = type
+                });
+            }
+
+            // Sort before the overlap check so the answer does not depend on the
+            // order the page happened to post them in.
+            items = items.OrderBy(x => x.StartTime, StringComparer.Ordinal).ToList();
+            for (int i = 1; i < items.Count; i++)
+            {
+                if (string.CompareOrdinal(items[i].StartTime, items[i - 1].EndTime) < 0)
+                    return Json(new
+                    {
+                        success = false,
+                        message = $"\"{items[i].Label}\" overlaps \"{items[i - 1].Label}\"."
+                    });
+            }
 
             var result = await _schoolSettingsService.SavePeriodStructureAsync(items, tenantId, schoolId, actionUserId);
             return Json(new { success = result.Success, message = result.Message });

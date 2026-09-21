@@ -38,7 +38,11 @@
     position: fixed; top: 0; left: 0; width: 0; height: 3px;
     background: var(--ec-primary, var(--bs-primary, #ff8a00)); z-index: 99999;
     opacity: 1; pointer-events: none; border-radius: 0 2px 2px 0;
-}
+}
+
+/* The link or menu item that was just clicked, while its page is on its way.
+   pointer-events is what stops the second, impatient click. */
+.ec-nav-busy { opacity: .55; pointer-events: none; }
 
 /* ---------- Reusable server-side pager (_Pager.cshtml) ---------- */
 .ec-pager { display: inline-flex; align-items: center; gap: .25rem; flex-wrap: wrap; }

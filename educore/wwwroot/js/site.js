@@ -25,6 +25,65 @@ EC.hideLoader = function () {
     });
 };
 
+// ── Navigation progress ─────────────────────────────────────────────────
+// A server-rendered page takes a moment to come back, and until it does the
+// browser shows nothing of its own inside the installed PWA - so the click
+// feels ignored and people press the menu item again. Show the same top bar
+// while the next page is on its way, and grey out what was clicked.
+// Put data-no-loader on a link or form that should not do this.
+
+EC.navBusy = function (el) {
+    EC.showLoader();
+    if (el) $(el).addClass('ec-nav-busy');
+    // A link that turns out to be a file download never leaves the page, so
+    // the bar must not be able to sit there forever.
+    clearTimeout(EC._navTimer);
+    EC._navTimer = setTimeout(EC.navDone, 20000);
+};
+
+EC.navDone = function () {
+    clearTimeout(EC._navTimer);
+    $('.ec-nav-busy').removeClass('ec-nav-busy');
+    EC.hideLoader();
+};
+
+// Does clicking this anchor actually load another page of this app?
+EC.isPageLink = function (a, host) {
+    var href = a.getAttribute('href') || '';
+    if (!href || href.charAt(0) === '#') return false;                  // same page
+    if (/^(javascript:|mailto:|tel:)/i.test(href)) return false;        // not a page
+    if (a.hasAttribute('download') || a.hasAttribute('data-no-loader')) return false;
+    if (a.target && a.target !== '_self') return false;                 // new window
+    if (a.host && a.host !== host) return false;                        // leaves the app
+    return true;
+};
+
+$(document).on('click', 'a[href]', function (e) {
+    if (e.isDefaultPrevented()) return;
+    // ctrl/cmd/shift/alt or middle click opens a new tab - this page stays
+    if (e.which > 1 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    if (!EC.isPageLink(this, window.location.host)) return;
+
+    EC.navBusy(this);
+});
+
+// A full-page form (filters, search) leaves the page the same way. Decided the
+// way the double-submit guard in _Scripts.cshtml decides: defer to a task so
+// every other submit handler has run, then trust defaultPrevented to tell an
+// AJAX form (which never navigates) from one that does.
+$(document).on('submit', 'form', function (e) {
+    var form = this;
+    if (form.hasAttribute('data-no-loader')) return;
+    if (form.target && form.target !== '_self') return;
+    setTimeout(function () {
+        if (e.isDefaultPrevented()) return;   // AJAX or failed validation
+        EC.navBusy(null);
+    }, 0);
+});
+
+// Back button can restore this page from the bfcache with the bar still up.
+$(window).on('pageshow', function () { EC.navDone(); });
+
 // ── Button busy state ───────────────────────────────────────────────────
 // For write actions (Save / Collect / Register). Disabling the clicked
 // button is the only blocking needed — it stops the double-submit.

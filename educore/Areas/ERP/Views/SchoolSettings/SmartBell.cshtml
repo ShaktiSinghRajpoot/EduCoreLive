@@ -134,8 +134,8 @@ function toMin(t){ if(!t) return 0; var p=String(t).split(':'); return parseInt(
 function toHHMM(min){ return two(Math.floor(min/60))+':'+two(min%60); }
 function two(n){ return (n<10?'0':'')+n; }
 function fmt12(t){ if(!t) return '—'; var p=String(t).split(':'),h=parseInt(p[0],10),m=p[1]; var ap=h>=12?'PM':'AM'; var hh=h%12||12; return hh+':'+m+' '+ap; }
-function typeIcon(t){ return {'class':'bx-book','break':'bx-coffee','lunch':'bx-restaurant'}[t]||'bx-book'; }
-function typeLabel(t){ return {'class':'Class','break':'Break','lunch':'Lunch'}[t]||'Class'; }
+function typeIcon(t){ return {'class':'bx-book','assembly':'bx-group','break':'bx-coffee','lunch':'bx-restaurant','diary':'bx-notepad'}[t]||'bx-book'; }
+function typeLabel(t){ return {'class':'Class','assembly':'Assembly','break':'Break','lunch':'Lunch','diary':'Diary'}[t]||'Class'; }
 function el(id){ return document.getElementById(id); }
 
 /* ---------------- server-anchored clock ----------------
@@ -258,6 +258,10 @@ function announceEn(boundary){
         return 'Attention please. It is now break time. '+s.name+' has begun. Students may relax and be back before the next bell.';
       case 'lunch':
         return 'Attention please. It is now the lunch break. Please proceed to the dining area in an orderly manner.';
+      case 'assembly':
+        return 'Attention please. It is time for the morning assembly. All students, please line up in the assembly area.';
+      case 'diary':
+        return 'Attention please. It is diary time. Students, please write down your homework before the final bell.';
       default:
         return 'Attention please. '+s.name+' is now beginning. Everyone, please move to your scheduled class.';
     }
@@ -278,6 +282,10 @@ function announceHi(boundary){
         return 'कृपया ध्यान दें। अब विश्राम का समय है। छात्र आराम कर सकते हैं और अगली घंटी से पहले वापस आ जाएँ।';
       case 'lunch':
         return 'कृपया ध्यान दें। अब भोजन अवकाश है। कृपया व्यवस्थित रूप से भोजन कक्ष में जाएँ।';
+      case 'assembly':
+        return 'कृपया ध्यान दें। अब प्रार्थना सभा का समय है। सभी छात्र कृपया सभा स्थल पर पंक्तिबद्ध हो जाएँ।';
+      case 'diary':
+        return 'कृपया ध्यान दें। अब डायरी लिखने का समय है। छात्र अंतिम घंटी से पहले अपना गृहकार्य लिख लें।';
       default:
         return 'कृपया ध्यान दें। '+s.name+' अब शुरू हो रहा है। सभी छात्र कृपया अपनी निर्धारित कक्षा में जाएँ।';
     }
@@ -317,14 +325,18 @@ function speakSeq(items, done, alive){
   })();
 }
 
-/* The chime: pattern class=1, break=2, lunch=3, day-end=long single. */
+/* The chime: class=1, break=2, lunch=3, diary=2 short rings. Assembly opens the
+   day and the day-end closes it, and both get one long ring instead. */
 function chime(boundary){
   if(!ensureAudio()) return;
-  var count=1, longEnd=false;
-  if(boundary.starts){ count={'class':1,'break':2,'lunch':3}[boundary.starts.type]||1; }
-  else { longEnd=true; }                 // nothing starts here → end of day
+  var count=1, longRing=false;
+  if(boundary.starts){
+    longRing = boundary.starts.type==='assembly';
+    count    = {'class':1,'break':2,'lunch':3,'diary':2}[boundary.starts.type]||1;
+  }
+  else { longRing=true; }                // nothing starts here → end of day
   var t=audioCtx.currentTime+0.02;
-  if(longEnd){ ding(t,1.1); }
+  if(longRing){ ding(t,1.1); }
   else { for(var i=0;i<count;i++){ ding(t,0.35); t+=0.5; } }
   flash();
 }

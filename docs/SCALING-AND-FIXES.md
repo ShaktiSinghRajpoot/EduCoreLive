@@ -3192,3 +3192,52 @@ no rows where the rightful owner gets 18; a cross-tenant save raises; the real
 "kid a" sent next to the existing "Kid A" is refused by
 `ux_academic_class_sections_name`. Live counts afterwards were untouched at 31
 classes and 47 sections, with no stray row left behind.
+
+### [2026-09-21] Period Structure: two new period types, and the validation to hold them
+
+Assembly and Diary time. Assembly and prayer are the same slot in these schools,
+not two, and it runs every day - which is the answer that kept this small: no
+per-day column, no second schedule, just two more values.
+
+**Adding a type turned out to be safe by design.** Everywhere in the codebase the
+rule is `type === 'class'` means a bookable teaching slot and everything else does
+not, which Timetable relies on in six places and StudentController notes in a
+comment. Assembly and Diary land in the non-bookable half on their own, which is
+exactly right - nobody books a teacher against assembly.
+
+**It was not one change, it was five.** The CHECK constraint, the procedure's
+whitelist, the page's dropdown and label/icon maps, the CSS, and the controller.
+`CREATE TABLE IF NOT EXISTS` only shapes a fresh database, so the widened
+constraint needed an explicit re-runnable DROP/ADD beside it for databases that
+already exist.
+
+**Smart Bell was the part that would have been missed.** The same schedule drives
+the kiosk, and there the type picks the icon, the hero tint, the timeline colour,
+**how many times the bell rings**, and both the Hindi and English PA lines. Left
+alone, assembly would have announced "please move to your scheduled class" and
+rung like any other period. Assembly opens the day, so it now gets the same one
+long ring the end of day gets, rather than a count of short ones; diary rings
+two, and both have their own announcement in both languages.
+
+The validation here was already better than Classes & Sections - the procedure
+checked labels, times, ordering and overlap server-side, and the page sent its
+antiforgery token. What was missing:
+
+- **The overlap test trusted the array order.** The comment said so out loud:
+  "the UI keeps them chronological". A payload posted out of order raised a
+  *false* overlap - 10:00-11:00 followed by 08:00-09:00 does not overlap, but the
+  check compared 08:00 against the previous 11:00 and refused it. It now walks
+  them in clock order, and that case is a regression test.
+- **An empty schedule saved silently**, and this schedule is what rings the bell.
+  Refused now, in the page, the controller and the procedure.
+- **Duplicate labels**, which both the timetable and the bell show by name.
+- **An unknown type was quietly rewritten to 'class'** by a CASE in the INSERT,
+  hiding the mistake until someone noticed the wrong colour. It is refused now,
+  so the CASE is gone.
+- **Label length and time format**, which reached PostgreSQL and came back as its
+  own wording - `value too long...`, `invalid input syntax for type time`.
+- **No cap on the number of periods.**
+
+Six procedure checks verified locally, each rolled back: a schedule using both new
+types saves; empty, duplicate label, unknown type and a real overlap all raise;
+and the out-of-order pair that used to be refused now passes.

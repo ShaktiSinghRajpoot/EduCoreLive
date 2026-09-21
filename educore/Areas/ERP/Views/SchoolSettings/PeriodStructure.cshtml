@@ -36,7 +36,7 @@
       <div class="col-6 col-lg-3">
         <div class="ps-card">
           <div class="ps-card-ic bg-label-secondary" style="color:#6c757d;"><i class="bx bx-coffee"></i></div>
-          <div><div class="ps-card-val" id="cBreaks">—</div><div class="ps-card-lbl">Breaks</div></div>
+          <div><div class="ps-card-val" id="cBreaks">—</div><div class="ps-card-lbl">Non-Teaching</div></div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
@@ -118,13 +118,15 @@
             <label class="form-label ps-modal-lbl">Type</label>
             <select class="form-select" id="mType">
               <option value="class">Class (teaching)</option>
+              <option value="assembly">Assembly / Prayer</option>
               <option value="break">Break</option>
               <option value="lunch">Lunch</option>
+              <option value="diary">Diary time</option>
             </select>
           </div>
           <div class="col-12 col-sm-6">
             <label class="form-label ps-modal-lbl">Label</label>
-            <input type="text" class="form-control" id="mName" placeholder="e.g. P1 / Break">
+            <input type="text" class="form-control" id="mName" maxlength="50" placeholder="e.g. P1 / Break">
           </div>
           <div class="col-6">
             <label class="form-label ps-modal-lbl">Start Time</label>
@@ -164,8 +166,10 @@ function rows(){ return PERIODS; }
 function toMin(t){ if(!t) return 0; var p=t.split(':'); return parseInt(p[0],10)*60+parseInt(p[1],10); }
 function dur(r){ return toMin(r.end)-toMin(r.start); }
 function fmt12(t){ if(!t) return '—'; var p=t.split(':'),h=parseInt(p[0],10),m=p[1]; var ap=h>=12?'PM':'AM'; var hh=h%12||12; return hh+':'+m+' '+ap; }
-function typeLabel(t){ return {class:'Class',break:'Break',lunch:'Lunch'}[t]||'Class'; }
-function typeIcon(t){ return {class:'bx-book',break:'bx-coffee',lunch:'bx-restaurant'}[t]||'bx-book'; }
+function typeLabel(t){ return {class:'Class',assembly:'Assembly',break:'Break',lunch:'Lunch',diary:'Diary'}[t]||'Class'; }
+function typeIcon(t){ return {class:'bx-book',assembly:'bx-group',break:'bx-coffee',lunch:'bx-restaurant',diary:'bx-notepad'}[t]||'bx-book'; }
+// The glance bar has a colour per type; anything unknown is drawn as a class.
+function typeKey(t){ return {class:1,assembly:1,break:1,lunch:1,diary:1}[t]?t:'class'; }
 
 /* validate ordering: detect overlaps / negative durations */
 function findIssue(){
@@ -190,7 +194,7 @@ function renderGlance(){
   var total=list.reduce(function(a,r){return a+Math.max(dur(r),0);},0)||1;
   g.innerHTML=list.map(function(r){
     var w=Math.max(dur(r),0)/total*100;
-    var cls=r.type==='class'?'ps-g-class':(r.type==='lunch'?'ps-g-lunch':'ps-g-break');
+    var cls='ps-g-'+typeKey(r.type);
     return '<div class="ps-g-seg '+cls+'" style="flex:'+w+' 1 0;" title="'+EC.esc(r.name)+' · '+r.start+'–'+r.end+'">'+(w>5?EC.esc(r.name):'')+'</div>';
   }).join('');
   var hrs=Math.floor(total/60), mins=total%60;
@@ -201,7 +205,7 @@ function render(){
   var list=rows(), box=document.getElementById('tlList');
   box.innerHTML=list.map(function(r,i){
     var d=dur(r);
-    return '<div class="ps-item ps-t-'+r.type+'">'
+    return '<div class="ps-item ps-t-'+typeKey(r.type)+'">'
       +'<div class="ps-time">'+r.start+'<small>'+r.end+'</small></div>'
       +'<div class="ps-line"><span class="ps-dot"></span></div>'
       +'<div class="ps-block">'
@@ -209,7 +213,7 @@ function render(){
       +  '<div class="ps-blk-info"><div class="ps-blk-name">'+EC.esc(r.name)+'</div>'
       +     '<div class="ps-blk-meta">'+fmt12(r.start)+' – '+fmt12(r.end)+'</div></div>'
       +  '<span class="ps-dur">'+(d>0?d+' min':'—')+'</span>'
-      +  '<span class="ps-type '+r.type+'">'+typeLabel(r.type)+'</span>'
+      +  '<span class="ps-type '+typeKey(r.type)+'">'+typeLabel(r.type)+'</span>'
       +  '<div class="ps-acts">'
       +     '<div class="ps-ord">'
       +        '<button class="ps-ord-btn js-up" data-i="'+i+'"'+(i===0?' disabled':'')+'><i class="bx bx-chevron-up"></i></button>'
@@ -278,6 +282,8 @@ document.getElementById('pmSave').addEventListener('click',function(){
     document.getElementById('mWarnTxt').textContent='End time must be after start time.';
     document.getElementById('mWarn').classList.remove('d-none'); return;
   }
+  var dup=rows().some(function(x){ return x.id!==editId && x.name.toLowerCase()===name.toLowerCase(); });
+  if(dup){ ecToast('warning','A period called "'+name+'" already exists.'); return; }
   if(editId){
     var r=rows().find(function(x){return x.id===editId;});
     r.name=name; r.start=start; r.end=end; r.type=type;
@@ -295,6 +301,7 @@ document.getElementById('pmSave').addEventListener('click',function(){
 /* ---- save the whole schedule (replace-all) ---- */
 document.getElementById('btnSave').addEventListener('click',function(){
   if(findIssue()){ ecToast('error','Fix the highlighted timing issue before saving.'); return; }
+  if(!rows().length){ ecToast('error','Add at least one period. An empty schedule stops the bell.'); return; }
   var token=document.querySelector('input[name="__RequestVerificationToken"]');
   var payload={ periods: rows().map(function(r){ return {name:r.name,start:r.start,end:r.end,type:r.type}; }) };
   $.ajax({

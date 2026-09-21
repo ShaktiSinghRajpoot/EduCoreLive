@@ -26,6 +26,8 @@
 .ps-g-class{ background:linear-gradient(135deg,#ff8a00,#ffad42); }
 .ps-g-break{ background:repeating-linear-gradient(45deg,#b9b3aa,#b9b3aa 6px,#a9a399 6px,#a9a399 12px); }
 .ps-g-lunch{ background:linear-gradient(135deg,#3b82f6,#60a5fa); }
+.ps-g-assembly{ background:linear-gradient(135deg,#7c3aed,#a78bfa); }
+.ps-g-diary{ background:linear-gradient(135deg,#0d9488,#2dd4bf); }
 .ps-legend{ display:flex; gap:1rem; flex-wrap:wrap; align-items:center; font-size:.72rem; font-weight:700; color:var(--ec-text-muted); }
 .ps-legend span{ display:inline-flex; align-items:center; gap:.35rem; }
 .ps-l-dot{ width:12px; height:12px; border-radius:4px; }
@@ -62,6 +64,8 @@
 .ps-type.class{ background:#fff4e6; color:#c2410c; }
 .ps-type.break{ background:#e9e6e1; color:#6b6258; }
 .ps-type.lunch{ background:#dbeafe; color:#1e40af; }
+.ps-type.assembly{ background:#ede9fe; color:#5b21b6; }
+.ps-type.diary{ background:#ccfbf1; color:#115e59; }
 
 /* type accents */
 .ps-t-class .ps-block{ border-left-color:#ff8a00; }
@@ -70,6 +74,12 @@
 .ps-t-break .ps-block{ border-left-color:#b9b3aa; }
 .ps-t-break .ps-blk-ic{ background:#efece7; color:#8b8175; }
 .ps-t-break .ps-dot{ border-color:#b9b3aa; }
+.ps-t-assembly .ps-block{ border-left-color:#7c3aed; }
+.ps-t-assembly .ps-blk-ic{ background:#ede9fe; color:#7c3aed; }
+.ps-t-assembly .ps-dot{ border-color:#7c3aed; }
+.ps-t-diary .ps-block{ border-left-color:#0d9488; }
+.ps-t-diary .ps-blk-ic{ background:#ccfbf1; color:#0d9488; }
+.ps-t-diary .ps-dot{ border-color:#0d9488; }
 .ps-t-lunch .ps-block{ border-left-color:#3b82f6; }
 .ps-t-lunch .ps-blk-ic{ background:#dbeafe; color:#3b82f6; }
 .ps-t-lunch .ps-dot{ border-color:#3b82f6; }
