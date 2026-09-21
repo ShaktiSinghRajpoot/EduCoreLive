@@ -96,7 +96,7 @@ SELECT
         AS read_path_scoped,
     (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
       WHERE n.nspname='academic' AND p.proname='sp_school_admin_academic_setup_manage'
-        AND pg_get_functiondef(p.oid) LIKE '%v_coord_staff_id := NULL%') = 1
+        AND pg_get_functiondef(p.oid) LIKE '%IF v_coordinator IS NULL THEN%') = 1
         AS coordinator_scoped,
     (SELECT to_regclass('academic.ux_academic_classes_name') IS NOT NULL)
         AS class_index,

@@ -3174,5 +3174,21 @@ alongside an existing "A" is now refused by the database itself. That is the
 backstop behind the controller check, not a replacement for it: the controller
 still answers first, with a sentence a human wrote.
 
-Railway has not been touched - the deploy script is written and proven, but the
-connection is not reachable from this session.
+**Applied to Railway** (PostgreSQL 18.6) the same day. The procedure there was
+checked first and was our own lineage - the enrolled-students guard, the class
+teacher snapshot and the enrolment-based strength were all present, none of the
+three new filters were - so replacing it clobbered nothing, and the old
+definition was saved off first as a rollback copy. The duplicate check came back
+empty, so both indexes were created. All four verification flags true.
+
+One of those flags was lying before it was fixed: `LIKE '%v_coord_staff_id :=
+NULL%'` also matches `v_coord_staff_id := NULLIF(...)`, which is in the original,
+so the coordinator check read true on a database that did not have the fix. It
+now looks for `IF v_coordinator IS NULL THEN`, which only the new version has.
+
+**Proved on Railway itself**, every call rolled back: a cross-tenant read returns
+no rows where the rightful owner gets 18; a cross-tenant save raises; the real
+11-class structure round-trips unchanged with the indexes in place; and a section
+"kid a" sent next to the existing "Kid A" is refused by
+`ux_academic_class_sections_name`. Live counts afterwards were untouched at 31
+classes and 47 sections, with no stray row left behind.
