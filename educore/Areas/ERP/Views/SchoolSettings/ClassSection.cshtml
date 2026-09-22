@@ -550,7 +550,7 @@ document.getElementById('secSave').addEventListener('click',function(){
   var dup=c.sections.some(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==secCtx.secId;});
   if(dup){ ecToast('warning','This section already exists in '+c.name+'.'); return; }
   /* A shared room is legitimate (labs, halls), so this warns and still saves. */
-  var roomTaken=room?findRoom(room,secCtx.secId):null;
+  var roomTaken=isRealRoom(room)?findRoom(room,secCtx.secId):null;
   if(secCtx.secId){
     var s=c.sections.find(function(x){return x.id===secCtx.secId;});
     if(cap && cap<s.str){ ecToast('error','Capacity ('+cap+') is below current strength ('+s.str+').'); return; }
@@ -563,6 +563,13 @@ document.getElementById('secSave').addEventListener('click',function(){
   if(roomTaken) ecToast('warning','Room '+room+' is already used by '+roomTaken+'.');
   updateCards(); render(); persist('Section saved.');
 });
+
+/* "N.A", "N/A", "-" and the like are placeholders rather than rooms, and plenty
+   of sections carry one. Two sections sharing a placeholder is not a clash. */
+function isRealRoom(room){
+  var r=(room||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+  return r!=='' && r!=='na' && r!=='nil' && r!=='none';
+}
 
 /* The section already sitting in this room, as "Class - Section", or null.
    Rooms are matched across the whole year: a clash in another class counts too. */
