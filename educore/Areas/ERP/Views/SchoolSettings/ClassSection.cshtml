@@ -151,6 +151,7 @@
           <div class="col-12 col-sm-8">
             <label class="form-label cs-modal-lbl">Class Name</label>
             <input type="text" class="form-control" id="mClassName" maxlength="50" placeholder="e.g. Class 6">
+            <div class="form-text" id="mClassNamePreview"></div>
           </div>
           <div class="col-12 col-sm-4">
             <label class="form-label cs-modal-lbl">Order / Rank</label>
@@ -159,10 +160,12 @@
           <div class="col-12 col-sm-6">
             <label class="form-label cs-modal-lbl">Stream</label>
             <select class="form-select" id="mClassStream">
-              <option value="gen">General</option>
-              <option value="sci">Science</option>
+              <option value="gen">Not Applicable</option>
+              <option value="pcm">Science (PCM)</option>
+              <option value="pcb">Science (PCB)</option>
               <option value="com">Commerce</option>
-              <option value="art">Arts</option>
+              <option value="art">Arts / Humanities</option>
+              <option value="voc">Vocational</option>
             </select>
           </div>
           <div class="col-12 col-sm-6">
@@ -178,7 +181,8 @@
         </div>
         <div class="alert alert-info d-flex align-items-start gap-2 mt-3 mb-0" style="border-radius:12px;font-size:.82rem;">
           <i class="bx bx-info-circle fs-5"></i>
-          <span><strong>Rank</strong> drives promotion order (Class 5 → Class 6) and report-card sequencing.</span>
+          <span><strong>Rank</strong> drives promotion order (Class 5 → Class 6) and report-card sequencing.<br>
+            For classes 11 and 12, create one class per stream — “Class 11 Science (PCM)”, “Class 11 Commerce” — each with the same rank.</span>
         </div>
       </div>
       <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
@@ -265,7 +269,8 @@ var DATA=(seed||[]).map(function(c,i){
 
 function classStr(c){ return c.sections.reduce(function(a,s){return a+(s.str||0);},0); }
 function classCap(c){ return c.sections.reduce(function(a,s){return a+(s.cap||0);},0); }
-function streamLbl(s){ return {gen:'General',sci:'Science',com:'Commerce',art:'Arts'}[s]||'General'; }
+/* 'sci' is the old single Science value, kept so classes saved before the split still read back. */
+function streamLbl(s){ return {gen:'Not Applicable',pcm:'Science (PCM)',pcb:'Science (PCB)',com:'Commerce',art:'Arts / Humanities',voc:'Vocational',sci:'Science'}[s]||'Not Applicable'; }
 function barCls(pct){ return pct>=100?'full':(pct>=85?'warn':'ok'); }
 
 /* -- Persist the whole structure for the selected year (replace-all) -- */
@@ -377,12 +382,18 @@ function render(){
     var streamBadge=(c.stream && c.stream!=='gen')
       ? '<span class="cs-stream '+EC.esc(c.stream)+'">'+streamLbl(c.stream)+'</span>' : '';
 
+    /* Attendance, the timetable and class teacher assignment all work per section,
+       so a class without one is invisible to them. Say so rather than leave it blank. */
+    var noSecBadge=c.sections.length?''
+      :'<span class="cs-nosec" title="Attendance and the timetable both work per section">'
+        +'<i class="bx bx-error-circle"></i>No sections</span>';
+
     html+='<div class="cs-class'+(isOpen?' open':'')+'" data-c="'+c.id+'">'
       +'<div class="cs-class-head js-toggle" data-c="'+c.id+'">'
       +  '<i class="bx bx-chevron-right cs-chev"></i>'
       +  '<div class="cs-rank">'+(c.rank||'-')+'</div>'
       +  '<div class="flex-grow-1">'
-      +    '<div class="d-flex align-items-center gap-2 flex-wrap"><span class="cs-class-name">'+EC.esc(c.name)+'</span>'+streamBadge+'</div>'
+      +    '<div class="d-flex align-items-center gap-2 flex-wrap"><span class="cs-class-name">'+EC.esc(c.name)+'</span>'+streamBadge+noSecBadge+'</div>'
       +    '<div class="cs-class-meta">'+(c.coord?('Coordinator: '+EC.esc(c.coord)):'No coordinator')+'</div>'
       +  '</div>'
       +  '<div class="d-flex align-items-center gap-3 cs-class-meta-wrap">'
@@ -422,6 +433,8 @@ function bindEvents(){
   document.querySelectorAll('.js-del-class').forEach(function(b){ b.addEventListener('click',function(){ delClass(parseInt(this.dataset.c,10)); }); });
 }
 
+var DEFAULT_SECTION_CAPACITY=40;
+
 /* ---- Class modal ---- */
 function openClassModal(id){
   editClassId=id;
@@ -429,11 +442,42 @@ function openClassModal(id){
   document.getElementById('classModalTitle').textContent=c?'Edit Class':'Add Class';
   document.getElementById('mClassName').value=c?c.name:'';
   document.getElementById('mClassRank').value=c?c.rank:(DATA.length+1);
-  document.getElementById('mClassStream').value=c?c.stream:'gen';
+  /* A stored value the dropdown no longer offers ('sci' from before the PCM/PCB
+     split) would leave the select blank and clear the stream on save, so show it. */
+  var streamSel=document.getElementById('mClassStream');
+  if(c && c.stream && !streamSel.querySelector('option[value="'+c.stream+'"]')){
+    var opt=document.createElement('option');
+    opt.value=c.stream; opt.textContent=streamLbl(c.stream);
+    streamSel.appendChild(opt);
+  }
+  streamSel.value=c?c.stream:'gen';
   document.getElementById('mClassCoord').value=c?(c.coordStaffId||''):'';
+  updateNamePreview();
   new bootstrap.Modal(document.getElementById('classModal')).show();
 }
 document.getElementById('btnAddClass').addEventListener('click',function(){ openClassModal(null); });
+/* The saved class name carries the stream: "Class 11" + Science (PCM) is stored as
+   "Class 11 Science (PCM)". The name is the key students, fees and reports resolve
+   on, so two streams of one class must not end up sharing a name. The suffix is
+   added only when adding a class -- renaming a saved class would orphan the
+   students already enrolled under the old name. */
+function composedName(name,stream){
+  if(!stream || stream==='gen') return name;
+  var suffix=streamLbl(stream);
+  return name.toLowerCase().indexOf(suffix.toLowerCase())>=0 ? name : name+' '+suffix;
+}
+
+/* Shows the name that will actually be saved, so the suffix is never a surprise. */
+function updateNamePreview(){
+  var el=document.getElementById('mClassNamePreview');
+  if(!el) return;
+  var name=document.getElementById('mClassName').value.trim();
+  var full=composedName(name,document.getElementById('mClassStream').value);
+  el.textContent=(!editClassId && name && full!==name) ? 'Saved as: '+full : '';
+}
+document.getElementById('mClassName').addEventListener('input',updateNamePreview);
+document.getElementById('mClassStream').addEventListener('change',updateNamePreview);
+
 document.getElementById('classSave').addEventListener('click',function(){
   var name=document.getElementById('mClassName').value.trim();
   if(!name){ ecToast('error','Class name is required.'); return; }
@@ -443,14 +487,26 @@ document.getElementById('classSave').addEventListener('click',function(){
   var coordSel=document.getElementById('mClassCoord');
   var coordStaffId=parseInt(coordSel.value,10)||null;
   var coord=coordStaffId?coordSel.options[coordSel.selectedIndex].text:'';
-  var dup=DATA.some(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==editClassId;});
-  if(dup){ ecToast('warning','A class with this name already exists.'); return; }
+  /* An existing class keeps the name it was already saved under. */
+  if(!editClassId) name=composedName(name,stream);
+  if(name.length>50){ ecToast('error','Class name "'+name+'" is longer than 50 characters.'); return; }
+  var clash=DATA.find(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==editClassId;});
+  if(clash){
+    ecToast('warning', clash.stream===stream
+      ? '"'+name+'" already exists with the same stream.'
+      : '"'+name+'" already exists.');
+    return;
+  }
   if(editClassId){
     var c=DATA.find(function(x){return x.id===editClassId;});
     c.name=name; c.rank=rank; c.stream=stream; c.coord=coord; c.coordStaffId=coordStaffId;
   } else {
     var nid=++nextClassId;
-    DATA.push({id:nid,name:name,rank:rank,stream:stream,coord:coord,coordStaffId:coordStaffId,sections:[]});
+    /* A class with no sections never reaches attendance, the timetable or class
+       teacher assignment -- all three work per section. So every new class gets
+       section A, which the user can rename or add to. */
+    DATA.push({id:nid,name:name,rank:rank,stream:stream,coord:coord,coordStaffId:coordStaffId,
+               sections:[{id:++nextSecId,name:'A',cap:DEFAULT_SECTION_CAPACITY,str:0,teacher:'',room:''}]});
     openSet[nid]=true;
   }
   bootstrap.Modal.getInstance(document.getElementById('classModal')).hide();
@@ -478,7 +534,7 @@ function openSecModal(classId,secId){
   document.getElementById('secModalTitle').textContent=s?'Edit Section':'Add Section';
   document.getElementById('secModalSub').textContent=c.name;
   document.getElementById('mSecName').value=s?s.name:'';
-  document.getElementById('mSecCap').value=s?(s.cap||''):40;
+  document.getElementById('mSecCap').value=s?(s.cap||''):DEFAULT_SECTION_CAPACITY;
   document.getElementById('mSecRoom').value=s?(s.room||''):'';
   document.getElementById('mSecTeacherView').textContent=(s&&s.teacher)?s.teacher:'Not assigned';
   new bootstrap.Modal(document.getElementById('secModal')).show();
@@ -493,6 +549,8 @@ document.getElementById('secSave').addEventListener('click',function(){
   var room=document.getElementById('mSecRoom').value.trim();
   var dup=c.sections.some(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==secCtx.secId;});
   if(dup){ ecToast('warning','This section already exists in '+c.name+'.'); return; }
+  /* A shared room is legitimate (labs, halls), so this warns and still saves. */
+  var roomTaken=room?findRoom(room,secCtx.secId):null;
   if(secCtx.secId){
     var s=c.sections.find(function(x){return x.id===secCtx.secId;});
     if(cap && cap<s.str){ ecToast('error','Capacity ('+cap+') is below current strength ('+s.str+').'); return; }
@@ -502,8 +560,21 @@ document.getElementById('secSave').addEventListener('click',function(){
   }
   openSet[c.id]=true;
   bootstrap.Modal.getInstance(document.getElementById('secModal')).hide();
+  if(roomTaken) ecToast('warning','Room '+room+' is already used by '+roomTaken+'.');
   updateCards(); render(); persist('Section saved.');
 });
+
+/* The section already sitting in this room, as "Class - Section", or null.
+   Rooms are matched across the whole year: a clash in another class counts too. */
+function findRoom(room,exceptSecId){
+  var key=room.toLowerCase(), hit=null;
+  DATA.forEach(function(c){
+    c.sections.forEach(function(s){
+      if(!hit && s.id!==exceptSecId && (s.room||'').toLowerCase()===key) hit=c.name+' - '+s.name;
+    });
+  });
+  return hit;
+}
 function delSection(classId,secId){
   var c=DATA.find(function(x){return x.id===classId;});
   var s=c.sections.find(function(x){return x.id===secId;});

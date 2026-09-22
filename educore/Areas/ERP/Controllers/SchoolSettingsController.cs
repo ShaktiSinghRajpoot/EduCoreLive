@@ -666,8 +666,10 @@ namespace educore.Areas.ERP.Controllers
         private const int RankMaxValue         = 999;
         private const int CapacityMaxValue     = 5000;
 
-        // The four values the page's stream dropdown offers.
-        private static readonly string[] AllowedStreams = { "gen", "sci", "com", "art" };
+        // The values the page's stream dropdown offers. "sci" is the old single
+        // Science option, still accepted so classes saved before the PCM/PCB split
+        // can be re-saved without being rejected.
+        private static readonly string[] AllowedStreams = { "gen", "pcm", "pcb", "com", "art", "voc", "sci" };
 
         // Persists the full structure for one academic year (replace-all),
         // matching the stored procedure's semantics.
@@ -697,7 +699,7 @@ namespace educore.Areas.ERP.Controllers
                 if (name.Length > ClassNameMaxLength)
                     return Json(new { success = false, message = $"Class name \"{name}\" is longer than {ClassNameMaxLength} characters." });
                 if (model.ClassDetails.Any(x => x.ClassName.Equals(name, StringComparison.OrdinalIgnoreCase)))
-                    return Json(new { success = false, message = $"There are two classes named \"{name}\"." });
+                    return Json(new { success = false, message = $"There are two classes named \"{name}\". Two streams need two class names, e.g. \"{name} Science (PCM)\" and \"{name} Commerce\"." });
                 if (c.Rank < 0 || c.Rank > RankMaxValue)
                     return Json(new { success = false, message = $"Order for \"{name}\" must be between 1 and {RankMaxValue}." });
 

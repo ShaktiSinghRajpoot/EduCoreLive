@@ -52,10 +52,18 @@
 .cs-class-name{ font-weight:800; color:var(--ec-text-dark); font-size:.98rem; line-height:1.2; }
 .cs-class-meta{ font-size:.74rem; color:var(--ec-text-muted); font-weight:650; }
 .cs-stream{ display:inline-flex; align-items:center; padding:.18rem .55rem; border-radius:999px; font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; }
-.cs-stream.sci{ background:#cfe2ff; color:#084298; }
+.cs-stream.sci,
+.cs-stream.pcm{ background:#cfe2ff; color:#084298; }
+.cs-stream.pcb{ background:#cff4fc; color:#055160; }
 .cs-stream.com{ background:#d4edda; color:#155724; }
 .cs-stream.art{ background:#fff3cd; color:#664d03; }
+.cs-stream.voc{ background:#e2d9f3; color:#432874; }
 .cs-stream.gen{ background:#eceff5; color:#5a6072; }
+
+/* A class with no sections: flagged because attendance and the timetable both work per section. */
+.cs-nosec{ display:inline-flex; align-items:center; gap:.25rem; padding:.18rem .55rem; border-radius:999px;
+           font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em;
+           background:#f8d7da; color:#842029; }
 
 .cs-pill{ display:inline-flex; align-items:center; gap:.3rem; font-size:.76rem; font-weight:700; color:var(--ec-text-muted); }
 .cs-chev{ transition:transform .25s ease; font-size:1.4rem; color:var(--ec-text-muted); }

@@ -3241,3 +3241,54 @@ antiforgery token. What was missing:
 Six procedure checks verified locally, each rolled back: a schedule using both new
 types saves; empty, duplicate label, unknown type and a real overlap all raise;
 and the out-of-order pair that used to be refused now passes.
+
+### [2026-09-22] Classes & Sections: real streams, and why the class name carries them
+
+The stream dropdown offered General / Science / Commerce / Arts. Real Indian
+schools split Science into PCM and PCB, call Arts "Humanities", and run a
+Vocational stream - and the app already knew this: the Enquiry CRM's Interested
+Stream list has had the right six values all along. Classes & Sections just never
+caught up. The codes stay short (`pcm`, `pcb`, `com`, `art`, `voc`, `gen`) so the
+`varchar(50)` column is untouched, and `sci` stays in the whitelist so classes
+saved before the split can still be re-saved.
+
+**The interesting part was the duplicate-name complaint.** Creating "Class 11" for
+PCM and "Class 11" again for PCB is refused, and the obvious fix - make the
+uniqueness check `(name, stream)` instead of `name` - is the wrong one. Nothing
+downstream carries the stream. `core.student_enrolment` stores `class_name` as
+text with no stream column, and the enrolment procedure resolves the class by
+name with `ORDER BY display_order, academic_class_id LIMIT 1`. Two rows named
+"Class 11" and that `LIMIT 1` silently attaches a PCB student to the PCM class.
+The student, fee and report filters all match on the name the same way.
+
+So the name stays the key, and the page composes it: you type "Class 11", pick
+Science (PCM), and it saves as "Class 11 Science (PCM)", with a live "Saved as:"
+hint so the suffix is never a surprise. The duplicate check then reads as
+class + stream, which is what was actually wanted. Composition is idempotent, and
+it runs only when **adding** - recomposing on edit would rename a class that
+already has students enrolled under the old name, and enrolment stores that name
+as text.
+
+**A class with no sections is invisible.** Attendance requires a section and gates
+marking on being that section's class teacher, the timetable is built per section
+and bails without one, and class-teacher assignment is per section. So "Nursery
+doesn't need sections" cannot mean zero sections - every new class now gets
+section A, and classes that already have none are badged rather than left
+looking fine. Ten such classes existed locally and were backfilled.
+
+**Rooms were never checked anywhere.** Two sections could share "Room 101" with
+nothing said, and the timetable's clash detection keys on
+`day_period_teacherId` only - it flags a double-booked teacher, never a
+double-booked room. The section save now warns (and still saves, because labs and
+halls are legitimately shared) when a room is already taken, matching across the
+whole year rather than just the current class. The room clash check inside
+Timetable itself is still open.
+
+One bug found while checking the legacy path: a class holding a stream the
+dropdown no longer offers left the select blank, and saving cleared the stream.
+The stored value is now added as an option so it survives the round trip.
+
+Not fixed, and worth knowing: `Program.cs` pins `UseUrls` to
+`0.0.0.0:{PORT ?? 8080}`, which overrides `ASPNETCORE_URLS` and every
+launchSettings profile. On a machine where 8080 is in the reserved port
+exclusions, `dotnet run` dies with a bare `SocketException (10013)`.
