@@ -667,6 +667,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         day.CountedCash    = DbRead.Dec(reader, cols, "counted_cash");
                         day.Difference     = DbRead.Dec(reader, cols, "difference");
                         day.CloseRemarks   = DbRead.NStr(reader, cols, "close_remarks");
+                        day.SchoolCollected = DbRead.Dec(reader, cols, "school_collected");
+                        day.SchoolReceipts  = DbRead.Int(reader, cols, "school_receipts");
                     }
                 },
                 // cursor 1: per-mode breakdown (many rows)

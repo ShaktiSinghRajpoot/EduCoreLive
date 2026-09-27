@@ -65,6 +65,12 @@
         public decimal          CountedCash    { get; set; }
         public decimal          Difference     { get; set; }
         public string?          CloseRemarks   { get; set; }
+
+        // The same day across every cashier. Only used to explain a zero -- see
+        // the note on the DayClose page. It is not part of the reconciliation.
+        public decimal          SchoolCollected { get; set; }
+        public int              SchoolReceipts  { get; set; }
+
         public List<DayModeRow> Modes          { get; set; } = new();
     }
 

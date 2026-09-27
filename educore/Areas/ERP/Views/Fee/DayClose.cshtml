@@ -22,7 +22,7 @@
         <div class="d-flex align-items-center gap-2">
           <div class="ec-page-icon"><i class="bx bx-lock-open-alt"></i></div>
           <div><h4 class="ec-page-title mb-1">Day Close</h4>
-            <p class="ec-page-subtitle">Reconcile your day's collection and record the cash count</p></div>
+            <p class="ec-page-subtitle">Your own counter: reconcile the day's collection and record the cash count</p></div>
         </div>
         <div class="d-flex gap-2 align-items-end no-print">
           <div><label class="form-label mb-1">Date</label><input type="date" id="dDate" class="form-control form-control-sm"></div>
@@ -33,6 +33,9 @@
     </div>
 
     <div id="closedNote" class="alert alert-success py-2 d-none"><i class="bx bx-check-circle me-1"></i><span id="closedText"></span></div>
+
+    <!-- Why the figures can read zero. See load(). -->
+    <div id="scopeNote" class="alert alert-info py-2 d-none"><i class="bx bx-info-circle me-1"></i><span id="scopeText"></span></div>
 
     <!-- KPIs -->
     <div class="kpis">
@@ -47,7 +50,7 @@
       <div class="col-12 col-lg-6">
         <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap">
           <div class="ec-section-icon"><i class="bx bx-credit-card"></i></div>
-          <div><h6 class="ec-section-title">Collection by mode</h6><div class="ec-section-subtitle">Cancelled receipts excluded</div></div>
+          <div><h6 class="ec-section-title">Collection by mode</h6><div class="ec-section-subtitle">Your receipts only, cancelled excluded</div></div>
         </div></div>
           <div class="ec-card-body p-0">
             <div class="table-responsive"><table class="table ec-table mb-0">
@@ -113,7 +116,17 @@ $(function () {
             var rows=(d.modes||[]);
             $('#modeRows').html(rows.length? rows.map(function(m){
                 return '<tr><td class="fw-semibold">'+EC.esc(m.mode)+'</td><td class="text-end text-muted">'+m.count+'</td><td class="text-end mode-amt">'+EC.money(m.amount)+'</td></tr>';
-            }).join('') : '<tr><td colspan="3" class="text-muted text-center py-4">No collection on this date.</td></tr>');
+            }).join('') : '<tr><td colspan="3" class="text-muted text-center py-4">You collected nothing on this date.</td></tr>');
+
+            /* A zero on this page nearly always means "not my counter" or "not
+               this date" -- day close is deliberately per cashier, so a fee
+               taken at another counter never appears here. Left as a bare 0 it
+               reads like the money went missing, so say which it is. */
+            if(EC.num(d.totalCollected)===0 && EC.num(d.schoolCollected)>0){
+                $('#scopeText').text('You collected nothing on this date. The school took '+EC.money(d.schoolCollected)+
+                                     ' across '+d.schoolReceipts+' receipt(s) at other counters. This page closes your drawer only — for the school total use Fee › Reports.');
+                $('#scopeNote').removeClass('d-none');
+            } else $('#scopeNote').addClass('d-none');
 
             // closed state
             if(d.isClosed){

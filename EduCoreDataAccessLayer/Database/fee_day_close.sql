@@ -68,6 +68,19 @@ BEGIN
         (SELECT COALESCE(SUM(amount),0) FROM core.fee_payments
            WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND created_by=p_action_user_id
              AND payment_date::date=v_date AND is_cancelled=FALSE AND payment_mode='Cash')           AS cash_collected,
+
+        -- The same day for the WHOLE school, every cashier. Not part of this
+        -- cashier's reconciliation -- it exists so the page can explain a zero.
+        -- A cashier who collected nothing sees 0 and reasonably reads it as the
+        -- fees having gone missing, when the money was simply taken at another
+        -- counter (or on another date). These two let the page say which.
+        (SELECT COALESCE(SUM(amount),0) FROM core.fee_payments
+           WHERE tenant_id=p_tenant_id AND school_id=p_school_id
+             AND payment_date::date=v_date AND is_cancelled=FALSE)                                   AS school_collected,
+        (SELECT COUNT(*) FROM core.fee_payments
+           WHERE tenant_id=p_tenant_id AND school_id=p_school_id
+             AND payment_date::date=v_date AND is_cancelled=FALSE)                                   AS school_receipts,
+
         (SELECT COALESCE(SUM(amount),0) FROM core.fee_refunds
            WHERE tenant_id=p_tenant_id AND school_id=p_school_id AND refunded_by=p_action_user_id
              AND refunded_at::date=v_date)                                                     AS total_refunded,

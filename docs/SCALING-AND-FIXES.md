@@ -4024,3 +4024,35 @@ The header returns both keys now. Verified through the real procedures:
 
 All 16 suites: 500 checks, 0 failures -- and none of them caught this, because
 no test asserts on what a receipt prints. That is the gap worth closing next.
+
+### [2026-09-28] Day Close showed ₹0 without saying why
+
+Reported as a bug: fees were collected, and `ERP/Fee/DayClose` still read zero.
+
+The procedure was right. Run against live data it answers correctly:
+
+    user 53 (who collected), 27 Sep  ->  48,500 across 13 receipts
+    any other user,          27 Sep  ->  0
+    user 53,                 28 Sep  ->  0
+
+`sp_fee_day_collection_get` filters on `created_by = p_action_user_id`, and that
+is deliberate -- a day close reconciles *one drawer* against *one cash count*.
+Totalling the whole school on this page would make the cash-count line
+meaningless. So a zero means "not my counter" or "not this date", never "the
+money is missing".
+
+The page simply never said so. A bare ₹0 after a day of collection reads like
+lost money, and there was nothing on screen to suggest looking at the date or
+at whose login was being used.
+
+The summary cursor now also returns `school_collected` / `school_receipts` --
+the same day across every cashier. They take no part in the reconciliation;
+they exist so the page can tell the two cases apart:
+
+- collected 0, school > 0  -> "You collected nothing on this date. The school
+  took ₹48,500 across 13 receipt(s) at other counters."
+- collected 0, school 0    -> genuinely a quiet day, nothing added.
+
+The headings say whose sheet it is now ("Your own counter", "Your receipts
+only"), and the empty mode table says "You collected nothing on this date"
+rather than a flat "No collection on this date", which claimed more than it knew.
