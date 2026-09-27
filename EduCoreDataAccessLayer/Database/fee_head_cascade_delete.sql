@@ -41,6 +41,7 @@ DECLARE
     v_plan_rows   integer := 0;
     v_ledger_rows integer := 0;
     v_paid_rows   integer := 0;
+    v_emptied     integer := 0;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 OR COALESCE(p_fee_head_id, 0) <= 0 THEN
         RAISE EXCEPTION 'Invalid request.';
@@ -91,16 +92,20 @@ BEGIN
     -- 2. Recompute rollups for the affected structures from what remains.
     IF v_structs IS NOT NULL THEN
         UPDATE core.school_fee_structures fs
-        SET one_time_total = COALESCE(t.one_time, 0),
-            monthly_total  = COALESCE(t.monthly, 0),
-            yearly_total   = COALESCE(t.yearly, 0),
-            annual_total   = COALESCE(t.annual, 0),
-            updated_by     = p_action_user_id,
-            updated_at     = NOW()
+        SET one_time_total    = COALESCE(t.one_time, 0),
+            monthly_total     = COALESCE(t.monthly, 0),
+            quarterly_total   = COALESCE(t.quarterly, 0),
+            half_yearly_total = COALESCE(t.half_yearly, 0),
+            yearly_total      = COALESCE(t.yearly, 0),
+            annual_total      = COALESCE(t.annual, 0),
+            updated_by        = p_action_user_id,
+            updated_at        = NOW()
         FROM (
             SELECT d.fee_structure_id,
                    SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'one time')    AS one_time,
                    SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'monthly')     AS monthly,
+                   SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'quarterly')   AS quarterly,
+                   SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'half yearly') AS half_yearly,
                    SUM(d.amount) FILTER (WHERE lower(d.frequency) NOT IN ('one time','monthly','quarterly','half yearly')) AS yearly,
                    ( COALESCE(SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'one time'), 0)
                    + COALESCE(SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'monthly'), 0) * 12
@@ -114,14 +119,24 @@ BEGIN
         ) t
         WHERE fs.fee_structure_id = t.fee_structure_id;
 
-        -- Structures left with no details at all → zero the totals.
+        -- A structure whose last fee head just went is not a structure. Zeroing the
+        -- totals and leaving it alive is what this used to do, and it left the class
+        -- listed as configured while billing nothing -- seventeen of them on the live
+        -- database, all from deleting one head that every class shared. Retire it
+        -- instead, so the page shows the class as not set up, which is the truth.
         UPDATE core.school_fee_structures fs
-        SET one_time_total = 0, monthly_total = 0, yearly_total = 0, annual_total = 0,
+        SET one_time_total = 0, monthly_total = 0, quarterly_total = 0,
+            half_yearly_total = 0, yearly_total = 0, annual_total = 0,
+            -- This table tracks a delete with is_deleted + updated_by; it has no
+            -- deleted_by/deleted_at pair, unlike most others.
+            is_deleted = TRUE, is_active = FALSE,
             updated_by = p_action_user_id, updated_at = NOW()
         WHERE fs.fee_structure_id = ANY(v_structs)
+          AND COALESCE(fs.is_deleted, FALSE) = FALSE
           AND NOT EXISTS (
               SELECT 1 FROM core.school_fee_structure_details d
               WHERE d.fee_structure_id = fs.fee_structure_id);
+        GET DIAGNOSTICS v_emptied = ROW_COUNT;
     END IF;
 
     -- 3. Remove the head from every student's frozen plan.
@@ -144,8 +159,11 @@ BEGIN
 
     OPEN p_result FOR
     SELECT TRUE AS success,
-           format('"%s" deleted — removed from %s structure row(s), %s plan row(s) and %s ledger due(s).',
-                  v_name, v_struct_rows, v_plan_rows, v_ledger_rows) AS message,
+           format('"%s" deleted — removed from %s structure row(s), %s plan row(s) and %s ledger due(s).%s',
+                  v_name, v_struct_rows, v_plan_rows, v_ledger_rows,
+                  CASE WHEN v_emptied > 0
+                       THEN format(' %s class fee structure(s) had no other head and were retired.', v_emptied)
+                       ELSE '' END) AS message,
            v_struct_rows AS structure_rows,
            v_plan_rows   AS plan_rows,
            v_ledger_rows AS ledger_rows;

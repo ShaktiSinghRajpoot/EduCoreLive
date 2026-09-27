@@ -3661,3 +3661,40 @@ save with annual 2,000 + 12,000 + 1,000 + 6,000 + 500 = 21,500; five detail rows
 re-saving with one head leaves one live row and resets quarterly to zero; an
 empty payload is refused and writes no header. All 16 suites: 500 checks, 0
 failures.
+
+### [2026-09-27] Seventeen empty fee structures, and the line that made them
+
+The live database had seventeen fee structures with a header, zero details and a
+zero annual -- every class from Class 2 to Class 12 including all the stream
+classes. The page listed each one like any other, so those classes read as
+configured while billing nothing.
+
+**The earlier entry blamed the non-atomic save. That was wrong.** The evidence
+ruled it out: a failed save leaves *soft-deleted* details behind, and these
+structures had none at all, deleted or otherwise. The cause was
+`fee_head_cascade_delete.sql`, which HARD-deletes a head's structure rows and
+then did this to whatever was left with nothing:
+
+```sql
+-- Structures left with no details at all → zero the totals.
+UPDATE core.school_fee_structures
+SET one_time_total = 0, monthly_total = 0, yearly_total = 0, annual_total = 0
+WHERE ... AND NOT EXISTS (SELECT 1 FROM ..._details ...);
+```
+
+Zero the totals, leave it alive. Delete one fee head that every class shares and
+you get one of these per class -- which is exactly the shape of the seventeen.
+
+A structure whose last fee head just went is not a structure, so it is retired
+now rather than zeroed, and the delete message says how many went with the head.
+The recompute above it also gained `quarterly_total` and `half_yearly_total`,
+which it had been leaving stale since those columns were added.
+
+`fee_structure_retire_empty.sql` clears what the old behaviour produced. It is
+idempotent -- it only touches structures with no live details -- and says how
+many it retired rather than doing it quietly.
+
+Six behaviours verified against the real procedures, rolled back: a structure
+using only the deleted head is retired; a structure that used it alongside
+another head survives; that survivor's annual is recomputed correctly; and the
+message names the retirement. All 16 suites: 500 checks, 0 failures.
