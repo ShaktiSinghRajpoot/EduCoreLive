@@ -3840,3 +3840,36 @@ And the two cases that must NOT produce a row: a registration already paid in
 full (0 rows) and a walk-in admission with no enquiry at all (0 rows).
 
 All 16 suites: 500 checks, 0 failures.
+
+### [2026-09-27] The part-payment receipt, and a button that took money without asking
+
+Two things reported from the Registration screen after part payments went in.
+
+**The receipt printed the cash and nothing else.** Collect 900 of a 1,000
+registration fee and the slip read "Registration Fee 900, Total Paid 900" -- true
+about the cash and silent about the arrangement. The family goes home with a
+document that reads like the fee was 900 and there is nothing left to pay. It
+now prints the fee and what is still owed beside the amount received, and only
+when there IS a balance, so a fully paid receipt is unchanged.
+
+The numbers come from `sp_registration_fee_summary`, added because two screens
+need the same three figures -- the receipt, and the collect dialog below. The
+receipt procedure already returned `enquiry_id`; only the model had not mapped
+it, so nothing there had to change.
+
+**"Mark fee collected" posted the full fee on click.** No amount, no payment
+mode, no reference, no confirmation -- and after part payments existed, no way
+to take part of one. It opens a dialog now: student, fee, already received,
+outstanding, an amount box that starts at the outstanding figure and says what
+will still be owed as it is typed, payment mode and reference. On save it
+collects, and then shows the receipt rather than leaving the cashier to find it
+in a list while the parent waits.
+
+Verified against the real procedures, rolled back, using the reported case:
+
+    collect 900 of 1,000  -> "Part payment received. 100.00 still outstanding."
+    summary               -> fee 1000, received 900, outstanding 100, paid flag false
+    receipt               -> received 900, plus "Registration fee 1,000"
+                             and "Balance payable 100"
+
+All 16 suites: 500 checks, 0 failures.

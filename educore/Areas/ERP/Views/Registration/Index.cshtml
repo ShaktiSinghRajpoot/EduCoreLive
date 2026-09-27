@@ -187,6 +187,57 @@
 </div>
 
 <!-- ═══ REGISTER WALK-IN (1-step: create intake + register) ═══ -->
+<!-- Collect registration fee. The button in the list used to post the full fee
+     the instant it was clicked: no amount, no payment mode, no confirmation, and
+     no way to take part of it. -->
+<div class="modal fade" id="collectFeeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bx bx-rupee me-1"></i>Collect Registration Fee</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="cfEnquiryId" />
+        <div class="fw-bold mb-1" id="cfStudentName">-</div>
+
+        <div class="border rounded p-2 mb-3" style="font-size:.85rem">
+          <div class="d-flex justify-content-between"><span class="text-muted">Registration fee</span><span id="cfFee">0</span></div>
+          <div class="d-flex justify-content-between"><span class="text-muted">Already received</span><span id="cfSettled">0</span></div>
+          <hr class="my-2">
+          <div class="d-flex justify-content-between fw-bold"><span>Outstanding</span><span id="cfBalance">0</span></div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Collecting now</label>
+            <input type="number" min="0" step="0.01" class="form-control" id="cfAmount" />
+            <div class="form-text" id="cfHint">Taking the whole outstanding amount.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Payment Mode</label>
+            <select class="form-select" id="cfMode">
+              <option value="Cash">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="Card">Card</option>
+              <option value="Cheque">Cheque</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Reference <span class="text-muted">(optional)</span></label>
+            <input type="text" class="form-control" id="cfReference" maxlength="60" placeholder="Txn / cheque no" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="cfSave"><i class="bx bx-check me-1"></i>Collect &amp; Receipt</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="registerWalkinModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
@@ -475,18 +526,69 @@ $(function () {
     });
 
     /* ── mark fee paid ── */
+    var CF_BALANCE = 0;
+
+    /* Open the collect dialog and show what is owed before anyone types a figure.
+       This used to fire the payment straight from the click. */
     $('#regBody').on('click', '.btn-fee', function(){
         var id = $(this).data('id');
+        $('#cfEnquiryId').val(id);
+        $('#cfAmount').val('').data('touched', false);
+        $('#cfReference').val(''); $('#cfMode').val('Cash');
+        $('#cfStudentName').text('Loading...');
+        $('#cfFee, #cfSettled, #cfBalance').text(inr(0));
+        CF_BALANCE = 0;
+        new bootstrap.Modal(document.getElementById('collectFeeModal')).show();
+
+        $.getJSON('/ERP/Registration/FeeSummary', { enquiryId: id })
+        .done(function(res){
+            if(!res || !res.success){ ecToast('error', (res && res.message) || 'Could not load the fee.'); return; }
+            $('#cfStudentName').text(res.studentName || '');
+            $('#cfFee').text(inr(res.fee));
+            $('#cfSettled').text(inr(res.settled));
+            $('#cfBalance').text(inr(res.balance));
+            CF_BALANCE = res.balance;
+            $('#cfAmount').val(res.balance > 0 ? res.balance : '');
+            cfUpdateHint();
+        })
+        .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Could not load the fee')); });
+    });
+
+    /* Say what will still be owed as the amount is typed. */
+    function cfUpdateHint(){
+        var take = parseFloat($('#cfAmount').val());
+        if (isNaN(take)) take = CF_BALANCE;
+        var left = Math.round((CF_BALANCE - take) * 100) / 100;
+        if (take <= 0)                       $('#cfHint').html('<span class="text-danger">Enter an amount.</span>');
+        else if (take > CF_BALANCE + 0.005)  $('#cfHint').html('<span class="text-danger">Only ' + inr(CF_BALANCE) + ' is outstanding.</span>');
+        else if (left > 0.005)               $('#cfHint').html('<span class="text-warning-emphasis">Part payment - <strong>' + inr(left) + '</strong> will still be outstanding.</span>');
+        else                                 $('#cfHint').text('This clears the registration fee.');
+    }
+    $(document).on('input', '#cfAmount', function(){ $(this).data('touched', true); cfUpdateHint(); });
+
+    $('#cfSave').on('click', function(){
+        var take = parseFloat($('#cfAmount').val());
+        if (!(take > 0))               { ecToast('warning', 'Enter an amount to collect.'); return; }
+        if (take > CF_BALANCE + 0.005) { ecToast('warning', 'Only ' + inr(CF_BALANCE) + ' is outstanding.'); return; }
+
+        var $btn = $(this); EC.buttonBusy($btn, 'Collecting...');
         $.ajax({ url:'/ERP/Registration/MarkFeePaid', type:'POST', contentType:'application/json',
-            headers:{ 'RequestVerificationToken':csrf }, data: JSON.stringify({ enquiryId:id }) })
+            headers:{ 'RequestVerificationToken':csrf },
+            data: JSON.stringify({ enquiryId: parseInt($('#cfEnquiryId').val(), 10),
+                                   collectAmount: take,
+                                   paymentMode: $('#cfMode').val(),
+                                   paymentReference: $('#cfReference').val() }) })
         .done(function(res){
             if(res.success){
-                ecToast('success', res.message + (res.receiptNo ? ' Receipt ' + res.receiptNo + '.' : ''));
-                // Not auto-opened — print from the list when needed.
+                bootstrap.Modal.getInstance(document.getElementById('collectFeeModal')).hide();
+                ecToast('success', res.message || 'Collected.');
+                /* Hand over the receipt straight away - the parent is standing there. */
+                if (res.receiptNo && window.EcReceipt) EcReceipt.show(res.receiptNo);
                 load();
-            } else ecToast('error', res.message||'Failed.');
+            } else ecToast('error', res.message || 'Failed.');
         })
-        .fail(function(){ ecToast('error', 'Something went wrong.'); });
+        .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Could not collect the fee')); })
+        .always(function(){ EC.buttonReset($btn); });
     });
 
     /* ── cancel registration (mark withdrawn / Not Interested) ── */

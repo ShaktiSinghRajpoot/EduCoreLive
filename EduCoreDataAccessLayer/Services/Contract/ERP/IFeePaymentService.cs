@@ -31,6 +31,12 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             string?  discountReason = null,
             decimal  feeAmount      = 0);  // the agreed fee, frozen on the first payment
 
+        /// <summary>
+        /// A registration fee's position: agreed, settled so far, and still owed.
+        /// </summary>
+        Task<(decimal Fee, decimal Settled, decimal Balance, string StudentName)>
+            GetRegistrationFeeSummaryAsync(int enquiryId, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>A student's outstanding ledger installments (amount due &gt; amount paid + concession).</summary>
         /// <summary>
         /// School-wide defaulter list for the Fee Due Reminders screen — one row per

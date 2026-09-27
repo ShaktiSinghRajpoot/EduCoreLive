@@ -214,6 +214,41 @@ END;
 $procedure$;
 
 
+-- ── 3b. The summary two screens need ───────────────────────────────────────
+-- The collect dialog has to show what is owed BEFORE taking money, and a part
+-- payment receipt has to print the fee and the balance beside what was received
+-- -- a slip saying only "900" tells the family nothing about the 100 still due.
+-- Both want the same three numbers, so they ask the same place for them.
+CREATE OR REPLACE PROCEDURE core.sp_registration_fee_summary(
+    IN    p_tenant_id  integer,
+    IN    p_school_id  integer,
+    IN    p_enquiry_id integer,
+    INOUT p_result     refcursor DEFAULT 'result_cursor'::refcursor)
+LANGUAGE plpgsql
+AS $procedure$
+BEGIN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 OR p_enquiry_id <= 0 THEN
+        RAISE EXCEPTION 'Invalid request.';
+    END IF;
+
+    OPEN p_result FOR
+    SELECT
+        e.enquiry_id,
+        e.student_name,
+        e.class_name,
+        e.session,
+        COALESCE(e.registration_fee_amount, 0) AS fee_amount,
+        core.fn_registration_fee_settled(p_tenant_id, p_school_id, p_enquiry_id) AS settled_amount,
+        GREATEST(COALESCE(e.registration_fee_amount, 0)
+                 - core.fn_registration_fee_settled(p_tenant_id, p_school_id, p_enquiry_id), 0) AS balance_amount,
+        COALESCE(e.registration_fee_paid, FALSE) AS is_paid
+    FROM core.enquiries e
+    WHERE e.enquiry_id = p_enquiry_id
+      AND e.tenant_id = p_tenant_id
+      AND e.school_id = p_school_id;
+END;
+$procedure$;
+
 -- ── 4. Backfill: what was already collected in full ────────────────────────
 -- Enquiries flagged paid under the old all-or-nothing rule have receipts but no
 -- agreed amount. Take the amount from their own receipts, so their balance

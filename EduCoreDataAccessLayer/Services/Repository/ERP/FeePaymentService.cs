@@ -118,6 +118,40 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
         }
 
+        /// <summary>
+        /// What a registration fee stands at: agreed, settled so far, and still owed.
+        /// The collect dialog needs it before taking money and a part-payment receipt
+        /// needs it to print a balance, so both ask the same place.
+        /// </summary>
+        public async Task<(decimal Fee, decimal Settled, decimal Balance, string StudentName)>
+            GetRegistrationFeeSummaryAsync(int enquiryId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || enquiryId <= 0) return (0m, 0m, 0m, string.Empty);
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",  NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",  NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_enquiry_id", NpgsqlDbType.Integer) { Value = enquiryId },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "registration_summary_cursor" }
+            };
+
+            (decimal, decimal, decimal, string) result = (0m, 0m, 0m, string.Empty);
+            await _db.ExecuteCursorsAsync("core.sp_registration_fee_summary", parameters, async reader =>
+            {
+                var cols = reader.Columns();
+                if (await reader.ReadAsync())
+                {
+                    result = (DbRead.Dec(reader, cols, "fee_amount"),
+                              DbRead.Dec(reader, cols, "settled_amount"),
+                              DbRead.Dec(reader, cols, "balance_amount"),
+                              DbRead.NStr(reader, cols, "student_name") ?? string.Empty);
+                }
+            });
+            return result;
+        }
+
         public async Task<FeeDueItem> GetFeeDueListAsync(
             FeeDueItem query, int tenantId, int schoolId, int actionUserId)
         {
@@ -955,6 +989,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                                 ReferenceNo     = DbRead.NStr(reader, cols, "reference_no"),
                                 Remarks         = DbRead.NStr(reader, cols, "remarks"),
                                 PaymentType     = DbRead.NStr(reader, cols, "payment_type") ?? "Fee",
+                                EnquiryId       = DbRead.Int(reader, cols, "enquiry_id"),
                                 DiscountType    = DbRead.NStr(reader, cols, "discount_type"),
                                 DiscountValue   = DbRead.Dec(reader, cols, "discount_value"),
                                 DiscountReason  = DbRead.NStr(reader, cols, "discount_reason"),

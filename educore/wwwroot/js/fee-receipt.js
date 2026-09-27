@@ -88,6 +88,15 @@
             out += '<tr><td colspan="' + cols + '">Paid from advance</td><td class="rc-amt">−' + EC.money(r.advanceUsed) + '</td></tr>';
         if (r.advanceCredit > 0)
             out += '<tr><td colspan="' + cols + '">Saved to advance</td><td class="rc-amt">+' + EC.money(r.advanceCredit) + '</td></tr>';
+
+        // A registration fee can be paid in parts. Printing only what was handed
+        // over makes the slip look like the fee was 900 when it was 1000 and 100 is
+        // still owed, so show the arrangement: the fee, and what is left after this
+        // receipt. Only when there IS a balance -- a fully paid one needs no row.
+        if (r.registration && r.registration.balance > 0) {
+            out += '<tr><td colspan="' + cols + '">Registration fee</td><td class="rc-amt">' + EC.money(r.registration.fee) + '</td></tr>';
+            out += '<tr class="rc-bal"><td colspan="' + cols + '"><strong>Balance payable</strong></td><td class="rc-amt"><strong>' + EC.money(r.registration.balance) + '</strong></td></tr>';
+        }
         return out;
     }
 

@@ -1,4 +1,4 @@
-namespace EduCoreDataAccessLayer.Models.ERP
+﻿namespace EduCoreDataAccessLayer.Models.ERP
 {
     /// <summary>
     /// One due the cashier chose to collect on the Fee Collection counter:
@@ -210,6 +210,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string?   ReferenceNo     { get; set; }
         public string?   Remarks         { get; set; }
         public string    PaymentType     { get; set; } = "Fee";   // Fee | Registration
+        /// <summary>Set on a Registration receipt: there is no student yet, only an enquiry.</summary>
+        public int       EnquiryId       { get; set; }
         public string?   DiscountType    { get; set; }            // Flat | Percent
         public decimal   DiscountValue   { get; set; }            // entered ₹ or %
         public string?   DiscountReason  { get; set; }

@@ -176,6 +176,41 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = success > 0, message, receiptNo, balance });
         }
 
+        // ── GET: /ERP/Registration/FeeSummary ────────────────────
+        // What this registration's fee stands at, so the collect dialog can show the
+        // family what is owed before anyone types an amount. "Mark fee collected"
+        // used to post the full fee the moment it was clicked, with nothing shown
+        // and nothing to confirm.
+        [HttpGet]
+        [HasPermission("fees.view")]
+        public async Task<IActionResult> FeeSummary(int enquiryId)
+        {
+            if (enquiryId <= 0) return Json(new { success = false, message = "Invalid request." });
+
+            int tenantId = TenantId(), schoolId = SchoolId(), actionUserId = UserId();
+
+            var (fee, settled, balance, name) =
+                await _feePaymentService.GetRegistrationFeeSummaryAsync(enquiryId, tenantId, schoolId, actionUserId);
+
+            // Nothing agreed yet — this registration predates the fee being recorded,
+            // so fall back to the configured Registration-point total for its class.
+            if (fee <= 0)
+            {
+                var enquiry = await _enquiryService.GetEnquiryByIdAsync(enquiryId, tenantId, schoolId, actionUserId);
+                if (enquiry != null)
+                {
+                    fee = await _schoolSettingsService.GetCollectionPointTotalAsync(
+                        enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
+                        "Registration", tenantId, schoolId, actionUserId);
+                    balance = fee - settled;
+                    if (balance < 0) balance = 0;
+                    if (string.IsNullOrWhiteSpace(name)) name = enquiry.StudentName ?? string.Empty;
+                }
+            }
+
+            return Json(new { success = true, studentName = name, fee, settled, balance });
+        }
+
         // ── Helpers ──────────────────────────────────────────────
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
         private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
