@@ -350,6 +350,12 @@ BEGIN
            p.reference_no, p.remarks, p.payment_type,
            p.discount_type, p.discount_value, p.discount_reason,
            p.advance_used, p.advance_credit,
+           -- Who the receipt is FOR. The header named the student but never
+           -- returned the keys, so a caller wanting to say what is still owed had
+           -- nothing to ask about -- the balance lines on the registration and fee
+           -- receipts read 0 every time and silently printed nothing.
+           COALESCE(p.student_id, 0) AS student_id,
+           COALESCE(p.enquiry_id, 0) AS enquiry_id,
            COALESCE(s.student_name, e.student_name, 'Student') AS student_name,
            COALESCE(s.admission_no, '-')                       AS admission_no,
            COALESCE(s.class_name, e.class_name, '-')           AS class_name,

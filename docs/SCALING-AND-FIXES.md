@@ -3994,3 +3994,33 @@ every payment, and the history list has a Print button. Admission and
 registration are one-off moments with a parent waiting.
 
 All 16 suites: 500 checks, 0 failures. No SQL changed.
+
+### [2026-09-28] Both balance blocks were dead code, and the tests had not noticed
+
+Checking the admission receipt found that neither balance block had ever
+printed -- not on the admission receipt, and not on the registration one either,
+which is why it still looked wrong after yesterday's work.
+
+`sp_fee_receipt_get` returns the student's NAME, admission number and class, all
+resolved through `LEFT JOIN core.students` and `LEFT JOIN core.enquiries` -- and
+never returned `student_id` or `enquiry_id` themselves. The C# mapped both, got
+0 from `DbRead.Int` (which tolerates a missing column by design), and the
+controller's guards -- `r.EnquiryId > 0` and `r.StudentId > 0` -- were false
+every single time. Both features were wired end to end and switched off by one
+missing column.
+
+**Worth being honest about how this got through.** The procedures were tested
+directly and passed, and the layout was rendered from a hand-built payload and
+looked right. Neither exercise touched the join between them: the thing that
+returns the receipt and the thing that answers "what is still owed" were never
+asked to work together. Verifying two layers separately is not the same as
+verifying the path, and a `DbRead` helper that tolerates missing columns turns
+that gap into silence rather than an error.
+
+The header returns both keys now. Verified through the real procedures:
+
+    admission receipt     student_id 1948, enquiry_id 0 -> dues block computes
+    registration receipt  enquiry_id 252, student_id 0  -> fee 1000, balance 100
+
+All 16 suites: 500 checks, 0 failures -- and none of them caught this, because
+no test asserts on what a receipt prints. That is the gap worth closing next.
