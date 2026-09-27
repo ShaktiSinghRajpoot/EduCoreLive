@@ -1,7 +1,7 @@
 ﻿@model EduCoreDataAccessLayer.Models.ERP.DashboardSummary
 @{
     ViewData["Title"] = "Dashboard";
-    var greeting = DateTime.Now.Hour < 12 ? "Good morning" : DateTime.Now.Hour < 17 ? "Good afternoon" : "Good evening";
+    var greeting = Dates.Now.Hour < 12 ? "Good morning" : Dates.Now.Hour < 17 ? "Good afternoon" : "Good evening";
 
     // map per-item accent -> soft theme class
     string Money(decimal v) => "₹" + v.ToString("N0", System.Globalization.CultureInfo.GetCultureInfo("en-IN"));
@@ -43,7 +43,7 @@
                 <div class="dash-hero-body d-flex flex-column h-100">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
                         <div>
-                            <span class="dash-chip mb-3"><i class="bx bx-calendar"></i> @DateTime.Now.ToString("dddd, dd MMMM yyyy")</span>
+                            <span class="dash-chip mb-3"><i class="bx bx-calendar"></i> @Dates.Now.ToString("dddd, dd MMMM yyyy")</span>
                             <h3 class="text-white fw-bold mb-1">@greeting, @(User.FindFirst(EduCoreDataAccessLayer.Helpers.Common.SK_UserName)?.Value ?? "Admin") 👋</h3>
                             <p class="mb-0" style="color:rgba(255,255,255,.9);max-width:36rem">
                                 @if (Model.TodayCollection > 0)

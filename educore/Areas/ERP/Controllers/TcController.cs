@@ -138,7 +138,7 @@ namespace educore.Areas.ERP.Controllers
             WorkingDays     = 220,
             DaysPresent     = 210,
             Activities      = "Scouts; School football team",
-            ApplicationDate = Dates.Norm(DateTime.Today.AddDays(-2).ToString(Dates.Iso))
+            ApplicationDate = Dates.Norm(Dates.Now.Date.AddDays(-2).ToString(Dates.Iso))
         };
     }
 }

@@ -1,3 +1,5 @@
+using EduCoreDataAccessLayer.Helpers;
+
 namespace educore.Models
 {
     /// <summary>
@@ -20,6 +22,6 @@ namespace educore.Models
         /// <summary>Safe, timestamped file name, e.g. "SCH14_2026-07-26_143022.json".</summary>
         public string FileName =>
             $"{(string.IsNullOrWhiteSpace(SchoolCode) ? "school-" + SchoolId : SchoolCode)}" +
-            $"_{DateTime.Now:yyyy-MM-dd_HHmmss}.json";
+            $"_{Dates.Now:yyyy-MM-dd_HHmmss}.json";
     }
 }

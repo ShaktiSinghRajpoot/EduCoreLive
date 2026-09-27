@@ -379,7 +379,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 {
                     FollowupId = IntVal(row, "followup_id"),
                     EnquiryId  = enquiryId,
-                    FollowupDate = row["followup_date"] == DBNull.Value ? DateTime.UtcNow : Convert.ToDateTime(row["followup_date"]),
+                    FollowupDate = row["followup_date"] == DBNull.Value ? Dates.Now : Convert.ToDateTime(row["followup_date"]),
                     FollowupType = row["followup_type"] == DBNull.Value ? "Call": row["followup_type"].ToString()!,
                     Outcome=row["outcome"]== DBNull.Value ? null: row["outcome"].ToString(),
                     Notes  = row["notes"]               == DBNull.Value ? null                  : row["notes"].ToString(),
@@ -387,7 +387,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     StatusBefore      = row["status_before"]       == DBNull.Value ? null                  : row["status_before"].ToString(),
                     StatusAfter       = row["status_after"]        == DBNull.Value ? null                  : row["status_after"].ToString(),
                     CreatedBy         = IntVal(row, "created_by"),
-                    CreatedAt         = row["created_at"]          == DBNull.Value ? DateTime.UtcNow       : Convert.ToDateTime(row["created_at"])
+                    CreatedAt         = row["created_at"]          == DBNull.Value ? Dates.Now       : Convert.ToDateTime(row["created_at"])
                 });
             }
             return list;
@@ -426,7 +426,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     StatusTo   = row["status_to"]    == DBNull.Value ? string.Empty     : row["status_to"].ToString()!,
                     ChangeNote = row["change_note"]  == DBNull.Value ? null             : row["change_note"].ToString(),
                     ChangedBy  = IntVal(row, "changed_by"),
-                    CreatedAt  = row["created_at"]   == DBNull.Value ? DateTime.UtcNow  : Convert.ToDateTime(row["created_at"])
+                    CreatedAt  = row["created_at"]   == DBNull.Value ? Dates.Now  : Convert.ToDateTime(row["created_at"])
                 });
             }
             return list;
@@ -522,9 +522,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             m.AdmissionId           = Has(row,"admission_id") && row["admission_id"] != DBNull.Value
                                         ? Convert.ToInt32(row["admission_id"]) : null;
             m.CreatedAt             = Has(row,"created_at") && row["created_at"] != DBNull.Value
-                                        ? Convert.ToDateTime(row["created_at"]) : DateTime.UtcNow;
+                                        ? Convert.ToDateTime(row["created_at"]) : Dates.Now;
             m.UpdatedAt             = Has(row,"updated_at") && row["updated_at"] != DBNull.Value
-                                        ? Convert.ToDateTime(row["updated_at"]) : DateTime.UtcNow;
+                                        ? Convert.ToDateTime(row["updated_at"]) : Dates.Now;
         }
 
         // ── Tiny helpers ─────────────────────────────────────────

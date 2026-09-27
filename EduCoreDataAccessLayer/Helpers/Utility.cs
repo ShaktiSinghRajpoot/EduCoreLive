@@ -90,7 +90,7 @@ namespace EduCoreDataAccessLayer.Helpers
         public static List<SelectListItem> GetYearList()
         {
             var data = new List<SelectListItem>();
-            for (int i = DateTime.Now.Year; i >= 1800; i--)
+            for (int i = Dates.Now.Year; i >= 1800; i--)
             {
                 data.Add(new SelectListItem() { Value = i.ToString(), Text = i.ToString() });
             }

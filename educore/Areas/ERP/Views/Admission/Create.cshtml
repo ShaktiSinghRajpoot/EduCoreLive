@@ -81,7 +81,7 @@
                             </div>
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Date of Birth</label>
-                                <input type="date" name="DateOfBirth" class="form-control" value="@(ViewBag.PreDob as string ?? "")" max="@DateTime.Today.ToString("yyyy-MM-dd")" required>
+                                <input type="date" name="DateOfBirth" class="form-control" value="@(ViewBag.PreDob as string ?? "")" max="@Dates.Today" required>
                             </div>
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Academic Year</label>
@@ -464,7 +464,7 @@ $(function () {
     // an admission on the day it is entered. The fee preview still needs that
     // date to know how many months to bill, so it uses the server's today —
     // the same value sp_admission_manage will fall back to.
-    var ADMISSION_DATE = '@DateTime.Today.ToString("yyyy-MM-dd")';
+    var ADMISSION_DATE = '@Dates.Today';
     var $feeBox     = $('#feeContent');
     var $annual     = $('#annualTotalText');
     var $annualRef  = $('#annualRefText');

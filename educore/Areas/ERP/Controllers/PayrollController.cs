@@ -26,7 +26,7 @@ namespace educore.Areas.ERP.Controllers
             // The month picker was three hardcoded options. Offer the last twelve
             // months, newest first — payroll is never run for a future month.
             var months = Enumerable.Range(0, 12)
-                .Select(i => DateTime.Today.AddMonths(-i))
+                .Select(i => Dates.Now.Date.AddMonths(-i))
                 .Select(d => new { value = $"{d:yyyy-MM}", label = d.ToString("MMMM yyyy") })
                 .ToList();
 

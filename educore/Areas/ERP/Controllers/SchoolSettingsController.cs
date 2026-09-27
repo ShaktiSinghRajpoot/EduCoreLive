@@ -150,7 +150,7 @@ namespace educore.Areas.ERP.Controllers
 
             string folderPath = UploadPaths.FolderFor(_config, _webHostEnvironment, "schools", tenantId, schoolId);
 
-            string fileName = imageType + "_" + DateTime.Now.ToString("yyyyMMddHHmmssfff") + extension;
+            string fileName = imageType + "_" + Dates.Now.ToString("yyyyMMddHHmmssfff") + extension;
             string fullPath = Path.Combine(folderPath, fileName);
 
             using (var stream = new FileStream(fullPath, FileMode.Create))
@@ -394,9 +394,9 @@ namespace educore.Areas.ERP.Controllers
 
             // Current academic year string (e.g. "2026-2027")
             string currentAy = academicYears.FirstOrDefault()
-                ?? (DateTime.Now.Month >= 4
-                    ? $"{DateTime.Now.Year}-{DateTime.Now.Year + 1}"
-                    : $"{DateTime.Now.Year - 1}-{DateTime.Now.Year}");
+                ?? (Dates.Now.Month >= 4
+                    ? $"{Dates.Now.Year}-{Dates.Now.Year + 1}"
+                    : $"{Dates.Now.Year - 1}-{Dates.Now.Year}");
 
             var model = new FeeStructureModel
             {
@@ -1110,7 +1110,7 @@ namespace educore.Areas.ERP.Controllers
         {
             int tenantId = SmTenant(), schoolId = SmSchool(), actionUserId = SmUser();
 
-            var now     = DateTime.Now;                    // server wall clock — the single source of truth
+            var now     = Dates.Now;                       // the school's clock — the single source of truth
             var periods = await _schoolSettingsService.GetPeriodStructureAsync(tenantId, schoolId, actionUserId);
             var day     = await _schoolCalendarService.GetDayStatusAsync(now.Date, tenantId, schoolId, actionUserId);
 
@@ -1243,7 +1243,7 @@ namespace educore.Areas.ERP.Controllers
         [HasPermission("academics.view")]
         public async Task<IActionResult> SchoolCalendarData(int? year)
         {
-            var y    = year is >= 2000 and <= 2100 ? year.Value : DateTime.Now.Year;
+            var y    = year is >= 2000 and <= 2100 ? year.Value : Dates.Now.Year;
             var from = new DateTime(y, 1, 1);
             var data = await _schoolCalendarService.GetCalendarAsync(
                 from, from.AddYears(1).AddDays(-1), SmTenant(), SmSchool(), SmUser());

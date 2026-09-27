@@ -243,7 +243,7 @@ namespace educore.Areas.ERP.Controllers
         {
             // Dates travel as ISO text now, so this is the one spot that turns the
             // start back into a real date - the month count is genuine arithmetic.
-            var start = Dates.Parse(startIso) ?? DateTime.Today;
+            var start = Dates.Parse(startIso) ?? Dates.Now.Date;
 
             int endYear;
             if (!string.IsNullOrWhiteSpace(academicYear) && academicYear.Length >= 4 &&

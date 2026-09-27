@@ -4056,3 +4056,51 @@ they exist so the page can tell the two cases apart:
 The headings say whose sheet it is now ("Your own counter", "Your receipts
 only"), and the empty mode table says "You collected nothing on this date"
 rather than a flat "No collection on this date", which claimed more than it knew.
+
+### [2026-09-28] The server was on UTC, so five and a half hours of every day had yesterday's date
+
+Reported as "Day Close shows 0 even after collecting". The previous entry
+explained the per-cashier scoping and added a note to the page. That was not the
+whole answer, and the follow-up -- *"but collection to aaj kiya hu"* -- was right.
+
+The payments were stamped 27 September. They were taken on the 28th:
+
+    Railway server   2026-09-27 22:12 UTC     TimeZone = Etc/UTC
+    India, same moment  2026-09-28 03:42       <- when the money was actually taken
+    stored           payment_date = 2026-09-27
+
+`sp_fee_payment_collect` does `v_date := COALESCE(p_payment_date, CURRENT_DATE)`,
+the app passes NULL, and `CURRENT_DATE` on a UTC server is the UTC date. The page
+asks the browser for today and gets the India date. They disagree from midnight
+until 5:30 am, every night.
+
+Day Close was only where it got noticed. For those five and a half hours a
+receipt printed yesterday's date, a fee register missed the row, and an admission
+made at 1 am was dated a day early. It never showed up in development because the
+developer machine's PostgreSQL is on Asia/Calcutta -- only the hosted database
+was on UTC.
+
+**Not fixed one call site at a time.** There are 426 uses of `CURRENT_DATE`,
+`now()` and `CURRENT_TIMESTAMP` across the procedures and 30 of `DateTime.Now`
+in C#. Editing them individually is how this kind of thing goes wrong. Instead,
+one setting at each end:
+
+- `school_timezone.sql` sets the database's own timezone to Asia/Kolkata. All 426
+  are correct from that moment, and no procedure is touched. It also carries a
+  one-shot correction for the payments already written in UTC -- guarded twice:
+  by a new `core.schema_marks` row so it cannot apply twice, and by reading the
+  timezone *before* changing it, so it does nothing on a database that was
+  already on India time. Run on the dev machine it correctly did nothing.
+- `Dates.Now` / `Dates.Today` are the app's clock, and the fourteen files that
+  asked the server for the time now ask them instead.
+
+`Dates` uses a fixed +05:30 rather than a named zone on purpose. India has had no
+daylight saving since 1945, so the offset is exact, and a named lookup needs the
+tzdata package that slim container images leave out -- without it the lookup
+throws, or silently falls back to UTC, which is the bug itself.
+
+One consequence worth naming: `EnquiryModel.TimeAgo` used to compare
+`DateTime.UtcNow` against a `created_at` assumed to be UTC. With the database on
+India time that assumption would have made every follow-up read five hours stale
+-- the exact symptom a comment there already warned about. Both sides of that
+subtraction are now the school's clock.

@@ -133,7 +133,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
             get
             {
                 var next = Dates.Parse(NextFollowupDate);
-                return next == null ? null : (int)(next.Value.Date - DateTime.Today).TotalDays;
+                return next == null ? null : (int)(next.Value.Date - Dates.Now.Date).TotalDays;
             }
         }
 
@@ -298,21 +298,20 @@ namespace EduCoreDataAccessLayer.Models.ERP
             _                  => "bg-label-secondary"
         };
 
-        // The DataSet round-trip drops DateTimeKind, so this UTC value arrives tagged
-        // Unspecified. ToUniversalTime() would treat it as local and subtract the offset
-        // again — which is why a follow-up logged seconds ago used to read "5h ago".
-        private DateTime CreatedAtUtc => DateTime.SpecifyKind(CreatedAt, DateTimeKind.Utc);
-
+        // Both sides of this subtraction are the school's own clock: the database
+        // now records timestamps in India time, and Dates.Now reads the same clock.
+        // No conversion, and nothing here depends on the server's timezone — which
+        // is what used to make a follow-up logged seconds ago read "5h ago".
         public string TimeAgo
         {
             get
             {
-                var diff = DateTime.UtcNow - CreatedAtUtc;
+                var diff = Dates.Now - CreatedAt;
                 if (diff.TotalMinutes < 1)  return "Just now";
                 if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
                 if (diff.TotalHours   < 24) return $"{(int)diff.TotalHours}h ago";
                 if (diff.TotalDays    < 7)  return $"{(int)diff.TotalDays}d ago";
-                return CreatedAtUtc.ToString("dd MMM yyyy");
+                return CreatedAt.ToString("dd MMM yyyy");
             }
         }
     }

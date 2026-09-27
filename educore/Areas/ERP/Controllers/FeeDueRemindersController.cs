@@ -176,7 +176,7 @@ namespace educore.Areas.ERP.Controllers
             }
 
             var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
-            return File(bytes, "text/csv", $"fee_dues_{DateTime.Today:yyyy-MM-dd}.csv");
+            return File(bytes, "text/csv", $"fee_dues_{Dates.Today}.csv");
         }
 
         // ── helpers ──────────────────────────────────────────────

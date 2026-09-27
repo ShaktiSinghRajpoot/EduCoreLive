@@ -213,7 +213,7 @@ namespace educore.Areas.ERP.Controllers
 
             var folder = UploadPaths.FolderFor(_config, _env, "students", TenantId(), SchoolId());
 
-            var fileName = $"student_{id}_{DateTime.Now:yyyyMMddHHmmssfff}{ext}";
+            var fileName = $"student_{id}_{Dates.Now:yyyyMMddHHmmssfff}{ext}";
             var fullPath = Path.Combine(folder, fileName);
             using (var stream = new FileStream(fullPath, FileMode.Create))
             {

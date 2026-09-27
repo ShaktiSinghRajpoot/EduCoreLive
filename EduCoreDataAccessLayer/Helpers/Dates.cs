@@ -20,8 +20,29 @@ namespace EduCoreDataAccessLayer.Helpers
     {
         public const string Iso = "yyyy-MM-dd";
 
-        /// <summary>Today as ISO text.</summary>
-        public static string Today => DateTime.Today.ToString(Iso, CultureInfo.InvariantCulture);
+        /// <summary>
+        /// The school's own clock, as an offset from UTC.
+        ///
+        /// WHY THIS EXISTS: the app is hosted on a server whose clock is UTC, so
+        /// DateTime.Today there is the UTC date -- and between midnight and 5:30
+        /// am in India that is still YESTERDAY. A fee collected at 3 am was being
+        /// stamped with the previous day and then vanished from Day Close, which
+        /// only ever asks for today. Every "now" and "today" in the app goes
+        /// through here so the server's own timezone stops mattering.
+        ///
+        /// A fixed offset rather than a named zone, deliberately: India has been
+        /// UTC+05:30 with no daylight saving since 1945, so +05:30 is exact, and
+        /// it needs no tzdata package -- the slim container images leave tzdata
+        /// out, and a named lookup there throws or quietly falls back to UTC,
+        /// which is the very bug being fixed.
+        /// </summary>
+        private static readonly TimeSpan SchoolOffset = TimeSpan.FromMinutes(330);
+
+        /// <summary>Now, on the school's clock. Use instead of DateTime.Now.</summary>
+        public static DateTime Now => DateTimeOffset.UtcNow.ToOffset(SchoolOffset).DateTime;
+
+        /// <summary>Today as ISO text, on the school's clock.</summary>
+        public static string Today => Now.ToString(Iso, CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Whatever the browser sent, normalised to ISO text. Null when it is
