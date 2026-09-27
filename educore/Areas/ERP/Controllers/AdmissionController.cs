@@ -372,10 +372,19 @@ namespace educore.Areas.ERP.Controllers
                             discountReason: NullIfEmpty(form.DiscountReason));
 
                         receiptNo  = res.ReceiptNo;
+
+                        // What is still due now, after this cash and any concession. A
+                        // parent paying 4,000 of 10,000 is normal; being told nothing
+                        // about the other 6,000 at the counter is how it gets forgotten.
+                        decimal stillDue = totals.PayToday - payAmount - concAmount;
+                        string  balance  = stillDue > 0.005m
+                            ? $" ₹{stillDue:N0} is still due — collect it from Fee → Collect Fees."
+                            : string.Empty;
+
                         feeMessage = !res.Success
                             ? $"Admission saved, but payment failed: {res.Message}"
-                            : (payAmount > 0 ? $"Receipt {res.ReceiptNo} generated."
-                                             : $"Concession recorded (receipt {res.ReceiptNo}).");
+                            : (payAmount > 0 ? $"Receipt {res.ReceiptNo} generated.{balance}"
+                                             : $"Concession recorded (receipt {res.ReceiptNo}).{balance}");
                     }
                     else if (payAmount > 0)
                     {

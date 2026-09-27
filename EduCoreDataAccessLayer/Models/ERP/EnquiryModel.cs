@@ -408,6 +408,11 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? RegistrationNumber  { get; set; }   // blank => auto-generate
         public string? RegistrationDate    { get; set; }   // blank => today
         public bool    RegistrationFeePaid { get; set; }
+        // How much is actually being handed over now. A parent who pays part of the
+        // fee was impossible to record before: this was a yes/no and the amount was
+        // always the full fee. Null / 0 with the flag on still means "the whole fee",
+        // so an older caller behaves as it always did.
+        public decimal? CollectAmount      { get; set; }
         public string? PaymentMode         { get; set; }   // Cash / UPI / Card / … (when fee collected)
         public string? PaymentReference    { get; set; }   // txn / cheque no (optional)
         // Optional discount on the registration fee. Amount is computed server-side
@@ -436,6 +441,11 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? RegistrationNumber  { get; set; }   // blank => auto-generate
         public string? RegistrationDate    { get; set; }   // blank => today
         public bool    RegistrationFeePaid { get; set; }
+        // How much is actually being handed over now. A parent who pays part of the
+        // fee was impossible to record before: this was a yes/no and the amount was
+        // always the full fee. Null / 0 with the flag on still means "the whole fee",
+        // so an older caller behaves as it always did.
+        public decimal? CollectAmount      { get; set; }
         public string? PaymentMode         { get; set; }
         public string? PaymentReference    { get; set; }
         public string?  DiscountType   { get; set; }       // "Percentage" | "Fixed"

@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Helpers;
+﻿using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -45,17 +45,25 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             _logger = logger;
         }
 
-        public async Task<(bool Success, string Message, string? ReceiptNo)> RecordRegistrationPaymentAsync(
+        /// <summary>
+        /// Records a registration payment, which may be part of the fee. `amount` is the
+        /// cash being taken now, `feeAmount` the total agreed. The procedure freezes the
+        /// agreed fee on the enquiry the first time, refuses more than is outstanding, and
+        /// works out the balance by summing the receipts -- so cancelling one puts the
+        /// balance back without anything having to be unwound.
+        /// </summary>
+        public async Task<(bool Success, string Message, string? ReceiptNo, decimal Balance)> RecordRegistrationPaymentAsync(
             int enquiryId, decimal amount, string paymentMode, string? referenceNo,
             string? remarks, string? finYear, int tenantId, int schoolId, int actionUserId,
-            decimal discountAmount = 0, string? discountType = null, string? discountReason = null)
+            decimal discountAmount = 0, string? discountType = null, string? discountReason = null,
+            decimal feeAmount = 0)
         {
             if (tenantId <= 1 || schoolId <= 0 || enquiryId <= 0)
-                return (false, "Invalid request.", null);
+                return (false, "Invalid request.", null, 0m);
             // `amount` is the NET collected; a 100% discount makes it 0, so only reject
             // a negative net or a zero gross (net + discount).
             if (amount < 0 || amount + discountAmount <= 0)
-                return (false, "Registration fee amount is invalid.", null);
+                return (false, "Enter an amount to collect.", null, 0m);
 
             var parameters = new NpgsqlParameter[]
             {
@@ -72,12 +80,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_discount_amount", NpgsqlDbType.Numeric) { Value = discountAmount },
                 new("p_discount_type",   NpgsqlDbType.Text)    { Value = (object?)discountType ?? DBNull.Value },
                 new("p_discount_reason", NpgsqlDbType.Text)    { Value = (object?)discountReason ?? DBNull.Value },
+                new("p_fee_amount",      NpgsqlDbType.Numeric) { Value = feeAmount },
                 new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
             };
 
             try
             {
-                (bool ok, string msg, string? rcp)? outcome = null;
+                (bool ok, string msg, string? rcp, decimal bal)? outcome = null;
                 await _db.ExecuteCursorsAsync(SpRegistrationRecord, parameters, async reader =>
                 {
                     var cols = reader.Columns();
@@ -86,24 +95,26 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         bool ok = DbRead.Bool(reader, cols, "success");
                         string msg = DbRead.NStr(reader, cols, "message") ?? (ok ? "Registration fee recorded." : "Error.");
                         string? rcp = DbRead.NStr(reader, cols, "receipt_no");
-                        outcome = (ok, msg, rcp);
+                        // What is still owed after this receipt, so the caller can say so.
+                        decimal bal = DbRead.Dec(reader, cols, "balance_amount");
+                        outcome = (ok, msg, rcp, bal);
                     }
                 });
 
-                return outcome ?? (false, "No response.", null);
+                return outcome ?? (false, "No response.", null, 0m);
             }
             catch (PostgresException pex)
             {
                 // WHY: a proc RAISE is usually a business rule (e.g. duplicate). Log at Warning with
                 // SqlState so we can distinguish business rules from real DB faults, then surface the message.
                 _logger.LogWarning(pex, "Registration fee payment rejected for enquiry {EnquiryId}, school {SchoolId}. SqlState {SqlState}", enquiryId, schoolId, pex.SqlState);
-                return (false, pex.MessageText, null);
+                return (false, pex.MessageText, null, 0m);
             }
             catch (Exception ex)
             {
                 // WHY: unexpected failure in a money path must never be swallowed silently.
                 _logger.LogError(ex, "Unexpected error recording registration fee for enquiry {EnquiryId}, school {SchoolId}.", enquiryId, schoolId);
-                return (false, "Unable to record the registration fee.", null);
+                return (false, "Unable to record the registration fee.", null, 0m);
             }
         }
 

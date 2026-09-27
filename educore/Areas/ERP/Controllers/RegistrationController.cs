@@ -1,4 +1,4 @@
-using educore.Services;
+﻿using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -141,6 +141,7 @@ namespace educore.Areas.ERP.Controllers
             // way the CRM register modal does. The amount is master data (sum of the
             // Registration-point Fee Heads for the enquiry's class), never client-supplied.
             string? receiptNo = null;
+            decimal balance = 0m;
             if (success > 0)
             {
                 var enquiry = await _enquiryService.GetEnquiryByIdAsync(req.EnquiryId, tenantId, schoolId, actionUserId);
@@ -152,20 +153,27 @@ namespace educore.Areas.ERP.Controllers
 
                     if (regFee > 0)
                     {
-                        var (paid, _, rcp) = await _feePaymentService.RecordRegistrationPaymentAsync(
-                            req.EnquiryId, regFee,
+                        // A part payment is allowed. No amount means "whatever is still
+                        // owed", which is what this button meant when the fee was a
+                        // yes/no -- so the old behaviour survives untouched.
+                        decimal cash = req.CollectAmount is > 0 ? req.CollectAmount.Value : regFee;
+
+                        var (paid, payMsg, rcp, bal) = await _feePaymentService.RecordRegistrationPaymentAsync(
+                            req.EnquiryId, cash,
                             NullIfEmpty(req.PaymentMode) ?? "Cash",
                             NullIfEmpty(req.PaymentReference),
                             "Registration fee",
                             enquiry.Session,
-                            tenantId, schoolId, actionUserId);
+                            tenantId, schoolId, actionUserId,
+                            feeAmount: regFee);
 
-                        if (paid) receiptNo = rcp;
+                        if (paid) { receiptNo = rcp; balance = bal; message = payMsg; }
+                        else      { message = payMsg; return Json(new { success = false, message }); }
                     }
                 }
             }
 
-            return Json(new { success = success > 0, message, receiptNo });
+            return Json(new { success = success > 0, message, receiptNo, balance });
         }
 
         // ── Helpers ──────────────────────────────────────────────

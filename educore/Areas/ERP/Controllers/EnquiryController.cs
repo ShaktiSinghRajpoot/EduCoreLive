@@ -331,7 +331,7 @@ namespace educore.Areas.ERP.Controllers
 
             var (ok, message, regNo, receiptNo) = await RegisterCoreAsync(
                 req.EnquiryId, req.RegistrationNumber, req.RegistrationDate,
-                req.RegistrationFeePaid, req.PaymentMode, req.PaymentReference,
+                req.RegistrationFeePaid, req.CollectAmount, req.PaymentMode, req.PaymentReference,
                 req.DiscountType, req.DiscountValue, req.DiscountReason,
                 workflow, tenantId, schoolId, actionUserId);
 
@@ -384,7 +384,7 @@ namespace educore.Areas.ERP.Controllers
             // 2) Register it in the same step (admission stays a later action).
             var (ok, message, regNo, receiptNo) = await RegisterCoreAsync(
                 newId, req.RegistrationNumber, req.RegistrationDate,
-                req.RegistrationFeePaid, req.PaymentMode, req.PaymentReference,
+                req.RegistrationFeePaid, req.CollectAmount, req.PaymentMode, req.PaymentReference,
                 req.DiscountType, req.DiscountValue, req.DiscountReason,
                 workflow, tenantId, schoolId, actionUserId);
 
@@ -402,7 +402,7 @@ namespace educore.Areas.ERP.Controllers
         // receipt. Used by the per-enquiry Register action AND the walk-in 1-step form.
         private async Task<(bool ok, string message, string? regNo, string? receiptNo)> RegisterCoreAsync(
             int enquiryId, string? registrationNumber, string? registrationDate,
-            bool registrationFeePaid, string? paymentMode, string? paymentReference,
+            bool registrationFeePaid, decimal? collectAmount, string? paymentMode, string? paymentReference,
             string? discountType, decimal discountValue, string? discountReason,
             AdmissionWorkflowModel workflow, int tenantId, int schoolId, int actionUserId)
         {
@@ -456,18 +456,34 @@ namespace educore.Areas.ERP.Controllers
                             if (discountAmount < 0) discountAmount = 0m;
                         }
 
-                        decimal net = regFee - discountAmount;
+                        // What the parent actually hands over. The full net is the default,
+                        // so a caller that does not send an amount behaves as before; a
+                        // smaller figure is a part payment and leaves a balance behind.
+                        decimal net  = regFee - discountAmount;
+                        decimal cash = collectAmount is > 0 ? Math.Min(collectAmount.Value, net) : net;
 
-                        var (paid, _, rcp) = await _feePaymentService.RecordRegistrationPaymentAsync(
-                            enquiryId, net,
+                        var (paid, payMsg, rcp, balance) = await _feePaymentService.RecordRegistrationPaymentAsync(
+                            enquiryId, cash,
                             NullIfEmpty(paymentMode) ?? "Cash",
                             NullIfEmpty(paymentReference),
                             "Registration fee",
                             enquiry.Session,
                             tenantId, schoolId, actionUserId,
-                            discountAmount, discType, NullIfEmpty(discountReason));
+                            discountAmount, discType, NullIfEmpty(discountReason),
+                            feeAmount: regFee);
 
-                        if (paid) receiptNo = rcp;
+                        if (paid)
+                        {
+                            receiptNo = rcp;
+                            // Say what is still owed. Silence here is how a balance gets
+                            // forgotten at the counter.
+                            if (balance > 0)
+                                message = $"{message} {payMsg}";
+                        }
+                        else
+                        {
+                            message = $"{message} Fee not recorded: {payMsg}";
+                        }
                     }
                 }
             }

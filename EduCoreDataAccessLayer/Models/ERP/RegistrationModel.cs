@@ -56,6 +56,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class MarkRegistrationFeeRequest
     {
         public int     EnquiryId        { get; set; }
+        // Part payments are allowed: null / 0 means "collect whatever is still owed".
+        public decimal? CollectAmount   { get; set; }
         public string? PaymentMode      { get; set; }
         public string? PaymentReference { get; set; }
     }

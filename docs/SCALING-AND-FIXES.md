@@ -3738,3 +3738,62 @@ in the ledger. What does not work is registration, which has no ledger row at
 all -- that is the next change.
 
 All 16 suites: 500 checks, 0 failures.
+
+### [2026-09-27] A registration fee can be paid in parts, and the admission receipt appears
+
+Two questions from the counter: what if a parent pays only part of the
+registration fee, and where is the admission receipt.
+
+**Admission already handled partials.** Worth stating because it was not
+obvious: `PaymentAmount` is a free amount capped at what is due now,
+`AllocateAdmissionPayment` spreads it across the freshly created dues capped at
+each one's outstanding, and the rest stays in the ledger. Ten thousand due, four
+thousand paid:
+
+    ZZ Admission Fee      due 6000  paid 4000  outstanding 2000  Partial
+    ZZ Security Deposit   due 4000  paid 0     outstanding 4000  Pending
+
+What was missing was being *told*: the screen said "Receipt generated" and
+nothing about the six thousand. It now names the balance and where to collect it.
+
+**The admission receipt was generated and never shown.** The branch that runs
+when a receipt exists attached a modal-close handler and stopped -- no open, no
+redirect -- so the page sat there while the parent waited for a document that
+already existed in the database. Its own comment admitted it: "Receipt not
+auto-opened; print it from the fee history / list." One line, `EcReceipt.show`.
+
+**Registration genuinely could not take a part payment.**
+`enquiries.registration_fee_paid` is a boolean, the amount was always the full
+Registration-point total, and `sp_registration_fee_record` wrote one row to
+`core.fee_payments` and nothing else -- no details, no ledger. No due meant
+nowhere for a balance to live.
+
+The obvious fix is a `student_ledger` row, and it was measured and rejected: 23
+SQL files read that table and 30 places filter on `student_id`, and at
+registration there is no student, so `student_id` would have to go nullable and
+every one of those 30 could then include or exclude enquiry rows by accident.
+That is the billing core wagered on a small feature.
+
+Two things already true did most of the work instead. `core.fee_payments`
+already carries `enquiry_id` with a nullable `student_id`, so registration money
+already lands in the same table as every other rupee and already reaches the
+reports -- "history of every transaction" was already satisfied. And nothing
+stopped an enquiry having several receipts.
+
+So only the agreed amount was missing, and it goes on the enquiry, frozen at
+registration so a later edit to the fee head cannot rewrite what a family was
+told. **What has been paid is never stored** -- it is summed from the receipts
+each time. A running total would drift and would have to be unwound by hand when
+a receipt is cancelled; derived, the balance comes back on its own. That is the
+seventh check below.
+
+Verified against the real procedure, rolled back: 2,000 of a 5,000 fee leaves
+"3,000.00 still outstanding" and the flag false; trying to take 9,000 is refused
+naming the 3,000 actually outstanding; a second payment of 3,000 reads "received
+in full" and flips the flag; two receipts against one enquiry; and cancelling
+the second receipt puts the balance back to 3,000 with nothing touched.
+
+Backwards compatible on purpose: a caller that does not mention a fee -- every
+existing one -- has its payment treated as the whole fee, which is exactly the
+old all-or-nothing behaviour. Three suites caught the first version, which
+raised instead. All 16: 500 checks, 0 failures.

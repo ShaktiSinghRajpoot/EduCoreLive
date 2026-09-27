@@ -1021,6 +1021,13 @@
                                 <div class="alert alert-light border mb-0 py-2" id="regNetLine" style="font-size:.83rem">Fee ₹0.00</div>
                             </div>
                             <div class="col-12 col-md-6">
+                                <label class="form-label">Collecting now</label>
+                                <input type="number" min="0" step="0.01" class="form-control" id="regCollectAmount" placeholder="0" />
+                                <div class="form-text" id="regBalanceHint">
+                                    Leave as-is to take the whole fee. Enter less for a part payment.
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
                                 <label class="form-label">Payment Mode</label>
                                 <select class="form-select" id="regPaymentMode">
                                     <option value="Cash" selected>Cash</option>
@@ -1445,9 +1452,30 @@ $(document).ready(function () {
         var net = fee - disc;
         $('#regNetLine').html('Fee ₹' + fee.toLocaleString('en-IN') +
             (disc > 0 ? ' − Discount ₹' + disc.toLocaleString('en-IN') : '') +
-            ' = <strong>Collect ₹' + net.toLocaleString('en-IN') + '</strong>');
+            ' = <strong>Payable ₹' + net.toLocaleString('en-IN') + '</strong>');
+
+        /* Follow the payable figure until the user types their own amount, so
+           paying in full needs no typing. */
+        var $amt = $('#regCollectAmount');
+        if (!$amt.data('touched')) $amt.val(net > 0 ? net : '');
+        regUpdateBalance(net);
+    }
+
+    /* A balance nobody is told about at the counter is a balance nobody collects. */
+    function regUpdateBalance(net) {
+        var taking = parseFloat($('#regCollectAmount').val());
+        if (isNaN(taking)) taking = net;
+        var left = Math.round((net - taking) * 100) / 100;
+        if (taking > net + 0.005) {
+            $('#regBalanceHint').html('<span class="text-danger">That is more than the ₹' + net.toLocaleString('en-IN') + ' payable.</span>');
+        } else if (left > 0.005) {
+            $('#regBalanceHint').html('<span class="text-warning-emphasis">Part payment — <strong>₹' + left.toLocaleString('en-IN') + '</strong> will still be outstanding.</span>');
+        } else {
+            $('#regBalanceHint').text('Paid in full.');
+        }
     }
     $('#regDiscountType, #regDiscountValue').on('input change', regUpdateNet);
+    $(document).on('input', '#regCollectAmount', function () { $(this).data('touched', true); regUpdateNet(); });
 
 
     // Payment details appear only when the registration fee is marked collected.
@@ -1478,6 +1506,8 @@ $(document).ready(function () {
                 registrationNumber:  regNumber,
                 registrationDate:    $('#regDate').val(),
                 registrationFeePaid: REG_FEE_ENABLED && $('#regFeePaid').is(':checked'),
+                /* Blank means the whole fee; a smaller number is a part payment. */
+                collectAmount: parseFloat($('#regCollectAmount').val()) || null,
                 paymentMode:         $('#regPaymentMode').val(),
                 paymentReference:    $.trim($('#regPaymentReference').val()),
                 discountType:        $('#regDiscountType').val(),

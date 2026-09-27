@@ -981,9 +981,13 @@ $(function () {
                 // If a fee was collected, show the printable receipt; go to the
                 // student list once the user closes it. Otherwise redirect straight away.
                 if (res.receiptNo && window.EcReceipt) {
+                    // The receipt was generated and then never shown: this branch wired up
+                    // the close handler and stopped, so the page sat there with no receipt
+                    // and no redirect, and the cashier had to go hunting in fee history for
+                    // a document the parent was standing there waiting for. Open it.
                     var modalEl = document.getElementById('ecReceiptModal');
                     if (modalEl) modalEl.addEventListener('hidden.bs.modal', function () { window.location.href = URL_LIST; }, { once: true });
-                    // Receipt not auto-opened; print it from the fee history / list.
+                    EcReceipt.show(res.receiptNo);
                 } else {
                     setTimeout(function () { window.location.href = URL_LIST; }, 900);
                 }

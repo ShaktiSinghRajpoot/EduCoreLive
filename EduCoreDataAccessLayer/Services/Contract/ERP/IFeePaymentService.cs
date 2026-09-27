@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Models.ERP;
+﻿using EduCoreDataAccessLayer.Models.ERP;
 
 namespace EduCoreDataAccessLayer.Services.Contract.ERP
 {
@@ -11,12 +11,14 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
     {
         /// <summary>
         /// Records a registration fee against an enquiry (there is no student yet) and
-        /// issues a receipt. No ledger allocation is done — registration fees are not
-        /// part of the student fee schedule.
+        /// issues a receipt. It may be PART of the fee: the agreed total is frozen on
+        /// the enquiry, what has been paid is summed from the receipts, and Balance is
+        /// what is still owed. No ledger allocation — a registration fee is not part of
+        /// the student fee schedule, and there is no student to hang it on yet.
         /// </summary>
-        Task<(bool Success, string Message, string? ReceiptNo)> RecordRegistrationPaymentAsync(
+        Task<(bool Success, string Message, string? ReceiptNo, decimal Balance)> RecordRegistrationPaymentAsync(
             int      enquiryId,
-            decimal  amount,               // NET collected (gross fee − discount)
+            decimal  amount,               // cash collected NOW (may be part of the fee)
             string   paymentMode,
             string?  referenceNo,
             string?  remarks,
@@ -26,7 +28,8 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             int      actionUserId,
             decimal  discountAmount = 0,   // server-computed from type + value
             string?  discountType   = null,
-            string?  discountReason = null);
+            string?  discountReason = null,
+            decimal  feeAmount      = 0);  // the agreed fee, frozen on the first payment
 
         /// <summary>A student's outstanding ledger installments (amount due &gt; amount paid + concession).</summary>
         /// <summary>

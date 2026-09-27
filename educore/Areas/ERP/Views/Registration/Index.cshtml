@@ -296,6 +296,13 @@
                 <div class="alert alert-light border mb-0 py-2" id="rwNetLine" style="font-size:.85rem">Select class &amp; session to see the fee.</div>
               </div>
               <div class="col-md-6">
+                <label class="form-label">Collecting now</label>
+                <input type="number" min="0" step="0.01" class="form-control" id="rwCollectAmount" placeholder="0" />
+                <div class="form-text" id="rwBalanceHint">
+                  Leave as-is to take the whole fee. Enter less if the parent is paying part of it.
+                </div>
+              </div>
+              <div class="col-md-6">
                 <label class="form-label">Payment Mode</label>
                 <select class="form-select" id="rwPaymentMode">
                   <option value="Cash">Cash</option>
@@ -537,8 +544,33 @@ $(function () {
         disc = Math.round(disc * 100) / 100;
         var net = fee - disc;
         $('#rwNetLine').html('Fee ' + inr(fee) + (disc > 0 ? ' − Discount ' + inr(disc) : '') +
-            ' = <strong>Collect ' + inr(net) + '</strong>');
+            ' = <strong>Payable ' + inr(net) + '</strong>');
+
+        /* The amount box follows the payable figure until the user types their own,
+           so the common case (paying it all) needs no typing at all. */
+        var $amt = $('#rwCollectAmount');
+        if (!$amt.data('touched')) $amt.val(net > 0 ? net : '');
+        rwUpdateBalance(net);
     }
+
+    /* Say what will still be owed the moment a part amount is entered — a balance
+       nobody is told about at the counter is a balance nobody collects. */
+    function rwUpdateBalance(net) {
+        var taking = parseFloat($('#rwCollectAmount').val());
+        if (isNaN(taking)) taking = net;
+        var left = Math.round((net - taking) * 100) / 100;
+        if (taking > net + 0.005) {
+            $('#rwBalanceHint').html('<span class="text-danger">That is more than the ' + inr(net) + ' payable.</span>');
+        } else if (left > 0.005) {
+            $('#rwBalanceHint').html('<span class="text-warning-emphasis">Part payment — <strong>' + inr(left) + '</strong> will still be outstanding.</span>');
+        } else {
+            $('#rwBalanceHint').text('Paid in full.');
+        }
+    }
+    $(document).on('input', '#rwCollectAmount', function () {
+        $(this).data('touched', true);
+        rwUpdateNet();
+    });
     function rwLoadFee() {
         if (!FEE_ENABLED) return;
         var cls = $('#rwClass').val(), ses = $('#rwSession').val();
@@ -598,6 +630,8 @@ $(function () {
                 registrationNumber:  $.trim($('#rwRegNumber').val()),
                 registrationDate:    $('#rwRegDate').val(),
                 registrationFeePaid: FEE_ENABLED && $('#rwFeePaid').is(':checked'),
+                /* Blank means the whole fee; a smaller number is a part payment. */
+                collectAmount: parseFloat($('#rwCollectAmount').val()) || null,
                 paymentMode:         $('#rwPaymentMode').val(),
                 paymentReference:    $.trim($('#rwPaymentReference').val()),
                 discountType:        $('#rwDiscountType').val(),
