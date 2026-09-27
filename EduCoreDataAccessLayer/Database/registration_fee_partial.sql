@@ -62,6 +62,30 @@ COMMENT ON FUNCTION core.fn_registration_fee_settled(integer, integer, integer) 
     'Registration fee settled for an enquiry: cash plus waiver, across every live receipt. Derived on purpose - a stored total would drift and would survive a cancelled receipt.';
 
 
+-- ── 2b. The name an unpaid balance is billed under ─────────────────────────
+-- When a registration is only part paid and the enquiry becomes a student, the
+-- remainder moves onto the student's ledger (see sp_admission_manage). Bill it
+-- under the school's own Registration-point head when there is exactly one, so
+-- the line matches the fee master and the reports group it with the rest of the
+-- registration money. With none or several, a plain label beats guessing which
+-- head was meant.
+CREATE OR REPLACE FUNCTION core.fn_registration_fee_head_name(
+    p_tenant_id integer, p_school_id integer)
+RETURNS varchar
+LANGUAGE sql STABLE AS $$
+    SELECT COALESCE(
+        -- max() over the whole set, with HAVING count = 1: returns the name only
+        -- when there is exactly one such head, and NULL otherwise.
+        (SELECT max(h.fee_head_name)
+           FROM core.school_fee_heads h
+          WHERE h.tenant_id = p_tenant_id
+            AND h.school_id = p_school_id
+            AND h.collection_point = 'Registration'
+            AND COALESCE(h.is_deleted, FALSE) = FALSE
+          HAVING COUNT(*) = 1),
+        'Registration Fee');
+$$;
+
 -- ── 3. Record a payment, in full or in part ────────────────────────────────
 -- p_fee_amount is the agreed fee. It is stored the first time and then left
 -- alone, so a later change to the fee head cannot move an existing balance.

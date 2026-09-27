@@ -3797,3 +3797,46 @@ Backwards compatible on purpose: a caller that does not mention a fee -- every
 existing one -- has its payment treated as the whole fee, which is exactly the
 old all-or-nothing behaviour. Three suites caught the first version, which
 raised instead. All 16: 500 checks, 0 failures.
+
+### [2026-09-27] An unpaid registration balance follows the child into the ledger
+
+Part payment at registration works, and the remainder is derived from the
+receipts against the enquiry. That holds right up to the moment the enquiry
+becomes a student -- and then stops. Every screen that chases money reads
+`core.student_ledger`, which is keyed on `student_id`, so the balance would sit
+on a record nobody opens again and never be collected. The family would simply
+never be asked for it.
+
+At admission it becomes an ordinary due on the new student: it shows at the fee
+counter, in the due list, on reminders and in the reports, and it is collected
+and receipted like anything else.
+
+It is billed under the school's own Registration-point fee head when there is
+exactly one, so the line matches the fee master and the reports group it with
+the rest of the registration money. With none or several, a plain "Registration
+Fee" beats guessing which head was meant.
+
+**Nothing is written back to the enquiry.** Its balance is derived from its own
+receipts and keeps saying what happened at registration; from admission onwards
+the student's ledger is where the money is chased. Nothing anywhere sums an
+enquiry's balance into a student's dues, so the two cannot double-count.
+
+**The first attempt was wrong and worth recording.** It patched
+`sp_admission_manage` at runtime -- read `pg_get_functiondef`, string-replace,
+`EXECUTE`. Clever, and it would have been erased the next time
+`student_master_fields.sql` ran, which is precisely the "an old file undoes a
+newer one" disease dug out of this repo four times today. The owning file was
+edited instead.
+
+Verified end to end against the real procedures, rolled back:
+
+    registration  2,000 of 5,000 -> "3,000.00 still outstanding"
+    admission     -> student ledger:
+                       Tuition           Sep 2026 .. Mar 2027   1000.00  Pending
+                       Registration Fee  Registration           3000.00  Pending
+    audit         -> "Unpaid registration balance 3000.00 carried from enquiry 222"
+
+And the two cases that must NOT produce a row: a registration already paid in
+full (0 rows) and a walk-in admission with no enquiry at all (0 rows).
+
+All 16 suites: 500 checks, 0 failures.

@@ -133,6 +133,7 @@ DECLARE
     v_period_end    DATE;
     v_sess_month    DATE;
     v_cycles        INTEGER;
+    v_reg_balance   NUMERIC;
 BEGIN
 
     -- ── SaveAdmission ────────────────────────────────────────
@@ -446,6 +447,47 @@ BEGIN
                     );
                 END IF;
             END LOOP;
+        END IF;
+
+        -- Carry an unpaid registration balance onto the student as a real due.
+        -- A family can pay part of the registration fee (registration_fee_partial.sql)
+        -- and the remainder is derived from the receipts against their enquiry. That
+        -- works until the enquiry becomes a student: every screen that chases money
+        -- reads core.student_ledger, which is keyed on student_id, so from that moment
+        -- the balance would sit on a record nobody opens again and never be collected.
+        -- It becomes an ordinary due here -- visible at the fee counter, in the due
+        -- list, on reminders and in the reports -- in the same transaction as the
+        -- admission, because a balance that can be lost between two calls is a bug
+        -- this codebase has been bitten by before.
+        --
+        -- Nothing is written back to the enquiry: its figure is derived from its own
+        -- receipts and keeps saying what happened at registration. Nothing sums an
+        -- enquiry's balance into a student's dues, so this is not double counting.
+        IF p_enquiry_id IS NOT NULL AND p_enquiry_id > 0 THEN
+            SELECT COALESCE(registration_fee_amount, 0)
+                   - core.fn_registration_fee_settled(p_tenant_id, p_school_id, p_enquiry_id)
+              INTO v_reg_balance
+            FROM core.enquiries
+            WHERE enquiry_id = p_enquiry_id
+              AND tenant_id = p_tenant_id AND school_id = p_school_id;
+
+            IF COALESCE(v_reg_balance, 0) > 0.005 THEN
+                INSERT INTO core.student_ledger (
+                    tenant_id, school_id, student_id,
+                    fee_head_name, frequency, installment_label,
+                    due_date, amount_due, status
+                ) VALUES (
+                    p_tenant_id, p_school_id, v_student_id,
+                    core.fn_registration_fee_head_name(p_tenant_id, p_school_id),
+                    'One Time', 'Registration',
+                    v_adm_date, ROUND(v_reg_balance, 2), 'Pending'
+                );
+
+                INSERT INTO core.admission_audit (tenant_id, school_id, student_id, action, detail, action_by)
+                VALUES (p_tenant_id, p_school_id, v_student_id, 'RegistrationBalanceCarried',
+                        'Unpaid registration balance ' || ROUND(v_reg_balance, 2)::TEXT ||
+                        ' carried from enquiry ' || p_enquiry_id::TEXT, p_action_user_id);
+            END IF;
         END IF;
 
         -- Audit
