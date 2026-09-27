@@ -622,4 +622,31 @@ EC.listEmpty = function (target, text, icon) {
         (text || 'No data found'));
 };
 
+// ── Why an AJAX call failed ─────────────────────────────────────────────
+// Eleven .fail()/.catch() handlers in this app said "Check your connection."
+// That sentence is right for exactly one case -- the request never reached the
+// server -- and wrong for every other one, so a 500 from a real bug was shown
+// to the user as a network problem, and nobody went looking at the log.
+//
+//     $.post(url, data).fail(function (xhr) {
+//         ecToast('error', EC.ajaxError(xhr, 'Save failed'));
+//     });
+//
+// `action` is what was being attempted ('Save failed', 'Copy failed'), so the
+// message names the thing that did not happen. A message the server sent wins
+// over anything generic: it is the only one that knows what actually broke.
+EC.ajaxError = function (xhr, action) {
+    var what = action || 'Request failed';
+    var code = xhr ? xhr.status : 0;
+    var said = xhr && xhr.responseJSON ? xhr.responseJSON.message : '';
+    if (said) return what + ': ' + said;
+    if (!code)        return what + '. Could not reach the server - check your connection.';
+    if (code === 400) return what + '. The page has gone stale (security token expired). Reload and try again.';
+    if (code === 401) return what + '. Your session has expired - sign in again.';
+    if (code === 403) return what + '. You do not have permission to do this.';
+    if (code === 404) return what + '. The server could not find that (HTTP 404).';
+    if (code >= 500)  return what + '. The server hit an error (HTTP ' + code + ').';
+    return what + ' (HTTP ' + code + ').';
+};
+
 window.EC = EC;

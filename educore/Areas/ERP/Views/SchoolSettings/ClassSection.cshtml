@@ -300,7 +300,7 @@ function persist(okMsg){
       setTimeout(function(){ window.location.reload(); }, 1200); /* resync from server */
     }
   })
-  .fail(function(){ ecToast('error','Save failed. Check your connection.'); });
+  .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); });
 }
 
 /* -- Copy the previous session's structure into this (empty) one -- */
@@ -327,8 +327,8 @@ if (btnCopy) {
         EC.buttonReset(btnCopy);
       }
     })
-    .fail(function(){
-      ecToast('error','Copy failed. Check your connection.');
+    .fail(function(xhr){
+      ecToast('error', EC.ajaxError(xhr, 'Copy failed'));
       EC.buttonReset(btnCopy);
     });
   });

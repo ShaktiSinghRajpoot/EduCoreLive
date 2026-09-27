@@ -462,7 +462,7 @@ $(document).ready(function () {
                 ecToast('error', (res && res.message) || 'Save failed.');
             }
         })
-        .fail(function() { ecToast('error', 'Save failed. Check your connection.'); })
+        .fail(function(xhr) { ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
         .always(function () { EC.buttonReset($btn); });
     });
 
