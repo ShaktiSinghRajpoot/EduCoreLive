@@ -3698,3 +3698,43 @@ Six behaviours verified against the real procedures, rolled back: a structure
 using only the deleted head is retired; a structure that used it alongside
 another head survives; that survivor's annual is recomputed correctly; and the
 message names the retirement. All 16 suites: 500 checks, 0 failures.
+
+### [2026-09-27] Two versions of the money-collection procedure were live
+
+`core.sp_fee_payment_collect` -- the procedure that takes a parent's cash and
+writes the receipt -- existed twice on both databases: a 16-arg version without
+`p_advance_used` and a 17-arg version with it. Calling it without naming every
+parameter answered `procedure is not unique` instead of taking a payment. The
+application happened to be safe because its C# passes all seventeen, so
+PostgreSQL could resolve it; anything else -- a script, a report, a future
+endpoint -- could not.
+
+Five files defined it: `fee_collection_full_flow.sql`, `fee_collection_extras.sql`,
+`fee_discount_meta.sql`, `fee_advance.sql` and `fee_payment_tenders.sql`. Each
+added a parameter and created its own signature. `fee_advance.sql` holds the
+full one (tenders *and* advance) and already dropped the 16-arg -- but
+`fee_payment_tenders.sql` is dated two days later and re-created exactly that
+16-arg without advance. Run them in date order and you get the pair.
+
+This is the fourth instance of the same disease found today, after
+`fee_collection_point.sql`, the eight workflow files, and the missing
+`fee_structure_manage.sql`. It is the one that mattered most: the others
+reverted behaviour, this one sat on the cash counter.
+
+`fee_advance.sql` owns it now and the other four carry a note. Verified by the
+test that exposed it -- a collect call that omits `p_advance_used`, which failed
+with "is not unique" before and now records the payment -- and by re-running all
+four retired files afterwards to confirm the second overload does not come back.
+
+While proving it, the partial-payment question that started this got its answer.
+Ten thousand due, four thousand paid:
+
+    ZZ Admission Fee      due 6000  paid 4000  outstanding 2000  Partial
+    ZZ Security Deposit   due 4000  paid 0     outstanding 4000  Pending
+    receipt RCP-2026-0001 -> ZZ Admission Fee 4000.00
+
+Partial collection at admission already works, itemised, with the balance left
+in the ledger. What does not work is registration, which has no ledger row at
+all -- that is the next change.
+
+All 16 suites: 500 checks, 0 failures.
