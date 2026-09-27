@@ -13,8 +13,9 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int AcademicYearId { get; set; }
         public string AcademicYearName { get; set; } = string.Empty;
 
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
+        // ISO "yyyy-MM-dd" text, like every other date in the app. See Helpers/Dates.
+        public string? StartDate { get; set; }
+        public string? EndDate { get; set; }
 
         public bool IsCurrent { get; set; }
 
@@ -63,8 +64,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
     {
         public int AcademicYearId { get; set; }
         public string AcademicYearName { get; set; } = string.Empty;
-        public DateTime? StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
+        public string? StartDate { get; set; }
+        public string? EndDate { get; set; }
         public bool IsCurrent { get; set; }
         public int ClassCount { get; set; }
         public int StudentCount { get; set; }

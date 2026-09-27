@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Academic Years";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var years = ViewBag.Years as List<EduCoreDataAccessLayer.Models.ERP.AcademicYearModel>
@@ -69,7 +69,7 @@
                   <span class="ay-name">@y.AcademicYearName</span>
                   @if (y.IsCurrent) { <span class="ay-badge cur">Current</span> }
                 </div>
-                <div class="ay-dates">@(y.StartDate?.ToString("dd MMM yyyy") ?? "—") &ndash; @(y.EndDate?.ToString("dd MMM yyyy") ?? "—")</div>
+                <div class="ay-dates">@(Dates.Show(y.StartDate) is { Length: > 0 } sd ? sd : "—") &ndash; @(Dates.Show(y.EndDate) is { Length: > 0 } ed ? ed : "—")</div>
               </div>
               <div class="d-flex align-items-center gap-3 ms-3">
                 <span class="ay-pill"><i class="bx bx-been-here"></i>@y.ClassCount class@(y.ClassCount == 1 ? "" : "es")</span>
@@ -81,7 +81,7 @@
                   <button class="ay-btn success js-current" data-id="@y.AcademicYearId" title="Set as current"><i class="bx bx-check-circle"></i>Set current</button>
                 }
                 <button class="ay-btn js-edit" data-id="@y.AcademicYearId" data-name="@y.AcademicYearName"
-                        data-start="@(y.StartDate?.ToString("yyyy-MM-dd"))" data-end="@(y.EndDate?.ToString("yyyy-MM-dd"))"
+                        data-start="@y.StartDate" data-end="@y.EndDate"
                         data-current="@(y.IsCurrent ? "1" : "0")" title="Edit"><i class="bx bx-edit-alt"></i>Edit</button>
                 <button class="ay-btn danger js-del" data-id="@y.AcademicYearId" data-name="@y.AcademicYearName" title="Delete"><i class="bx bx-trash"></i></button>
               </div>

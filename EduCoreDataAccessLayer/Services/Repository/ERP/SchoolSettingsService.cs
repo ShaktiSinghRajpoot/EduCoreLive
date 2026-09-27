@@ -582,18 +582,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static int?    AsNullableInt(DataRow r, string c)=> Col(r, c) && r[c] != DBNull.Value ? Convert.ToInt32(r[c]) : (int?)null;
         private static string? AsStr(DataRow r, string c)        => Col(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
         private static bool    AsBool(DataRow r, string c)       => Col(r, c) && r[c] != DBNull.Value && Convert.ToBoolean(r[c]);
-        private static DateTime? AsDate(DataRow r, string c)
-        {
-            if (!Col(r, c) || r[c] == DBNull.Value) return null;
-            var v = r[c];
-            return v switch
-            {
-                DateTime dt                                      => dt,
-                string s when DateTime.TryParse(s, out var p)    => p,
-                _                                                => Convert.ToDateTime(v)
-            };
-        }
-
         #endregion
 
         #region Academic Year
@@ -615,8 +603,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 {
                     AcademicYearId   = AsInt(row, "academic_year_id"),
                     AcademicYearName = AsStr(row, "academic_year_name") ?? string.Empty,
-                    StartDate        = AsDate(row, "start_date"),
-                    EndDate          = AsDate(row, "end_date"),
+                    StartDate        = AsStr(row, "start_date"),
+                    EndDate          = AsStr(row, "end_date"),
                     IsCurrent        = AsBool(row, "is_current"),
                     ClassCount       = AsInt(row, "class_count"),
                     StudentCount     = AsInt(row, "student_count")
@@ -670,7 +658,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         private async Task<DataSet> RunAcademicYearAsync(
             string operation, int tenantId, int schoolId, int actionUserId,
-            int? academicYearId, string? name, DateTime? startDate, DateTime? endDate, bool isCurrent, string cursorName)
+            int? academicYearId, string? name, string? startDate, string? endDate, bool isCurrent, string cursorName)
         {
             var parameters = new NpgsqlParameter[]
             {

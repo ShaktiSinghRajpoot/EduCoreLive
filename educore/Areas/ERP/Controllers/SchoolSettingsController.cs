@@ -799,8 +799,8 @@ namespace educore.Areas.ERP.Controllers
             {
                 AcademicYearId   = dto.Id,
                 AcademicYearName = dto.Name.Trim(),
-                StartDate        = ParseDate(dto.StartDate),
-                EndDate          = ParseDate(dto.EndDate),
+                StartDate        = Dates.Norm(dto.StartDate),
+                EndDate          = Dates.Norm(dto.EndDate),
                 IsCurrent        = dto.IsCurrent
             };
 
@@ -855,8 +855,6 @@ namespace educore.Areas.ERP.Controllers
             }
         }
 
-        private static DateTime? ParseDate(string? s) =>
-            DateTime.TryParse(s, out var d) ? d : (DateTime?)null;
         #endregion
 
         #region StaffMasters (Departments & Designations)
