@@ -1027,6 +1027,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                                 Remarks         = DbRead.NStr(reader, cols, "remarks"),
                                 PaymentType     = DbRead.NStr(reader, cols, "payment_type") ?? "Fee",
                                 EnquiryId       = DbRead.Int(reader, cols, "enquiry_id"),
+                                StudentId       = DbRead.Int(reader, cols, "student_id"),
                                 DiscountType    = DbRead.NStr(reader, cols, "discount_type"),
                                 DiscountValue   = DbRead.Dec(reader, cols, "discount_value"),
                                 DiscountReason  = DbRead.NStr(reader, cols, "discount_reason"),

@@ -365,6 +365,7 @@
                                 <div class="col-12 col-sm-6">
                                     <label class="form-label">Amount to Collect</label>
                                     <input type="number" min="0" step="1" id="paymentAmount" name="PaymentAmount" class="form-control" placeholder="0">
+                                    <div class="form-text" id="payBalanceHint"></div>
                                 </div>
                                 <div class="col-12 col-sm-6">
                                     <label class="form-label">Mode</label>
@@ -775,6 +776,7 @@ $(function () {
         if ($('#paymentAmount').length) {
             $('#paymentAmount').attr('max', payTodayMax);
             if (!window._payEdited) $('#paymentAmount').val(payTodayMax);
+            payUpdateHint();
         }
 
         $ledger.val(JSON.stringify({
@@ -805,7 +807,21 @@ $(function () {
     });
 
     /* ── Collect Now (only present when the school enables it) ── */
-    $('#paymentAmount').on('input', function () { window._payEdited = true; });
+    /* Part payment is allowed here -- say what will still be due, at the counter,
+       while the parent is standing there. It used to be silent, and the balance
+       only turned up later on the fee screen. */
+    function payUpdateHint() {
+        var $h = $('#payBalanceHint');
+        if (!$h.length) return;
+        var take = Number($('#paymentAmount').val());
+        if (isNaN(take)) take = payTodayMax;
+        var left = Math.round((payTodayMax - take) * 100) / 100;
+        if (payTodayMax <= 0)   $h.text('');
+        else if (take <= 0)     $h.html('<span class="text-warning-emphasis">Nothing collected now — ' + EC.money(payTodayMax) + ' stays due.</span>');
+        else if (left > 0.005)  $h.html('<span class="text-warning-emphasis">Part payment — <strong>' + EC.money(left) + '</strong> will still be due. Collect it later from Fee → Collect Fees.</span>');
+        else                    $h.text('Clears everything due at admission.');
+    }
+    $('#paymentAmount').on('input', function () { window._payEdited = true; payUpdateHint(); });
     // Block overpay: at admission you can collect at most the amount due now. Advance
     // / prepay must go through the Fee counter (ManageFee). Clamp back on blur + warn.
     $('#paymentAmount').on('change', function () {

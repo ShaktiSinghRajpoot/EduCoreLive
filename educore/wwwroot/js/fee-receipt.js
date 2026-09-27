@@ -103,6 +103,16 @@
                    (g.balance > 0 ? 'Balance payable' : 'Balance') +
                    '</strong></td><td class="rc-amt"><strong>' + EC.money(g.balance) + '</strong></td></tr>';
         }
+
+        /* Student fee receipt: what is still owed. Dated on purpose -- unlike a
+           registration fee, a student's dues keep being generated through the year,
+           so there is no fixed figure to freeze. Saying "as on <date>" is honest;
+           printing a bare "Balance" that quietly means "today" would not be. */
+        if (r.dues && r.dues.outstanding > 0) {
+            out += '<tr class="rc-bal"><td colspan="' + cols + '"><strong>Outstanding as on ' +
+                   EC.esc(r.dues.asOn) + '</strong></td><td class="rc-amt"><strong>' +
+                   EC.money(r.dues.outstanding) + '</strong></td></tr>';
+        }
         return out;
     }
 

@@ -3914,3 +3914,44 @@ Verified against the real procedures, rolled back:
         balance still 100
 
 All 16 suites: 500 checks, 0 failures.
+
+### [2026-09-28] The admission side of a part payment
+
+Same walk-through as registration, on the admission screen. The money was
+already right -- the amount box is free, capped at what is due now, and the
+allocation caps each line at its own outstanding -- so what was left was
+everything around it.
+
+**The counter said nothing about the remainder.** Typing 4,000 against 10,000
+due gave no reaction at all; the balance only surfaced later on the fee screen,
+by which time the parent has gone. It now says what will still be due as the
+amount is typed, and where to collect it.
+
+**The receipt said nothing either.** A fee receipt had no concept of a balance
+at all -- itemised lines and "Total Paid", nothing else. It carries the
+outstanding now.
+
+**And the first version of that was wrong in a way worth writing down.** Summing
+every open ledger row put the whole year's unbilled monthly instalments on the
+slip: a parent settling 4,000 of the 10,000 owed at admission would have read
+"Outstanding 13,000", or on a student with a full year loaded, 4,35,000. True
+arithmetic, useless document, and genuinely alarming. A receipt states what is
+owed *now*; the year ahead is a fee structure, not a debt. Only dues that have
+actually fallen due are counted.
+
+It is also dated -- "Outstanding as on 28-Sep-2026" -- and deliberately not a
+frozen snapshot like the registration receipt beside it. A registration fee is
+one agreed figure, so "the balance when this was written" is a real thing to
+freeze. A student's dues keep being generated all year, so there is no honest
+fixed number; what there is, is what they owe today, and the line says so in as
+many words instead of implying otherwise.
+
+Verified end to end against the real procedures, rolled back:
+
+    admission   6,000 + 4,000 due now, plus Sep tuition 1,000
+    collect     4,000
+    receipt     Total Paid 4,000
+                Outstanding as on 2026-09-28   7,000
+                (summing everything would have said 13,000)
+
+All 16 suites: 500 checks, 0 failures. No SQL changed.

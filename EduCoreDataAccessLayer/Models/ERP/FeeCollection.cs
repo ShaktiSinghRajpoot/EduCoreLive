@@ -212,6 +212,8 @@
         public string    PaymentType     { get; set; } = "Fee";   // Fee | Registration
         /// <summary>Set on a Registration receipt: there is no student yet, only an enquiry.</summary>
         public int       EnquiryId       { get; set; }
+        /// <summary>Set on a student fee receipt; 0 on a registration one.</summary>
+        public int       StudentId       { get; set; }
         public string?   DiscountType    { get; set; }            // Flat | Percent
         public decimal   DiscountValue   { get; set; }            // entered ₹ or %
         public string?   DiscountReason  { get; set; }

@@ -569,6 +569,35 @@ namespace educore.Areas.ERP.Controllers
                     registration = new { fee, paidBefore, thisReceipt, balance = balanceAfter };
             }
 
+            // A student fee receipt gets the outstanding too -- a parent paying 4,000 of
+            // 10,000 at admission should not have to ask what is left.
+            //
+            // Dated, and deliberately NOT a snapshot like the registration one. A
+            // registration fee is a fixed agreed figure, so "the balance when this
+            // receipt was written" is a real thing. A student's dues keep being
+            // generated all year, so there is no honest fixed balance to freeze --
+            // what there is, is what they owe today, and the receipt says so in as
+            // many words rather than implying otherwise.
+            object? dues = null;
+            if (!string.Equals(r.PaymentType, "Registration", StringComparison.OrdinalIgnoreCase) && r.StudentId > 0)
+            {
+                var open = await _feePaymentService.GetStudentDuesAsync(r.StudentId, TenantId(), SchoolId(), UserId());
+
+                // Only what has actually fallen due. Summing every open row put the
+                // whole year's unbilled monthly installments on the slip -- a parent
+                // settling 4,000 of the 10,000 owed at admission would read
+                // "Outstanding 4,35,000" and reasonably panic. A receipt states what
+                // is owed now; the year ahead is a fee structure, not a debt.
+                string today = Dates.Today;
+                decimal outstanding = open
+                    .Where(d => string.IsNullOrWhiteSpace(d.DueDate)
+                             || string.CompareOrdinal(d.DueDate, today) <= 0)
+                    .Sum(d => d.Outstanding);
+
+                if (outstanding > 0)
+                    dues = new { outstanding, asOn = today };
+            }
+
             // The school's chosen print format drives which template renders.
             var format = await _schoolSettingsService.GetReceiptFormatAsync(TenantId(), SchoolId(), UserId());
 
@@ -591,6 +620,7 @@ namespace educore.Areas.ERP.Controllers
                 advanceCredit  = r.AdvanceCredit,
                 student     = new { name = r.StudentName, admNo = r.AdmissionNo, className = r.ClassName, section = r.Section, roll = r.RollNo },
                 registration,
+                dues,
                 lines
             });
         }
