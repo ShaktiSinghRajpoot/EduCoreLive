@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Helpers;
+﻿using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
@@ -105,9 +105,9 @@ namespace educore.Areas.ERP.Controllers
                 IsRefundable    = isSecurity                    // security deposit is refundable
             };
 
-            var result = await _schoolSettingsService.SaveFeeHeadAsync(head, TenantId(), SchoolId(), UserId());
-            if (result <= 0)
-                return Json(new { success = false, message = "Unable to save the amount." });
+            var (ok, message) = await _schoolSettingsService.SaveFeeHeadAsync(head, TenantId(), SchoolId(), UserId());
+            if (!ok)
+                return Json(new { success = false, message });
 
             var (reg, sec) = await LoadSetupFeesAsync();
             return Json(new { success = true, message = "Saved.", registration = reg, security = sec });
@@ -131,9 +131,11 @@ namespace educore.Areas.ERP.Controllers
         // Security = the refundable Admission-point head. (If a school created several
         // via the Fee Head master, the inline card manages the first / primary one.)
         private static FeeHead? FirstRegistration(System.Collections.Generic.List<FeeHead> all)
-            => all.FirstOrDefault(h => string.Equals(h.CollectionPoint, "Registration", System.StringComparison.OrdinalIgnoreCase));
+            => all.OrderByDescending(h => h.IsActive)
+                  .FirstOrDefault(h => string.Equals(h.CollectionPoint, "Registration", System.StringComparison.OrdinalIgnoreCase));
         private static FeeHead? FirstSecurity(System.Collections.Generic.List<FeeHead> all)
-            => all.FirstOrDefault(h => string.Equals(h.CollectionPoint, "Admission", System.StringComparison.OrdinalIgnoreCase) && h.IsRefundable);
+            => all.OrderByDescending(h => h.IsActive)
+                  .FirstOrDefault(h => string.Equals(h.CollectionPoint, "Admission", System.StringComparison.OrdinalIgnoreCase) && h.IsRefundable);
 
         private async Task<(object? reg, object? sec)> LoadSetupFeesAsync()
         {

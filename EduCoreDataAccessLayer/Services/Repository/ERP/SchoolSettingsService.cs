@@ -3,6 +3,7 @@ using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using System.Data;
@@ -14,6 +15,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     {
         private readonly PgExec _db;
         private readonly AppCache _cache;
+        private readonly ILogger<SchoolSettingsService> _logger;
         private const string SpBasicProfileManage = "core.sp_school_admin_basic_profile_manage";
         private const string SpReceiptFormatManage = "core.sp_school_receipt_format_manage";
         private const string SpTcFormatManage = "core.sp_school_tc_format_manage";
@@ -26,10 +28,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpFeeHeadManage = "core.sp_school_admin_fee_head_manage";
         private const string SpFeeStructureManage = "core.sp_school_admin_fee_structure_manage";
 
-        public SchoolSettingsService(PgExec db, AppCache cache)
+        public SchoolSettingsService(PgExec db, AppCache cache, ILogger<SchoolSettingsService> logger)
         {
             _db = db;
             _cache = cache;
+            _logger = logger;
         }
 
         // WHY (Fix #6): cache keys for the two read-mostly lookups below. Tenant/school-scoped.
@@ -845,9 +848,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             row.Table.Columns.Contains("is_refundable") && row["is_refundable"] != DBNull.Value
                 && Convert.ToBoolean(row["is_refundable"]);
 
-        public async Task<int> SaveFeeHeadAsync(FeeHead model, int tenantId, int schoolId, int actionUserId)
+        public async Task<(bool Success, string Message)> SaveFeeHeadAsync(FeeHead model, int tenantId, int schoolId, int actionUserId)
         {
-            if (tenantId <= 1 || schoolId <= 0) return 0;
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
 
             model.TenantId = tenantId;
             model.SchoolId = schoolId;
@@ -870,19 +873,32 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "save_fee_head_cursor" }
             };
 
-            var dal = _db;
-            var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeHeadManage, parameters);
+            // The procedure raises for a duplicate name, a negative amount or an
+            // unknown cycle. Those are business rules with a sentence attached, not
+            // crashes, so they come back as a message instead of a 500.
+            DataSet ds;
+            try
+            {
+                ds = await _db.ExecuteProcedureWithCursorsAsync(SpFeeHeadManage, parameters);
+            }
+            catch (PostgresException ex)
+            {
+                _logger.LogWarning(ex, "SaveFeeHead refused ({SqlState}) for tenant {TenantId}, school {SchoolId}",
+                    ex.SqlState, tenantId, schoolId);
+                return (false, ex.MessageText);
+            }
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
-                return 0;
+                return (false, "No response from server.");
 
+            var row = ds.Tables[0].Rows[0];
             _cache.Remove(FeeHeadsKey(tenantId, schoolId));   // WHY (Fix #6): invalidate so the edit shows immediately
-            return 1;
+            return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty);
         }
 
-        public async Task<int> DeleteFeeHeadAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId)
+        public async Task<(bool Success, string Message)> DeleteFeeHeadAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId)
         {
-            if (tenantId <= 1 || schoolId <= 0) return 0;
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
 
             // Cascade delete: removes the head from fee structures, student plans and
             // the ledger (paid + unpaid dues), then soft-deletes the head. Receipts
@@ -896,21 +912,31 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "delete_fee_head_cursor" }
             };
 
-            var dal = _db;
-            var ds = await dal.ExecuteProcedureWithCursorsAsync("core.sp_fee_head_delete_cascade", parameters);
+            DataSet ds;
+            try
+            {
+                ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_fee_head_delete_cascade", parameters);
+            }
+            catch (PostgresException ex)
+            {
+                _logger.LogWarning(ex, "DeleteFeeHead refused ({SqlState}) for tenant {TenantId}, school {SchoolId}",
+                    ex.SqlState, tenantId, schoolId);
+                return (false, ex.MessageText);
+            }
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
-                return 0;
+                return (false, "No response from server.");
 
             var row = ds.Tables[0].Rows[0];
-            bool ok = row.Table.Columns.Contains("success") && row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]);
             _cache.Remove(FeeHeadsKey(tenantId, schoolId));   // WHY (Fix #6): invalidate after delete
-            return ok ? 1 : 0;
+            // The message carries the blast radius -- how many structure, plan and
+            // ledger rows went with it, or why it was refused.
+            return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty);
         }
 
-        public async Task<int> ToggleFeeHeadStatusAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId)
+        public async Task<(bool Success, string Message)> ToggleFeeHeadStatusAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId)
         {
-            if (tenantId <= 1 || schoolId <= 0) return 0;
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
 
             var parameters = new NpgsqlParameter[]
             {
@@ -922,14 +948,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "toggle_fee_head_cursor" }
             };
 
-            var dal = _db;
-            var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeHeadManage, parameters);
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpFeeHeadManage, parameters);
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
-                return 0;
+                return (false, "No response from server.");
 
+            var row = ds.Tables[0].Rows[0];
             _cache.Remove(FeeHeadsKey(tenantId, schoolId));   // WHY (Fix #6): invalidate after status toggle
-            return 1;
+            return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty);
         }
 
         #endregion
@@ -1081,6 +1107,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     {
                         detail.CollectionPoint = head.CollectionPoint;
                         detail.IsRefundable = head.IsRefundable;
+                        detail.IsActive = head.IsActive;
                     }
                 }
             }

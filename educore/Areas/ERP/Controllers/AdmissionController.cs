@@ -475,7 +475,11 @@ namespace educore.Areas.ERP.Controllers
             // collects Registration-point heads (those are taken at the registration step).
             // A refundable Admission head (the security deposit) is only charged when the
             // school enables the security deposit toggle in Workflow Settings.
+            // A head switched off in the Fee Head master is not charged again. It stays
+            // on the saved structure and on every record already written -- the flag is
+            // the safe alternative to deleting a head that has ledger history.
             var visible = details.Where(d =>
+                d.IsActive &&
                 !string.Equals(d.CollectionPoint, "Registration", StringComparison.OrdinalIgnoreCase) &&
                 (!(IsAdmissionPoint(d.CollectionPoint) && d.IsRefundable) || workflow.EnableSecurityFee));
 

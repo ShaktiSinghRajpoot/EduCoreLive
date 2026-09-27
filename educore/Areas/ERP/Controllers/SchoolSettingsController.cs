@@ -278,12 +278,12 @@ namespace educore.Areas.ERP.Controllers
                 return RedirectToAction(nameof(FeeHead));
             }
 
-            var result = await _schoolSettingsService.SaveFeeHeadAsync(model, tenantId, schoolId, actionUserId);
+            var (ok, message) = await _schoolSettingsService.SaveFeeHeadAsync(model, tenantId, schoolId, actionUserId);
 
-            if (result > 0)
-                TempData["SuccessMessage"] = "Fee head saved successfully.";
+            if (ok)
+                TempData["SuccessMessage"] = message;
             else
-                TempData["ErrorMessage"] = "Unable to save fee head.";
+                TempData["ErrorMessage"] = message;
 
             return RedirectToAction(nameof(FeeHead));
         }
@@ -312,12 +312,12 @@ namespace educore.Areas.ERP.Controllers
             int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
             int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
-            var result = await _schoolSettingsService.DeleteFeeHeadAsync(id, tenantId, schoolId, actionUserId);
+            var (ok, message) = await _schoolSettingsService.DeleteFeeHeadAsync(id, tenantId, schoolId, actionUserId);
 
-            if (result > 0)
-                TempData["SuccessMessage"] = "Fee head deleted successfully.";
+            if (ok)
+                TempData["SuccessMessage"] = message;
             else
-                TempData["ErrorMessage"] = "Unable to delete fee head.";
+                TempData["ErrorMessage"] = message;
 
             return RedirectToAction(nameof(FeeHead));
         }
@@ -331,12 +331,12 @@ namespace educore.Areas.ERP.Controllers
             int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
             int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
-            var result = await _schoolSettingsService.ToggleFeeHeadStatusAsync(id, tenantId, schoolId, actionUserId);
+            var (ok, message) = await _schoolSettingsService.ToggleFeeHeadStatusAsync(id, tenantId, schoolId, actionUserId);
 
-            if (result > 0)
-                TempData["SuccessMessage"] = "Fee head status updated successfully.";
+            if (ok)
+                TempData["SuccessMessage"] = message;
             else
-                TempData["ErrorMessage"] = "Unable to update fee head status.";
+                TempData["ErrorMessage"] = message;
 
             return RedirectToAction(nameof(FeeHead));
         }
@@ -393,7 +393,9 @@ namespace educore.Areas.ERP.Controllers
                 AvailableClasses   = availableClasses,
                 AcademicYears      = academicYears,
                 ExistingStructures = existingStructures,
-                FeeHeads           = rawFeeHeads.Select(fh => new FeeStructureDetailModel
+                // An inactive head stays on structures already saved (the enrichment
+                // below carries its flag), but must not be offered for a new one.
+                FeeHeads           = rawFeeHeads.Where(fh => fh.IsActive).Select(fh => new FeeStructureDetailModel
                 {
                     FeeHeadId   = fh.FeeHeadId,
                     FeeHeadName = fh.FeeHeadName,

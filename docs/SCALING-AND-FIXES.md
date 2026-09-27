@@ -3354,3 +3354,67 @@ deleted while students are billed against it, and always reports success;
 name text alone, so "Tuition Fee" and "tuition fee" split one fee into two;
 renaming a head orphans the ledger rows already written under the old name; and
 fee head save validates presence only - a negative amount is accepted.
+
+### [2026-09-27] Fee Head: the name is the identity, so it is protected now
+
+`core.student_ledger` carries `fee_head_name` and no `fee_head_id` - the cascade
+delete says so out loud, because it has to match on the name. So the name is the
+join key for every due, every receipt line and every report, exactly the shape
+`class_name` has. It had none of the protection `class_name` got.
+
+**The Active/Inactive toggle did nothing at all.** It was written, stored,
+toggled and rendered as a pill - and no layer filtered on it. The procedure
+selected `is_active` without a WHERE, no C# filtered it, and FeeStructure only
+printed the label. A head marked inactive still appeared in the structure picker
+and was still charged on new admissions. The flag now decides: the picker offers
+only active heads, and the admission fee list skips them. Deliberately it does
+*not* filter in the master read - the by-id enrichment that gives a saved
+structure row its collection point would lose inactive heads and blank out their
+lifecycle. Filtering belongs at the decision, not at the lookup.
+
+That flag matters more than it looks, because it is the answer to the next one.
+
+**Deleting purged paid dues.** The cascade is intentional and documented - a head
+removed from the master must leave the structures and plans too. But it also
+deleted the head's ledger rows *including the paid ones*, while receipts in
+`core.fee_payment_details` are kept on purpose. A receipt survived pointing at a
+due that had been erased, so money collected could not be reconciled against what
+it was collected for. A due with any payment, concession or refund against it now
+refuses the delete and says to deactivate instead - which is why the toggle had to
+start working first.
+
+**Uniqueness was case-sensitive.** "Tuition Fee" and "tuition fee" were two heads
+writing two sets of ledger rows that read identically on screen and never summed
+together. The index is now on `lower(fee_head_name)`. Saving a NEW head under an
+existing name stays an upsert rather than an error - that is deliberate and
+tested (settings_tests C4): it revives a head someone deleted instead of
+complaining about a row the user cannot see. The duplicate error is raised only
+on a rename, which is the case that used to reach the index and come back as a
+bare 500.
+
+**A rename orphaned everything already written.** Fixing a typo - and there is a
+live one, "Tution Fee" - left every existing row under the old spelling, so one
+fee showed as two in every report. The rename now carries into `student_ledger`,
+`student_fee_plan`, `school_fee_structure_details` and `fee_payment_details`, and
+the message says how many rows followed. Receipt lines move too: a receipt is a
+snapshot of amounts, not of spelling, and leaving them behind is what splits a
+collection report down the middle.
+
+**The procedure's message now reaches the user.** All three writes returned `int`
+and the page replaced whatever happened with a fixed sentence - so "removed from
+3 structure rows, 12 plan rows and 148 ledger dues" was thrown away and shown as
+"Fee head deleted successfully." They return `(Success, Message)` now, matching
+the academic-year methods, and the save catches `PostgresException` so a business
+rule arrives as a sentence instead of a 500. Validation moved into the procedure
+with it: negative amounts, unknown billing cycles and unknown collection points
+were all accepted before, checked nowhere.
+
+Eight behaviours verified against the real procedures, each rolled back, plus all
+16 suites: 500 checks, 0 failures. One of those suites caught a real mistake - the
+first version raised on any duplicate name and broke the documented upsert, which
+is the whole reason that test spells out its reasoning.
+
+Not done here: `display_order` is dead weight (22 heads on Railway, one distinct
+value, no UI input, and the only ORDER BY on it degrades to the name), and the
+Fee Head page still gives no hint when a head is switched off by a Workflow
+toggle rather than by its own flag.

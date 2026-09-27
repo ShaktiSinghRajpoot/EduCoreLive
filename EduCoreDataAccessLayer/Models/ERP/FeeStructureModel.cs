@@ -46,5 +46,11 @@
 
         /// <summary>Refundable flag inherited from the fee head master (e.g. security deposit).</summary>
         public bool IsRefundable { get; set; }
+
+        /// <summary>
+        /// Active flag inherited from the fee head master. A head switched off stays on
+        /// the structure and on every record already written, but is not charged again.
+        /// </summary>
+        public bool IsActive { get; set; } = true;
     }
 }

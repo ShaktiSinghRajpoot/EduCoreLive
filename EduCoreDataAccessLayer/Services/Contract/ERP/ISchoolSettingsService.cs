@@ -51,9 +51,12 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         // TotalCount filled — the "one model does everything" master pattern.
         Task<FeeHead> GetFeeHeadPageAsync(FeeHead query, int tenantId, int schoolId, int actionUserId);
         Task<FeeHead?> GetFeeHeadByIdAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId);
-        Task<int> SaveFeeHeadAsync(FeeHead model, int tenantId, int schoolId, int actionUserId);
-        Task<int> DeleteFeeHeadAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId);
-        Task<int> ToggleFeeHeadStatusAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId);
+        // These three return the procedure's own message. It is the only one that
+        // knows what happened -- how many rows a rename carried, or why a delete
+        // was refused -- and the page used to replace it with a fixed sentence.
+        Task<(bool Success, string Message)> SaveFeeHeadAsync(FeeHead model, int tenantId, int schoolId, int actionUserId);
+        Task<(bool Success, string Message)> DeleteFeeHeadAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId);
+        Task<(bool Success, string Message)> ToggleFeeHeadStatusAsync(int feeHeadId, int tenantId, int schoolId, int actionUserId);
         #endregion
 
         #region MyRegion

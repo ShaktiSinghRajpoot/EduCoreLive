@@ -13,6 +13,11 @@
 -- store their own snapshot of the head name/amount and remain printable from
 -- payment history. Only the live ledger/config is purged.
 --
+-- Which is exactly why a head whose dues have been paid, waived or refunded
+-- cannot be deleted at all: the receipt would survive and point at a due that
+-- had been purged. That case is refused up front and the school is told to
+-- deactivate instead (see core.fn_fee_head_delete_guard in fee_head_identity.sql).
+--
 -- The ledger has no fee_head_id, so its rows are matched by fee_head_name (which
 -- is unique per school). Rollups mirror the Fee Structure screen's formula:
 --   annual = one_time + monthly*12 + quarterly*4 + half_yearly*2 + yearly
@@ -35,6 +40,7 @@ DECLARE
     v_struct_rows integer := 0;
     v_plan_rows   integer := 0;
     v_ledger_rows integer := 0;
+    v_paid_rows   integer := 0;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 OR COALESCE(p_fee_head_id, 0) <= 0 THEN
         RAISE EXCEPTION 'Invalid request.';
@@ -47,6 +53,21 @@ BEGIN
 
     IF v_name IS NULL THEN
         OPEN p_result FOR SELECT FALSE AS success, 'Fee head not found.' AS message;
+        RETURN;
+    END IF;
+
+    -- Money already collected against this head stops the delete. Step 4 below
+    -- purges the ledger, and the receipts in core.fee_payment_details are kept
+    -- on purpose -- so purging a PAID due leaves a receipt pointing at a due
+    -- that no longer exists, and the money can never be reconciled against what
+    -- it was taken for. Deactivating keeps the history and stops the charge,
+    -- which is what the school actually wants here.
+    v_paid_rows := core.fn_fee_head_delete_guard(p_tenant_id, p_school_id, v_name);
+    IF v_paid_rows > 0 THEN
+        OPEN p_result FOR
+        SELECT FALSE AS success,
+               format('"%s" cannot be deleted: %s due(s) already have a payment, concession or refund against them. Mark it inactive instead — it stays on past records and stops being charged.',
+                      v_name, v_paid_rows) AS message;
         RETURN;
     END IF;
 
