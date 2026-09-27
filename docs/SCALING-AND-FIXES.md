@@ -3574,3 +3574,38 @@ would have started disagreeing about what a room is.
 All 16 suites: 500 checks, 0 failures. `settings_tests` caught the changed
 procedure signature, which is the second time today a test has been the thing
 that noticed.
+
+### [2026-09-27] Eight files defined one procedure; now one does
+
+`core.sp_school_admin_admission_workflow_manage` was re-created by eight
+different migration files. Each was correct the day it was written, each widened
+the parameter list a little further, and every one of them says "safe to re-run".
+Running any of the older seven silently reverted everything the newer ones had
+added -- no error, nothing to notice. The same shape had already been caught
+hours earlier in `fee_collection_point.sql`, still holding a stale copy of the
+fee head procedure.
+
+`fee_charge_from_per_year.sql` is now the only file that defines it. The other
+seven keep the columns and backfills that are genuinely theirs, and where the
+procedure used to be there is a note saying who owns it and why the copy was
+removed. The old `DROP PROCEDURE` statements went with it: the owner file handles
+overload cleanup, and a stray DROP in a file nobody expects to matter is the next
+version of this problem.
+
+**The test found a second layer of it.** Re-running the seven left the procedure
+byte-identical -- and put two dropped columns back. `security_fee_at_admission.sql`
+still added `security_fee_amount` and `fee_charge_from_setting.sql` still added
+`charge_fees_from`, both `IF NOT EXISTS`, both dropped on purpose earlier today
+when the amounts moved to Fee Heads and the billing policy moved to the academic
+year. Exactly the same "an old migration undoes a newer one" bug, one layer down,
+and it would have been missed by reading the files instead of running them.
+
+Verified the way it should be: drop the columns, hash the procedure definition,
+run all seven files, hash again.
+
+    proc md5 before   4ebf8327d71ee0f249575abece46cf82
+    proc md5 after    4ebf8327d71ee0f249575abece46cf82   (identical)
+    dead columns back 0
+    overloads         1
+
+All 16 suites: 500 checks, 0 failures.
