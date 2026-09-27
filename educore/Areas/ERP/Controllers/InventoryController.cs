@@ -10,6 +10,7 @@ namespace educore.Areas.ERP.Controllers
     // Stock / store module. Still gated by fees.view until a dedicated
     // inventory.* permission is added to the RBAC catalog.
     [HasPermission("fees.view")]
+    [RequiresModule(SchoolModule.Inventory)]
     public class InventoryController : Controller
     {
         private readonly IInventoryService _inventory;

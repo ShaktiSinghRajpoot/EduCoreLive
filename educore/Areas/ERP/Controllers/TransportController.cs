@@ -4,62 +4,29 @@ using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
     [HasPermission("transport.view")]
+    [RequiresModule(SchoolModule.Transport)]
     public class TransportController : Controller
     {
         private readonly ITransportService _transportService;
         private readonly IBaseService _baseService;
         private readonly IAdmissionService _admissionService;
         private readonly ISchoolSettingsService _schoolSettingsService;
-        private readonly IAdmissionWorkflowService _admissionWorkflowService;
 
         public TransportController(
             ITransportService transportService,
             IBaseService baseService,
             IAdmissionService admissionService,
-            ISchoolSettingsService schoolSettingsService,
-            IAdmissionWorkflowService admissionWorkflowService)
+            ISchoolSettingsService schoolSettingsService)
         {
             _transportService = transportService;
             _baseService = baseService;
             _admissionService = admissionService;
             _schoolSettingsService = schoolSettingsService;
-            _admissionWorkflowService = admissionWorkflowService;
-        }
-
-        // Server-side guard: a school can turn the Transport module off in Admission
-        // Workflow settings. The side-menu is hidden then, but this blocks anyone who
-        // reaches a Transport URL directly. Pages redirect to the settings screen
-        // (where it can be re-enabled); AJAX/API calls get a clean JSON refusal.
-        public override async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
-        {
-            var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
-            if (!workflow.EnableTransport)
-            {
-                const string msg = "Transport module is turned off for this school. Enable it in Admission Workflow settings.";
-                bool isAjax = string.Equals(
-                    context.HttpContext.Request.Headers["X-Requested-With"], "XMLHttpRequest",
-                    StringComparison.OrdinalIgnoreCase);
-
-                if (isAjax)
-                {
-                    context.Result = new JsonResult(new { success = false, message = msg });
-                }
-                else
-                {
-                    TempData["Result"] = "0";
-                    TempData["Message"] = msg;
-                    context.Result = RedirectToAction("WorkflowSettings", "AdmissionWorkflow", new { area = "ERP" });
-                }
-                return;
-            }
-
-            await next();
         }
 
         // ── Pages ────────────────────────────────────────────────

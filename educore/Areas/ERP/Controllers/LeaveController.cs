@@ -7,6 +7,7 @@ namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
     [HasPermission("staff.view")]
+    [RequiresModule(SchoolModule.Payroll)]
     public class LeaveController : Controller
     {
         private readonly IStaffLeaveService _leaveService;

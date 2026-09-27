@@ -392,6 +392,25 @@
                                                     {
                                                         <span class="badge bg-label-info ms-1">Refundable</span>
                                                     }
+                                                    @*
+                                                        A head can be perfectly valid and still never be charged, because
+                                                        a switch on another screen silences it. Without this the page read
+                                                        "Security Deposit 5,000" and gave no hint it was dormant.
+                                                    *@
+                                                    @if (item.CollectionPoint == "Registration" && ViewBag.RegistrationFeeOn == false)
+                                                    {
+                                                        <span class="badge bg-label-warning ms-1"
+                                                              title="Registration fee is switched off in Admission Workflow settings, so this is not collected.">
+                                                            <i class="bx bx-pause-circle"></i> Not collected
+                                                        </span>
+                                                    }
+                                                    else if (item.CollectionPoint == "Admission" && item.IsRefundable && ViewBag.SecurityFeeOn == false)
+                                                    {
+                                                        <span class="badge bg-label-warning ms-1"
+                                                              title="Security deposit is switched off in Admission Workflow settings, so this is not charged.">
+                                                            <i class="bx bx-pause-circle"></i> Not charged
+                                                        </span>
+                                                    }
                                                 </small>
                                             </div>
                                         </div>

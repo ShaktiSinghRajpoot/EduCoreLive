@@ -10,6 +10,7 @@ namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
     [HasPermission("exams.view")]
+    [RequiresModule(SchoolModule.Exams)]
     public class ExamController : Controller
     {
         private readonly IExamService _exam;

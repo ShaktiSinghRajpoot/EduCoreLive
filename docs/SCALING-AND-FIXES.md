@@ -3449,3 +3449,40 @@ The Search button reuses `btn btn-sm btn-primary` with a `bx-search` icon,
 because Student/Inactive already had exactly that and matching it beat inventing
 a shared class - the first attempt here added one to site.css and it was the
 wrong call.
+
+### [2026-09-27] A switched-off module is switched off now, and a silenced fee head says so
+
+Both halves of the same complaint: a setting said one thing and the app did
+another.
+
+**Turning a module off only hid its menu.** `EnableExams`, `EnableInventory` and
+`EnablePayroll` were read in exactly one place, `_VerticalMenu.cshtml`, so a
+bookmark, a typed URL or a stale tab walked straight into a module the school had
+switched off. Transport was the only one that checked server-side, and it did it
+with a twenty-five line `OnActionExecutionAsync` override inside its own
+controller. Copying that into three more controllers is how four copies of one
+rule drift apart, so it became `[RequiresModule(SchoolModule.Exams)]` - shaped
+like the `[HasPermission]` attribute already in the project, because a
+cross-cutting controller guard is exactly what that pattern is for. Transport now
+uses it too and is 36 lines lighter.
+
+It is deliberately not a permission check. Permissions decide what a user may do;
+this decides whether the school runs the module at all, so it refuses everyone
+equally and redirects to the screen where it can be turned back on. AJAX callers
+get the same refusal as JSON, because a fetch cannot follow a redirect usefully -
+it would parse the settings page as its payload.
+
+Leave is guarded by the Payroll switch, not one of its own, because that is what
+the menu already does - both items sit behind `showPayroll`.
+
+**A fee head can be valid and still never be charged.** Two workflow switches
+silence one without touching it: a Registration-point head is only collected when
+the school runs a registration fee, and the refundable Admission head - the
+security deposit - only when that toggle is on. The Fee Head page showed
+"Security Deposit 5,000" with nothing to say it was dormant. It now carries a
+"Not charged" badge naming the switch responsible.
+
+Worth saying plainly: this is the opposite of the fee head's own Active flag,
+which was fixed earlier today and means "we stopped charging this". These two
+badges answer the same question - why is nothing happening - from the two
+different places that can cause it.

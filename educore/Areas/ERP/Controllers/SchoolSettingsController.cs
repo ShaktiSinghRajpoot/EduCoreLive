@@ -24,8 +24,9 @@ namespace educore.Areas.ERP.Controllers
         private readonly ISchoolCalendarService _schoolCalendarService;
         private readonly ISubjectService _subjectService;
         private readonly ITimetableService _timetableService;
+        private readonly IAdmissionWorkflowService _admissionWorkflowService;
 
-        public SchoolSettingsController(ISchoolSettingsService schoolSettingsService, IBaseService BaseService, IWebHostEnvironment webHostEnvironment, IStaffService staffService, IClassTeacherService classTeacherService, ISchoolCalendarService schoolCalendarService, ISubjectService subjectService, ITimetableService timetableService, IConfiguration config)
+        public SchoolSettingsController(ISchoolSettingsService schoolSettingsService, IBaseService BaseService, IWebHostEnvironment webHostEnvironment, IStaffService staffService, IClassTeacherService classTeacherService, ISchoolCalendarService schoolCalendarService, ISubjectService subjectService, ITimetableService timetableService, IAdmissionWorkflowService admissionWorkflowService, IConfiguration config)
         {
             _schoolSettingsService = schoolSettingsService;
             _baseService = BaseService;
@@ -36,6 +37,7 @@ namespace educore.Areas.ERP.Controllers
             _schoolCalendarService = schoolCalendarService;
             _subjectService = subjectService;
             _timetableService = timetableService;
+            _admissionWorkflowService = admissionWorkflowService;
         }
 
         #region BasicProfile
@@ -247,6 +249,15 @@ namespace educore.Areas.ERP.Controllers
             // all bound from the query string. Server-side paging + sorting + search.
             query.Operation = "SaveFeeHead";
             await _schoolSettingsService.GetFeeHeadPageAsync(query, tenantId, schoolId, actionUserId);
+
+            // Two workflow switches silence a head without touching the head itself:
+            // a Registration-point head is only collected when the school runs a
+            // registration fee, and the refundable Admission head (the security
+            // deposit) only when that toggle is on. Someone reading this page saw
+            // "Security Deposit 5,000" with nothing to say it was never charged.
+            var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, actionUserId);
+            ViewBag.RegistrationFeeOn = workflow.EnableRegistration && workflow.EnableRegistrationFee;
+            ViewBag.SecurityFeeOn     = workflow.EnableSecurityFee;
 
             return View(query);
         }
