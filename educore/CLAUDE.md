@@ -18,7 +18,10 @@ There is **no ORM**. All persistence is **PostgreSQL stored procedures** invoked
 dotnet build educore/educore.csproj
 
 # Run locally (Development env loads the local connection string — see below)
-dotnet run --project educore/educore.csproj          # uses Properties/launchSettings.json (port 5055)
+dotnet run --project educore/educore.csproj          # http profile -> http://localhost:5055
+# Program.cs only calls UseUrls when the PORT env var is set (Railway sets it). With PORT
+# unset, launchSettings/ASPNETCORE_URLS decide -- so the profiles below really are the ports:
+#   http  -> 5055        https -> 7230 + 5055        IIS Express -> 44383 (this is what F5 uses)
 
 # Publish (as the Dockerfile does)
 dotnet publish educore/educore.csproj -c Release -o out

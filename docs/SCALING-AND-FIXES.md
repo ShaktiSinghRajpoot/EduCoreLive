@@ -3486,3 +3486,37 @@ Worth saying plainly: this is the opposite of the fee head's own Active flag,
 which was fixed earlier today and means "we stopped charging this". These two
 badges answer the same question - why is nothing happening - from the two
 different places that can cause it.
+
+### [2026-09-27] `dotnet run` works again, because UseUrls stopped overriding everything
+
+`Program.cs` carried this, under a comment reading "ADD THIS LINE":
+
+```csharp
+builder.WebHost.UseUrls($"http://0.0.0.0:{Environment.GetEnvironmentVariable("PORT") ?? "8080"}");
+```
+
+`UseUrls` outranks `ASPNETCORE_URLS` **and** every launchSettings profile, so the
+5055 / 7230 / 44383 profiles in this repo were decorative -- `dotnet run` always
+tried `0.0.0.0:8080`. On a machine where 8080 sits in Windows' reserved port
+exclusions, that dies with a bare `SocketException (10013)` naming neither the
+port nor the cause, which is a genuinely miserable thing to hit on a fresh
+checkout. It also bound every interface, putting the dev server on the LAN.
+
+The fix is to honour `PORT` only when it is actually set. What makes it safe is
+something the line itself hid: the Dockerfile **already** sets
+`ASPNETCORE_URLS=http://+:8080` and exposes 8080, so production never needed this
+line at all -- it was overriding an answer that was already correct. With `PORT`
+set the binding is identical to before; without it, the Dockerfile's value takes
+over and produces the same address.
+
+Both paths were run, not reasoned about. Published to a temp directory (the
+working copy's `bin\Debug` was locked by the user's Visual Studio, which is the
+MSB3027 case this file's own gotchas section describes) and started twice:
+
+- `PORT` unset, `ASPNETCORE_URLS=http://localhost:5099` → listening on 5099.
+  Before this change it would have ignored that and tried 8080.
+- `PORT=5098` with `ASPNETCORE_URLS=http://localhost:5099` → listening on 5098,
+  and **not** on 5099. PORT still wins, which is what Railway depends on.
+
+CLAUDE.md claimed `dotnet run` used port 5055 and had been wrong since this line
+landed. It now says what decides the port.

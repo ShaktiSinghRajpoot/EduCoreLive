@@ -31,8 +31,19 @@ var cookieSecurePolicy = requireHttps
     : CookieSecurePolicy.SameAsRequest;
 
 
-// ADD THIS LINE 👇
-builder.WebHost.UseUrls($"http://0.0.0.0:{Environment.GetEnvironmentVariable("PORT") ?? "8080"}");
+// Railway hands the port in through PORT and expects the app on every interface.
+// Only honour it when it is actually set: UseUrls OVERRIDES ASPNETCORE_URLS and
+// every launchSettings profile, so calling it unconditionally meant `dotnet run`
+// always tried 0.0.0.0:8080 locally -- and on a machine where 8080 sits in
+// Windows' reserved port ranges that dies with a bare SocketException (10013)
+// naming neither the port nor the cause. It also put the dev server on the LAN.
+//
+// Production is unchanged either way: with PORT set this binds it exactly as
+// before, and without PORT the Dockerfile's ASPNETCORE_URLS=http://+:8080 takes
+// over, which is the same address this line was producing.
+var port = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(port))
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
 var mvcBuilder = builder.Services
     .AddControllersWithViews()
