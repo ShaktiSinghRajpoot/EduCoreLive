@@ -119,7 +119,7 @@
                    placeholder="Search name, admission no, mobile…" />
           </div>
 
-          <select class="in-chip" name="FilterStatus" onchange="this.form.submit()">
+          <select class="in-chip" name="FilterStatus">
             <option value="">All Reasons</option>
             <option value="Transfer"   selected="@(Model.FilterStatus == "Transfer")">Transferred</option>
             <option value="Passout"    selected="@(Model.FilterStatus == "Passout")">Passed Out</option>
@@ -127,7 +127,7 @@
             <option value="Withdrawn"  selected="@(Model.FilterStatus == "Withdrawn")">Withdrawn</option>
           </select>
 
-          <select class="in-chip" name="FilterDues" onchange="this.form.submit()">
+          <select class="in-chip" name="FilterDues">
             <option value="">Dues: Any</option>
             <option value="pending" selected="@(Model.FilterDues == "pending")">With Dues</option>
             <option value="clear"   selected="@(Model.FilterDues == "clear")">Cleared</option>

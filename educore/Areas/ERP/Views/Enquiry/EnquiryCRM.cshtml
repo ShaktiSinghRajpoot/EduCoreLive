@@ -148,24 +148,23 @@
                                 <i class="bx bx-search text-muted"></i>
                             </span>
                             <input type="search" class="form-control border-start-0 ps-0" name="Search"
-                                   value="@Model.Search" placeholder="Search student, parent or mobile..."
-                                   onchange="this.form.submit()" />
+                                   value="@Model.Search" placeholder="Search student, parent or mobile..." />
                         </div>
                     </div>
                     <div class="col-6 col-sm-3 col-lg-2">
-                        <select class="form-select" name="FilterSession" onchange="this.form.submit()">
+                        <select class="form-select" name="FilterSession">
                             <option value="">All Sessions</option>
                             @foreach (var s in sessions){<option value="@s.Text" selected="@Sel(s.Text, Model.FilterSession)">@s.Text</option>}
                         </select>
                     </div>
                     <div class="col-6 col-sm-3 col-lg-2">
-                        <select class="form-select" name="FilterClass" onchange="this.form.submit()">
+                        <select class="form-select" name="FilterClass">
                             <option value="">All Classes</option>
                             @foreach (var c in classes){<option value="@c.Text" selected="@Sel(c.Text, Model.FilterClass)">@c.Text</option>}
                         </select>
                     </div>
                     <div class="col-6 col-sm-3 col-lg-2">
-                        <select class="form-select" name="FilterSource" onchange="this.form.submit()">
+                        <select class="form-select" name="FilterSource">
                             <option value="">All Sources</option>
                             @foreach (var src in new[] { "Walk-in", "QR Code", "Referral", "Website", "Phone Call", "Social Media" })
                             {
@@ -176,7 +175,7 @@
                     @if (counsellors.Any())
                     {
                         <div class="col-6 col-sm-3 col-lg-2">
-                            <select class="form-select" name="FilterAssignedTo" onchange="this.form.submit()">
+                            <select class="form-select" name="FilterAssignedTo">
                                 <option value="">All Counsellors</option>
                                 @foreach (var c in counsellors)
                                 {
@@ -185,6 +184,10 @@
                             </select>
                         </div>
                     }
+                </div>
+
+                <div class="mt-3">
+                    <button type="submit" class="btn btn-sm btn-primary"><i class="bx bx-search me-1"></i>Search</button>
                 </div>
 
                 @* The two quick filters are booleans carried in the same form. Each

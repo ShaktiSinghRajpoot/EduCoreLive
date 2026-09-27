@@ -111,21 +111,22 @@
                                 <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
                                 <input type="hidden" name="SortDir" value="@Model.SortDirection" />
                                 <input type="search" name="Search" value="@Model.Search" class="form-control form-control-sm"
-                                       placeholder="Search name, adm no, mobile…" style="min-width:8rem" onchange="this.form.submit()">
-                                <select name="FilterClass" class="form-select form-select-sm" style="min-width:6.5rem" onchange="this.form.submit()">
+                                       placeholder="Search name, adm no, mobile…" style="min-width:8rem">
+                                <select name="FilterClass" class="form-select form-select-sm" style="min-width:6.5rem">
                                     <option value="">Class</option>
                                     @foreach (var c in Model.ClassList)
                                     {
                                         <option value="@c.Text" selected="@Sel(c.Text, Model.FilterClass)">@c.Text</option>
                                     }
                                 </select>
-                                <select name="FilterBucket" class="form-select form-select-sm" style="min-width:7rem" onchange="this.form.submit()">
+                                <select name="FilterBucket" class="form-select form-select-sm" style="min-width:7rem">
                                     <option value="">Overdue</option>
                                     <option value="NotDue" selected="@Sel("NotDue", Model.FilterBucket)">Not due yet</option>
                                     <option value="0-30"   selected="@Sel("0-30", Model.FilterBucket)">0–30 d</option>
                                     <option value="31-60"  selected="@Sel("31-60", Model.FilterBucket)">31–60 d</option>
                                     <option value="60+"    selected="@Sel("60+", Model.FilterBucket)">60+ d</option>
                                 </select>
+                                <button type="submit" class="btn btn-sm btn-primary"><i class="bx bx-search me-1"></i>Search</button>
                             </form>
                         </div>
                     </div>

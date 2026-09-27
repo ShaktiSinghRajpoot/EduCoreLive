@@ -73,28 +73,29 @@
         <div class="st-search">
           <i class="bx bx-search"></i>
           <input type="text" name="Search" value="@Model.Search" class="form-control"
-                 placeholder="Search name, ID or designation…" onchange="this.form.submit()">
+                 placeholder="Search name, ID or designation…">
         </div>
-        <select name="FilterDepartment" class="form-select" style="max-width:170px" onchange="this.form.submit()">
+        <select name="FilterDepartment" class="form-select" style="max-width:170px">
           <option value="">All Departments</option>
           @foreach (var d in Model.DepartmentList)
           {
               <option value="@d.Value" selected="@Sel(d.Value, Model.FilterDepartment)">@d.Text</option>
           }
         </select>
-        <select name="FilterStaffType" class="form-select" style="max-width:150px" onchange="this.form.submit()">
+        <select name="FilterStaffType" class="form-select" style="max-width:150px">
           <option value="">All Types</option>
           @foreach (var t in Model.StaffTypeList)
           {
               <option value="@t.Value" selected="@Sel(t.Value, Model.FilterStaffType)">@t.Text</option>
           }
         </select>
-        <select name="FilterStatus" class="form-select" style="max-width:140px" onchange="this.form.submit()">
+        <select name="FilterStatus" class="form-select" style="max-width:140px">
           <option value="">All Status</option>
           <option value="Active" selected="@Sel("Active", Model.FilterStatus)">Active</option>
           <option value="On Leave" selected="@Sel("On Leave", Model.FilterStatus)">On Leave</option>
           <option value="Inactive" selected="@Sel("Inactive", Model.FilterStatus)">Inactive</option>
         </select>
+        <button type="submit" class="btn btn-sm btn-primary"><i class="bx bx-search me-1"></i>Search</button>
         @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.FilterDepartment)
              || !string.IsNullOrEmpty(Model.FilterStaffType) || !string.IsNullOrEmpty(Model.FilterStatus))
         {

@@ -140,13 +140,13 @@
           <div class="sl-srch-wrap">
             <i class="bx bx-search sl-srch-ic"></i>
             <input type="search" class="sl-srch-inp" name="Search" value="@Model.Search"
-                   placeholder="Search name, adm no, guardian, mobile…" onchange="this.form.submit()">
+                   placeholder="Search name, adm no, guardian, mobile…">
           </div>
 
           <div class="sl-fbar-div"></div>
 
           <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterClass) ? "" : "active-filter")"
-                  name="FilterClass" onchange="this.form.submit()">
+                  name="FilterClass">
             <option value="">Class</option>
             @foreach (var c in Model.ClassList)
             {
@@ -155,7 +155,7 @@
           </select>
 
           <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterGender) ? "" : "active-filter")"
-                  name="FilterGender" onchange="this.form.submit()">
+                  name="FilterGender">
             <option value="">Gender</option>
             <option value="Male" selected="@Sel("Male", Model.FilterGender)">Male</option>
             <option value="Female" selected="@Sel("Female", Model.FilterGender)">Female</option>
@@ -163,7 +163,7 @@
           </select>
 
           <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterFee) ? "" : "active-filter")"
-                  name="FilterFee" onchange="this.form.submit()">
+                  name="FilterFee">
             <option value="">Fee</option>
             <option value="Paid" selected="@Sel("Paid", Model.FilterFee)">Paid</option>
             <option value="Partial" selected="@Sel("Partial", Model.FilterFee)">Partial</option>
@@ -171,13 +171,15 @@
           </select>
 
           <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterYear) ? "" : "active-filter")"
-                  name="FilterYear" onchange="this.form.submit()">
+                  name="FilterYear">
             <option value="">Year</option>
             @foreach (var y in Model.YearList)
             {
                 <option value="@y.Text" selected="@Sel(y.Text, Model.FilterYear)">@y.Text</option>
             }
           </select>
+
+          <button type="submit" class="btn btn-sm btn-primary"><i class="bx bx-search me-1"></i>Search</button>
 
           @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.FilterClass)
                || !string.IsNullOrEmpty(Model.FilterGender) || !string.IsNullOrEmpty(Model.FilterFee)

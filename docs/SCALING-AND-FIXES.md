@@ -3418,3 +3418,34 @@ Not done here: `display_order` is dead weight (22 heads on Railway, one distinct
 value, no UI input, and the only ORDER BY on it degrades to the name), and the
 Fee Head page still gives no hint when a head is switched off by a Workflow
 toggle rather than by its own flag.
+
+### [2026-09-27] Half Yearly reaches the dropdown, and filters wait for the button
+
+**Half Yearly was implemented everywhere except the one place you could pick
+it.** The billing engine steps it by six months, the Fee Structure annual total
+already multiplied it by two, and the admission summary already had a
+Half-Yearly line. Only the Fee Head dropdown never offered it. Adding the option
+to the form and the filter is the whole change; the FeeCycle lookup gained the
+row too, with an explicit UPDATE beside the seed because that INSERT is
+`DO NOTHING` and an existing Yearly would have kept sort order 4 and sat on top
+of the new entry. Verified end to end: 2 installments, "Apr 2026 - Sep 2026" and
+"Oct 2026 - Mar 2027".
+
+**Every list page applied its filters on change.** Twenty-three
+`onchange="this.form.submit()"` across seven forms, each one a full page load -
+so picking a class, then a gender, then a year cost three round trips and
+rendered two states nobody asked for. Filters now apply on a Search button, and
+the five forms that had no button got one. Enter in the search box still
+submits, because the inputs are `type="search"` inside the form.
+
+Two things deliberately kept their automatic submit. The Enquiry quick-filter
+buttons flip a hidden field and submit from their own click handler - that is an
+explicit press, not a side effect of choosing a value. And `_PageSize` stays
+automatic, with a comment saying why: "rows per page" is not a filter, it is how
+you look at an answer you already asked for, and hiding it behind Search would
+read as broken.
+
+The Search button reuses `btn btn-sm btn-primary` with a `bx-search` icon,
+because Student/Inactive already had exactly that and matching it beat inventing
+a shared class - the first attempt here added one to site.css and it was the
+wrong call.

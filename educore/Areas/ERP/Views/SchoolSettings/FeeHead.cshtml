@@ -159,6 +159,7 @@
                                     <option value="One Time">One Time</option>
                                     <option value="Monthly">Monthly</option>
                                     <option value="Quarterly">Quarterly</option>
+                                    <option value="Half Yearly">Half Yearly</option>
                                     <option value="Yearly">Yearly</option>
                                 </select>
 
@@ -326,22 +327,23 @@
                                        class="form-control form-control-sm"
                                        placeholder="Search fee head..." />
 
-                                <select name="FilterFrequency" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <select name="FilterFrequency" class="form-select form-select-sm">
                                     <option value="">All Cycles</option>
                                     <option value="One Time"  selected="@(Model.FilterFrequency == "One Time")">One Time</option>
                                     <option value="Monthly"   selected="@(Model.FilterFrequency == "Monthly")">Monthly</option>
                                     <option value="Quarterly" selected="@(Model.FilterFrequency == "Quarterly")">Quarterly</option>
+                                    <option value="Half Yearly" selected="@(Model.FilterFrequency == "Half Yearly")">Half Yearly</option>
                                     <option value="Yearly"    selected="@(Model.FilterFrequency == "Yearly")">Yearly</option>
                                 </select>
 
-                                <select name="SortColumn" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <select name="SortColumn" class="form-select form-select-sm">
                                     <option value="">Sort: Default</option>
                                     <option value="name"   selected="@(Model.SortColumn == "name")">Name</option>
                                     <option value="amount" selected="@(Model.SortColumn == "amount")">Amount</option>
                                     <option value="cycle"  selected="@(Model.SortColumn == "cycle")">Cycle</option>
                                 </select>
 
-                                <select name="SortDir" class="form-select form-select-sm" onchange="this.form.submit()">
+                                <select name="SortDir" class="form-select form-select-sm">
                                     <option value="asc"  selected="@(!Model.Desc)">Asc</option>
                                     <option value="desc" selected="@(Model.Desc)">Desc</option>
                                 </select>

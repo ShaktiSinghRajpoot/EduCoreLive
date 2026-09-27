@@ -20,6 +20,11 @@
     if (Model == null || Model.TotalCount <= sizes.Min()) { return; }
 }
 <label class="mb-0 text-muted" style="white-space:nowrap;font-size:.81rem">@label</label>
+@* This one keeps its auto-submit on purpose. The filter bars above dropped
+   theirs and apply on a Search button, because three filter changes meant three
+   page loads and two states nobody wanted. "Rows per page" is not a filter --
+   it is how you look at the answer you already asked for, and hiding it behind
+   Search would read as broken. *@
 <select name="PageSize" form="@formId" class="form-select form-select-sm" style="width:auto"
         title="@label" onchange="this.form.submit()">
     @foreach (var n in sizes)

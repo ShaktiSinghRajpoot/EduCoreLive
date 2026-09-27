@@ -68,12 +68,20 @@ INSERT INTO config.lookup_value (tenant_id, school_id, category, code, label, di
     (0,0,'FeeCycle','One Time','One Time',1,TRUE),
     (0,0,'FeeCycle','Monthly','Monthly',2,TRUE),
     (0,0,'FeeCycle','Quarterly','Quarterly',3,TRUE),
-    (0,0,'FeeCycle','Yearly','Yearly',4,TRUE),
+    (0,0,'FeeCycle','Half Yearly','Half Yearly',4,TRUE),
+    (0,0,'FeeCycle','Yearly','Yearly',5,TRUE),
     -- Gender (SYSTEM — universal)
     (0,0,'Gender','Male','Male',1,TRUE),
     (0,0,'Gender','Female','Female',2,TRUE),
     (0,0,'Gender','Other','Other',3,TRUE)
 ON CONFLICT ON CONSTRAINT uq_lookup_value DO NOTHING;
+
+-- The insert above is DO NOTHING, so a row that already exists keeps its old
+-- sort order. Half Yearly was added between Quarterly and Yearly, which leaves
+-- an existing Yearly still sitting on 4 alongside it. Put it back after.
+UPDATE config.lookup_value
+   SET display_order = 5
+ WHERE category = 'FeeCycle' AND code = 'Yearly' AND display_order <> 5;
 
 -- ============================================================================
 -- Extend the shared dropdown provider. Entity-master branches (Class,
