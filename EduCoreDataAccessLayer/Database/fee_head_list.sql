@@ -45,7 +45,6 @@ BEGIN
         fee_group,
         COALESCE(collection_point, 'Recurring') AS collection_point,
         COALESCE(is_refundable, FALSE)          AS is_refundable,
-        COALESCE(display_order, 0)              AS display_order,
         COALESCE(is_active, TRUE)               AS is_active,
         COUNT(*) OVER()                                        AS total_count,
         -- Summary tiles must reflect the FULL filtered set, not just this page,
@@ -66,7 +65,7 @@ BEGIN
         CASE WHEN v_col = 'amount' AND NOT v_asc THEN COALESCE(default_amount, 0) END DESC,
         CASE WHEN v_col = 'cycle'  AND v_asc     THEN frequency END ASC  NULLS LAST,
         CASE WHEN v_col = 'cycle'  AND NOT v_asc THEN frequency END DESC NULLS LAST,
-        display_order, fee_head_name   -- stable default when no/unknown sort
+        fee_head_name   -- stable default when no/unknown sort
     LIMIT p_page_size OFFSET v_offset;
 END;
 $procedure$;

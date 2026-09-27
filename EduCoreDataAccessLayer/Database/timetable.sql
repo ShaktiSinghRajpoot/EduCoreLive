@@ -170,12 +170,18 @@ BEGIN
           AND t.academic_class_section_id = p_section_id
         ORDER BY t.day_of_week, t.period_seq;
 
-        -- 2: every OTHER section's teacher bookings — the page flags clashes with these.
+        -- 2: every OTHER section's bookings — the page flags clashes with these.
+        --    A booking ties up two things: the teacher AND the room. The teacher half
+        --    was here from the start; the room half was not, so two sections could sit
+        --    in "Room 101" for the same period with nothing said. The room comes from
+        --    the entry when it names one, otherwise from the section's own room.
+        --    Rows with neither a teacher nor a room cannot clash with anything.
         OPEN p_result2 FOR
         SELECT
             t.day_of_week,
             t.period_seq,
             t.staff_id,
+            COALESCE(NULLIF(TRIM(t.room_no), ''), NULLIF(TRIM(sec.room_no), '')) AS room_no,
             c.class_name || ' – ' || sec.section_name AS section_label
         FROM academic.timetable t
         JOIN academic.academic_class_sections sec ON sec.academic_class_section_id = t.academic_class_section_id
@@ -183,7 +189,8 @@ BEGIN
         WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id
           AND t.academic_year_id = v_year
           AND t.academic_class_section_id <> p_section_id
-          AND t.staff_id IS NOT NULL;
+          AND (t.staff_id IS NOT NULL
+            OR COALESCE(NULLIF(TRIM(t.room_no), ''), NULLIF(TRIM(sec.room_no), '')) IS NOT NULL);
 
         -- 3: subjects this section's class actually studies (the modal's dropdown).
         SELECT sec.academic_class_id INTO v_class

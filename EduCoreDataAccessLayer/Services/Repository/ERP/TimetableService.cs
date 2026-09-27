@@ -103,6 +103,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         DayOfWeek    = IntVal(row, "day_of_week"),
                         PeriodSeq    = IntVal(row, "period_seq"),
                         StaffId      = IntVal(row, "staff_id"),
+                        RoomNo       = Str(row, "room_no"),
                         SectionLabel = Str(row, "section_label")
                     });
 

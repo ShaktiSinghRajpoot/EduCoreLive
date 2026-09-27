@@ -3520,3 +3520,57 @@ MSB3027 case this file's own gotchas section describes) and started twice:
 
 CLAUDE.md claimed `dotnet run` used port 5055 and had been wrong since this line
 landed. It now says what decides the port.
+
+### [2026-09-27] The backlog, and the file that would have undone this morning
+
+Clearing the last of the list turned up something worse than anything on it.
+
+**`fee_collection_point.sql` still defined `sp_school_admin_fee_head_manage`.**
+That is the procedure `fee_head_identity.sql` rewrote hours earlier to protect
+the fee head name. Running the older file -- which its own header invites, "safe
+to re-run" -- would have silently put back the case-sensitive matching, dropped
+the rename cascade, and removed the amount and billing-cycle validation, with no
+error and nothing to notice. This repo already has seven files racing to define
+the admission workflow procedure; that is how they drift. The definition is
+deleted from the older file and replaced with a pointer to its current home. The
+columns and backfill it actually owns stay. Proved by re-running it and checking
+the validation was still in the live procedure afterwards.
+
+**Delete now names the way out.** The refusal said "mark it inactive instead"
+and stopped there, which moves the problem to whoever reads it. Cancelling a
+receipt reverses `amount_paid` and `concession` on the ledger
+(`fee_receipt_cancel.sql`), so once the receipts against a head are cancelled the
+delete goes through -- the guard is an ordering requirement, not a wall. One case
+genuinely has no way out: `fee_refund.sql` only ever *adds* to `refund_amount`,
+nothing reverses it, so a refunded head can be deactivated and never deleted. The
+message says so, because letting someone cancel receipts all afternoon for
+nothing is worse than admitting it.
+
+**`DeleteSetupFee` took any id.** The endpoint exists to clear the two cards on
+the workflow page and would delete any fee head in the school. The caller holds
+`fees.manage` and could do it from the Fee Head master anyway, so this was not a
+security boundary -- it was a trap for the next person editing that page. It now
+checks the id is one of the two it manages, and surfaces the procedure's message
+instead of always reporting success.
+
+**`display_order` is gone**, from the column, the procedure signature, the model
+and both mappings: 22 heads on Railway, one distinct value, nothing non-zero, no
+input on the page, and the only `ORDER BY` on it sorted by name in practice.
+`registration_fee_amount` and `security_fee_amount` went too, with a guard that
+refuses to drop them if a non-zero value ever appears -- the premise is that they
+are dead, and a value would mean the premise is wrong.
+
+**The timetable checks the room, not just the teacher.** A booking ties up two
+things and only one was ever checked, so two sections could sit in Room 101 for
+the same period in silence. The busy cursor now carries the room -- the entry's
+own, else the section's -- and the check returns which half is double-booked:
+"Teacher is", "Room 101 is", or both. The modal reacts as the room is typed,
+since a clash found on save is found too late.
+
+`isRealRoom` moved onto `EC` on the way. Classes & Sections had it, the timetable
+needed the same answer about "N.A", and a second copy is precisely how the two
+would have started disagreeing about what a room is.
+
+All 16 suites: 500 checks, 0 failures. `settings_tests` caught the changed
+procedure signature, which is the second time today a test has been the thing
+that noticed.

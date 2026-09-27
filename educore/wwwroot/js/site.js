@@ -649,4 +649,15 @@ EC.ajaxError = function (xhr, action) {
     return what + ' (HTTP ' + code + ').';
 };
 
+// ── Is this actually a room? ────────────────────────────────────────────
+// Plenty of sections carry "N.A" or "-" where a room number should be. Two of
+// them are not sharing a room, so anything that compares rooms -- the section
+// save on Classes & Sections, the timetable's clash check -- has to agree on
+// what counts as one. It lived on Classes & Sections first; the timetable needed
+// the same answer, and a second copy is how the two would start disagreeing.
+EC.isRealRoom = function (room) {
+    var r = (room || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return r !== '' && r !== 'na' && r !== 'nil' && r !== 'none';
+};
+
 window.EC = EC;

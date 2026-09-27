@@ -121,10 +121,25 @@ namespace educore.Areas.ERP.Controllers
             if (req == null || req.Id <= 0)
                 return Json(new { success = false, message = "Invalid request." });
 
-            await _schoolSettingsService.DeleteFeeHeadAsync(req.Id, TenantId(), SchoolId(), UserId());
+            // This endpoint exists to clear the two cards on THIS page, and it took
+            // whatever id it was handed -- so a crafted post deleted any fee head in
+            // the school through a screen that shows two. The caller has fees.manage
+            // and could do it from the Fee Head master anyway, but a button that
+            // deletes something other than the thing beside it is a trap for the
+            // next person editing this page, not a security boundary.
+            var all = await _schoolSettingsService.GetFeeHeadAsync(TenantId(), SchoolId(), UserId());
+            var reg0 = FirstRegistration(all);
+            var sec0 = FirstSecurity(all);
+            if (req.Id != (reg0?.FeeHeadId ?? 0) && req.Id != (sec0?.FeeHeadId ?? 0))
+                return Json(new { success = false, message = "That is not one of the fee heads managed on this page." });
+
+            // The procedure refuses a head whose dues carry money, and says why.
+            var (ok, message) = await _schoolSettingsService.DeleteFeeHeadAsync(req.Id, TenantId(), SchoolId(), UserId());
+            if (!ok)
+                return Json(new { success = false, message });
 
             var (reg, sec) = await LoadSetupFeesAsync();
-            return Json(new { success = true, registration = reg, security = sec });
+            return Json(new { success = true, message, registration = reg, security = sec });
         }
 
         // Exactly one head per kind. Registration = the Registration-point head;

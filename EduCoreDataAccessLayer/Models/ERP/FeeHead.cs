@@ -37,7 +37,6 @@ namespace EduCoreDataAccessLayer.Models.ERP
         /// <summary>True for refundable charges such as a security deposit / caution money.</summary>
         public bool IsRefundable { get; set; }
 
-        public int DisplayOrder { get; set; }
         public bool IsActive { get; set; } = true;
 
         // ── Listing ──────────────────────────────────────────────

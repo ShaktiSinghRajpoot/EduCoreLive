@@ -729,7 +729,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 model.FeeGroup = row["fee_group"] == DBNull.Value ? "Academic" : row["fee_group"].ToString() ?? "Academic";
                 model.CollectionPoint = GetCollectionPoint(row);
                 model.IsRefundable = GetRefundable(row);
-                model.DisplayOrder = row["display_order"] == DBNull.Value ? 0 : Convert.ToInt32(row["display_order"]);
                 model.IsActive = row["is_active"] != DBNull.Value && Convert.ToBoolean(row["is_active"]);
 
                 list.Add(model);
@@ -780,7 +779,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     FeeGroup        = row["fee_group"] == DBNull.Value ? "Academic" : row["fee_group"].ToString() ?? "Academic",
                     CollectionPoint = GetCollectionPoint(row),
                     IsRefundable    = GetRefundable(row),
-                    DisplayOrder    = row["display_order"] == DBNull.Value ? 0 : Convert.ToInt32(row["display_order"]),
                     IsActive        = row["is_active"] != DBNull.Value && Convert.ToBoolean(row["is_active"])
                 });
             }
@@ -831,7 +829,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             model.FeeGroup = row["fee_group"] == DBNull.Value ? "Academic" : row["fee_group"].ToString() ?? "Academic";
             model.CollectionPoint = GetCollectionPoint(row);
             model.IsRefundable = GetRefundable(row);
-            model.DisplayOrder = row["display_order"] == DBNull.Value ? 0 : Convert.ToInt32(row["display_order"]);
             model.IsActive = row["is_active"] != DBNull.Value && Convert.ToBoolean(row["is_active"]);
 
             return model;
@@ -869,7 +866,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_fee_group", model.FeeGroup),
                 new NpgsqlParameter("p_collection_point", string.IsNullOrWhiteSpace(model.CollectionPoint) ? "Recurring" : model.CollectionPoint),
                 new NpgsqlParameter("p_is_refundable", model.IsRefundable),
-                new NpgsqlParameter("p_display_order", model.DisplayOrder),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "save_fee_head_cursor" }
             };
 

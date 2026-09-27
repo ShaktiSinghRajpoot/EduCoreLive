@@ -49,6 +49,13 @@ $ix$;
 
 
 -- ── 2. Save: a rename carries the name with it ─────────────────────────────
+-- p_display_order is gone, which is a new signature, so the old overload has to
+-- go or calls fail with "procedure is not unique".
+DROP PROCEDURE IF EXISTS core.sp_school_admin_fee_head_manage(
+    character varying, integer, integer, integer, integer, character varying,
+    character varying, numeric, character varying, character varying,
+    character varying, boolean, integer, refcursor);
+
 CREATE OR REPLACE PROCEDURE core.sp_school_admin_fee_head_manage(
     IN    p_operation        character varying,
     IN    p_tenant_id        integer,
@@ -62,7 +69,6 @@ CREATE OR REPLACE PROCEDURE core.sp_school_admin_fee_head_manage(
     IN    p_fee_group        character varying DEFAULT 'Academic'::character varying,
     IN    p_collection_point character varying DEFAULT 'Recurring'::character varying,
     IN    p_is_refundable    boolean   DEFAULT false,
-    IN    p_display_order    integer   DEFAULT 0,
     INOUT p_result           refcursor DEFAULT 'result_cursor'::refcursor
 )
 LANGUAGE plpgsql
@@ -92,12 +98,11 @@ BEGIN
             fee_type, fee_group,
             COALESCE(collection_point, 'Recurring') AS collection_point,
             COALESCE(is_refundable, FALSE) AS is_refundable,
-            COALESCE(display_order, 0) AS display_order,
             COALESCE(is_active, TRUE) AS is_active
         FROM core.school_fee_heads
         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
           AND COALESCE(is_deleted, FALSE) = FALSE
-        ORDER BY display_order, fee_head_name;
+        ORDER BY fee_head_name;
 
     ELSIF p_operation = 'GetFeeHeadById' THEN
 
@@ -108,7 +113,6 @@ BEGIN
             fee_type, fee_group,
             COALESCE(collection_point, 'Recurring') AS collection_point,
             COALESCE(is_refundable, FALSE) AS is_refundable,
-            COALESCE(display_order, 0) AS display_order,
             COALESCE(is_active, TRUE) AS is_active
         FROM core.school_fee_heads
         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
@@ -172,7 +176,6 @@ BEGIN
                 fee_group        = COALESCE(p_fee_group, 'Academic'),
                 collection_point = COALESCE(p_collection_point, 'Recurring'),
                 is_refundable    = COALESCE(p_is_refundable, FALSE),
-                display_order    = COALESCE(p_display_order, 0),
                 updated_by       = p_action_user_id,
                 updated_at       = NOW()
             WHERE tenant_id = p_tenant_id AND school_id = p_school_id
@@ -210,13 +213,13 @@ BEGIN
         ELSE
             INSERT INTO core.school_fee_heads
                 (tenant_id, school_id, fee_head_name, frequency, default_amount,
-                 fee_type, fee_group, collection_point, is_refundable, display_order,
+                 fee_type, fee_group, collection_point, is_refundable,
                  is_active, is_deleted, created_by, created_at)
             VALUES
                 (p_tenant_id, p_school_id, v_name, p_frequency, COALESCE(p_default_amount, 0),
                  p_fee_type, COALESCE(p_fee_group, 'Academic'),
                  COALESCE(p_collection_point, 'Recurring'), COALESCE(p_is_refundable, FALSE),
-                 COALESCE(p_display_order, 0), TRUE, FALSE, p_action_user_id, NOW())
+                 TRUE, FALSE, p_action_user_id, NOW())
             ON CONFLICT (tenant_id, school_id, lower(fee_head_name))
                 WHERE COALESCE(is_deleted, FALSE) = FALSE
             DO UPDATE SET
@@ -226,7 +229,6 @@ BEGIN
                 fee_group        = EXCLUDED.fee_group,
                 collection_point = EXCLUDED.collection_point,
                 is_refundable    = EXCLUDED.is_refundable,
-                display_order    = EXCLUDED.display_order,
                 is_active        = TRUE,
                 is_deleted       = FALSE,
                 updated_by       = p_action_user_id,
@@ -295,3 +297,12 @@ $$;
 
 COMMENT ON FUNCTION core.fn_fee_head_delete_guard(integer, integer, varchar) IS
     'How many of this fee head''s dues have money against them. Non-zero means the head cannot be deleted, only deactivated.';
+
+
+-- ── 4. display_order goes ──────────────────────────────────────────────────
+-- Stored, passed through every layer, and never once set: 22 heads on Railway,
+-- one distinct value, nothing non-zero, no input anywhere on the page. The only
+-- ORDER BY on it therefore sorted by name in practice, which is what the
+-- procedures now say out loud. Kept "in case", it is the same dead weight as
+-- registration_fee_amount sitting at 0.00 long after the amounts moved.
+ALTER TABLE core.school_fee_heads DROP COLUMN IF EXISTS display_order;

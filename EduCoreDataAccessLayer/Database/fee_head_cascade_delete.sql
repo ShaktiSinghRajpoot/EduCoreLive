@@ -64,9 +64,16 @@ BEGIN
     -- which is what the school actually wants here.
     v_paid_rows := core.fn_fee_head_delete_guard(p_tenant_id, p_school_id, v_name);
     IF v_paid_rows > 0 THEN
+        -- Name the way out. Refusing without one just moves the problem to whoever
+        -- reads the message: cancelling a receipt reverses amount_paid and
+        -- concession on the ledger (fee_receipt_cancel.sql), so once every receipt
+        -- against this head is cancelled the delete goes through. A refund does NOT
+        -- reverse -- fee_refund.sql only ever adds to refund_amount -- so a head
+        -- that has been refunded can be deactivated but never deleted, and saying
+        -- so beats letting someone cancel receipts all afternoon for nothing.
         OPEN p_result FOR
         SELECT FALSE AS success,
-               format('"%s" cannot be deleted: %s due(s) already have a payment, concession or refund against them. Mark it inactive instead — it stays on past records and stops being charged.',
+               format('"%s" cannot be deleted: %s due(s) still have money against them. Either mark it inactive (it stays on past records and stops being charged), or cancel the receipts collected against it and delete it then. A due that has been refunded cannot be cleared this way — that one can only be made inactive.',
                       v_name, v_paid_rows) AS message;
         RETURN;
     END IF;

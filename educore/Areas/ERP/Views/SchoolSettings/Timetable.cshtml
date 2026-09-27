@@ -161,7 +161,7 @@ var SECTIONS=[], TEACHERS=[], SUBJECTS=[];
 
 /* TT[dayIdx+'_'+periodSeq] = {subjectId, subjectName, teacherId, teacherName, room}
    — only the section on screen. BUSY holds every OTHER section's teacher booking. */
-var TT={}, BUSY={}, TEACH={};
+var TT={}, BUSY={}, TEACH={}, ROOMBUSY={};
 
 var view='class', curSection=0, curTeacher=0, curDay=0, ctx=null;
 function PERIODS(){ return PERIOD_LIST; }
@@ -176,11 +176,20 @@ function post(url,payload){
     data:JSON.stringify(payload) });
 }
 
-/* A clash is the same teacher, same day+period, in another section. */
-function clashSection(dayIdx,periodId,teacherId){
-  if(!teacherId) return null;
-  var label=BUSY[DAY_VALUES[dayIdx]+'_'+periodId+'_'+teacherId];
-  return label ? {label:label} : null;
+/* A booking ties up a teacher AND a room, and either can already be taken by
+   another section in the same day+period. Only the teacher half used to be
+   checked, so two classes could be put in Room 101 at the same time in silence.
+   Returns what is double-booked, or null. */
+function clashSection(dayIdx,periodId,teacherId,room){
+  var day=DAY_VALUES[dayIdx];
+  var t = teacherId ? BUSY[day+'_'+periodId+'_'+teacherId] : null;
+  var r = EC.isRealRoom(room)
+        ? ROOMBUSY[day+'_'+periodId+'_'+room.trim().toLowerCase()] : null;
+  if(!t && !r) return null;
+  return { label: t || r,
+           what: t && r ? 'Teacher and room are'
+               : t      ? 'Teacher is'
+               :          'Room ' + room.trim() + ' is' };
 }
 
 /* ---- load ---- */
@@ -218,8 +227,13 @@ function loadGrid(){
         TT[di+'_'+e.periodSeq]={subjectId:e.subjectId, subjectName:e.subjectName,
                                 teacherId:e.staffId||0, teacherName:e.staffName, room:e.roomNo};
       });
-      BUSY={};
-      (g.busy||[]).forEach(function(b){ BUSY[b.dayOfWeek+'_'+b.periodSeq+'_'+b.staffId]=b.sectionLabel; });
+      BUSY={}; ROOMBUSY={};
+      (g.busy||[]).forEach(function(b){
+        if(b.staffId) BUSY[b.dayOfWeek+'_'+b.periodSeq+'_'+b.staffId]=b.sectionLabel;
+        /* "N.A" and friends are not rooms, so two sections carrying one do not clash. */
+        if(EC.isRealRoom(b.roomNo))
+          ROOMBUSY[b.dayOfWeek+'_'+b.periodSeq+'_'+b.roomNo.trim().toLowerCase()]=b.sectionLabel;
+      });
       SUBJECTS=(g.subjects||[]).map(function(s){ return {id:s.subjectId, name:s.subjectName}; });
       fillSubjectSelect();
       render();
@@ -284,7 +298,7 @@ function renderStats(){
   if(view==='class'){
     var filled=0, clashes=0;
     PERIODS().filter(function(p){return p.type==='class';}).forEach(function(p){
-      DAYS.forEach(function(d,di){ var e=TT[di+'_'+p.id]; if(e){ filled++; if(clashSection(di,p.id,e.teacherId)) clashes++; } });
+      DAYS.forEach(function(d,di){ var e=TT[di+'_'+p.id]; if(e){ filled++; if(clashSection(di,p.id,e.teacherId,e.room)) clashes++; } });
     });
     bar.innerHTML='<span class="tt-stat"><b>'+filled+'</b><i>/ '+classPeriods+' set</i></span>'
       +'<span class="tt-stat"><b>'+(classPeriods-filled)+'</b><i>free</i></span>'
@@ -332,9 +346,9 @@ function cellHtml(dayIdx,periodId,mob){
   if(view==='class'){
     var e=TT[dayIdx+'_'+periodId];
     if(!e){ return '<'+(mob?'div':'button')+' class="'+base+' empty js-cell" data-d="'+dayIdx+'" data-p="'+periodId+'"><i class="bx bx-plus"></i>'+(mob?'Add':'')+'</'+(mob?'div':'button')+'>'; }
-    var c=clashSection(dayIdx,periodId,e.teacherId);
+    var c=clashSection(dayIdx,periodId,e.teacherId,e.room);
     return '<'+(mob?'div':'button')+' class="'+base+' js-cell'+(c?' clash':'')+'" data-d="'+dayIdx+'" data-p="'+periodId+'">'
-      +'<div class="tt-subj"><span class="dot '+dotClass(e.subjectId)+'"></span>'+EC.esc(e.subjectName)+(c?' <i class="bx bx-error tt-clash-ic" title="Clash with '+EC.esc(c.label)+'"></i>':'')+'</div>'
+      +'<div class="tt-subj"><span class="dot '+dotClass(e.subjectId)+'"></span>'+EC.esc(e.subjectName)+(c?' <i class="bx bx-error tt-clash-ic" title="'+EC.esc(c.what)+' already booked in '+EC.esc(c.label)+'"></i>':'')+'</div>'
       +'<div class="tt-teacher">'+EC.esc(e.teacherName||'Unassigned')+'</div>'
       +'<div class="tt-room">Room '+EC.esc(e.room||'—')+'</div></'+(mob?'div':'button')+'>';
   } else {
@@ -378,11 +392,18 @@ function openCell(dayIdx,periodId){
 function checkModalClash(){
   if(!ctx) return;
   var tid=parseInt(document.getElementById('mTeacher').value,10);
-  var c=clashSection(ctx.dayIdx,ctx.periodId,tid), w=document.getElementById('cellWarn');
-  if(c){ document.getElementById('cellWarnTxt').textContent=teacherName(tid)+' is already teaching '+c.label+' at this slot.'; w.classList.add('show'); }
+  var room=document.getElementById('mRoom').value;
+  var c=clashSection(ctx.dayIdx,ctx.periodId,tid,room), w=document.getElementById('cellWarn');
+  if(c){
+    document.getElementById('cellWarnTxt').textContent=c.what+' already booked in '+c.label+' at this slot.';
+    w.classList.add('show');
+  }
   else w.classList.remove('show');
 }
 document.getElementById('mTeacher').addEventListener('change',checkModalClash);
+/* The room is typed, so react as it is typed -- a clash found only on save is
+   found too late to be useful. */
+document.getElementById('mRoom').addEventListener('input',checkModalClash);
 
 document.getElementById('cellSave').addEventListener('click',function(){
   var sid=parseInt(document.getElementById('mSubject').value,10), tid=parseInt(document.getElementById('mTeacher').value,10);

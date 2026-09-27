@@ -59,6 +59,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int    DayOfWeek    { get; set; }
         public int    PeriodSeq    { get; set; }
         public int    StaffId      { get; set; }
+        /// <summary>Room this booking occupies: the entry's own, else the section's.</summary>
+        public string RoomNo       { get; set; } = string.Empty;
         public string SectionLabel { get; set; } = string.Empty;
     }
 
