@@ -32,6 +32,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             decimal  feeAmount      = 0);  // the agreed fee, frozen on the first payment
 
         /// <summary>
+        /// Where a registration fee stood when a given receipt was written -- not where
+        /// it stands now, so a reprint shows what was printed.
+        /// </summary>
+        Task<(decimal Fee, decimal PaidBefore, decimal ThisReceipt, decimal BalanceAfter)>
+            GetRegistrationReceiptContextAsync(string receiptNo, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>
         /// A registration fee's position: agreed, settled so far, and still owed.
         /// </summary>
         Task<(decimal Fee, decimal Settled, decimal Balance, string StudentName)>

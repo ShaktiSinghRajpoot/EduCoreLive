@@ -89,13 +89,19 @@
         if (r.advanceCredit > 0)
             out += '<tr><td colspan="' + cols + '">Saved to advance</td><td class="rc-amt">+' + EC.money(r.advanceCredit) + '</td></tr>';
 
-        // A registration fee can be paid in parts. Printing only what was handed
-        // over makes the slip look like the fee was 900 when it was 1000 and 100 is
-        // still owed, so show the arrangement: the fee, and what is left after this
-        // receipt. Only when there IS a balance -- a fully paid one needs no row.
-        if (r.registration && r.registration.balance > 0) {
-            out += '<tr><td colspan="' + cols + '">Registration fee</td><td class="rc-amt">' + EC.money(r.registration.fee) + '</td></tr>';
-            out += '<tr class="rc-bal"><td colspan="' + cols + '"><strong>Balance payable</strong></td><td class="rc-amt"><strong>' + EC.money(r.registration.balance) + '</strong></td></tr>';
+        // A registration fee can be paid in parts, so a slip showing only the cash
+        // reads like the fee was 900 when it was 1000. Show the arrangement AS OF
+        // THIS RECEIPT: the fee, anything received before it, and what was left
+        // after. The server sends these only when this receipt is not the whole
+        // story, so a single full payment still prints as it always did.
+        if (r.registration) {
+            var g = r.registration;
+            out += '<tr><td colspan="' + cols + '">Registration fee</td><td class="rc-amt">' + EC.money(g.fee) + '</td></tr>';
+            if (g.paidBefore > 0)
+                out += '<tr><td colspan="' + cols + '">Received earlier</td><td class="rc-amt">' + EC.money(g.paidBefore) + '</td></tr>';
+            out += '<tr class="rc-bal"><td colspan="' + cols + '"><strong>' +
+                   (g.balance > 0 ? 'Balance payable' : 'Balance') +
+                   '</strong></td><td class="rc-amt"><strong>' + EC.money(g.balance) + '</strong></td></tr>';
         }
         return out;
     }

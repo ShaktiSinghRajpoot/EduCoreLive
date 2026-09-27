@@ -3873,3 +3873,44 @@ Verified against the real procedures, rolled back, using the reported case:
                              and "Balance payable 100"
 
 All 16 suites: 500 checks, 0 failures.
+
+### [2026-09-28] A receipt must not change after it is handed over
+
+Reported as a question rather than a bug, which is how the good ones arrive:
+part of the registration fee is taken from the Enquiry screen, the rest later
+from the Registration screen -- what does the second receipt look like?
+
+Running it exposed something worse than the second receipt. Yesterday's change
+printed the balance on a part-payment receipt, and it asked for the balance
+**now**. So collecting the final 100 silently erased the "Balance payable 100"
+line from the 900 receipt that had already been printed and handed over. Reprint
+it a week later and it says something different from the paper in the parent's
+file. That is not a receipt.
+
+It is computed as of the receipt now: the agreed fee, everything settled by live
+receipts *before* this one, this receipt's own amount, and what was left after
+it. Ordered by payment_id rather than date, because two payments on one day
+still have an order and it is the order they were taken in. Cancelling a later
+receipt cannot reach back and change an earlier one.
+
+The second receipt also gains the context it had none of -- it now reads fee
+1,000, received earlier 900, this receipt 100, balance 0, instead of a bare
+"Registration Fee 100" that says nothing about what it completed.
+
+Two procedures now, answering two different questions on purpose:
+`sp_registration_fee_summary` is "where does this fee stand now", which is what
+the collect dialog needs before taking money, and
+`sp_registration_receipt_context` is "where did it stand when this receipt was
+written", which is what printing needs. Collapsing them into one is exactly the
+mistake that caused this.
+
+Verified against the real procedures, rolled back:
+
+    Receipt A (900 from Enquiry), reprinted after BOTH payments
+        fee 1000 | earlier 0   | this 900 | balance 100   <- unchanged
+    Receipt B (100 from Registration)
+        fee 1000 | earlier 900 | this 100 | balance 0
+    Receipt B cancelled, A reprinted
+        balance still 100
+
+All 16 suites: 500 checks, 0 failures.

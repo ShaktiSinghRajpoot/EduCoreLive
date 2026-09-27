@@ -549,17 +549,24 @@ namespace educore.Areas.ERP.Controllers
             if (lines.Count == 0)
                 lines.Add(new { label = r.PaymentType == "Registration" ? "Registration Fee" : "Fee", amount = r.Amount, concession = 0m, lineType = "Due" });
 
-            // A registration fee can be paid in parts, and a slip that says only
-            // "900" tells the family nothing about the 100 still owed. Print what
-            // the fee was and what is left, so the receipt is the record of the
-            // arrangement rather than just of the cash.
+            // A registration fee can be paid in parts, and a slip saying only "900"
+            // tells the family nothing about the 100 still owed. Print the fee, what
+            // had already been received, and what was left AFTER this receipt.
+            //
+            // As of this receipt, not as of now. The first version asked for the
+            // current balance, which meant collecting the final 100 quietly erased
+            // the "Balance payable 100" line from the earlier 900 receipt — a
+            // document that changes after it is handed over is not a receipt.
             object? registration = null;
             if (string.Equals(r.PaymentType, "Registration", StringComparison.OrdinalIgnoreCase) && r.EnquiryId > 0)
             {
-                var (fee, settled, balance, _) =
-                    await _feePaymentService.GetRegistrationFeeSummaryAsync(r.EnquiryId, TenantId(), SchoolId(), UserId());
-                if (fee > 0)
-                    registration = new { fee, settled, balance };
+                var (fee, paidBefore, thisReceipt, balanceAfter) =
+                    await _feePaymentService.GetRegistrationReceiptContextAsync(r.ReceiptNo, TenantId(), SchoolId(), UserId());
+
+                // Only worth printing when this receipt is not the whole story:
+                // either something came before it, or something is still owed.
+                if (fee > 0 && (paidBefore > 0 || balanceAfter > 0))
+                    registration = new { fee, paidBefore, thisReceipt, balance = balanceAfter };
             }
 
             // The school's chosen print format drives which template renders.

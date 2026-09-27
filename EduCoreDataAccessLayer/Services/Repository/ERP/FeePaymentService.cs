@@ -152,6 +152,43 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return result;
         }
 
+        /// <summary>
+        /// Where a registration fee stood when THIS receipt was written: the agreed fee,
+        /// what had been settled before it, this receipt's own amount, and what was left
+        /// after. Deliberately not the current balance -- printing that means a receipt
+        /// changes after it is issued, so collecting the last 100 would make the earlier
+        /// 900 receipt stop mentioning the balance it was printed with.
+        /// </summary>
+        public async Task<(decimal Fee, decimal PaidBefore, decimal ThisReceipt, decimal BalanceAfter)>
+            GetRegistrationReceiptContextAsync(string receiptNo, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(receiptNo))
+                return (0m, 0m, 0m, 0m);
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",  NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",  NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_receipt_no", NpgsqlDbType.Varchar) { Value = receiptNo },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "registration_receipt_cursor" }
+            };
+
+            (decimal, decimal, decimal, decimal) result = (0m, 0m, 0m, 0m);
+            await _db.ExecuteCursorsAsync("core.sp_registration_receipt_context", parameters, async reader =>
+            {
+                var cols = reader.Columns();
+                if (await reader.ReadAsync())
+                {
+                    result = (DbRead.Dec(reader, cols, "fee_amount"),
+                              DbRead.Dec(reader, cols, "paid_before"),
+                              DbRead.Dec(reader, cols, "this_receipt"),
+                              DbRead.Dec(reader, cols, "balance_after"));
+                }
+            });
+            return result;
+        }
+
         public async Task<FeeDueItem> GetFeeDueListAsync(
             FeeDueItem query, int tenantId, int schoolId, int actionUserId)
         {

@@ -249,6 +249,75 @@ BEGIN
 END;
 $procedure$;
 
+-- ── 3c. A receipt's own place in the story ─────────────────────────────────
+-- The summary above answers "where does this fee stand NOW", which is what the
+-- collect dialog needs. A receipt needs a different question: "what did this
+-- family owe at the moment THIS receipt was written". Printing the current
+-- balance on it means a receipt changes after it is issued -- collect the last
+-- 100 and the earlier 900 receipt silently stops mentioning the balance it was
+-- printed with. A receipt is a record of a moment, so it is computed as of
+-- itself: everything settled up to and including it, and nothing after.
+--
+-- Ordered by payment_id, not date: two payments on one day still have an order,
+-- and it is the order they were taken in.
+CREATE OR REPLACE PROCEDURE core.sp_registration_receipt_context(
+    IN    p_tenant_id  integer,
+    IN    p_school_id  integer,
+    IN    p_receipt_no varchar,
+    INOUT p_result     refcursor DEFAULT 'result_cursor'::refcursor)
+LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+    v_payment_id integer;
+    v_enquiry_id integer;
+    v_this       numeric;
+BEGIN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
+        RAISE EXCEPTION 'Invalid request.';
+    END IF;
+
+    SELECT p.payment_id, p.enquiry_id,
+           COALESCE(p.amount, 0) + COALESCE(p.discount_amount, 0)
+      INTO v_payment_id, v_enquiry_id, v_this
+    FROM core.fee_payments p
+    WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
+      AND p.receipt_no = p_receipt_no
+      AND p.payment_type = 'Registration';
+
+    IF v_enquiry_id IS NULL THEN
+        OPEN p_result FOR SELECT 0::numeric AS fee_amount, 0::numeric AS paid_before,
+                                 0::numeric AS this_receipt, 0::numeric AS balance_after
+                          WHERE FALSE;
+        RETURN;
+    END IF;
+
+    OPEN p_result FOR
+    SELECT
+        COALESCE(e.registration_fee_amount, 0) AS fee_amount,
+        -- Settled by every live receipt BEFORE this one.
+        COALESCE((SELECT SUM(COALESCE(q.amount,0) + COALESCE(q.discount_amount,0))
+                    FROM core.fee_payments q
+                   WHERE q.tenant_id = p_tenant_id AND q.school_id = p_school_id
+                     AND q.enquiry_id = v_enquiry_id
+                     AND q.payment_type = 'Registration'
+                     AND COALESCE(q.is_cancelled, FALSE) = FALSE
+                     AND q.payment_id < v_payment_id), 0) AS paid_before,
+        v_this AS this_receipt,
+        GREATEST(
+            COALESCE(e.registration_fee_amount, 0)
+            - COALESCE((SELECT SUM(COALESCE(q.amount,0) + COALESCE(q.discount_amount,0))
+                          FROM core.fee_payments q
+                         WHERE q.tenant_id = p_tenant_id AND q.school_id = p_school_id
+                           AND q.enquiry_id = v_enquiry_id
+                           AND q.payment_type = 'Registration'
+                           AND COALESCE(q.is_cancelled, FALSE) = FALSE
+                           AND q.payment_id <= v_payment_id), 0), 0) AS balance_after
+    FROM core.enquiries e
+    WHERE e.enquiry_id = v_enquiry_id
+      AND e.tenant_id = p_tenant_id AND e.school_id = p_school_id;
+END;
+$procedure$;
+
 -- ── 4. Backfill: what was already collected in full ────────────────────────
 -- Enquiries flagged paid under the old all-or-nothing rule have receipts but no
 -- agreed amount. Take the amount from their own receipts, so their balance
