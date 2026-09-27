@@ -89,31 +89,43 @@
         if (r.advanceCredit > 0)
             out += '<tr><td colspan="' + cols + '">Saved to advance</td><td class="rc-amt">+' + EC.money(r.advanceCredit) + '</td></tr>';
 
-        // A registration fee can be paid in parts, so a slip showing only the cash
-        // reads like the fee was 900 when it was 1000. Show the arrangement AS OF
-        // THIS RECEIPT: the fee, anything received before it, and what was left
-        // after. The server sends these only when this receipt is not the whole
-        // story, so a single full payment still prints as it always did.
+        return out;
+    }
+
+    /* What is still owed, printed BELOW the total rather than among the charges.
+       The first version put these rows in the adjustments, which sit above
+       "Total Paid" -- so a part-paid registration printed
+
+           Registration Fee      900     <- the charge
+           Registration fee    1,000     <- the fee total
+           Balance payable       100
+           Total Paid            900
+
+       two near-identical labels with different amounts, stacked. Adjustments are
+       deductions from what is being paid; a balance is not one. It belongs after
+       the total, as its own small summary. */
+    function balanceBlock(r) {
+        var rows = '';
+
         if (r.registration) {
             var g = r.registration;
-            out += '<tr><td colspan="' + cols + '">Registration fee</td><td class="rc-amt">' + EC.money(g.fee) + '</td></tr>';
+            rows += '<div class="rc-kv"><span>Registration fee</span><b>' + EC.money(g.fee) + '</b></div>';
             if (g.paidBefore > 0)
-                out += '<tr><td colspan="' + cols + '">Received earlier</td><td class="rc-amt">' + EC.money(g.paidBefore) + '</td></tr>';
-            out += '<tr class="rc-bal"><td colspan="' + cols + '"><strong>' +
-                   (g.balance > 0 ? 'Balance payable' : 'Balance') +
-                   '</strong></td><td class="rc-amt"><strong>' + EC.money(g.balance) + '</strong></td></tr>';
+                rows += '<div class="rc-kv"><span>Received earlier</span><b>' + EC.money(g.paidBefore) + '</b></div>';
+            rows += '<div class="rc-kv"><span>Paid on this receipt</span><b>' + EC.money(g.thisReceipt) + '</b></div>';
+            rows += '<div class="rc-kv rc-bal"><span>' + (g.balance > 0 ? 'Balance payable' : 'Balance') +
+                    '</span><b>' + EC.money(g.balance) + '</b></div>';
         }
 
-        /* Student fee receipt: what is still owed. Dated on purpose -- unlike a
-           registration fee, a student's dues keep being generated through the year,
-           so there is no fixed figure to freeze. Saying "as on <date>" is honest;
-           printing a bare "Balance" that quietly means "today" would not be. */
+        /* Student fee receipt. Dated on purpose: unlike a registration fee, a
+           student's dues keep being generated through the year, so there is no
+           fixed figure to freeze -- only what is owed today. */
         if (r.dues && r.dues.outstanding > 0) {
-            out += '<tr class="rc-bal"><td colspan="' + cols + '"><strong>Outstanding as on ' +
-                   EC.esc(r.dues.asOn) + '</strong></td><td class="rc-amt"><strong>' +
-                   EC.money(r.dues.outstanding) + '</strong></td></tr>';
+            rows += '<div class="rc-kv rc-bal"><span>Outstanding as on ' + EC.esc(r.dues.asOn) +
+                    '</span><b>' + EC.money(r.dues.outstanding) + '</b></div>';
         }
-        return out;
+
+        return rows ? '<div class="rc-balance">' + rows + '</div>' : '';
     }
 
     function title(r) {
@@ -165,6 +177,8 @@
             '<tfoot><tr><td colspan="2">Total Paid</td><td class="rc-amt">' + EC.money(r.amount) + '</td></tr></tfoot>' +
           '</table>' +
 
+          balanceBlock(r) +
+
           '<div class="rc-words"><span>In words:</span> ' + EC.esc(amountWords(r.amount)) + '</div>' +
 
           '<div class="rc-pay">' +
@@ -207,6 +221,8 @@
             '<tbody>' + lineRows(r, true) + adjustmentRows(r, 1) + '</tbody>' +
             '<tfoot><tr><td>Total Paid</td><td class="rc-amt">' + EC.money(r.amount) + '</td></tr></tfoot>' +
           '</table>' +
+
+          balanceBlock(r) +
           '<div class="rc-words">' + EC.esc(amountWords(r.amount)) + '</div>' +
           '<div class="rc-pay"><div><span>Mode</span><b>' + EC.esc(r.mode || '-') +
               (r.reference ? ' · ' + EC.esc(r.reference) : '') + '</b></div></div>' +
@@ -236,6 +252,7 @@
           '<table class="rc-lines"><tbody>' + lineRows(r, true) + adjustmentRows(r, 1) + '</tbody></table>' +
           '<div class="rc-sep"></div>' +
           '<div class="rc-kv rc-tot"><span>TOTAL</span><b>' + EC.money(r.amount) + '</b></div>' +
+          balanceBlock(r) +
           '<div class="rc-kv"><span>Mode</span><b>' + EC.esc(r.mode || '-') + '</b></div>' +
           (r.reference ? '<div class="rc-kv"><span>Ref</span><b>' + EC.esc(r.reference) + '</b></div>' : '') +
           '<div class="rc-sep"></div>' +
@@ -279,6 +296,8 @@
             '.rc-kv b{font-weight:700;text-align:right}' +
             '.rc-tot{font-size:13px;font-weight:700}' +
             '.rc-th .rc-lines td{padding:1px 0;font-size:11px}' +
+            '.rc-th .rc-balance{margin-top:3px;border-top:1px dashed #000;padding-top:3px;font-size:10px}' +
+            '.rc-th .rc-balance .rc-bal{font-weight:700}' +
             '.rc-th .rc-words{font-size:10px;margin-top:2px}' +
             '.rc-th .rc-foot{font-size:10px;margin-top:6px}';
         }
@@ -316,6 +335,14 @@
         '.rc-a4 .rc-lines th{background:#f2f2f2;border-bottom:1px solid #000;text-align:left}' +
         '.rc-a4 .rc-lines td{border-bottom:1px solid #eee}' +
         '.rc-sn{width:32px}' +
+        /* The balance summary under the total. Boxed and right-aligned so it reads
+           as a note about the account, not as another charge. */
+        '.rc-balance{margin-top:8px;margin-left:auto;width:max-content;min-width:200px;' +
+            'border:1px solid #ddd;border-radius:4px;padding:6px 10px;font-size:12px}' +
+        '.rc-balance .rc-kv{display:flex;justify-content:space-between;gap:18px}' +
+        '.rc-balance .rc-kv b{font-weight:600}' +
+        '.rc-balance .rc-bal{border-top:1px solid #ccc;margin-top:4px;padding-top:4px;font-weight:700}' +
+        '.rc-balance .rc-bal b{font-weight:800}' +
         '.rc-words{margin-top:8px;font-size:12px}' +
         '.rc-words span{color:#666;font-style:normal}' +
         '.rc-pay{margin-top:8px;display:flex;gap:24px;font-size:12px}' +

@@ -746,6 +746,9 @@ $(function () {
                 bootstrap.Modal.getInstance(document.getElementById('registerWalkinModal')).hide();
                 ecToast('success', (res.message || 'Walk-in registered.') +
                                (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
+                /* The receipt was already in the response and simply not used -- the
+                   fourth place in this app where one was issued and never handed over. */
+                if (res.receiptNo && window.EcReceipt) EcReceipt.show(res.receiptNo);
                 load();
             } else {
                 ecToast('error', (res && res.message) || 'Unable to register.');

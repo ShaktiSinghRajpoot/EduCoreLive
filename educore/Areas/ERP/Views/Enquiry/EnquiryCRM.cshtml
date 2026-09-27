@@ -1520,8 +1520,13 @@ $(document).ready(function () {
                 bootstrap.Modal.getInstance(document.getElementById('registerEnquiryModal')).hide();
                 ecToast('success', (res.message || 'Registration completed.') +
                                (res.registrationNumber ? ' (' + res.registrationNumber + ')' : ''));
-                // Show the printable registration-fee receipt when a fee was collected.
-                // Receipt not auto-opened; print it from the Registrations list.
+                // Hand the receipt over. The modal and renderer were already wired up
+                // here and simply never called -- the comment that stood in this spot
+                // said to print it from the Registrations list instead, which means
+                // walking away from a parent who is waiting for it. The same branch
+                // was dead on the admission screen and behind the Registrations list
+                // button; this was the third.
+                if (res.receiptNo && window.EcReceipt) EcReceipt.show(res.receiptNo);
                 reloadList();
             } else {
                 ecToast('error', (res && res.message) || 'Unable to complete registration.');

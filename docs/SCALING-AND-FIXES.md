@@ -3955,3 +3955,42 @@ Verified end to end against the real procedures, rolled back:
                 (summing everything would have said 13,000)
 
 All 16 suites: 500 checks, 0 failures. No SQL changed.
+
+### [2026-09-28] The receipt read like two charges, and three screens never handed it over
+
+Checking the Enquiry path found that the registration receipt was still wrong,
+just differently from before.
+
+**It printed two lines that looked like the same thing.** Yesterday's balance
+rows went into the adjustments block, which sits ABOVE "Total Paid" among the
+charges, so a part-paid registration read:
+
+    #  Particulars              Amount
+    1  Registration Fee            900     <- the charge
+       Registration fee          1,000     <- the fee total
+       Balance payable             100
+       Total Paid                  900
+
+Two near-identical labels with different amounts, stacked. Adjustments are
+deductions from what is being paid; a balance is not one. It is its own small
+boxed summary below the total now -- fee, received earlier, paid on this
+receipt, balance -- in all three layouts, and a single full payment prints with
+no block at all, exactly as it always did.
+
+**And the receipt was never shown on the Enquiry path.** Registering with a fee
+from the CRM generated a receipt and told nobody: the modal and the renderer
+were already included on the page and simply never called, under a comment
+saying to print it from the Registrations list instead. The walk-in form on the
+Registrations page did the same -- `receiptNo` came back in the response and was
+dropped on the floor.
+
+That is now the fourth and fifth instance of this one pattern, after the
+admission screen and the Registrations list button. The receipt exists, the
+renderer is wired up, and a comment explains why it is not being used.
+
+`ManageFee` is deliberately left alone. It does not auto-open either, and there
+the stated reason holds: a cashier working a queue does not want a modal after
+every payment, and the history list has a Print button. Admission and
+registration are one-off moments with a parent waiting.
+
+All 16 suites: 500 checks, 0 failures. No SQL changed.
