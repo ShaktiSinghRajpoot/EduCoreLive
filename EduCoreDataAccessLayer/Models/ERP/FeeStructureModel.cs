@@ -10,8 +10,17 @@
         public string AcademicYear { get; set; } = string.Empty;
         public decimal OneTimeTotal { get; set; }
         public decimal MonthlyTotal { get; set; }
+        public decimal QuarterlyTotal { get; set; }
+        public decimal HalfYearlyTotal { get; set; }
         public decimal YearlyTotal { get; set; }
         public decimal AnnualTotal { get; set; }
+
+        /// <summary>
+        /// Fee heads actually attached. Zero means the class is listed as configured
+        /// but nothing would be billed -- a real state, produced by the old
+        /// non-atomic save and by deleting every head a structure used.
+        /// </summary>
+        public int HeadCount { get; set; }
         public bool IsActive { get; set; } = true;
         public string FeeHeadNames { get; set; } = string.Empty;
         public int CreatedBy { get; set; }

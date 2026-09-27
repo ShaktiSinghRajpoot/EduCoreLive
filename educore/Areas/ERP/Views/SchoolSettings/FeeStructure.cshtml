@@ -200,13 +200,23 @@
 
                         <div class="ec-card-body">
 
+                            @* Grouped by billing cycle, and every cycle gets its own heading.
+                               Quarterly and Half Yearly used to be filed under "Yearly —
+                               collected once per year" while the biller charged them 4x and
+                               2x, so the page contradicted the money. *@
                             @foreach (var group in new[]
                                                         {
-                                                        new { Key="one-time", Title="One Time Charges", Sub="Charged once during admission." },
-                                                        new { Key="monthly", Title="Monthly Charges", Sub="Collected every month." },
-                                                        new { Key="yearly", Title="Yearly Charges", Sub="Collected once per year." }
+                                                        new { Key="One Time",    Title="One Time Charges",     Sub="Charged once, at admission." },
+                                                        new { Key="Monthly",     Title="Monthly Charges",      Sub="Collected every month of the session." },
+                                                        new { Key="Quarterly",   Title="Quarterly Charges",    Sub="Collected four times a year — Apr–Jun, Jul–Sep, Oct–Dec, Jan–Mar." },
+                                                        new { Key="Half Yearly", Title="Half Yearly Charges",  Sub="Collected twice a year — Apr–Sep and Oct–Mar." },
+                                                        new { Key="Yearly",      Title="Yearly Charges",       Sub="Collected once per year." }
                                                         })
                             {
+                                // Five cycles exist but most schools use two or three, and an
+                                // empty heading reads like something failed to load.
+                                if (!feeHeads.Any(h => h.Frequency == group.Key)) { continue; }
+
                                 <div class="mb-4">
                                     <div class="mb-3">
                                         <div class="fee-group-title">@group.Title</div>
@@ -215,7 +225,7 @@
 
                                     @for (int i = 0; i < feeHeads.Count; i++)
                                     {
-                                        if (feeHeads[i].FeeGroup == group.Key)
+                                        if (feeHeads[i].Frequency == group.Key)
                                         {
                                             var isMandatory = feeHeads[i].FeeType == "Mandatory";
 
@@ -412,7 +422,7 @@
                                 <th>Class</th>
                                 <th>Academic Year</th>
                                 <th>Fee Heads</th>
-                                <th>Monthly</th>
+                                <th>Recurring</th>
                                 <th>Annual Estimate</th>
                                 <th>Status</th>
                                 <th>Created By</th>
@@ -435,11 +445,27 @@
 
                                     <td>
                                         <div class="saved-head-list">
-                                            @item.FeeHeadNames
+                                            @if (item.HeadCount == 0)
+                                            {
+                                                <span class="badge bg-label-danger">
+                                                    <i class="bx bx-error-circle"></i> No fee heads — nothing will be billed
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                @item.FeeHeadNames
+                                            }
                                         </div>
                                     </td>
 
-                                    <td>₹@item.MonthlyTotal.ToString("N0")</td>
+                                    @* "Monthly" alone showed 0 for a school billing quarterly,
+                                       next to a large annual figure, with nothing to explain it. *@
+                                    <td>
+                                        @if (item.MonthlyTotal > 0)    { <div>₹@item.MonthlyTotal.ToString("N0") <small class="text-muted">/mo</small></div> }
+                                        @if (item.QuarterlyTotal > 0)  { <div>₹@item.QuarterlyTotal.ToString("N0") <small class="text-muted">/qtr</small></div> }
+                                        @if (item.HalfYearlyTotal > 0) { <div>₹@item.HalfYearlyTotal.ToString("N0") <small class="text-muted">/half-yr</small></div> }
+                                        @if (item.MonthlyTotal == 0 && item.QuarterlyTotal == 0 && item.HalfYearlyTotal == 0) { <span class="text-muted">—</span> }
+                                    </td>
 
                                     <td class="fw-bold text-primary">
                                         ₹@item.AnnualTotal.ToString("N0")

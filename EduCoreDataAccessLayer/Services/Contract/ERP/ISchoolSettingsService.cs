@@ -66,14 +66,6 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             int actionUserId
         );
 
-        Task<FeeStructureModel?> GetFeeStructureByClassAsync(
-            string className,
-            string academicYear,
-            int tenantId,
-            int schoolId,
-            int actionUserId
-        );
-
         Task<List<FeeStructureDetailModel>> GetFeeStructureDetailsAsync(
             string className,
             string academicYear,
@@ -137,7 +129,8 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             bool refundableOnly = false
         );
 
-        Task<int> SaveFeeStructureAsync(
+        // Returns which classes were written, and where it stopped if it did.
+        Task<(bool Success, string Message)> SaveFeeStructureAsync(
             FeeStructureModel model,
             int tenantId,
             int schoolId,

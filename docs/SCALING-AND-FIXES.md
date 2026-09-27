@@ -3609,3 +3609,55 @@ run all seven files, hash again.
     overloads         1
 
 All 16 suites: 500 checks, 0 failures.
+
+### [2026-09-27] Fee Structure: a procedure with no source, and a save that was not one
+
+**The procedure had no source file.** `core.sp_school_admin_fee_structure_manage`
+existed in the live databases and in `database/backup_pre_cleanup/`, and nowhere
+in `EduCoreDataAccessLayer/Database` -- so rebuilding from the scripts produced a
+database without it. It has a home now, `fee_structure_manage.sql`.
+
+**Saving a structure was not one operation.** It was a header call followed by
+one call per fee head, each in its own transaction, and the header save
+soft-deletes the existing details *before* the new ones are written. Anything
+going wrong in between left a header with no details: a class the page lists as
+configured that would bill nothing. Two such rows were sitting in the local
+database (fee_structure_id 64 and 65, zero details, zero totals). The C# made it
+invisible -- on an unexpected header result it skipped the details with
+`continue` and still returned success, and the page's message counted the classes
+that had been *asked* for, so it read identically whether every class saved or
+none did.
+
+The details now travel with the header as JSONB and the whole save is one call,
+so it either happens or it does not. The rollups are computed inside the
+procedure from the rows being written, which is also the only way the stored
+totals cannot drift from the stored details. It collapses 1 + N round trips per
+class into one, and an empty payload is refused before a header exists rather
+than after.
+
+**Quarterly and Half Yearly were filed under "Collected once per year".** The
+controller overwrote each head's `FeeGroup` with a three-way bucket for the
+page's headings -- destroying the real group (Academic / Transport / Optional
+Services) and folding Quarterly and Half Yearly into "yearly". After this
+morning's billing fix those are charged 4x and 2x, so the page was contradicting
+the money. It groups by `Frequency` directly now, with a heading per cycle and
+the real periods spelled out; empty cycles are skipped, since most schools use
+two or three of the five.
+
+**The list showed "Monthly 0" beside a large annual.** `quarterly_total` and
+`half_yearly_total` did not exist as columns -- the amounts were folded into
+`annual_total` and nowhere else. They exist now, are backfilled from the saved
+details, and the column shows whichever cycles a structure actually uses. A
+structure with no heads says so in red instead of showing an empty list.
+
+Two things fell out on the way: `GetFeeStructureByClassAsync` was dead (nothing
+called it) and its operation went with the rewrite, and the detail insert needed
+an upsert rather than a plain insert -- `uq_school_fee_structure_details_head`
+covers soft-deleted rows, so a head marked deleted moments earlier still owns its
+key. The test caught that; reading the constraint list would not have.
+
+Four behaviours verified against the real procedure, rolled back: all five cycles
+save with annual 2,000 + 12,000 + 1,000 + 6,000 + 500 = 21,500; five detail rows;
+re-saving with one head leaves one live row and resets quarterly to zero; an
+empty payload is refused and writes no header. All 16 suites: 500 checks, 0
+failures.

@@ -585,6 +585,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static int?    AsNullableInt(DataRow r, string c)=> Col(r, c) && r[c] != DBNull.Value ? Convert.ToInt32(r[c]) : (int?)null;
         private static string? AsStr(DataRow r, string c)        => Col(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
         private static bool    AsBool(DataRow r, string c)       => Col(r, c) && r[c] != DBNull.Value && Convert.ToBoolean(r[c]);
+        private static decimal AsDec(DataRow r, string c)        => Col(r, c) && r[c] != DBNull.Value ? Convert.ToDecimal(r[c]) : 0m;
         #endregion
 
         #region Academic Year
@@ -991,7 +992,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 model.AcademicYear = row["academic_year"] == DBNull.Value ? string.Empty : row["academic_year"].ToString() ?? string.Empty;
                 model.OneTimeTotal = row["one_time_total"] == DBNull.Value ? 0 : Convert.ToDecimal(row["one_time_total"]);
                 model.MonthlyTotal = row["monthly_total"] == DBNull.Value ? 0 : Convert.ToDecimal(row["monthly_total"]);
+                model.QuarterlyTotal = AsDec(row, "quarterly_total");
+                model.HalfYearlyTotal = AsDec(row, "half_yearly_total");
                 model.YearlyTotal = row["yearly_total"] == DBNull.Value ? 0 : Convert.ToDecimal(row["yearly_total"]);
+                model.HeadCount = AsInt(row, "head_count");
                 model.AnnualTotal = row["annual_total"] == DBNull.Value ? 0 : Convert.ToDecimal(row["annual_total"]);
                 model.IsActive = row["is_active"] != DBNull.Value && Convert.ToBoolean(row["is_active"]);
                 model.FeeHeadNames = row["fee_head_names"] == DBNull.Value ? string.Empty : row["fee_head_names"].ToString() ?? string.Empty;
@@ -1003,48 +1007,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
 
             return list;
-        }
-
-        public async Task<FeeStructureModel?> GetFeeStructureByClassAsync(string className, string academicYear, int tenantId, int schoolId, int actionUserId)
-        {
-            if (tenantId <= 1 || schoolId <= 0) return null;
-
-            var parameters = new NpgsqlParameter[]
-            {
-                new NpgsqlParameter("p_operation", "GetFeeStructureByClass"),
-                new NpgsqlParameter("p_tenant_id", tenantId),
-                new NpgsqlParameter("p_school_id", schoolId),
-                new NpgsqlParameter("p_action_user_id", actionUserId),
-                new NpgsqlParameter("p_class_name", className),
-                new NpgsqlParameter("p_academic_year", academicYear),
-                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "fee_structure_by_class_cursor" }
-            };
-
-            var dal = _db;
-            var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, parameters);
-
-            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
-                return null;
-
-            var row = ds.Tables[0].Rows[0];
-
-            var model = new FeeStructureModel();
-
-            model.Operation = "SaveFeeStructure";
-            model.TenantId = row["tenant_id"] == DBNull.Value ? tenantId : Convert.ToInt32(row["tenant_id"]);
-            model.SchoolId = row["school_id"] == DBNull.Value ? schoolId : Convert.ToInt32(row["school_id"]);
-            model.FeeStructureId = row["fee_structure_id"] == DBNull.Value ? 0 : Convert.ToInt32(row["fee_structure_id"]);
-            model.ClassName = row["class_name"] == DBNull.Value ? string.Empty : row["class_name"].ToString() ?? string.Empty;
-            model.AcademicYear = row["academic_year"] == DBNull.Value ? string.Empty : row["academic_year"].ToString() ?? string.Empty;
-            model.OneTimeTotal = row["one_time_total"] == DBNull.Value ? 0 : Convert.ToDecimal(row["one_time_total"]);
-            model.MonthlyTotal = row["monthly_total"] == DBNull.Value ? 0 : Convert.ToDecimal(row["monthly_total"]);
-            model.YearlyTotal = row["yearly_total"] == DBNull.Value ? 0 : Convert.ToDecimal(row["yearly_total"]);
-            model.AnnualTotal = row["annual_total"] == DBNull.Value ? 0 : Convert.ToDecimal(row["annual_total"]);
-            model.IsActive = row["is_active"] != DBNull.Value && Convert.ToBoolean(row["is_active"]);
-
-            model.FeeHeads = await GetFeeStructureDetailsAsync(className, academicYear, tenantId, schoolId, actionUserId);
-
-            return model;
         }
 
         public async Task<List<FeeStructureDetailModel>> GetFeeStructureDetailsAsync(string className, string academicYear, int tenantId, int schoolId, int actionUserId)
@@ -1298,33 +1260,39 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 .Sum(h => h.DefaultAmount);
         }
 
-        public async Task<int> SaveFeeStructureAsync(FeeStructureModel model, int tenantId, int schoolId, int actionUserId)
+        public async Task<(bool Success, string Message)> SaveFeeStructureAsync(
+            FeeStructureModel model, int tenantId, int schoolId, int actionUserId)
         {
-            if (tenantId <= 1 || schoolId <= 0) return 0;
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
 
             model.TenantId = tenantId;
             model.SchoolId = schoolId;
 
-            if (model.SelectedClasses == null || model.SelectedClasses.Count == 0) return 0;
+            if (model.SelectedClasses == null || model.SelectedClasses.Count == 0)
+                return (false, "Select at least one class.");
 
             var selectedFeeHeads = model.FeeHeads.Where(x => x.IsSelected).ToList();
+            if (selectedFeeHeads.Count == 0)
+                return (false, "Select at least one fee head.");
 
-            if (selectedFeeHeads.Count == 0) return 0;
+            // One payload per class, sent whole. This used to be a header call plus
+            // one call per fee head, each in its own transaction -- and the header
+            // wipes the existing details before the new ones are written, so a
+            // failure in between left a structure with no details at all while the
+            // caller still reported success. The procedure now does the lot, and
+            // computes the rollups from the rows it is writing.
+            var details = JsonSerializer.Serialize(selectedFeeHeads.Select(h => new
+            {
+                feeHeadId   = h.FeeHeadId,
+                feeHeadName = h.FeeHeadName,
+                frequency   = h.Frequency,
+                amount      = h.Amount
+            }));
 
+            var saved = new List<string>();
             foreach (var className in model.SelectedClasses)
             {
-                decimal oneTimeTotal    = selectedFeeHeads.Where(x => x.Frequency == "One Time").Sum(x => x.Amount);
-                decimal monthlyTotal    = selectedFeeHeads.Where(x => x.Frequency == "Monthly").Sum(x => x.Amount);
-                decimal quarterlyTotal  = selectedFeeHeads.Where(x => x.Frequency == "Quarterly").Sum(x => x.Amount);
-                decimal halfYearlyTotal = selectedFeeHeads.Where(x => x.Frequency == "Half Yearly").Sum(x => x.Amount);
-                decimal yearlyTotal     = selectedFeeHeads.Where(x => x.Frequency == "Yearly").Sum(x => x.Amount);
-                // Annualise every billing cycle: monthly×12, quarterly×4, half-yearly×2,
-                // yearly×1, plus one-time charges. (Previously Quarterly/Half-Yearly were
-                // dropped, understating the annual estimate.)
-                decimal annualTotal = oneTimeTotal + (monthlyTotal * 12) + (quarterlyTotal * 4)
-                                      + (halfYearlyTotal * 2) + yearlyTotal;
-
-                var headerParameters = new NpgsqlParameter[]
+                var parameters = new NpgsqlParameter[]
                 {
                     new NpgsqlParameter("p_operation", "SaveFeeStructure"),
                     new NpgsqlParameter("p_tenant_id", tenantId),
@@ -1332,42 +1300,36 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     new NpgsqlParameter("p_action_user_id", actionUserId),
                     new NpgsqlParameter("p_class_name", className),
                     new NpgsqlParameter("p_academic_year", model.AcademicYear),
-                    new NpgsqlParameter("p_one_time_total", oneTimeTotal),
-                    new NpgsqlParameter("p_monthly_total", monthlyTotal),
-                    new NpgsqlParameter("p_yearly_total", yearlyTotal),
-                    new NpgsqlParameter("p_annual_total", annualTotal),
-                    new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "save_fee_structure_cursor" }
+                    new NpgsqlParameter("p_details", NpgsqlDbType.Jsonb) { Value = details },
+                    new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                        { Direction = ParameterDirection.InputOutput, Value = "save_fee_structure_cursor" }
                 };
 
-                var dal = _db;
-                var ds = await dal.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, headerParameters);
-
-                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
-                    continue;
-
-                foreach (var feeHead in selectedFeeHeads)
+                try
                 {
-                    var detailParameters = new NpgsqlParameter[]
-                    {
-                        new NpgsqlParameter("p_operation", "SaveFeeStructureDetail"),
-                        new NpgsqlParameter("p_tenant_id", tenantId),
-                        new NpgsqlParameter("p_school_id", schoolId),
-                        new NpgsqlParameter("p_action_user_id", actionUserId),
-                        new NpgsqlParameter("p_class_name", className),
-                        new NpgsqlParameter("p_academic_year", model.AcademicYear),
-                        new NpgsqlParameter("p_fee_head_id", feeHead.FeeHeadId),
-                        new NpgsqlParameter("p_fee_head_name", feeHead.FeeHeadName),
-                        new NpgsqlParameter("p_frequency", feeHead.Frequency),
-                        new NpgsqlParameter("p_amount", feeHead.Amount),
-                        new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "save_fee_structure_detail_cursor" }
-                    };
+                    var ds = await _db.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, parameters);
+                    if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                        return (false, $"No response from server while saving {className}.");
 
-                    var detailDal = _db;
-                    await detailDal.ExecuteProcedureWithCursorsAsync(SpFeeStructureManage, detailParameters);
+                    var row = ds.Tables[0].Rows[0];
+                    if (!AsBool(row, "success"))
+                        return (false, AsStr(row, "message") ?? $"Could not save {className}.");
+
+                    saved.Add(className);
+                }
+                catch (PostgresException ex)
+                {
+                    _logger.LogWarning(ex, "SaveFeeStructure failed for {Class} ({SqlState}) tenant {TenantId}, school {SchoolId}",
+                        className, ex.SqlState, tenantId, schoolId);
+                    // Say how far it got. "Please try again" hid the fact that some
+                    // classes were already written and others were not.
+                    return (false, saved.Count == 0
+                        ? $"{className}: {ex.MessageText}"
+                        : $"Saved {string.Join(", ", saved)}. Stopped at {className}: {ex.MessageText}");
                 }
             }
 
-            return 1;
+            return (true, $"Fee structure saved for {saved.Count} class(es): {string.Join(", ", saved)}.");
         }
 
         public async Task<int> DeleteFeeStructureAsync(int feeStructureId, int tenantId, int schoolId, int actionUserId)

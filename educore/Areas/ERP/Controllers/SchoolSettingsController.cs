@@ -412,9 +412,13 @@ namespace educore.Areas.ERP.Controllers
                     FeeHeadName = fh.FeeHeadName,
                     Frequency   = fh.Frequency,
                     FeeType     = fh.FeeType,
-                    FeeGroup    = fh.Frequency == "One Time" ? "one-time"
-                                : fh.Frequency == "Monthly"  ? "monthly"
-                                :                              "yearly",
+                    // FeeGroup used to be overwritten with a three-way bucket for the
+                    // page's headings, which threw away the head's real group
+                    // (Academic / Transport / Optional Services) and folded Quarterly
+                    // and Half Yearly into "yearly" -- so the page filed them under
+                    // "Collected once per year" while billing them 4x and 2x. The page
+                    // groups by Frequency directly now; this keeps the real value.
+                    FeeGroup    = fh.FeeGroup,
                     CollectionPoint = fh.CollectionPoint,
                     IsRefundable    = fh.IsRefundable,
                     Amount      = fh.DefaultAmount,
@@ -482,12 +486,15 @@ namespace educore.Areas.ERP.Controllers
                 return RedirectToAction(nameof(FeeStructure));
             }
 
-            var result = await _schoolSettingsService.SaveFeeStructureAsync(model, tenantId, schoolId, actionUserId);
+            // The service says which classes were written and where it stopped. The
+            // old message counted the classes that were *asked* for, so it read the
+            // same whether every class saved or none did.
+            var (ok, message) = await _schoolSettingsService.SaveFeeStructureAsync(model, tenantId, schoolId, actionUserId);
 
-            if (result > 0)
-                TempData["SuccessMessage"] = $"Fee structure saved for {model.SelectedClasses.Count} class(es).";
+            if (ok)
+                TempData["SuccessMessage"] = message;
             else
-                TempData["ErrorMessage"] = "Unable to save fee structure. Please try again.";
+                TempData["ErrorMessage"] = message;
 
             return RedirectToAction(nameof(FeeStructure));
         }
