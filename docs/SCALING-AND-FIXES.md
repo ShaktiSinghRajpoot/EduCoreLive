@@ -3292,3 +3292,65 @@ Not fixed, and worth knowing: `Program.cs` pins `UseUrls` to
 `0.0.0.0:{PORT ?? 8080}`, which overrides `ASPNETCORE_URLS` and every
 launchSettings profile. On a machine where 8080 is in the reserved port
 exclusions, `dotnet run` dies with a bare `SocketException (10013)`.
+
+### [2026-09-27] Quarterly fees were billed once a year, and the billing policy moved to the session
+
+Two billing fixes, found by reading the Fee Head and Admission Workflow pages
+end to end rather than by a bug report.
+
+**Quarterly billed one installment instead of four.** The Fee Head page has
+offered Monthly / Quarterly / Yearly / One Time all along, but the ledger
+generator special-cased exactly one of them: `IF frequency = 'Monthly'` looped
+per month, and *everything else* fell into a single-row ELSE. So a school with
+"Exam Fee, Quarterly, 250" billed 250 for the whole year. Meanwhile the Fee
+Structure annual total already multiplied quarterly by 4, and Fee Collection
+already had a Quarterly tab - both sides assumed four installments that were
+never created. Live data had it: 7 students on Railway, one ledger row each,
+1,750 billed where 7,000 was due. Frequency now yields a step in months
+(Monthly 1, Quarterly 3, Half Yearly 6) and the same loop, with the same
+session-end clamp, runs for all of them.
+
+**The cycles are the school's, not the child's.** The first version started a
+joiner's quarters at their admission month, so a September arrival got a
+private "Sep-Nov, Dec-Feb, Mar". Real schools run fixed terms - Apr-Jun,
+Jul-Sep, Oct-Dec, Jan-Mar - the same ones for every student, and an exam fee is
+tied to a term, not to when a child walked in. The first billing month is now
+snapped back to the start of the cycle it falls inside, counted from the
+session start. An August joiner and a September joiner both get
+"Jul 2026 - Sep 2026" as their first quarter, which is the point: two children
+in the same class can be compared. Monthly is left alone, since a month is
+already aligned.
+
+**"Charge recurring fees from" now belongs to the academic year.** It decides
+how a student's entire session is billed, but it lived as one row per school,
+upserted in place, with only `updated_by`/`updated_at` behind it. A fee plan is
+generated once, at admission, and then frozen - so changing the switch in
+August could not reach the students admitted in April, and nothing recorded
+what the rule had been. Two children in one class billed differently, with no
+way left to answer why.
+
+Moving it onto `academic.academic_years` (backfilled from each school's current
+value, so no behaviour changed on the day it ran) does three things. Last
+year's policy can no longer be rewritten by this year's change. The admission
+procedure gets *shorter*, because it was already reading that same row two
+lines above for the session window. And the save can now refuse the change once
+the session has students - a question that could not even be asked while the
+value belonged to the school, since there was no session to count against.
+Renaming a year or fixing its dates stays allowed; only the policy locks, and
+the page disables the field and says how many students locked it.
+
+The old column is dropped rather than left behind. `registration_fee_amount`
+and `security_fee_amount` are still sitting on that same table reading 0.00,
+long after the amounts moved to Fee Heads, and that is exactly the trap being
+avoided - a second copy of an answer that nothing maintains.
+
+All 16 suites: 500 checks, 0 failures. Four of them called the two procedures
+whose signatures changed and were updated with the move rather than left to
+rot.
+
+Still open, found in the same read and not fixed here: a fee head can be
+deleted while students are billed against it, and always reports success;
+`uq_school_fee_heads_name` is case-sensitive while `student_ledger` keys on the
+name text alone, so "Tuition Fee" and "tuition fee" split one fee into two;
+renaming a head orphans the ledger rows already written under the old name; and
+fee head save validates presence only - a negative amount is accepted.

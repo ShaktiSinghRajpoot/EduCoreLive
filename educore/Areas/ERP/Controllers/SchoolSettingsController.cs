@@ -801,7 +801,11 @@ namespace educore.Areas.ERP.Controllers
                 AcademicYearName = dto.Name.Trim(),
                 StartDate        = Dates.Norm(dto.StartDate),
                 EndDate          = Dates.Norm(dto.EndDate),
-                IsCurrent        = dto.IsCurrent
+                IsCurrent        = dto.IsCurrent,
+                // Anything but the one other value means the default; the procedure
+                // checks again, and a CHECK constraint backs both up.
+                ChargeFeesFrom   = dto.ChargeFeesFrom == "SessionStart"
+                                       ? "SessionStart" : "AdmissionMonth"
             };
 
             try
@@ -1330,6 +1334,7 @@ namespace educore.Areas.ERP.Controllers
         public string? StartDate { get; set; }
         public string? EndDate { get; set; }
         public bool IsCurrent { get; set; }
+        public string? ChargeFeesFrom { get; set; }
     }
 
     public class AcademicYearIdDto

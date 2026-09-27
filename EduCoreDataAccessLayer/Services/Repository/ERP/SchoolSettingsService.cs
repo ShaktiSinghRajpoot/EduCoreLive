@@ -593,7 +593,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var list = new List<AcademicYearModel>();
             if (tenantId <= 1 || schoolId <= 0) return list;
 
-            var ds = await RunAcademicYearAsync("GetAcademicYears", tenantId, schoolId, actionUserId, null, null, null, null, false, "academic_years_cursor");
+            var ds = await RunAcademicYearAsync("GetAcademicYears", tenantId, schoolId, actionUserId, null, null, null, null, false, null, "academic_years_cursor");
 
             if (ds.Tables.Count == 0) return list;
 
@@ -606,6 +606,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     StartDate        = AsStr(row, "start_date"),
                     EndDate          = AsStr(row, "end_date"),
                     IsCurrent        = AsBool(row, "is_current"),
+                    ChargeFeesFrom   = AsStr(row, "charge_fees_from") ?? "AdmissionMonth",
                     ClassCount       = AsInt(row, "class_count"),
                     StudentCount     = AsInt(row, "student_count")
                 });
@@ -620,7 +621,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
             var ds = await RunAcademicYearAsync("SaveAcademicYear", tenantId, schoolId, actionUserId,
                 model.AcademicYearId > 0 ? model.AcademicYearId : (int?)null,
-                model.AcademicYearName, model.StartDate, model.EndDate, model.IsCurrent, "academic_year_save_cursor");
+                model.AcademicYearName, model.StartDate, model.EndDate, model.IsCurrent,
+                model.ChargeFeesFrom, "academic_year_save_cursor");
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.", 0);
             var row = ds.Tables[0].Rows[0];
@@ -634,7 +636,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
 
             var ds = await RunAcademicYearAsync("SetCurrentAcademicYear", tenantId, schoolId, actionUserId,
-                academicYearId, null, null, null, false, "academic_year_current_cursor");
+                academicYearId, null, null, null, false, null, "academic_year_current_cursor");
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.");
             var row = ds.Tables[0].Rows[0];
@@ -648,7 +650,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
 
             var ds = await RunAcademicYearAsync("DeleteAcademicYear", tenantId, schoolId, actionUserId,
-                academicYearId, null, null, null, false, "academic_year_delete_cursor");
+                academicYearId, null, null, null, false, null, "academic_year_delete_cursor");
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.");
             var row = ds.Tables[0].Rows[0];
@@ -658,7 +660,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         private async Task<DataSet> RunAcademicYearAsync(
             string operation, int tenantId, int schoolId, int actionUserId,
-            int? academicYearId, string? name, string? startDate, string? endDate, bool isCurrent, string cursorName)
+            int? academicYearId, string? name, string? startDate, string? endDate, bool isCurrent,
+            string? chargeFeesFrom, string cursorName)
         {
             var parameters = new NpgsqlParameter[]
             {
@@ -671,6 +674,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_start_date",         NpgsqlDbType.Unknown)    { Value = (object?)startDate ?? DBNull.Value },
                 new("p_end_date",           NpgsqlDbType.Unknown)    { Value = (object?)endDate ?? DBNull.Value },
                 new("p_is_current",         NpgsqlDbType.Boolean) { Value = isCurrent },
+                new("p_charge_fees_from",   NpgsqlDbType.Varchar) { Value = (object?)chargeFeesFrom ?? DBNull.Value },
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = cursorName }
             };
 

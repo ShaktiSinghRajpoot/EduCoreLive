@@ -66,14 +66,9 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public bool EnableInventory { get; set; } = true;
         public bool EnablePayroll   { get; set; } = true;
 
-        // ── Fee billing policy ──────────────────────────────────────────────
-
-        /// <summary>
-        /// When recurring (monthly / quarterly) fees start for a mid-session joiner:
-        /// "AdmissionMonth" (default, real-world norm — billed from the admission month
-        /// up to the session end, i.e. only enrolled months) or "SessionStart" (billed
-        /// the full session from April regardless of join date).
-        /// </summary>
-        public string ChargeFeesFrom { get; set; } = "AdmissionMonth";
+        // "Charge recurring fees from" used to live here. It now belongs to the
+        // academic year (AcademicYearModel.ChargeFeesFrom), because it decides how a
+        // whole session is billed and a school-wide value could be changed halfway
+        // through one. Set it in School Settings -> Academic Years.
     }
 }

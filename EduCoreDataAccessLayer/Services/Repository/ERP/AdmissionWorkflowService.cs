@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Infrastructure;
+﻿using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.Extensions.Configuration;
@@ -48,7 +48,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_enable_exams", DBNull.Value),
                 new NpgsqlParameter("p_enable_inventory", DBNull.Value),
                 new NpgsqlParameter("p_enable_payroll", DBNull.Value),
-                new NpgsqlParameter("p_charge_fees_from", DBNull.Value),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
             };
 
@@ -74,8 +73,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 model.EnableExams     = GetBool(row, "enable_exams", true);
                 model.EnableInventory = GetBool(row, "enable_inventory", true);
                 model.EnablePayroll   = GetBool(row, "enable_payroll", true);
-                if (row.Table.Columns.Contains("charge_fees_from") && row["charge_fees_from"] != DBNull.Value)
-                    model.ChargeFeesFrom = row["charge_fees_from"].ToString() ?? "AdmissionMonth";
 
                 if (row.Table.Columns.Contains("registration_number_prefix") && row["registration_number_prefix"] != DBNull.Value)
                     model.RegistrationNumberPrefix = row["registration_number_prefix"].ToString() ?? "REG-";
@@ -124,8 +121,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_enable_exams", model.EnableExams),
                 new NpgsqlParameter("p_enable_inventory", model.EnableInventory),
                 new NpgsqlParameter("p_enable_payroll", model.EnablePayroll),
-                new NpgsqlParameter("p_charge_fees_from",
-                    model.ChargeFeesFrom == "SessionStart" ? "SessionStart" : "AdmissionMonth"),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "admission_workflow_save_cursor" }
             };
 

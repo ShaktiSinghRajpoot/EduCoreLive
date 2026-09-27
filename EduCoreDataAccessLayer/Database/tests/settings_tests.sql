@@ -89,7 +89,7 @@ BEGIN
         c := 'a1';
         CALL academic.sp_school_admin_academic_year_manage('SaveAcademicYear',
              c_tenant, c_school, c_user, NULL, '   ',
-             DATE '2040-04-01', DATE '2041-03-31', FALSE, c);
+             DATE '2040-04-01', DATE '2041-03-31', FALSE, 'AdmissionMonth', c);
         PERFORM pg_temp.chk('A1 blank session name refused', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('A1 blank session name refused', TRUE, SQLERRM);
@@ -99,7 +99,7 @@ BEGIN
         c := 'a2';
         CALL academic.sp_school_admin_academic_year_manage('SaveAcademicYear',
              c_tenant, c_school, c_user, NULL, 'ZZ Backwards',
-             DATE '2041-04-01', DATE '2040-03-31', FALSE, c);
+             DATE '2041-04-01', DATE '2040-03-31', FALSE, 'AdmissionMonth', c);
         PERFORM pg_temp.chk('A2 end date before start date refused', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('A2 end date before start date refused', TRUE, SQLERRM);
@@ -109,7 +109,7 @@ BEGIN
         c := 'a3';
         CALL academic.sp_school_admin_academic_year_manage('SaveAcademicYear',
              c_tenant, c_school, c_user, NULL, v_year,
-             DATE '2040-04-01', DATE '2041-03-31', FALSE, c);
+             DATE '2040-04-01', DATE '2041-03-31', FALSE, 'AdmissionMonth', c);
         PERFORM pg_temp.chk('A3 duplicate session name refused', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('A3 duplicate session name refused', TRUE, SQLERRM);
@@ -118,7 +118,7 @@ BEGIN
     c := 'a4';
     CALL academic.sp_school_admin_academic_year_manage('SaveAcademicYear',
          c_tenant, c_school, c_user, NULL, 'ZZ Session',
-         DATE '2040-04-01', DATE '2041-03-31', FALSE, c);
+         DATE '2040-04-01', DATE '2041-03-31', FALSE, 'AdmissionMonth', c);
 
     SELECT academic_year_id INTO v_new FROM academic.academic_years
      WHERE tenant_id = c_tenant AND school_id = c_school AND academic_year_name = 'ZZ Session';
@@ -128,7 +128,7 @@ BEGIN
     -- session" gets a coin flip.
     c := 'a5';
     CALL academic.sp_school_admin_academic_year_manage('SetCurrentAcademicYear',
-         c_tenant, c_school, c_user, v_new, NULL, NULL, NULL, TRUE, c);
+         c_tenant, c_school, c_user, v_new, NULL, NULL, NULL, TRUE, NULL, c);
 
     SELECT COUNT(*) INTO v_n FROM academic.academic_years
      WHERE tenant_id = c_tenant AND school_id = c_school AND COALESCE(is_current, FALSE);
@@ -319,7 +319,7 @@ BEGIN
         c := 'e1';
         CALL academic.sp_school_admin_academic_year_manage('SaveAcademicYear',
              1, 0, c_user, NULL, 'ZZ Platform',
-             DATE '2040-04-01', DATE '2041-03-31', FALSE, c);
+             DATE '2040-04-01', DATE '2041-03-31', FALSE, 'AdmissionMonth', c);
         PERFORM pg_temp.chk('E1 platform scope session write refused', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('E1 platform scope session write refused', TRUE, SQLERRM);

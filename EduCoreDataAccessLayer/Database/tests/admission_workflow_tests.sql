@@ -14,7 +14,7 @@
 -- COVERS
 --   A. Settings round-trip — what is saved is what comes back, one row per school
 --   B. The four module toggles the side menu binds to
---   C. charge_fees_from — the setting with real money behind it
+--   C. charge_fees_from — the setting with real money behind it (now per session)
 --   D. Dependent flags cannot be left in an impossible combination
 --   E. Scope
 -- ============================================================================
@@ -94,7 +94,6 @@ BEGIN
          p_enable_exams => FALSE,
          p_enable_inventory => FALSE,
          p_enable_payroll => TRUE,
-         p_charge_fees_from => 'SessionStart',
          p_result => c);
 
     SELECT registration_number_prefix INTO v_txt
@@ -112,10 +111,12 @@ BEGIN
      WHERE tenant_id = c_tenant AND school_id = c_school;
     PERFORM pg_temp.chk('A3 collect-at-admission saved', v_b, format('got %s', v_b));
 
-    SELECT charge_fees_from INTO v_txt
-      FROM core.school_admission_workflow_settings
-     WHERE tenant_id = c_tenant AND school_id = c_school;
-    PERFORM pg_temp.chk('A4 charge-from policy saved', v_txt = 'SessionStart', format('got "%s"', v_txt));
+    -- The billing policy moved to the session (fee_charge_from_per_year.sql), so
+    -- the workflow row must no longer carry a second, unmaintained copy of it.
+    PERFORM pg_temp.chk('A4 charge-from is not on the workflow row any more', NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'core' AND table_name = 'school_admission_workflow_settings'
+           AND column_name = 'charge_fees_from'), 'it belongs to academic_years');
 
     -- One row per school, not one per save.
     SELECT COUNT(*) INTO v_n FROM core.school_admission_workflow_settings
@@ -176,7 +177,7 @@ BEGIN
          p_operation => 'SaveAdmissionWorkflow',
          p_tenant_id => c_tenant, p_school_id => c_school, p_action_user_id => c_user,
          p_enable_registration => TRUE, p_registration_number_prefix => 'ZZ2-',
-         p_charge_fees_from => 'SessionStart', p_result => c);
+         p_result => c);
 
     SELECT COUNT(*) INTO v_n FROM core.school_admission_workflow_settings
      WHERE tenant_id = c_tenant AND school_id = c_school;
@@ -194,6 +195,13 @@ BEGIN
     -- SessionStart bills the whole session whenever the student joined;
     -- AdmissionMonth bills only from the month they actually arrived. Same
     -- student, same plan, same joining date — only the setting differs.
+    --
+    -- Written straight onto the session: the save procedure refuses this change
+    -- once the session has students, and these cases admit students between the
+    -- two halves of the comparison.
+    UPDATE academic.academic_years SET charge_fees_from = 'SessionStart'
+     WHERE tenant_id = c_tenant AND school_id = c_school AND academic_year_name = v_year;
+
     c := 'c1';
     CALL core.sp_admission_manage('SaveAdmission', c_tenant, c_school, c_user, NULL,
          'ZZ-WF-SESS', NULL, 'ZZ WF Session', 'Male', DATE '2015-01-01',
@@ -210,12 +218,8 @@ BEGIN
                         v_first = DATE_TRUNC('month', v_start)::date,
                         format('first due %s, session starts %s', v_first, v_start));
 
-    c := 'c3';
-    CALL core.sp_school_admin_admission_workflow_manage(
-         p_operation => 'SaveAdmissionWorkflow',
-         p_tenant_id => c_tenant, p_school_id => c_school, p_action_user_id => c_user,
-         p_enable_registration => TRUE, p_charge_fees_from => 'AdmissionMonth',
-         p_result => c);
+    UPDATE academic.academic_years SET charge_fees_from = 'AdmissionMonth'
+     WHERE tenant_id = c_tenant AND school_id = c_school AND academic_year_name = v_year;
 
     c := 'c4';
     CALL core.sp_admission_manage('SaveAdmission', c_tenant, c_school, c_user, NULL,
@@ -263,7 +267,7 @@ BEGIN
          p_enable_registration => FALSE,
          p_registration_required_before_admission => FALSE,
          p_enable_registration_fee => FALSE,
-         p_charge_fees_from => 'AdmissionMonth', p_result => c);
+         p_result => c);
 
     SELECT registration_required_before_admission INTO v_b
       FROM core.school_admission_workflow_settings

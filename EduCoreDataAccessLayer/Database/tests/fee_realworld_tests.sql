@@ -45,7 +45,10 @@ BEGIN
                         format('got %s, expected %s', COALESCE(p_got::text,'NULL'), p_want));
 END $$;
 
--- Set the school's switches for the run that follows.
+-- Set the school's switches for the run that follows. p_charge is the billing
+-- policy, which now belongs to the session rather than the school
+-- (fee_charge_from_per_year.sql), so it is written onto every one of this
+-- school's years instead of going through the workflow procedure.
 CREATE OR REPLACE FUNCTION pg_temp.workflow(
     p_tenant integer, p_school integer, p_user integer,
     p_registration boolean, p_required boolean, p_collect boolean, p_charge text)
@@ -59,8 +62,12 @@ BEGIN
          p_registration_required_before_admission => p_required,
          p_enable_registration_fee => p_registration,
          p_collect_fee_at_admission => p_collect,
-         p_charge_fees_from => p_charge,
          p_result => c);
+
+    UPDATE academic.academic_years
+       SET charge_fees_from = p_charge, updated_by = p_user, updated_at = NOW()
+     WHERE tenant_id = p_tenant AND school_id = p_school
+       AND COALESCE(is_deleted, FALSE) = FALSE;
 END $$;
 
 -- What a student currently owes, has paid, and was let off.

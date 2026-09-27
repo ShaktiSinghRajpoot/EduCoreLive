@@ -128,6 +128,11 @@ DECLARE
     v_sess_start    DATE;
     v_sess_end      DATE;
     v_charge_from   VARCHAR(20);
+    v_freq          VARCHAR(30);
+    v_step          INTEGER;
+    v_period_end    DATE;
+    v_sess_month    DATE;
+    v_cycles        INTEGER;
 BEGIN
 
     -- ── SaveAdmission ────────────────────────────────────────
@@ -191,23 +196,23 @@ BEGIN
             RETURN;
         END IF;
 
-        -- Session window for this academic year — drives session-end-aware billing
-        -- (a mid-session joiner is billed only up to the session's end month).
-        SELECT start_date, end_date
-          INTO v_sess_start, v_sess_end
+        -- Session window AND its billing policy, from the one row that owns both.
+        -- The window drives session-end-aware billing (a mid-session joiner is
+        -- billed only up to the session's end month). "Charge recurring fees
+        -- from" is AdmissionMonth (default, real-world norm — pay only enrolled
+        -- months) or SessionStart (the full session from April). It lives on the
+        -- year, not the school, so a session cannot be re-billed by a setting
+        -- someone changed months later — see fee_charge_from_per_year.sql.
+        SELECT start_date, end_date,
+               COALESCE(NULLIF(TRIM(charge_fees_from), ''), 'AdmissionMonth')
+          INTO v_sess_start, v_sess_end, v_charge_from
         FROM academic.academic_years
         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
           AND academic_year_name = v_year
           AND COALESCE(is_deleted, FALSE) = FALSE
         LIMIT 1;
 
-        -- "Charge recurring fees from" policy: AdmissionMonth (default, real-world
-        -- norm — pay only enrolled months) or SessionStart (full session from April).
-        SELECT COALESCE(NULLIF(TRIM(charge_fees_from), ''), 'AdmissionMonth')
-          INTO v_charge_from
-        FROM core.school_admission_workflow_settings
-        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
-        LIMIT 1;
+        -- No matching year row (a back-dated or free-typed session name).
         v_charge_from := COALESCE(v_charge_from, 'AdmissionMonth');
 
         -- Duplicate guard: same name + dob + mobile already admitted. Name is
@@ -331,10 +336,25 @@ BEGIN
                 );
 
                 -- Ledger generation
-                IF COALESCE(v_item->>'frequency', 'Yearly') = 'Monthly' THEN
-                    -- Monthly tuition: one installment per month from the first billing
-                    -- month up to the SESSION END month (not a fixed 12 that spills into
-                    -- the next session). First month = admission month (default) or the
+                v_freq := COALESCE(v_item->>'frequency', 'Yearly');
+
+                -- How many months one installment covers. A recurring cycle bills in
+                -- installments across the session; everything else is a single row.
+                -- Quarterly used to fall into the single-row branch, so a school with
+                -- "Exam Fee, Quarterly, 250" billed 250 for the whole year instead of
+                -- 4 x 250 -- while the Fee Structure annual total (quarterly x 4) and
+                -- the Fee Collection Quarterly tab both already assumed 4.
+                v_step := CASE lower(trim(v_freq))
+                              WHEN 'monthly'     THEN 1
+                              WHEN 'quarterly'   THEN 3
+                              WHEN 'half yearly' THEN 6
+                              ELSE 0
+                          END;
+
+                IF v_step > 0 THEN
+                    -- Recurring: one installment per cycle from the first billing month
+                    -- up to the SESSION END month (not a fixed 12 that spills into the
+                    -- next session). First month = admission month (default) or the
                     -- session start when the school bills the full session.
                     IF v_charge_from = 'SessionStart' AND v_sess_start IS NOT NULL THEN
                         v_month_start := DATE_TRUNC('month', v_sess_start)::DATE;
@@ -354,6 +374,26 @@ BEGIN
                         v_month_start := DATE_TRUNC('month', v_sess_start)::DATE;
                     END IF;
 
+                    -- A school's quarters are its OWN calendar -- Apr-Jun, Jul-Sep,
+                    -- Oct-Dec, Jan-Mar -- and they are the same quarters for every
+                    -- student. A child joining in September joins DURING Jul-Sep; they
+                    -- do not get a private Sep-Nov window. So snap the first billing
+                    -- month back to the start of the cycle it falls inside, counting
+                    -- cycles from the session start. Monthly needs no snapping (a month
+                    -- is already aligned), which is why this only runs for v_step > 1.
+                    IF v_step > 1 AND v_sess_start IS NOT NULL THEN
+                        v_sess_month := DATE_TRUNC('month', v_sess_start)::DATE;
+                        -- Whole cycles between the session start and the first billing
+                        -- month, as a count of months divided by the cycle length.
+                        v_cycles := FLOOR(
+                            ( (EXTRACT(YEAR  FROM v_month_start) * 12
+                             + EXTRACT(MONTH FROM v_month_start))
+                            - (EXTRACT(YEAR  FROM v_sess_month)  * 12
+                             + EXTRACT(MONTH FROM v_sess_month)) ) / v_step );
+                        v_month_start := (v_sess_month
+                                          + make_interval(months => v_cycles * v_step))::DATE;
+                    END IF;
+
                     -- Last billing month = session end month; fall back to 11 months on
                     -- (a full year) if the academic year has no end date configured.
                     IF v_sess_end IS NOT NULL THEN
@@ -364,18 +404,31 @@ BEGIN
 
                     v_m := v_month_start;
                     WHILE v_m <= v_month_end LOOP
+                        -- Last month this installment covers, never past the session end,
+                        -- so a joiner who arrives inside the final quarter gets one row
+                        -- labelled for the months that are actually left.
+                        v_period_end := LEAST(
+                            (v_m + make_interval(months => v_step - 1))::DATE,
+                            v_month_end);
+
                         INSERT INTO core.student_ledger (
                             tenant_id, school_id, student_id,
                             fee_head_name, frequency, installment_label,
                             due_date, amount_due, status
                         ) VALUES (
                             p_tenant_id, p_school_id, v_student_id,
-                            COALESCE(v_item->>'feeHeadName', 'Fee'), 'Monthly',
-                            TO_CHAR(v_m, 'Mon YYYY'),
+                            COALESCE(v_item->>'feeHeadName', 'Fee'), v_freq,
+                            -- "Apr 2026" for a month, "Apr 2026 - Jun 2026" for a cycle
+                            -- that spans several. installment_label is varchar(40).
+                            CASE WHEN v_step = 1 OR v_period_end = v_m
+                                 THEN TO_CHAR(v_m, 'Mon YYYY')
+                                 ELSE TO_CHAR(v_m, 'Mon YYYY') || ' - ' ||
+                                      TO_CHAR(v_period_end, 'Mon YYYY')
+                            END,
                             v_m,
                             COALESCE((v_item->>'amount')::NUMERIC, 0), 'Pending'
                         );
-                        v_m := (v_m + INTERVAL '1 month')::DATE;
+                        v_m := (v_m + make_interval(months => v_step))::DATE;
                     END LOOP;
                 ELSE
                     INSERT INTO core.student_ledger (
@@ -385,8 +438,8 @@ BEGIN
                     ) VALUES (
                         p_tenant_id, p_school_id, v_student_id,
                         COALESCE(v_item->>'feeHeadName', 'Fee'),
-                        COALESCE(v_item->>'frequency', 'Yearly'),
-                        CASE WHEN COALESCE(v_item->>'frequency','Yearly') = 'One Time'
+                        v_freq,
+                        CASE WHEN v_freq = 'One Time'
                              THEN 'Admission' ELSE 'Annual' END,
                         v_adm_date,
                         COALESCE((v_item->>'amount')::NUMERIC, 0), 'Pending'

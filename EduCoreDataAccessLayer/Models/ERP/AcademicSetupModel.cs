@@ -67,6 +67,17 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? StartDate { get; set; }
         public string? EndDate { get; set; }
         public bool IsCurrent { get; set; }
+
+        /// <summary>
+        /// When recurring (monthly / quarterly) fees start for a mid-session joiner:
+        /// "AdmissionMonth" (default, real-world norm — only enrolled months) or
+        /// "SessionStart" (the full session from April). It belongs to the session
+        /// rather than the school: a student's fee plan is generated once, at
+        /// admission, so a later change must not silently re-describe a session
+        /// that was already billed the other way.
+        /// </summary>
+        public string ChargeFeesFrom { get; set; } = "AdmissionMonth";
+
         public int ClassCount { get; set; }
         public int StudentCount { get; set; }
     }

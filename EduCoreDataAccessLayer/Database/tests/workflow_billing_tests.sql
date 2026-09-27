@@ -54,18 +54,21 @@ BEGIN
                         format('got %s, expected %s', COALESCE(p_got::text,'NULL'), p_want));
 END $$;
 
--- Flip the school's policy.
+-- Flip the SESSION's policy. It used to be one value per school; it now lives on
+-- academic.academic_years, because it decides how a whole session is billed (see
+-- fee_charge_from_per_year.sql). Written directly rather than through the save
+-- procedure, which deliberately refuses the change once the session has students
+-- -- these cases admit students and then need to flip again.
 CREATE OR REPLACE FUNCTION pg_temp.set_policy(p_tenant integer, p_school integer,
-                                              p_user integer, p_policy text)
+                                              p_user integer, p_policy text,
+                                              p_year text DEFAULT NULL)
 RETURNS void LANGUAGE plpgsql AS $$
-DECLARE c refcursor := ('policy_' || md5(p_policy || clock_timestamp()::text))::refcursor;
 BEGIN
-    CALL core.sp_school_admin_admission_workflow_manage(
-         p_operation => 'SaveAdmissionWorkflow',
-         p_tenant_id => p_tenant, p_school_id => p_school, p_action_user_id => p_user,
-         p_enable_registration => TRUE,
-         p_charge_fees_from => p_policy,
-         p_result => c);
+    UPDATE academic.academic_years
+       SET charge_fees_from = p_policy, updated_by = p_user, updated_at = NOW()
+     WHERE tenant_id = p_tenant AND school_id = p_school
+       AND COALESCE(is_deleted, FALSE) = FALSE
+       AND (p_year IS NULL OR academic_year_name = p_year);
 END $$;
 
 -- Admit one student on a given date and report how many monthly instalments and
@@ -316,16 +319,19 @@ BEGIN
     RAISE NOTICE '';
     RAISE NOTICE '── F. Per school, and what the DB does NOT enforce ───────';
 
-    SELECT charge_fees_from INTO v_txt FROM core.school_admission_workflow_settings
-     WHERE tenant_id = c_tenant AND school_id = c_school;
+    SELECT DISTINCT charge_fees_from INTO v_txt FROM academic.academic_years
+     WHERE tenant_id = c_tenant AND school_id = c_school
+       AND COALESCE(is_deleted, FALSE) = FALSE;
     PERFORM pg_temp.chk('F1 the policy we set is the policy stored',
         v_txt = 'AdmissionMonth', format('school %s says %s', c_school, v_txt));
 
-    SELECT COUNT(*) INTO v_n FROM core.school_admission_workflow_settings
-     WHERE tenant_id = c_tenant AND school_id = c_school;
-    PERFORM pg_temp.chk_eq('F2 one policy row per school, not one per change', v_n, 1);
+    PERFORM pg_temp.chk('F2 the policy no longer lives on the school row', NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'core' AND table_name = 'school_admission_workflow_settings'
+           AND column_name = 'charge_fees_from'),
+        'it belongs to the session it bills, so one session cannot rewrite another');
 
-    SELECT COUNT(*) INTO v_n FROM core.school_admission_workflow_settings
+    SELECT COUNT(*) INTO v_n FROM academic.academic_years
      WHERE school_id <> c_school AND updated_at > now() - INTERVAL '1 minute';
     PERFORM pg_temp.chk_eq('F3 flipping our switch touched no other school', v_n, 0);
 
