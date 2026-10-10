@@ -142,6 +142,10 @@ BEGIN
               AND LOWER(sec.section_name) = LOWER(TRIM(p_section))
               AND st.user_id = p_action_user_id
               AND COALESCE(sec.is_deleted, FALSE) = FALSE
+              AND COALESCE(c.is_deleted, FALSE)   = FALSE
+              -- A teacher who has left must not keep marking attendance.
+              AND COALESCE(st.is_active, TRUE)    = TRUE
+              AND COALESCE(st.is_deleted, FALSE)  = FALSE
         ) AS is_teacher;
         RETURN;
     END IF;

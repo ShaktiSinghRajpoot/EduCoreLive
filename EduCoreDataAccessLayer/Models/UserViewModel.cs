@@ -23,6 +23,13 @@
 
         public string? PasswordHash { get; set; }
 
+        /// <summary>
+        /// Security stamp: users.password_changed_at as text ("0" = never changed).
+        /// Carried in the auth cookie and compared on every request (SessionValidator),
+        /// so a password change or reset ends every other session.
+        /// </summary>
+        public string? PasswordStamp { get; set; }
+
         // ── School gate (GET_LOGIN_USER only) ───────────────────────────────
         // Whether this user's school currently permits sign-in. Driven by
         // config.school_statuses.allows_login, plus a hard block when the school

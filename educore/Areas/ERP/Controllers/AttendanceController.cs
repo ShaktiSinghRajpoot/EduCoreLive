@@ -49,6 +49,7 @@ namespace educore.Areas.ERP.Controllers
         {
             try { ViewBag.ClassList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
             catch { ViewBag.ClassList = new List<SelectListItem>(); }
+            ViewBag.Today = Dates.Today;   // the school's clock, not the browser's UTC date
             return View();
         }
 
@@ -78,7 +79,9 @@ namespace educore.Areas.ERP.Controllers
                     roll   = s.RollNo,
                     parent = s.GuardianName,
                     phone  = s.Mobile,
-                    status = string.IsNullOrWhiteSpace(s.Status) ? "present" : s.Status.ToLowerInvariant()
+                    // "" = not marked yet; otherwise present | absent | late | leave as stored.
+                    status = string.IsNullOrWhiteSpace(s.Status) ? "" : s.Status.ToLowerInvariant(),
+                    marked = s.IsMarked
                 })
             });
         }
@@ -96,7 +99,10 @@ namespace educore.Areas.ERP.Controllers
             if (!await CanMarkAsync(request!.Class, request.Section))
                 return Json(new { success = false, message = "You can mark attendance only for your assigned class-section." });
 
-            var result = await _attendance.SaveAsync(d, request.Items, TenantId(), SchoolId(), UserId());
+            // The class-section goes to the proc too, so it can refuse any student
+            // who is not on that register (the gate above only approved the section).
+            var result = await _attendance.SaveAsync(d, request.Class!, request.Section, request.Items,
+                TenantId(), SchoolId(), UserId());
             return Json(new { success = result.Success, message = result.Message, saved = result.Saved });
         }
 
@@ -118,8 +124,9 @@ namespace educore.Areas.ERP.Controllers
             return Json(new
             {
                 schoolDays = reg.SchoolDays,
-                students   = reg.Students.Select(s => new { id = s.Id, name = s.Name, roll = s.Roll }),
-                marks      = reg.Marks.Select(m => new { studentId = m.StudentId, day = m.Day, mark = m.Mark })
+                students   = reg.Students.Select(s => new { id = s.Id, name = s.Name, roll = s.Roll, days = s.SchoolDays }),
+                marks      = reg.Marks.Select(m => new { studentId = m.StudentId, day = m.Day, mark = m.Mark }),
+                daysOff    = reg.DaysOff.Select(o => new { day = o.Day, type = o.DayType, title = o.Title })
             });
         }
     }

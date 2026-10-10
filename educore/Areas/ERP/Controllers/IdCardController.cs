@@ -53,6 +53,17 @@ namespace educore.Areas.ERP.Controllers
             return Json(sections);
         }
 
+        // Before printing: how many cards in this selection have no photo, and whose.
+        [HttpGet]
+        public async Task<IActionResult> PhotoCheck(string @class, string? section, string? year)
+        {
+            var students = await _cards.GetClassCardsAsync(@class, section, year, TenantId(), SchoolId(), UserId());
+            var missing = students.Where(s => string.IsNullOrWhiteSpace(s.PhotoUrl))
+                                  .Select(s => new { name = s.StudentName, roll = s.RollNo })
+                                  .ToList();
+            return Json(new { total = students.Count, missing });
+        }
+
         // The bulk sheet for one class.
         [HttpGet]
         public async Task<IActionResult> Print(string @class, string? section, string? year, string? format)

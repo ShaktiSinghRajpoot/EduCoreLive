@@ -12,6 +12,10 @@
 --                      OK | INVALID | EXPIRED | LOCKED
 --                    After 5 wrong tries the code is locked (single active code at a time).
 --
+-- Oct 2026: phone lookup matches login's digits-only rule; an unknown account
+-- answers INVALID (not EXPIRED); a reset stamps users.password_changed_at
+-- (access_security_hardening.sql must be applied first).
+--
 -- The table follows the core.* audit-column convention so a fresh DB matches production.
 -- ============================================================
 
@@ -75,7 +79,15 @@ BEGIN
            AND up.is_deleted = FALSE
         WHERE u.is_deleted = FALSE
           AND u.is_active = TRUE
-          AND (LOWER(u.email) = LOWER(p_identifier) OR up.phone = p_identifier)
+          -- Same identifier rule as the login lookup (sp_login_management): email
+          -- ignoring case/spaces, or the last 10 digits of a phone, so
+          -- '+91 98390 73643' finds the account that login accepts.
+          AND (LOWER(TRIM(u.email)) = LOWER(TRIM(p_identifier))
+               OR (length(regexp_replace(COALESCE(p_identifier, ''), '\D', '', 'g')) >= 10
+                   AND up.phone IS NOT NULL
+                   AND up.is_active = TRUE
+                   AND right(regexp_replace(up.phone, '\D', '', 'g'), 10)
+                       = right(regexp_replace(p_identifier, '\D', '', 'g'), 10)))
         LIMIT 1;
 
         IF v_user_id IS NOT NULL THEN
@@ -121,7 +133,15 @@ BEGIN
         ORDER BY t.password_reset_token_id DESC
         LIMIT 1;
 
-        IF v_token_id IS NULL THEN
+        -- An identifier that matched nobody arrives here as user 0. Answer it
+        -- exactly like a wrong code for a real account (INVALID), or the
+        -- "code expired" vs "incorrect code" message tells an attacker which
+        -- emails and phones have accounts.
+        IF NOT EXISTS (SELECT 1 FROM core.users
+                       WHERE user_id = p_user_id AND is_active = TRUE AND is_deleted = FALSE) THEN
+            OPEN p_result FOR SELECT FALSE AS success, 'INVALID'::text AS status;
+
+        ELSIF v_token_id IS NULL THEN
             OPEN p_result FOR SELECT FALSE AS success, 'EXPIRED'::text AS status;
 
         ELSIF v_attempts >= 5 THEN
@@ -134,6 +154,7 @@ BEGIN
             UPDATE core.users
             SET password_hash = p_password_hash,
                 must_change_password = FALSE,
+                password_changed_at = CURRENT_TIMESTAMP,   -- ends every open session
                 updated_by = p_user_id,
                 updated_at = CURRENT_TIMESTAMP
             WHERE user_id = p_user_id;

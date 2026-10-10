@@ -260,7 +260,8 @@ BEGIN
         OPEN p_result2 FOR
         SELECT v_year AS academic_year_id,
                COALESCE((SELECT academic_year_name FROM academic.academic_years
-                         WHERE academic_year_id = v_year), '') AS academic_year_name;
+                         WHERE academic_year_id = v_year
+                           AND tenant_id = p_tenant_id AND school_id = p_school_id), '') AS academic_year_name;
 
     ELSIF p_operation = 'GetExamList' THEN
 
@@ -298,7 +299,8 @@ BEGIN
         OPEN p_result2 FOR
         SELECT v_year AS academic_year_id,
                COALESCE((SELECT academic_year_name FROM academic.academic_years
-                         WHERE academic_year_id = v_year), '') AS academic_year_name;
+                         WHERE academic_year_id = v_year
+                           AND tenant_id = p_tenant_id AND school_id = p_school_id), '') AS academic_year_name;
 
     ELSIF p_operation = 'GetClassSections' THEN
 
@@ -412,7 +414,8 @@ BEGIN
         OPEN p_result2 FOR
         SELECT v_year AS academic_year_id,
                COALESCE((SELECT academic_year_name FROM academic.academic_years
-                         WHERE academic_year_id = v_year), '') AS academic_year_name;
+                         WHERE academic_year_id = v_year
+                           AND tenant_id = p_tenant_id AND school_id = p_school_id), '') AS academic_year_name;
 
     ELSIF p_operation = 'SetStatus' THEN
 
@@ -569,6 +572,27 @@ BEGIN
                     RAISE EXCEPTION 'The finish time for % must be after its start time.', v_sname;
                 END IF;
 
+                -- A paper cannot fall on a day the School Calendar has the school shut.
+                IF v_date IS NOT NULL
+                   AND academic.fn_school_day_type(p_tenant_id, p_school_id, v_date) IN ('holiday', 'weekly_off') THEN
+                    RAISE EXCEPTION '% is scheduled on % (%), when the school is closed. Pick a working day.',
+                        v_sname, to_char(v_date, 'DD Mon YYYY'),
+                        COALESCE((SELECT title FROM academic.school_calendar
+                                  WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                                    AND calendar_date = to_char(v_date, 'YYYY-MM-DD')),
+                                 'weekly off');
+                END IF;
+
+                -- Marks already entered must still fit the paper.
+                IF EXISTS (SELECT 1 FROM academic.exam_marks m
+                           WHERE m.exam_id = v_exam_id AND m.academic_class_id = v_cls
+                             AND m.subject_id = v_sid AND m.marks_obtained > v_max) THEN
+                    RAISE EXCEPTION 'Max marks for % cannot go below % — that mark has already been entered.',
+                        v_sname,
+                        (SELECT MAX(m.marks_obtained) FROM academic.exam_marks m
+                         WHERE m.exam_id = v_exam_id AND m.academic_class_id = v_cls AND m.subject_id = v_sid);
+                END IF;
+
                 v_ord := v_ord + 1;
 
                 INSERT INTO academic.exam_subjects
@@ -591,6 +615,20 @@ BEGIN
             IF v_ord = 0 THEN
                 RAISE EXCEPTION '% has no subjects on its datesheet.',
                     (SELECT class_name FROM academic.academic_classes WHERE academic_class_id = v_cls);
+            END IF;
+
+            -- A paper that already has marks cannot be dropped: the marks would be
+            -- orphaned. Clear them on Marks Entry first.
+            SELECT s.subject_name INTO v_clash
+            FROM academic.exam_marks m
+            JOIN academic.school_subjects s ON s.subject_id = m.subject_id
+            WHERE m.exam_id = v_exam_id AND m.academic_class_id = v_cls
+              AND NOT (m.subject_id = ANY (v_keep))
+              AND (m.marks_obtained IS NOT NULL OR m.is_absent)
+            LIMIT 1;
+            IF v_clash IS NOT NULL THEN
+                RAISE EXCEPTION '% already has marks entered for %, so it cannot be removed from the datesheet.',
+                    v_clash, (SELECT class_name FROM academic.academic_classes WHERE academic_class_id = v_cls);
             END IF;
 
             DELETE FROM academic.exam_subjects
@@ -627,7 +665,19 @@ BEGIN
             RAISE EXCEPTION 'Pick at least one class for this exam.';
         END IF;
 
-        -- A class dropped from the exam loses its datesheet and its sections.
+        -- A class dropped from the exam loses its datesheet and its sections —
+        -- unless marks were already entered for it.
+        SELECT c.class_name INTO v_clash
+        FROM academic.exam_marks m
+        JOIN academic.academic_classes c ON c.academic_class_id = m.academic_class_id
+        WHERE m.exam_id = v_exam_id
+          AND NOT (m.academic_class_id = ANY (v_classes))
+          AND (m.marks_obtained IS NOT NULL OR m.is_absent)
+        LIMIT 1;
+        IF v_clash IS NOT NULL THEN
+            RAISE EXCEPTION 'Class % already has marks entered for this exam, so it cannot be removed.', v_clash;
+        END IF;
+
         DELETE FROM academic.exam_subjects
         WHERE exam_id = v_exam_id
           AND NOT (academic_class_id = ANY (v_classes));
@@ -641,7 +691,7 @@ BEGIN
         -- too — if two papers share a day, say when each one runs.
         SELECT format('%s and %s are both on %s for %s',
                       sa.subject_name, sb.subject_name,
-                      to_char(a.exam_date, 'DD Mon'), c.class_name)
+                      to_char(a.exam_date::date, 'DD Mon'), c.class_name)
           INTO v_clash
         FROM academic.exam_subjects a
         JOIN academic.exam_subjects b
@@ -666,7 +716,7 @@ BEGIN
         -- Same check against the school's OTHER exams: a class cannot sit a paper
         -- for this exam while it is already sitting one for another.
         SELECT format('%s on %s for %s clashes with %s in "%s"',
-                      sa.subject_name, to_char(a.exam_date, 'DD Mon'), c.class_name,
+                      sa.subject_name, to_char(a.exam_date::date, 'DD Mon'), c.class_name,
                       sb.subject_name, e2.exam_name)
           INTO v_clash
         FROM academic.exam_subjects a
@@ -705,6 +755,14 @@ BEGIN
 
         IF COALESCE(p_exam_id, 0) = 0 THEN
             RAISE EXCEPTION 'Pick an exam to delete.';
+        END IF;
+
+        -- Finalised mark sheets are a record; such an exam can be moved back to
+        -- draft (hidden from results) but not deleted.
+        IF EXISTS (SELECT 1 FROM academic.exam_mark_sheets
+                   WHERE exam_id = p_exam_id AND tenant_id = p_tenant_id
+                     AND school_id = p_school_id AND is_finalized) THEN
+            RAISE EXCEPTION 'This exam has finalised mark sheets and cannot be deleted. Move it back to draft instead.';
         END IF;
 
         UPDATE academic.exams

@@ -9,6 +9,10 @@
 --      A new p_password_hash param is appended before p_result. The old 8-arg
 --      overload is dropped first so there is no ambiguous overload.
 --
+-- Oct 2026: GET_LOGIN_USER / GET_USER_BY_ID also return password_stamp and
+--   CHANGE_PASSWORD stamps core.users.password_changed_at (column added by
+--   access_security_hardening.sql -- apply that first).
+--
 -- NOTE: the temp-password admin is flagged must_change_password = TRUE inside
 --       core.sp_school_manage (see sp_school_manage.sql). Re-run that script too.
 -- ============================================================
@@ -59,6 +63,9 @@ BEGIN
             u.is_deleted,
             u.last_login_at,
             u.must_change_password,
+            -- Security stamp: the cookie carries it, Program.cs compares it with
+            -- core.sp_session_check, so a password change ends other sessions.
+            COALESCE(to_char(u.password_changed_at, 'YYYYMMDDHH24MISSUS'), '0') AS password_stamp,
 
             up.full_name,
             up.phone,
@@ -209,6 +216,9 @@ BEGIN
             u.is_deleted,
             u.last_login_at,
             u.must_change_password,
+            -- Security stamp: the cookie carries it, Program.cs compares it with
+            -- core.sp_session_check, so a password change ends other sessions.
+            COALESCE(to_char(u.password_changed_at, 'YYYYMMDDHH24MISSUS'), '0') AS password_stamp,
 
             up.full_name,
             up.phone,
@@ -372,6 +382,7 @@ BEGIN
         UPDATE core.users
         SET password_hash = p_password_hash,
             must_change_password = FALSE,
+            password_changed_at = CURRENT_TIMESTAMP,   -- signs out every other session
             updated_by = p_user_id,
             updated_at = CURRENT_TIMESTAMP
         WHERE user_id = p_user_id

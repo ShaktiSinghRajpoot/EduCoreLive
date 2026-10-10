@@ -36,6 +36,17 @@
 --   * Suppliers are per school and soft-deleted, because a purchase from last
 --     year must keep naming its supplier even after the school stops using them.
 --
+--   * REVISION 2026-10-10 (tests/inventory_store_tests.sql): a cancel re-reads
+--     stock per line and checks per item (the same item on two lines used to
+--     corrupt current_stock and slip past the zero floor); quantities and prices
+--     take at most 2 decimals; no negative opening stock or prices; a bill
+--     number is unique among no-supplier bills too; header total = sum of its
+--     lines; Inactive items cannot be issued or bought; the unit is frozen once
+--     stock has moved; a cancel needs a reason; new 'StockTake' movement (a
+--     counted quantity, can go down); the ledger keeps the rate (unit_rate) and
+--     the history shows who, in date order. Floors on the table itself:
+--     current_stock >= 0, prices >= 0.
+--
 -- Target DB: PostgreSQL. Safe to re-run.
 -- ============================================================================
 
@@ -153,8 +164,12 @@ CREATE INDEX IF NOT EXISTS ix_inventory_purchase_school
     ON core.inventory_purchases (tenant_id, school_id, purchase_date DESC);
 
 -- One invoice number per supplier, so the same bill cannot be entered twice.
-CREATE UNIQUE INDEX IF NOT EXISTS ux_inventory_purchase_invoice
-    ON core.inventory_purchases (tenant_id, school_id, supplier_id, LOWER(TRIM(invoice_no)))
+-- Bills with no supplier count as supplier 0: keyed on the raw supplier_id they
+-- never collided (NULLs are all distinct), so a cash bill could go in twice.
+-- Dropped and rebuilt on every run so an older definition is replaced.
+DROP INDEX IF EXISTS core.ux_inventory_purchase_invoice;
+CREATE UNIQUE INDEX ux_inventory_purchase_invoice
+    ON core.inventory_purchases (tenant_id, school_id, COALESCE(supplier_id, 0), LOWER(TRIM(invoice_no)))
     WHERE is_cancelled = FALSE AND invoice_no IS NOT NULL AND TRIM(invoice_no) <> '';
 
 
@@ -193,6 +208,7 @@ CREATE TABLE IF NOT EXISTS core.inventory_stock_ledger (
     quantity       numeric(14,2) NOT NULL,      -- signed: + in, - out
     balance_after  numeric(14,2) NOT NULL,
 
+    unit_rate      numeric(14,2),               -- rate the movement is valued at
     reference_type varchar(20),                 -- 'Purchase' | NULL
     reference_id   integer,                     -- purchase_id, when there is one
     issued_to      varchar(150),                -- for an Issue: who took it
@@ -202,12 +218,30 @@ CREATE TABLE IF NOT EXISTS core.inventory_stock_ledger (
     created_at     timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT chk_inv_move_type CHECK (movement_type IN
-        ('Opening','Purchase','Issue','Return','Damage','Adjustment','PurchaseCancel')),
+        ('Opening','Purchase','Issue','Return','Damage','Adjustment','StockTake','PurchaseCancel')),
     CONSTRAINT chk_inv_move_qty CHECK (quantity <> 0)
 );
 
 CREATE INDEX IF NOT EXISTS ix_inventory_ledger_item
     ON core.inventory_stock_ledger (tenant_id, school_id, item_id, movement_id DESC);
+
+-- Added after the first release (safe to re-run):
+--   * unit_rate: the rate each movement is valued at -- the bill's unit price
+--     for a purchase or its cancel, the item's cost price for everything else.
+--     Rows written before this column existed keep NULL ("not recorded").
+--   * StockTake: a physical count, which can move stock DOWN as well as up.
+--   * Hard floors behind the procs: stock and prices never below zero.
+ALTER TABLE core.inventory_stock_ledger ADD COLUMN IF NOT EXISTS unit_rate numeric(14,2);
+
+ALTER TABLE core.inventory_stock_ledger DROP CONSTRAINT IF EXISTS chk_inv_move_type;
+ALTER TABLE core.inventory_stock_ledger ADD CONSTRAINT chk_inv_move_type CHECK (movement_type IN
+    ('Opening','Purchase','Issue','Return','Damage','Adjustment','StockTake','PurchaseCancel'));
+
+ALTER TABLE core.inventory_items DROP CONSTRAINT IF EXISTS chk_inv_item_stock;
+ALTER TABLE core.inventory_items ADD CONSTRAINT chk_inv_item_stock CHECK (current_stock >= 0);
+ALTER TABLE core.inventory_items DROP CONSTRAINT IF EXISTS chk_inv_item_price;
+ALTER TABLE core.inventory_items ADD CONSTRAINT chk_inv_item_price
+    CHECK (cost_price >= 0 AND selling_price >= 0);
 
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -267,12 +301,15 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_op      text := UPPER(COALESCE(p_operation, ''));
+    v_type    text := TRIM(COALESCE(p_movement_type, ''));
     v_id      integer;
     v_name    text;
     v_stock   numeric;
     v_unit    text;
+    v_cost    numeric;
+    v_active  boolean;
     v_new     numeric;
-    v_sign    smallint;
+    v_qty     numeric;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -295,7 +332,8 @@ BEGIN
                COALESCE(i.brand, '')       AS brand,
                COALESCE(i.model, '')       AS model,
                COALESCE(i.description, '') AS description,
-               -- What the shelf is worth at standard cost.
+               -- What the shelf is worth at the item's cost price (not at what
+               -- each purchase actually paid) -- the page labels it that way.
                ROUND(i.current_stock * i.cost_price, 2) AS stock_value,
                -- Derived, never stored: one number cannot disagree with itself.
                CASE WHEN i.current_stock <= 0            THEN 'Out of Stock'
@@ -337,8 +375,55 @@ BEGIN
         IF COALESCE(p_min_stock, 0) < 0 THEN
             RAISE EXCEPTION 'Minimum stock cannot be negative.';
         END IF;
+        IF COALESCE(p_opening_stock, 0) < 0 THEN
+            RAISE EXCEPTION 'Opening stock cannot be negative.';
+        END IF;
+        IF COALESCE(p_cost_price, 0) < 0 OR COALESCE(p_selling_price, 0) < 0 THEN
+            RAISE EXCEPTION 'A price cannot be negative.';
+        END IF;
+        -- Quantities and prices are stored with 2 decimals. Accepting a third
+        -- and letting the column round it is how stock drifted from its ledger.
+        IF COALESCE(p_opening_stock, 0) <> ROUND(COALESCE(p_opening_stock, 0), 2)
+           OR COALESCE(p_min_stock, 0) <> ROUND(COALESCE(p_min_stock, 0), 2) THEN
+            RAISE EXCEPTION 'A quantity can have at most 2 decimal places.';
+        END IF;
+        IF COALESCE(p_cost_price, 0) <> ROUND(COALESCE(p_cost_price, 0), 2)
+           OR COALESCE(p_selling_price, 0) <> ROUND(COALESCE(p_selling_price, 0), 2) THEN
+            RAISE EXCEPTION 'A price can have at most 2 decimal places.';
+        END IF;
+
+        -- Duplicates are caught here so the store keeper reads a sentence, not
+        -- the unique index's name. The indexes stay as the last line of defence.
+        IF EXISTS (SELECT 1 FROM core.inventory_items
+                   WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                     AND is_deleted = FALSE AND item_id <> COALESCE(p_item_id, 0)
+                     AND LOWER(TRIM(item_name)) = LOWER(v_name)) THEN
+            RAISE EXCEPTION 'An item named "%" already exists.', v_name;
+        END IF;
+        IF NULLIF(TRIM(COALESCE(p_sku, '')), '') IS NOT NULL
+           AND EXISTS (SELECT 1 FROM core.inventory_items
+                       WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                         AND is_deleted = FALSE AND item_id <> COALESCE(p_item_id, 0)
+                         AND LOWER(TRIM(sku)) = LOWER(TRIM(p_sku))) THEN
+            RAISE EXCEPTION 'Another item already uses the code "%".', TRIM(p_sku);
+        END IF;
 
         IF COALESCE(p_item_id, 0) > 0 THEN
+            SELECT unit_type INTO v_unit FROM core.inventory_items
+            WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+              AND item_id = p_item_id AND is_deleted = FALSE;
+            IF v_unit IS NULL THEN
+                RAISE EXCEPTION 'Item not found.';
+            END IF;
+
+            -- Once stock has moved, every past row was counted in this unit.
+            -- Changing it would turn "3 Box" into "3 Piece" without a movement.
+            IF NULLIF(TRIM(COALESCE(p_unit_type, '')), '') IS NOT NULL
+               AND TRIM(p_unit_type) <> v_unit
+               AND EXISTS (SELECT 1 FROM core.inventory_stock_ledger WHERE item_id = p_item_id) THEN
+                RAISE EXCEPTION 'The unit cannot change once the item has stock history (it is counted in %).', v_unit;
+            END IF;
+
             -- Editing never touches current_stock: stock only moves through the
             -- ledger, or an edit screen becomes a silent way to invent inventory.
             UPDATE core.inventory_items
@@ -360,10 +445,6 @@ BEGIN
              WHERE tenant_id = p_tenant_id AND school_id = p_school_id
                AND item_id = p_item_id AND is_deleted = FALSE
              RETURNING item_id INTO v_id;
-
-            IF v_id IS NULL THEN
-                RAISE EXCEPTION 'Item not found.';
-            END IF;
         ELSE
             INSERT INTO core.inventory_items
                 (tenant_id, school_id, item_name, sku, category, sub_category,
@@ -386,16 +467,16 @@ BEGIN
 
             -- Opening stock is a movement like any other, so the first number on
             -- the shelf has a date and an author too.
-            IF COALESCE(p_opening_stock, 0) <> 0 THEN
+            IF COALESCE(p_opening_stock, 0) > 0 THEN
                 UPDATE core.inventory_items
-                   SET current_stock = COALESCE(p_opening_stock, 0)
+                   SET current_stock = p_opening_stock
                  WHERE item_id = v_id;
 
                 INSERT INTO core.inventory_stock_ledger
                     (tenant_id, school_id, item_id, movement_type, quantity,
-                     balance_after, remarks, created_by)
+                     balance_after, unit_rate, remarks, created_by)
                 VALUES (p_tenant_id, p_school_id, v_id, 'Opening',
-                        COALESCE(p_opening_stock, 0), COALESCE(p_opening_stock, 0),
+                        p_opening_stock, p_opening_stock, COALESCE(p_cost_price, 0),
                         'Opening stock', p_action_user_id);
             END IF;
         END IF;
@@ -427,15 +508,29 @@ BEGIN
         RETURN;
 
     -- ── Stock movement ──────────────────────────────────────────────────────
+    -- Issue / Damage take stock away, Return / Adjustment add it back, and
+    -- StockTake records a physical count: p_quantity is the COUNTED figure and
+    -- the movement is the difference, up or down.
     ELSIF v_op = 'MOVESTOCK' THEN
-        IF COALESCE(p_quantity, 0) <= 0 THEN
-            RAISE EXCEPTION 'Enter a quantity greater than zero.';
-        END IF;
-        IF COALESCE(TRIM(p_movement_type), '') NOT IN ('Issue','Return','Damage','Adjustment') THEN
+        IF v_type NOT IN ('Issue','Return','Damage','Adjustment','StockTake') THEN
             RAISE EXCEPTION 'Choose what kind of stock movement this is.';
         END IF;
+        IF v_type = 'StockTake' THEN
+            IF p_quantity IS NULL OR p_quantity < 0 THEN
+                RAISE EXCEPTION 'Enter the quantity actually counted (0 or more).';
+            END IF;
+            IF NULLIF(TRIM(COALESCE(p_remarks, '')), '') IS NULL THEN
+                RAISE EXCEPTION 'Give a reason for the stock-take difference.';
+            END IF;
+        ELSIF COALESCE(p_quantity, 0) <= 0 THEN
+            RAISE EXCEPTION 'Enter a quantity greater than zero.';
+        END IF;
+        IF p_quantity <> ROUND(p_quantity, 2) THEN
+            RAISE EXCEPTION 'A quantity can have at most 2 decimal places.';
+        END IF;
 
-        SELECT item_name, current_stock, unit_type INTO v_name, v_stock, v_unit
+        SELECT item_name, current_stock, unit_type, cost_price, is_active
+          INTO v_name, v_stock, v_unit, v_cost, v_active
         FROM core.inventory_items
         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
           AND item_id = p_item_id AND is_deleted = FALSE
@@ -444,11 +539,22 @@ BEGIN
         IF v_name IS NULL THEN
             RAISE EXCEPTION 'Item not found.';
         END IF;
+        -- An Inactive item is one the school has stopped handing out. Its old
+        -- stock can still be returned, written off or counted.
+        IF NOT v_active AND v_type = 'Issue' THEN
+            RAISE EXCEPTION '% is marked Inactive and cannot be issued. Make it Active first.', v_name;
+        END IF;
 
-        -- Issue and Damage take stock away; Return and Adjustment add it back.
-        v_sign := CASE WHEN TRIM(p_movement_type) IN ('Issue','Damage') THEN -1 ELSE 1 END;
-        v_new  := v_stock + (v_sign * p_quantity);
+        v_qty := CASE WHEN v_type IN ('Issue','Damage') THEN -p_quantity
+                      WHEN v_type = 'StockTake'         THEN p_quantity - v_stock
+                      ELSE p_quantity END;
 
+        IF v_qty = 0 THEN
+            RAISE EXCEPTION 'The count matches the % % on record, so there is nothing to adjust.',
+                TRIM(TO_CHAR(v_stock, 'FM999999990.00')), v_unit;
+        END IF;
+
+        v_new := v_stock + v_qty;
         IF v_new < 0 THEN
             RAISE EXCEPTION 'Only % % of % left.',
                 TRIM(TO_CHAR(v_stock, 'FM999999990.00')), v_unit, v_name;
@@ -460,9 +566,8 @@ BEGIN
 
         INSERT INTO core.inventory_stock_ledger
             (tenant_id, school_id, item_id, movement_type, quantity, balance_after,
-             issued_to, remarks, created_by)
-        VALUES (p_tenant_id, p_school_id, p_item_id, TRIM(p_movement_type),
-                v_sign * p_quantity, v_new,
+             unit_rate, issued_to, remarks, created_by)
+        VALUES (p_tenant_id, p_school_id, p_item_id, v_type, v_qty, v_new, v_cost,
                 NULLIF(TRIM(COALESCE(p_issued_to, '')), ''),
                 NULLIF(TRIM(COALESCE(p_remarks, '')), ''), p_action_user_id);
 
@@ -471,14 +576,33 @@ BEGIN
         RETURN;
 
     ELSIF v_op = 'ITEMLEDGER' THEN
+        -- Date order (newest first), then entry order within a day. A back-dated
+        -- bill therefore sits on its own date, and `balance` is the running total
+        -- in that same order, so the column reads top to bottom without jumps.
+        -- balance_after is the figure at the moment the row was entered.
         OPEN p_result FOR
-        SELECT l.movement_id, l.movement_date, l.movement_type, l.quantity,
-               l.balance_after, COALESCE(l.issued_to,'') AS issued_to,
-               COALESCE(l.remarks,'') AS remarks, l.reference_id
-        FROM core.inventory_stock_ledger l
-        WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
-          AND l.item_id = p_item_id
-        ORDER BY l.movement_id DESC;
+        SELECT x.* FROM (
+            SELECT l.movement_id, l.movement_date, l.movement_type, l.quantity,
+                   SUM(l.quantity) OVER (ORDER BY l.movement_date, l.movement_id) AS balance,
+                   l.balance_after,
+                   l.unit_rate,
+                   COALESCE(l.issued_to,'') AS issued_to,
+                   COALESCE(l.remarks,'') AS remarks, l.reference_id,
+                   COALESCE(p.invoice_no, '') AS invoice_no,
+                   COALESCE(up.full_name, u.email, 'User #' || l.created_by) AS created_by_name,
+                   l.created_at
+            FROM core.inventory_stock_ledger l
+            LEFT JOIN core.inventory_purchases p
+                   ON l.reference_type = 'Purchase' AND p.purchase_id = l.reference_id
+            LEFT JOIN core.users u ON u.user_id = l.created_by
+            LEFT JOIN LATERAL (
+                SELECT full_name FROM core.user_profiles pr
+                WHERE pr.user_id = l.created_by AND COALESCE(pr.is_deleted, FALSE) = FALSE
+                ORDER BY pr.user_profile_id DESC LIMIT 1) up ON TRUE
+            WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
+              AND l.item_id = p_item_id
+        ) x
+        ORDER BY x.movement_date DESC, x.movement_id DESC;
         RETURN;
 
     ELSIF v_op = 'RECOUNT' THEN
@@ -510,6 +634,12 @@ BEGIN
         v_name := NULLIF(TRIM(COALESCE(p_supplier_name, '')), '');
         IF v_name IS NULL THEN
             RAISE EXCEPTION 'Supplier name is required.';
+        END IF;
+        IF EXISTS (SELECT 1 FROM core.inventory_suppliers
+                   WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                     AND is_deleted = FALSE AND supplier_id <> COALESCE(p_supplier_id, 0)
+                     AND LOWER(TRIM(supplier_name)) = LOWER(v_name)) THEN
+            RAISE EXCEPTION 'A supplier named "%" already exists.', v_name;
         END IF;
 
         IF COALESCE(p_supplier_id, 0) > 0 THEN
@@ -603,14 +733,20 @@ LANGUAGE plpgsql
 AS $$
 DECLARE
     v_op     text := UPPER(COALESCE(p_operation, ''));
+    v_inv    text := NULLIF(TRIM(COALESCE(p_invoice_no, '')), '');
+    v_reason text := NULLIF(TRIM(COALESCE(p_remarks, '')), '');
     v_pid    integer;
     v_supp   text;
     v_sub    numeric := 0;
     v_tax    numeric := 0;
+    v_base   numeric;
+    v_ltax   numeric;
     v_line   record;
     v_new    numeric;
     v_name   text;
+    v_active boolean;
     v_cnt    integer;
+    v_dup    text;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -625,7 +761,9 @@ BEGIN
                p.sub_total, p.tax_total, p.grand_total,
                p.is_cancelled,
                (SELECT COUNT(*) FROM core.inventory_purchase_items pi
-                 WHERE pi.purchase_id = p.purchase_id)::int AS line_count
+                 WHERE pi.purchase_id = p.purchase_id)::int AS line_count,
+               (SELECT COALESCE(SUM(pi.quantity), 0) FROM core.inventory_purchase_items pi
+                 WHERE pi.purchase_id = p.purchase_id) AS item_qty
         FROM core.inventory_purchases p
         WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
           AND (p_from_date IS NULL OR p.purchase_date::date >= p_from_date)
@@ -659,10 +797,11 @@ BEGIN
         IF p_purchase_date IS NULL THEN
             RAISE EXCEPTION 'Choose the purchase date.';
         END IF;
+        -- CURRENT_DATE is the school's date: the database runs on its timezone.
         IF p_purchase_date > CURRENT_DATE THEN
             RAISE EXCEPTION 'A purchase cannot be dated in the future.';
         END IF;
-        IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
+        IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) = 0 THEN
             RAISE EXCEPTION 'Add at least one item to the purchase.';
         END IF;
 
@@ -674,8 +813,23 @@ BEGIN
             RAISE EXCEPTION 'Supplier not found.';
         END IF;
 
-        -- Every line must name an item that belongs to THIS school, checked
-        -- before anything is written, so a bad line cannot leave a half-purchase.
+        -- The same bill cannot go in twice -- per supplier, and among bills with
+        -- no supplier too (supplier 0 here, matching the unique index).
+        IF v_inv IS NOT NULL THEN
+            SELECT purchase_date INTO v_dup FROM core.inventory_purchases
+            WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+              AND is_cancelled = FALSE
+              AND COALESCE(supplier_id, 0) = COALESCE(p_supplier_id, 0)
+              AND LOWER(TRIM(invoice_no)) = LOWER(v_inv)
+            LIMIT 1;
+            IF v_dup IS NOT NULL THEN
+                RAISE EXCEPTION 'Bill % from % is already entered (dated %).',
+                    v_inv, COALESCE(v_supp, 'no supplier'), v_dup;
+            END IF;
+        END IF;
+
+        -- Every line must name an active item of THIS school, checked before
+        -- anything is written, so a bad line cannot leave a half-purchase.
         FOR v_line IN
             SELECT * FROM jsonb_to_recordset(p_items)
                 AS x("itemId" integer, quantity numeric, "unitPrice" numeric, "taxPercent" numeric)
@@ -683,16 +837,29 @@ BEGIN
             IF COALESCE(v_line.quantity, 0) <= 0 THEN
                 RAISE EXCEPTION 'Every line needs a quantity greater than zero.';
             END IF;
+            IF v_line.quantity <> ROUND(v_line.quantity, 2) THEN
+                RAISE EXCEPTION 'A quantity can have at most 2 decimal places.';
+            END IF;
             IF COALESCE(v_line."unitPrice", 0) < 0 THEN
                 RAISE EXCEPTION 'A unit price cannot be negative.';
             END IF;
+            IF COALESCE(v_line."unitPrice", 0) <> ROUND(COALESCE(v_line."unitPrice", 0), 2) THEN
+                RAISE EXCEPTION 'A unit price can have at most 2 decimal places.';
+            END IF;
+            IF COALESCE(v_line."taxPercent", 0) < 0 OR COALESCE(v_line."taxPercent", 0) > 100 THEN
+                RAISE EXCEPTION 'Tax must be between 0 and 100 percent.';
+            END IF;
 
-            SELECT item_name INTO v_name FROM core.inventory_items
+            v_name := NULL; v_active := NULL;
+            SELECT item_name, is_active INTO v_name, v_active FROM core.inventory_items
             WHERE tenant_id = p_tenant_id AND school_id = p_school_id
               AND item_id = v_line."itemId" AND is_deleted = FALSE;
 
             IF v_name IS NULL THEN
                 RAISE EXCEPTION 'One of the lines is not an item of this school.';
+            END IF;
+            IF NOT v_active THEN
+                RAISE EXCEPTION '% is marked Inactive and cannot be purchased. Make it Active first.', v_name;
             END IF;
         END LOOP;
 
@@ -700,29 +867,33 @@ BEGIN
             (tenant_id, school_id, supplier_id, supplier_name, purchase_date,
              invoice_no, payment_mode, remarks, created_by)
         VALUES (p_tenant_id, p_school_id, p_supplier_id, v_supp, p_purchase_date,
-                NULLIF(TRIM(COALESCE(p_invoice_no,'')),''),
+                v_inv,
                 NULLIF(TRIM(COALESCE(p_payment_mode,'')),''),
-                NULLIF(TRIM(COALESCE(p_remarks,'')),''), p_action_user_id)
+                v_reason, p_action_user_id)
         RETURNING purchase_id INTO v_pid;
 
         FOR v_line IN
             SELECT * FROM jsonb_to_recordset(p_items)
                 AS x("itemId" integer, quantity numeric, "unitPrice" numeric, "taxPercent" numeric)
         LOOP
+            -- Re-read the item each line, so the same item on two lines adds up.
             SELECT item_name, current_stock INTO v_name, v_new
             FROM core.inventory_items
             WHERE item_id = v_line."itemId" FOR UPDATE;
 
             v_new := v_new + v_line.quantity;
 
+            -- Each line is rounded once, and the header is the sum of the lines,
+            -- so the bill's total always equals the totals printed on its lines.
+            v_base := ROUND(v_line.quantity * COALESCE(v_line."unitPrice", 0), 2);
+            v_ltax := ROUND(v_base * COALESCE(v_line."taxPercent", 0) / 100.0, 2);
+
             INSERT INTO core.inventory_purchase_items
                 (tenant_id, school_id, purchase_id, item_id, item_name,
                  quantity, unit_price, tax_percent, line_total)
             VALUES (p_tenant_id, p_school_id, v_pid, v_line."itemId", v_name,
                     v_line.quantity, COALESCE(v_line."unitPrice", 0),
-                    COALESCE(v_line."taxPercent", 0),
-                    ROUND(v_line.quantity * COALESCE(v_line."unitPrice", 0)
-                          * (1 + COALESCE(v_line."taxPercent", 0) / 100.0), 2));
+                    COALESCE(v_line."taxPercent", 0), v_base + v_ltax);
 
             UPDATE core.inventory_items
                SET current_stock = v_new, updated_by = p_action_user_id, updated_at = now()
@@ -730,29 +901,32 @@ BEGIN
 
             INSERT INTO core.inventory_stock_ledger
                 (tenant_id, school_id, item_id, movement_date, movement_type,
-                 quantity, balance_after, reference_type, reference_id, created_by)
+                 quantity, balance_after, unit_rate, reference_type, reference_id, created_by)
             VALUES (p_tenant_id, p_school_id, v_line."itemId", p_purchase_date,
-                    'Purchase', v_line.quantity, v_new, 'Purchase', v_pid, p_action_user_id);
+                    'Purchase', v_line.quantity, v_new, COALESCE(v_line."unitPrice", 0),
+                    'Purchase', v_pid, p_action_user_id);
 
-            v_sub := v_sub + (v_line.quantity * COALESCE(v_line."unitPrice", 0));
-            v_tax := v_tax + ROUND(v_line.quantity * COALESCE(v_line."unitPrice", 0)
-                                   * COALESCE(v_line."taxPercent", 0) / 100.0, 2);
+            v_sub := v_sub + v_base;
+            v_tax := v_tax + v_ltax;
         END LOOP;
 
         UPDATE core.inventory_purchases
-           SET sub_total = ROUND(v_sub, 2), tax_total = ROUND(v_tax, 2),
-               grand_total = ROUND(v_sub + v_tax, 2)
+           SET sub_total = v_sub, tax_total = v_tax, grand_total = v_sub + v_tax
          WHERE purchase_id = v_pid;
 
         OPEN p_result FOR
             SELECT TRUE AS success, 'Purchase saved.' AS message,
-                   v_pid AS purchase_id, ROUND(v_sub + v_tax, 2) AS grand_total;
+                   v_pid AS purchase_id, v_sub + v_tax AS grand_total;
         RETURN;
 
     ELSIF v_op = 'CANCEL' THEN
         -- A purchase is never edited, only cancelled, and cancelling reverses its
         -- stock with matching negative movements rather than deleting the
         -- originals. The invoice and its reversal both stay on the record.
+        IF v_reason IS NULL THEN
+            RAISE EXCEPTION 'Give a reason for cancelling this purchase.';
+        END IF;
+
         SELECT COUNT(*) INTO v_cnt FROM core.inventory_purchases
         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
           AND purchase_id = p_purchase_id AND is_cancelled = FALSE;
@@ -761,38 +935,56 @@ BEGIN
             RAISE EXCEPTION 'Purchase not found, or already cancelled.';
         END IF;
 
+        -- Lock the bill's items first, in a fixed order.
+        PERFORM 1 FROM core.inventory_items
+        WHERE item_id IN (SELECT item_id FROM core.inventory_purchase_items
+                          WHERE purchase_id = p_purchase_id)
+        ORDER BY item_id
+        FOR UPDATE;
+
+        -- Check per ITEM, not per line: a bill with the same item on two lines
+        -- has to take both lines out of what is on the shelf now.
         FOR v_line IN
-            SELECT pi.item_id, pi.quantity, i.item_name, i.current_stock, i.unit_type
+            SELECT i.item_name, i.current_stock, i.unit_type, SUM(pi.quantity) AS qty
             FROM core.inventory_purchase_items pi
             JOIN core.inventory_items i ON i.item_id = pi.item_id
             WHERE pi.purchase_id = p_purchase_id
-            FOR UPDATE OF i
+            GROUP BY i.item_id, i.item_name, i.current_stock, i.unit_type
         LOOP
-            v_new := v_line.current_stock - v_line.quantity;
-
             -- Refusing here is the honest answer: the goods have already been
             -- issued, so the purchase cannot simply be un-received.
-            IF v_new < 0 THEN
+            IF v_line.current_stock - v_line.qty < 0 THEN
                 RAISE EXCEPTION 'Cannot cancel: only % % of % left, and this purchase brought in %.',
                     TRIM(TO_CHAR(v_line.current_stock, 'FM999999990.00')), v_line.unit_type,
-                    v_line.item_name, TRIM(TO_CHAR(v_line.quantity, 'FM999999990.00'));
+                    v_line.item_name, TRIM(TO_CHAR(v_line.qty, 'FM999999990.00'));
             END IF;
+        END LOOP;
 
+        -- Reverse line by line. UPDATE ... RETURNING reads the row as it is now,
+        -- so a second line for the same item starts from the first line's result.
+        FOR v_line IN
+            SELECT pi.item_id, pi.quantity, pi.unit_price
+            FROM core.inventory_purchase_items pi
+            WHERE pi.purchase_id = p_purchase_id
+            ORDER BY pi.purchase_item_id
+        LOOP
             UPDATE core.inventory_items
-               SET current_stock = v_new, updated_by = p_action_user_id, updated_at = now()
-             WHERE item_id = v_line.item_id;
+               SET current_stock = current_stock - v_line.quantity,
+                   updated_by = p_action_user_id, updated_at = now()
+             WHERE item_id = v_line.item_id
+            RETURNING current_stock INTO v_new;
 
             INSERT INTO core.inventory_stock_ledger
                 (tenant_id, school_id, item_id, movement_type, quantity, balance_after,
-                 reference_type, reference_id, remarks, created_by)
+                 unit_rate, reference_type, reference_id, remarks, created_by)
             VALUES (p_tenant_id, p_school_id, v_line.item_id, 'PurchaseCancel',
-                    -v_line.quantity, v_new, 'Purchase', p_purchase_id,
-                    NULLIF(TRIM(COALESCE(p_remarks,'')),''), p_action_user_id);
+                    -v_line.quantity, v_new, v_line.unit_price, 'Purchase', p_purchase_id,
+                    v_reason, p_action_user_id);
         END LOOP;
 
         UPDATE core.inventory_purchases
            SET is_cancelled = TRUE,
-               cancel_reason = NULLIF(TRIM(COALESCE(p_remarks,'')),''),
+               cancel_reason = v_reason,
                cancelled_by = p_action_user_id, cancelled_at = now()
          WHERE purchase_id = p_purchase_id;
 

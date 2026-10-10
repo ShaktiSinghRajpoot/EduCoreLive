@@ -2,6 +2,7 @@ using System.Data;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -10,11 +11,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     public class TimetableService : ITimetableService
     {
         private readonly PgExec _db;
+        private readonly ILogger<TimetableService> _logger;
         private const string Sp = "academic.sp_school_admin_timetable_manage";
 
-        public TimetableService(PgExec db)
+        public TimetableService(PgExec db, ILogger<TimetableService> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         public async Task<TimetableSetup> GetSetupAsync(
@@ -211,6 +214,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Timetable change rejected for school {SchoolId}. SqlState {SqlState}", p[2].Value, ex.SqlState);
                 // Proc RAISE — the teacher clash and "not a teaching period" land here.
                 return new TimetableSaveResult { Message = ex.MessageText };
             }

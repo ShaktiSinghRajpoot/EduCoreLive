@@ -13,7 +13,7 @@ namespace EduCoreDataAccessLayer.Services
         Task<UserViewModel?> GetLoginInfoAsync(string email);
         Task<UserViewModel?> GetUserInfoByUserIdAsync(int userId);
         Task<List<UserViewModel>> GetUserRolesAsync(int userId);
-        Task SaveLoginAttemptAsync(string email, bool isSuccess, string? failureReason);
+        Task SaveLoginAttemptAsync(string email, bool isSuccess, string? failureReason, HttpContext? httpContext = null);
         Task SaveUserSessionAsync(int userId, HttpContext httpContext);
         Task ChangePasswordAsync(int userId, string passwordHash);
 
@@ -21,6 +21,12 @@ namespace EduCoreDataAccessLayer.Services
         Task<UserViewModel?> RequestPasswordOtpAsync(string identifier, string otpHash);
         /// <summary>Verifies the OTP for the user and, on success, sets the new password. Returns OK | INVALID | EXPIRED | LOCKED.</summary>
         Task<string> ResetWithOtpAsync(int userId, string otpHash, string passwordHash);
+
+        /// <summary>
+        /// Per-request cookie check (core.sp_session_check): is the user still active,
+        /// does the cookie's school still allow sign-in, and the current password stamp.
+        /// </summary>
+        Task<(bool UserOk, bool SchoolOk, string PasswordStamp)> SessionCheckAsync(int userId, int schoolId);
     }
 
     public class LoginService : ILoginService
@@ -87,13 +93,17 @@ namespace EduCoreDataAccessLayer.Services
             return roles;
         }
 
-        public async Task SaveLoginAttemptAsync(string email, bool isSuccess, string? failureReason)
+        public async Task SaveLoginAttemptAsync(string email, bool isSuccess, string? failureReason, HttpContext? httpContext = null)
         {
+            // The client IP (the real one -- Program.cs trusts the proxy's
+            // X-Forwarded-For) and user agent make the failed-login trail usable.
             var parameters = BuildLoginParameters(
                 operationType: "SAVE_LOGIN_ATTEMPT",
                 email: email,
                 isSuccess: isSuccess,
-                failureReason: failureReason
+                failureReason: failureReason,
+                ipAddress: httpContext?.Connection.RemoteIpAddress?.ToString(),
+                userAgent: httpContext?.Request.Headers["User-Agent"].ToString()
             );
 
             var dal = _db;
@@ -157,6 +167,23 @@ namespace EduCoreDataAccessLayer.Services
             return ToStringValue(ds.Tables[0].Rows[0], "status") ?? "EXPIRED";
         }
 
+        public async Task<(bool UserOk, bool SchoolOk, string PasswordStamp)> SessionCheckAsync(int userId, int schoolId)
+        {
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_user_id", NpgsqlDbType.Integer) { Value = userId },
+                new NpgsqlParameter("p_school_id", NpgsqlDbType.Integer) { Value = schoolId },
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "session_check_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_session_check", parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                return (false, false, "0");
+
+            var row = ds.Tables[0].Rows[0];
+            return (ToBool(row, "user_ok"), ToBool(row, "school_ok"), ToStringValue(row, "password_stamp") ?? "0");
+        }
+
         private static NpgsqlParameter[] BuildResetParameters(
             string operationType,
             string? identifier = null,
@@ -217,6 +244,7 @@ namespace EduCoreDataAccessLayer.Services
                 IsActive = ToBool(row, "is_active"),
                 IsDeleted = ToBool(row, "is_deleted"),
                 MustChangePassword = ToBool(row, "must_change_password"),
+                PasswordStamp = ToStringValue(row, "password_stamp") ?? "0",
 
                 FullName = ToStringValue(row, "full_name"),
                 Phone = ToStringValue(row, "phone"),

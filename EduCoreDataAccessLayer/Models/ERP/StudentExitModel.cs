@@ -24,6 +24,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         /// <summary>Transfer | Passout | Struck Off | Withdrawn.</summary>
         public string   Status         { get; set; } = string.Empty;
         public string?  LeavingReason  { get; set; }
+        public Guid     PublicId       { get; set; }   // opens the read-only Student Dashboard
+        public bool     HasTc          { get; set; }   // a live TC exists: do not offer another
         public decimal  Outstanding    { get; set; }
 
         // Filters

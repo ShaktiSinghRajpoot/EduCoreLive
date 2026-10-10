@@ -5,6 +5,7 @@ using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -13,14 +14,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     public class ExamService : IExamService
     {
         private readonly PgExec _db;
+        private readonly ILogger<ExamService> _logger;
         private const string Sp      = "academic.sp_school_admin_exam_manage";
         private const string TimeFmt = "HH\\:mm";
         private const string SpMarks = "academic.sp_school_admin_exam_marks_manage";
         private const string SpStudentResult = "core.sp_exam_result_student";
 
-        public ExamService(PgExec db)
+        public ExamService(PgExec db, ILogger<ExamService> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         public async Task<ExamListData> GetExamsAsync(
@@ -192,6 +195,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Exam operation rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
                 // Proc RAISE (a business rule) — surface the friendly text.
                 return new ExamSaveResult { Message = ex.MessageText };
             }
@@ -223,6 +227,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Exam operation rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
                 return new ExamSaveResult { Message = ex.MessageText };
             }
         }
@@ -345,6 +350,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Exam operation rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
                 return new ExamSaveResult { Message = ex.MessageText };
             }
         }
@@ -567,6 +573,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Exam operation rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
                 return new ExamMarksSaveResult { Message = ex.MessageText };
             }
         }
@@ -601,6 +608,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Exam operation rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
                 return new ExamMarksSaveResult { Message = ex.MessageText };
             }
         }

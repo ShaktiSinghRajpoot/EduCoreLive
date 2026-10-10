@@ -44,7 +44,9 @@ namespace EduCoreDataAccessLayer.Services
         private readonly PgExec _db;
         private readonly AppCache _cache;
 
-        private const string SpUserRoles = "core.sp_user_roles_resolve";
+        // The ACCESS view of a user's roles: empty once the user is deactivated or
+        // their school stops allowing sign-in (see sp_rbac_manage.sql).
+        private const string SpUserRoles = "core.sp_user_roles_effective";
         private const string SpResolve   = "config.sp_role_permissions_resolve";
 
         public PermissionService(PgExec db, AppCache cache)
@@ -104,7 +106,13 @@ namespace EduCoreDataAccessLayer.Services
         }
 
         public void InvalidateRole(int tenantId, int schoolId, int roleId) =>
-            _cache.Remove(AppCache.Key($"rperms:r{roleId}", tenantId, schoolId));
+            _cache.Remove(RoleKeysKey(tenantId, roleId));
+
+        // Roles are TENANT-wide (one role list for all of a tenant's schools), so a
+        // role's key set is cached per tenant, not per school: a matrix edit made from
+        // one school must take effect at once in the tenant's other schools too.
+        private static string RoleKeysKey(int tenantId, int roleId) =>
+            AppCache.Key($"rperms:r{roleId}", tenantId, 0);
 
         public void InvalidateUser(int tenantId, int schoolId, int userId) =>
             _cache.Remove(AppCache.Key($"uroles:u{userId}", tenantId, schoolId));
@@ -134,7 +142,7 @@ namespace EduCoreDataAccessLayer.Services
             });
 
         private Task<HashSet<string>> GetRoleKeysAsync(int tenantId, int schoolId, int roleId) =>
-            _cache.GetOrCreateAsync(AppCache.Key($"rperms:r{roleId}", tenantId, schoolId), async () =>
+            _cache.GetOrCreateAsync(RoleKeysKey(tenantId, roleId), async () =>
             {
                 var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var ds = await _db.ExecuteProcedureWithCursorsAsync(

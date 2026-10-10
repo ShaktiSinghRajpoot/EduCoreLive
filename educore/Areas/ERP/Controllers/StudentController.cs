@@ -49,11 +49,6 @@ namespace educore.Areas.ERP.Controllers
             _config = config;
         }
 
-        public IActionResult StudentAttendance()
-        {
-            return View();
-        }
-
         // One StudentListModel does it all: bound filters/sort/page come in via
         // the query string; the service fills Items + TotalCount + summary tiles.
         // Tenant/school/user are sourced from CLAIMS only (never model-bound).
@@ -141,10 +136,12 @@ namespace educore.Areas.ERP.Controllers
             return Json(ladder.Select(c => new { name = c.Name, order = c.Order }));
         }
 
-        // Sections that have active students in a class — fills the Section dropdown.
-        public async Task<IActionResult> PromotionSections(string @class)
+        // Sections the class HAS in that session's setup — fills the Section
+        // dropdowns on Promotion and Edit Student. Empty sections included, so a
+        // new 5-C can be picked. Null year = the current session.
+        public async Task<IActionResult> PromotionSections(string @class, string? year)
         {
-            var sections = await _admissionService.GetClassSectionsAsync(@class, TenantId(), SchoolId(), UserId());
+            var sections = await _admissionService.GetClassSectionsAsync(@class, TenantId(), SchoolId(), UserId(), year);
             return Json(sections);
         }
 
@@ -215,6 +212,9 @@ namespace educore.Areas.ERP.Controllers
 
             var folder = UploadPaths.FolderFor(_config, _env, "students", TenantId(), SchoolId());
 
+            // The photo being replaced, so its file can be removed afterwards.
+            var oldUrl = (await _admissionService.GetStudentByIdAsync(id, TenantId(), SchoolId(), UserId()))?.PhotoUrl;
+
             var fileName = $"student_{id}_{Dates.Now:yyyyMMddHHmmssfff}{ext}";
             var fullPath = Path.Combine(folder, fileName);
             using (var stream = new FileStream(fullPath, FileMode.Create))
@@ -227,6 +227,21 @@ namespace educore.Areas.ERP.Controllers
 
             // If the DB update failed, don't leave an orphan file behind.
             if (!ok) { try { System.IO.File.Delete(fullPath); } catch { } }
+
+            // Replaced photos used to pile up on disk. Delete the old file, but only
+            // when its URL is in THIS school's student-photo folder; the name is
+            // reduced to a bare file name so the path cannot walk anywhere else.
+            var prefix = UploadPaths.UrlFor("students", TenantId(), SchoolId(), "");
+            if (ok && !string.IsNullOrWhiteSpace(oldUrl)
+                   && oldUrl.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                   && !string.Equals(oldUrl, url, StringComparison.OrdinalIgnoreCase))
+            {
+                var oldName = Path.GetFileName(oldUrl);
+                if (!string.IsNullOrWhiteSpace(oldName))
+                {
+                    try { System.IO.File.Delete(Path.Combine(folder, oldName)); } catch { }
+                }
+            }
 
             return Json(new { success = ok, message, photoUrl });
         }
@@ -315,6 +330,13 @@ namespace educore.Areas.ERP.Controllers
                 found = true,
                 student = new
                 {
+                    // A left student is shown read-only: the page hides Edit and
+                    // says when and why they left.
+                    isActive  = student.IsActive,
+                    status    = string.IsNullOrWhiteSpace(student.Status) ? (student.IsActive ? "Active" : "Left") : student.Status,
+                    leftOn    = string.IsNullOrWhiteSpace(student.DateOfLeaving) ? null : Dates.Show(student.DateOfLeaving, "dd MMM yyyy"),
+                    leftWhy   = student.LeavingReason,
+                    photo     = student.PhotoUrl,
                     name      = student.StudentName,
                     roll      = student.RollNo ?? "—",
                     admNo     = student.AdmissionNo ?? "—",
@@ -477,8 +499,15 @@ namespace educore.Areas.ERP.Controllers
             var model = await _admissionService.GetStudentByIdAsync(studentId, TenantId(), SchoolId(), UserId());
             if (model == null) return RedirectToAction("StudentList");
 
+            // A student who has left is a closed record: view it, do not edit it.
+            if (!model.IsActive)
+            {
+                TempData["ErrorMessage"] = "This student has left. Re-admit them from Inactive Students to edit the record.";
+                return RedirectToAction("Dashboard", new { id });
+            }
+
             ViewBag.StudentPublicId = id;
-            await FillEditDropdownsAsync(model.ClassName);
+            await FillEditDropdownsAsync(model.ClassName, model.AcademicYear);
             return View(model);
         }
 
@@ -494,10 +523,50 @@ namespace educore.Areas.ERP.Controllers
             // form could name a different student than the one the URL authorised.
             model.StudentId = studentId;
 
+            var stored = await _admissionService.GetStudentByIdAsync(studentId, TenantId(), SchoolId(), UserId());
+            if (stored == null) return RedirectToAction("StudentList");
+            if (!stored.IsActive)
+            {
+                TempData["ErrorMessage"] = "This student has left. Re-admit them from Inactive Students to edit the record.";
+                return RedirectToAction("Dashboard", new { id });
+            }
+
+            // The read-only fields are not posted (they have no name); put them
+            // back so a refused save re-renders with them filled in.
+            model.AdmissionNo   = stored.AdmissionNo;
+            model.AdmissionDate = stored.AdmissionDate;
+            model.AcademicYear  = stored.AcademicYear;
+            model.PhotoUrl      = stored.PhotoUrl;
+
+            // Same rules as admission (AdmissionController.SaveAdmission). The
+            // proc checks them too; this keeps the message on the form.
+            var mobile = model.MobileNumber?.Trim();
+            if (string.IsNullOrWhiteSpace(mobile))
+                ModelState.AddModelError(nameof(model.MobileNumber), "Mobile number is required.");
+            else if (!System.Text.RegularExpressions.Regex.IsMatch(mobile, @"^\d{10}$"))
+                ModelState.AddModelError(nameof(model.MobileNumber), "Mobile number must be 10 digits.");
+            if (!string.IsNullOrWhiteSpace(model.AlternateMobile) &&
+                !System.Text.RegularExpressions.Regex.IsMatch(model.AlternateMobile.Trim(), @"^\d{10}$"))
+                ModelState.AddModelError(nameof(model.AlternateMobile), "Alternate mobile must be 10 digits.");
+            if (!string.IsNullOrWhiteSpace(model.IdProofNo) &&
+                !System.Text.RegularExpressions.Regex.IsMatch(model.IdProofNo.Trim(), @"^\d{12}$"))
+                ModelState.AddModelError(nameof(model.IdProofNo), "Aadhaar number must be 12 digits.");
+            var dob = Dates.Norm(model.DateOfBirth);
+            if (string.IsNullOrWhiteSpace(model.DateOfBirth))
+                ModelState.AddModelError(nameof(model.DateOfBirth), "Date of birth is required.");
+            else if (dob == null)
+                ModelState.AddModelError(nameof(model.DateOfBirth), "Date of birth is not a valid date.");
+            else if (string.CompareOrdinal(dob, Dates.Today) > 0)
+                ModelState.AddModelError(nameof(model.DateOfBirth), "Date of birth cannot be in the future.");
+            else if (!string.IsNullOrWhiteSpace(stored.AdmissionDate) &&
+                     string.CompareOrdinal(dob, Dates.Norm(stored.AdmissionDate) ?? "") > 0)
+                ModelState.AddModelError(nameof(model.DateOfBirth), "Date of birth cannot be after the admission date.");
+            model.DateOfBirth = dob ?? model.DateOfBirth;
+
             if (!ModelState.IsValid)
             {
                 ViewBag.StudentPublicId = id;
-                await FillEditDropdownsAsync(model.ClassName);
+                await FillEditDropdownsAsync(model.ClassName, stored.AcademicYear);
                 return View(model);
             }
 
@@ -511,7 +580,7 @@ namespace educore.Areas.ERP.Controllers
                 // disappears while they are still reading the field it refers to.
                 ModelState.AddModelError(string.Empty, message);
                 ViewBag.StudentPublicId = id;
-                await FillEditDropdownsAsync(model.ClassName);
+                await FillEditDropdownsAsync(model.ClassName, stored.AcademicYear);
                 return View(model);
             }
 
@@ -519,8 +588,8 @@ namespace educore.Areas.ERP.Controllers
             return RedirectToAction("Dashboard", new { id });
         }
 
-        // Class list + the sections that class actually has, for the edit form.
-        private async Task FillEditDropdownsAsync(string? className)
+        // Class list + the sections that class has in the student's session.
+        private async Task FillEditDropdownsAsync(string? className, string? academicYear)
         {
             try
             {
@@ -531,7 +600,7 @@ namespace educore.Areas.ERP.Controllers
 
             ViewBag.SectionList = string.IsNullOrWhiteSpace(className)
                 ? new List<string>()
-                : await _admissionService.GetClassSectionsAsync(className, TenantId(), SchoolId(), UserId());
+                : await _admissionService.GetClassSectionsAsync(className, TenantId(), SchoolId(), UserId(), academicYear);
         }
     }
 }

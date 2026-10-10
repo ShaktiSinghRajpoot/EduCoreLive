@@ -63,7 +63,7 @@
 
     bool gStaff       = Can("staff.view");
     bool gTransport   = showTransport && Can("transport.view");
-    bool gInventory   = showInventory && Can("fees.view");   // no inventory.* key yet
+    bool gInventory   = showInventory && Can("inventory.view");
     bool secPeople    = gStaff || gTransport || gInventory;
 
     // Setup screens used to sit in ONE 14-item "School Settings" group, which was

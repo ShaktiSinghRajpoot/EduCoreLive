@@ -1,5 +1,6 @@
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
+using educore.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,6 +25,23 @@ namespace educore.Controllers
         public async Task<IActionResult> Index()
         {
             var model = await _dashboardService.GetSummaryAsync(TenantId(), SchoolId(), UserId());
+
+            // Every signed-in role lands here. Fee collections, outstanding dues and the
+            // defaulters list (names + amounts) are finance data: without fees.view they
+            // are removed from the model on the server, not just hidden in the page.
+            if (!await HasPermissionAttribute.UserHasAsync(this, "fees.view"))
+            {
+                model.ShowFinance = false;
+                model.TodayCollection = 0;
+                model.YesterdayCollection = 0;
+                model.Outstanding = 0;
+                model.DueStudents = 0;
+                model.Trend.Clear();
+                model.Modes.Clear();
+                model.Defaulters.Clear();
+                model.Recent.Clear();
+            }
+
             return View(model);
         }
     }

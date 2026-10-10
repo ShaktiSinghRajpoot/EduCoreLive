@@ -22,20 +22,15 @@
         mother      = Model.MotherName ?? "",
         mobile      = Model.MobileNumber ?? "",
         altMobile   = Model.AlternateMobile ?? "",
-        email       = Model.FatherEmail ?? "",
-        whatsapp    = "",
         address     = Model.Address ?? "",
         bloodGroup  = Model.BloodGroup ?? "",
         religion    = Model.Religion ?? "",
         category    = Model.Category ?? "",
         nationality = Model.Nationality ?? "",
-        caste       = "",
         aadhar      = Model.IdProofNo ?? "",
         prevSchool  = Model.PrevSchoolName ?? "",
-        remarks     = "",
         rollNo      = Model.RollNo ?? "",
-        status      = "Active",
-        photo       = ""
+        photo       = Model.PhotoUrl ?? ""
     });
 }
 
@@ -85,7 +80,6 @@
           enctype="multipart/form-data"
           novalidate>
         @Html.AntiForgeryToken()
-        <input type="hidden" name="StudentStatus" id="hStatus" value="Active" />
 
         <div class="row g-4">
 
@@ -233,17 +227,6 @@
                                        placeholder="Optional">
                                 <div class="invalid-feedback">Enter a valid 10-digit number.</div>
                             </div>
-                            <div class="col-12 col-md-6">
-                                <label class="es-label">Email Address</label>
-                                <input type="email" name="FatherEmail" id="fEmail" class="form-control"
-                                       placeholder="parent@email.com">
-                            </div>
-                            <div class="col-12 col-md-6">
-                                <label class="es-label">WhatsApp Number</label>
-                                <input type="tel" name="WhatsappNo" id="fWhatsapp" class="form-control"
-                                       maxlength="10" pattern="[0-9]{10}"
-                                       placeholder="If different from mobile">
-                            </div>
                             <div class="col-12">
                                 <label class="es-label required">Address</label>
                                 <textarea name="Address" id="fAddress" class="form-control"
@@ -302,11 +285,6 @@
                                        value="Indian" placeholder="e.g. Indian">
                             </div>
                             <div class="col-12 col-md-6">
-                                <label class="es-label">Caste</label>
-                                <input type="text" name="Caste" id="fCaste" class="form-control"
-                                       placeholder="Optional">
-                            </div>
-                            <div class="col-12 col-md-6">
                                 <label class="es-label">Aadhar Number</label>
                                 <input type="text" name="IdProofNo" id="fAadhar" class="form-control"
                                        maxlength="12" pattern="[0-9]{12}"
@@ -318,62 +296,34 @@
                                 <input type="text" name="PrevSchoolName" id="fPrevSchool" class="form-control"
                                        placeholder="Name of last school attended">
                             </div>
-                            <div class="col-12">
-                                <label class="es-label">Remarks / Notes</label>
-                                <textarea name="Remarks" id="fRemarks" class="form-control" rows="2"
-                                          placeholder="Any special notes or medical conditions..."></textarea>
-                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- ④ Status -->
+                <!-- ④ Leaving the school -->
+                @* Status used to be editable here, but nothing saved it: marking a
+                   student as left (or transferred) is the Exit flow's job, because
+                   it closes future dues, ends the bus and makes them eligible for a
+                   TC. This card points there instead. *@
                 <div class="es-card">
                     <div class="es-card-hdr">
                         <div class="es-sec-ic" style="background:#fff3e0;color:#e65100;">
                             <i class="bx bx-shield-quarter"></i>
                         </div>
                         <div>
-                            <div class="es-sec-title">Student Status</div>
-                            <div class="es-sec-sub">Changing status affects fee dues, attendance and reports</div>
+                            <div class="es-sec-title">Leaving the school</div>
+                            <div class="es-sec-sub">Left, transferred, passed out or struck off</div>
                         </div>
                     </div>
                     <div class="es-card-body">
-                        <div class="es-status-grid" id="statusGrid">
-                            <div class="es-status-opt selected-active" data-status="Active" onclick="selectStatus(this,'selected-active')">
-                                <div class="es-status-dot dot-active"></div>
-                                <div>
-                                    <div class="es-status-lbl" style="color:#155724;">Active</div>
-                                    <div style="font-size:.71rem;font-weight:650;color:#28a745;margin-top:.05rem;">Currently enrolled</div>
-                                </div>
-                            </div>
-                            <div class="es-status-opt" data-status="Inactive" onclick="selectStatus(this,'selected-inactive')">
-                                <div class="es-status-dot dot-inactive"></div>
-                                <div>
-                                    <div class="es-status-lbl" style="color:#495057;">Inactive</div>
-                                    <div style="font-size:.71rem;font-weight:650;color:#6c757d;margin-top:.05rem;">Temporarily not attending</div>
-                                </div>
-                            </div>
-                            <div class="es-status-opt" data-status="Transfer" onclick="selectStatus(this,'selected-transfer')">
-                                <div class="es-status-dot dot-transfer"></div>
-                                <div>
-                                    <div class="es-status-lbl" style="color:#084298;">Transfer</div>
-                                    <div style="font-size:.71rem;font-weight:650;color:#0d6efd;margin-top:.05rem;">Issued Transfer Certificate</div>
-                                </div>
-                            </div>
-                            <div class="es-status-opt" data-status="Left" onclick="selectStatus(this,'')">
-                                <div class="es-status-dot dot-left"></div>
-                                <div>
-                                    <div class="es-status-lbl" style="color:#842029;">Left</div>
-                                    <div style="font-size:.71rem;font-weight:650;color:#dc3545;margin-top:.05rem;">Dropped / Left school</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mt-3" id="statusReasonWrap" style="display:none;">
-                            <label class="es-label required">Reason for Status Change</label>
-                            <textarea name="StatusReason" id="fStatusReason" class="form-control" rows="2"
-                                      placeholder="Required: explain reason for this status change"></textarea>
-                        </div>
+                        <p class="mb-2" style="font-size:.85rem;">
+                            To record that this student has left, use <strong>Mark as left</strong> in the student list.
+                            It closes their future dues and bus, and makes them eligible for a Transfer Certificate.
+                        </p>
+                        <a class="btn btn-sm btn-outline-danger"
+                           href="@Url.Action("StudentList", "Student", new { area = "ERP", Search = Model.AdmissionNo })">
+                            <i class="bx bx-user-x me-1"></i>Go to Mark as left
+                        </a>
                     </div>
                 </div>
 
@@ -395,10 +345,12 @@
                         </div>
                         <div class="es-panel-name" id="panelName">Loading…</div>
                         <div class="es-panel-meta" id="panelMeta">—</div>
-                        <input type="file" id="photoInput" name="PhotoFile"
-                               class="d-none" accept="image/png,image/jpeg,image/webp">
-                        <div class="mt-2" style="font-size:.72rem;font-weight:650;color:var(--ec-text-muted);">
-                            <i class="bx bx-info-circle me-1"></i>JPG or PNG · Max 2 MB
+                        @* No name attribute: the photo is uploaded on its own (UploadPhoto)
+                           the moment it is picked, not with the form. *@
+                        <input type="file" id="photoInput"
+                               class="d-none" accept="image/*">
+                        <div class="mt-2" style="font-size:.72rem;font-weight:650;color:var(--ec-text-muted);" id="photoHint">
+                            <i class="bx bx-info-circle me-1"></i>Pick a photo to upload it straight away · JPG, PNG or WEBP
                         </div>
                     </div>
 
@@ -476,12 +428,14 @@
     // otherwise the form offers a section the new class does not have and the save
     // is refused. Same endpoint the promotion page uses.
     const SECTIONS_URL = '@Url.Action("PromotionSections", "Student", new { area = "ERP" })';
+    const PHOTO_URL    = '@Url.Action("UploadPhoto", "Student", new { area = "ERP" })';
 
     document.getElementById("fClass").addEventListener("change", function () {
         const cls = this.value, sel = document.getElementById("fSection");
         if (!cls) { sel.innerHTML = '<option value="">Select</option>'; return; }
 
-        fetch(SECTIONS_URL + '?class=' + encodeURIComponent(cls))
+        // Sections the class has in THIS student's session (empty ones too).
+        fetch(SECTIONS_URL + '?class=' + encodeURIComponent(cls) + '&year=' + encodeURIComponent(student.acYear))
             .then(function (r) { return r.json(); })
             .then(function (list) {
                 var html = '<option value="">Select</option>';
@@ -523,34 +477,16 @@
         setVal("fMother",     student.mother);
         setVal("fMobile",     student.mobile);
         setVal("fAltMobile",  student.altMobile);
-        setVal("fEmail",      student.email);
-        setVal("fWhatsapp",   student.whatsapp);
         setVal("fAddress",    student.address);
         setVal("fBlood",      student.bloodGroup);
         setVal("fReligion",   student.religion);
         setVal("fCategory",   student.category);
         setVal("fNationality",student.nationality);
-        setVal("fCaste",      student.caste);
         setVal("fAadhar",     student.aadhar);
         setVal("fPrevSchool", student.prevSchool);
-        setVal("fRemarks",    student.remarks);
 
         // Photo
-        if (student.photo) {
-            const img = document.createElement("img");
-            img.src = student.photo;
-            const av = document.getElementById("avatarEl");
-            av.innerHTML = "";
-            av.appendChild(img);
-        }
-
-        // Status
-        if (student.status !== "Active") {
-            document.querySelectorAll(".es-status-opt").forEach(o => o.classList.remove("selected-active"));
-            const match = document.querySelector("[data-status='" + student.status + "']");
-            if (match) match.classList.add("selected-" + student.status.toLowerCase());
-            document.getElementById("hStatus").value = student.status;
-        }
+        if (student.photo) showPhoto(student.photo);
 
         // Snapshot for change detection
         snapshotOriginal();
@@ -571,44 +507,43 @@
         document.getElementById("avatarInitials").textContent = init.toUpperCase();
     }
 
-    // ── Photo preview ────────────────────────────────────────────────────
+    function showPhoto(url) {
+        const img = document.createElement("img");
+        img.src = url;
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;";
+        const av = document.getElementById("avatarEl");
+        av.innerHTML = "";
+        av.appendChild(img);
+    }
+
+    // ── Photo upload ─────────────────────────────────────────────────────
+    // The photo used to be picked here and then thrown away on save. It now
+    // goes to the same endpoint as the student list's camera button, at once.
     document.getElementById("photoInput").addEventListener("change", function () {
-        const file = this.files[0];
+        const input = this, file = this.files[0];
         if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-            ecToast('error', 'Photo must be under 2 MB.');
-            this.value = "";
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const av = document.getElementById("avatarEl");
-            av.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;">';
-        };
-        reader.readAsDataURL(file);
+        const hint = document.getElementById("photoHint");
+        hint.textContent = "Uploading…";
+        EC.compressImage(file).then(function (small) {
+            const fd = new FormData();
+            fd.append("publicId", student.id);
+            fd.append("photo", small);
+            fd.append("__RequestVerificationToken", document.querySelector('input[name="__RequestVerificationToken"]').value);
+            return fetch(PHOTO_URL, { method: "POST", body: fd }).then(function (r) { return r.json(); });
+        }).then(function (res) {
+            if (res && res.success) {
+                showPhoto(res.photoUrl);
+                hint.textContent = "Photo saved.";
+                ecToast('success', res.message || 'Photo updated.');
+            } else {
+                hint.textContent = "Photo not saved.";
+                ecToast('error', (res && res.message) || 'Could not upload the photo.');
+            }
+        }).catch(function () {
+            hint.textContent = "Photo not saved.";
+            ecToast('error', 'Could not upload the photo.');
+        }).then(function () { input.value = ""; });
     });
-
-    // ── Status selection ─────────────────────────────────────────────────
-    window.selectStatus = function (el, cls) {
-        document.querySelectorAll(".es-status-opt").forEach(o => {
-            o.classList.remove("selected-active", "selected-inactive", "selected-transfer");
-        });
-        if (cls) el.classList.add(cls);
-        const status = el.dataset.status;
-        document.getElementById("hStatus").value = status;
-
-        const reasonWrap = document.getElementById("statusReasonWrap");
-        const reasonField = document.getElementById("fStatusReason");
-        if (status !== "Active") {
-            reasonWrap.style.display = "block";
-            reasonField.setAttribute("required", "required");
-        } else {
-            reasonWrap.style.display = "none";
-            reasonField.removeAttribute("required");
-            reasonField.value = "";
-        }
-        markChanged("Status", status);
-    };
 
     // ── Change detection ─────────────────────────────────────────────────
     let originalValues = {};
@@ -619,11 +554,6 @@
     }
 
     const changedFields = new Set();
-
-    function markChanged(label, val) {
-        changedFields.add(label);
-        updateChangeSummary();
-    }
 
     function updateChangeSummary() {
         const wrap = document.getElementById("changeSummary");
@@ -676,7 +606,7 @@
     });
 
     // ── Mobile number input: digits only ─────────────────────────────────
-    ["fMobile", "fAltMobile", "fWhatsapp", "fAadhar"].forEach(id => {
+    ["fMobile", "fAltMobile", "fAadhar"].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         el.addEventListener("input", function () {

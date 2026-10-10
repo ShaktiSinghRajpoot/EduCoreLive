@@ -365,6 +365,7 @@ var PALETTE=['primary','info','success','warning','danger','secondary'];
 
 var roster=[];          // currently loaded students (from the server)
 var outcome={};         // id -> 'promote' | 'retain' | 'passout'
+var unpicked={};        // id -> true when the office unticked that student
 
 /* ── Helpers ─────────────────────────────────── */
 function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
@@ -409,11 +410,13 @@ document.getElementById('srcClass').addEventListener('change', function(){
     clearErr();
   }
 
-  $.getJSON(SEC_URL, { 'class':cls }).done(function(list){
+  // Sections come from each session's class setup, so an empty section (a new
+  // 6-C) is offered as a target too.
+  $.getJSON(SEC_URL, { 'class':cls, year:document.getElementById('srcYear').value }).done(function(list){
     fillSelect(document.getElementById('srcSection'), list, 'All sections', '');
   });
   // Target sections come from the next class (blank on the final class).
-  if(nc){ $.getJSON(SEC_URL, { 'class':nc }).done(function(list){ fillSelect(document.getElementById('tgtSection'), list, 'Keep same section', 'keep'); }); }
+  if(nc){ $.getJSON(SEC_URL, { 'class':nc, year:document.getElementById('tgtYear').value }).done(function(list){ fillSelect(document.getElementById('tgtSection'), list, 'Keep same section', 'keep'); }); }
   else  { fillSelect(document.getElementById('tgtSection'), [], 'Keep same section', 'keep'); }
 });
 
@@ -437,7 +440,7 @@ document.getElementById('loadBtn').addEventListener('click', function(){
     roster=(list||[]).map(function(s,i){
       return {id:s.id, name:s.name, roll:s.roll||'', cls:s.cls, sec:s.sec||'', due:s.due||0, color:PALETTE[i%PALETTE.length]};
     });
-    outcome={}; targetClass={};
+    outcome={}; targetClass={}; unpicked={};
     roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
 
     document.getElementById('sumSection').style.display='';
@@ -489,11 +492,15 @@ function classPicker(s, nc){
 }
 
 /* ── Outcome segmented control markup ────────── */
-function seg(id, val){
+// pfx keeps the desktop ('oc') and mobile ('ocm') copies in separate radio
+// groups. With one shared name the hidden mobile radio took the checked state
+// and the desktop toggle never showed the choice.
+function seg(id, val, pfx){
+  pfx = pfx || 'oc';
   function r(o,lbl){
     var checked = val===o ? 'checked' : '';
-    return '<input type="radio" class="o-'+o+'" name="oc'+id+'" id="oc'+id+'_'+o+'" value="'+o+'" '+checked+'>'+
-           '<label for="oc'+id+'_'+o+'">'+lbl+'</label>';
+    return '<input type="radio" class="o-'+o+'" name="'+pfx+id+'" id="'+pfx+id+'_'+o+'" value="'+o+'" '+checked+'>'+
+           '<label for="'+pfx+id+'_'+o+'">'+lbl+'</label>';
   }
   return '<div class="pr-seg" data-id="'+id+'">'+r('promote','Promote')+r('retain','Retain')+r('passout','Pass Out')+'</div>';
 }
@@ -518,7 +525,7 @@ function render(){
               : nc===null ? '<span class="text-muted">—</span>'
               : '<span class="text-danger fw-bold" title="Not set up in either session">Not set up</span>';
     return '<tr class="'+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
-      +'<td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input pr-pick" data-id="'+s.id+'" checked></td>'
+      +'<td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input pr-pick" data-id="'+s.id+'"'+(isPicked(s.id)?' checked':'')+'></td>'
       +'<td><div class="d-flex align-items-center gap-2">'
       +   '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
       +   '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
@@ -539,7 +546,7 @@ function render(){
               : nc===null ? '—' : 'Not set up';
     return '<div class="pr-mob-card '+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
       +'<div class="pr-mob-top">'
-      +  '<input type="checkbox" class="form-check-input pr-pick mt-0" data-id="'+s.id+'" checked>'
+      +  '<input type="checkbox" class="form-check-input pr-pick-m mt-0" data-id="'+s.id+'"'+(isPicked(s.id)?' checked':'')+'>'
       +  '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
       +  '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.roll||'—')+' · '+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
       +'</div>'
@@ -548,7 +555,7 @@ function render(){
       +  '<span class="pr-due '+(s.due>0?'has':'clear')+'">Dues '+inr(s.due)+'</span>'
       +'</div>'
       +'<div class="text-muted small fw-bold mb-2"><i class="bx bx-right-arrow-alt"></i> '+ncTxt+'</div>'
-      +seg(s.id, oc)
+      +seg(s.id, oc, 'ocm')
       +'</div>';
   }).join('');
 
@@ -567,8 +574,17 @@ function bindSegs(){
       render();
     });
   });
-  document.querySelectorAll('.pr-pick').forEach(function(c){
-    c.addEventListener('change', updateCounts);
+  // Desktop and mobile each draw a checkbox per student. Unticking either one
+  // records it in `unpicked` and mirrors the other copy, so a hidden ticked copy
+  // can no longer send a student the office meant to leave out.
+  document.querySelectorAll('.pr-pick, .pr-pick-m').forEach(function(c){
+    c.addEventListener('change', function(){
+      var id=this.dataset.id, on=this.checked;
+      if(on) delete unpicked[id]; else unpicked[id]=true;
+      document.querySelectorAll('.pr-pick[data-id="'+id+'"], .pr-pick-m[data-id="'+id+'"]')
+        .forEach(function(x){ x.checked=on; });
+      updateCounts();
+    });
   });
   // No re-render here: the select already shows what was picked, and redrawing
   // would drop the user's focus mid-scroll on a long roster.
@@ -581,10 +597,9 @@ function bindSegs(){
 }
 
 /* ── Counts ──────────────────────────────────── */
+function isPicked(id){ return !unpicked[id]; }
 function picked(){
-  var set={};
-  document.querySelectorAll('.pr-pick').forEach(function(c){ if(c.checked) set[c.dataset.id]=true; });
-  return roster.filter(function(s){ return set[s.id]; });
+  return roster.filter(function(s){ return isPicked(s.id); });
 }
 function updateCounts(){
   var sel=picked();
@@ -619,7 +634,9 @@ document.getElementById('promoteFailed').addEventListener('click', function(){
 /* ── Select all ──────────────────────────────── */
 document.getElementById('selAll').addEventListener('change', function(){
   var on=this.checked;
-  document.querySelectorAll('.pr-pick').forEach(function(c){ c.checked=on; });
+  unpicked={};
+  if(!on) roster.forEach(function(s){ unpicked[s.id]=true; });
+  document.querySelectorAll('.pr-pick, .pr-pick-m').forEach(function(c){ c.checked=on; });
   updateCounts();
 });
 
@@ -638,7 +655,7 @@ document.getElementById('carryDues').addEventListener('change', function(){
 
 /* ── Reset ───────────────────────────────────── */
 document.getElementById('resetBtn').addEventListener('click', function(){
-  roster=[]; outcome={}; targetClass={};
+  roster=[]; outcome={}; targetClass={}; unpicked={};
   document.getElementById('sumSection').style.display='none';
   document.getElementById('rosterCard').style.display='none';
   document.getElementById('srcClass').value='';
@@ -722,7 +739,7 @@ document.getElementById('srcYear').addEventListener('change', function(){
   if(document.getElementById('srcYear').value===document.getElementById('tgtYear').value) initTargetYear();
 
   // Classes belong to a session, so the list and any loaded roster are now stale.
-  roster=[]; outcome={}; targetClass={};
+  roster=[]; outcome={}; targetClass={}; unpicked={};
   document.getElementById('sumSection').style.display='none';
   document.getElementById('rosterCard').style.display='none';
   loadSourceClasses();
@@ -863,7 +880,7 @@ document.getElementById('commitBtn').addEventListener('click', function(){
     showResult(res);
 
     // The students have moved to the new session, so this roster is stale.
-    roster=[]; outcome={}; targetClass={};
+    roster=[]; outcome={}; targetClass={}; unpicked={};
     document.getElementById('sumSection').style.display='none';
     document.getElementById('rosterCard').style.display='none';
   })

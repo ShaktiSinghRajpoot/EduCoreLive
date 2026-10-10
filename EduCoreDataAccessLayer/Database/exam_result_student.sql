@@ -96,8 +96,12 @@ BEGIN
            CASE WHEN COALESCE(m.is_absent, FALSE) OR COALESCE(es.max_marks, 0) = 0 THEN NULL
                 ELSE ROUND(m.marks_obtained * 100.0 / es.max_marks, 1) END AS percent
     FROM academic.exam_marks m
-    LEFT JOIN academic.exam_subjects es
-           ON es.exam_id = m.exam_id AND es.subject_id = m.subject_id
+    -- The paper is (exam, CLASS, subject): the same subject can sit on several
+    -- classes' datesheets with different max marks. A mark whose paper is no
+    -- longer on the datesheet is not a result.
+    JOIN academic.exam_subjects es
+      ON es.exam_id = m.exam_id AND es.subject_id = m.subject_id
+     AND es.academic_class_id = m.academic_class_id
     LEFT JOIN academic.school_subjects sub
            ON sub.subject_id = m.subject_id
           AND sub.tenant_id = p_tenant_id AND sub.school_id = p_school_id
@@ -106,23 +110,27 @@ BEGIN
       AND m.tenant_id  = p_tenant_id AND m.school_id = p_school_id
     ORDER BY es.display_order NULLS LAST, subject;
 
-    -- ── 3. Totals, absences excluded ────────────────────────────────────────
+    -- ── 3. Totals, absences and not-yet-entered marks excluded ─────────────
     OPEN p_summary FOR
-    SELECT COUNT(*) FILTER (WHERE NOT COALESCE(m.is_absent, FALSE))::int   AS subjects,
-           COALESCE(SUM(m.marks_obtained) FILTER (WHERE NOT COALESCE(m.is_absent, FALSE)), 0) AS obtained,
-           COALESCE(SUM(es.max_marks)     FILTER (WHERE NOT COALESCE(m.is_absent, FALSE)), 0) AS total,
-           CASE WHEN COALESCE(SUM(es.max_marks) FILTER (WHERE NOT COALESCE(m.is_absent, FALSE)), 0) = 0
+    SELECT COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL)::int   AS subjects,
+           COALESCE(SUM(m.marks_obtained) FILTER (WHERE m.marks_obtained IS NOT NULL), 0) AS obtained,
+           COALESCE(SUM(es.max_marks)     FILTER (WHERE m.marks_obtained IS NOT NULL), 0) AS total,
+           CASE WHEN COALESCE(SUM(es.max_marks) FILTER (WHERE m.marks_obtained IS NOT NULL), 0) = 0
                 THEN 0::numeric
-                ELSE ROUND(SUM(m.marks_obtained) FILTER (WHERE NOT COALESCE(m.is_absent, FALSE)) * 100.0
-                         / SUM(es.max_marks)     FILTER (WHERE NOT COALESCE(m.is_absent, FALSE)), 1)
+                ELSE ROUND(SUM(m.marks_obtained) FILTER (WHERE m.marks_obtained IS NOT NULL) * 100.0
+                         / SUM(es.max_marks)     FILTER (WHERE m.marks_obtained IS NOT NULL), 1)
            END                                                             AS percent,
            COUNT(*) FILTER (WHERE COALESCE(m.is_absent, FALSE))::int       AS absent_count,
-           COUNT(*) FILTER (WHERE NOT COALESCE(m.is_absent, FALSE)
+           COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL
                               AND es.pass_marks IS NOT NULL
                               AND m.marks_obtained < es.pass_marks)::int   AS failed_count
     FROM academic.exam_marks m
-    LEFT JOIN academic.exam_subjects es
-           ON es.exam_id = m.exam_id AND es.subject_id = m.subject_id
+    -- The paper is (exam, CLASS, subject): the same subject can sit on several
+    -- classes' datesheets with different max marks. A mark whose paper is no
+    -- longer on the datesheet is not a result.
+    JOIN academic.exam_subjects es
+      ON es.exam_id = m.exam_id AND es.subject_id = m.subject_id
+     AND es.academic_class_id = m.academic_class_id
     WHERE m.exam_id    = v_exam_id
       AND m.student_id = p_student_id
       AND m.tenant_id  = p_tenant_id AND m.school_id = p_school_id;

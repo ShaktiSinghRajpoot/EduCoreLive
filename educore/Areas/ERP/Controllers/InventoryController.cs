@@ -7,9 +7,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
-    // Stock / store module. Still gated by fees.view until a dedicated
-    // inventory.* permission is added to the RBAC catalog.
-    [HasPermission("fees.view")]
+    // Stock / store module. Reading needs inventory.view; every write action
+    // below also needs inventory.manage (which implies view). Cancelling a
+    // purchase is a write like any other -- there is no separate key for it.
+    [HasPermission("inventory.view")]
     [RequiresModule(SchoolModule.Inventory)]
     public class InventoryController : Controller
     {
@@ -32,8 +33,13 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> PurchaseEntry()
         {
             // Both pickers come from the database; the shell had them hardcoded.
+            // Inactive items are left out: the proc refuses to buy them anyway.
             ViewBag.Suppliers = await _inventory.GetSuppliersAsync(TenantId(), SchoolId(), UserId());
-            ViewBag.Items     = await _inventory.GetItemsAsync(TenantId(), SchoolId(), UserId());
+            ViewBag.Items     = (await _inventory.GetItemsAsync(TenantId(), SchoolId(), UserId()))
+                                .Where(i => i.IsActive).ToList();
+            // The school's date, not the browser's UTC one (toISOString), so the
+            // default is right before 05:30 in the morning too.
+            ViewBag.Today     = Dates.Today;
             return View();
         }
 
@@ -90,6 +96,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
         public async Task<IActionResult> SaveItem([FromBody] InventoryItemInput input)
         {
             if (input == null) return Json(new { success = false, message = "Nothing to save." });
@@ -100,6 +107,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
         public async Task<IActionResult> DeleteItem([FromBody] IdRequest req)
         {
             var res = await _inventory.DeleteItemAsync(req?.Id ?? 0, TenantId(), SchoolId(), UserId());
@@ -109,6 +117,7 @@ namespace educore.Areas.ERP.Controllers
         // ── Stock ───────────────────────────────────────────────────────────
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
         public async Task<IActionResult> MoveStock([FromBody] StockMovementInput input)
         {
             if (input == null) return Json(new { success = false, message = "Nothing to record." });
@@ -127,7 +136,10 @@ namespace educore.Areas.ERP.Controllers
                 date    = Dates.Show(r.MovementDate),
                 type    = r.MovementType,
                 qty     = r.Quantity,
-                balance = r.BalanceAfter,
+                balance = r.Balance,
+                rate    = r.UnitRate,
+                by      = r.CreatedBy,
+                invoice = r.InvoiceNo,
                 to      = r.IssuedTo,
                 remarks = r.Remarks
             }));
@@ -153,6 +165,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
         public async Task<IActionResult> SaveSupplier([FromBody] InventorySupplier input)
         {
             if (input == null) return Json(new { success = false, message = "Nothing to save." });
@@ -163,6 +176,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
         public async Task<IActionResult> DeleteSupplier([FromBody] IdRequest req)
         {
             var res = await _inventory.DeleteSupplierAsync(req?.Id ?? 0, TenantId(), SchoolId(), UserId());
@@ -179,6 +193,8 @@ namespace educore.Areas.ERP.Controllers
             {
                 id        = r.PurchaseId,
                 date      = Dates.Show(r.PurchaseDate, "dd MMM yyyy"),
+                iso       = r.PurchaseDate,
+                qty       = r.ItemQty,
                 supplier  = r.SupplierName,
                 invoice   = r.InvoiceNo,
                 mode      = r.PaymentMode,
@@ -224,6 +240,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
         public async Task<IActionResult> SavePurchase([FromBody] PurchaseInput input)
         {
             if (input == null) return Json(new { success = false, message = "Nothing to save." });
@@ -234,6 +251,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
         public async Task<IActionResult> CancelPurchase([FromBody] CancelRequest req)
         {
             var res = await _inventory.CancelPurchaseAsync(

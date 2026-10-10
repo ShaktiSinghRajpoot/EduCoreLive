@@ -441,7 +441,9 @@ document.getElementById('btnExcel').addEventListener('click',function(){
     +'&search='+encodeURIComponent(val('Search'))
     +'&className='+encodeURIComponent(val('FilterClass'))
     +'&gender='+encodeURIComponent(val('FilterGender'))
-    +'&year='+encodeURIComponent(val('FilterYear'));
+    +'&year='+encodeURIComponent(val('FilterYear'))
+    // The export must be the list on screen: it used to drop the Fee filter.
+    +'&fee='+encodeURIComponent(val('FilterFee'));
   $.ajax({
     url:     EXPORT_URL+qs,
     type:    'GET',
@@ -451,7 +453,14 @@ document.getElementById('btnExcel').addEventListener('click',function(){
       var rows=(res&&res.success&&res.rows)?res.rows:[];
       var hdr=['Adm No','Roll','Name','Class','Sec','Gender','Adm Date','Guardian','Phone','Fee','Status'];
       var body=rows.map(function(s){return[s.admissionNo,s.rollNo||'',s.studentName,s.className,s.section||'',s.gender||'',fmtDate(s.admissionDate),s.guardianName||'',s.mobile||'',s.feeStatus||'',s.status||''];});
-      var csv='﻿'+[hdr].concat(body).map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
+      // A cell that starts with = + - @@ (or a tab / CR) is run as a formula by
+      // Excel. Prefix it with ' so a name like "=HYPERLINK(...)" stays text.
+      function cell(c){
+        var v=String(c==null?'':c);
+        if(/^[=+\-@@\t\r]/.test(v)) v="'"+v;
+        return '"'+v.replace(/"/g,'""')+'"';
+      }
+      var csv='﻿'+[hdr].concat(body).map(function(r){return r.map(cell).join(',');}).join('\r\n');
       var a=document.createElement('a');
       a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
       a.download='students_'+new Date().toISOString().slice(0,10)+'.csv';

@@ -55,6 +55,19 @@ CREATE INDEX IF NOT EXISTS ix_timetable_teacher_slot
     ON academic.timetable (tenant_id, school_id, academic_year_id, day_of_week, period_seq, staff_id);
 
 
+-- A room number reduced to a comparable key, or NULL when it is not a real
+-- room ("", "N.A", "nil", "none"), so " 101 " and "101" clash and two sections
+-- marked "N.A" do not. Mirrors EC.isRealRoom in wwwroot/js/site.js.
+CREATE OR REPLACE FUNCTION academic.fn_room_key(p_room text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $function$
+    SELECT CASE WHEN k IN ('', 'na', 'nil', 'none') THEN NULL ELSE k END
+    FROM (SELECT regexp_replace(lower(COALESCE(p_room, '')), '[^a-z0-9]', '', 'g') AS k) x;
+$function$;
+
+
 CREATE OR REPLACE PROCEDURE academic.sp_school_admin_timetable_manage(
     IN    p_operation        character varying,
     IN    p_tenant_id        integer,
@@ -83,6 +96,7 @@ DECLARE
     v_skipped   integer := 0;
     v_day       smallint;
     v_row       record;
+    v_room      text;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -129,10 +143,12 @@ BEGIN
 
         -- 3: teaching staff.
         OPEN p_result3 FOR
+        -- Active TEACHING staff only — the same pool SaveCell accepts.
         SELECT staff_id, full_name
         FROM core.staff
         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
           AND NOT is_deleted AND is_active
+          AND LOWER(COALESCE(staff_type, '')) = 'teaching'
         ORDER BY full_name;
 
         -- 4: day columns = the week minus the school's weekly offs.
@@ -250,6 +266,70 @@ BEGIN
             RAISE EXCEPTION 'That section does not belong to this school.';
         END IF;
 
+        SELECT sec.academic_class_id, sec.room_no INTO v_class, v_room
+        FROM academic.academic_class_sections sec
+        WHERE sec.academic_class_section_id = p_section_id;
+
+        IF p_day < 0 OR p_day > 6 THEN
+            RAISE EXCEPTION 'That is not a day of the week.';
+        END IF;
+
+        -- The weekly offs have no column on the grid, so nothing can be booked there.
+        SELECT COALESCE(weekly_off_days, '{0}') INTO v_offs
+        FROM academic.school_calendar_settings
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id;
+        IF p_day = ANY (COALESCE(v_offs, '{0}')) THEN
+            RAISE EXCEPTION '% is a weekly off. Change it in the School Calendar first.',
+                to_char(DATE '2024-01-07' + p_day, 'FMDay');
+        END IF;
+
+        -- The subject must be one this class studies this session (Subject
+        -- Management) — which also keeps it inside this school.
+        IF NOT EXISTS (SELECT 1 FROM academic.class_subjects cs
+                       JOIN academic.school_subjects s ON s.subject_id = cs.subject_id
+                       WHERE cs.tenant_id = p_tenant_id AND cs.school_id = p_school_id
+                         AND s.tenant_id  = p_tenant_id AND s.school_id  = p_school_id
+                         AND cs.academic_year_id  = v_year
+                         AND cs.academic_class_id = v_class
+                         AND cs.subject_id        = p_subject_id) THEN
+            RAISE EXCEPTION 'That subject is not taught in this class. Check Subject Management.';
+        END IF;
+
+        -- The teacher must be active teaching staff of this school.
+        IF p_staff_id IS NOT NULL AND NOT EXISTS (
+               SELECT 1 FROM core.staff st
+               WHERE st.staff_id = p_staff_id
+                 AND st.tenant_id = p_tenant_id AND st.school_id = p_school_id
+                 AND NOT st.is_deleted AND st.is_active
+                 AND LOWER(COALESCE(st.staff_type, '')) = 'teaching') THEN
+            RAISE EXCEPTION 'Pick an active teacher of this school.';
+        END IF;
+
+        -- A room holds one class at a time. The room is the one typed, otherwise
+        -- the section's own room; "N.A" and blanks are not rooms.
+        v_room := academic.fn_room_key(COALESCE(NULLIF(trim(COALESCE(p_room_no, '')), ''), v_room));
+        IF v_room IS NOT NULL THEN
+            SELECT c.class_name || ' – ' || sec.section_name INTO v_clash
+            FROM academic.timetable t
+            JOIN academic.academic_class_sections sec ON sec.academic_class_section_id = t.academic_class_section_id
+            JOIN academic.academic_classes c          ON c.academic_class_id = sec.academic_class_id
+            WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id
+              AND t.academic_year_id = v_year
+              AND t.day_of_week = p_day
+              AND t.period_seq  = p_period_seq
+              AND t.academic_class_section_id <> p_section_id
+              AND academic.fn_room_key(COALESCE(NULLIF(trim(t.room_no), ''), sec.room_no)) = v_room
+            LIMIT 1;
+
+            IF v_clash IS NOT NULL THEN
+                RAISE EXCEPTION 'Room % is already taken by % in this slot.',
+                    trim(COALESCE(NULLIF(trim(COALESCE(p_room_no, '')), ''),
+                                  (SELECT room_no FROM academic.academic_class_sections
+                                   WHERE academic_class_section_id = p_section_id))), v_clash;
+            END IF;
+            v_clash := NULL;
+        END IF;
+
         -- Only teaching periods are bookable — never a break or lunch.
         IF NOT EXISTS (SELECT 1 FROM academic.period_structure
                        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
@@ -354,6 +434,27 @@ BEGIN
                     CONTINUE;
                 END IF;
 
+                -- Same for the room: skip a slot whose room is taken that day.
+                IF academic.fn_room_key(COALESCE(NULLIF(trim(v_row.room_no), ''),
+                       (SELECT room_no FROM academic.academic_class_sections
+                        WHERE academic_class_section_id = p_section_id))) IS NOT NULL
+                   AND EXISTS (
+                    SELECT 1 FROM academic.timetable t
+                    JOIN academic.academic_class_sections sec ON sec.academic_class_section_id = t.academic_class_section_id
+                    WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id
+                      AND t.academic_year_id = v_year
+                      AND t.day_of_week = v_day
+                      AND t.period_seq  = v_row.period_seq
+                      AND t.academic_class_section_id <> p_section_id
+                      AND academic.fn_room_key(COALESCE(NULLIF(trim(t.room_no), ''), sec.room_no))
+                        = academic.fn_room_key(COALESCE(NULLIF(trim(v_row.room_no), ''),
+                              (SELECT room_no FROM academic.academic_class_sections
+                               WHERE academic_class_section_id = p_section_id)))
+                ) THEN
+                    v_skipped := v_skipped + 1;
+                    CONTINUE;
+                END IF;
+
                 INSERT INTO academic.timetable
                     (tenant_id, school_id, academic_year_id, academic_class_section_id,
                      day_of_week, period_seq, subject_id, staff_id, room_no, created_by, created_at)
@@ -371,7 +472,7 @@ BEGIN
                v_copied  AS copied,
                v_skipped AS skipped,
                CASE WHEN v_skipped > 0
-                    THEN v_copied || ' periods copied · ' || v_skipped || ' skipped (teacher already booked).'
+                    THEN v_copied || ' periods copied · ' || v_skipped || ' skipped (teacher or room already booked).'
                     ELSE v_copied || ' periods copied across the week.'
                END AS message;
 

@@ -43,6 +43,10 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> GetTransportRoutes()
         {
+            // No routes to offer when the school has switched Transport off.
+            var wf = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
+            if (!wf.EnableTransport) return Json(Array.Empty<object>());
+
             var rows = await _transportService.GetRoutesDropdownAsync(TenantId(), SchoolId(), UserId());
             var routes = rows.GroupBy(r => new { r.RouteId, r.RouteName }).Select(g => new
             {
@@ -81,7 +85,11 @@ namespace educore.Areas.ERP.Controllers
         public IActionResult StudentList()
             => RedirectToAction("StudentList", "Student", new { area = "ERP" });
 
-        public IActionResult Dashboard() => View();
+        // This used to render a mock student dashboard (random grades, a rank of
+        // rand(1,40), made-up attendance) that looked like real data. The real
+        // dashboard is per student (Student/Dashboard/{id}), reached from the list.
+        public IActionResult Dashboard()
+            => RedirectToAction("StudentList", "Student", new { area = "ERP" });
 
         // ── GET: /ERP/Admission/Create?enquiryId= ────────────────
         // Opens the admission page; when an enquiry id is supplied the
@@ -444,7 +452,14 @@ namespace educore.Areas.ERP.Controllers
             // ── Assign transport (optional) ── generates monthly bus-fee dues
             // through the end of the session; the proc reads the session's real
             // end date, so no month count is worked out here any more.
-            if (result.Success && result.StudentId > 0 && form.TransportRouteId is > 0 && form.TransportStopId is > 0)
+            // Never when the Transport module is switched off: the form hides the
+            // panel, but a stale page or a crafted post still sent a route, and the
+            // bus was assigned and billed for a school that runs no buses (SEC-20).
+            bool transportOn = form.TransportRouteId is > 0 && form.TransportStopId is > 0
+                && (await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId)).EnableTransport;
+            if (result.Success && result.StudentId > 0 && form.TransportRouteId is > 0 && form.TransportStopId is > 0 && !transportOn)
+                transportMessage = "Admission saved. The bus was not assigned because the Transport module is turned off.";
+            if (result.Success && result.StudentId > 0 && transportOn)
             {
                 var (busOk, busMsg, _, _) = await _transportService.SaveAssignmentAsync(
                     result.StudentId, form.TransportRouteId.Value, form.TransportStopId.Value,
@@ -472,12 +487,21 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> GetStudentsData(
             int page = 1, int pageSize = 10, string? search = null,
             string? className = null, string? section = null, string? gender = null,
-            string? year = null, string? status = null)
+            string? year = null, string? status = null, string? fee = null)
         {
             var (rows, totalCount) = await _admissionService.GetStudentsAsync(
                 TenantId(), SchoolId(), UserId(), page, pageSize,
                 NullIfEmpty(search), NullIfEmpty(className), NullIfEmpty(section),
                 NullIfEmpty(gender), NullIfEmpty(year), NullIfEmpty(status));
+
+            // Fee status (Paid / Partial / Pending) is computed per row by the
+            // proc, so the directory's Fee filter is applied here. The CSV export
+            // used to ignore it and export everyone.
+            if (!string.IsNullOrWhiteSpace(fee))
+            {
+                rows = rows.Where(s => string.Equals(s.FeeStatus, fee.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
+                totalCount = rows.Count;
+            }
 
             int totalPages = totalCount > 0 ? (int)Math.Ceiling((double)totalCount / pageSize) : 1;
 

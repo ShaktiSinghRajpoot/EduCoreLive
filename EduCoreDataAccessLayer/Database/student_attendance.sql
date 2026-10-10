@@ -80,7 +80,48 @@ END;
 $procedure$;
 
 
--- ── the roster for a class/section on a date, with any marks already made ─────
+-- ── who belongs on a class-section's register on one date ───────────────────
+-- Shared by the roster (what the teacher sees) and the save (what it accepts),
+-- so the two can never disagree:
+--   * students in the class-section now, admitted by that date, and either still
+--     active or leaving on/after that date - unless that day's row already puts
+--     them in another class-section (they moved later, or were marked there);
+--   * plus anyone whose row for that date is already in this class-section, so a
+--     past day can be corrected after a student moved or left.
+CREATE OR REPLACE FUNCTION core.fn_attendance_register(
+    p_tenant_id integer, p_school_id integer, p_class varchar, p_section varchar, p_date date)
+RETURNS TABLE (student_id integer)
+LANGUAGE sql
+STABLE
+AS $function$
+    SELECT s.student_id
+    FROM core.students s
+    WHERE s.tenant_id = p_tenant_id
+      AND s.school_id = p_school_id
+      AND LOWER(s.class_name)            = LOWER(TRIM(p_class))
+      AND LOWER(COALESCE(s.section, '')) = LOWER(TRIM(COALESCE(p_section, '')))
+      AND (s.admission_date IS NULL OR s.admission_date::date <= p_date)
+      AND (s.is_active
+           OR (s.date_of_leaving IS NOT NULL AND s.date_of_leaving::date >= p_date))
+      AND NOT EXISTS (
+          SELECT 1 FROM core.student_attendance o
+          WHERE o.tenant_id = s.tenant_id AND o.school_id = s.school_id
+            AND o.student_id = s.student_id
+            AND o.attendance_date = to_char(p_date, 'YYYY-MM-DD')
+            AND NOT (LOWER(o.class_name)            = LOWER(TRIM(p_class))
+                 AND LOWER(COALESCE(o.section, '')) = LOWER(TRIM(COALESCE(p_section, '')))))
+    UNION
+    SELECT a.student_id
+    FROM core.student_attendance a
+    WHERE a.tenant_id = p_tenant_id
+      AND a.school_id = p_school_id
+      AND a.attendance_date = to_char(p_date, 'YYYY-MM-DD')
+      AND LOWER(a.class_name)            = LOWER(TRIM(p_class))
+      AND LOWER(COALESCE(a.section, '')) = LOWER(TRIM(COALESCE(p_section, '')));
+$function$;
+
+
+-- ── the class roster for a date, with any marks already made ───────────────
 CREATE OR REPLACE PROCEDURE core.sp_attendance_roster(
     IN    p_tenant_id integer,
     IN    p_school_id integer,
@@ -92,7 +133,7 @@ CREATE OR REPLACE PROCEDURE core.sp_attendance_roster(
 LANGUAGE plpgsql
 AS $procedure$
 BEGIN
-    IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 OR COALESCE(TRIM(p_class), '') = '' OR p_date IS NULL THEN
         OPEN p_result FOR SELECT WHERE FALSE;
         RETURN;
     END IF;
@@ -104,19 +145,14 @@ BEGIN
         a.status  AS status,           -- NULL when not yet marked
         a.remarks AS remarks,
         (a.attendance_id IS NOT NULL) AS is_marked
-    FROM core.students s
+    FROM core.fn_attendance_register(p_tenant_id, p_school_id, p_class, p_section, p_date) r
+    JOIN core.students s
+      ON s.student_id = r.student_id
     LEFT JOIN core.student_attendance a
            ON a.student_id      = s.student_id
           AND a.tenant_id       = s.tenant_id
           AND a.school_id       = s.school_id
-          AND a.attendance_date::date = p_date
-    WHERE s.tenant_id = p_tenant_id
-      AND s.school_id = p_school_id
-      AND s.is_active = TRUE
-      -- A student can't be on a register before they were admitted.
-      AND (s.admission_date IS NULL OR s.admission_date::date <= p_date)
-      AND (p_class   IS NULL OR TRIM(p_class)   = '' OR LOWER(s.class_name)          = LOWER(TRIM(p_class)))
-      AND (p_section IS NULL OR TRIM(p_section) = '' OR LOWER(COALESCE(s.section,'')) = LOWER(TRIM(p_section)))
+          AND a.attendance_date = to_char(p_date, 'YYYY-MM-DD')
     ORDER BY
         CASE WHEN s.roll_no ~ '^[0-9]+$' THEN lpad(s.roll_no, 6, '0') ELSE NULL END NULLS LAST,
         s.student_name;
@@ -124,14 +160,31 @@ END;
 $procedure$;
 
 
--- ── save (upsert) the whole class's marks for a date ─────────────────────────
+-- ── save (upsert) one class-section's marks for a date ──────────────────────
 -- p_items is a JSON array: [{ "studentId": 1, "status": "Present", "remarks": "" }, ...]
--- The class/section/year snapshot is taken from each student's current row.
+--
+-- The class-section is part of the call so the save can check every student
+-- against the same register the roster showed: the controller's class-teacher
+-- gate approves a class-section, and this keeps the items inside it.
+--
+-- Rules, in order: school scope; date not in the future; the School Calendar
+-- says the school is open that day (declared holidays and weekly offs refused,
+-- declared working days allowed, a half day is a normal day); inside the
+-- back-date window; every status is Present/Absent/Late/Leave; every student
+-- is on the register. Nothing is saved if any item is refused.
+--
+-- A mark that does not change is not rewritten, so updated_by keeps meaning
+-- "who last changed it", and the history trigger (academics_edit_history.sql)
+-- records only real changes.
+DROP PROCEDURE IF EXISTS core.sp_attendance_save(integer, integer, integer, date, jsonb, refcursor);
+
 CREATE OR REPLACE PROCEDURE core.sp_attendance_save(
     IN    p_tenant_id integer,
     IN    p_school_id integer,
     IN    p_action_user_id integer,
     IN    p_date      date,
+    IN    p_class     varchar,
+    IN    p_section   varchar,
     IN    p_items     jsonb,
     INOUT p_result    refcursor DEFAULT 'attendance_save_cursor'::refcursor)
 LANGUAGE plpgsql
@@ -139,6 +192,9 @@ AS $procedure$
 DECLARE
     v_saved         integer := 0;
     v_backdate_days integer;
+    v_day_type      text;
+    v_title         text;
+    v_bad           text;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -146,17 +202,28 @@ BEGIN
     IF p_date IS NULL THEN
         RAISE EXCEPTION 'Attendance date is required.';
     END IF;
+    IF COALESCE(TRIM(p_class), '') = '' THEN
+        RAISE EXCEPTION 'Choose a class first.';
+    END IF;
     IF p_date > CURRENT_DATE THEN
         RAISE EXCEPTION 'Attendance cannot be marked for a future date.';
     END IF;
 
-    -- D: Sundays are non-working days — no register. (Saturdays are left open,
-    -- since many schools work them.)
-    IF EXTRACT(DOW FROM p_date) = 0 THEN
-        RAISE EXCEPTION 'Attendance is not marked on Sundays.';
+    -- The School Calendar decides which days have a register — the same answer
+    -- the Smart Bell gets.
+    v_day_type := academic.fn_school_day_type(p_tenant_id, p_school_id, p_date);
+    IF v_day_type = 'holiday' THEN
+        SELECT title INTO v_title FROM academic.school_calendar
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+          AND calendar_date = to_char(p_date, 'YYYY-MM-DD');
+        RAISE EXCEPTION '% is a school holiday (%). No attendance is taken.',
+            to_char(p_date, 'DD Mon YYYY'), COALESCE(v_title, 'Holiday');
+    ELSIF v_day_type = 'weekly_off' THEN
+        RAISE EXCEPTION '% is a weekly off (%). No attendance is taken.',
+            to_char(p_date, 'DD Mon YYYY'), trim(to_char(p_date, 'Day'));
     END IF;
 
-    -- B: older days are locked. The window is per-school (default 7 days).
+    -- Older days are locked. The window is per-school (default 7 days).
     SELECT COALESCE(attendance_backdate_days, 7) INTO v_backdate_days
     FROM core.school_settings
     WHERE tenant_id = p_tenant_id AND school_id = p_school_id
@@ -169,36 +236,55 @@ BEGIN
             to_char(p_date, 'DD Mon YYYY'), v_backdate_days;
     END IF;
 
-    IF p_items IS NULL OR jsonb_array_length(p_items) = 0 THEN
+    IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' OR jsonb_array_length(p_items) = 0 THEN
         RAISE EXCEPTION 'No students to save.';
+    END IF;
+
+    -- Column names are quoted so they match the camelCase JSON keys exactly —
+    -- unquoted identifiers fold to lowercase and would never match "studentId".
+    SELECT string_agg(DISTINCT COALESCE(i.status, '(blank)'), ', ') INTO v_bad
+    FROM jsonb_to_recordset(p_items) AS i("studentId" integer, status text, remarks text)
+    WHERE COALESCE(TRIM(i.status), '') NOT IN ('Present', 'Absent', 'Late', 'Leave');
+    IF v_bad IS NOT NULL THEN
+        RAISE EXCEPTION 'Unknown attendance status: %. Use Present, Absent, Late or Leave.', v_bad;
+    END IF;
+
+    SELECT string_agg(COALESCE(s.student_name, 'Student #' || COALESCE(i."studentId"::text, '?')), ', ') INTO v_bad
+    FROM jsonb_to_recordset(p_items) AS i("studentId" integer, status text, remarks text)
+    LEFT JOIN core.students s
+           ON s.student_id = i."studentId" AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id
+    WHERE i."studentId" IS NULL
+       OR i."studentId" NOT IN (SELECT r.student_id
+                                FROM core.fn_attendance_register(p_tenant_id, p_school_id, p_class, p_section, p_date) r);
+    IF v_bad IS NOT NULL THEN
+        RAISE EXCEPTION 'Not on the % register for %: %.',
+            TRIM(p_class) || CASE WHEN COALESCE(TRIM(p_section), '') = '' THEN '' ELSE '-' || TRIM(p_section) END,
+            to_char(p_date, 'DD Mon YYYY'), v_bad;
     END IF;
 
     INSERT INTO core.student_attendance AS a
         (tenant_id, school_id, student_id, attendance_date, status, remarks,
          academic_year, class_name, section, marked_by, marked_at)
     SELECT
-        p_tenant_id, p_school_id, s.student_id, p_date,
+        p_tenant_id, p_school_id, s.student_id, to_char(p_date, 'YYYY-MM-DD'),
         TRIM(i.status),
         NULLIF(TRIM(i.remarks), ''),
         s.academic_year, s.class_name, s.section,
         p_action_user_id, now()
-    -- Column names are quoted so they match the camelCase JSON keys exactly —
-    -- unquoted identifiers fold to lowercase and would never match "studentId".
     FROM jsonb_to_recordset(p_items) AS i("studentId" integer, status text, remarks text)
     JOIN core.students s
       ON s.student_id = i."studentId"
      AND s.tenant_id  = p_tenant_id
      AND s.school_id  = p_school_id
-    WHERE TRIM(i.status) IN ('Present', 'Absent', 'Late', 'Leave')
-      -- C: never record attendance before a student's admission date.
-      AND (s.admission_date IS NULL OR s.admission_date::date <= p_date)
     ON CONFLICT (tenant_id, school_id, student_id, attendance_date) DO UPDATE
         SET status     = EXCLUDED.status,
             remarks    = EXCLUDED.remarks,
             updated_by = p_action_user_id,
-            updated_at = now();
+            updated_at = now()
+        WHERE a.status  IS DISTINCT FROM EXCLUDED.status
+           OR a.remarks IS DISTINCT FROM EXCLUDED.remarks;
 
-    GET DIAGNOSTICS v_saved = ROW_COUNT;
+    v_saved := jsonb_array_length(p_items);
 
     OPEN p_result FOR
     SELECT TRUE AS success,

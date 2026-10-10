@@ -43,10 +43,19 @@ namespace EduCoreDataAccessLayer.Models.ERP
     /// <summary>A month's attendance for one class/section — feeds the report views.</summary>
     public class AttendanceMonthRegister
     {
-        /// <summary>Distinct non-Sunday days that actually had a register this month.</summary>
+        /// <summary>Distinct days that actually had a register for this class-section this month.</summary>
         public int SchoolDays { get; set; }
         public List<AttendanceRosterEntry> Students { get; set; } = new();
         public List<AttendanceDayMark>     Marks    { get; set; } = new();
+        /// <summary>Holidays / weekly offs from the School Calendar that had no register.</summary>
+        public List<AttendanceDayOff>      DaysOff  { get; set; } = new();
+    }
+
+    public class AttendanceDayOff
+    {
+        public int    Day     { get; set; }   // day-of-month 1..31
+        public string DayType { get; set; } = string.Empty;   // holiday | weekly_off
+        public string Title   { get; set; } = string.Empty;
     }
 
     public class AttendanceRosterEntry
@@ -54,6 +63,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int     Id   { get; set; }
         public string? Roll { get; set; }
         public string  Name { get; set; } = string.Empty;
+        /// <summary>Registers of this class-section the student belonged to (joiners / leavers / movers count fewer).</summary>
+        public int     SchoolDays { get; set; }
     }
 
     public class AttendanceDayMark

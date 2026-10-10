@@ -161,7 +161,15 @@
               {
                   <tr>
                     <td>
-                      <div class="fw-bold">@s.StudentName</div>
+                      @* The record of a leaver opens read-only (fees, receipts, history). *@
+                      @if (s.PublicId != Guid.Empty)
+                      {
+                          <a class="fw-bold text-reset" href="@Url.Action("Dashboard", "Student", new { area = "ERP", id = s.PublicId })">@s.StudentName</a>
+                      }
+                      else
+                      {
+                          <div class="fw-bold">@s.StudentName</div>
+                      }
                       <div class="text-muted" style="font-size:.76rem">@s.AdmissionNo</div>
                     </td>
                     <td>@s.ClassDisplay<div class="text-muted" style="font-size:.76rem">@s.AcademicYear</div></td>
@@ -186,7 +194,13 @@
                     <td class="text-end">
                       @* A TC is only for a transfer / passout / struck-off exit — a plain
                          withdrawal does not get one. Reprint lives in the TC Register. *@
-                      @if (s.Status is "Transfer" or "Passout" or "Struck Off")
+                      @if (s.HasTc)
+                      {
+                          <a class="btn btn-sm btn-outline-secondary" href="@Url.Action("Register", "Tc", new { area = "ERP", Search = s.AdmissionNo })">
+                            <i class="bx bx-award me-1"></i>TC issued
+                          </a>
+                      }
+                      else if (s.Status is "Transfer" or "Passout" or "Struck Off")
                       {
                           <button type="button" class="btn btn-sm btn-outline-success btn-tc"
                                   data-id="@s.StudentId" data-name="@s.StudentName" data-dues="@s.Outstanding.ToString("0.##")">
@@ -407,7 +421,11 @@
                     ecToast('success', res.message);
                     tcModal.hide();
                     // Open the freshly issued certificate to print.
-                    window.open('@Url.Action("Print", "Tc", new { area = "ERP" })?id=' + res.tcId, '_blank');
+                    // Print is addressed by the certificate's uuid (the int id is
+                    // not routable - this used to open a 404). print=1 asks the
+                    // page to print once; a refresh does not print again.
+                    window.open('@Url.Action("Print", "Tc", new { area = "ERP" })?id=' + encodeURIComponent(res.tcPublicId) + '&print=1', '_blank');
+                    setTimeout(function () { location.reload(); }, 800);
                 } else {
                     ecToast('error', (res && res.message) || 'Could not issue the certificate.');
                 }

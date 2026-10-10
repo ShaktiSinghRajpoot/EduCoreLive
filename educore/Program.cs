@@ -83,6 +83,14 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
         options.ExpireTimeSpan = TimeSpan.FromHours(8);
         options.ReturnUrlParameter = "returnUrl";
+
+        // WHY: a cookie must not outlive the account, the school's permission to sign in,
+        // or the password it was issued under. Re-checked per request, cached a minute
+        // per user -- see Helpers/SessionValidator.cs.
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnValidatePrincipal = educore.Helpers.SessionValidator.ValidateAsync
+        };
     });
 
 builder.Services.AddAuthorization(options =>
@@ -233,12 +241,26 @@ builder.Logging.AddConsole();
 
 var app = builder.Build();
 
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+// WHY: behind Railway's proxy every request arrives FROM the proxy. By default ASP.NET
+// only believes X-Forwarded-For from loopback, so RemoteIpAddress was the proxy's address
+// for every visitor -- and the per-IP login rate limit (5 / 5 min) was one bucket for the
+// WHOLE site. Clearing KnownNetworks/KnownProxies trusts the proxy in front of us.
+// ForwardLimit stays at its default of 1, so only the entry the proxy itself appended
+// is used; a client-supplied X-Forwarded-For further left is ignored. (The app is only
+// reachable through the proxy; do not expose its port directly.)
+//
+// With X-Forwarded-Proto now honoured, Request.IsHttps is true for HTTPS visitors, so
+// Security:RequireHttps=true no longer makes UseHttpsRedirection loop. It stays false
+// by default -- the owner turns it on in the Railway environment when ready.
+var forwardedHeaders = new ForwardedHeadersOptions
 {
     ForwardedHeaders =
         ForwardedHeaders.XForwardedFor |
         ForwardedHeaders.XForwardedProto
-});
+};
+forwardedHeaders.KnownNetworks.Clear();
+forwardedHeaders.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeaders);
 
 if (app.Environment.IsDevelopment())
 {

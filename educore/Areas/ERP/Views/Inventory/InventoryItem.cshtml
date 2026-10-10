@@ -50,7 +50,7 @@
       <div class="col-6 col-lg-3">
         <div class="iv-card">
           <div class="iv-card-ic bg-label-success text-success"><i class="bx bx-rupee"></i></div>
-          <div><div class="iv-card-val" id="sumValue">—</div><div class="iv-card-lbl">Stock Value</div></div>
+          <div><div class="iv-card-val" id="sumValue">—</div><div class="iv-card-lbl">Stock Value (at cost price)</div></div>
         </div>
       </div>
     </div>
@@ -124,7 +124,7 @@
                 <th>Unit</th>
                 <th class="iv-sortable" data-col="stock">Current Stock <i class="bx bx-sort iv-si" id="si-stock"></i></th>
                 <th>Minimum</th>
-                <th class="iv-sortable" data-col="value">Value <i class="bx bx-sort iv-si" id="si-value"></i></th>
+                <th class="iv-sortable" data-col="value" title="Current stock x the item's cost price">Value (at cost) <i class="bx bx-sort iv-si" id="si-value"></i></th>
                 <th>Status</th>
                 <th class="text-end">Action</th>
               </tr>
@@ -231,19 +231,19 @@
                             <div class="row g-3">
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label">Opening Stock</label>
-                                    <input type="number" class="form-control" id="openingStock" min="0" placeholder="0">
+                                    <input type="number" class="form-control" id="openingStock" min="0" step="0.01" placeholder="0">
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label">Minimum Stock Alert</label>
-                                    <input type="number" class="form-control" id="minimumStock" min="0" placeholder="10">
+                                    <input type="number" class="form-control" id="minimumStock" min="0" step="0.01" placeholder="10">
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label">Cost Price</label>
-                                    <input type="number" class="form-control" id="costPrice" min="0" placeholder="0">
+                                    <input type="number" class="form-control" id="costPrice" min="0" step="0.01" placeholder="0">
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label">Selling Price</label>
-                                    <input type="number" class="form-control" id="sellingPrice" min="0" placeholder="0">
+                                    <input type="number" class="form-control" id="sellingPrice" min="0" step="0.01" placeholder="0">
                                 </div>
                             </div>
                         </div>
@@ -312,11 +312,12 @@
               <option value="Issue">Issue — given out</option>
               <option value="Return">Return — came back</option>
               <option value="Damage">Damage / lost</option>
-              <option value="Adjustment">Adjustment — physical count</option>
+              <option value="Adjustment">Adjustment — add stock found</option>
+              <option value="StockTake">Stock-take — enter the counted quantity</option>
             </select>
           </div>
           <div class="col-12 col-sm-6">
-            <label class="form-label">Quantity</label>
+            <label class="form-label" id="mvQtyLabel">Quantity</label>
             <input type="number" class="form-control" id="mvQty" min="0" step="0.01" placeholder="0">
           </div>
           <div class="col-12" id="mvIssuedWrap">
@@ -355,7 +356,8 @@
             <thead>
               <tr>
                 <th>Date</th><th>Movement</th>
-                <th class="text-end">Qty</th><th class="text-end">Balance</th>
+                <th class="text-end">Qty</th><th class="text-end">Rate</th>
+                <th class="text-end">Balance</th><th>By</th>
                 <th>Issued to</th><th>Remarks</th>
               </tr>
             </thead>
@@ -396,6 +398,13 @@
             headers: { 'RequestVerificationToken': token(), 'X-Requested-With': 'XMLHttpRequest' },
             data: JSON.stringify(body)
         });
+    }
+
+    // Quantities and prices are kept to 2 decimals; the server refuses a third,
+    // so say so here before the round trip. Blank counts as fine (it means 0).
+    function twoDp(v) {
+        v = $.trim(v == null ? '' : String(v));
+        return v === '' || /^\d+(\.\d{1,2})?$/.test(v);
     }
 
     function statusBadge(s) {
@@ -555,6 +564,12 @@
                 $('#itemId').val(d.id);
                 $('#itemName').val(d.name);
                 $('#itemCode').val(d.sku);
+                // A category the dropdown does not list would make the select
+                // blank, and saving would then wipe it -- so add it first.
+                if (d.category && !$('#itemCategory option').filter(function () {
+                        return $(this).val() === d.category; }).length) {
+                    $('#itemCategory').append($('<option>').text(d.category));
+                }
                 $('#itemCategory').val(d.category);
                 $('#itemSubCategory').val(d.subCat);
                 $('#itemType').val(d.type);
@@ -581,6 +596,14 @@
         var $btn = $(this);
         var name = $.trim($('#itemName').val());
         if (!name) { ecToast('warning', 'Enter the item name.'); $('#itemName').focus(); return; }
+        var bad = ['#openingStock', '#minimumStock', '#costPrice', '#sellingPrice'].filter(function (f) {
+            return !twoDp($(f).val());
+        });
+        if (bad.length) {
+            ecToast('warning', 'Use a number 0 or more, with at most 2 decimal places.');
+            $(bad[0]).focus();
+            return;
+        }
 
         EC.buttonBusy($btn, 'Saving…');
         postJson(SAVE_URL, {
@@ -620,24 +643,38 @@
         $('#stockItemLabel').text(r.name + ' — ' + EC.num(r.stock) + ' ' + r.unit + ' in stock');
         $('#mvType').val('Issue');
         $('#mvQty,#mvIssuedTo,#mvRemarks').val('');
-        $('#mvIssuedWrap').removeClass('d-none');
+        moveTypeChanged();
         new bootstrap.Modal(document.getElementById('stockModal')).show();
     }
 
-    // "Issued to" only means something when stock is going out.
-    $('#mvType').on('change', function () {
-        $('#mvIssuedWrap').toggleClass('d-none', $(this).val() !== 'Issue');
-    });
+    // "Issued to" only means something when stock is going out. A stock-take
+    // asks for the quantity COUNTED (the server records the difference) and
+    // needs a reason.
+    function moveTypeChanged() {
+        var t = $('#mvType').val();
+        $('#mvIssuedWrap').toggleClass('d-none', t !== 'Issue');
+        $('#mvQtyLabel').text(t === 'StockTake' ? 'Counted quantity' : 'Quantity');
+        $('#mvRemarks').attr('placeholder', t === 'StockTake' ? 'Why does the count differ? (required)' : 'Optional');
+    }
+    $('#mvType').on('change', moveTypeChanged);
 
     $('#saveMoveBtn').on('click', function () {
         var $btn = $(this);
-        var qty = EC.numPos($('#mvQty').val());
-        if (qty <= 0) { ecToast('warning', 'Enter a quantity.'); $('#mvQty').focus(); return; }
+        var type = $('#mvType').val();
+        var raw  = $.trim($('#mvQty').val());
+        var qty  = EC.numPos(raw);
+        if (!twoDp(raw)) { ecToast('warning', 'Use at most 2 decimal places.'); $('#mvQty').focus(); return; }
+        if (type === 'StockTake') {
+            if (raw === '') { ecToast('warning', 'Enter the quantity you counted.'); $('#mvQty').focus(); return; }
+            if (!$.trim($('#mvRemarks').val())) {
+                ecToast('warning', 'Give a reason for the stock-take difference.'); $('#mvRemarks').focus(); return;
+            }
+        } else if (qty <= 0) { ecToast('warning', 'Enter a quantity.'); $('#mvQty').focus(); return; }
 
         EC.buttonBusy($btn, 'Saving…');
         postJson(MOVE_URL, {
             itemId:       EC.num($('#mvItemId').val()),
-            movementType: $('#mvType').val(),
+            movementType: type,
             quantity:     qty,
             issuedTo:     $.trim($('#mvIssuedTo').val()),
             remarks:      $.trim($('#mvRemarks').val())
@@ -655,6 +692,12 @@
     });
 
     // ── History ─────────────────────────────────────────────────────────────
+    var MOVE_LABELS = {
+        Opening: 'Opening stock', Purchase: 'Purchase', PurchaseCancel: 'Purchase cancelled',
+        Issue: 'Issue', Return: 'Return', Damage: 'Damage / lost',
+        Adjustment: 'Adjustment', StockTake: 'Stock-take'
+    };
+
     function openHistory(id) {
         var r = rows.find(function (x) { return x.id === id; });
         $('#ledgerItemLabel').text(r ? r.name : '');
@@ -667,14 +710,20 @@
                     EC.listEmpty('#ledgerBody', 'No stock movement yet.', 'bx-history');
                     return;
                 }
+                // Newest date first, then newest entry; Balance is the running
+                // total in that same order, so it reads cleanly top to bottom.
                 $('#ledgerBody').html(d.map(function (m) {
                     var q = EC.num(m.qty);
+                    var label = MOVE_LABELS[m.type] || m.type;
+                    if (m.invoice) label += ' · Bill ' + m.invoice;
                     return '<tr>' +
                         '<td>' + EC.esc(m.date) + '</td>' +
-                        '<td>' + EC.esc(m.type) + '</td>' +
+                        '<td>' + EC.esc(label) + '</td>' +
                         '<td class="text-end ' + (q < 0 ? 'text-danger' : 'text-success') + '">' +
                             (q > 0 ? '+' : '') + q + '</td>' +
+                        '<td class="text-end">' + (m.rate === null || m.rate === undefined ? '—' : EC.money(m.rate)) + '</td>' +
                         '<td class="text-end fw-semibold">' + EC.num(m.balance) + '</td>' +
+                        '<td class="small">' + EC.esc(m.by || '—') + '</td>' +
                         '<td>' + EC.esc(m.to || '—') + '</td>' +
                         '<td class="text-muted small">' + EC.esc(m.remarks || '—') + '</td>' +
                     '</tr>';
@@ -688,12 +737,12 @@
     // ── Delete ──────────────────────────────────────────────────────────────
     function del(id) {
         var r = rows.find(function (x) { return x.id === id; });
+        // EC.confirm escapes name and message itself.
         EC.confirm({
-            title: 'Delete this item?',
-            body: 'This removes <strong>' + EC.esc(r ? r.name : 'the item') +
-                  '</strong> from the store. Its stock history is kept.',
-            confirmText: 'Delete',
-            confirmClass: 'btn-danger'
+            title:   'Delete this item?',
+            name:    r ? r.name : '',
+            message: 'It is removed from the store list. Its stock history is kept.',
+            okText:  'Delete item'
         }).then(function (ok) {
             if (!ok) return;
             EC.showLoader();

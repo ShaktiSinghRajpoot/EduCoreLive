@@ -124,11 +124,14 @@ namespace educore.Areas.ERP.Controllers
         {
             var rows = await _transportService.GetRoutesDropdownAsync(TenantId(), SchoolId(), UserId());
             // group stops under each route for the cascading select
-            var routes = rows.GroupBy(r => new { r.RouteId, r.RouteName })
+            var routes = rows.GroupBy(r => new { r.RouteId, r.RouteName, r.Riders, r.Seats })
                 .Select(g => new
                 {
                     routeId   = g.Key.RouteId,
                     routeName = g.Key.RouteName,
+                    // Riders now / seats on the route's active buses (null = no limit).
+                    riders    = g.Key.Riders,
+                    seats     = g.Key.Seats,
                     stops     = g.Select(s => new { stopId = s.StopId, stopName = s.StopName, fare = s.MonthlyFare })
                 });
             return Json(routes);

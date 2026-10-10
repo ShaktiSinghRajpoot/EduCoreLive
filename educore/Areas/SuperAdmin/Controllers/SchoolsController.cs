@@ -396,7 +396,18 @@ namespace educore.Areas.SuperAdmin.Controllers
                 var path = Path.Combine(folder, archive.FileName);
                 await System.IO.File.WriteAllTextAsync(path, archive.ArchiveJson);
 
-                await _schoolService.PurgeSchoolAsync(id, tenantId, userId, confirmName ?? string.Empty);
+                // If the purge is refused (not Closed, wrong name) or fails, the school is
+                // still intact -- so its full data dump must not be left lying on disk.
+                // (sp_school_archive already strips password hashes and reset codes.)
+                try
+                {
+                    await _schoolService.PurgeSchoolAsync(id, tenantId, userId, confirmName ?? string.Empty);
+                }
+                catch
+                {
+                    System.IO.File.Delete(path);
+                    throw;
+                }
 
                 TempData["Success"] =
                     $"{archive.SchoolName} purged permanently. {archive.TotalRows:N0} rows archived to {archive.FileName}.";

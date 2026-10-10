@@ -17,6 +17,13 @@ namespace EduCoreDataAccessLayer.Models.ERP
         /// which is not the same as nobody turning up.</summary>
         public int     MarkedToday  { get; set; }
 
+        /// <summary>
+        /// False when the viewer lacks fees.view: the controller then empties every money
+        /// figure and list (collections, outstanding, modes, defaulters, receipts) and the
+        /// view hides those cards. Set by DashboardsController, not by the proc.
+        /// </summary>
+        public bool ShowFinance { get; set; } = true;
+
         public List<DashboardTrendPoint>  Trend      { get; set; } = new();
         public List<DashboardClassCount>  Classes    { get; set; } = new();
         public List<DashboardModeTotal>   Modes      { get; set; } = new();

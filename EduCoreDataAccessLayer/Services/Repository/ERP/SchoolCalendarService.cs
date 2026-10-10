@@ -3,6 +3,7 @@ using System.Globalization;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -13,11 +14,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     public class SchoolCalendarService : ISchoolCalendarService
     {
         private readonly PgExec _db;
+        private readonly ILogger<SchoolCalendarService> _logger;
         private const string Sp = "academic.sp_school_admin_calendar_manage";
 
-        public SchoolCalendarService(PgExec db)
+        public SchoolCalendarService(PgExec db, ILogger<SchoolCalendarService> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         public async Task<SchoolCalendarData> GetCalendarAsync(
@@ -139,6 +142,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Calendar change rejected for school {SchoolId}. SqlState {SqlState}", p[2].Value, ex.SqlState);
                 // Proc RAISE (e.g. a half day with no closing time) — surface the friendly text.
                 return new SchoolCalendarSaveResult { Message = ex.MessageText };
             }

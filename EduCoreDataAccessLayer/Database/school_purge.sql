@@ -23,6 +23,16 @@
 --
 -- core.fee_payment_details and core.fee_payment_tenders have no school_id but
 -- cascade from core.fee_payments, so they need no explicit delete.
+--
+-- Oct 2026 (platform_access_security_tests.sql):
+--   * the delete list now covers the modules added after it was written -- exams,
+--     inventory, staff leave/payroll, enrolment, promotion history, day-close log.
+--     A school that had run exams could not be purged at all (FK on exam_subjects).
+--     Also the attendance / exam-mark edit history (academics_edit_history.sql).
+--   * the archive no longer carries secrets: password_reset_tokens is skipped and
+--     password_hash / token_hash are stripped from every row. The file sits on disk.
+--   * purging a tenant's ONLY school keeps the tenant and its roles (decision D-7):
+--     roles are tenant-level rows (school_id NULL), which this purge never touches.
 -- ============================================================================
 
 -- ── ARCHIVE (read-only) ────────────────────────────────────────────────────
@@ -56,9 +66,13 @@ BEGIN
         -- Leaving it out was a real hole — purging a school stranded its role rows.
         WHERE c.column_name = 'school_id'
           AND c.table_schema IN ('core', 'academic', 'config')
+          -- One-time reset codes are secrets with no archival value.
+          AND NOT (c.table_schema = 'core' AND c.table_name = 'password_reset_tokens')
         ORDER BY 1, 2
     LOOP
-        EXECUTE format('SELECT COALESCE(jsonb_agg(to_jsonb(x)), ''[]''::jsonb), count(*) FROM %I.%I x WHERE x.school_id = $1',
+        -- Secrets are stripped (password_hash, token_hash, user_sessions.refresh_token_hash):
+        -- the archive is a file on disk.
+        EXECUTE format('SELECT COALESCE(jsonb_agg(to_jsonb(x) - ''password_hash'' - ''token_hash'' - ''refresh_token_hash''), ''[]''::jsonb), count(*) FROM %I.%I x WHERE x.school_id = $1',
                        r.sch, r.tbl)
         INTO v_json, v_rows
         USING p_school_id;
@@ -137,6 +151,14 @@ BEGIN
 
     -- ── Deletes, ordered so no foreign key is violated ─────────────────────
     -- academic: timetable and class_subjects reference sections/classes/subjects
+    -- exams reference classes and subjects; marks reference students
+    DELETE FROM academic.exam_marks_history        WHERE school_id = p_school_id;
+    DELETE FROM academic.exam_marks                WHERE school_id = p_school_id;
+    DELETE FROM academic.exam_mark_sheets          WHERE school_id = p_school_id;
+    DELETE FROM academic.exam_class_sections       WHERE school_id = p_school_id;
+    DELETE FROM academic.exam_subjects             WHERE school_id = p_school_id;
+    DELETE FROM academic.exams                     WHERE school_id = p_school_id;
+
     DELETE FROM academic.timetable                 WHERE school_id = p_school_id;
     DELETE FROM academic.class_subjects            WHERE school_id = p_school_id;
     DELETE FROM academic.period_structure          WHERE school_id = p_school_id;
@@ -148,6 +170,7 @@ BEGIN
     DELETE FROM academic.academic_years            WHERE school_id = p_school_id;
 
     -- student-linked data before students
+    DELETE FROM core.student_attendance_history    WHERE school_id = p_school_id;
     DELETE FROM core.student_attendance            WHERE school_id = p_school_id;
     DELETE FROM core.student_transport             WHERE school_id = p_school_id;
     DELETE FROM core.student_advance               WHERE school_id = p_school_id;
@@ -155,6 +178,8 @@ BEGIN
     DELETE FROM core.student_ledger                WHERE school_id = p_school_id;
     DELETE FROM core.tc_register                   WHERE school_id = p_school_id;
     DELETE FROM core.tc_counters                   WHERE school_id = p_school_id;
+    DELETE FROM core.student_enrolment             WHERE school_id = p_school_id;
+    DELETE FROM core.student_promotion_history     WHERE school_id = p_school_id;
     DELETE FROM core.students                      WHERE school_id = p_school_id;
 
     -- enquiries (children cascade, deleted explicitly for clarity)
@@ -165,6 +190,7 @@ BEGIN
     -- money: fee_payment_details / _tenders cascade from fee_payments
     DELETE FROM core.fee_refunds                   WHERE school_id = p_school_id;
     DELETE FROM core.fee_reminder_log              WHERE school_id = p_school_id;
+    DELETE FROM core.fee_day_close_log             WHERE school_id = p_school_id;
     DELETE FROM core.fee_day_close                 WHERE school_id = p_school_id;
     DELETE FROM core.fee_payments                  WHERE school_id = p_school_id;
     DELETE FROM core.school_fee_structure_details  WHERE school_id = p_school_id;
@@ -182,6 +208,13 @@ BEGIN
     DELETE FROM core.transport_vehicles            WHERE school_id = p_school_id;
     DELETE FROM core.transport_routes              WHERE school_id = p_school_id;
 
+    -- inventory: purchase lines and the stock ledger reference items/purchases
+    DELETE FROM core.inventory_purchase_items      WHERE school_id = p_school_id;
+    DELETE FROM core.inventory_stock_ledger        WHERE school_id = p_school_id;
+    DELETE FROM core.inventory_purchases           WHERE school_id = p_school_id;
+    DELETE FROM core.inventory_items               WHERE school_id = p_school_id;
+    DELETE FROM core.inventory_suppliers           WHERE school_id = p_school_id;
+
     -- school configuration
     DELETE FROM core.school_documents              WHERE school_id = p_school_id;
     DELETE FROM core.school_working_hours          WHERE school_id = p_school_id;
@@ -198,6 +231,8 @@ BEGIN
     DELETE FROM core.user_sessions                 WHERE school_id = p_school_id;
     DELETE FROM core.user_roles                    WHERE school_id = p_school_id;
     DELETE FROM core.user_profiles                 WHERE school_id = p_school_id;
+    DELETE FROM core.staff_leave                   WHERE school_id = p_school_id;
+    DELETE FROM core.staff_payroll                 WHERE school_id = p_school_id;
     DELETE FROM core.staff                         WHERE school_id = p_school_id;
     DELETE FROM core.users                         WHERE school_id = p_school_id;
 

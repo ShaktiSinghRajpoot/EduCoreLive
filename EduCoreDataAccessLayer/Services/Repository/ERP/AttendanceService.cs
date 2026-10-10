@@ -3,6 +3,7 @@ using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -11,15 +12,17 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     public class AttendanceService : IAttendanceService
     {
         private readonly PgExec _db;
+        private readonly ILogger<AttendanceService> _logger;
         private const string SpSections = "core.sp_class_active_sections";
         private const string SpStudent  = "core.sp_attendance_student";
         private const string SpRoster   = "core.sp_attendance_roster";
         private const string SpSave     = "core.sp_attendance_save";
         private const string SpMonth    = "core.sp_attendance_month_register";
 
-        public AttendanceService(PgExec db)
+        public AttendanceService(PgExec db, ILogger<AttendanceService> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         public async Task<List<string>> GetSectionsAsync(string className, int tenantId, int schoolId, int actionUserId)
@@ -147,10 +150,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<AttendanceSaveResult> SaveAsync(
-            string date, List<AttendanceMark> marks, int tenantId, int schoolId, int actionUserId)
+            string date, string className, string? section, List<AttendanceMark> marks,
+            int tenantId, int schoolId, int actionUserId)
         {
             if (tenantId <= 1 || schoolId <= 0)
                 return new AttendanceSaveResult { Message = "Invalid school context." };
+            if (string.IsNullOrWhiteSpace(className))
+                return new AttendanceSaveResult { Message = "Choose a class first." };
             if (marks == null || marks.Count == 0)
                 return new AttendanceSaveResult { Message = "No students to save." };
 
@@ -168,6 +174,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
                 new("p_date",           NpgsqlDbType.Unknown)    { Value = date },
+                new("p_class",          NpgsqlDbType.Varchar) { Value = className },
+                new("p_section",        NpgsqlDbType.Varchar) { Value = (object?)section ?? DBNull.Value },
                 new("p_items",          NpgsqlDbType.Jsonb)   { Value = itemsJson },
                 new("p_result", NpgsqlDbType.Refcursor)
                     { Direction = ParameterDirection.InputOutput, Value = "attendance_save_cursor" }
@@ -189,6 +197,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                // A proc RAISE (holiday, locked day, student not on the register...).
+                _logger.LogWarning(ex, "Attendance save rejected for school {SchoolId}, class {Class}-{Section}, date {Date}. SqlState {SqlState}",
+                    schoolId, className, section, date, ex.SqlState);
                 return new AttendanceSaveResult { Message = ex.MessageText };
             }
         }
@@ -210,7 +221,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_year",           NpgsqlDbType.Integer) { Value = year },
                 new("p_meta",     NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "ar_meta" },
                 new("p_students", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "ar_students" },
-                new("p_marks",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "ar_marks" }
+                new("p_marks",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "ar_marks" },
+                new("p_days_off", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "ar_days_off" }
             };
 
             var ds = await _db.ExecuteProcedureWithCursorsAsync(SpMonth, parameters);
@@ -224,7 +236,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     {
                         Id   = IntVal(row, "student_id"),
                         Roll = NullStr(row, "roll_no"),
-                        Name = Str(row, "student_name")
+                        Name = Str(row, "student_name"),
+                        SchoolDays = IntVal(row, "school_days")
                     });
 
             if (ds.Tables.Count > 2)
@@ -234,6 +247,15 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         StudentId = IntVal(row, "student_id"),
                         Day       = IntVal(row, "day"),
                         Mark      = Str(row, "mark")
+                    });
+
+            if (ds.Tables.Count > 3)
+                foreach (DataRow row in ds.Tables[3].Rows)
+                    result.DaysOff.Add(new AttendanceDayOff
+                    {
+                        Day     = IntVal(row, "day"),
+                        DayType = Str(row, "day_type"),
+                        Title   = Str(row, "title")
                     });
 
             return result;

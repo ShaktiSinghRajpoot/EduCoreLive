@@ -27,27 +27,41 @@ LANGUAGE plpgsql
 AS $procedure$
 DECLARE
     v_name varchar;
+    v_old  varchar;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
+    END IF;
+
+    -- The previous file is returned so the controller can delete it from disk
+    -- once the new one is saved; replaced photos used to pile up.
+    SELECT student_name, photo_url INTO v_name, v_old
+    FROM core.students
+    WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Student not found.';
     END IF;
 
     UPDATE core.students
     SET photo_url  = NULLIF(TRIM(p_photo_url), ''),
         updated_by = p_action_user_id,
         updated_at = now()
-    WHERE student_id = p_student_id
-      AND tenant_id  = p_tenant_id
-      AND school_id  = p_school_id
-    RETURNING student_name INTO v_name;
+    WHERE student_id = p_student_id;
 
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Student not found.';
-    END IF;
+    -- Who changed the photo and when shows on the student's History card.
+    INSERT INTO core.admission_audit (tenant_id, school_id, student_id, action, detail, action_by)
+    VALUES (p_tenant_id, p_school_id, p_student_id, 'PhotoChanged',
+            CASE WHEN NULLIF(TRIM(p_photo_url), '') IS NULL THEN 'Photo removed'
+                 WHEN v_old IS NULL THEN 'Photo added'
+                 ELSE 'Photo replaced' END,
+            p_action_user_id);
 
     OPEN p_result FOR
     SELECT TRUE AS success,
            'Photo updated for ' || v_name || '.' AS message,
-           NULLIF(TRIM(p_photo_url), '') AS photo_url;
+           NULLIF(TRIM(p_photo_url), '') AS photo_url,
+           v_old AS old_photo_url;
 END;
 $procedure$;

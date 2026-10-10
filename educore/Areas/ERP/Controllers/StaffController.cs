@@ -1,4 +1,5 @@
 ﻿using EduCoreDataAccessLayer.Helpers;
+using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models;
 using EduCoreDataAccessLayer.Services;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -15,12 +16,25 @@ namespace educore.Areas.ERP.Controllers
         private readonly IStaffService _staffService;
         private readonly IPermissionService _perms;
         private readonly IPublicIdService _publicIds;
+        private readonly AppCache _cache;
 
-        public StaffController(IStaffService staffService, IPermissionService perms, IPublicIdService publicIds)
+        public StaffController(IStaffService staffService, IPermissionService perms, IPublicIdService publicIds, AppCache cache)
         {
             _staffService = staffService;
             _perms = perms;
             _publicIds = publicIds;
+            _cache = cache;
+        }
+
+        // A person's access changed (roles, password, login switched on/off): drop the
+        // cached role list AND the cached session check, so it applies on their next
+        // request. The user id comes from the database row, never from the posted form.
+        private async Task ForgetAccessAsync(int staffId)
+        {
+            var staff = await _staffService.GetStaffByIdAsync(staffId, TenantId(), SchoolId(), UserId());
+            if (staff?.UserId is not int uid) return;
+            _perms.InvalidateUser(TenantId(), SchoolId(), uid);
+            SessionValidator.Forget(_cache, TenantId(), SchoolId(), uid);
         }
 
         // ── GET: /ERP/Staff/StaffList ────────────────────────────
@@ -61,6 +75,7 @@ namespace educore.Areas.ERP.Controllers
             if (staffId == 0) return RedirectToAction("Inactive");
 
             var (ok, message) = await _staffService.ReactivateAsync(staffId, TenantId(), SchoolId(), UserId());
+            if (ok > 0) await ForgetAccessAsync(staffId);
             TempData[ok > 0 ? "SuccessMessage" : "ErrorMessage"] = ok > 0 ? "Staff member re-activated successfully." : message;
             return RedirectToAction("Inactive");
         }
@@ -74,6 +89,7 @@ namespace educore.Areas.ERP.Controllers
             if (staffId == 0) return RedirectToAction("StaffList");
 
             var (ok, message) = await _staffService.DeactivateAsync(staffId, TenantId(), SchoolId(), UserId());
+            if (ok > 0) await ForgetAccessAsync(staffId);
             TempData[ok > 0 ? "SuccessMessage" : "ErrorMessage"] =
                 ok > 0 ? "Staff member deactivated." : message;
             return RedirectToAction("StaffList");
@@ -189,9 +205,10 @@ namespace educore.Areas.ERP.Controllers
                 return View(model);
             }
 
-            // Their role set may have changed — drop the cached roles so access refreshes.
-            if (model.UserId is int uid)
-                _perms.InvalidateUser(TenantId(), SchoolId(), uid);
+            // Their role set or password may have changed. The proc resolves the login
+            // from the staff row, so the cache is dropped for THAT user -- a missing or
+            // tampered UserId field in the form used to leave the old roles cached.
+            await ForgetAccessAsync(savedId);
 
             TempData["SuccessMessage"] = "Staff profile updated successfully.";
             return await RedirectToProfileAsync(savedId);

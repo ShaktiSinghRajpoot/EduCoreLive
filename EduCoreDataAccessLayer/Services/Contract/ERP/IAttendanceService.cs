@@ -19,9 +19,10 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<List<AttendanceStudent>> GetRosterAsync(
             string className, string? section, string date, int tenantId, int schoolId, int actionUserId);
 
-        /// <summary>Upsert the whole class's marks for the date.</summary>
+        /// <summary>Upsert one class-section's marks for the date. Every student must be on that register.</summary>
         Task<AttendanceSaveResult> SaveAsync(
-            string date, List<AttendanceMark> marks, int tenantId, int schoolId, int actionUserId);
+            string date, string className, string? section, List<AttendanceMark> marks,
+            int tenantId, int schoolId, int actionUserId);
 
         /// <summary>A class/section's full month of attendance for the report views.</summary>
         Task<AttendanceMonthRegister> GetMonthRegisterAsync(

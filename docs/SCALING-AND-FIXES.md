@@ -4350,3 +4350,214 @@ Found by `tests/money_fee_collection_tests.sql` (catalog: `educore/docs/test-cas
   the two are now identical so run order cannot change it.
 - **`deploy_2026_10_10.sql`** runs every changed script in dependency order (verified end to end
   locally, then all 24 suites: 1,578 checks green).
+
+### [2026-10-10] Inventory: deep test pass and fixes (stock = sum of its movements, again)
+
+A deeper suite (`tests/inventory_store_tests.sql`, catalog `educore/docs/test-cases/inventory_store.md`)
+found 10 failing checks plus UI and permission bugs. All fixed. The suite is 142 / 0 and
+`inventory_tests.sql` 49 / 0.
+
+- **Cancel corrupted stock (HIGH).** The CANCEL loop read `current_stock` once for every line, so
+  a bill with the same item on two lines left stock 52 against a ledger of 22. The same stale read
+  let a cancel take true stock to -15. Now the cancel locks the items, checks per ITEM (the whole
+  bill's quantity), then reverses line by line with `UPDATE ... RETURNING`.
+- **Permissions (HIGH).** The controller was gated on `fees.view` for reads and writes alike. It is
+  now `inventory.view` on the class and `inventory.manage` on all seven write actions (cancel
+  included). The sidebar (`_VerticalMenu.cshtml:66`) still uses `fees.view` and needs the same
+  change by whoever owns that file.
+- **Decimals.** A quantity of 0.335 rounded differently in the item (9.67) and the ledger (-0.34),
+  so stock drifted. Quantities and prices now take at most 2 decimals (proc and page).
+- **Bill totals.** Each line rounds its base and tax once, and the header is the sum of the
+  lines. Before, the header could be a paisa off its own lines.
+- **Duplicates.** The bill-number index keys on `COALESCE(supplier_id, 0)`, so a no-supplier bill
+  can no longer be entered twice. Duplicate item, SKU, supplier and bill numbers are caught in the
+  procs with plain sentences instead of the index name.
+- **Rules (user-approved defaults D-1..D-11).** No negative opening stock or prices (with table
+  CHECKs behind the procs: `current_stock >= 0`, prices >= 0). Inactive items cannot be issued or
+  bought. The unit is frozen once stock has moved. A cancel needs a reason. Future-dated bills
+  are refused, back-dated ones allowed. New `StockTake` movement: enter the counted quantity, the
+  signed difference is recorded, and a reason is required.
+- **History.** Every movement keeps `unit_rate` (new column; NULL on older rows). The item history
+  shows who made each movement, the rate and the bill number, in date order then entry order,
+  with a running balance in that order.
+- **Service.** `InventoryService` now has an `ILogger` (Warning with SqlState for PostgresException,
+  Error otherwise) and maps raw database errors to sentences. Filter dates go through `Dates.Norm`,
+  the purchase date is validated, and a line with no item is refused instead of dropped.
+- **Pages.** The purchase page's four hard-coded cards (Rs 42,500 / 18 / 560 / 12) now show real
+  figures. Confirm dialogs use `EC.confirm` / `EC.prompt`'s real options: "Cancel purchase" no
+  longer reads "Delete". The default purchase date comes from `Dates.Today` instead of UTC
+  `toISOString()`. Stock value is labelled "at cost price".
+- `inventory.sql` stays re-runnable (procs dropped and recreated; index and constraints dropped
+  and re-added). It is not yet in `deploy_2026_10_10.sql`.
+- Not done (features, not bugs): supplier list/edit screen, purchase detail view, transfers and
+  partial returns (D-10).
+
+
+### [2026-10-10] Platform, access and security: test pass and fixes
+
+Suite `Database/tests/platform_access_security_tests.sql` (catalog
+`educore/docs/test-cases/platform_access_security.md`). First run: 79 passed, 23 failed. After the fixes: **123 passed, 0 failed**.
+
+- **Custom roles can sign in.** `AccountController.IsValidSaasScope` used to accept only the built-in codes. It now treats every code except SUPER_ADMIN/TENANT_ADMIN as a school role.
+- **A cookie no longer outlives the account, the school, or the password.**
+  - New `Helpers/SessionValidator.cs`, wired as the cookie's `OnValidatePrincipal`, asks `core.sp_session_check` at most once a minute per user (AppCache).
+  - It rejects the cookie when the user is deactivated or deleted, when the school stops allowing sign-in, or when the `pwd_stamp` claim no longer matches `core.users.password_changed_at` (new column). Change password, OTP reset and admin resets all set that column.
+  - Change Password re-issues the current cookie with the new stamp and keeps its properties, so remember-me survives.
+  - `PermissionService` now resolves roles through the new `core.sp_user_roles_effective`, which is empty for an inactive user or a blocked school.
+- **Staff Inactive = login off.** `sp_staff_manage` DELETE also switches off the login, and REACTIVATE turns it back on, with email/phone clash checks.
+  - A one-off fix in `access_security_hardening.sql` switched off the 5 existing inactive-staff logins. It never touches the last admin of a school.
+- **Role rules (decisions D-2, D-3).**
+  - Role ids must belong to the tenant.
+  - Nobody can change their own roles or deactivate their own login.
+  - Only a school admin (or the platform) can grant or remove SCHOOL_ADMIN.
+  - The last active school admin of a school cannot lose the role or be deactivated.
+  - StaffController drops the role cache and session cache for the user id the database resolves, not the posted form value.
+- **Roles.** New roles never get a reserved code ("Super Admin" becomes SUPER_ADMIN_2, not a hidden full-bypass role). The matrix refuses permission ids that are not in the catalog. The role key cache is per tenant, so a matrix edit applies at once in every school of the tenant (D-1).
+- **Password reset.** An unknown account answers INVALID, like a wrong code, so the form no longer reveals which accounts exist. Reset by phone uses login's digits-only match.
+- **Audit (D-6).** New `core.fn_admin_audit` writes `admin_activity_logs` rows for:
+  - role create, rename and delete;
+  - every matrix change, recorded as old -> new;
+  - user role changes;
+  - login activation and deactivation;
+  - admin password resets.
+  School create, status change, admin creation and super-admin resets are logged on tenant 1, so they survive a purge.
+- **SuperAdmin.**
+  - `sp_school_manage` INSERT/UPDATE/DELETE are platform-only.
+  - Phone checks use `fn_user_phone_taken`, so a duplicate gets a message instead of a raw constraint error.
+  - An admin created from Edit is forced to reset their password.
+- **Purge.** `sp_school_purge` now covers the 15 tables added since it was written (exams, inventory, leave/payroll, enrolment, promotion, day-close log) plus the two edit-history tables. Schools that ran exams can now be purged.
+  - The archive drops `password_reset_tokens` and strips the password, token and refresh-token hashes from every row.
+  - SchoolsController deletes the archive file if the purge then fails.
+  - Purging a tenant's only school keeps the tenant and its roles (D-7).
+- **Rate limit behind Railway (SEC-10).**
+  - `UseForwardedHeaders` now clears KnownNetworks/KnownProxies, so `RemoteIpAddress` is the real client and the 5-per-5-minute login limit is per visitor, not site-wide.
+  - Login attempts now record the IP and user agent.
+  - `Security:RequireHttps` stays false. With X-Forwarded-Proto honoured, turning it on no longer loops.
+- **Dashboard (D-5).** Money cards, trend, payment modes, defaulters and recent receipts need `fees.view`. Without it they are emptied in the controller and hidden in the view.
+- **Deploy order:**
+  1. `academics_edit_history.sql` (the purge deletes from its tables)
+  2. `access_security_hardening.sql`
+  3. `change_password.sql`
+  4. `forgot_password.sql`
+  5. `sp_rbac_manage.sql`
+  6. `sp_staff_manage.sql`
+  7. `sp_school_manage.sql`
+  8. `school_purge.sql`
+
+### [2026-10-10] Daily academics: attendance, exams, timetable, calendar follow one set of rules
+
+Test pass and fixes for Attendance, Exams, Timetable, School Calendar and Smart Bell. Catalog: `educore/docs/test-cases/academics_attendance_exams.md`. Suite: `Database/tests/academics_attendance_exams_tests.sql` (137 pass; one deliberate BUG check left: ATT-B8, the class-teacher gate in `core.sp_class_teacher_manage` ignores an inactive teacher, which belongs to the settings area).
+
+- **One answer to "is the school open?"** New `academic.fn_school_day_type(tenant, school, date)` returns holiday / weekly_off / half_day / working, the same answer the Smart Bell gets.
+  - Attendance refuses declared holidays and configured weekly offs, and accepts declared working days. There is no longer a hard-coded Sunday rule.
+  - A half day is a normal attendance day; only the bell changes.
+  - Exam papers on a closed day are refused.
+  - Half-day closing times must fall inside the period structure.
+- **Attendance save is scoped to the class-section.** `core.sp_attendance_save` gained `p_class, p_section`. **Signature change:** the old 6-argument overload is dropped.
+  - `core.fn_attendance_register` defines who is on a register for a date; the roster and the save both use it.
+  - A teacher approved for 7-A can no longer post 7-B students.
+  - Students not yet admitted, or already left, are refused by name; a back-dated day still lists a student who left later.
+  - Unknown statuses are refused.
+  - Unchanged marks are not rewritten.
+- **Attendance % counts only the days a student belonged.** Mid-month joiners, leavers and section changers no longer read 50% or 150% (`core.fn_attendance_student_days`). `core.sp_attendance_month_register` (**signature change:** new `p_days_off` cursor):
+  - keeps leavers and movers for the days they sat there;
+  - shows marks by the class-section snapshot;
+  - returns per-student `school_days` and the calendar's days off.
+- **Edit history.** `academics_edit_history.sql` adds `core.student_attendance_history` and `academic.exam_marks_history`. AFTER UPDATE triggers write old value, new value, who and when, only on a real change.
+- **Exams.**
+  - `to_char` on the text date columns was fixed (hotfix kept).
+  - A paper that has marks cannot be removed, and its max cannot drop below an entered mark.
+  - An exam with finalised sheets cannot be deleted; it can still be unpublished.
+  - Marks are refused on a Draft exam and on a section the exam does not cover.
+  - Finalise turns blank draft rows into Absent.
+  - Results join papers on (exam, class, subject). A multi-class exam with a shared subject was being counted three times. Orphan or not-entered marks no longer reach the totals.
+  - The exam list no longer shows another school's session name.
+- **Timetable.** SaveCell now requires all of the following:
+  - a subject the class studies;
+  - an active teaching staff member of this school;
+  - a working weekday;
+  - a free room. Room clashes are enforced server-side via `academic.fn_room_key`, the same rule as `EC.isRealRoom`.
+  The picker lists teaching staff only. Copy Day skips busy rooms too.
+- **UI.**
+  - Attendance page: escapes names, keeps Late/Leave, shows "not marked yet", uses the server's date, and shows `EC.listEmpty` on failure.
+  - Report: per-student %, calendar shading, CSV formula guard.
+  - The mock `/ERP/Student/StudentAttendance` page (fake students, a Save that saved nothing) is removed.
+  - The dead localStorage mirror in Subject Management is removed.
+  - Attendance, Exam, Calendar and Timetable services now log rejected proc calls at Warning.
+- **Deploy order:**
+  1. `hotfix_2026_10_10.sql` (if not yet applied; it is superseded by the two scripts below that redefine the same procs)
+  2. `school_calendar.sql`
+  3. `academics_edit_history.sql`
+  4. `student_attendance.sql`
+  5. `attendance_student.sql`
+  6. `attendance_report.sql`
+  7. `exam_marks.sql`
+  8. `exam_result_student.sql`
+  9. `exam_schedule.sql`
+  10. `timetable.sql`
+
+  All of them are safe to re-run. **Do not re-run `hotfix_2026_10_10.sql` after step 9**: it would put back the older exam and calendar procs.
+
+### [2026-10-10] Students, transport and documents: test pass and fixes
+
+Catalog: `educore/docs/test-cases/students_transport_documents.md`. Suite: `Database/tests/students_transport_documents_tests.sql` (phase 1: 69 passed / 28 BUG failures; after the fixes: 120 passed, 0 failed).
+
+- **Edit Student** refuses what admission refuses: a future DOB, a DOB after the admission date, a mobile that is not 10 digits, an Aadhaar that is not 12 digits, an unknown gender, a duplicate name + DOB + mobile, and a roll number already used in the class + section + session. The checks live in the proc and the controller. Each rule only fires when that value changes, so older rows stay editable. Every changed field is written to `admission_audit` as `StudentEdited` (old → new, who, when). The Aadhaar number itself is not copied into the audit text. A roll change reaches `student_enrolment`.
+- **Admission** applies the same Aadhaar and roll rules (`sp_admission_manage` SaveAdmission).
+- **Edit Student page:**
+  - Fields that were posted and silently dropped are gone: email, WhatsApp, caste, remarks, and the status block. Status changes belong to the Exit flow, and the page now links to it.
+  - The photo uploads as soon as it is picked, and the current photo is shown.
+  - A refused save keeps the locked fields filled in.
+- **Sections** for Edit Student and Promotion come from the session's class setup (`core.sp_class_setup_sections`, new), so an empty section can be picked. `sp_class_active_sections` is unchanged; attendance still uses it.
+- **Directory:**
+  - Search collapses inner spaces and treats `%` / `_` as literal characters (strpos, not LIKE). The same applies to GetStudents, the exit list and the TC register.
+  - "Sort by class" follows the teaching order.
+  - The CSV export honours the Fee filter and neutralises cells that start with `=` `+` `-` `@`.
+- **Photos:** a replaced file is deleted, and only when it sits in this school's student folder. Every photo change is audited (`PhotoChanged`).
+- **Student Dashboard:**
+  - Every database value is escaped (stored XSS).
+  - It shows the real address, contact and status instead of a hard-coded address.
+  - A left student's dashboard opens read-only (the Inactive list links it). Edit refuses leavers.
+- **Promotion:**
+  - Unticking a student really leaves them out. Each student has one picked flag; the desktop and mobile checkboxes mirror each other.
+  - Desktop and mobile radios no longer share a group.
+  - A reloaded roster for the source session no longer lists children already moved on: GetStudents with status Active plus a session needs that session's enrolment to be Active.
+- **Transport:**
+  - **Fixed:** `GetForStudent` alias clash (the Assign page's "Currently assigned / Remove").
+  - **Unique and valid entries:** route and vehicle numbers are unique (case and spacing ignored); fares ≥ 0; capacity ≥ 1.
+  - **Delete and remove guards:**
+    - A route, or one of its stops, cannot be removed while children ride it. An empty route is soft-deleted and its buses are detached.
+    - The last active bus of a route with riders cannot be switched off or deleted.
+  - **Assignment:**
+    - Refused on an inactive or deleted route or a removed stop. A child already on that route or stop is exempt, so promotion's re-bill keeps working.
+    - Refused when the route's active buses are full. Routes with no capacity set are unlimited.
+    - Riders and seats are shown on Routes and Assign.
+  - **Vehicles:** a bus can only point at this school's routes.
+  - **Messages:** a foreign or deleted id gets "not found", never a success message.
+  - **Fares:** a stop fare change applies to new riders only, and the UI says so.
+  - **Pages:** Assign escapes every name, and Save shows a busy state on Routes and Vehicles.
+- **Admission + transport (SEC-20):** no bus is assigned or billed, and no routes are offered, when the Transport module is off.
+- **TC:**
+  - Issue returns the certificate's public id. "Issue & Print" used to open a 404 because it passed the integer id.
+  - Opening or refreshing `Tc/Print` no longer counts a print. The Print button POSTs `Tc/MarkPrinted` (`students.manage`). Until then the sheet carries a "NOT AN ORIGINAL" watermark.
+  - A voided TC is refused for printing and shows VOID.
+  - Board fields are validated: no negative days, present ≤ working, application date ≤ issue date.
+  - The Register shows the void reason, who voided it and when.
+  - The number series still restarts on 1 January, by decision.
+- **ID cards:**
+  - Index lists children with no photo before printing.
+  - A sheet with missing photos does not auto-print, and lists them on screen.
+  - A missing file falls back to the blank box.
+  - The stale "upload not enabled" banner is gone.
+  - Sections reload when the year changes.
+- **Admission/Dashboard:** this mock page (random grades, `rank:rand(1,40)`) is removed. The URL redirects to the student list.
+- **Deploy order (all safe to re-run):**
+  1. `transport_module.sql`
+  2. `transfer_certificate.sql`
+  3. `student_update.sql`
+  4. `student_photo.sql`
+  5. `student_list.sql`
+  6. `student_master_fields.sql`
+  7. `student_exit.sql`
+
+  Apply `transport_module.sql` **after** `hotfix_2026_10_10.sql`. Never re-run that hotfix afterwards: it carries an older `sp_transport_assign_manage`.

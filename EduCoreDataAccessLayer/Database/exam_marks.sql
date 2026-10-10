@@ -162,6 +162,8 @@ DECLARE
     v_enrol   integer;
     v_saved   integer := 0;
     v_added   integer := 0;
+    v_blank   integer := 0;
+    v_status  text;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -171,7 +173,7 @@ BEGIN
 
     -- Every operation works on one exam; resolve its academic year once.
     IF COALESCE(p_exam_id, 0) > 0 THEN
-        SELECT academic_year_id INTO v_year_id
+        SELECT academic_year_id, status INTO v_year_id, v_status
         FROM academic.exams
         WHERE exam_id   = p_exam_id
           AND tenant_id = p_tenant_id
@@ -324,6 +326,23 @@ BEGIN
             RAISE EXCEPTION 'These marks are finalized. Ask a school admin to reopen the sheet.';
         END IF;
 
+        -- A draft datesheet is still being built; the Marks Entry page hides
+        -- drafts, and the server holds the same line.
+        IF v_status IS DISTINCT FROM 'Published' THEN
+            RAISE EXCEPTION 'This exam is still a draft. Publish it before entering marks.';
+        END IF;
+
+        -- An exam that targets specific sections of this class takes marks only
+        -- for those sections (no exam_class_sections rows = the whole class).
+        IF EXISTS (SELECT 1 FROM academic.exam_class_sections x
+                   WHERE x.exam_id = p_exam_id AND x.academic_class_id = p_academic_class_id)
+           AND NOT EXISTS (SELECT 1 FROM academic.exam_class_sections x
+                           WHERE x.exam_id = p_exam_id AND x.academic_class_id = p_academic_class_id
+                             AND LOWER(x.section) = LOWER(v_section)) THEN
+            RAISE EXCEPTION 'This exam is not held for section % of this class.',
+                CASE WHEN v_section = '' THEN '(none)' ELSE v_section END;
+        END IF;
+
         v_items := COALESCE(NULLIF(p_items, ''), '[]')::jsonb;
 
         FOR v_item IN SELECT value FROM jsonb_array_elements(v_items)
@@ -361,7 +380,14 @@ BEGIN
                           academic_class_id = EXCLUDED.academic_class_id,
                           section           = EXCLUDED.section,
                           updated_by        = p_action_user_id,
-                          updated_at        = now();
+                          updated_at        = now()
+            -- An unchanged mark is not rewritten, so updated_by keeps meaning
+            -- "who last changed it" and the history trigger stays quiet.
+            WHERE academic.exam_marks.marks_obtained    IS DISTINCT FROM EXCLUDED.marks_obtained
+               OR academic.exam_marks.is_absent         IS DISTINCT FROM EXCLUDED.is_absent
+               OR academic.exam_marks.enrolment_id      IS DISTINCT FROM EXCLUDED.enrolment_id
+               OR academic.exam_marks.academic_class_id IS DISTINCT FROM EXCLUDED.academic_class_id
+               OR academic.exam_marks.section           IS DISTINCT FROM EXCLUDED.section;
 
             v_saved := v_saved + 1;
         END LOOP;
@@ -382,6 +408,23 @@ BEGIN
                                 AND m.student_id = r.out_student_id);
 
             GET DIAGNOSTICS v_added = ROW_COUNT;
+
+            -- A blank that was saved as a draft (or a mark cleared later) is just
+            -- as unmarked: it is recorded Absent too.
+            UPDATE academic.exam_marks m
+               SET is_absent  = TRUE,
+                   updated_by = p_action_user_id,
+                   updated_at = now()
+             WHERE m.exam_id    = p_exam_id
+               AND m.subject_id = p_subject_id
+               AND m.marks_obtained IS NULL
+               AND NOT m.is_absent
+               AND m.student_id IN (SELECT r.out_student_id
+                                    FROM academic.fn_exam_sheet_roster(p_tenant_id, p_school_id, v_year_id,
+                                                                       p_academic_class_id, v_section) r);
+
+            GET DIAGNOSTICS v_blank = ROW_COUNT;
+            v_added := v_added + v_blank;
 
             INSERT INTO academic.exam_mark_sheets
                 (tenant_id, school_id, exam_id, academic_class_id, subject_id, section,

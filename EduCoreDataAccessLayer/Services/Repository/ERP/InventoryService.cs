@@ -4,6 +4,7 @@ using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -12,12 +13,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     public class InventoryService : IInventoryService
     {
         private readonly PgExec _db;
+        private readonly ILogger<InventoryService> _logger;
         private const string Sp         = "core.sp_inventory_manage";
         private const string SpPurchase = "core.sp_inventory_purchase_manage";
 
-        public InventoryService(PgExec db)
+        public InventoryService(PgExec db, ILogger<InventoryService> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         // ── Items ───────────────────────────────────────────────────────────
@@ -104,6 +107,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     MovementType = Str(r, "movement_type"),
                     Quantity     = DecVal(r, "quantity"),
                     BalanceAfter = DecVal(r, "balance_after"),
+                    Balance      = DecVal(r, "balance"),
+                    UnitRate     = Has(r, "unit_rate") && r["unit_rate"] != DBNull.Value
+                                       ? Convert.ToDecimal(r["unit_rate"]) : null,
+                    CreatedBy    = Str(r, "created_by_name"),
+                    InvoiceNo    = Str(r, "invoice_no"),
                     IssuedTo     = Str(r, "issued_to"),
                     Remarks      = Str(r, "remarks"),
                     ReferenceId  = IntVal(r, "reference_id")
@@ -168,9 +176,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var list = new List<PurchaseListItem>();
             if (tenantId <= 1 || schoolId <= 0) return list;
 
+            // A filter date the browser mangled is dropped (Dates.Norm returns
+            // null) rather than reaching the proc and failing the whole list.
             var ds = await _db.ExecuteProcedureWithCursorsAsync(
                 SpPurchase, PurchaseParams("List", tenantId, schoolId, actionUserId,
-                                           fromDate: fromDate, toDate: toDate));
+                                           fromDate: Dates.Norm(fromDate), toDate: Dates.Norm(toDate)));
 
             if (ds.Tables.Count == 0) return list;
             foreach (DataRow r in ds.Tables[0].Rows)
@@ -185,7 +195,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     TaxTotal     = DecVal(r, "tax_total"),
                     GrandTotal   = DecVal(r, "grand_total"),
                     IsCancelled  = BoolVal(r, "is_cancelled"),
-                    LineCount    = IntVal(r, "line_count")
+                    LineCount    = IntVal(r, "line_count"),
+                    ItemQty      = DecVal(r, "item_qty")
                 });
             return list;
         }
@@ -239,11 +250,19 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             if (tenantId <= 1 || schoolId <= 0)
                 return new InventoryResult { Message = "Invalid school scope." };
 
+            var purchaseDate = Dates.Norm(input.PurchaseDate);
+            if (purchaseDate == null)
+                return new InventoryResult { Message = "Choose a valid purchase date." };
+
+            // A line with no item is refused, not silently dropped: the bill
+            // would otherwise save with fewer lines than the user typed.
+            var lines = input.Items ?? new List<PurchaseLineInput>();
+            if (lines.Any(i => i.ItemId <= 0))
+                return new InventoryResult { Message = "Every line needs an item." };
+
             // camelCase keys, matching the ->> lookups in the proc.
             var itemsJson = JsonSerializer.Serialize(
-                (input.Items ?? new List<PurchaseLineInput>())
-                .Where(i => i.ItemId > 0)
-                .Select(i => new
+                lines.Select(i => new
                 {
                     itemId     = i.ItemId,
                     quantity   = i.Quantity,
@@ -253,7 +272,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
             return await RunAsync(SpPurchase,
                 PurchaseParams("Save", tenantId, schoolId, actionUserId,
-                    supplierId: input.SupplierId, purchaseDate: input.PurchaseDate,
+                    supplierId: input.SupplierId, purchaseDate: purchaseDate,
                     invoiceNo: input.InvoiceNo, paymentMode: input.PaymentMode,
                     remarks: input.Remarks, itemsJson: itemsJson));
         }
@@ -290,10 +309,48 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
-                // Every RAISE in these procs is a rule the store keeper needs to
-                // read — "Only 3 Piece of School Tie left", "already cancelled" —
-                // so the proc's own wording goes straight back to the screen.
-                return new InventoryResult { Message = ex.MessageText };
+                _logger.LogWarning(ex, "Inventory call {Proc} rejected. SqlState {SqlState}", sp, ex.SqlState);
+                return new InventoryResult { Message = Friendly(ex) };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Inventory call {Proc} failed.", sp);
+                return new InventoryResult { Message = "Something went wrong. Please try again." };
+            }
+        }
+
+        // Every RAISE in these procs (SqlState P0001) is a rule the store keeper
+        // needs to read -- "Only 3 Piece of School Tie left", "already cancelled" --
+        // so its wording goes straight back. Anything else is a database error
+        // whose raw text ("duplicate key value violates unique constraint ...")
+        // means nothing on screen, so it is turned into a sentence here.
+        private static string Friendly(PostgresException ex)
+        {
+            if (ex.SqlState == PostgresErrorCodes.RaiseException) return ex.MessageText;
+
+            switch (ex.SqlState)
+            {
+                case PostgresErrorCodes.UniqueViolation:
+                    return ex.ConstraintName switch
+                    {
+                        "ux_inventory_item_name"        => "An item with this name already exists.",
+                        "ux_inventory_item_sku"         => "Another item already uses this code.",
+                        "ux_inventory_supplier_name"    => "A supplier with this name already exists.",
+                        "ux_inventory_purchase_invoice" => "This bill number is already entered for this supplier.",
+                        _                               => "This record already exists."
+                    };
+                case PostgresErrorCodes.CheckViolation:
+                    return "One of the values is not allowed. Check quantities, prices and tax.";
+                case PostgresErrorCodes.NumericValueOutOfRange:
+                    return "One of the numbers is too large.";
+                case PostgresErrorCodes.StringDataRightTruncation:
+                    return "One of the text fields is too long.";
+                case PostgresErrorCodes.InvalidTextRepresentation:
+                case PostgresErrorCodes.InvalidDatetimeFormat:
+                case PostgresErrorCodes.DatetimeFieldOverflow:
+                    return "One of the values is not in the right format.";
+                default:
+                    return "Could not save. Please check the values and try again.";
             }
         }
 

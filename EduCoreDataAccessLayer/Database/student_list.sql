@@ -34,6 +34,9 @@ DECLARE
     v_offset  integer;
     v_col     text;
     v_asc     boolean;
+    -- The search as typed, trimmed, lower-cased and with inner runs of spaces
+    -- collapsed, so "meera  devi" finds "Meera Devi".
+    v_q       text := NULLIF(regexp_replace(LOWER(TRIM(COALESCE(p_search, ''))), '\s+', ' ', 'g'), '');
 BEGIN
     -- Tenant/school scope guard (tenant 1 = platform, never real data).
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
@@ -58,6 +61,15 @@ BEGIN
                 s.admission_date, s.created_at, s.guardian_name, s.mobile,
                 s.annual_total, s.status, s.approval_status, s.enquiry_id,
                 s.photo_url,
+                -- Teaching order of the class in the student's session, so a
+                -- "sort by class" reads Nursery, LKG, 1, 2 ... 10, not text order.
+                (SELECT MIN(ac.display_order)
+                   FROM academic.academic_classes ac
+                   JOIN academic.academic_years ay ON ay.academic_year_id = ac.academic_year_id
+                  WHERE ac.tenant_id = s.tenant_id AND ac.school_id = s.school_id
+                    AND ac.class_name = COALESCE(e.class_name, s.class_name)
+                    AND ay.academic_year_name = COALESCE(e.academic_year, s.academic_year)
+                    AND COALESCE(ac.is_deleted, FALSE) = FALSE) AS class_order,
                 -- Concession settles a due as surely as cash does. Leaving it
                 -- out showed a fully settled student as owing / Partial.
                 COALESCE((
@@ -84,12 +96,14 @@ BEGIN
             WHERE s.tenant_id = p_tenant_id
               AND s.school_id = p_school_id
               AND s.is_active = TRUE
+              -- strpos, not LIKE: a typed % or _ is a character, not a wildcard
+              -- (LIKE '%%%' matched every student).
               AND (
-                  p_search IS NULL OR TRIM(p_search) = ''
-                  OR LOWER(s.student_name) LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                  OR LOWER(s.admission_no)  LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                  OR LOWER(COALESCE(s.guardian_name,'')) LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                  OR COALESCE(s.mobile,'') LIKE '%' || TRIM(p_search) || '%'
+                  v_q IS NULL
+                  OR strpos(regexp_replace(LOWER(s.student_name), '\s+', ' ', 'g'), v_q) > 0
+                  OR strpos(LOWER(s.admission_no), v_q) > 0
+                  OR strpos(regexp_replace(LOWER(COALESCE(s.guardian_name, '')), '\s+', ' ', 'g'), v_q) > 0
+                  OR strpos(COALESCE(s.mobile, ''), v_q) > 0
               )
               -- Enrolled in the requested session at all.
               AND (NULLIF(TRIM(COALESCE(p_filter_year, '')), '') IS NULL
@@ -118,8 +132,10 @@ BEGIN
             -- Whitelisted, injection-safe sort (no dynamic SQL).
             CASE WHEN v_col = 'name'    AND v_asc      THEN student_name    END ASC,
             CASE WHEN v_col = 'name'    AND NOT v_asc  THEN student_name    END DESC,
-            CASE WHEN v_col = 'class'   AND v_asc      THEN class_name      END ASC,
-            CASE WHEN v_col = 'class'   AND NOT v_asc  THEN class_name      END DESC,
+            CASE WHEN v_col = 'class'   AND v_asc      THEN class_order     END ASC,
+            CASE WHEN v_col = 'class'   AND v_asc      THEN section         END ASC,
+            CASE WHEN v_col = 'class'   AND NOT v_asc  THEN class_order     END DESC,
+            CASE WHEN v_col = 'class'   AND NOT v_asc  THEN section         END DESC,
             CASE WHEN v_col = 'admdate' AND v_asc      THEN admission_date  END ASC,
             CASE WHEN v_col = 'admdate' AND NOT v_asc  THEN admission_date  END DESC,
             -- Default: the most recently ENTERED record first, not the most

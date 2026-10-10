@@ -136,9 +136,10 @@ var SECTIONS_URL='@Url.Action("Sections","Attendance",new{area="ERP"})';
 var MONTH_URL   ='@Url.Action("MonthRegister","Attendance",new{area="ERP"})';
 
 /* The roster + marks for the selected month come from the server. */
-var STUDENTS=[];        // [{id,name,roll}]
+var STUDENTS=[];        // [{id,name,roll,days}] - days = registers this student belonged to
 var SERVER_MARKS={};    // studentId -> { dayNumber: 'P'|'A'|'L' }
 var SCHOOL_DAYS=0;      // distinct days a register was actually taken this month
+var DAYS_OFF={};        // dayNumber -> title, holidays / weekly offs from the School Calendar
 
 function el(id){ return document.getElementById(id); }
 
@@ -146,7 +147,8 @@ var avatarColors=['primary','success','info','warning','danger','secondary'];
 function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
 
 /* Build each student's per-day marks for the month from the server data.
-   Sundays render as H; a non-Sunday day with no register shows blank. */
+   School Calendar holidays / weekly offs render as H; any other day with no
+   register shows blank. */
 var DATA={};   // studentId -> array of marks per day ['P','A','L','H','',...]
 var daysInMonth=0, schoolDays=0, monthIdx=0, year=0;
 
@@ -160,8 +162,9 @@ function buildMonth(){
     var marks=SERVER_MARKS[s.id]||{};
     var arr=[];
     for(var d=1; d<=daysInMonth; d++){
-      if(new Date(year,monthIdx,d).getDay()===0){ arr.push('H'); }
-      else { arr.push(marks[d]||''); }   // '' = no register taken that day
+      if(marks[d]){ arr.push(marks[d]); }
+      else if(DAYS_OFF[d]){ arr.push('H'); }
+      else { arr.push(''); }              // '' = no register taken that day
     }
     DATA[s.id]=arr;
   });
@@ -170,7 +173,8 @@ function buildMonth(){
 /* Fetch the roster + month's marks for the current filters, then render. */
 function loadData(){
   var cls=el('fClass').value;
-  if(!cls){ STUDENTS=[]; SERVER_MARKS={}; SCHOOL_DAYS=0; render(); return; }
+  if(!cls){ STUDENTS=[]; SERVER_MARKS={}; SCHOOL_DAYS=0; DAYS_OFF={}; render(); return; }
+  EC.showLoader();
   $.getJSON(MONTH_URL,{
     'class':  cls,
     section:  el('fSection').value,
@@ -178,7 +182,9 @@ function loadData(){
     year:     parseInt(el('fYear').value,10)
   })
   .done(function(res){
-    STUDENTS=(res.students||[]).map(function(s){ return {id:s.id,name:s.name,roll:s.roll||''}; });
+    STUDENTS=(res.students||[]).map(function(s){ return {id:s.id,name:s.name,roll:s.roll||'',days:s.days||0}; });
+    DAYS_OFF={};
+    (res.daysOff||[]).forEach(function(o){ DAYS_OFF[o.day]=o.title||'Holiday'; });
     SERVER_MARKS={};
     (res.marks||[]).forEach(function(m){
       (SERVER_MARKS[m.studentId]=SERVER_MARKS[m.studentId]||{})[m.day]=m.mark;
@@ -186,7 +192,11 @@ function loadData(){
     SCHOOL_DAYS=res.schoolDays||0;
     render();
   })
-  .fail(function(){ ecToast('error','Could not load the attendance register.'); });
+  .fail(function(xhr){
+    STUDENTS=[]; SERVER_MARKS={}; SCHOOL_DAYS=0; DAYS_OFF={}; render();
+    ecToast('error', EC.ajaxError(xhr, 'Could not load the attendance register'));
+  })
+  .always(EC.hideLoader);
 }
 
 /* Fill the Section dropdown for the chosen class, then (optionally) load data. */
@@ -207,7 +217,10 @@ function loadSections(thenLoad){
 function statsFor(id){
   var arr=DATA[id], p=0,a=0,l=0;
   arr.forEach(function(m){ if(m==='P')p++; else if(m==='A')a++; else if(m==='L')l++; });
-  var pct = schoolDays? Math.round(p/schoolDays*100) : 0;
+  // Out of the registers THIS student belonged to (a mid-month joiner, leaver or
+  // section changer is not marked down for days they were not in this class).
+  var s=STUDENTS.find(function(x){ return x.id===id; }), days=(s&&s.days)||0;
+  var pct = days? Math.round(p/days*100) : 0;
   return {p:p,a:a,l:l,pct:pct};
 }
 function pctCls(pct){ return pct>=THRESHOLD?'good':(pct>=60?'warn':'bad'); }
@@ -236,8 +249,8 @@ function renderRegister(){
   }
   var head='<thead><tr><th class="ar-stick">Student</th>';
   for(var d=1; d<=daysInMonth; d++){
-    var wknd=(new Date(year,monthIdx,d).getDay()===0);
-    head+='<th class="'+(wknd?'wknd':'')+'">'+d+'</th>';
+    var off=DAYS_OFF[d];
+    head+='<th class="'+(off?'wknd':'')+'"'+(off?' title="'+EC.esc(off)+'"':'')+'>'+d+'</th>';
   }
   head+='<th class="ar-totcol">P</th><th class="ar-totcol">A</th><th class="ar-totcol">%</th></tr></thead>';
 
@@ -310,7 +323,11 @@ function exportCsv(){
     var st=statsFor(s.id);
     rows.push([s.roll, s.name, st.p, st.a, st.l, st.pct+'%']);
   });
-  var csv=rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\r\n');
+  // A cell starting with = + - or an at-sign is a formula in Excel; prefix a quote so a
+  // student name can never run as one.
+  var csv=rows.map(function(r){ return r.map(function(c){
+    var v=String(c); if(/^[=+\-\x40]/.test(v)) v="'"+v;   // \x40 = at-sign (a literal one would be Razor)
+    return '"'+v.replace(/"/g,'""')+'"'; }).join(','); }).join('\r\n');
   var name='attendance_'+el('fClass').value+'_'+el('fSection').value+'_'+MONTHS[monthIdx]+'_'+year+'.csv';
   var a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));

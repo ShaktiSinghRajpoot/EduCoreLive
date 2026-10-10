@@ -59,7 +59,19 @@
 
         /// Signed: positive came in, negative went out.
         public decimal  Quantity     { get; set; }
+
+        /// Stock at the moment this row was entered.
         public decimal  BalanceAfter { get; set; }
+
+        /// Running total in the order the history is shown (date, then entry),
+        /// so the column reads cleanly even around a back-dated bill.
+        public decimal  Balance      { get; set; }
+
+        /// What the movement is valued at: the bill's rate for a purchase, the
+        /// item's cost price otherwise. Null on rows written before it was kept.
+        public decimal? UnitRate     { get; set; }
+        public string   CreatedBy    { get; set; } = string.Empty;
+        public string   InvoiceNo    { get; set; } = string.Empty;
         public string   IssuedTo     { get; set; } = string.Empty;
         public string   Remarks      { get; set; } = string.Empty;
         public int      ReferenceId  { get; set; }
@@ -68,7 +80,9 @@
     public class StockMovementInput
     {
         public int     ItemId       { get; set; }
-        public string  MovementType { get; set; } = string.Empty;   // Issue|Return|Damage|Adjustment
+        public string  MovementType { get; set; } = string.Empty;   // Issue|Return|Damage|Adjustment|StockTake
+
+        /// For a StockTake this is the quantity COUNTED, not the difference.
         public decimal Quantity     { get; set; }
         public string? IssuedTo     { get; set; }
         public string? Remarks      { get; set; }
@@ -100,6 +114,7 @@
         public decimal  GrandTotal   { get; set; }
         public bool     IsCancelled  { get; set; }
         public int      LineCount    { get; set; }
+        public decimal  ItemQty      { get; set; }
     }
 
     public class PurchaseLine

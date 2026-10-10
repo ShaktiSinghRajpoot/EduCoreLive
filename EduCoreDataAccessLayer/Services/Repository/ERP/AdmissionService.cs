@@ -269,7 +269,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 ConcessionAmount = DecVal(row, "concession_amount"),
                 ConcessionReason = NullStr(row, "concession_reason"),
                 EnquiryId        = Has(row, "enquiry_id") && row["enquiry_id"] != DBNull.Value
-                                     ? Convert.ToInt32(row["enquiry_id"]) : null
+                                     ? Convert.ToInt32(row["enquiry_id"]) : null,
+                IsActive         = !Has(row, "is_active") || row["is_active"] == DBNull.Value || Convert.ToBoolean(row["is_active"]),
+                Status           = NullStr(row, "status"),
+                DateOfLeaving    = DbRead.NStr(row, "date_of_leaving"),
+                LeavingReason    = NullStr(row, "leaving_reason"),
+                PhotoUrl         = NullStr(row, "photo_url")
             };
         }
 
@@ -415,6 +420,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     DateOfLeaving = DbRead.NStr(row, "date_of_leaving"),
                     Status        = Str(row, "status"),
                     LeavingReason = NullStr(row, "leaving_reason"),
+                    PublicId      = Has(row, "public_id") && row["public_id"] != DBNull.Value ? (Guid)row["public_id"] : Guid.Empty,
+                    HasTc         = Has(row, "has_tc") && row["has_tc"] != DBNull.Value && Convert.ToBoolean(row["has_tc"]),
                     Outstanding   = DecVal(row, "outstanding")
                 });
             }
@@ -478,7 +485,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
         }
 
-        public async Task<List<string>> GetClassSectionsAsync(string className, int tenantId, int schoolId, int actionUserId)
+        public async Task<List<string>> GetClassSectionsAsync(string className, int tenantId, int schoolId, int actionUserId, string? academicYear = null)
         {
             var sections = new List<string>();
             if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(className)) return sections;
@@ -488,11 +495,15 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_tenant_id", NpgsqlDbType.Integer) { Value = tenantId },
                 new("p_school_id", NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_class",     NpgsqlDbType.Varchar) { Value = className },
+                new("p_academic_year", NpgsqlDbType.Varchar)
+                    { Value = string.IsNullOrWhiteSpace(academicYear) ? DBNull.Value : academicYear.Trim() },
                 new("p_result", NpgsqlDbType.Refcursor)
-                    { Direction = ParameterDirection.InputOutput, Value = "class_sections_cursor" }
+                    { Direction = ParameterDirection.InputOutput, Value = "class_setup_sections_cursor" }
             };
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_class_active_sections", parameters);
+            // From the class setup, not from where students already sit: an empty
+            // section (a new 5-C) has to be pickable on Edit Student and Promotion.
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_class_setup_sections", parameters);
             if (ds.Tables.Count == 0) return sections;
 
             foreach (DataRow row in ds.Tables[0].Rows)

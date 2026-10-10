@@ -1,8 +1,10 @@
 ﻿using educore.Models;
 using educore.Services;
+using educore.Helpers;
 using educore.Services.Notifications;
 using EduCoreDataAccessLayer.Extensions;
 using EduCoreDataAccessLayer.Helpers;
+using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models;
 using EduCoreDataAccessLayer.Services;
 using Microsoft.AspNetCore.Authentication;
@@ -25,6 +27,7 @@ namespace educore.Controllers
         private readonly IBaseService _baseService;
         private readonly INotificationService _notificationService;
         private readonly IPermissionService _perms;
+        private readonly AppCache _cache;
 
         // Encrypts/decrypts values that leave the server (query strings, custom cookies).
         // Built once here — CreateProtector is cheap but the purpose string must be the same
@@ -36,8 +39,9 @@ namespace educore.Controllers
         // Session key for the half-logged-in user waiting on the multi-role picker.
         private const string PendingUserIdKey = "PendingUserId";
 
-        public AccountController(ILoginService loginService, IBaseService baseService, INotificationService notificationService, IPermissionService perms, IDataProtectionProvider dataProtectionProvider, IOptions<AppSettings> appSettings)
+        public AccountController(ILoginService loginService, IBaseService baseService, INotificationService notificationService, IPermissionService perms, IDataProtectionProvider dataProtectionProvider, IOptions<AppSettings> appSettings, AppCache cache)
         {
+            _cache = cache;
             _loginService = loginService;
             _baseService = baseService;
             _notificationService = notificationService;
@@ -95,7 +99,7 @@ namespace educore.Controllers
 
             if (string.IsNullOrEmpty(model.Email) || string.IsNullOrEmpty(model.Password))
             {
-                await _loginService.SaveLoginAttemptAsync(model.Email ?? string.Empty, false, "Invalid email");
+                await _loginService.SaveLoginAttemptAsync(model.Email ?? string.Empty, false, "Invalid email", HttpContext);
                 TempData["Result"] = "0";
                 TempData["Message"] = "Email/mobile number and password are required.";
                 return View(model);
@@ -105,7 +109,7 @@ namespace educore.Controllers
 
             if (user == null || user.UserId == 0)
             {
-                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid email");
+                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid email", HttpContext);
                 TempData["Result"] = "0";
                 TempData["Message"] = "Invalid email/mobile number or password.";
                 return View(model);
@@ -113,7 +117,7 @@ namespace educore.Controllers
 
             if (!user.IsActive || user.IsDeleted)
             {
-                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Inactive or deleted account");
+                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Inactive or deleted account", HttpContext);
                 TempData["Result"] = "0";
                 TempData["Message"] = "Your account is not active or deleted.";
                 return View(model);
@@ -123,7 +127,7 @@ namespace educore.Controllers
 
             if (!isPasswordValid)
             {
-                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid password");
+                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid password", HttpContext);
                 TempData["Result"] = "0";
                 TempData["Message"] = "Invalid email/mobile number or password.";
                 return View(model);
@@ -136,7 +140,7 @@ namespace educore.Controllers
             if (!user.SchoolAllowsLogin)
             {
                 await _loginService.SaveLoginAttemptAsync(
-                    model.Email, false, $"School not active ({user.SchoolStatusCode})");
+                    model.Email, false, $"School not active ({user.SchoolStatusCode})", HttpContext);
 
                 // A full page, not a toast: a toast disappears in 3.5s and leaves the
                 // user with no way to act on it. SchoolUnavailable explains the state
@@ -152,7 +156,7 @@ namespace educore.Controllers
 
             if (roles == null || roles.Count == 0)
             {
-                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Role not assigned");
+                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Role not assigned", HttpContext);
                 TempData["Result"] = "0";
                 TempData["Message"] = "User role is not assigned.";
                 return View(model);
@@ -169,7 +173,7 @@ namespace educore.Controllers
 
                 if (!IsValidSaasScope(user))
                 {
-                    await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid SaaS scope");
+                    await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid SaaS scope", HttpContext);
                     TempData["Result"] = "0";
                     TempData["Message"] = "User tenant or school mapping is invalid.";
                     return View(model);
@@ -179,13 +183,13 @@ namespace educore.Controllers
 
                 if (!authorized)
                 {
-                    await _loginService.SaveLoginAttemptAsync(model.Email, false, "Authorization failed");
+                    await _loginService.SaveLoginAttemptAsync(model.Email, false, "Authorization failed", HttpContext);
                     TempData["Result"] = "0";
                     TempData["Message"] = "User authorization failed.";
                     return View(model);
                 }
 
-                await _loginService.SaveLoginAttemptAsync(model.Email, true, null);
+                await _loginService.SaveLoginAttemptAsync(model.Email, true, null, HttpContext);
                 await _loginService.SaveUserSessionAsync(user.UserId, HttpContext);
 
                 if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
@@ -271,7 +275,7 @@ namespace educore.Controllers
                 return RedirectToAction("Login");
             }
 
-            await _loginService.SaveLoginAttemptAsync(email, true, null);
+            await _loginService.SaveLoginAttemptAsync(email, true, null, HttpContext);
             await _loginService.SaveUserSessionAsync(user.UserId, HttpContext);
 
             HttpContext.Session.Remove(PendingUserIdKey);
@@ -283,6 +287,9 @@ namespace educore.Controllers
 
         private static bool IsValidSaasScope(UserViewModel user)
         {
+            if (string.IsNullOrWhiteSpace(user.RoleCode))
+                return false;
+
             return user.RoleCode switch
             {
                 "SUPER_ADMIN" => user.TenantId == 1 && user.SchoolId == 0,
@@ -290,13 +297,14 @@ namespace educore.Controllers
                 "TENANT_ADMIN" => user.TenantId.HasValue &&
                                   user.TenantId.Value > 1,
 
-                "SCHOOL_ADMIN" or "TEACHER" or "ACCOUNTANT" or "RECEPTIONIST" =>
-                    user.TenantId.HasValue &&
-                    user.TenantId.Value > 1 &&
-                    user.SchoolId.HasValue &&
-                    user.SchoolId.Value > 0,
-
-                _ => false
+                // Every other code is a SCHOOL role: the four built-ins AND any role a
+                // school created on the Roles page (LIBRARIAN, CASHIER ...). Listing only
+                // the built-ins here locked every custom-role user out ("mapping is
+                // invalid"). sp_role_manage never hands out SUPER_ADMIN/TENANT_ADMIN.
+                _ => user.TenantId.HasValue &&
+                     user.TenantId.Value > 1 &&
+                     user.SchoolId.HasValue &&
+                     user.SchoolId.Value > 0
             };
         }
 
@@ -335,7 +343,10 @@ namespace educore.Controllers
         new Claim(Common.SK_SchoolId, user.SchoolId?.ToString() ?? "0"),
 
         // Drives the forced first-login reset gate (middleware in Program.cs).
-        new Claim("must_change_password", user.MustChangePassword.ToString())
+        new Claim("must_change_password", user.MustChangePassword.ToString()),
+
+        // Security stamp, compared on every request by SessionValidator.
+        new Claim(SessionValidator.StampClaim, user.PasswordStamp ?? "0")
     };
 
             var claimsIdentity = new ClaimsIdentity(
@@ -597,9 +608,12 @@ namespace educore.Controllers
             var newHash = BCrypt.Net.BCrypt.HashPassword(model.NewPassword);
             await _loginService.ChangePasswordAsync(userId, newHash);
 
-            // Re-issue the cookie with must_change_password = false so the forced-reset
-            // gate releases immediately, without forcing a re-login.
-            await RefreshClaimsClearingForcedReset();
+            // The change moved the password stamp, which ends every OTHER session of this
+            // user. Re-issue THIS cookie with the new stamp (and must_change_password =
+            // false, so the forced-reset gate releases) so this browser stays signed in.
+            var fresh = await _loginService.GetUserInfoByUserIdAsync(userId);
+            SessionValidator.Forget(_cache, ClaimInt(Common.SK_TenantId), ClaimInt(Common.SK_SchoolId), userId);
+            await RefreshClaimsAfterPasswordChange(fresh?.PasswordStamp ?? "0");
 
             TempData["Result"] = "1";
             TempData["Message"] = "Your password has been changed successfully.";
@@ -610,20 +624,26 @@ namespace educore.Controllers
         private bool MustChangePassword() =>
             string.Equals(User.FindFirst("must_change_password")?.Value, "True", StringComparison.OrdinalIgnoreCase);
 
-        // Rebuilds the auth cookie from the current claims, flipping must_change_password to
-        // false. Preserves the active role/tenant/school exactly (important for multi-role users).
-        private async Task RefreshClaimsClearingForcedReset()
+        // Rebuilds the auth cookie from the current claims with must_change_password = false
+        // and the new password stamp. Preserves the active role/tenant/school exactly
+        // (important for multi-role users) AND the original cookie properties -- signing
+        // in without them turned a 7-day "remember me" cookie into a session cookie.
+        private async Task RefreshClaimsAfterPasswordChange(string passwordStamp)
         {
             var claims = User.Claims
-                .Where(c => c.Type != "must_change_password")
+                .Where(c => c.Type != "must_change_password" && c.Type != SessionValidator.StampClaim)
                 .ToList();
             claims.Add(new Claim("must_change_password", bool.FalseString));
+            claims.Add(new Claim(SessionValidator.StampClaim, passwordStamp));
 
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
+            var current = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(identity));
+                new ClaimsPrincipal(identity),
+                current.Properties ?? new AuthenticationProperties());
         }
 
         [HttpPost]

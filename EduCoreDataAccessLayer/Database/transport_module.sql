@@ -95,6 +95,30 @@ CREATE TABLE IF NOT EXISTS core.student_transport
 );
 CREATE INDEX IF NOT EXISTS idx_student_transport_student ON core.student_transport(student_id);
 
+-- ── Riders and seats per route ──────────────────────────────────────────────
+-- Riders = students on the roll with an active assignment on the route.
+-- Seats  = total capacity of the route's active vehicles. NULL when no active
+-- vehicle on the route has a capacity set: the route then has no known limit
+-- and assignment is not capped (a school that never registers buses still works).
+CREATE OR REPLACE FUNCTION core.fn_transport_route_riders(p_route_id integer, p_except_student integer DEFAULT NULL)
+RETURNS integer LANGUAGE sql STABLE AS $fn$
+    SELECT COUNT(DISTINCT a.student_id)::integer
+    FROM core.student_transport a
+    JOIN core.students st ON st.student_id = a.student_id AND st.is_active
+    WHERE a.route_id = p_route_id
+      AND a.is_active AND NOT COALESCE(a.is_deleted, FALSE)
+      AND a.student_id IS DISTINCT FROM p_except_student;
+$fn$;
+
+CREATE OR REPLACE FUNCTION core.fn_transport_route_seats(p_route_id integer, p_except_vehicle integer DEFAULT NULL)
+RETURNS integer LANGUAGE sql STABLE AS $fn$
+    SELECT NULLIF(SUM(COALESCE(v.capacity, 0)), 0)::integer
+    FROM core.transport_vehicles v
+    WHERE v.route_id = p_route_id
+      AND v.is_active AND NOT COALESCE(v.is_deleted, FALSE)
+      AND v.vehicle_id IS DISTINCT FROM p_except_vehicle;
+$fn$;
+
 -- ── Routes (+ stops) manage ─────────────────────────────────────────────────
 CREATE OR REPLACE PROCEDURE core.sp_transport_route_manage(
     IN    p_operation      varchar,
@@ -114,6 +138,8 @@ DECLARE
     v_stop     jsonb;
     v_stop_id  integer;
     v_keep     integer[] := ARRAY[]::integer[];
+    v_busy     text;
+    v_riders   integer;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -124,7 +150,9 @@ BEGIN
         SELECT r.route_id, r.route_name, r.description, r.is_active,
                COUNT(s.stop_id) FILTER (WHERE s.is_active)            AS stop_count,
                MIN(s.monthly_fare) FILTER (WHERE s.is_active)         AS min_fare,
-               MAX(s.monthly_fare) FILTER (WHERE s.is_active)         AS max_fare
+               MAX(s.monthly_fare) FILTER (WHERE s.is_active)         AS max_fare,
+               core.fn_transport_route_riders(r.route_id)             AS riders,
+               core.fn_transport_route_seats(r.route_id)              AS seats
         FROM core.transport_routes r
         LEFT JOIN core.transport_stops s ON s.route_id = r.route_id
         WHERE r.tenant_id = p_tenant_id AND r.school_id = p_school_id
@@ -145,19 +173,45 @@ BEGIN
             RAISE EXCEPTION 'Route name is required.';
         END IF;
 
+        -- One route per name (case and spaces ignored), or the Assign dropdown
+        -- offers two "North Zone"s and nobody knows which one a child is on.
+        IF EXISTS (SELECT 1 FROM core.transport_routes
+                    WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                      AND NOT COALESCE(is_deleted, FALSE)
+                      AND lower(regexp_replace(trim(route_name), '\s+', ' ', 'g'))
+                          = lower(regexp_replace(trim(p_route_name), '\s+', ' ', 'g'))
+                      AND route_id IS DISTINCT FROM NULLIF(p_route_id, 0)) THEN
+            RAISE EXCEPTION 'A route called "%" already exists.', trim(p_route_name);
+        END IF;
+
+        -- A fare is money the parent pays; it cannot be negative.
+        IF p_stops IS NOT NULL AND jsonb_typeof(p_stops) = 'array' AND EXISTS (
+               SELECT 1 FROM jsonb_array_elements(p_stops) e
+                WHERE COALESCE(NULLIF(trim(e->>'stopName'), ''), '') <> ''
+                  AND COALESCE((e->>'monthlyFare')::numeric, 0) < 0) THEN
+            RAISE EXCEPTION 'A stop fare cannot be negative.';
+        END IF;
+
         IF COALESCE(p_route_id, 0) > 0 THEN
             UPDATE core.transport_routes
-            SET route_name = p_route_name, description = p_description,
+            SET route_name = trim(p_route_name), description = NULLIF(trim(p_description), ''),
                 updated_by = p_action_user_id, updated_at = NOW()
             WHERE route_id = p_route_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+              AND NOT COALESCE(is_deleted, FALSE)
             RETURNING route_id INTO v_route_id;
+            -- Another school's id, or a deleted route: say so, do not pretend.
+            IF v_route_id IS NULL THEN
+                RAISE EXCEPTION 'Route not found.';
+            END IF;
         ELSE
             INSERT INTO core.transport_routes (tenant_id, school_id, route_name, description, created_by)
-            VALUES (p_tenant_id, p_school_id, p_route_name, p_description, p_action_user_id)
+            VALUES (p_tenant_id, p_school_id, trim(p_route_name), NULLIF(trim(p_description), ''), p_action_user_id)
             RETURNING route_id INTO v_route_id;
         END IF;
 
-        -- Sync stops: upsert provided ones, deactivate any existing not in the list.
+        -- Sync stops: upsert provided ones, switch off any existing not in the list.
+        -- A fare change applies to NEW assignments only: a child already on the
+        -- stop keeps the fare snapshotted when they were assigned.
         IF p_stops IS NOT NULL AND jsonb_typeof(p_stops) = 'array' THEN
             FOR v_stop IN SELECT * FROM jsonb_array_elements(p_stops)
             LOOP
@@ -167,40 +221,87 @@ BEGIN
                 v_stop_id := NULLIF((v_stop->>'stopId'), '')::integer;
                 IF COALESCE(v_stop_id, 0) > 0 THEN
                     UPDATE core.transport_stops
-                    SET stop_name = v_stop->>'stopName',
+                    SET stop_name = trim(v_stop->>'stopName'),
                         monthly_fare = COALESCE((v_stop->>'monthlyFare')::numeric, 0),
                         display_order = COALESCE((v_stop->>'displayOrder')::integer, 0),
                         is_active = TRUE, updated_at = NOW()
                     WHERE stop_id = v_stop_id AND route_id = v_route_id;
+                    IF NOT FOUND THEN
+                        v_stop_id := NULL;   -- not a stop of this route: ignore it
+                    END IF;
                 ELSE
                     INSERT INTO core.transport_stops
                         (route_id, tenant_id, school_id, stop_name, monthly_fare, display_order)
                     VALUES
-                        (v_route_id, p_tenant_id, p_school_id, v_stop->>'stopName',
+                        (v_route_id, p_tenant_id, p_school_id, trim(v_stop->>'stopName'),
                          COALESCE((v_stop->>'monthlyFare')::numeric, 0),
                          COALESCE((v_stop->>'displayOrder')::integer, 0))
                     RETURNING stop_id INTO v_stop_id;
                 END IF;
-                v_keep := array_append(v_keep, v_stop_id);
+                IF v_stop_id IS NOT NULL THEN
+                    v_keep := array_append(v_keep, v_stop_id);
+                END IF;
             END LOOP;
         END IF;
 
+        -- A stop that children board at cannot be taken off the route: they
+        -- would stay assigned (and billed) at a stop that no longer exists.
+        SELECT string_agg(DISTINCT s.stop_name, ', ') INTO v_busy
+        FROM core.transport_stops s
+        JOIN core.student_transport a ON a.stop_id = s.stop_id
+             AND a.is_active AND NOT COALESCE(a.is_deleted, FALSE)
+        JOIN core.students st ON st.student_id = a.student_id AND st.is_active
+        WHERE s.route_id = v_route_id AND s.is_active
+          AND NOT (s.stop_id = ANY(v_keep));
+        IF v_busy IS NOT NULL THEN
+            RAISE EXCEPTION 'Stop(s) % still have students assigned. Move them to another stop first.', v_busy;
+        END IF;
+
+        -- Removed stops are switched off, never deleted: past assignments and
+        -- their history still point at them.
         UPDATE core.transport_stops
         SET is_active = FALSE, updated_at = NOW()
-        WHERE route_id = v_route_id AND NOT (stop_id = ANY(v_keep));
+        WHERE route_id = v_route_id AND is_active AND NOT (stop_id = ANY(v_keep));
 
         OPEN p_result FOR SELECT TRUE AS success, 'Route saved.' AS message, v_route_id AS route_id;
 
     ELSIF p_operation = 'DeleteRoute' THEN
+        PERFORM 1 FROM core.transport_routes
+         WHERE route_id = p_route_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+           AND NOT COALESCE(is_deleted, FALSE);
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Route not found.';
+        END IF;
+
+        -- Children still riding it: refuse. A deleted route would keep billing
+        -- them on a route nobody can see.
+        v_riders := core.fn_transport_route_riders(p_route_id);
+        IF v_riders > 0 THEN
+            RAISE EXCEPTION '% student(s) are still assigned to this route. Move or remove them first.', v_riders;
+        END IF;
+
+        -- Soft delete: the row stays so past assignments keep their route name.
         UPDATE core.transport_routes
         SET is_deleted = TRUE, is_active = FALSE, updated_by = p_action_user_id, updated_at = NOW()
         WHERE route_id = p_route_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
+
+        -- A bus left pointing at a deleted route would still show it on Vehicles.
+        UPDATE core.transport_vehicles
+        SET route_id = NULL, updated_by = p_action_user_id, updated_at = NOW()
+        WHERE route_id = p_route_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
+
         OPEN p_result FOR SELECT TRUE AS success, 'Route deleted.' AS message;
 
     ELSIF p_operation = 'ToggleRouteStatus' THEN
+        -- Switching a route off only stops NEW assignments; children already on
+        -- it stay until they are moved.
         UPDATE core.transport_routes
         SET is_active = NOT is_active, updated_by = p_action_user_id, updated_at = NOW()
-        WHERE route_id = p_route_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
+        WHERE route_id = p_route_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+          AND NOT COALESCE(is_deleted, FALSE);
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Route not found.';
+        END IF;
         OPEN p_result FOR SELECT TRUE AS success, 'Route status updated.' AS message;
 
     ELSE
@@ -235,6 +336,9 @@ AS $procedure$
 DECLARE
     v_dname  varchar(100);
     v_dphone varchar(20);
+    v_route  integer;
+    v_active boolean;
+    v_riders integer;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -245,7 +349,11 @@ BEGIN
         SELECT v.vehicle_id, v.vehicle_no, v.capacity, v.driver_name, v.driver_phone,
                v.route_id, r.route_name, v.is_active, v.driver_staff_id
         FROM core.transport_vehicles v
+        -- Only this school's live routes: a route id from anywhere else must
+        -- never surface another school's route name here.
         LEFT JOIN core.transport_routes r ON r.route_id = v.route_id
+             AND r.tenant_id = v.tenant_id AND r.school_id = v.school_id
+             AND NOT COALESCE(r.is_deleted, FALSE)
         WHERE v.tenant_id = p_tenant_id AND v.school_id = p_school_id
           AND COALESCE(v.is_deleted, FALSE) = FALSE
         ORDER BY v.vehicle_no;
@@ -266,6 +374,36 @@ BEGIN
             RAISE EXCEPTION 'Vehicle number is required.';
         END IF;
 
+        -- A registration number is one vehicle. Compared without case, spaces
+        -- or dashes so "RJ14-AB-1234" and "rj14 ab 1234" are the same bus.
+        IF EXISTS (SELECT 1 FROM core.transport_vehicles
+                    WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                      AND NOT COALESCE(is_deleted, FALSE)
+                      AND upper(regexp_replace(vehicle_no, '[\s-]', '', 'g'))
+                          = upper(regexp_replace(p_vehicle_no, '[\s-]', '', 'g'))
+                      AND vehicle_id IS DISTINCT FROM NULLIF(p_vehicle_id, 0)) THEN
+            RAISE EXCEPTION 'Vehicle % is already registered.', trim(p_vehicle_no);
+        END IF;
+
+        IF p_capacity IS NOT NULL AND p_capacity < 1 THEN
+            RAISE EXCEPTION 'Capacity must be at least 1 seat (or left blank).';
+        END IF;
+
+        -- The route must be one of this school's live routes.
+        IF COALESCE(p_route_id, 0) > 0 AND NOT EXISTS (
+               SELECT 1 FROM core.transport_routes
+                WHERE route_id = p_route_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+                  AND NOT COALESCE(is_deleted, FALSE)) THEN
+            RAISE EXCEPTION 'Route not found.';
+        END IF;
+
+        IF COALESCE(p_driver_staff_id, 0) > 0 AND NOT EXISTS (
+               SELECT 1 FROM core.staff
+                WHERE staff_id = p_driver_staff_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+                  AND COALESCE(is_deleted, FALSE) = FALSE) THEN
+            RAISE EXCEPTION 'Driver not found.';
+        END IF;
+
         -- Snapshot driver name/phone from the linked staff row (single source);
         -- fall back to any free-text passed in when no staff is linked.
         IF COALESCE(p_driver_staff_id, 0) > 0 THEN
@@ -280,33 +418,59 @@ BEGIN
 
         IF COALESCE(p_vehicle_id, 0) > 0 THEN
             UPDATE core.transport_vehicles
-            SET vehicle_no = p_vehicle_no, capacity = p_capacity,
+            SET vehicle_no = trim(p_vehicle_no), capacity = p_capacity,
                 driver_name = v_dname, driver_phone = v_dphone,
                 driver_staff_id = NULLIF(COALESCE(p_driver_staff_id, 0), 0),
                 route_id = NULLIF(COALESCE(p_route_id, 0), 0),
                 updated_by = p_action_user_id, updated_at = NOW()
-            WHERE vehicle_id = p_vehicle_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
+            WHERE vehicle_id = p_vehicle_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+              AND NOT COALESCE(is_deleted, FALSE);
+            IF NOT FOUND THEN
+                RAISE EXCEPTION 'Vehicle not found.';
+            END IF;
         ELSE
             INSERT INTO core.transport_vehicles
                 (tenant_id, school_id, vehicle_no, capacity, driver_name, driver_phone,
                  driver_staff_id, route_id, created_by)
             VALUES
-                (p_tenant_id, p_school_id, p_vehicle_no, p_capacity, v_dname, v_dphone,
+                (p_tenant_id, p_school_id, trim(p_vehicle_no), p_capacity, v_dname, v_dphone,
                  NULLIF(COALESCE(p_driver_staff_id, 0), 0), NULLIF(COALESCE(p_route_id, 0), 0), p_action_user_id);
         END IF;
         OPEN p_result FOR SELECT TRUE AS success, 'Vehicle saved.' AS message;
 
-    ELSIF p_operation = 'DeleteVehicle' THEN
-        UPDATE core.transport_vehicles
-        SET is_deleted = TRUE, is_active = FALSE, updated_by = p_action_user_id, updated_at = NOW()
-        WHERE vehicle_id = p_vehicle_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
-        OPEN p_result FOR SELECT TRUE AS success, 'Vehicle deleted.' AS message;
+    ELSIF p_operation IN ('DeleteVehicle', 'ToggleVehicleStatus') THEN
+        SELECT route_id, is_active INTO v_route, v_active
+        FROM core.transport_vehicles
+        WHERE vehicle_id = p_vehicle_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+          AND NOT COALESCE(is_deleted, FALSE);
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Vehicle not found.';
+        END IF;
 
-    ELSIF p_operation = 'ToggleVehicleStatus' THEN
-        UPDATE core.transport_vehicles
-        SET is_active = NOT is_active, updated_by = p_action_user_id, updated_at = NOW()
-        WHERE vehicle_id = p_vehicle_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
-        OPEN p_result FOR SELECT TRUE AS success, 'Vehicle status updated.' AS message;
+        -- Taking a bus off the road (switching it off, or deleting it) is
+        -- refused when it is the last active bus of a route children ride:
+        -- they would be assigned to a route with no bus. Switching ON is free.
+        IF v_active AND v_route IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM core.transport_vehicles
+                            WHERE route_id = v_route AND vehicle_id <> p_vehicle_id
+                              AND is_active AND NOT COALESCE(is_deleted, FALSE)) THEN
+            v_riders := core.fn_transport_route_riders(v_route);
+            IF v_riders > 0 THEN
+                RAISE EXCEPTION 'This is the only active vehicle on its route and % student(s) ride it. Add or move another vehicle to the route first.', v_riders;
+            END IF;
+        END IF;
+
+        IF p_operation = 'DeleteVehicle' THEN
+            UPDATE core.transport_vehicles
+            SET is_deleted = TRUE, is_active = FALSE, updated_by = p_action_user_id, updated_at = NOW()
+            WHERE vehicle_id = p_vehicle_id;
+            OPEN p_result FOR SELECT TRUE AS success, 'Vehicle deleted.' AS message;
+        ELSE
+            UPDATE core.transport_vehicles
+            SET is_active = NOT is_active, updated_by = p_action_user_id, updated_at = NOW()
+            WHERE vehicle_id = p_vehicle_id;
+            OPEN p_result FOR SELECT TRUE AS success, 'Vehicle status updated.' AS message;
+        END IF;
 
     ELSE
         RAISE EXCEPTION 'Invalid operation %', p_operation;
@@ -324,7 +488,9 @@ LANGUAGE plpgsql
 AS $procedure$
 BEGIN
     OPEN p_result FOR
-    SELECT r.route_id, r.route_name, s.stop_id, s.stop_name, s.monthly_fare
+    SELECT r.route_id, r.route_name, s.stop_id, s.stop_name, s.monthly_fare,
+           core.fn_transport_route_riders(r.route_id) AS riders,
+           core.fn_transport_route_seats(r.route_id)  AS seats
     FROM core.transport_routes r
     JOIN core.transport_stops s ON s.route_id = r.route_id AND s.is_active = TRUE
     WHERE r.tenant_id = p_tenant_id AND r.school_id = p_school_id
@@ -367,6 +533,11 @@ DECLARE
     v_already     numeric(12,2);
     v_closed      numeric(12,2);
     v_reason      varchar(200);
+    v_open        boolean;
+    v_same_route  boolean;
+    v_same_stop   boolean;
+    v_seats       integer;
+    v_riders      integer;
     r             record;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 OR p_student_id <= 0 THEN
@@ -376,9 +547,11 @@ BEGIN
     IF p_operation = 'GetForStudent' THEN
         OPEN p_result FOR
         SELECT a.assignment_id, a.route_id, a.stop_id, a.monthly_fare, a.start_date,
-               r.route_name, s.stop_name
+               rt.route_name, s.stop_name
         FROM core.student_transport a
-        LEFT JOIN core.transport_routes r ON r.route_id = a.route_id
+        -- "rt", not "r": r is a record variable of this proc, and PL/pgSQL read
+        -- r.route_name as that (unassigned) variable -- every call failed.
+        LEFT JOIN core.transport_routes rt ON rt.route_id = a.route_id
         LEFT JOIN core.transport_stops  s ON s.stop_id  = a.stop_id
         WHERE a.student_id = p_student_id AND a.tenant_id = p_tenant_id AND a.school_id = p_school_id
           AND a.is_active = TRUE AND COALESCE(a.is_deleted, FALSE) = FALSE
@@ -397,13 +570,43 @@ BEGIN
             RAISE EXCEPTION 'Student not found, or no longer on the roll.';
         END IF;
 
-        SELECT s.monthly_fare, s.stop_name, rt.route_name INTO v_fare, v_stop_name, v_route_name
+        SELECT s.monthly_fare, s.stop_name, rt.route_name,
+               (s.is_active AND rt.is_active AND NOT COALESCE(rt.is_deleted, FALSE))
+          INTO v_fare, v_stop_name, v_route_name, v_open
         FROM core.transport_stops s
         JOIN core.transport_routes rt ON rt.route_id = s.route_id
         WHERE s.stop_id = p_stop_id AND s.route_id = p_route_id
           AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id;
         IF NOT FOUND THEN
             RAISE EXCEPTION 'Selected stop not found.';
+        END IF;
+
+        -- Is the child already on this route / stop? Promotion re-bills a kept
+        -- route for the new session through this same call, and that must keep
+        -- working even if the route has since been closed or filled up.
+        v_same_route := EXISTS (SELECT 1 FROM core.student_transport
+                                 WHERE student_id = p_student_id AND route_id = p_route_id
+                                   AND is_active AND NOT COALESCE(is_deleted, FALSE));
+        v_same_stop  := EXISTS (SELECT 1 FROM core.student_transport
+                                 WHERE student_id = p_student_id AND stop_id = p_stop_id
+                                   AND is_active AND NOT COALESCE(is_deleted, FALSE));
+
+        -- A switched-off route, a deleted route or a removed stop takes no new
+        -- riders.
+        IF NOT v_open AND NOT v_same_stop THEN
+            RAISE EXCEPTION 'Route % / stop % is not in service. Pick an active route and stop.',
+                v_route_name, v_stop_name;
+        END IF;
+
+        -- Seats: the route's active buses decide how many children it takes.
+        -- Unlimited when no active bus on the route has a capacity set.
+        IF NOT v_same_route THEN
+            v_seats  := core.fn_transport_route_seats(p_route_id);
+            v_riders := core.fn_transport_route_riders(p_route_id, p_student_id);
+            IF v_seats IS NOT NULL AND v_riders >= v_seats THEN
+                RAISE EXCEPTION 'Route % is full: % of % seats taken. Add a vehicle or pick another route.',
+                    v_route_name, v_riders, v_seats;
+            END IF;
         END IF;
 
         v_start := COALESCE(p_start_date, CURRENT_DATE);

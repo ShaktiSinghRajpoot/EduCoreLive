@@ -20,6 +20,8 @@
                     <div class="sd-hdr-nm" id="sdName">Loading…</div>
                     <div class="sd-hdr-sub" id="sdMeta">—</div>
                     <div class="d-flex gap-1 flex-wrap mt-1" id="sdBadges"></div>
+                    @* Shown for a student who has left: the record is read-only. *@
+                    <div class="text-danger small fw-bold mt-1 d-none" id="sdLeft"></div>
                 </div>
                 <a asp-area="ERP" asp-controller="Student" asp-action="StudentList"
                    class="sd-back-btn ms-auto">
@@ -176,7 +178,7 @@
                 </div>
 
                 <div class="sd-pane" id="tab-profile">
-                    <div class="mb-3 text-end">
+                    <div class="mb-3 text-end" id="sdEditWrap">
                         <a asp-area="ERP" asp-controller="Student" asp-action="EditStudent"
                            asp-route-id="@studentPublicId"
                            class="btn btn-primary btn-sm">
@@ -269,8 +271,8 @@ var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 function fmtDate(d){var x=new Date(d);return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]+' '+x.getFullYear();}
 function ini(n){return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase();}
 function inr(n){return n===0?'₹ 0':'₹ '+n.toLocaleString('en-IN');}
-function feeB(f){var m={Paid:'b-paid',Partial:'b-partial',Pending:'b-pending'};return '<span class="sd-bdg '+(m[f]||'b-pending')+'">'+f+'</span>';}
-function statB(s){var m={Active:'b-active',Inactive:'b-inactive',Transfer:'b-transfer'};return '<span class="sd-bdg '+(m[s]||'b-inactive')+'">'+s+'</span>';}
+function feeB(f){var m={Paid:'b-paid',Partial:'b-partial',Pending:'b-pending'};return '<span class="sd-bdg '+(m[f]||'b-pending')+'">'+EC.esc(f)+'</span>';}
+function statB(s){var m={Active:'b-active',Inactive:'b-inactive',Transfer:'b-transfer'};return '<span class="sd-bdg '+(m[s]||'b-inactive')+'">'+EC.esc(s)+'</span>';}
 function pct(a,b){return b===0?0:Math.round(a/b*100);}
 function attHtml(p){
   var c=p>=75?'#28c76f':p>=50?'#ff9f43':'#ea5455';
@@ -338,7 +340,8 @@ function loadDashboard(){
         // The shape the render functions expect, from real values.
         var s={
             id:STUDENT_ID, name:st.name, roll:st.roll, cls:st.cls, sec:st.sec,
-            gender:st.gender, guardian:st.guardian, status:'Active', admDate:st.admDate,
+            gender:st.gender, guardian:st.guardian, status:st.status || 'Active', admDate:st.admDate,
+            phone:st.mobile, address:st.address,
             feeDue:api.fee.outstanding,
             feeSt:api.fee.outstanding<=0 ? 'Paid' : (api.fee.totalPaid>0 ? 'Partial' : 'Pending'),
             attend:null, color:'primary'
@@ -356,6 +359,20 @@ function loadDashboard(){
         var av=document.getElementById('sdAv');
         av.textContent=ini(s.name);
         av.className='sd-hdr-av bg-label-'+s.color+' text-'+s.color;
+        if(st.photo){
+            var img=document.createElement('img');
+            img.src=st.photo; img.alt='';
+            img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:inherit;';
+            av.textContent=''; av.appendChild(img);
+        }
+
+        // A student who has left: read-only. Say when and why, and hide Edit.
+        if(st.isActive===false){
+            var left=document.getElementById('sdLeft');
+            left.textContent='Left the school'+(st.leftOn?' on '+st.leftOn:'')+(st.leftWhy?' — '+st.leftWhy:'')+'. This record is read-only.';
+            left.classList.remove('d-none');
+            document.getElementById('sdEditWrap').classList.add('d-none');
+        }
         document.getElementById('sdName').textContent=s.name;
         document.getElementById('sdMeta').textContent=s.roll+' · '+s.cls+' – '+s.sec+' · '+st.admNo;
         document.getElementById('sdBadges').innerHTML=statB(s.status)+' '+feeB(s.feeSt);
@@ -411,7 +428,7 @@ function renderOverview(s,d){
         'Last fee payment', inr(d.feeHistory[0].amt)+' · '+EC.esc(d.feeHistory[0].date));
     if(att&&att.schoolDays)   acts+=ai('bx-user-check','bg-label-primary text-primary',
         'Attendance this session', att.present+' of '+att.schoolDays+' days');
-    acts+=ai('bx-user-plus','bg-label-primary text-primary','Admission', EC.esc(d.dob ? s.admDate||'—' : '—'));
+    acts+=ai('bx-user-plus','bg-label-primary text-primary','Admission', EC.esc(s.admDate||'—'));
     document.getElementById('ov-activity').innerHTML = acts;
 
     document.getElementById('ov-qinfo').innerHTML=
@@ -432,8 +449,9 @@ function ai(icon,cls,title,time){
     return '<div class="sd-act-item"><div class="sd-act-ic '+cls+'"><i class="bx '+icon+'"></i></div>'
         +'<div><div class="sd-act-title">'+title+'</div><div class="sd-act-time">'+time+'</div></div></div>';
 }
+// val is data (names, DOB, guardian...) so it is escaped; lbl is our own text.
 function ic(lbl,val){
-    return '<div class="sd-ic"><div class="sd-ic-lbl">'+lbl+'</div><div class="sd-ic-val">'+val+'</div></div>';
+    return '<div class="sd-ic"><div class="sd-ic-lbl">'+lbl+'</div><div class="sd-ic-val">'+EC.esc(val==null?'—':val)+'</div></div>';
 }
 
 /* ── Tab 2: Academic ─────────────────────────── */
@@ -666,7 +684,7 @@ function renderFee(s,d){
     document.getElementById('feeStructBody').innerHTML=d.feeStructure.map(function(f){
         var balStyle=f.balance>0?' class="text-danger fw-bold"':'';
         return '<tr>'
-            +'<td class="fw-bold">'+f.head+'</td>'
+            +'<td class="fw-bold">'+EC.esc(f.head)+'</td>'
             +'<td>'+inr(f.total)+'</td>'
             +'<td class="text-success fw-bold">'+inr(f.paid)+'</td>'
             +'<td'+balStyle+'>'+inr(f.balance)+(f.balance>0?' ⚠':'')+'</td>'
@@ -675,12 +693,12 @@ function renderFee(s,d){
 
     document.getElementById('feeHistBody').innerHTML=d.feeHistory.map(function(f){
         return '<tr>'
-            +'<td>'+f.date+'</td>'
-            +'<td class="fw-bold">'+f.head+'</td>'
+            +'<td>'+EC.esc(f.date)+'</td>'
+            +'<td class="fw-bold">'+EC.esc(f.head)+'</td>'
             +'<td class="text-success fw-bold">'+inr(f.amt)+'</td>'
-            +'<td>'+f.mode+'</td>'
-            +'<td>'+f.receipt+'</td>'
-            +'<td>'+f.by+'</td>'
+            +'<td>'+EC.esc(f.mode)+'</td>'
+            +'<td>'+EC.esc(f.receipt)+'</td>'
+            +'<td>'+EC.esc(f.by)+'</td>'
             +'<td><button class="btn btn-sm btn-outline-secondary" onclick="window.print()" title="Print Receipt"><i class="bx bx-printer"></i></button></td>'
             +'</tr>';
     }).join('');
@@ -708,12 +726,12 @@ function renderProfile(s,d){
             ['Blood Group',d.blood],['Mother Tongue',d.motherTongue],
             ['Religion',d.religion],['Caste',d.caste],
             ['Category',d.category],['Nationality',d.nationality],
-            ['Aadhaar',d.aadhaar],['Address','Village Mathura, UP – 281001']
+            ['Aadhaar',d.aadhaar],['Address',s.address||'—']
         ])
        +ps('Parent / Guardian',[
             ['Father Name',d.fatherName],['Mother Name',d.motherName],
             ['Guardian',d.guardianName],['Occupation',d.occupation],
-            ['Annual Income',d.income],['Contact',s.phone],['Email',d.email]
+            ['Annual Income',d.income],['Contact',s.phone||'—'],['Email',d.email]
         ])
        +ps('Previous School',[
             ['School Name',d.prevSchool],['Board',d.prevBoard],
@@ -725,7 +743,7 @@ function ps(title,rows){
     return '<div class="mb-4">'
         +'<div class="ec-detail-title mb-2">'+title+'</div>'
         +'<div class="sd-prof-grid">'
-        +rows.map(function(r){return '<div class="sd-pf"><label>'+r[0]+'</label><span>'+r[1]+'</span></div>';}).join('')
+        +rows.map(function(r){return '<div class="sd-pf"><label>'+r[0]+'</label><span>'+EC.esc(r[1]==null?'—':r[1])+'</span></div>';}).join('')
         +'</div></div>';
 }
 function docsSection(docs){
@@ -736,9 +754,9 @@ function docsSection(docs){
         var stCol=doc.status==='Uploaded'?'b-active':'b-partial';
         return '<div class="sd-doc-row">'
             +'<div class="sd-doc-ic '+icCol+'"><i class="bx '+ic+'"></i></div>'
-            +'<div class="flex-grow-1"><div class="fw-bold" style="font-size:.85rem;">'+doc.name+'</div>'
-            +'<div class="text-muted" style="font-size:.73rem;">'+doc.type+' · '+doc.date+'</div></div>'
-            +'<span class="sd-bdg '+stCol+'">'+doc.status+'</span>'
+            +'<div class="flex-grow-1"><div class="fw-bold" style="font-size:.85rem;">'+EC.esc(doc.name)+'</div>'
+            +'<div class="text-muted" style="font-size:.73rem;">'+EC.esc(doc.type)+' · '+EC.esc(doc.date)+'</div></div>'
+            +'<span class="sd-bdg '+stCol+'">'+EC.esc(doc.status)+'</span>'
             +(doc.status==='Uploaded'
                 ?'<button class="btn btn-sm btn-outline-secondary ms-2" title="Download"><i class="bx bx-download"></i></button>'
                 :'<button class="btn btn-sm btn-outline-warning ms-2" title="Upload"><i class="bx bx-upload"></i></button>')

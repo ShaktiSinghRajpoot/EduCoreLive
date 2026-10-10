@@ -41,7 +41,7 @@
           <div class="col-md-2"><div class="fare-box"><div class="amt" id="aFare">₹0.00</div><div class="lbl">Monthly</div></div></div>
           <div class="col-md-2"><button class="btn btn-primary w-100" id="saveBtn" disabled><i class="bx bx-check me-1"></i>Assign</button></div>
         </div>
-        <div class="text-muted mt-2" style="font-size:.8rem"><i class="bx bx-info-circle"></i> Bus fee is billed monthly from this month to the end of the academic year, and appears on the Fee Collection counter.</div>
+        <div class="text-muted mt-2" style="font-size:.8rem"><i class="bx bx-info-circle"></i> Bus fee is billed monthly from this month to the end of the academic year, and appears on the Fee Collection counter. The student keeps the fare shown here even if the stop's fare is changed later.</div>
       </div>
     </div>
   </div>
@@ -58,19 +58,22 @@ $(function(){
             routes:'@Url.Action("GetRoutesDropdown")', getAssign:'@Url.Action("GetAssignment")', save:'@Url.Action("SaveAssignment")', remove:'@Url.Action("RemoveAssignment")' };
   function post(url,data){ return $.ajax({url:url,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},data:JSON.stringify(data)}); }
   function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
-  function fill($el,items,ph){ var h=ph?'<option value="">'+ph+'</option>':''; items.forEach(function(x){h+='<option value="'+x+'">'+x+'</option>';}); $el.html(h); }
+  // Every name below comes from the database and goes into .html(), so it is
+  // escaped with EC.esc (a student or route name could carry markup).
+  function fill($el,items,ph){ var h=ph?'<option value="">'+ph+'</option>':''; items.forEach(function(x){h+='<option value="'+EC.esc(x)+'">'+EC.esc(x)+'</option>';}); $el.html(h); }
 
   var $session=$('#fSession'),$class=$('#fClass'),$section=$('#fSection'),$student=$('#fStudent');
   var students=[], routes=[], currentStudent=null;
 
   // cascade
   $.getJSON(URL.sessions,function(s){ fill($session,s,null); $session.val(s[0]); loadClasses(); });
-  $.getJSON(URL.routes,function(r){ routes=r||[]; fillRoutes(); });
+  function reloadRoutes(){ $.getJSON(URL.routes,function(r){ routes=r||[]; fillRoutes(); }); }
+  reloadRoutes();
 
   function loadClasses(){ clearPane(); $.getJSON(URL.classes,function(c){ fill($class,c,'Select Class'); }); $section.prop('disabled',true).html('<option value="">Select class first</option>'); $student.prop('disabled',true).html('<option value="">Select section first</option>'); }
   $session.on('change',loadClasses);
   $class.on('change',function(){ clearPane(); $student.prop('disabled',true).html('<option value="">Select section first</option>'); if(!$class.val()){ $section.prop('disabled',true).html('<option value="">Select class first</option>'); return; } $.getJSON(URL.sections,{session:$session.val(),className:$class.val()},function(sec){ fill($section,sec,'Select Section'); $section.prop('disabled',sec.length===0); }); });
-  $section.on('change',function(){ clearPane(); if(!$section.val()){ $student.prop('disabled',true).html('<option value="">Select section first</option>'); return; } $.getJSON(URL.students,{session:$session.val(),className:$class.val(),section:$section.val()},function(list){ students=list||[]; var h='<option value="">'+(students.length?'Select Student':'No students')+'</option>'; students.forEach(function(s){ h+='<option value="'+s.id+'">Roll '+(s.roll||'—')+' — '+s.name+' ('+s.admNo+')</option>'; }); $student.html(h).prop('disabled',students.length===0); }); });
+  $section.on('change',function(){ clearPane(); if(!$section.val()){ $student.prop('disabled',true).html('<option value="">Select section first</option>'); return; } $.getJSON(URL.students,{session:$session.val(),className:$class.val(),section:$section.val()},function(list){ students=list||[]; var h='<option value="">'+(students.length?'Select Student':'No students')+'</option>'; students.forEach(function(s){ h+='<option value="'+s.id+'">Roll '+EC.esc(s.roll||'—')+' — '+EC.esc(s.name)+' ('+EC.esc(s.admNo)+')</option>'; }); $student.html(h).prop('disabled',students.length===0); }); });
   $student.on('change',function(){ var id=Number($(this).val()); if(!id){ clearPane(); return; } currentStudent=students.find(function(s){return s.id===id;}); openStudent(); });
 
   function clearPane(){ currentStudent=null; $('#pane').addClass('d-none'); $('#paneEmpty').removeClass('d-none'); }
@@ -83,11 +86,14 @@ $(function(){
     });
   }
 
-  function fillRoutes(){ var h='<option value="">Select Route</option>'; routes.forEach(function(r){ h+='<option value="'+r.routeId+'">'+r.routeName+'</option>'; }); $('#aRoute').html(h); }
+  // Seats: riders now / seats on the route's active buses. A full route is
+  // shown but the server refuses new riders on it.
+  function seatText(r){ return r.seats ? ' ('+r.riders+'/'+r.seats+' seats'+(r.riders>=r.seats?' — full':'')+')' : (r.riders ? ' ('+r.riders+' riders)' : ''); }
+  function fillRoutes(){ var h='<option value="">Select Route</option>'; routes.forEach(function(r){ h+='<option value="'+r.routeId+'">'+EC.esc(r.routeName)+EC.esc(seatText(r))+'</option>'; }); $('#aRoute').html(h); }
   $('#aRoute').on('change',function(){
     var r=routes.find(function(x){return x.routeId===Number($('#aRoute').val());});
     if(!r){ $('#aStop').prop('disabled',true).html('<option value="">Select route first</option>'); $('#aFare').text('₹0.00'); $('#saveBtn').prop('disabled',true); return; }
-    var h='<option value="">Select Stop</option>'; r.stops.forEach(function(s){ h+='<option value="'+s.stopId+'" data-fare="'+s.fare+'">'+s.stopName+' — '+EC.money(s.fare)+'</option>'; });
+    var h='<option value="">Select Stop</option>'; r.stops.forEach(function(s){ h+='<option value="'+s.stopId+'" data-fare="'+s.fare+'">'+EC.esc(s.stopName)+' — '+EC.money(s.fare)+'</option>'; });
     $('#aStop').html(h).prop('disabled',false); $('#aFare').text('₹0.00'); $('#saveBtn').prop('disabled',true);
   });
   $('#aStop').on('change',function(){ var fare=Number($(this).find(':selected').data('fare'))||0; $('#aFare').text(EC.money(fare)); $('#saveBtn').prop('disabled', !$(this).val()); });
@@ -97,7 +103,7 @@ $(function(){
     if(!routeId||!stopId){ ecToast('warning','Select a route and stop.'); return; }
     var $btn=$(this); EC.buttonBusy($btn);
     post(URL.save,{ studentId:currentStudent.id, routeId:routeId, stopId:stopId, session:$session.val() })
-      .done(function(res){ EC.buttonReset($btn); ecToast(res.success?'success':'error',res.message); if(res.success) openStudent(); })
+      .done(function(res){ EC.buttonReset($btn); ecToast(res.success?'success':'error',res.message); if(res.success){ openStudent(); reloadRoutes(); } })
       .fail(function(){ EC.buttonReset($btn); ecToast('error','Could not assign transport.'); });
   });
   $('#removeBtn').on('click',function(){
@@ -106,7 +112,8 @@ $(function(){
                  message:'Future unpaid bus dues for this student will be removed.',
                  okText:'Remove transport' }).then(function(ok){
       if(!ok) return;
-      postForm(URL.remove,{studentId:currentStudent.id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) openStudent(); });
+      postForm(URL.remove,{studentId:currentStudent.id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success){ openStudent(); reloadRoutes(); } })
+        .fail(function(){ ecToast('error','Could not remove transport.'); });
     });
   });
 

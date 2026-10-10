@@ -37,25 +37,25 @@
             <div class="col-6 col-xl-3">
                 <div class="iv-card">
                     <div class="iv-card-ic bg-label-primary text-primary"><i class="bx bx-rupee"></i></div>
-                    <div><div class="iv-card-val">₹42,500</div><div class="iv-card-lbl">Today's Purchases</div></div>
+                    <div><div class="iv-card-val" id="sumToday">—</div><div class="iv-card-lbl">Today's Purchases</div></div>
                 </div>
             </div>
             <div class="col-6 col-xl-3">
                 <div class="iv-card">
                     <div class="iv-card-ic bg-label-info text-info"><i class="bx bx-receipt"></i></div>
-                    <div><div class="iv-card-val">18</div><div class="iv-card-lbl">Purchase Bills</div></div>
+                    <div><div class="iv-card-val" id="sumBills">—</div><div class="iv-card-lbl">Bills This Month</div></div>
                 </div>
             </div>
             <div class="col-6 col-xl-3">
                 <div class="iv-card">
                     <div class="iv-card-ic bg-label-success text-success"><i class="bx bx-package"></i></div>
-                    <div><div class="iv-card-val">560</div><div class="iv-card-lbl">Items Purchased</div></div>
+                    <div><div class="iv-card-val" id="sumQty">—</div><div class="iv-card-lbl">Quantity Bought This Month</div></div>
                 </div>
             </div>
             <div class="col-6 col-xl-3">
                 <div class="iv-card">
                     <div class="iv-card-ic bg-label-warning text-warning"><i class="bx bx-store"></i></div>
-                    <div><div class="iv-card-val">12</div><div class="iv-card-lbl">Suppliers</div></div>
+                    <div><div class="iv-card-val" id="sumSuppliers">—</div><div class="iv-card-lbl">Suppliers</div></div>
                 </div>
             </div>
         </div>
@@ -89,7 +89,7 @@
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
                         <label class="form-label">Purchase Date</label>
-                        <input type="date" class="form-control" id="purchaseDate">
+                        <input type="date" class="form-control" id="purchaseDate" max="@ViewBag.Today">
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
                         <label class="form-label">Invoice Number</label>
@@ -158,7 +158,8 @@
                             <ul class="mb-0 ps-3 small fw-semibold">
                                 <li>Every purchase creates inventory transaction history.</li>
                                 <li>Stock is automatically updated after save.</li>
-                                <li>Invoice number should be unique per supplier.</li>
+                                <li>A bill number can be entered only once per supplier (and once among bills with no supplier).</li>
+                                <li>Quantities and prices take at most 2 decimal places; a bill cannot be dated in the future.</li>
                                 <li>Purchase can later be linked with accounts module.</li>
                             </ul>
                         </div>
@@ -279,8 +280,13 @@
             ?? new List<EduCoreDataAccessLayer.Models.ERP.InventoryItem>()))
         .Select(i => new { id = i.ItemId, name = i.ItemName, unit = i.UnitType, cost = i.CostPrice })));
 
+    // The school's date from the server. new Date().toISOString() is the UTC
+    // date, which in India is still yesterday until 05:30 in the morning.
+    var TODAY = '@ViewBag.Today';
+
     var rows = [];      // the lines being entered
     var seq  = 0;
+    var lastList = []; // the last purchase list loaded, for the cancel dialog
 
     function token() {
         return $('input[name="__RequestVerificationToken"]').first().val();
@@ -303,10 +309,22 @@
         return html;
     }
 
-    function lineTotal(r) {
-        // Tax is a percentage ON the line, the same arithmetic the proc uses, so
-        // the figure on screen matches the one that gets saved.
-        return EC.num(r.qty) * EC.num(r.price) * (1 + EC.num(r.tax) / 100);
+    // Round to paise the way PostgreSQL does (half away from zero). The tiny
+    // nudge stops 83.325 being read as 83.32499999 by floating point.
+    function r2(x) {
+        return Math.round(x * 100 + (x >= 0 ? 1e-6 : -1e-6)) / 100;
+    }
+
+    // Same arithmetic as the proc: the line's base and its tax are each rounded
+    // once, and the bill is the sum of its lines -- so screen and saved bill agree.
+    function lineBase(r) { return r2(EC.num(r.qty) * EC.num(r.price)); }
+    function lineTax(r)  { return r2(lineBase(r) * EC.num(r.tax) / 100); }
+    function lineTotal(r) { return lineBase(r) + lineTax(r); }
+
+    // At most 2 decimals, as the server insists.
+    function twoDp(v) {
+        v = String(v == null ? '' : v).trim();
+        return v === '' || /^\d+(\.\d{1,2})?$/.test(v);
     }
 
     function renderGrid() {
@@ -339,9 +357,8 @@
     function totals() {
         var sub = 0, tax = 0;
         rows.forEach(function (r) {
-            var base = EC.num(r.qty) * EC.num(r.price);
-            sub += base;
-            tax += base * EC.num(r.tax) / 100;
+            sub += lineBase(r);
+            tax += lineTax(r);
         });
         $('#subTotalAmount').text(EC.money(sub));
         $('#taxAmount').text(EC.money(tax));
@@ -381,6 +398,7 @@
                 return;
             }
             r[field] = EC.numPos($el.val());
+            r[field + 'Raw'] = $el.val();   // kept to check decimals on save
             // Only the affected line and the totals change, so the inputs keep
             // focus while the user is typing.
             $el.closest('tr').find('td').eq(4).text(EC.money(lineTotal(r)));
@@ -393,8 +411,20 @@
         var date = $('#purchaseDate').val();
         if (!date) { ecToast('warning', 'Choose the purchase date.'); $('#purchaseDate').focus(); return; }
 
+        if (date > TODAY) { ecToast('warning', 'A purchase cannot be dated in the future.'); $('#purchaseDate').focus(); return; }
+
         var lines = rows.filter(function (r) { return r.itemId > 0 && EC.num(r.qty) > 0; });
         if (!lines.length) { ecToast('warning', 'Add at least one item with a quantity.'); return; }
+        if (rows.some(function (r) { return !(r.itemId > 0); })) {
+            ecToast('warning', 'Pick an item on every line, or remove the empty line.'); return;
+        }
+        var badDp = lines.some(function (r) {
+            return !twoDp(r.qtyRaw) || !twoDp(r.priceRaw) || !twoDp(r.taxRaw);
+        });
+        if (badDp) { ecToast('warning', 'Quantity, price and tax take at most 2 decimal places.'); return; }
+        if (lines.some(function (r) { return EC.num(r.tax) > 100; })) {
+            ecToast('warning', 'Tax must be between 0 and 100 percent.'); return;
+        }
 
         EC.buttonBusy($btn, 'Saving…');
         postJson(SAVE_URL, {
@@ -416,6 +446,7 @@
             if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not save.'); return; }
             ecToast('success', res.message + ' Stock has been updated.');
             resetForm();
+            loadSummary();
         })
         .fail(function () { ecToast('error', 'Could not save the purchase.'); })
         .always(function () { EC.buttonReset($btn); });
@@ -425,17 +456,39 @@
         rows = [];
         $('#invoiceNumber,#purchaseRemarks').val('');
         $('#supplierId').val('');
-        $('#purchaseDate').val(new Date().toISOString().slice(0, 10));
+        $('#purchaseDate').val(TODAY);
         renderGrid();
     }
 
     $('#cancelPurchaseBtn').on('click', function () {
         EC.confirm({
-            title: 'Clear this purchase?',
-            body: 'Everything typed on this form will be discarded.',
-            confirmText: 'Clear'
+            title:   'Clear this form?',
+            message: 'Everything typed on this form will be discarded. Nothing has been saved yet.',
+            okText:  'Clear form',
+            danger:  false,
+            icon:    'bx-eraser'
         }).then(function (ok) { if (ok) resetForm(); });
     });
+
+    // ── Summary cards ───────────────────────────────────────────────────────
+    // Real figures from the same purchase list the history shows; cancelled
+    // bills do not count. Refreshed after every save and cancel.
+    function loadSummary() {
+        $.get(LIST_URL).done(function (d) {
+            var month = TODAY.slice(0, 7);
+            var today = 0, bills = 0, qty = 0;
+            (d || []).forEach(function (p) {
+                if (p.cancelled) return;
+                var iso = String(p.iso || '');
+                if (iso === TODAY) today += EC.num(p.total);
+                if (iso.slice(0, 7) === month) { bills++; qty += EC.num(p.qty); }
+            });
+            $('#sumToday').text(EC.money(today));
+            $('#sumBills').text(bills);
+            $('#sumQty').text(qty);
+        });
+        $.get(SUPPLIERS_URL).done(function (list) { $('#sumSuppliers').text((list || []).length); });
+    }
 
     // ── History ─────────────────────────────────────────────────────────────
     $('#historyBtn').on('click', function () {
@@ -444,6 +497,7 @@
 
         $.get(LIST_URL)
             .done(function (d) {
+                lastList = d || [];
                 if (!d || !d.length) {
                     EC.listEmpty('#historyBody', 'No purchases recorded yet.', 'bx-receipt');
                     return;
@@ -471,13 +525,16 @@
 
     $(document).on('click', '[data-cancel]', function () {
         var id = EC.num($(this).data('cancel'));
+        var p  = lastList.find(function (x) { return x.id === id; });
         EC.prompt({
-            title: 'Cancel this purchase?',
-            body: 'The stock it brought in will be taken back out. The invoice stays on the record with its reversal.',
-            label: 'Why is it being cancelled?',
+            title:    'Cancel this purchase?',
+            name:     p ? ((p.invoice ? 'Bill ' + p.invoice : 'Bill without number') +
+                           ' — ' + (p.supplier || 'no supplier') + ' — ' + EC.money(p.total)) : '',
+            message:  'The stock it brought in will be taken back out. The bill stays on record, marked cancelled.',
+            label:    'Why is it being cancelled?',
             required: true,
-            confirmText: 'Cancel purchase',
-            confirmClass: 'btn-danger'
+            okText:   'Cancel purchase',
+            icon:     'bx-x-circle'
         }).then(function (reason) {
             if (reason === null) return;
             EC.showLoader();
@@ -487,6 +544,7 @@
                     // says which item and by how much.
                     if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not cancel.'); return; }
                     ecToast('success', res.message);
+                    loadSummary();
                     $('#historyBtn').trigger('click');
                 })
                 .fail(function () { ecToast('error', 'Could not cancel the purchase.'); })
@@ -527,6 +585,7 @@
                     html += '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
                 });
                 $('#supplierId').html(html).val(res.id);
+                $('#sumSuppliers').text((list || []).length);
             });
         })
         .fail(function () { ecToast('error', 'Could not save the supplier.'); })
@@ -538,8 +597,9 @@
         ecToast('info', 'Purchase printing is not built yet.');
     });
 
-    $('#purchaseDate').val(new Date().toISOString().slice(0, 10));
+    $('#purchaseDate').val(TODAY);
     renderGrid();
+    loadSummary();
 })();
 </script>
 }

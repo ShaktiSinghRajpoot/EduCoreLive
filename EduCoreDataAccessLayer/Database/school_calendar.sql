@@ -53,6 +53,28 @@ CREATE INDEX IF NOT EXISTS ix_school_calendar_date
     ON academic.school_calendar (tenant_id, school_id, calendar_date);
 
 
+-- What kind of day a date is for one school: 'holiday' | 'weekly_off' |
+-- 'half_day' | 'working'. A dated entry beats the weekly pattern in both
+-- directions. GetDayStatus below answers the same question for the Smart Bell;
+-- attendance and exam scheduling call this so all three agree.
+CREATE OR REPLACE FUNCTION academic.fn_school_day_type(
+    p_tenant_id integer, p_school_id integer, p_date date)
+RETURNS text
+LANGUAGE sql
+STABLE
+AS $function$
+    SELECT COALESCE(
+        (SELECT c.day_type FROM academic.school_calendar c
+         WHERE c.tenant_id = p_tenant_id AND c.school_id = p_school_id
+           AND c.calendar_date = to_char(p_date, 'YYYY-MM-DD')),
+        CASE WHEN EXTRACT(DOW FROM p_date)::smallint = ANY (
+                 COALESCE((SELECT s.weekly_off_days FROM academic.school_calendar_settings s
+                           WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id),
+                          '{0}'::smallint[]))
+             THEN 'weekly_off' ELSE 'working' END);
+$function$;
+
+
 CREATE OR REPLACE PROCEDURE academic.sp_school_admin_calendar_manage(
     IN    p_operation      character varying,
     IN    p_tenant_id      integer,
@@ -90,7 +112,7 @@ BEGIN
         OPEN p_result FOR
         SELECT
             calendar_id,
-            to_char(calendar_date, 'YYYY-MM-DD')     AS calendar_date,
+            to_char(calendar_date::date, 'YYYY-MM-DD')     AS calendar_date,
             day_type,
             title,
             to_char(half_day_end, 'HH24:MI')         AS half_day_end
@@ -181,6 +203,22 @@ BEGIN
             RAISE EXCEPTION 'A half day needs a closing time.';
         END IF;
 
+        -- The closing time has to fall inside the school day, or the bell either
+        -- never rings (before the first period) or the half day changes nothing.
+        IF v_type = 'half_day' AND EXISTS (
+               SELECT 1 FROM academic.period_structure
+               WHERE tenant_id = p_tenant_id AND school_id = p_school_id)
+           AND (p_half_day_end <= (SELECT MIN(start_time) FROM academic.period_structure
+                                   WHERE tenant_id = p_tenant_id AND school_id = p_school_id)
+             OR p_half_day_end >= (SELECT MAX(end_time) FROM academic.period_structure
+                                   WHERE tenant_id = p_tenant_id AND school_id = p_school_id)) THEN
+            RAISE EXCEPTION 'A half day must close during the school day (between % and %).',
+                (SELECT to_char(MIN(start_time), 'HH24:MI') FROM academic.period_structure
+                 WHERE tenant_id = p_tenant_id AND school_id = p_school_id),
+                (SELECT to_char(MAX(end_time), 'HH24:MI') FROM academic.period_structure
+                 WHERE tenant_id = p_tenant_id AND school_id = p_school_id);
+        END IF;
+
         INSERT INTO academic.school_calendar
             (tenant_id, school_id, calendar_date, day_type, title, half_day_end, created_by, created_at)
         VALUES
@@ -204,6 +242,10 @@ BEGIN
           AND school_id = p_school_id
           AND (   (p_calendar_id IS NOT NULL AND calendar_id   = p_calendar_id)
                OR (p_calendar_id IS NULL     AND calendar_date::date = p_date));
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'That calendar entry was not found.';
+        END IF;
 
         OPEN p_result FOR SELECT TRUE AS success, 'Entry removed.' AS message;
         OPEN p_result2 FOR SELECT 1 WHERE FALSE;

@@ -1,25 +1,69 @@
 -- ============================================================================
 -- One student's attendance — the per-student view the Student Dashboard needs.
 --
--- core.sp_attendance_month_register already answers "the whole class, one month"
--- (the register grid). This is the other axis: one student, a whole session,
--- plus the day-by-day marks for whichever month is on screen.
+-- core.sp_attendance_month_register answers "the whole class, one month" (the
+-- register grid). This is the other axis: one student, a whole session, plus
+-- the day-by-day marks for whichever month is on screen.
 --
--- It follows the register's conventions exactly, so the two screens can never
--- disagree about the same student:
+-- A "school day" for a student is a day a register was taken for the
+-- class-section the student belonged to THAT day (core.fn_attendance_student_days):
 --
---   * A "school day" is a day a register was actually taken for that class —
---     COUNT(DISTINCT attendance_date) — not a calendar day. A day nobody marked
---     is not a day the student was absent.
---   * Sundays are excluded (EXTRACT(DOW) <> 0), same as the register.
---   * Status folds the same way: Absent -> A, Leave -> L, everything else
---     (Present, Late) counts as present.
+--   * every day the student has a mark (the row's class-section snapshot says
+--     where they were), plus
+--   * registers of their CURRENT class-section taken on/after their admission,
+--     on/before their date of leaving, and after the last day they were marked
+--     in a different class-section (so a student who moved from 7-A to 7-B is
+--     not charged with 7-B's registers from before the move).
 --
--- Percentage is computed over days the student's OWN class had a register, so a
--- student who joined in August is not marked down for July.
+-- A day nobody marked is not a day the student was absent. Weekly offs and
+-- holidays have no register (sp_attendance_save refuses them), so there is no
+-- calendar filter here; a declared working Sunday counts like any other day.
+--
+-- Status folds the same way as the register: Absent -> A, Leave -> L, Present
+-- and Late -> P. Leave is NOT present: it stays in the denominator and is
+-- reported separately.
 --
 -- Target DB: PostgreSQL. Safe to re-run.
 -- ============================================================================
+
+-- The school days one student belonged to in one session (see above).
+CREATE OR REPLACE FUNCTION core.fn_attendance_student_days(
+    p_tenant_id integer, p_school_id integer, p_student_id integer, p_academic_year varchar)
+RETURNS TABLE (day date)
+LANGUAGE sql
+STABLE
+AS $function$
+    WITH st AS (
+        SELECT s.class_name AS cls, COALESCE(s.section, '') AS sec,
+               NULLIF(s.admission_date::text, '')::date AS adm,
+               CASE WHEN s.is_active THEN NULL ELSE NULLIF(s.date_of_leaving::text, '')::date END AS lv
+        FROM core.students s
+        WHERE s.student_id = p_student_id AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id
+    ),
+    mine AS (
+        SELECT a.attendance_date::date AS d, a.class_name, COALESCE(a.section, '') AS sec
+        FROM core.student_attendance a
+        WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
+          AND a.student_id = p_student_id AND a.academic_year = p_academic_year
+    ),
+    last_other AS (
+        SELECT MAX(m.d) AS d
+        FROM mine m, st
+        WHERE NOT (LOWER(m.class_name) = LOWER(st.cls) AND LOWER(m.sec) = LOWER(st.sec))
+    )
+    SELECT d FROM mine
+    UNION
+    SELECT DISTINCT a.attendance_date::date
+    FROM core.student_attendance a, st, last_other lo
+    WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
+      AND a.academic_year = p_academic_year
+      AND LOWER(a.class_name)            = LOWER(st.cls)
+      AND LOWER(COALESCE(a.section, '')) = LOWER(st.sec)
+      AND (st.adm IS NULL OR a.attendance_date::date >= st.adm)
+      AND (st.lv  IS NULL OR a.attendance_date::date <= st.lv)
+      AND (lo.d   IS NULL OR a.attendance_date::date >  lo.d);
+$function$;
+
 
 CREATE OR REPLACE PROCEDURE core.sp_attendance_student(
     IN    p_tenant_id      integer,
@@ -36,8 +80,6 @@ LANGUAGE plpgsql
 AS $procedure$
 DECLARE
     v_year  varchar;
-    v_cls   varchar;
-    v_sec   varchar;
     v_start date;
     v_end   date;
 BEGIN
@@ -48,11 +90,8 @@ BEGIN
         RETURN;
     END IF;
 
-    -- The student's own session and class — attendance rows carry the class the
-    -- student was in on that day, which is what we must count against.
-    SELECT COALESCE(NULLIF(TRIM(COALESCE(p_academic_year, '')), ''), s.academic_year),
-           s.class_name, COALESCE(s.section, '')
-      INTO v_year, v_cls, v_sec
+    SELECT COALESCE(NULLIF(TRIM(COALESCE(p_academic_year, '')), ''), s.academic_year)
+      INTO v_year
     FROM core.students s
     WHERE s.student_id = p_student_id
       AND s.tenant_id  = p_tenant_id
@@ -66,47 +105,36 @@ BEGIN
     END IF;
 
     -- ── 1. Session summary ──────────────────────────────────────────────────
-    -- school_days counts registers taken for the student's class in this session;
-    -- the student's own marks are counted from their rows.
     OPEN p_summary FOR
     WITH held AS (
-        SELECT DISTINCT a.attendance_date
-        FROM core.student_attendance a
-        WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
-          AND a.academic_year = v_year
-          AND LOWER(a.class_name)            = LOWER(v_cls)
-          AND LOWER(COALESCE(a.section, '')) = LOWER(v_sec)
-          AND EXTRACT(DOW FROM a.attendance_date::date) <> 0
+        SELECT day FROM core.fn_attendance_student_days(p_tenant_id, p_school_id, p_student_id, v_year)
     ),
     mine AS (
-        SELECT a.attendance_date,
-               CASE a.status WHEN 'Absent' THEN 'A' WHEN 'Leave' THEN 'L' ELSE 'P' END AS mark
+        SELECT CASE a.status WHEN 'Absent' THEN 'A' WHEN 'Leave' THEN 'L' ELSE 'P' END AS mark
         FROM core.student_attendance a
         WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
-          AND a.student_id = p_student_id
-          AND a.academic_year = v_year
-          AND EXTRACT(DOW FROM a.attendance_date::date) <> 0
+          AND a.student_id = p_student_id AND a.academic_year = v_year
     )
     SELECT (SELECT COUNT(*) FROM held)::int                                  AS school_days,
-           COUNT(*) FILTER (WHERE mark = 'P')::int                           AS present,
-           COUNT(*) FILTER (WHERE mark = 'A')::int                           AS absent,
-           COUNT(*) FILTER (WHERE mark = 'L')::int                           AS leave_days,
+           (SELECT COUNT(*) FROM mine WHERE mark = 'P')::int                 AS present,
+           (SELECT COUNT(*) FROM mine WHERE mark = 'A')::int                 AS absent,
+           (SELECT COUNT(*) FROM mine WHERE mark = 'L')::int                 AS leave_days,
            CASE WHEN (SELECT COUNT(*) FROM held) = 0 THEN 0::numeric
-                ELSE ROUND(COUNT(*) FILTER (WHERE mark = 'P') * 100.0
-                           / (SELECT COUNT(*) FROM held), 1) END             AS percent
-    FROM mine;
+                ELSE ROUND((SELECT COUNT(*) FROM mine WHERE mark = 'P') * 100.0
+                           / (SELECT COUNT(*) FROM held), 1) END             AS percent;
 
     -- ── 2. Month by month, for the page's month picker ──────────────────────
+    -- Same denominator as the summary, month by month.
     OPEN p_months FOR
-    SELECT EXTRACT(MONTH FROM a.attendance_date::date)::int AS month,
-           EXTRACT(YEAR  FROM a.attendance_date::date)::int AS year,
-           COUNT(*)::int                               AS school_days,
-           COUNT(*) FILTER (WHERE a.status NOT IN ('Absent', 'Leave'))::int AS present
-    FROM core.student_attendance a
-    WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
-      AND a.student_id = p_student_id
-      AND a.academic_year = v_year
-      AND EXTRACT(DOW FROM a.attendance_date::date) <> 0
+    SELECT EXTRACT(MONTH FROM h.day)::int                                    AS month,
+           EXTRACT(YEAR  FROM h.day)::int                                    AS year,
+           COUNT(*)::int                                                     AS school_days,
+           COUNT(*) FILTER (WHERE a.status IN ('Present', 'Late'))::int      AS present
+    FROM core.fn_attendance_student_days(p_tenant_id, p_school_id, p_student_id, v_year) h
+    LEFT JOIN core.student_attendance a
+           ON a.tenant_id = p_tenant_id AND a.school_id = p_school_id
+          AND a.student_id = p_student_id
+          AND a.attendance_date = to_char(h.day, 'YYYY-MM-DD')
     GROUP BY 1, 2
     ORDER BY year DESC, month DESC;
 
@@ -126,7 +154,6 @@ BEGIN
     WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
       AND a.student_id = p_student_id
       AND a.attendance_date::date BETWEEN v_start AND v_end
-      AND EXTRACT(DOW FROM a.attendance_date::date) <> 0
     ORDER BY day;
 END;
 $procedure$;

@@ -57,7 +57,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     Success = true,
                     Message = Str(row, "message"),
                     TcId    = IntVal(row, "tc_id"),
-                    TcNo    = NullStr(row, "tc_no")
+                    TcNo    = NullStr(row, "tc_no"),
+                    PublicId = GuidVal(row, "public_id")
                 };
             }
             catch (PostgresException ex)
@@ -78,6 +79,34 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
 
             return MapCertificate(ds.Tables[0].Rows[0]);
+        }
+
+        public async Task<TransferCertificate?> GetAsync(int tcId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || tcId <= 0) return null;
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, Params("Get", tenantId, schoolId, actionUserId, tcId: tcId));
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
+
+            return MapCertificate(ds.Tables[0].Rows[0]);
+        }
+
+        public async Task<(bool Success, string Message, bool WasDuplicate)> MarkPrintedAsync(int tcId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || tcId <= 0) return (false, "Invalid certificate context.", false);
+
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, Params("Print", tenantId, schoolId, actionUserId, tcId: tcId));
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "Certificate not found.", false);
+                return (true, "Marked as printed.", BoolVal(ds.Tables[0].Rows[0], "was_duplicate"));
+            }
+            catch (PostgresException ex)
+            {
+                // Voided / not found are proc RAISEs; the page shows the wording.
+                _logger.LogWarning(ex, "TC print refused for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
+                return (false, ex.MessageText, false);
+            }
         }
 
         public async Task<TcListModel> GetListAsync(TcListModel query, int tenantId, int schoolId, int actionUserId)
@@ -110,7 +139,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     AcademicYear  = NullStr(row, "academic_year"),
                     DateOfLeaving = DbRead.NStr(row, "date_of_leaving"),
                     IsVoid        = BoolVal(row, "is_void"),
-                    PrintCount    = IntVal(row, "print_count")
+                    PrintCount    = IntVal(row, "print_count"),
+                    VoidReason    = NullStr(row, "void_reason"),
+                    VoidedAt      = Has(row, "voided_at") && row["voided_at"] != DBNull.Value
+                                        ? Convert.ToDateTime(row["voided_at"]).ToString("dd MMM yyyy, HH:mm") : null,
+                    VoidedBy      = NullStr(row, "voided_by_name")
                 });
             }
 
@@ -219,6 +252,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             ApplicationDate = DbRead.NStr(row, "application_date"),
             PrintCount    = IntVal(row, "print_count"),
             IsVoid        = BoolVal(row, "is_void"),
+            VoidReason    = NullStr(row, "void_reason"),
             WasDuplicate  = BoolVal(row, "was_duplicate")
         };
 

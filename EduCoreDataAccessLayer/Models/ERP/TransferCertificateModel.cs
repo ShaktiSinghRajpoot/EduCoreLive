@@ -31,6 +31,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string  Message { get; set; } = string.Empty;
         public int     TcId    { get; set; }
         public string? TcNo    { get; set; }
+        // Tc/Print is addressed by this uuid; the integer id is not routable.
+        public Guid    PublicId { get; set; }
     }
 
     /// <summary>Payload for voiding a mistaken certificate.</summary>
@@ -89,6 +91,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
 
         public int       PrintCount    { get; set; }
         public bool      IsVoid        { get; set; }
+        public string?   VoidReason    { get; set; }
 
         /// <summary>True when this serve is a reprint — the page stamps DUPLICATE.</summary>
         public bool      WasDuplicate  { get; set; }
@@ -114,6 +117,9 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? DateOfLeaving { get; set; }
         public bool      IsVoid        { get; set; }
         public int       PrintCount    { get; set; }
+        public string?   VoidReason    { get; set; }
+        public string?   VoidedAt      { get; set; }
+        public string?   VoidedBy      { get; set; }
 
         public List<TcListModel> Items { get; set; } = new();
 

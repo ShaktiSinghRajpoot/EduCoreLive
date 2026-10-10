@@ -139,8 +139,10 @@ $(document).ready(function () {
     var SAVE_URL     = '@Url.Action("Save",     "Attendance", new { area = "ERP" })';
 
     // The roster is loaded from the server for the chosen class/section/date.
+    // status[id] is present | absent | late | leave. Late and Leave come from the
+    // stored mark and are kept as they are unless the teacher taps a button.
     let students = [];
-    const status = {}, notified = {};
+    const status = {}, notified = {}, marked = {};
     let touched = false; // true once teacher interacts with any toggle
     let canMark = true;  // false when this user isn't the section's class teacher
 
@@ -166,22 +168,27 @@ $(document).ready(function () {
         }
     }
 
-    const today = new Date(), iso = today.toISOString().slice(0,10);
+    // "Today" is the school's date from the server. The browser's toISOString()
+    // is UTC, which before 05:30 IST is still yesterday.
+    var iso = '@ViewBag.Today';
     $('#attendanceDate').val(iso).attr('max', iso);
 
+    // yyyy-MM-dd -> local Date (new Date('yyyy-MM-dd') would parse it as UTC).
+    function parseDay(v) { var p = String(v || iso).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+
     function dateStr() {
-        const d = $('#attendanceDate').val() ? new Date($('#attendanceDate').val()) : today;
-        const s = d.toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
-        return d.toISOString().slice(0,10) === iso ? s + ' (Today)' : s;
+        const v = $('#attendanceDate').val() || iso;
+        const s = parseDay(v).toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
+        return v === iso ? s + ' (Today)' : s;
     }
 
     // ── Attractive live date banner ──
     function updateDateBanner() {
-        const v = $('#attendanceDate').val();
-        const d = v ? new Date(v) : today;
+        const v = $('#attendanceDate').val() || iso;
+        const d = parseDay(v);
         $('#dbDay').text(d.toLocaleDateString('en-IN', { weekday: 'long' }));
         $('#dbDate').text(d.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }));
-        const isToday = d.toISOString().slice(0,10) === iso;
+        const isToday = v === iso;
         $('#dbStatus')
             .attr('class', 'db-status ' + (isToday ? 'today' : 'past'))
             .html('<span class="db-dot"></span>' + (isToday ? 'Today' : 'Back-dated'));
@@ -194,8 +201,16 @@ $(document).ready(function () {
             $('#list').html('<p class="text-muted text-center py-4 mb-0">Pick a class, section and date to load the roster.</p>');
             return;
         }
-        $('#list').html(students.map(function (s) {
+        var anyMarked = students.some(function (s) { return marked[s.id]; });
+        var head = anyMarked ? '' :
+            '<p class="text-muted text-center small py-2 mb-0"><i class="bx bx-info-circle me-1"></i>' +
+            'This day is not marked yet — everyone starts as Present until you save.</p>';
+        $('#list').html(head + students.map(function (s) {
             const ab = status[s.id] === 'absent';
+            // Late / Leave are shown, never silently turned into Present.
+            const tag = status[s.id] === 'late'  ? ' <span class="badge bg-label-warning ms-1">Late</span>'
+                      : status[s.id] === 'leave' ? ' <span class="badge bg-label-info ms-1">Leave</span>'
+                      : '';
             const notify = ab
                 ? '<div class="att-notify">' +
                     '<span class="notify-chip ' + (notified[s.id]?'sent':'pending') + '">' +
@@ -205,10 +220,10 @@ $(document).ready(function () {
                 : '';
             return (
                 '<div class="att-row ' + (ab?'absent':'') + '">' +
-                    '<div class="att-av">' + s.av + '</div>' +
-                    '<div class="att-info"><div class="att-name">' + s.name + '</div><div class="att-roll">Roll No. ' + (s.roll || '—') + '</div></div>' +
+                    '<div class="att-av">' + EC.esc(s.av) + '</div>' +
+                    '<div class="att-info"><div class="att-name">' + EC.esc(s.name) + tag + '</div><div class="att-roll">Roll No. ' + EC.esc(s.roll || '—') + '</div></div>' +
                     '<div class="att-toggle">' +
-                        '<button class="seg-p ' + (ab?'':'on') + '" data-id="' + s.id + '" data-set="present"><i class="bx bx-check"></i>Present</button>' +
+                        '<button class="seg-p ' + (status[s.id] === 'present' || status[s.id] === 'late' ? 'on' : '') + '" data-id="' + s.id + '" data-set="present"><i class="bx bx-check"></i>Present</button>' +
                         '<button class="seg-a ' + (ab?'on':'') + '" data-id="' + s.id + '" data-set="absent"><i class="bx bx-x"></i>Absent</button>' +
                     '</div>' +
                     notify +
@@ -219,8 +234,9 @@ $(document).ready(function () {
 
     function renderStats() {
         const total = students.length;
-        const present = students.filter(s => status[s.id]==='present').length;
-        const absent = total - present;
+        // Late counts as present; Leave is neither present nor absent.
+        const present = students.filter(s => status[s.id]==='present' || status[s.id]==='late').length;
+        const absent = students.filter(s => status[s.id]==='absent').length;
         const rate = total ? Math.round(present/total*100) : 0;
         $('#sumPresent').text(present); $('#sumAbsent').text(absent); $('#sumTotal').text(total); $('#sumRate').text(rate + '%');
         $('#barLabelText').text(($('#filterClass').val() || 'Class') + ' - ' + ($('#filterSection').val() || '—') + ' · ' + dateStr());
@@ -236,18 +252,35 @@ $(document).ready(function () {
         touched = false; updateSaveBtn();
         if (!cls || !sec) { students = []; render(); return; }
 
+        EC.showLoader();
+        EC.listLoading('#list', 'Loading roster...');
         $.getJSON(ROSTER_URL, { "class": cls, section: sec, date: date })
             .done(function (res) {
                 var rows = (res && res.students) || [];
                 students = rows.map(function (r) {
                     return { id:r.id, name:r.name, roll:r.roll, parent:r.parent, phone:r.phone, av:initials(r.name) };
                 });
-                students.forEach(function (s, i) { status[s.id] = (rows[i].status === 'absent') ? 'absent' : 'present'; notified[s.id] = false; });
+                students.forEach(function (s, i) {
+                    var st = rows[i].status;   // '' when the day is not marked yet
+                    status[s.id]   = (st === 'absent' || st === 'late' || st === 'leave') ? st : 'present';
+                    marked[s.id]   = !!rows[i].marked;
+                    notified[s.id] = false;
+                });
                 canMark = !res || res.canMark !== false;
+                if (!students.length) {
+                    renderStats();
+                    EC.listEmpty('#list', 'No students on this register for the chosen date.', 'bx-user-x');
+                    return;
+                }
                 render();
                 applyCanMark();
             })
-            .fail(function () { ecToast('error', 'Could not load the roster.'); });
+            .fail(function (xhr) {
+                students = [];
+                renderStats();
+                EC.listEmpty('#list', EC.ajaxError(xhr, 'Could not load the roster'), 'bx-error-circle');
+            })
+            .always(EC.hideLoader);
     }
 
     $(document).on('click', '.att-toggle button', function () {
@@ -282,9 +315,11 @@ $(document).ready(function () {
             setTimeout(function () { $('#list').find('.att-row:first').css('box-shadow',''); }, 1800);
             return;
         }
-        // Send the whole roster; map present/absent → Present/Absent for the server.
+        // Send the whole roster with each student's status as it stands (the server
+        // only rewrites rows whose status actually changed).
+        var STATUS = { present: 'Present', absent: 'Absent', late: 'Late', leave: 'Leave' };
         var items = students.map(function (s) {
-            return { studentId: s.id, status: (status[s.id] === 'absent') ? 'Absent' : 'Present', remarks: '' };
+            return { studentId: s.id, status: STATUS[status[s.id]] || 'Present', remarks: '' };
         });
         var $btn = $(this);
         EC.buttonBusy($btn, 'Saving…');
@@ -296,10 +331,10 @@ $(document).ready(function () {
             data: JSON.stringify({ date: $('#attendanceDate').val(), "class": $('#filterClass').val(), section: $('#filterSection').val(), items: items })
         })
         .done(function (res) {
-            if (res && res.success) ecToast('success', res.message);
+            if (res && res.success) { ecToast('success', res.message); loadRoster(); }
             else ecToast('error', (res && res.message) || 'Could not save.');
         })
-        .fail(function () { ecToast('error', 'Something went wrong.'); })
+        .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not save')); })
         .always(function () { EC.buttonReset($btn); });
     });
 
@@ -324,9 +359,9 @@ $(document).ready(function () {
         if (!absent.length) { $('#modalList').html('<p class="text-muted text-center small py-3 mb-0">No absent students.</p>'); return; }
         $('#modalList').html(absent.map(function (s) {
             return '<div class="modal-row">' +
-                '<div class="att-av" style="width:36px;height:36px;border-radius:10px;font-size:.7rem;background:#fee2e2;color:var(--ec-danger);">' + s.av + '</div>' +
-                '<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:.83rem;color:var(--ec-heading);">' + s.name + '</div>' +
-                '<div style="font-size:.71rem;font-weight:700;color:var(--ec-muted);">' + (s.parent || 'Parent') + ' · +91 ' + (s.phone || '—') + '</div></div>' +
+                '<div class="att-av" style="width:36px;height:36px;border-radius:10px;font-size:.7rem;background:#fee2e2;color:var(--ec-danger);">' + EC.esc(s.av) + '</div>' +
+                '<div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:.83rem;color:var(--ec-heading);">' + EC.esc(s.name) + '</div>' +
+                '<div style="font-size:.71rem;font-weight:700;color:var(--ec-muted);">' + EC.esc(s.parent || 'Parent') + ' · +91 ' + EC.esc(s.phone || '—') + '</div></div>' +
                 '<span class="notify-chip ' + (notified[s.id]?'sent':'pending') + '" style="flex:0 0 auto;"><i class="bx ' + (notified[s.id]?'bx-check-circle':'bx-time-five') + '"></i>' + (notified[s.id]?'Sent':'Pending') + '</span>' +
                 '<button class="btn-wa wa-modal" data-id="' + s.id + '"><i class="bx bxl-whatsapp"></i></button></div>';
         }).join(''));

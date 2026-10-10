@@ -212,7 +212,6 @@ $(document).ready(function () {
     const LOAD_URL   = '@Url.Action("ClassSubjects","SchoolSettings",new{area="ERP"})';
     const SESSION_ID = @(ViewBag.AcademicYearId ?? 0);
     const SAVE_URL   = '@Url.Action("SaveClassSubjects","SchoolSettings",new{area="ERP"})';
-    const LS_KEY     = 'educore_subjects';   // still mirrored: CreateExam/MarkEntry read this
     const subjectData = {};
     let activeClass   = null;   // display name
     let activeId      = 0;      // academic_class_id
@@ -463,7 +462,6 @@ $(document).ready(function () {
                 savedData[activeId] = [...subjects];
                 updateDirty();
                 updateClassBadge(activeId);
-                mirrorToLocalStorage();
                 ecToast('success', res.message || 'Subjects saved.');
             } else {
                 ecToast('error', (res && res.message) || 'Save failed.');
@@ -472,17 +470,6 @@ $(document).ready(function () {
         .fail(function(xhr) { ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
         .always(function () { EC.buttonReset($btn); });
     });
-
-    // CreateExam and MarkEntry still read subjects out of localStorage; keep that
-    // key in step until those two pages are wired to the server as well.
-    function mirrorToLocalStorage() {
-        const byName = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
-        $('#classList .sm-class-item').each(function() {
-            const id = parseInt($(this).data('id'), 10);
-            if (subjectData[id]) byName[$(this).attr('data-class')] = subjectData[id];
-        });
-        localStorage.setItem(LS_KEY, JSON.stringify(byName));
-    }
 
     // ── Init — colour the badges the server already rendered ─────────────────
     $('#classList .sm-class-item').each(function() {

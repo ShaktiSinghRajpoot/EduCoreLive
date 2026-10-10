@@ -37,3 +37,25 @@ WHERE np.permission_key IN ('fees.collect', 'fees.cancel', 'fees.refund', 'fees.
           AND x.role_id = rp.role_id
           AND x.permission_id = np.permission_id
           AND COALESCE(x.is_deleted, FALSE) = FALSE);
+
+-- ----------------------------------------------------------------------------
+-- Inventory used to be gated on fees.view (2026-10-10 it moved to its own
+-- inventory.view / inventory.manage keys). Keep everyone's access: a role with
+-- fees.view gets inventory.view, a role with fees.manage gets inventory.manage.
+-- ----------------------------------------------------------------------------
+INSERT INTO config.role_permissions (tenant_id, school_id, role_id, permission_id, is_allowed, created_by, created_at)
+SELECT rp.tenant_id, rp.school_id, rp.role_id, np.permission_id, rp.is_allowed, rp.created_by, CURRENT_TIMESTAMP
+FROM config.role_permissions rp
+JOIN config.permissions mp ON mp.permission_id = rp.permission_id
+JOIN config.permissions np ON np.permission_key =
+        CASE mp.permission_key WHEN 'fees.view' THEN 'inventory.view'
+                               WHEN 'fees.manage' THEN 'inventory.manage' END
+WHERE mp.permission_key IN ('fees.view', 'fees.manage')
+  AND COALESCE(rp.is_deleted, FALSE) = FALSE
+  AND NOT EXISTS (
+        SELECT 1 FROM config.role_permissions x
+        WHERE x.tenant_id IS NOT DISTINCT FROM rp.tenant_id
+          AND x.school_id IS NOT DISTINCT FROM rp.school_id
+          AND x.role_id = rp.role_id
+          AND x.permission_id = np.permission_id
+          AND COALESCE(x.is_deleted, FALSE) = FALSE);

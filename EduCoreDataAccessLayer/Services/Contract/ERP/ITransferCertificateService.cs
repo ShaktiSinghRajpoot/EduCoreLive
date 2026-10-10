@@ -15,6 +15,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// second and later serves come back with WasDuplicate = true.</summary>
         Task<TransferCertificate?> GetForPrintAsync(int tcId, int tenantId, int schoolId, int actionUserId);
 
+        // Reads the certificate WITHOUT marking it printed (opening / refreshing the page).
+        Task<TransferCertificate?> GetAsync(int tcId, int tenantId, int schoolId, int actionUserId);
+
+        // Marks one print. First call = the original; later calls are duplicates.
+        // A voided certificate is refused.
+        Task<(bool Success, string Message, bool WasDuplicate)> MarkPrintedAsync(int tcId, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>The issued-TC register: search + paging.</summary>
         Task<TcListModel> GetListAsync(TcListModel query, int tenantId, int schoolId, int actionUserId);
 

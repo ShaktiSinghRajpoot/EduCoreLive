@@ -1,3 +1,12 @@
+-- Oct 2026 (platform_access_security_tests.sql) -- needs access_security_hardening.sql:
+--   * INSERT / UPDATE / DELETE are platform-only (p_tenant_id = 1), like purge.
+--     Only the SuperAdmin controller calls them; the proc no longer trusts that.
+--   * Admin phone uniqueness uses core.fn_user_phone_taken (last 10 digits).
+--   * An admin created from Edit is forced to reset the typed password, and any
+--     super-admin password set stamps users.password_changed_at (ends sessions).
+--   * School create, status change, admin creation and admin password reset write
+--     admin_activity_logs on the PLATFORM tenant (1, no school) so the record
+--     outlives a purge of the school.
 -- Adding p_country_id / p_state_id / p_district_id changes the signature, and in
 -- Postgres CREATE OR REPLACE would then create a SECOND overload instead of
 -- replacing — every CALL afterwards fails as ambiguous. Drop all overloads first.
@@ -24,12 +33,20 @@ DECLARE
     v_school_code character varying;
     v_user_id integer;
     v_seq integer;
+    v_old_status character varying;
+    v_new_status character varying;
 BEGIN
     IF p_operation IS NULL OR TRIM(p_operation) = '' THEN
         RAISE EXCEPTION 'Operation is required.';
     END IF;
 
     p_operation := UPPER(TRIM(p_operation));
+
+    -- Creating or changing a school -- including its status, which is the login
+    -- gate -- is a platform action. GET / LIST stay readable by the school itself.
+    IF p_operation IN ('INSERT', 'UPDATE', 'DELETE') AND COALESCE(p_tenant_id, 0) <> 1 THEN
+        RAISE EXCEPTION 'Only the platform super admin can create or change a school.';
+    END IF;
 
     /*
         LIST
@@ -457,13 +474,7 @@ BEGIN
         -- Phone must be unique across active login users (mirrors the email rule).
         IF p_operation = 'INSERT'
            AND p_admin_phone IS NOT NULL AND TRIM(p_admin_phone) <> ''
-           AND EXISTS (
-                SELECT 1
-                FROM core.user_profiles
-                WHERE TRIM(phone) = TRIM(p_admin_phone)
-                  AND is_active = TRUE
-                  AND is_deleted = FALSE
-           ) THEN
+           AND core.fn_user_phone_taken(p_admin_phone) THEN
             RAISE EXCEPTION 'Admin phone already exists.';
         END IF;
     END IF;
@@ -519,6 +530,10 @@ BEGIN
         )
         RETURNING school_id INTO v_school_id;
 
+        PERFORM core.fn_admin_audit(1, NULL, p_action_user_id, 'SCHOOL_CREATE', 'SuperAdmin/Schools',
+            'core.schools', v_school_id,
+            format('School %s (%s) created on tenant %s', TRIM(p_school_name), v_school_code, v_tenant_id));
+
     ELSE
         IF p_school_id IS NULL OR p_school_id <= 0 THEN
             RAISE EXCEPTION 'School id is required.';
@@ -537,6 +552,10 @@ BEGIN
 
         v_school_id := p_school_id;
 
+        SELECT st.name INTO v_old_status
+        FROM core.schools s LEFT JOIN config.school_statuses st ON st.school_status_id = s.status_id
+        WHERE s.school_id = v_school_id;
+
         UPDATE core.schools
         SET
             school_name = TRIM(p_school_name),
@@ -546,6 +565,14 @@ BEGIN
             updated_at = NOW()
         WHERE school_id = v_school_id
           AND tenant_id = v_tenant_id;
+
+        SELECT name INTO v_new_status FROM config.school_statuses WHERE school_status_id = p_status_id;
+        IF v_old_status IS DISTINCT FROM v_new_status THEN
+            PERFORM core.fn_admin_audit(1, NULL, p_action_user_id, 'SCHOOL_STATUS', 'SuperAdmin/Schools',
+                'core.schools', v_school_id,
+                format('School %s (tenant %s) status: %s -> %s', v_school_id, v_tenant_id,
+                       COALESCE(v_old_status, '?'), COALESCE(v_new_status, '?')));
+        END IF;
     END IF;
 
     /*
@@ -857,6 +884,10 @@ BEGIN
           AND r.is_active = TRUE
           AND r.is_deleted = FALSE
         ON CONFLICT (tenant_id, user_id, role_id) DO NOTHING;
+
+        PERFORM core.fn_admin_audit(1, NULL, p_action_user_id, 'SCHOOL_ADMIN_CREATE', 'SuperAdmin/Schools',
+            'core.users', v_user_id,
+            format('School admin %s created for school %s (tenant %s)', LOWER(TRIM(p_admin_email)), v_school_id, v_tenant_id));
     END IF;
 
     /*
@@ -890,13 +921,7 @@ BEGIN
 
         -- Phone must stay unique across active login users (excluding the admin being edited).
         IF p_admin_phone IS NOT NULL AND TRIM(p_admin_phone) <> ''
-           AND EXISTS (
-            SELECT 1 FROM core.user_profiles
-            WHERE TRIM(phone) = TRIM(p_admin_phone)
-              AND is_active = TRUE
-              AND is_deleted = FALSE
-              AND (v_user_id IS NULL OR user_id <> v_user_id)
-        ) THEN
+           AND core.fn_user_phone_taken(p_admin_phone, v_user_id) THEN
             RAISE EXCEPTION 'Admin phone already exists.';
         END IF;
 
@@ -915,9 +940,20 @@ BEGIN
                     WHEN NULLIF(TRIM(p_password_hash), '') IS NOT NULL THEN TRUE
                     ELSE must_change_password
                 END,
+                -- A new password ends the admin's open sessions (cookie stamp check).
+                password_changed_at = CASE
+                    WHEN NULLIF(TRIM(p_password_hash), '') IS NOT NULL THEN NOW()
+                    ELSE password_changed_at
+                END,
                 updated_by = p_action_user_id,
                 updated_at = NOW()
             WHERE user_id = v_user_id;
+
+            IF NULLIF(TRIM(p_password_hash), '') IS NOT NULL THEN
+                PERFORM core.fn_admin_audit(1, NULL, p_action_user_id, 'PASSWORD_RESET_BY_ADMIN', 'SuperAdmin/Schools',
+                    'core.users', v_user_id,
+                    format('School admin password reset for school %s (tenant %s)', v_school_id, v_tenant_id));
+            END IF;
 
             UPDATE core.user_profiles
             SET full_name = COALESCE(NULLIF(TRIM(p_admin_full_name), ''), full_name),
@@ -929,11 +965,17 @@ BEGIN
 
         ELSIF p_password_hash IS NOT NULL AND TRIM(p_password_hash) <> '' THEN
             -- No admin yet: create one (only when a password was supplied).
+            -- must_change_password = TRUE, exactly like INSERT: the super admin typed
+            -- this password, so it must be single-use.
             INSERT INTO core.users
-                (tenant_id, school_id, email, password_hash, is_active, created_by, created_at)
+                (tenant_id, school_id, email, password_hash, must_change_password, is_active, created_by, created_at)
             VALUES
-                (v_tenant_id, v_school_id, LOWER(TRIM(p_admin_email)), p_password_hash, TRUE, p_action_user_id, NOW())
+                (v_tenant_id, v_school_id, LOWER(TRIM(p_admin_email)), p_password_hash, TRUE, TRUE, p_action_user_id, NOW())
             RETURNING user_id INTO v_user_id;
+
+            PERFORM core.fn_admin_audit(1, NULL, p_action_user_id, 'SCHOOL_ADMIN_CREATE', 'SuperAdmin/Schools',
+                'core.users', v_user_id,
+                format('School admin %s created for school %s (tenant %s)', LOWER(TRIM(p_admin_email)), v_school_id, v_tenant_id));
 
             INSERT INTO core.user_profiles
                 (tenant_id, user_id, school_id, full_name, phone, designation, is_active, created_by, created_at)

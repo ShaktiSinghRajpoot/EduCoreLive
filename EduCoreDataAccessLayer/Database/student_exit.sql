@@ -301,6 +301,12 @@ BEGIN
                 s.guardian_name, s.mobile,
                 s.admission_date, s.date_of_leaving,
                 s.status, s.leaving_reason,
+                -- The uuid opens the (read-only) Student Dashboard of a leaver;
+                -- has_tc stops the page offering a second TC.
+                s.public_id,
+                EXISTS (SELECT 1 FROM core.tc_register t
+                         WHERE t.student_id = s.student_id AND t.tenant_id = s.tenant_id
+                           AND t.school_id = s.school_id AND NOT t.is_void) AS has_tc,
                 COALESCE((
                     SELECT SUM(l.amount_due - l.amount_paid - COALESCE(l.concession, 0))
                     FROM core.student_ledger l
@@ -310,11 +316,12 @@ BEGIN
             WHERE s.tenant_id = p_tenant_id
               AND s.school_id = p_school_id
               AND s.is_active = FALSE
+              -- strpos, not LIKE: a typed % or _ is a character, not a wildcard.
               AND (
                   p_search IS NULL OR TRIM(p_search) = ''
-                  OR LOWER(s.student_name) LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                  OR LOWER(s.admission_no) LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                  OR COALESCE(s.mobile, '') LIKE '%' || TRIM(p_search) || '%'
+                  OR strpos(LOWER(s.student_name), LOWER(TRIM(p_search))) > 0
+                  OR strpos(LOWER(s.admission_no), LOWER(TRIM(p_search))) > 0
+                  OR strpos(COALESCE(s.mobile, ''), TRIM(p_search)) > 0
               )
               AND (p_filter_status IS NULL OR TRIM(p_filter_status) = ''
                    OR LOWER(s.status) = LOWER(TRIM(p_filter_status)))
@@ -328,7 +335,7 @@ BEGIN
         SELECT
             student_id, admission_no, student_name, class_name, section,
             academic_year, guardian_name, mobile, admission_date,
-            date_of_leaving, status, leaving_reason,
+            date_of_leaving, status, leaving_reason, public_id, has_tc,
             GREATEST(outstanding, 0) AS outstanding,
             COUNT(*)                                                        OVER() AS total_count,
             COUNT(*) FILTER (WHERE status = 'Transfer')                     OVER() AS transfer_count,

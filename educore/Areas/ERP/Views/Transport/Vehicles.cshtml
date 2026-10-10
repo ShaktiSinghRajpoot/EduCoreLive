@@ -58,7 +58,7 @@
         <input type="hidden" id="vId" value="0">
         <div class="row g-3">
           <div class="col-md-6"><label class="form-label fw-bold">Vehicle Number</label><input id="vNo" class="form-control" placeholder="e.g. RJ14-AB-1234"></div>
-          <div class="col-md-6"><label class="form-label fw-bold">Capacity</label><input id="vCap" type="number" min="0" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label fw-bold">Capacity</label><input id="vCap" type="number" min="1" class="form-control" placeholder="Seats"></div>
           <div class="col-md-6"><label class="form-label fw-bold">Driver</label>
             <select id="vDsid" class="form-select">
               <option value="">— None —</option>
@@ -97,16 +97,22 @@ $(function(){
 
   $('#saveVBtn').on('click',function(){
     var no=$('#vNo').val().trim(); if(!no){ ecToast('warning','Enter a vehicle number.'); return; }
-    post(URL.save,{ vehicleId:Number($('#vId').val())||0, vehicleNo:no, capacity:Number($('#vCap').val())||null,
+    var capRaw=$('#vCap').val().trim();
+    if(capRaw!=='' && !(Number(capRaw)>=1)){ ecToast('warning','Capacity must be at least 1 seat, or left blank.'); return; }
+    // Busy while saving: a double click used to register the bus twice.
+    var $btn=$(this); EC.buttonBusy($btn,'Saving…');
+    post(URL.save,{ vehicleId:Number($('#vId').val())||0, vehicleNo:no, capacity:capRaw===''?null:Number(capRaw),
         driverStaffId:Number($('#vDsid').val())||null, driverPhone:$('#vDp').val().trim(), routeId:Number($('#vRid').val())||null })
-      .done(function(res){ if(res.success){ ecToast('success',res.message); setTimeout(function(){location.reload();},600);} else ecToast('error',res.message); });
+      .done(function(res){ if(res.success){ ecToast('success',res.message); setTimeout(function(){location.reload();},600);} else { ecToast('error',res.message); EC.buttonReset($btn); } })
+      .fail(function(){ ecToast('error','Could not save the vehicle.'); EC.buttonReset($btn); });
   });
-  $('.toggleV').on('click',function(){ postForm(URL.toggle,{id:$(this).data('id')}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); }); });
+  $('.toggleV').on('click',function(){ postForm(URL.toggle,{id:$(this).data('id')}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); }).fail(function(){ ecToast('error','Could not update the vehicle.'); }); });
   $('.delV').on('click',function(){
     var id=$(this).data('id');
     EC.confirm({ title:'Delete this vehicle?', name:$(this).data('no'), okText:'Delete vehicle' }).then(function(ok){
       if(!ok) return;
-      postForm(URL.del,{id:id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); });
+      postForm(URL.del,{id:id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); })
+        .fail(function(){ ecToast('error','Could not delete the vehicle.'); });
     });
   });
 

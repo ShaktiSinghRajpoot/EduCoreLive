@@ -65,7 +65,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             int studentId, string? photoUrl, int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Sections that have active students in a class (for cascading dropdowns).</summary>
-        Task<List<string>> GetClassSectionsAsync(string className, int tenantId, int schoolId, int actionUserId);
+        // Sections the class HAS in the session's setup (null = current session),
+        // including empty ones.
+        Task<List<string>> GetClassSectionsAsync(string className, int tenantId, int schoolId, int actionUserId, string? academicYear = null);
 
         // ── Promotion (backs Student/Promotion) ──
 

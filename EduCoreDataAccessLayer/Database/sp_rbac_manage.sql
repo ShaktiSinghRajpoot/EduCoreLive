@@ -13,6 +13,15 @@
 --   core.sp_user_role_list             login users + their primary role
 --   core.sp_user_role_assign           reassign a user's primary role
 --
+--   core.sp_user_roles_effective       roles that count for ACCESS right now (Oct 2026)
+--
+-- Oct 2026 (platform_access_security_tests.sql):
+--   * a new role never gets a reserved code (SUPER_ADMIN, TENANT_ADMIN, the built-ins)
+--     -- "Super Admin" used to become SUPER_ADMIN: hidden from LIST and a full bypass;
+--   * the matrix refuses permission ids that are not in the catalog;
+--   * role create/rename/delete and every matrix change write admin_activity_logs
+--     through core.fn_admin_audit (access_security_hardening.sql -- apply it first).
+--
 -- Built-in role codes are protected from edit/delete so a school can't break its
 -- own admin/teacher logins.
 -- ============================================================================
@@ -96,6 +105,11 @@ BEGIN
         UPDATE config.roles
         SET is_deleted = TRUE, is_active = FALSE, deleted_by = p_action_user_id, deleted_at = now()
         WHERE tenant_id = p_tenant_id AND role_id = p_role_id;
+
+        PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'ROLE_DELETE', 'Roles',
+            'config.roles', p_role_id,
+            format('Role %s deleted', (SELECT role_name FROM config.roles WHERE role_id = p_role_id)));
+
         OPEN p_result FOR SELECT p_role_id AS role_id;
         RETURN;
     END IF;
@@ -123,7 +137,12 @@ BEGIN
             v_base := TRIM(BOTH '_' FROM v_base);
             IF v_base = '' THEN v_base := 'ROLE'; END IF;
             v_role_code := v_base;
-            WHILE EXISTS (SELECT 1 FROM config.roles
+            -- The platform and built-in codes are RESERVED even when this tenant has
+            -- no row with that code: PermissionService treats SUPER_ADMIN/SCHOOL_ADMIN
+            -- as a full bypass and LIST hides SUPER_ADMIN, so "Super Admin" must
+            -- become SUPER_ADMIN_2, never SUPER_ADMIN.
+            WHILE v_role_code IN ('SUPER_ADMIN','TENANT_ADMIN','SCHOOL_ADMIN','TEACHER','ACCOUNTANT','RECEPTIONIST')
+               OR EXISTS (SELECT 1 FROM config.roles
                           WHERE tenant_id = p_tenant_id AND role_code = v_role_code AND is_deleted = FALSE) LOOP
                 v_suffix := v_suffix + 1;
                 v_role_code := v_base || '_' || v_suffix;
@@ -135,6 +154,9 @@ BEGIN
                 (p_tenant_id, p_school_id, v_role_code, TRIM(p_role_name), NULLIF(TRIM(p_description), ''),
                  TRUE, p_action_user_id, now())
             RETURNING role_id INTO v_role_id;
+
+            PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'ROLE_CREATE', 'Roles',
+                'config.roles', v_role_id, format('Role %s created (code %s)', TRIM(p_role_name), v_role_code));
         ELSE
             SELECT role_code INTO v_existing
             FROM config.roles
@@ -145,6 +167,11 @@ BEGIN
             IF v_existing IN ('SUPER_ADMIN','SCHOOL_ADMIN','TEACHER','ACCOUNTANT','RECEPTIONIST') THEN
                 RAISE EXCEPTION 'Built-in roles cannot be renamed.';
             END IF;
+
+            PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'ROLE_UPDATE', 'Roles',
+                'config.roles', p_role_id,
+                format('Role renamed: %s -> %s',
+                       (SELECT role_name FROM config.roles WHERE role_id = p_role_id), TRIM(p_role_name)));
 
             UPDATE config.roles
             SET role_name = TRIM(p_role_name),
@@ -226,9 +253,17 @@ LANGUAGE plpgsql
 AS $procedure$
 DECLARE
     v_role_code text;
+    v_before    text;
+    v_after     text;
 BEGIN
     IF p_tenant_id IS NULL OR p_tenant_id <= 1 OR p_school_id IS NULL OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid tenant/school scope.';
+    END IF;
+
+    -- Only ids from the catalog can be granted (there is no FK on role_permissions).
+    IF EXISTS (SELECT 1 FROM UNNEST(COALESCE(p_permission_ids, ARRAY[]::integer[])) AS pid
+               WHERE NOT EXISTS (SELECT 1 FROM config.permissions p WHERE p.permission_id = pid)) THEN
+        RAISE EXCEPTION 'Unknown permission.';
     END IF;
 
     SELECT role_code INTO v_role_code
@@ -237,6 +272,11 @@ BEGIN
     IF v_role_code IS NULL THEN
         RAISE EXCEPTION 'Role not found.';
     END IF;
+
+    -- Grants before the save, for the audit row.
+    SELECT string_agg(p.permission_key, ', ' ORDER BY p.permission_key) INTO v_before
+    FROM config.role_permissions rp JOIN config.permissions p USING (permission_id)
+    WHERE rp.tenant_id = p_tenant_id AND rp.role_id = p_role_id AND rp.is_deleted = FALSE AND rp.is_allowed = TRUE;
 
     -- Soft-delete grants that are no longer selected.
     UPDATE config.role_permissions
@@ -259,6 +299,18 @@ BEGIN
         SELECT 1 FROM config.role_permissions rp
         WHERE rp.tenant_id = p_tenant_id AND rp.role_id = p_role_id AND rp.permission_id = pid
     );
+
+    SELECT string_agg(p.permission_key, ', ' ORDER BY p.permission_key) INTO v_after
+    FROM config.role_permissions rp JOIN config.permissions p USING (permission_id)
+    WHERE rp.tenant_id = p_tenant_id AND rp.role_id = p_role_id AND rp.is_deleted = FALSE AND rp.is_allowed = TRUE;
+
+    IF v_before IS DISTINCT FROM v_after THEN
+        PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'ROLE_PERMISSIONS', 'Roles',
+            'config.role_permissions', p_role_id,
+            format('Role %s permissions: [%s] -> [%s]',
+                   (SELECT role_name FROM config.roles WHERE role_id = p_role_id),
+                   COALESCE(v_before, ''), COALESCE(v_after, '')));
+    END IF;
 
     OPEN p_result FOR SELECT p_role_id AS role_id;
 END;
@@ -406,5 +458,45 @@ BEGIN
       AND  ur.user_id   = p_user_id
       AND  ur.is_deleted = FALSE
       AND  ur.is_active  = TRUE;
+END;
+$procedure$;
+
+
+-- ====================================================== sp_user_roles_effective
+-- The roles that count for ACCESS right now. Same rows as sp_user_roles_resolve,
+-- but empty when the user is deactivated/deleted or their school no longer allows
+-- sign-in (Inactive / Suspended / Closed / Pending / disabled). PermissionService
+-- uses this, so an open cookie loses its permissions with the account or school.
+-- (sp_user_roles_resolve stays ungated: the People form must still show an
+-- inactive person's roles.)
+DROP PROCEDURE IF EXISTS core.sp_user_roles_effective(integer, integer, integer, refcursor);
+
+CREATE OR REPLACE PROCEDURE core.sp_user_roles_effective(
+    p_tenant_id integer,
+    p_school_id integer,
+    p_user_id   integer,
+    INOUT p_result refcursor DEFAULT 'user_roles_cursor'
+)
+LANGUAGE plpgsql
+AS $procedure$
+BEGIN
+    OPEN p_result FOR
+    SELECT r.role_id, r.role_code
+    FROM   core.user_roles ur
+    JOIN   config.roles r
+        ON r.role_id = ur.role_id AND r.tenant_id = ur.tenant_id AND r.is_deleted = FALSE
+    JOIN   core.users u
+        ON u.user_id = ur.user_id AND u.is_active = TRUE AND u.is_deleted = FALSE
+    WHERE  ur.tenant_id = p_tenant_id
+      AND  ur.user_id   = p_user_id
+      AND  ur.is_deleted = FALSE
+      AND  ur.is_active  = TRUE
+      AND  EXISTS (
+            SELECT 1
+            FROM core.schools sc
+            JOIN config.school_statuses st
+              ON st.school_status_id = sc.status_id AND st.is_deleted = FALSE
+            WHERE sc.school_id = p_school_id AND sc.tenant_id = p_tenant_id
+              AND sc.is_active = TRUE AND sc.is_deleted = FALSE AND st.allows_login = TRUE);
 END;
 $procedure$;

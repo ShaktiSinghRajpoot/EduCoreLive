@@ -10,6 +10,10 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int      StopCount   { get; set; }
         public decimal? MinFare     { get; set; }
         public decimal? MaxFare     { get; set; }
+        // Students on the route now, and the seats of its active vehicles
+        // (null = no vehicle with a capacity, so no limit is applied).
+        public int      Riders      { get; set; }
+        public int?     Seats       { get; set; }
         public List<TransportStop> Stops { get; set; } = new();
     }
 
@@ -67,5 +71,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int     StopId      { get; set; }
         public string  StopName    { get; set; } = string.Empty;
         public decimal MonthlyFare { get; set; }
+        public int     Riders      { get; set; }
+        public int?    Seats       { get; set; }
     }
 }

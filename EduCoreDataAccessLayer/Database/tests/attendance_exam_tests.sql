@@ -110,7 +110,7 @@ BEGIN
     -- A1: the future cannot be marked. Nobody knows who will turn up tomorrow.
     BEGIN
         c := 'a1';
-        CALL core.sp_attendance_save(c_tenant, c_school, c_user, CURRENT_DATE + 1,
+        CALL core.sp_attendance_save(c_tenant, c_school, c_user, CURRENT_DATE + 1, v_class, 'A',
              jsonb_build_array(jsonb_build_object('studentId', v_sid, 'status', 'Present')), c);
         PERFORM pg_temp.chk('A1 future date refused', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
@@ -121,7 +121,7 @@ BEGIN
     --     module and payroll all use.
     BEGIN
         c := 'a2';
-        CALL core.sp_attendance_save(c_tenant, c_school, c_user, v_sun,
+        CALL core.sp_attendance_save(c_tenant, c_school, c_user, v_sun, v_class, 'A',
              jsonb_build_array(jsonb_build_object('studentId', v_sid, 'status', 'Present')), c);
         PERFORM pg_temp.chk('A2 Sunday refused', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
@@ -132,7 +132,7 @@ BEGIN
     --     be quietly rewritten months later.
     BEGIN
         c := 'a3';
-        CALL core.sp_attendance_save(c_tenant, c_school, c_user, CURRENT_DATE - 400,
+        CALL core.sp_attendance_save(c_tenant, c_school, c_user, CURRENT_DATE - 400, v_class, 'A',
              jsonb_build_array(jsonb_build_object('studentId', v_sid, 'status', 'Present')), c);
         PERFORM pg_temp.chk('A3 long-past date is locked', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
@@ -142,7 +142,7 @@ BEGIN
     -- A4: an empty register is refused rather than silently recording nothing.
     BEGIN
         c := 'a4';
-        CALL core.sp_attendance_save(c_tenant, c_school, c_user, v_mon, '[]'::jsonb, c);
+        CALL core.sp_attendance_save(c_tenant, c_school, c_user, v_mon, v_class, 'A', '[]'::jsonb, c);
         PERFORM pg_temp.chk('A4 empty register refused', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('A4 empty register refused', TRUE, SQLERRM);
@@ -153,7 +153,7 @@ BEGIN
     RAISE NOTICE '-- B. Marking and correcting -----------------------------';
 
     c := 'b1';
-    CALL core.sp_attendance_save(c_tenant, c_school, c_user, v_mon,
+    CALL core.sp_attendance_save(c_tenant, c_school, c_user, v_mon, v_class, 'A',
          jsonb_build_array(
              jsonb_build_object('studentId', v_sid,  'status', 'Present'),
              jsonb_build_object('studentId', v_sid2, 'status', 'Absent')), c);
@@ -169,7 +169,7 @@ BEGIN
     -- Re-saving the same day must CORRECT, not duplicate — a teacher fixing a
     -- mistake should not leave two rows for one student on one day.
     c := 'b3';
-    CALL core.sp_attendance_save(c_tenant, c_school, c_user, v_mon,
+    CALL core.sp_attendance_save(c_tenant, c_school, c_user, v_mon, v_class, 'A',
          jsonb_build_array(jsonb_build_object('studentId', v_sid2, 'status', 'Present')), c);
 
     SELECT COUNT(*) INTO v_n FROM core.student_attendance

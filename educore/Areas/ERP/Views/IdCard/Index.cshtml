@@ -76,6 +76,9 @@
           </div>
         </div>
 
+        @* Filled by checkPhotos(): which children in the selection have no photo. *@
+        <div class="small mt-3" id="idPhotoCheck"></div>
+
         <div class="mt-3 d-flex gap-2 flex-wrap">
           <button type="button" class="btn btn-primary" id="idOpenSheet">
             <i class="bx bx-id-card me-1"></i>Open ID card sheet
@@ -94,12 +97,33 @@
 <script>
     $(function () {
 
-        // When the class changes, load the sections that actually have students.
-        $('#idClass').on('change', function () {
-            var cls = $(this).val();
+        // Missing photos are listed before printing, not discovered on the sheet.
+        function checkPhotos() {
+            var cls = $('#idClass').val(), $box = $('#idPhotoCheck');
+            $box.empty();
+            if (!cls) return;
+            $.getJSON('@Url.Action("PhotoCheck", "IdCard", new { area = "ERP" })',
+                { "class": cls, section: $('#idSection').val() || '', year: $('#idYear').val() || '' })
+            .done(function (res) {
+                if (!res || !res.total) { $box.text('No students in this selection.'); return; }
+                if (!res.missing.length) {
+                    $box.html('<span class="text-success"><i class="bx bx-check-circle me-1"></i>All ' + res.total + ' card(s) have a photo.</span>');
+                    return;
+                }
+                var names = res.missing.map(function (m) {
+                    return EC.esc(m.name) + (m.roll ? ' (roll ' + EC.esc(m.roll) + ')' : '');
+                }).join(', ');
+                $box.html('<span class="text-danger"><i class="bx bx-error-circle me-1"></i>' + res.missing.length +
+                          ' of ' + res.total + ' card(s) have no photo: ' + names + '.</span>');
+            });
+        }
+
+        // When the class (or year) changes, load the sections that have students.
+        function loadSections() {
+            var cls = $('#idClass').val();
             var $sec = $('#idSection');
             $sec.html('<option value="">All sections</option>');
-            if (!cls) return;
+            if (!cls) { checkPhotos(); return; }
 
             $.getJSON('@Url.Action("Sections", "IdCard", new { area = "ERP" })',
                 { "class": cls, year: $('#idYear').val() || '' })
@@ -107,8 +131,11 @@
                 $.each(list || [], function (i, s) {
                     $sec.append($('<option>').val(s).text(s));
                 });
-            });
-        });
+            })
+            .always(checkPhotos);
+        }
+        $('#idClass, #idYear').on('change', loadSections);
+        $('#idSection').on('change', checkPhotos);
 
         $('#idOpenSheet').on('click', function () {
             var cls = $('#idClass').val();

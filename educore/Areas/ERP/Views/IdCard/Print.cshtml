@@ -8,6 +8,11 @@
         .Where(p => !string.IsNullOrWhiteSpace(p)));
 
     string V(string? s) => string.IsNullOrWhiteSpace(s) ? "—" : s;
+
+    // Children with no photo on file. Listed on screen (not printed) so the
+    // office can fix them before printing; the sheet then does not auto-print.
+    var noPhoto = Model.IsPreview ? new List<EduCoreDataAccessLayer.Models.ERP.IdCardStudent>()
+                                  : Model.Students.Where(s => string.IsNullOrWhiteSpace(s.PhotoUrl)).ToList();
 }
 <!DOCTYPE html>
 <html>
@@ -70,7 +75,14 @@
     <div class="id-toolbar">
         <button type="button" onclick="window.print()">Print @Model.Students.Count card(s)</button>
     </div>
-    <div class="id-note">Photos are blank — paste or print them separately until student-photo upload is enabled.</div>
+    @if (noPhoto.Any())
+    {
+        <div class="id-note" style="color:#b00020;">
+            @noPhoto.Count of @Model.Students.Count card(s) have no photo and will print a blank PHOTO box:
+            @string.Join(", ", noPhoto.Select(s => s.StudentName + (string.IsNullOrWhiteSpace(s.RollNo) ? "" : " (roll " + s.RollNo + ")"))).
+            Add photos from the student list, then reopen this sheet.
+        </div>
+    }
 
     @if (!Model.Students.Any())
     {
@@ -93,7 +105,9 @@
                 <div class="id-body">
                     @if (!string.IsNullOrWhiteSpace(s.PhotoUrl))
                     {
-                        <img class="id-photo" src="@s.PhotoUrl" alt="PHOTO" style="object-fit:cover;" />
+                        @* A file missing from disk falls back to the blank box, not a broken image. *@
+                        <img class="id-photo" src="@s.PhotoUrl" alt="PHOTO" style="object-fit:cover;"
+                             onerror="this.outerHTML='&lt;div class=&quot;id-photo&quot;&gt;PHOTO&lt;/div&gt;'" />
                     }
                     else
                     {
@@ -119,7 +133,7 @@
         }
     </div>
 
-    @if (!Model.IsPreview && Model.Students.Any())
+    @if (!Model.IsPreview && Model.Students.Any() && !noPhoto.Any())
     {
         <script>
             window.addEventListener('load', function () { window.print(); });

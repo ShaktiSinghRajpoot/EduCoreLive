@@ -272,6 +272,28 @@ BEGIN
             RETURN;
         END IF;
 
+        -- Aadhaar: 12 digits when filled (the same rule as Edit Student).
+        IF NULLIF(TRIM(COALESCE(p_id_proof_no, '')), '') IS NOT NULL
+           AND TRIM(p_id_proof_no) !~ '^[0-9]{12}$' THEN
+            OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                'Aadhaar number must be 12 digits.' AS message, NULL::TEXT AS admission_no;
+            RETURN;
+        END IF;
+
+        -- A roll number belongs to one child per class + section + session.
+        IF NULLIF(TRIM(COALESCE(p_roll_no, '')), '') IS NOT NULL AND EXISTS (
+               SELECT 1 FROM core.students o
+                WHERE o.tenant_id = p_tenant_id AND o.school_id = p_school_id AND o.is_active
+                  AND o.academic_year = v_year AND o.class_name = TRIM(p_class_name)
+                  AND COALESCE(o.section, '') = COALESCE(TRIM(p_section), '')
+                  AND LOWER(TRIM(o.roll_no)) = LOWER(TRIM(p_roll_no))) THEN
+            OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                format('Roll no %s is already used in %s.', TRIM(p_roll_no),
+                       TRIM(p_class_name) || COALESCE('-' || NULLIF(TRIM(p_section), ''), '')) AS message,
+                NULL::TEXT AS admission_no;
+            RETURN;
+        END IF;
+
         -- Admission number: use supplied value or auto-generate per school+year
         IF p_admission_no IS NULL OR TRIM(p_admission_no) = '' THEN
             INSERT INTO core.admission_counters (tenant_id, school_id, academic_year, last_seq)
@@ -512,16 +534,27 @@ BEGIN
                 WHERE s.tenant_id = p_tenant_id
                   AND s.school_id = p_school_id
                   AND s.is_active = TRUE
+                  -- strpos, not LIKE: a typed % or _ is a character, not a
+                  -- wildcard; inner runs of spaces are collapsed on both sides.
                   AND (
                       p_search IS NULL OR TRIM(p_search) = ''
-                      OR LOWER(s.student_name) LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                      OR LOWER(s.admission_no) LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                      OR LOWER(COALESCE(s.guardian_name,'')) LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                      OR COALESCE(s.mobile,'') LIKE '%' || TRIM(p_search) || '%'
+                      OR strpos(regexp_replace(LOWER(s.student_name), '\s+', ' ', 'g'),
+                                regexp_replace(LOWER(TRIM(p_search)), '\s+', ' ', 'g')) > 0
+                      OR strpos(LOWER(s.admission_no), LOWER(TRIM(p_search))) > 0
+                      OR strpos(regexp_replace(LOWER(COALESCE(s.guardian_name,'')), '\s+', ' ', 'g'),
+                                regexp_replace(LOWER(TRIM(p_search)), '\s+', ' ', 'g')) > 0
+                      OR strpos(COALESCE(s.mobile,''), TRIM(p_search)) > 0
                   )
                   -- Enrolled in the requested session at all.
                   AND (NULLIF(TRIM(COALESCE(p_filter_year, '')), '') IS NULL
                        OR e.enrolment_id IS NOT NULL)
+                  -- "Active" in a given session means the session's own
+                  -- enrolment is still open: a child already promoted, retained
+                  -- into the next session or passed out has left that roster
+                  -- (the Promotion page reloaded the moved children otherwise).
+                  AND (NULLIF(TRIM(COALESCE(p_filter_year, '')), '') IS NULL
+                       OR LOWER(COALESCE(TRIM(p_filter_status), '')) <> 'active'
+                       OR e.status = 'Active')
                   -- Class/section are matched against that session's position.
                   AND (p_filter_class   IS NULL OR TRIM(p_filter_class)   = '' OR LOWER(COALESCE(e.class_name, s.class_name)) = LOWER(TRIM(p_filter_class)))
                   AND (p_filter_section IS NULL OR TRIM(p_filter_section) = '' OR LOWER(COALESCE(e.section, s.section, '')) = LOWER(TRIM(p_filter_section)))
@@ -538,12 +571,14 @@ BEGIN
     -- ── GetStudentById ───────────────────────────────────────
     ELSIF p_operation = 'GetStudentById' THEN
         OPEN p_result FOR
+            -- Leavers included: the Student Dashboard shows a left student
+            -- read-only (fees, receipts, history). Edit Student refuses them
+            -- in the controller by reading is_active.
             SELECT s.*
             FROM core.students s
             WHERE s.student_id = p_student_id
               AND s.tenant_id  = p_tenant_id
-              AND s.school_id  = p_school_id
-              AND s.is_active  = TRUE;
+              AND s.school_id  = p_school_id;
         RETURN;
 
     -- ── DeleteStudent (soft) ─────────────────────────────────

@@ -43,7 +43,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     IsActive    = r["is_active"] != DBNull.Value && Convert.ToBoolean(r["is_active"]),
                     StopCount   = ToInt(r["stop_count"]),
                     MinFare     = r["min_fare"] == DBNull.Value ? null : Convert.ToDecimal(r["min_fare"]),
-                    MaxFare     = r["max_fare"] == DBNull.Value ? null : Convert.ToDecimal(r["max_fare"])
+                    MaxFare     = r["max_fare"] == DBNull.Value ? null : Convert.ToDecimal(r["max_fare"]),
+                    Riders      = r.Table.Columns.Contains("riders") ? ToInt(r["riders"]) : 0,
+                    Seats       = r.Table.Columns.Contains("seats") && r["seats"] != DBNull.Value ? ToInt(r["seats"]) : null
                 });
             }
             return list;
@@ -231,7 +233,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     RouteName   = r["route_name"]?.ToString() ?? string.Empty,
                     StopId      = ToInt(r["stop_id"]),
                     StopName    = r["stop_name"]?.ToString() ?? string.Empty,
-                    MonthlyFare = r["monthly_fare"] == DBNull.Value ? 0 : Convert.ToDecimal(r["monthly_fare"])
+                    MonthlyFare = r["monthly_fare"] == DBNull.Value ? 0 : Convert.ToDecimal(r["monthly_fare"]),
+                    Riders      = r.Table.Columns.Contains("riders") ? ToInt(r["riders"]) : 0,
+                    Seats       = r.Table.Columns.Contains("seats") && r["seats"] != DBNull.Value ? ToInt(r["seats"]) : null
                 });
             }
             return list;

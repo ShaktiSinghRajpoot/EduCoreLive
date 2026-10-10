@@ -36,22 +36,43 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> Issue([FromBody] TcIssueRequest request)
         {
             var result = await _tc.IssueAsync(request, TenantId(), SchoolId(), UserId());
-            return Json(new { success = result.Success, message = result.Message, tcId = result.TcId, tcNo = result.TcNo });
+            return Json(new { success = result.Success, message = result.Message, tcId = result.TcId, tcNo = result.TcNo, tcPublicId = result.PublicId });
         }
 
-        // The printable certificate. Opens full-page and prints itself. Serving it
-        // marks it printed, so every reprint after the first is stamped DUPLICATE.
+        // The printable certificate. Opening (or refreshing) it marks NOTHING: it
+        // used to count every GET as a print, so a refresh, a link preview or a
+        // view-only user turned the original into a "DUPLICATE". The count moves
+        // only when someone presses Print, through MarkPrinted below. ?print=1
+        // (from Issue & Print) asks the page to run that once on load.
         [HttpGet]
-        public async Task<IActionResult> Print(Guid id)
+        public async Task<IActionResult> Print(Guid id, bool print = false)
         {
             var tcId = await _publicIds.ResolveAsync(IPublicIdService.Tc, id, TenantId(), SchoolId());
             if (tcId == 0) return NotFound();
 
-            var cert = await _tc.GetForPrintAsync(tcId, TenantId(), SchoolId(), UserId());
+            var cert = await _tc.GetAsync(tcId, TenantId(), SchoolId(), UserId());
             if (cert == null) return NotFound();
 
             var model = await BuildPrintModel(cert, isPreview: false);
+            ViewBag.TcPublicId = id;
+            ViewBag.AutoPrint  = print && !cert.IsVoid;
             return View("Print", model);
+        }
+
+        // Counts one print. The first is the original; later ones come back as
+        // duplicates and the page stamps DUPLICATE before printing. A voided
+        // certificate is refused. Needs students.manage: a view-only user can read
+        // the certificate but not print an original.
+        [HttpPost]
+        [HasPermission("students.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarkPrinted(Guid id)
+        {
+            var tcId = await _publicIds.ResolveAsync(IPublicIdService.Tc, id, TenantId(), SchoolId());
+            if (tcId == 0) return Json(new { success = false, message = "Certificate not found." });
+
+            var (ok, message, wasDuplicate) = await _tc.MarkPrintedAsync(tcId, TenantId(), SchoolId(), UserId());
+            return Json(new { success = ok, message, wasDuplicate });
         }
 
         // Format preview for the Documents page and the issue modal — sample data, no

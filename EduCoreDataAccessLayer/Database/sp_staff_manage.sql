@@ -14,6 +14,17 @@
 -- profile + role (p_role_id) assigned, and core.staff.user_id linked. A bus
 -- driver / peon left without a login is simply a staff row with user_id NULL.
 --
+-- Oct 2026 (platform_access_security_tests.sql) -- needs access_security_hardening.sql:
+--   * DELETE also switches off the linked login; REACTIVATE switches it back on.
+--     Nobody can deactivate their own login, and the last active school admin of a
+--     school cannot be deactivated.
+--   * Role ids must be roles of THIS tenant (there is no FK; a foreign id used to
+--     become the primary role and lock the person out).
+--   * Nobody can change their own roles. Only a school admin (or the platform)
+--     can grant or remove SCHOOL_ADMIN, and the last school admin keeps it.
+--   * Phone uniqueness uses core.fn_user_phone_taken (last 10 digits, like the index).
+--   * Activation, role changes and admin password resets write admin_activity_logs.
+--
 -- NOTE: parameters are POSITIONAL (Npgsql CommandType.StoredProcedure). The C#
 -- StaffService MUST build NpgsqlParameter[] in exactly this order.
 -- ============================================================================
@@ -72,6 +83,11 @@ DECLARE
     v_staff_id    integer;
     v_user_id     integer;
     v_staff_type  text;
+    v_old_roles   text;
+    v_new_roles   text;
+    v_admin_role  integer;
+    v_had_admin   boolean;
+    v_gets_admin  boolean;
 BEGIN
     -- Multi-tenancy guard (tenant 1 = platform; real schools are tenant > 1).
     IF p_tenant_id IS NULL OR p_tenant_id <= 1 OR p_school_id IS NULL OR p_school_id <= 0 THEN
@@ -119,22 +135,73 @@ BEGIN
 
     -- -------------------------------------------------------------- DELETE
     IF p_operation = 'DELETE' THEN
+        SELECT user_id INTO v_user_id FROM core.staff
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
+
+        IF v_user_id IS NOT NULL THEN
+            IF v_user_id = p_action_user_id THEN
+                RAISE EXCEPTION 'You cannot deactivate your own login.';
+            END IF;
+            IF core.fn_is_last_school_admin(p_school_id, v_user_id) THEN
+                RAISE EXCEPTION 'This is the last active School Admin of the school. Make someone else a School Admin first.';
+            END IF;
+        END IF;
+
         UPDATE core.staff
         SET    status = 'Inactive', is_active = FALSE,
                status_changed_at = now(),
                updated_by = p_action_user_id, updated_at = now()
         WHERE  tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
+
+        -- Someone who has left must not keep signing in.
+        IF v_user_id IS NOT NULL THEN
+            UPDATE core.users
+            SET    is_active = FALSE, updated_by = p_action_user_id, updated_at = now()
+            WHERE  user_id = v_user_id AND tenant_id = p_tenant_id AND is_active = TRUE;
+
+            IF FOUND THEN
+                PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'USER_DEACTIVATE',
+                    'Staff', 'core.users', v_user_id,
+                    format('Login deactivated with staff %s', p_staff_id));
+            END IF;
+        END IF;
+
         OPEN p_result FOR SELECT p_staff_id AS staff_id;
         RETURN;
     END IF;
 
     -- ---------------------------------------------------------- REACTIVATE
     IF p_operation = 'REACTIVATE' THEN
+        SELECT user_id INTO v_user_id FROM core.staff
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
+
         UPDATE core.staff
         SET    status = 'Active', is_active = TRUE,
                status_changed_at = now(),
                updated_by = p_action_user_id, updated_at = now()
         WHERE  tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
+
+        -- Bring the login back, unless its email or phone now belongs to someone else.
+        IF v_user_id IS NOT NULL
+           AND EXISTS (SELECT 1 FROM core.users WHERE user_id = v_user_id
+                       AND tenant_id = p_tenant_id AND is_active = FALSE AND is_deleted = FALSE) THEN
+            IF core.fn_user_email_taken((SELECT email FROM core.users WHERE user_id = v_user_id), v_user_id) THEN
+                RAISE EXCEPTION 'This person''s login email is now used by another user. Change it before re-activating.';
+            END IF;
+            IF EXISTS (SELECT 1 FROM core.user_profiles up WHERE up.user_id = v_user_id AND up.phone IS NOT NULL
+                       AND core.fn_user_phone_taken(up.phone, v_user_id)) THEN
+                RAISE EXCEPTION 'This person''s login phone is now used by another user. Change it before re-activating.';
+            END IF;
+
+            UPDATE core.users
+            SET    is_active = TRUE, updated_by = p_action_user_id, updated_at = now()
+            WHERE  user_id = v_user_id;
+
+            PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'USER_ACTIVATE',
+                'Staff', 'core.users', v_user_id,
+                format('Login re-activated with staff %s', p_staff_id));
+        END IF;
+
         OPEN p_result FOR SELECT p_staff_id AS staff_id;
         RETURN;
     END IF;
@@ -190,10 +257,10 @@ BEGIN
                 RAISE EXCEPTION 'A login with this email already exists.';
             END IF;
 
+            -- Same rule as uq_user_phone_active (last 10 digits), so '+91 98390 73643'
+            -- gets this message instead of a raw constraint error.
             IF p_mobile IS NOT NULL AND TRIM(p_mobile) <> ''
-               AND EXISTS (SELECT 1 FROM core.user_profiles
-                           WHERE TRIM(phone) = TRIM(p_mobile)
-                             AND is_active = TRUE AND is_deleted = FALSE) THEN
+               AND core.fn_user_phone_taken(p_mobile) THEN
                 RAISE EXCEPTION 'A login with this phone already exists.';
             END IF;
 
@@ -220,15 +287,59 @@ BEGIN
             UPDATE core.users
             SET    password_hash = p_password_hash,
                    must_change_password = TRUE,
+                   password_changed_at = now(),   -- ends the person's open sessions
                    updated_by = p_action_user_id,
                    updated_at = now()
             WHERE  user_id = v_user_id AND tenant_id = p_tenant_id;
+
+            PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'PASSWORD_RESET_BY_ADMIN',
+                'Staff', 'core.users', v_user_id, format('Password reset for staff %s', p_staff_id));
         END IF;
 
         -- Assign / sync the login's role(s). A user's effective permissions are the
         -- UNION of all their roles. Runs for a freshly-created OR an existing login,
         -- so the People edit form is the single place to manage a person's access.
         IF v_user_id IS NOT NULL AND p_role_ids IS NOT NULL THEN
+            -- Every id must be a live role of THIS tenant (and never the platform role).
+            IF EXISTS (SELECT 1 FROM unnest(p_role_ids) AS rid
+                       WHERE NOT EXISTS (SELECT 1 FROM config.roles r
+                                         WHERE r.role_id = rid AND r.tenant_id = p_tenant_id
+                                           AND r.is_deleted = FALSE AND r.role_code <> 'SUPER_ADMIN')) THEN
+                RAISE EXCEPTION 'Role not found.';
+            END IF;
+
+            SELECT string_agg(r.role_code, ', ' ORDER BY r.role_code) INTO v_old_roles
+            FROM core.user_roles ur JOIN config.roles r ON r.role_id = ur.role_id
+            WHERE ur.tenant_id = p_tenant_id AND ur.user_id = v_user_id
+              AND ur.is_deleted = FALSE AND ur.is_active = TRUE;
+            SELECT string_agg(r.role_code, ', ' ORDER BY r.role_code) INTO v_new_roles
+            FROM config.roles r WHERE r.role_id = ANY (p_role_ids);
+
+            IF v_old_roles IS DISTINCT FROM v_new_roles THEN
+                IF v_user_id = p_action_user_id THEN
+                    RAISE EXCEPTION 'You cannot change your own roles. Ask another School Admin.';
+                END IF;
+
+                SELECT role_id INTO v_admin_role FROM config.roles
+                WHERE tenant_id = p_tenant_id AND role_code = 'SCHOOL_ADMIN' AND is_deleted = FALSE
+                ORDER BY role_id LIMIT 1;
+                v_had_admin  := COALESCE(v_old_roles, '') ~ '(^|, )SCHOOL_ADMIN(,|$)';
+                v_gets_admin := v_admin_role = ANY (p_role_ids);
+
+                IF v_had_admin IS DISTINCT FROM v_gets_admin
+                   AND NOT core.fn_user_is_school_admin(p_tenant_id, p_action_user_id) THEN
+                    RAISE EXCEPTION 'Only a School Admin can grant or remove the School Admin role.';
+                END IF;
+                IF v_had_admin AND NOT v_gets_admin
+                   AND core.fn_is_last_school_admin(p_school_id, v_user_id) THEN
+                    RAISE EXCEPTION 'This is the last active School Admin of the school. Make someone else a School Admin first.';
+                END IF;
+
+                PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'USER_ROLES_CHANGE',
+                    'Staff', 'core.user_roles', v_user_id,
+                    format('Roles: [%s] -> [%s]', COALESCE(v_old_roles, ''), COALESCE(v_new_roles, '')));
+            END IF;
+
             -- drop roles no longer selected
             UPDATE core.user_roles
             SET is_deleted = TRUE, is_active = FALSE, is_primary = FALSE,

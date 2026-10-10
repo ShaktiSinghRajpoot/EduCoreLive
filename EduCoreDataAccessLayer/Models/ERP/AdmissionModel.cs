@@ -70,6 +70,14 @@
         public List<StudentFeePlanItem> FeePlan { get; set; } = new();
         // Conversion linkage
         public int?      EnquiryId        { get; set; }
+
+        // Read back by GetStudentById only. A left student is shown read-only on
+        // the Dashboard, and Edit Student refuses them.
+        public bool      IsActive         { get; set; } = true;
+        public string?   Status           { get; set; }
+        public string?   DateOfLeaving    { get; set; }
+        public string?   LeavingReason    { get; set; }
+        public string?   PhotoUrl         { get; set; }
     }
 
     // ── Save result returned to the controller ─────────────────────────

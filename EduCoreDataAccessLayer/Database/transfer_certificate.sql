@@ -209,6 +209,7 @@ DECLARE
     v_seq    integer;
     v_tc_no  varchar(40);
     v_new_id integer;
+    v_public uuid;
     v_fmt    varchar(20);
     v_offset integer;
     v_was_printed boolean;
@@ -273,7 +274,24 @@ BEGIN
             RAISE EXCEPTION 'A Transfer Certificate has already been issued for %. Use reprint.', s.student_name;
         END IF;
 
+        -- The Board particulars are printed on a legal document, so they have
+        -- to make sense: no negative days, never more days present than
+        -- working days, and nobody applies for a TC after it was issued.
+        IF COALESCE(p_working_days, 0) < 0 OR COALESCE(p_days_present, 0) < 0 THEN
+            RAISE EXCEPTION 'Working days and days present cannot be negative.';
+        END IF;
+        IF p_working_days IS NOT NULL AND p_days_present IS NOT NULL
+           AND p_days_present > p_working_days THEN
+            RAISE EXCEPTION 'Days present (%) cannot be more than working days (%).',
+                p_days_present, p_working_days;
+        END IF;
+        IF p_application_date IS NOT NULL AND p_application_date > CURRENT_DATE THEN
+            RAISE EXCEPTION 'The date of application cannot be after the date of issue.';
+        END IF;
+
         v_fmt  := CASE WHEN p_format IN ('Basic', 'Board') THEN p_format ELSE 'Basic' END;
+        -- The series restarts on 1 January (calendar year), not at the session
+        -- start. Kept on purpose: the school confirmed it (2026-10-10).
         v_year := to_char(CURRENT_DATE, 'YYYY');
 
         -- Gap-free number, atomic per (school, year).
@@ -306,19 +324,24 @@ BEGIN
             NULLIF(TRIM(p_subjects), ''), NULLIF(TRIM(p_fees_paid_upto), ''),
             p_working_days, p_days_present, NULLIF(TRIM(p_activities), ''), p_application_date,
             p_action_user_id, now())
-        RETURNING tc_id INTO v_new_id;
+        RETURNING tc_id, public_id INTO v_new_id, v_public;
 
         OPEN p_result_cur FOR
         SELECT TRUE AS success,
                'Transfer Certificate ' || v_tc_no || ' issued for ' || s.student_name || '.' AS message,
-               v_new_id AS tc_id, v_tc_no AS tc_no;
+               v_new_id AS tc_id, v_tc_no AS tc_no,
+               -- The page opens Tc/Print by this uuid (the int id is not routable).
+               v_public AS public_id;
         RETURN;
     END IF;
 
     -- ─────────────────────────── Print / Get ──────────────────────────
-    -- Print serves the frozen row and marks it printed: the first serve is the
-    -- original, every later serve comes back with was_duplicate = TRUE so the
-    -- page can stamp DUPLICATE. Get is the same read WITHOUT marking (for lists).
+    -- Print marks the certificate printed: the first Print is the original,
+    -- every later one comes back with was_duplicate = TRUE so the page can
+    -- stamp DUPLICATE. The page calls it only from an explicit POST when the
+    -- user presses Print (TcController.MarkPrinted) -- opening or refreshing the
+    -- page uses Get, which never marks anything.
+    -- A VOIDED certificate is never printed: it would come out looking valid.
     IF p_operation IN ('Print', 'Get') THEN
         IF p_operation = 'Print' THEN
             SELECT (print_count > 0) INTO v_was_printed
@@ -327,6 +350,11 @@ BEGIN
 
             IF NOT FOUND THEN
                 RAISE EXCEPTION 'Certificate not found.';
+            END IF;
+
+            IF EXISTS (SELECT 1 FROM core.tc_register
+                        WHERE tc_id = p_tc_id AND is_void) THEN
+                RAISE EXCEPTION 'This certificate was voided and cannot be printed.';
             END IF;
 
             UPDATE core.tc_register
@@ -352,17 +380,21 @@ BEGIN
         WITH filtered AS (
             SELECT r.tc_id, r.public_id, r.tc_no, r.format, r.issue_date, r.student_id,
                    r.admission_no, r.student_name, r.class_name, r.section,
-                   r.academic_year, r.date_of_leaving, r.is_void, r.print_count
+                   r.academic_year, r.date_of_leaving, r.is_void, r.print_count,
+                   -- Why, who and when a number was retired, for the Register.
+                   r.void_reason, r.voided_at, u.email AS voided_by_name
             FROM core.tc_register r
+            LEFT JOIN core.users u ON u.user_id = r.voided_by
             WHERE r.tenant_id = p_tenant_id AND r.school_id = p_school_id
+              -- strpos, not LIKE: a typed % or _ is a character, not a wildcard.
               AND (p_search IS NULL OR TRIM(p_search) = ''
-                   OR LOWER(r.student_name) LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                   OR LOWER(r.tc_no)        LIKE '%' || LOWER(TRIM(p_search)) || '%'
-                   OR LOWER(COALESCE(r.admission_no, '')) LIKE '%' || LOWER(TRIM(p_search)) || '%')
+                   OR strpos(LOWER(r.student_name), LOWER(TRIM(p_search))) > 0
+                   OR strpos(LOWER(r.tc_no), LOWER(TRIM(p_search))) > 0
+                   OR strpos(LOWER(COALESCE(r.admission_no, '')), LOWER(TRIM(p_search))) > 0)
         )
         SELECT tc_id, public_id, tc_no, format, issue_date, student_id, admission_no,
                student_name, class_name, section, academic_year, date_of_leaving,
-               is_void, print_count,
+               is_void, print_count, void_reason, voided_at, voided_by_name,
                COUNT(*) OVER() AS total_count
         FROM filtered
         ORDER BY tc_id DESC
