@@ -5,6 +5,7 @@ using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -13,6 +14,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     public class AdmissionService : IAdmissionService
     {
         private readonly PgExec _db;
+        private readonly ILogger<AdmissionService> _logger;
         private const string SpMain = "core.sp_admission_manage";
         private const string SpStudentList = "core.sp_student_list";
         private const string SpStudentExit = "core.sp_student_exit";
@@ -21,9 +23,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpStudentPromote = "core.sp_student_promote";
         private const string SpEnrolmentHistory = "core.sp_student_enrolment_history";
 
-        public AdmissionService(PgExec db)
+        public AdmissionService(PgExec db, ILogger<AdmissionService> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         // ── Save admission ───────────────────────────────────────
@@ -360,6 +363,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Student exit/reactivate rejected. SqlState {SqlState}", ex.SqlState);
                 return new StudentExitResult { Message = ex.MessageText };
             }
         }
@@ -469,6 +473,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Student photo update rejected for student {StudentId}. SqlState {SqlState}", studentId, ex.SqlState);
                 return (false, ex.MessageText, null);
             }
         }
@@ -578,8 +583,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             catch (PostgresException ex)
             {
                 // A proc RAISE is a business rule (unknown class, not this school's
-                // student), so the office sees its wording — same as the other
-                // catches in this service, which has no logger injected.
+                // student), so the office sees its wording.
+                _logger.LogWarning(ex, "Student update rejected for student {StudentId}, school {SchoolId}. SqlState {SqlState}",
+                    model.StudentId, schoolId, ex.SqlState);
                 return (false, ex.MessageText);
             }
         }
@@ -672,6 +678,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             {
                 // The proc RAISEs the business rules ("final class", "session not
                 // set up"), so the office sees that message rather than a stack.
+                _logger.LogWarning(ex, "Promotion rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
                 return new StudentPromotionResult { Message = ex.MessageText };
             }
         }
@@ -707,6 +714,96 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     IsCurrent    = row.Table.Columns.Contains("is_current")
                                    && row["is_current"] != DBNull.Value
                                    && Convert.ToBoolean(row["is_current"])
+                });
+            }
+            return items;
+        }
+
+        // ── Money across the lifecycle ───────────────────────────
+        public async Task<Dictionary<string, int>> GetPlanInstalmentsAsync(
+            string academicYear, int tenantId, int schoolId, int actionUserId)
+        {
+            var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(academicYear)) return map;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_academic_year",  NpgsqlDbType.Varchar) { Value = academicYear.Trim() },
+                new("p_from",           NpgsqlDbType.Date)    { Value = DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "plan_instalments_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_plan_instalments", parameters);
+            if (ds.Tables.Count == 0) return map;
+            foreach (DataRow row in ds.Tables[0].Rows)
+                map[Str(row, "frequency")] = IntVal(row, "instalments");
+            return map;
+        }
+
+        public async Task<StudentFeeTotals> GetStudentFeeTotalsAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId)
+        {
+            var totals = new StudentFeeTotals();
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0) return totals;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",     NpgsqlDbType.Integer) { Value = studentId },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "student_fee_totals_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_student_fee_totals", parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return totals;
+
+            var row = ds.Tables[0].Rows[0];
+            totals.TotalDue        = DecVal(row, "total_due");
+            totals.TotalPaid       = DecVal(row, "total_paid");
+            totals.TotalConcession = DecVal(row, "total_concession");
+            totals.TotalRefunded   = DecVal(row, "total_refunded");
+            totals.TotalClosed     = DecVal(row, "total_closed");
+            totals.Outstanding     = DecVal(row, "outstanding");
+            totals.AdvanceBalance  = DecVal(row, "advance_balance");
+            return totals;
+        }
+
+        public async Task<List<StudentHistoryItem>> GetStudentHistoryAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId)
+        {
+            var items = new List<StudentHistoryItem>();
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0) return items;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",     NpgsqlDbType.Integer) { Value = studentId },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "student_history_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_student_history_get", parameters);
+            if (ds.Tables.Count == 0) return items;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                items.Add(new StudentHistoryItem
+                {
+                    HappenedAt = Has(row, "happened_at") && row["happened_at"] != DBNull.Value
+                                 ? Convert.ToDateTime(row["happened_at"]).ToString("dd MMM yyyy, HH:mm")
+                                 : null,
+                    Action     = Str(row, "action"),
+                    Detail     = NullStr(row, "detail"),
+                    Amount     = Has(row, "amount") && row["amount"] != DBNull.Value ? Convert.ToDecimal(row["amount"]) : null,
+                    DoneBy     = NullStr(row, "done_by")
                 });
             }
             return items;

@@ -171,7 +171,15 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         ViewId        = view?.PermissionId,
                         ManageId      = manage?.PermissionId,
                         ViewGranted   = view   != null && granted.Contains(view.PermissionId),
-                        ManageGranted = manage != null && granted.Contains(manage.PermissionId)
+                        ManageGranted = manage != null && granted.Contains(manage.PermissionId),
+                        Extras        = feat.Where(x => x.Level != "view" && x.Level != "manage")
+                                            .OrderBy(x => x.SortOrder)
+                                            .Select(x => new MatrixExtra
+                                            {
+                                                PermissionId = x.PermissionId,
+                                                Label        = x.DisplayName.Contains('—') ? x.DisplayName[(x.DisplayName.IndexOf('—') + 1)..].Trim() : x.DisplayName,
+                                                Granted      = granted.Contains(x.PermissionId)
+                                            }).ToList()
                     });
                 }
                 matrix.Groups.Add(mg);

@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Models.ERP;
+﻿using EduCoreDataAccessLayer.Models.ERP;
 
 namespace EduCoreDataAccessLayer.Services.Contract.ERP
 {
@@ -68,6 +68,6 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<List<EnquiryFollowupModel>>       GetFollowupsAsync(int enquiryId, int tenantId, int schoolId, int actionUserId);
         Task<List<EnquiryStatusHistoryModel>>  GetStatusHistoryAsync(int enquiryId, int tenantId, int schoolId, int actionUserId);
 
-        Task<int> DeleteEnquiryAsync(int enquiryId, int tenantId, int schoolId, int actionUserId);
+        Task<(int Success, string Message)> DeleteEnquiryAsync(int enquiryId, int tenantId, int schoolId, int actionUserId);
     }
 }

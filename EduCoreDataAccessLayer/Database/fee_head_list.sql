@@ -56,7 +56,9 @@ BEGIN
     WHERE tenant_id = p_tenant_id
       AND school_id = p_school_id
       AND COALESCE(is_deleted, FALSE) = FALSE
-      AND (p_search    IS NULL OR TRIM(p_search) = ''    OR fee_head_name ILIKE '%' || p_search || '%')
+      -- Trimmed, and matched as plain text: a pasted term carries spaces, and
+      -- ILIKE treated a typed % or _ as a wildcard.
+      AND (p_search    IS NULL OR TRIM(p_search) = ''    OR position(lower(TRIM(p_search)) IN lower(fee_head_name)) > 0)
       AND (p_frequency IS NULL OR TRIM(p_frequency) = '' OR lower(frequency) = lower(p_frequency))
     ORDER BY
         CASE WHEN v_col = 'name'   AND v_asc     THEN fee_head_name END ASC  NULLS LAST,

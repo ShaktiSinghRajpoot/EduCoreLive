@@ -151,6 +151,7 @@ namespace educore.Areas.ERP.Controllers
                                  : $"{d.FeeHeadName} — {d.InstallmentLabel}",
                     dueDate  = d.DueDate,
                     amount   = d.Outstanding,           // payable now (due − paid − concession)
+                    refundable = d.IsRefundable,
                     overdue  = d.DueDate != null && string.CompareOrdinal(d.DueDate, today) < 0
                 }).ToList();
 
@@ -168,14 +169,22 @@ namespace educore.Areas.ERP.Controllers
         // Collects payment against the exact dues the cashier picked. Each item
         // carries its own cash amount and optional concession (waiver).
         [HttpPost]
-        [HasPermission("fees.manage")]
+        [HasPermission("fees.collect")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Collect([FromBody] CollectRequest req)
         {
-            if (req == null || req.StudentId <= 0 || req.Items == null || req.Items.Count == 0)
+            // Giving a concession is its own permission, so a cashier can take money
+            // without being able to waive it.
+            if (req?.Items != null && req.Items.Any(i => i.Concession > 0)
+                && !await HasPermissionAttribute.UserHasAsync(this, "fees.concession"))
+                return Json(new { success = false, message = "You do not have permission to give a concession." });
+
+            // No dues is fine when there is an extra charge (a lost ID card, a fine):
+            // the check below refuses only a request with neither.
+            if (req == null || req.StudentId <= 0)
                 return Json(new { success = false, message = "Select at least one due to collect." });
 
-            var items = req.Items
+            var items = (req.Items ?? new List<CollectItem>())
                 .Where(i => i.LedgerId > 0 && (i.Amount > 0 || i.Concession > 0))
                 .Select(i => new EduCoreDataAccessLayer.Models.ERP.FeeCollectItem
                 {
@@ -189,7 +198,8 @@ namespace educore.Areas.ERP.Controllers
                 .Select(e => new EduCoreDataAccessLayer.Models.ERP.FeeExtraItem
                 {
                     Label  = e.Label!.Trim(),
-                    Amount = e.Amount
+                    Amount = e.Amount,
+                    Note   = NullIfEmpty(e.Note)
                 }).ToList();
 
             if (items.Count == 0 && extras.Count == 0)
@@ -212,7 +222,8 @@ namespace educore.Areas.ERP.Controllers
                 NullIfEmpty(req.Session),
                 TenantId(), SchoolId(), UserId(),
                 NullIfEmpty(req.DiscountType), req.DiscountValue, NullIfEmpty(req.DiscountReason),
-                tenders.Count > 0 ? tenders : null, req.AdvanceUsed);
+                tenders.Count > 0 ? tenders : null, req.AdvanceUsed,
+                NullIfEmpty(req.ClientRef), NullIfEmpty(req.DiscountApprovedBy));
 
             return Json(new
             {
@@ -237,8 +248,12 @@ namespace educore.Areas.ERP.Controllers
             public string?  DiscountType   { get; set; }   // Flat | Percent
             public decimal  DiscountValue  { get; set; }
             public string?  DiscountReason { get; set; }
+            public string?  DiscountApprovedBy { get; set; }
             public List<TenderLine> Tenders { get; set; } = new();
             public decimal AdvanceUsed { get; set; }
+            // One id per settlement on the counter; a retried POST with the same id
+            // returns the first receipt instead of taking the money again.
+            public string? ClientRef { get; set; }
         }
 
         public class TenderLine
@@ -259,32 +274,56 @@ namespace educore.Areas.ERP.Controllers
         {
             public string? Label  { get; set; }
             public decimal Amount { get; set; }
+            public string? Note   { get; set; }
         }
 
         // ── GET: /ERP/Fee/GetHistory ─────────────────────────────
-        // Every receipt issued for a student (for the History tab + re-print).
+        // Every receipt issued for a student AND every refund voucher, so the
+        // History tab shows money in and money out (for review + re-print).
         [HttpGet]
         public async Task<IActionResult> GetHistory(int studentId)
         {
             var history = await _feePaymentService.GetPaymentHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
-            return Json(history.Select(h => new
+            var refunds = await _feePaymentService.GetRefundHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
+            return Json(new
             {
-                receiptNo    = h.ReceiptNo,
-                date         = h.PaymentDate,
-                amount       = h.Amount,
-                concession   = h.ConcessionTotal,
-                mode         = h.PaymentMode,
-                reference    = h.ReferenceNo,
-                isCancelled  = h.IsCancelled,
-                cancelReason = h.CancelReason
-            }));
+                receipts = history.Select(h => new
+                {
+                    receiptNo     = h.ReceiptNo,
+                    date          = h.PaymentDate,
+                    amount        = h.Amount,
+                    concession    = h.ConcessionTotal,
+                    mode          = h.PaymentMode,
+                    reference     = h.ReferenceNo,
+                    type          = h.PaymentType,
+                    advanceUsed   = h.AdvanceUsed,
+                    advanceCredit = h.AdvanceCredit,
+                    collectedBy   = h.CollectedBy,
+                    isCancelled   = h.IsCancelled,
+                    cancelReason  = h.CancelReason,
+                    cancelledBy   = h.CancelledByName,
+                    cancelledAt   = h.CancelledAt?.ToString("yyyy-MM-dd HH:mm"),
+                    authorisedBy  = h.CancelAuthorizedBy
+                }),
+                refunds = refunds.Select(r => new
+                {
+                    refundNo   = r.RefundNo,
+                    date       = r.RefundDate,
+                    amount     = r.Amount,
+                    mode       = r.Mode,
+                    reason     = r.Reason,
+                    authorised = r.AuthorizedBy,
+                    refundedBy = r.RefundedBy,
+                    against    = r.Against
+                })
+            });
         }
 
         // ── POST: /ERP/Fee/CancelReceipt ─────────────────────────
         // Voids a receipt: reverses its ledger allocation (re-opens the dues) and
         // marks it Cancelled with reason + authoriser. The receipt is kept on record.
         [HttpPost]
-        [HasPermission("fees.manage")]
+        [HasPermission("fees.cancel")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CancelReceipt([FromBody] CancelReceiptRequest req)
         {
@@ -292,6 +331,8 @@ namespace educore.Areas.ERP.Controllers
                 return Json(new { success = false, message = "Receipt number is required." });
             if (string.IsNullOrWhiteSpace(req.Reason))
                 return Json(new { success = false, message = "A reason is required to cancel a receipt." });
+            if (string.IsNullOrWhiteSpace(req.AuthorizedBy))
+                return Json(new { success = false, message = "Say who authorised the cancellation." });
 
             var (ok, msg) = await _feePaymentService.CancelReceiptAsync(
                 req.ReceiptNo.Trim(), req.Reason.Trim(), NullIfEmpty(req.AuthorizedBy),
@@ -308,14 +349,15 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── GET: /ERP/Fee/GetRefundables ─────────────────────────
-        // Paid charges that still have cash retained and can be refunded (deposits first).
+        // Paid charges that still have cash retained and can be refunded (deposits
+        // first), plus the advance wallet as ledgerId 0 when it holds money.
         [HttpGet]
         public async Task<IActionResult> GetRefundables(int studentId)
         {
             var rows = await _feePaymentService.GetRefundablesAsync(studentId, TenantId(), SchoolId(), UserId());
             return Json(rows.Select(r => new
             {
-                ledgerId     = r.LedgerId,
+                ledgerId     = r.LedgerId,   // 0 = advance (wallet) balance
                 label        = string.IsNullOrWhiteSpace(r.InstallmentLabel) ? r.FeeHeadName : $"{r.FeeHeadName} — {r.InstallmentLabel}",
                 refundable   = r.Refundable,
                 paid         = r.AmountPaid,
@@ -325,18 +367,21 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── POST: /ERP/Fee/Refund ────────────────────────────────
-        // Returns money against a paid charge (refundable deposit / overpayment).
+        // Returns money against a paid charge (refundable deposit / overpayment),
+        // or — with LedgerId 0 — the student's advance (wallet) balance at exit.
         [HttpPost]
-        [HasPermission("fees.manage")]
+        [HasPermission("fees.refund")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Refund([FromBody] RefundRequest req)
         {
-            if (req == null || req.StudentId <= 0 || req.LedgerId <= 0)
+            if (req == null || req.StudentId <= 0 || req.LedgerId < 0)
                 return Json(new { success = false, message = "Pick a charge to refund." });
             if (req.Amount <= 0)
                 return Json(new { success = false, message = "Enter a refund amount." });
             if (string.IsNullOrWhiteSpace(req.Reason))
                 return Json(new { success = false, message = "A reason is required to refund." });
+            if (string.IsNullOrWhiteSpace(req.AuthorizedBy))
+                return Json(new { success = false, message = "Say who authorised the refund." });
 
             var (ok, msg, refundNo) = await _feePaymentService.RecordRefundAsync(
                 req.StudentId, req.LedgerId, req.Amount,
@@ -369,6 +414,7 @@ namespace educore.Areas.ERP.Controllers
                 totalCollected = day.TotalCollected,
                 receiptCount   = day.ReceiptCount,
                 cancelledCount = day.CancelledCount,
+                cancelledAmount = day.CancelledAmount,
                 cashCollected  = day.CashCollected,
                 totalRefunded  = day.TotalRefunded,
                 cashRefunded   = day.CashRefunded,
@@ -377,8 +423,46 @@ namespace educore.Areas.ERP.Controllers
                 countedCash    = day.CountedCash,
                 difference     = day.Difference,
                 closeRemarks   = day.CloseRemarks,
-                modes          = day.Modes.Select(m => new { mode = m.Mode, amount = m.Amount, count = m.Count })
+                closedAt       = day.ClosedAt?.ToString("dd MMM yyyy, hh:mm tt"),
+                reopenedAt     = day.ReopenedAt?.ToString("dd MMM yyyy, hh:mm tt"),
+                reopenReason   = day.ReopenReason,
+                schoolCollected = day.SchoolCollected,
+                schoolReceipts  = day.SchoolReceipts,
+                modes          = day.Modes.Select(m => new { mode = m.Mode, amount = m.Amount, count = m.Count }),
+                history        = day.History.Select(h => new
+                {
+                    action   = h.Action,
+                    at       = h.ActionAt?.ToString("dd MMM yyyy, hh:mm tt"),
+                    by       = h.ActionBy,
+                    expected = h.ExpectedCash,
+                    counted  = h.CountedCash,
+                    diff     = h.Difference,
+                    note     = h.Note
+                })
             });
+        }
+
+        // ── POST: /ERP/Fee/ReopenDay ─────────────────────────────
+        // Re-opens the cashier's own closed day so a correction can be made and the
+        // day closed again. A reason is required; the earlier count stays in the
+        // close history and is never overwritten.
+        [HttpPost]
+        [HasPermission("fees.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ReopenDay([FromBody] ReopenDayRequest req)
+        {
+            if (req == null || string.IsNullOrWhiteSpace(req.Reason))
+                return Json(new { success = false, message = "A reason is required to re-open a closed day." });
+
+            var (ok, msg) = await _feePaymentService.ReopenDayAsync(
+                Dates.Norm(req.Date), UserId(), req.Reason!.Trim(), TenantId(), SchoolId(), UserId());
+            return Json(new { success = ok, message = msg });
+        }
+
+        public class ReopenDayRequest
+        {
+            public string? Date   { get; set; }
+            public string? Reason { get; set; }
         }
 
         // ── POST: /ERP/Fee/CloseDay ──────────────────────────────
@@ -423,11 +507,13 @@ namespace educore.Areas.ERP.Controllers
 
         // ── GET: /ERP/Fee/GetCollectionRegister ──────────────────
         [HttpGet]
-        public async Task<IActionResult> GetCollectionRegister(string? from = null, string? to = null)
+        public async Task<IActionResult> GetCollectionRegister(string? from = null, string? to = null,
+                                                               string? className = null, string? section = null)
         {
             var f = Dates.Norm(from);
             var t = Dates.Norm(to);
-            var reg = await _feePaymentService.GetCollectionRegisterAsync(f, t, TenantId(), SchoolId(), UserId());
+            var reg = await _feePaymentService.GetCollectionRegisterAsync(f, t, TenantId(), SchoolId(), UserId(),
+                NullIfEmpty(className), NullIfEmpty(section));
 
             // Money OUT for the same range. A register that only counts money in
             // overstates what the school actually holds, so report NET as well.
@@ -451,11 +537,20 @@ namespace educore.Areas.ERP.Controllers
                     mode       = r.Mode,
                     reason     = r.Reason,
                     authorised = r.AuthorizedBy,
+                    by         = r.RefundedByName,
                     amount     = r.Amount
                 }),
                 refundModes = refunds.Modes.Select(m => new { mode = m.Mode, count = m.Count, amount = m.Amount }),
+                // A cancellation is its own negative line on the day it was cancelled;
+                // the receipt itself stays on its own day (flagged "cancelled").
+                receiptCount = reg.Receipts.Count(r => r.Entry == "Receipt"),
                 receipts = reg.Receipts.Select(r => new
                 {
+                    entry     = r.Entry,
+                    lineDate  = r.LineDate,
+                    cancelled = r.IsCancelled,
+                    cancelReason = r.CancelReason,
+                    cashier   = r.CashierName,
                     receiptNo = r.ReceiptNo,
                     date      = r.Date,
                     student   = r.StudentName,
@@ -489,6 +584,9 @@ namespace educore.Areas.ERP.Controllers
                     student   = c.Student,
                     admNo     = c.AdmNo,
                     amount    = c.Concession,
+                    type      = c.PaymentType,
+                    cancelled = c.IsCancelled,
+                    givenBy   = c.GivenBy,
                     kind      = c.DiscountType == "Percent" ? $"{c.DiscountValue}%" : (c.DiscountType ?? ""),
                     reason    = c.Reason
                 }),
@@ -499,7 +597,9 @@ namespace educore.Areas.ERP.Controllers
                     student   = c.Student,
                     admNo     = c.AdmNo,
                     amount    = c.Amount,
-                    cancelledAt = c.CancelledAt,
+                    cancelledAt = c.CancelledAt?.ToString("dd MMM yyyy, hh:mm tt"),
+                    cancelledBy = c.CancelledBy,
+                    collectedBy = c.CollectedBy,
                     authorisedBy = c.AuthorizedBy,
                     reason    = c.Reason
                 })
@@ -514,6 +614,8 @@ namespace educore.Areas.ERP.Controllers
                 NullIfEmpty(className), NullIfEmpty(section), TenantId(), SchoolId(), UserId());
             return Json(rows.Select(d => new
             {
+                entry       = d.Entry,          // Student | Registration (not admitted yet)
+                status      = d.StudentStatus,  // Active | Transfer | Passout ... | Registered
                 student     = d.StudentName,
                 admNo       = d.AdmissionNo,
                 cls         = string.IsNullOrWhiteSpace(d.ClassName) ? "" : $"{d.ClassName}{(string.IsNullOrWhiteSpace(d.Section) ? "" : " - " + d.Section)}",
@@ -546,8 +648,11 @@ namespace educore.Areas.ERP.Controllers
                 lineType   = l.LineType
             }).ToList();
 
+            // The line is the fee this receipt settled (cash + any registration
+            // discount); the discount is then printed as its own deduction, so
+            // "Total Paid" is the cash alone.
             if (lines.Count == 0)
-                lines.Add(new { label = r.PaymentType == "Registration" ? "Registration Fee" : "Fee", amount = r.Amount, concession = 0m, lineType = "Due" });
+                lines.Add(new { label = r.PaymentType == "Registration" ? "Registration Fee" : "Fee", amount = r.Amount + r.DiscountAmount, concession = 0m, lineType = "Due" });
 
             // A registration fee can be paid in parts, and a slip saying only "900"
             // tells the family nothing about the 100 still owed. Print the fee, what
@@ -560,13 +665,15 @@ namespace educore.Areas.ERP.Controllers
             object? registration = null;
             if (string.Equals(r.PaymentType, "Registration", StringComparison.OrdinalIgnoreCase) && r.EnquiryId > 0)
             {
-                var (fee, paidBefore, thisReceipt, balanceAfter) =
+                var (fee, paidBefore, _, balanceAfter) =
                     await _feePaymentService.GetRegistrationReceiptContextAsync(r.ReceiptNo, TenantId(), SchoolId(), UserId());
 
                 // Only worth printing when this receipt is not the whole story:
                 // either something came before it, or something is still owed.
+                // "Paid on this receipt" is the CASH on it; a discount is shown
+                // beside it, not added into it.
                 if (fee > 0 && (paidBefore > 0 || balanceAfter > 0))
-                    registration = new { fee, paidBefore, thisReceipt, balance = balanceAfter };
+                    registration = new { fee, paidBefore, thisReceipt = r.Amount, discount = r.DiscountAmount, balance = balanceAfter };
             }
 
             // A student fee receipt gets the outstanding too -- a parent paying 4,000 of
@@ -618,6 +725,16 @@ namespace educore.Areas.ERP.Controllers
                 discountReason = r.DiscountReason,
                 advanceUsed    = r.AdvanceUsed,
                 advanceCredit  = r.AdvanceCredit,
+                discountAmount = r.DiscountAmount,
+                discountApprovedBy = r.DiscountApprovedBy,
+                collectedBy    = r.CollectedBy,
+                tenders        = r.Tenders.Select(t => new { mode = t.Mode, amount = t.Amount, reference = t.Reference }),
+                // A voided receipt prints as CANCELLED, with who/when/why.
+                isCancelled    = r.IsCancelled,
+                cancelReason   = r.CancelReason,
+                cancelledBy    = r.CancelledByName,
+                cancelledAt    = r.CancelledAt?.ToString("yyyy-MM-dd HH:mm"),
+                cancelAuthorisedBy = r.CancelAuthorizedBy,
                 student     = new { name = r.StudentName, admNo = r.AdmissionNo, className = r.ClassName, section = r.Section, roll = r.RollNo },
                 registration,
                 dues,

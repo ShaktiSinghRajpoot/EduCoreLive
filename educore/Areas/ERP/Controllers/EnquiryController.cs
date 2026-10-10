@@ -329,6 +329,9 @@ namespace educore.Areas.ERP.Controllers
             if (!workflow.EnableRegistration)
                 return Json(new { success = false, message = "Registration is not enabled for this school." });
 
+            var refusal = await MoneyPermissionRefusalAsync(req.RegistrationFeePaid, req.DiscountValue);
+            if (refusal != null) return Json(new { success = false, message = refusal });
+
             var (ok, message, regNo, receiptNo) = await RegisterCoreAsync(
                 req.EnquiryId, req.RegistrationNumber, req.RegistrationDate,
                 req.RegistrationFeePaid, req.CollectAmount, req.PaymentMode, req.PaymentReference,
@@ -361,6 +364,10 @@ namespace educore.Areas.ERP.Controllers
             if (string.IsNullOrWhiteSpace(req.StudentName) || string.IsNullOrWhiteSpace(mobile) ||
                 string.IsNullOrWhiteSpace(req.ClassName) || string.IsNullOrWhiteSpace(req.Session))
                 return Json(new { success = false, message = "Student name, mobile, class and session are required." });
+
+            // Before the enquiry row is created, so a refusal leaves nothing behind.
+            var refusal = await MoneyPermissionRefusalAsync(req.RegistrationFeePaid, req.DiscountValue);
+            if (refusal != null) return Json(new { success = false, message = refusal });
 
             // 1) Create the intake record behind the scenes.
             var enquiry = new EnquiryModel
@@ -398,6 +405,17 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
+        // Registering is enquiry/registration work, but taking the fee is money work:
+        // check that before anything is written. Returns null when allowed.
+        private async Task<string?> MoneyPermissionRefusalAsync(bool collectsFee, decimal discountValue)
+        {
+            if (collectsFee && !await HasPermissionAttribute.UserHasAsync(this, "fees.collect"))
+                return "You do not have permission to collect fees. Register without collecting, or ask the accounts desk.";
+            if (collectsFee && discountValue > 0 && !await HasPermissionAttribute.UserHasAsync(this, "fees.concession"))
+                return "You do not have permission to give a discount.";
+            return null;
+        }
+
         // Shared registration core: issue the number + (optionally) record the fee
         // receipt. Used by the per-enquiry Register action AND the walk-in 1-step form.
         private async Task<(bool ok, string message, string? regNo, string? receiptNo)> RegisterCoreAsync(
@@ -420,7 +438,9 @@ namespace educore.Areas.ERP.Controllers
                 enquiryId,
                 NullIfEmpty(registrationNumber),
                 regDate,
-                registrationFeePaid,
+                // Never the browser's tick: that marked fees paid with no receipt.
+                // The procedure ignores it too; paid follows the receipts written below.
+                false,
                 workflow.AutoGenerateRegistrationNumber,
                 workflow.RegistrationNumberPrefix,
                 tenantId, schoolId, actionUserId);
@@ -485,6 +505,11 @@ namespace educore.Areas.ERP.Controllers
                             message = $"{message} Fee not recorded: {payMsg}";
                         }
                     }
+                    else
+                    {
+                        // Say so rather than quietly registering without the fee.
+                        message = $"{message} Fee not recorded: no registration fee is set up for this class.";
+                    }
                 }
             }
 
@@ -519,8 +544,10 @@ namespace educore.Areas.ERP.Controllers
             if (req == null || req.EnquiryId <= 0)
                 return Json(new { success = false, message = "Invalid request." });
 
-            var result = await _enquiryService.DeleteEnquiryAsync(req.EnquiryId, tenantId, schoolId, actionUserId);
-            return Json(new { success = result > 0, message = result > 0 ? "Enquiry deleted." : "Unable to delete." });
+            // The procedure refuses admitted enquiries and ones holding a registration
+            // receipt, and says why; pass its message through.
+            var (success, message) = await _enquiryService.DeleteEnquiryAsync(req.EnquiryId, tenantId, schoolId, actionUserId);
+            return Json(new { success = success > 0, message });
         }
 
         // ── Helpers ──────────────────────────────────────────────

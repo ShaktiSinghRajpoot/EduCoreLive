@@ -83,6 +83,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 // settings screen still renders and can be saved later. Log it so a
                 // genuinely broken backend doesn't silently masquerade as "no settings".
                 _logger?.LogWarning(ex, "GetAdmissionWorkflow failed for tenant {Tenant}/school {School}; returning defaults.", tenantId, schoolId);
+                model.LoadFailed = true;
                 return model;
             }
 

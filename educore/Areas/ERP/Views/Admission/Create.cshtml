@@ -662,6 +662,9 @@ $(function () {
                         id: f.feeHeadId, name: f.feeHeadName, group: f.group,
                         cycle: f.frequency, stage: f.stage,
                         amount: Number(f.amount || 0),
+                        // How many times this head bills in the session for someone
+                        // joining today (server-side, same rule as the ledger).
+                        instalments: Number(f.instalments || 1),
                         refundable: f.isRefundable === true,
                         mandatory: f.mandatory !== false, selected: true
                     };
@@ -730,10 +733,9 @@ $(function () {
         var discountableNow = 0, discountableAnnual = 0;
         $.each(fees, function (_, f) {
             if (!f.selected) return;
-            var annualAmt = (f.cycle === 'Monthly' ? f.amount * 12
-                : f.cycle === 'Quarterly' ? f.amount * 4
-                : f.cycle === 'Half Yearly' ? f.amount * 2
-                : f.amount);
+            // What the session will really bill: a student joining in October
+            // pays six monthly instalments, not twelve.
+            var annualAmt = f.stage === 'Admission' ? f.amount : f.amount * (f.instalments || 1);
             annual += annualAmt;
             if (!f.refundable) discountableAnnual += annualAmt;
             if (f.stage === 'Admission') { payNow += f.amount; if (!f.refundable) discountableNow += f.amount; }
@@ -992,20 +994,39 @@ $(function () {
         .done(function (res) {
             if (res && res.success) {
                 var msg = 'Admission ' + (res.admissionNo || '') + ' saved.';
-                if (res.receiptNo) msg += ' Receipt ' + res.receiptNo + ' generated.';
-                ecToast('success', msg);
+
                 // If a fee was collected, show the printable receipt; go to the
-                // student list once the user closes it. Otherwise redirect straight away.
-                if (res.receiptNo && window.EcReceipt) {
-                    // The receipt was generated and then never shown: this branch wired up
-                    // the close handler and stopped, so the page sat there with no receipt
-                    // and no redirect, and the cashier had to go hunting in fee history for
-                    // a document the parent was standing there waiting for. Open it.
-                    var modalEl = document.getElementById('ecReceiptModal');
-                    if (modalEl) modalEl.addEventListener('hidden.bs.modal', function () { window.location.href = URL_LIST; }, { once: true });
-                    EcReceipt.show(res.receiptNo);
+                // student list once the user closes it. Otherwise redirect.
+                var goOn = function () {
+                    if (res.receiptNo && window.EcReceipt) {
+                        var modalEl = document.getElementById('ecReceiptModal');
+                        if (modalEl) modalEl.addEventListener('hidden.bs.modal', function () { window.location.href = URL_LIST; }, { once: true });
+                        EcReceipt.show(res.receiptNo);
+                    } else {
+                        setTimeout(function () { window.location.href = URL_LIST; }, 900);
+                    }
+                };
+
+                // The server reports what happened to the money and the bus.
+                // A failed receipt or bus assignment used to be reported and never
+                // shown, so the cashier saw "saved" with cash in hand and no receipt.
+                // A problem must be read, so it holds the page until acknowledged.
+                var problems = [];
+                if (res.feeFailed && res.feeMessage) problems.push(res.feeMessage);
+                if (res.transportMessage) problems.push(res.transportMessage);
+
+                if (problems.length) {
+                    EC.confirm({
+                        title:   msg + ' Please read:',
+                        danger:  false,
+                        icon:    'bx-error',
+                        message: problems.join(' '),
+                        okText:  'OK, understood'
+                    }).then(goOn);
                 } else {
-                    setTimeout(function () { window.location.href = URL_LIST; }, 900);
+                    // Receipt number and any balance still due, e.g. a part payment.
+                    ecToast('success', res.feeMessage ? msg + ' ' + res.feeMessage : msg);
+                    goOn();
                 }
             } else {
                 ecToast('error', (res && res.message) || 'Unable to save admission.');

@@ -3,6 +3,7 @@ using System.Text.Json;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -11,11 +12,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     public class SubjectService : ISubjectService
     {
         private readonly PgExec _db;
+        private readonly ILogger<SubjectService> _logger;
         private const string Sp = "academic.sp_school_admin_subject_manage";
 
-        public SubjectService(PgExec db)
+        public SubjectService(PgExec db, ILogger<SubjectService> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         public async Task<List<SubjectClassItem>> GetClassesAsync(
@@ -94,6 +97,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             catch (PostgresException ex)
             {
                 // Proc RAISE (e.g. a class from another school) — surface the friendly text.
+                _logger.LogWarning(ex, "SaveClassSubjects refused (SqlState {SqlState}) for class {ClassId}",
+                    ex.SqlState, academicClassId);
                 return new SubjectSaveResult { Message = ex.MessageText };
             }
         }

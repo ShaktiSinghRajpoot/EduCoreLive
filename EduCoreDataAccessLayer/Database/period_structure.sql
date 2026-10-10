@@ -62,6 +62,7 @@ DECLARE
     v_start    time;
     v_end      time;
     v_prev_end time;
+    v_booked   text;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -131,6 +132,34 @@ BEGIN
             v_prev_end := v_end;
         END LOOP;
 
+        -- Timetable lessons point at a period by its seq, and the save below
+        -- renumbers every period. So a period that has lessons must survive the
+        -- save, by label, as a teaching period. Otherwise its lessons would be
+        -- left on nothing, or slide onto whatever period took its number.
+        SELECT ps.label INTO v_booked
+        FROM academic.period_structure ps
+        WHERE ps.tenant_id = p_tenant_id
+          AND ps.school_id = p_school_id
+          AND EXISTS (SELECT 1 FROM academic.timetable t
+                      WHERE t.tenant_id = ps.tenant_id AND t.school_id = ps.school_id
+                        AND t.period_seq = ps.seq)
+          AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_items) e
+                          WHERE lower(trim(COALESCE(e ->> 'name', ''))) = lower(ps.label)
+                            AND lower(trim(COALESCE(e ->> 'type', 'class'))) = 'class')
+        ORDER BY ps.seq
+        LIMIT 1;
+
+        IF v_booked IS NOT NULL THEN
+            RAISE EXCEPTION 'Period "%" has lessons in the timetable. Keep it as a class period, or clear those lessons in Timetable first.', v_booked;
+        END IF;
+
+        -- Remember each booked period's label so its lessons can follow it.
+        CREATE TEMP TABLE IF NOT EXISTS _old_periods (seq integer, label text) ON COMMIT DROP;
+        DELETE FROM _old_periods;
+        INSERT INTO _old_periods
+        SELECT seq, lower(label) FROM academic.period_structure
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id;
+
         -- Replace-all: this page owns the whole schedule for the school.
         DELETE FROM academic.period_structure
         WHERE tenant_id = p_tenant_id
@@ -149,6 +178,23 @@ BEGIN
             p_action_user_id,
             now()
         FROM jsonb_array_elements(v_items) elem;
+
+        -- Move each lesson to its period's new number. Done in two steps (via a
+        -- negative number) so the unique slot index never sees two lessons on one
+        -- number half way through.
+        UPDATE academic.timetable t
+        SET period_seq = -ps.seq
+        FROM _old_periods o
+        JOIN academic.period_structure ps
+          ON lower(ps.label) = o.label
+         AND ps.tenant_id = p_tenant_id AND ps.school_id = p_school_id
+        WHERE t.tenant_id = p_tenant_id
+          AND t.school_id = p_school_id
+          AND t.period_seq = o.seq;
+
+        UPDATE academic.timetable
+        SET period_seq = -period_seq
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND period_seq < 0;
 
         OPEN p_result FOR
         SELECT TRUE AS success, 'Schedule saved.' AS message;

@@ -90,13 +90,23 @@ namespace educore.Areas.ERP.Controllers
             var all = await _schoolSettingsService.GetFeeHeadAsync(TenantId(), SchoolId(), UserId());
             var existing = isSecurity ? FirstSecurity(all) : FirstRegistration(all);
 
+            string name = string.IsNullOrWhiteSpace(req.Name)
+                            ? (existing?.FeeHeadName ?? (isSecurity ? "Security Deposit" : "Registration Fee"))
+                            : req.Name!.Trim();
+
+            // The fee head proc matches by name, so a name that belongs to a
+            // different head (say "Tuition Fee") would turn THAT head into a
+            // one-time registration charge. Refuse instead of overwriting it.
+            var clash = all.FirstOrDefault(h => h.FeeHeadId != (existing?.FeeHeadId ?? 0)
+                && string.Equals((h.FeeHeadName ?? "").Trim(), name, System.StringComparison.OrdinalIgnoreCase));
+            if (clash != null)
+                return Json(new { success = false, message = $"A fee head called \"{clash.FeeHeadName}\" already exists for another purpose. Please use a different name." });
+
             var head = new FeeHead
             {
                 Operation       = "SaveFeeHead",
                 FeeHeadId       = existing?.FeeHeadId ?? 0,
-                FeeHeadName     = string.IsNullOrWhiteSpace(req.Name)
-                                    ? (existing?.FeeHeadName ?? (isSecurity ? "Security Deposit" : "Registration Fee"))
-                                    : req.Name!.Trim(),
+                FeeHeadName     = name,
                 Frequency       = "One Time",
                 DefaultAmount   = req.Amount,
                 FeeType         = "Mandatory",
@@ -108,6 +118,12 @@ namespace educore.Areas.ERP.Controllers
             var (ok, message) = await _schoolSettingsService.SaveFeeHeadAsync(head, TenantId(), SchoolId(), UserId());
             if (!ok)
                 return Json(new { success = false, message });
+
+            // The card shows the amount as the live charge, so a head that was
+            // switched off in the Fee Head master is switched back on here.
+            // Otherwise registration would quietly charge 0.
+            if (existing != null && !existing.IsActive)
+                await _schoolSettingsService.ToggleFeeHeadStatusAsync(existing.FeeHeadId, TenantId(), SchoolId(), UserId());
 
             var (reg, sec) = await LoadSetupFeesAsync();
             return Json(new { success = true, message = "Saved.", registration = reg, security = sec });

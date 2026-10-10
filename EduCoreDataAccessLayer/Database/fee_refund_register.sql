@@ -40,6 +40,10 @@ BEGIN
            r.refund_mode,
            r.reason,
            r.authorized_by,
+           -- The USER who recorded it (authorized_by is free text). Needs
+           -- fee_day_close.sql applied first (fn_user_display_name).
+           r.refunded_by,
+           core.fn_user_display_name(r.refunded_by) AS refunded_by_name,
            COALESCE(s.student_name, '—') AS student_name,
            COALESCE(s.admission_no, '—') AS admission_no,
            s.class_name,

@@ -22,14 +22,18 @@ namespace EduCoreDataAccessLayer.Models.ERP
         /// <summary>Parent email (father, else mother) — the Email reminder channel needs it.</summary>
         public string?  ParentEmail      { get; set; }
 
-        /// <summary>Amount still owed (due − paid − concession) across all unpaid installments.</summary>
+        /// <summary>Active, or how the student left. A student who left still owes.</summary>
+        public string?  StudentStatus    { get; set; }
+
+        /// <summary>Amount that has FALLEN DUE and is unpaid (due − paid − concession).
+        /// Instalments not due yet are not counted: this is the reminder's {due_amount}.</summary>
         public decimal  TotalOutstanding { get; set; }
 
-        /// <summary>Days the OLDEST unpaid installment is past its due date. 0 = nothing overdue yet.</summary>
+        /// <summary>Days the OLDEST unpaid installment is past its due date (0 = due today).</summary>
         public int      OverdueDays      { get; set; }
 
-        /// <summary>Ageing bucket derived from OverdueDays: NotDue / 0-30 / 31-60 / 60+.</summary>
-        public string   Bucket           { get; set; } = "NotDue";
+        /// <summary>Ageing bucket derived from OverdueDays: 0-30 / 31-60 / 60+.</summary>
+        public string   Bucket           { get; set; } = "0-30";
 
         /// <summary>When a reminder was last DELIVERED to this student (null = never).</summary>
         public DateTime? LastReminderAt  { get; set; }

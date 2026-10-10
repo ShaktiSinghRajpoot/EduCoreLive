@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 using System.Data;
+using System.Text.Json;
 using EduCoreDataAccessLayer.Helpers;
 
 namespace EduCoreDataAccessLayer.Services.Repository.ERP
@@ -72,7 +73,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         Status              = Str(row, "status"),
                         AdmissionId         = Has(row, "admission_id") && row["admission_id"] != DBNull.Value
                                                 ? Convert.ToInt32(row["admission_id"]) : null,
-                        ReceiptNo           = NullStr(row, "receipt_no")
+                        ReceiptNo           = NullStr(row, "receipt_no"),
+                        FeeAmount           = DecVal(row, "fee_amount"),
+                        SettledAmount       = DecVal(row, "settled_amount"),
+                        BalanceAmount       = DecVal(row, "balance_amount"),
+                        Receipts            = ReadReceipts(NullStr(row, "receipts"))
                     });
                     if (total == 0) total = IntVal(row, "total_count");
                 }
@@ -114,11 +119,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             int enquiryId, string? reason, int tenantId, int schoolId, int actionUserId)
             => RunActionAsync("Cancel", enquiryId, reason, tenantId, schoolId, actionUserId);
 
-        public Task<(int Success, string Message)> MarkFeePaidAsync(
-            int enquiryId, int tenantId, int schoolId, int actionUserId)
-            => RunActionAsync("MarkFeePaid", enquiryId, null, tenantId, schoolId, actionUserId);
+        // (There is no MarkFeePaid any more: it flipped the "fee paid" flag before,
+        // and sometimes without, a receipt. Collecting goes through
+        // FeePaymentService.RecordRegistrationPaymentAsync, and paid follows the money.)
 
-        // ── Shared action runner (Cancel / MarkFeePaid) ─────────────
+        // ── Shared action runner ────────────────────────────────────
         private async Task<(int Success, string Message)> RunActionAsync(
             string operation, int enquiryId, string? reason, int tenantId, int schoolId, int actionUserId)
         {
@@ -168,5 +173,15 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static bool      BoolVal(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value && Convert.ToBoolean(r[c]);
         private static string    Str(DataRow r, string c)     => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString()! : string.Empty;
         private static string?   NullStr(DataRow r, string c) => Has(r, c) && r[c] != DBNull.Value ? r[c].ToString() : null;
+        private static decimal   DecVal(DataRow r, string c)  => Has(r, c) && r[c] != DBNull.Value ? Convert.ToDecimal(r[c]) : 0m;
+
+        // Every registration receipt for the row (the proc returns a JSON array).
+        private static List<RegistrationReceiptItem> ReadReceipts(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return new List<RegistrationReceiptItem>();
+            return JsonSerializer.Deserialize<List<RegistrationReceiptItem>>(json,
+                       new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                   ?? new List<RegistrationReceiptItem>();
+        }
     }
 }

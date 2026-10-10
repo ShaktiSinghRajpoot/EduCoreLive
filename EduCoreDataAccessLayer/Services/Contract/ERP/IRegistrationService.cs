@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Models.ERP;
+﻿using EduCoreDataAccessLayer.Models.ERP;
 
 namespace EduCoreDataAccessLayer.Services.Contract.ERP
 {
@@ -18,8 +18,5 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         Task<(int Success, string Message)> CancelRegistrationAsync(
             int enquiryId, string? reason, int tenantId, int schoolId, int actionUserId);
-
-        Task<(int Success, string Message)> MarkFeePaidAsync(
-            int enquiryId, int tenantId, int schoolId, int actionUserId);
     }
 }

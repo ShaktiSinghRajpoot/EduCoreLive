@@ -169,7 +169,7 @@ function loadAll(){
       var map={}, order=[];
       (gridRes[0]||[]).forEach(function(r){
         if(!map[r.className]){ map[r.className]={ cls:r.className, rank:r.classRank, sections:[] }; order.push(r.className); }
-        map[r.className].sections.push({ id:r.sectionId, name:r.sectionName, room:r.roomNo, teacherId:r.teacherId||0 });
+        map[r.className].sections.push({ id:r.sectionId, name:r.sectionName, room:r.roomNo, teacherId:r.teacherId||0, teacherName:r.teacherName||'' });
       });
       DATA = order.map(function(k){ return map[k]; });
 
@@ -194,6 +194,12 @@ function updateCards(){
 function selectHtml(sec){
   var lm=loadMap();
   var opts='<option value="0">— Unassigned —</option>';
+  // A teacher who has since left (or is no longer teaching staff) is not in the
+  // pool. Show them anyway, or the row reads "Unassigned" while it is assigned.
+  var inPool = TEACHERS.some(function(t){ return t.id===sec.teacherId; });
+  if(sec.teacherId && !inPool){
+    opts+='<option value="'+sec.teacherId+'" selected>'+EC.esc(sec.teacherName||('Staff #'+sec.teacherId))+' (inactive)</option>';
+  }
   TEACHERS.forEach(function(t){
     var load=lm[t.id]||0;
     var extra = (load>0 && t.id!==sec.teacherId) ? ' ('+load+' sec)' : (t.id===sec.teacherId && load>1 ? ' ('+load+' sec)' : '');

@@ -1,8 +1,14 @@
 -- ============================================================================
 -- Fee Due Reminders — server-side paged/filtered defaulters list.
 --
--- One row per ACTIVE student who still owes money, with the outstanding total,
--- how many days the OLDEST unpaid installment is overdue, and an ageing bucket.
+-- One row per student who owes money that has FALLEN DUE (due_date on or before
+-- today), with that total, how many days the OLDEST unpaid installment is
+-- overdue, and an ageing bucket. Next months' instalments are not owed yet, so
+-- they are not counted -- the amount here is the {due_amount} a reminder sends.
+--
+-- Same rule as core.sp_fee_defaulters_get, including for students who have left:
+-- they are listed while they still owe (student_status says so), so the office
+-- can chase them and the two screens total the same.
 -- Separate from core.sp_fee_defaulters_get (the report proc, which returns the
 -- full un-paged ageing breakdown) so the screen can page/filter/sort server-side.
 --
@@ -18,7 +24,7 @@ CREATE OR REPLACE PROCEDURE core.sp_fee_due_list(
     IN    p_action_user_id integer,
     IN    p_search         varchar   DEFAULT NULL,
     IN    p_class          varchar   DEFAULT NULL,
-    IN    p_bucket         varchar   DEFAULT NULL,   -- NotDue | 0-30 | 31-60 | 60+
+    IN    p_bucket         varchar   DEFAULT NULL,   -- 0-30 | 31-60 | 60+
     IN    p_page_no        integer   DEFAULT 1,
     IN    p_page_size      integer   DEFAULT 10,
     IN    p_sort_column    varchar   DEFAULT NULL,   -- name | class | due | days
@@ -52,21 +58,22 @@ BEGIN
         WHERE sl.tenant_id = p_tenant_id
           AND sl.school_id = p_school_id
           AND sl.amount_due > sl.amount_paid + COALESCE(sl.concession, 0)
+          AND (sl.due_date IS NULL OR sl.due_date::date <= CURRENT_DATE)
     ),
     agg AS (
         SELECT s.student_id, s.student_name, s.admission_no,
                s.class_name, s.section, s.roll_no, s.mobile,
                -- Parent email drives the Email reminder channel (father first, else mother).
                COALESCE(NULLIF(TRIM(s.father_email), ''), NULLIF(TRIM(s.mother_email), '')) AS parent_email,
+               CASE WHEN COALESCE(s.is_active, TRUE) THEN 'Active'
+                    ELSE COALESCE(NULLIF(TRIM(s.status), ''), 'Left') END AS student_status,
                SUM(d.outstanding) AS total_outstanding,
-               -- days the OLDEST overdue installment is past its due date (0 = nothing overdue yet)
-               COALESCE(MAX(CASE WHEN d.due_date::date < CURRENT_DATE
-                                 THEN (CURRENT_DATE - d.due_date::date) END), 0) AS overdue_days
+               -- days the OLDEST unpaid installment is past its due date (0 = due today)
+               COALESCE(MAX(CURRENT_DATE - d.due_date::date), 0) AS overdue_days
         FROM dues d
         JOIN core.students s ON s.student_id = d.student_id
         WHERE s.tenant_id = p_tenant_id
           AND s.school_id = p_school_id
-          AND COALESCE(s.is_active, TRUE) = TRUE
           AND (p_class IS NULL OR TRIM(p_class) = '' OR s.class_name = p_class)
           AND (p_search IS NULL OR TRIM(p_search) = ''
                OR s.student_name        ILIKE '%' || p_search || '%'
@@ -74,19 +81,18 @@ BEGIN
                OR COALESCE(s.mobile,'') ILIKE '%' || p_search || '%')
         GROUP BY s.student_id, s.student_name, s.admission_no,
                  s.class_name, s.section, s.roll_no, s.mobile,
-                 s.father_email, s.mother_email
+                 s.father_email, s.mother_email, s.is_active, s.status
         HAVING SUM(d.outstanding) > 0
     ),
     filtered AS (
         SELECT a.*,
-               CASE WHEN a.overdue_days = 0  THEN 'NotDue'
-                    WHEN a.overdue_days <= 30 THEN '0-30'
+               CASE WHEN a.overdue_days <= 30 THEN '0-30'
                     WHEN a.overdue_days <= 60 THEN '31-60'
                     ELSE '60+' END AS bucket
         FROM agg a
     )
     SELECT f.student_id, f.student_name, f.admission_no, f.class_name, f.section, f.roll_no,
-           f.mobile, f.parent_email,
+           f.mobile, f.parent_email, f.student_status,
            f.total_outstanding, f.overdue_days, f.bucket,
            lr.sent_at                   AS last_reminder_at,
            COUNT(*)               OVER() AS total_count,

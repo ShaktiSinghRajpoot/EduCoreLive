@@ -27,6 +27,88 @@ COMMENT ON COLUMN core.students.date_of_leaving IS
     'Last day at this school. Printed on the TC, so it is set once at exit.';
 
 
+-- ── money when a student leaves / comes back ───────────────────────────────
+-- Depends on student_money_lifecycle.sql (fn_student_close_future_dues,
+-- fn_student_restore_closed_dues and the close columns).
+--
+-- Leaving: every instalment due AFTER the leaving date is CLOSED (never
+-- deleted) with the reason 'Left on <date>', who and when, and the bus
+-- assignment ends. Dues up to the leaving date stay owed. Before this, tuition
+-- and bus fees for every month to March stayed on a leaver's ledger, and the TC
+-- was refused for months the child never attended.
+--
+-- Coming back (Reactivate): exactly what the exit closed is put back — the rows
+-- closed with close_source 'Exit' and the bus assignment ended by it.
+CREATE OR REPLACE FUNCTION core.fn_student_leave_money(
+    p_tenant_id      integer,
+    p_school_id      integer,
+    p_student_id     integer,
+    p_date_of_leaving date,
+    p_action_user_id integer)
+RETURNS numeric
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_reason varchar(200) := 'Left on ' || to_char(p_date_of_leaving, 'YYYY-MM-DD');
+    v_closed numeric(12,2);
+BEGIN
+    v_closed := core.fn_student_close_future_dues(
+        p_tenant_id, p_school_id, p_student_id, p_date_of_leaving,
+        v_reason, 'Exit', p_action_user_id);
+
+    UPDATE core.student_transport
+       SET is_active  = FALSE,
+           end_reason = v_reason,
+           ended_by   = p_action_user_id,
+           ended_at   = now(),
+           updated_by = p_action_user_id,
+           updated_at = now()
+     WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+       AND is_active = TRUE;
+
+    RETURN v_closed;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION core.fn_student_return_money(
+    p_tenant_id      integer,
+    p_school_id      integer,
+    p_student_id     integer,
+    p_action_user_id integer)
+RETURNS numeric
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    v_restored numeric(12,2);
+    v_assign   integer;
+BEGIN
+    v_restored := core.fn_student_restore_closed_dues(p_tenant_id, p_school_id, p_student_id, 'Exit');
+
+    -- The bus assignment the exit ended (the latest one), if it was not
+    -- replaced by another since.
+    SELECT assignment_id INTO v_assign
+      FROM core.student_transport
+     WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+       AND is_active = FALSE AND COALESCE(is_deleted, FALSE) = FALSE
+       AND end_reason LIKE 'Left on %'
+     ORDER BY assignment_id DESC
+     LIMIT 1;
+
+    IF v_assign IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM core.student_transport
+         WHERE student_id = p_student_id AND is_active = TRUE) THEN
+        UPDATE core.student_transport
+           SET is_active  = TRUE,
+               end_reason = NULL, ended_by = NULL, ended_at = NULL,
+               updated_by = p_action_user_id, updated_at = now()
+         WHERE assignment_id = v_assign;
+    END IF;
+
+    RETURN v_restored;
+END;
+$$;
+
+
 -- ── mark / unmark a student as left ────────────────────────────────────────
 CREATE OR REPLACE PROCEDURE core.sp_student_exit(
     IN  p_operation      varchar,    -- 'Exit' | 'Undo'
@@ -45,20 +127,24 @@ DECLARE
     v_active boolean;
     v_year   varchar;   -- session the student is sitting in (for the enrolment row)
     v_dues   numeric(12,2);
+    v_closed numeric(12,2);
+    s        core.students%ROWTYPE;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
     END IF;
 
-    SELECT student_name, is_active, academic_year INTO v_name, v_active, v_year
+    SELECT * INTO s
     FROM core.students
     WHERE student_id = p_student_id
       AND tenant_id  = p_tenant_id
-      AND school_id  = p_school_id;
+      AND school_id  = p_school_id
+    FOR UPDATE;
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Student not found.';
     END IF;
+    v_name := s.student_name; v_active := s.is_active; v_year := s.academic_year;
 
     IF p_operation = 'Exit' THEN
         IF NOT v_active THEN
@@ -73,9 +159,13 @@ BEGIN
             RAISE EXCEPTION 'Date of leaving is required.';
         END IF;
 
-        -- Outstanding dues do NOT block the exit: the student has physically left
-        -- either way, and pretending otherwise loses the record. The dues are
-        -- reported so the office can chase them, and the TC step checks them again.
+        -- Instalments after the leaving date are closed and the bus ends.
+        v_closed := core.fn_student_leave_money(
+            p_tenant_id, p_school_id, p_student_id, p_date_of_leaving, p_action_user_id);
+
+        -- What is still owed (up to the leaving date) does NOT block the exit:
+        -- the student has physically left either way. It is reported so the
+        -- office can chase it, and the TC step checks it again.
         SELECT COALESCE(SUM(l.amount_due - l.amount_paid - COALESCE(l.concession, 0)), 0)
         INTO v_dues
         FROM core.student_ledger l
@@ -99,15 +189,48 @@ BEGIN
             CASE WHEN TRIM(p_status) = 'Passout' THEN 'PassedOut' ELSE 'Left' END,
             p_action_user_id);
 
+        INSERT INTO core.admission_audit (tenant_id, school_id, student_id, action, detail, action_by)
+        VALUES (p_tenant_id, p_school_id, p_student_id, 'StudentExited',
+                TRIM(p_status) || ' on ' || to_char(p_date_of_leaving, 'YYYY-MM-DD') ||
+                COALESCE(' (' || NULLIF(TRIM(p_reason), '') || ')', '') ||
+                '; ' || to_char(v_closed, 'FM99999990.00') || ' of later dues closed' ||
+                '; ' || to_char(GREATEST(v_dues, 0), 'FM99999990.00') || ' still owed',
+                p_action_user_id);
+
         OPEN p_result FOR
         SELECT TRUE AS success,
-               v_name || ' marked as ' || TRIM(p_status) || '.' AS message,
-               GREATEST(v_dues, 0) AS outstanding;
+               v_name || ' marked as ' || TRIM(p_status) || '.' ||
+               CASE WHEN v_closed > 0
+                    THEN ' ' || to_char(v_closed, 'FM99999990.00') || ' of fees due after the leaving date closed.'
+                    ELSE '' END AS message,
+               GREATEST(v_dues, 0) AS outstanding,
+               v_closed AS closed_amount;
 
     ELSIF p_operation = 'Undo' THEN
         IF v_active THEN
             RAISE EXCEPTION '% is already an active student.', v_name;
         END IF;
+
+        -- A live TC says the child has left. Void it first, so the register
+        -- and the roll never disagree.
+        IF EXISTS (SELECT 1 FROM core.tc_register
+                    WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                      AND student_id = p_student_id AND is_void = FALSE) THEN
+            RAISE EXCEPTION 'A Transfer Certificate has been issued for %. Void it before re-activating.', v_name;
+        END IF;
+
+        v_closed := core.fn_student_return_money(p_tenant_id, p_school_id, p_student_id, p_action_user_id);
+
+        -- The exit details are cleared on the student row (they describe a
+        -- leaving that no longer stands) but kept here, with the restore.
+        INSERT INTO core.admission_audit (tenant_id, school_id, student_id, action, detail, action_by)
+        VALUES (p_tenant_id, p_school_id, p_student_id, 'StudentReactivated',
+                'Was ' || COALESCE(s.status, '?') || ' on ' || COALESCE(s.date_of_leaving::text, '?') ||
+                COALESCE(' (' || s.leaving_reason || ')', '') ||
+                ', recorded by user ' || COALESCE(s.exit_recorded_by::text, '?') ||
+                ' at ' || COALESCE(LEFT(s.exit_recorded_at::text, 16), '?') ||
+                '; ' || to_char(v_closed, 'FM99999990.00') || ' of dues restored',
+                p_action_user_id);
 
         UPDATE core.students
         SET status           = 'Active',
@@ -126,8 +249,12 @@ BEGIN
 
         OPEN p_result FOR
         SELECT TRUE AS success,
-               v_name || ' re-activated.' AS message,
-               0::numeric AS outstanding;
+               v_name || ' re-activated.' ||
+               CASE WHEN v_closed > 0
+                    THEN ' ' || to_char(v_closed, 'FM99999990.00') || ' of dues closed at exit restored.'
+                    ELSE '' END AS message,
+               0::numeric AS outstanding,
+               v_closed AS closed_amount;
     ELSE
         RAISE EXCEPTION 'Unknown operation %.', p_operation;
     END IF;

@@ -1,4 +1,4 @@
-﻿using EduCoreDataAccessLayer.Models.ERP;
+using EduCoreDataAccessLayer.Models.ERP;
 
 namespace EduCoreDataAccessLayer.Services.Contract.ERP
 {
@@ -87,6 +87,23 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         /// <summary>A student's session-by-session timeline, newest session first.</summary>
         Task<List<StudentEnrolmentItem>> GetEnrolmentHistoryAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId);
+
+        // ── Money across the lifecycle (student_money_lifecycle.sql) ──
+
+        /// <summary>
+        /// Instalments each billing cycle produces for someone joining the session
+        /// today (keyed Monthly / Quarterly / Half Yearly / Yearly / One Time).
+        /// </summary>
+        Task<Dictionary<string, int>> GetPlanInstalmentsAsync(
+            string academicYear, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Whole-ledger totals for one student (billed, paid, concession, refunded, closed).</summary>
+        Task<StudentFeeTotals> GetStudentFeeTotalsAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Everything that changed the student's place or money outside a receipt, newest first.</summary>
+        Task<List<StudentHistoryItem>> GetStudentHistoryAsync(
             int studentId, int tenantId, int schoolId, int actionUserId);
     }
 }

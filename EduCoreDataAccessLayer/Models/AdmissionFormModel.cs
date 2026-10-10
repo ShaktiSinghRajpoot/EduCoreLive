@@ -49,6 +49,9 @@ namespace EduCoreDataAccessLayer.Models
         // ── Documents checklist (JSON array of {name,status}) ──
         public string? DocumentsJson { get; set; }
         public string? DiscountType { get; set; }
+        public decimal? DiscountValue { get; set; }
+        // 'payToday' (one-time charges due now) or 'annual' (the whole year's dues).
+        public string? DiscountApplyTo { get; set; }
         public string? DiscountReason { get; set; }
         public string? LedgerPreviewJson { get; set; }
         public int? EnquiryId { get; set; }

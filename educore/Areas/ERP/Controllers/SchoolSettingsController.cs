@@ -98,14 +98,40 @@ namespace educore.Areas.ERP.Controllers
             ModelState.Remove(nameof(model.HeaderImageUrl));
             ModelState.Remove(nameof(model.LogoUrl));
 
+            // The page accepts "school.com", so add the scheme here rather than
+            // failing [Url] with "Enter valid website URL." after the page said OK.
+            if (!string.IsNullOrWhiteSpace(model.Website))
+            {
+                model.Website = model.Website.Trim();
+                if (!model.Website.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+                    && !model.Website.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                {
+                    model.Website = "https://" + model.Website;
+                    ModelState.Remove(nameof(model.Website));
+                    if (!new System.ComponentModel.DataAnnotations.UrlAttribute().IsValid(model.Website))
+                        ModelState.AddModelError(nameof(model.Website), "Enter valid website URL.");
+                }
+            }
+
+            // The model allows up to 2100; a school cannot be established in the future.
+            if (model.EstablishedYear > Dates.Now.Year)
+                ModelState.AddModelError(nameof(model.EstablishedYear), "Enter valid established year.");
+
             // Server-side logo validation
             if (LogoImageFile != null && LogoImageFile.Length > 0)
             {
                 var allowedTypes = new[] { "image/jpeg", "image/png", "image/webp" };
+                var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
 
                 if (!allowedTypes.Contains(LogoImageFile.ContentType.ToLower()))
                 {
                     ModelState.AddModelError("LogoImageFile", "Only JPG, PNG or WEBP image is allowed.");
+                }
+                // Checked here too: SaveSchoolImageAsync throws on any other
+                // extension, and a .jfif JPEG passed the content-type check.
+                else if (!allowedExtensions.Contains(Path.GetExtension(LogoImageFile.FileName).ToLower()))
+                {
+                    ModelState.AddModelError("LogoImageFile", "Only .jpg, .jpeg, .png or .webp files are allowed.");
                 }
 
                 if (LogoImageFile.Length > 2 * 1024 * 1024)
@@ -116,6 +142,7 @@ namespace educore.Areas.ERP.Controllers
 
             if (!ModelState.IsValid)
             {
+                await RestoreReadOnlyFields(model, tenantId, schoolId, actionUserId);
                 await FillDropdowns(model, tenantId, schoolId);
                 return View(model);
             }
@@ -132,6 +159,7 @@ namespace educore.Areas.ERP.Controllers
                 TempData["Result"] = "0";
                 TempData["Message"] = "Basic profile could not be updated.";
 
+                await RestoreReadOnlyFields(model, tenantId, schoolId, actionUserId);
                 await FillDropdowns(model, tenantId, schoolId);
                 return View(model);
             }
@@ -159,6 +187,29 @@ namespace educore.Areas.ERP.Controllers
             }
 
             return UploadPaths.UrlFor("schools", tenantId, schoolId, fileName);
+        }
+
+        // The form does not post the display-only fields (tenant, status, board and
+        // its state lock, logo), so re-read them when the page is shown again after
+        // a failed save. Otherwise the sidebar read "Tenant not available".
+        private async Task RestoreReadOnlyFields(SchoolManageModel model, int tenantId, int schoolId, int actionUserId)
+        {
+            var saved = await _schoolSettingsService.GetBasicProfileAsync(tenantId, schoolId, actionUserId);
+            if (saved == null) return;
+
+            model.SchoolName         = saved.SchoolName;
+            model.SchoolCode         = saved.SchoolCode;
+            model.TenantName         = saved.TenantName;
+            model.TenantCode         = saved.TenantCode;
+            model.StatusId           = saved.StatusId;
+            model.StatusName         = saved.StatusName;
+            model.BoardId            = saved.BoardId;
+            model.BoardName          = saved.BoardName;
+            model.BoardStateId       = saved.BoardStateId;
+            model.BoardRequiresState = saved.BoardRequiresState;
+            model.SchoolTypeName     = saved.SchoolTypeName;
+            model.LogoUrl            = saved.LogoUrl;
+            model.HeaderImageUrl     = saved.HeaderImageUrl;
         }
 
         private async Task FillDropdowns(SchoolManageModel model, int tenantId, int schoolId)
@@ -250,6 +301,15 @@ namespace educore.Areas.ERP.Controllers
             query.Operation = "SaveFeeHead";
             await _schoolSettingsService.GetFeeHeadPageAsync(query, tenantId, schoolId, actionUserId);
 
+            // A page past the end (old link, or the last row of a page just deleted)
+            // came back empty, and the tiles -- read from the first row -- showed
+            // 0 / 0 / 0 with "No fee heads". Show the first page instead.
+            if (query.Items.Count == 0 && query.Page > 1)
+            {
+                query.Page = 1;
+                await _schoolSettingsService.GetFeeHeadPageAsync(query, tenantId, schoolId, actionUserId);
+            }
+
             // Two workflow switches silence a head without touching the head itself:
             // a Registration-point head is only collected when the school runs a
             // registration fee, and the refundable Admission head (the security
@@ -265,7 +325,7 @@ namespace educore.Areas.ERP.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [HasPermission("fees.manage")]
-        public async Task<IActionResult> SaveFeeHead(FeeHead model)
+        public async Task<IActionResult> SaveFeeHead(FeeHead model, string? returnUrl)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
             int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
@@ -274,19 +334,19 @@ namespace educore.Areas.ERP.Controllers
             if (string.IsNullOrWhiteSpace(model.FeeHeadName))
             {
                 TempData["ErrorMessage"] = "Please enter fee head name.";
-                return RedirectToAction(nameof(FeeHead));
+                return BackToFeeHead(returnUrl);
             }
 
             if (string.IsNullOrWhiteSpace(model.Frequency))
             {
                 TempData["ErrorMessage"] = "Please select billing cycle.";
-                return RedirectToAction(nameof(FeeHead));
+                return BackToFeeHead(returnUrl);
             }
 
             if (string.IsNullOrWhiteSpace(model.FeeType))
             {
                 TempData["ErrorMessage"] = "Please select fee type.";
-                return RedirectToAction(nameof(FeeHead));
+                return BackToFeeHead(returnUrl);
             }
 
             var (ok, message) = await _schoolSettingsService.SaveFeeHeadAsync(model, tenantId, schoolId, actionUserId);
@@ -296,6 +356,16 @@ namespace educore.Areas.ERP.Controllers
             else
                 TempData["ErrorMessage"] = message;
 
+            return BackToFeeHead(returnUrl);
+        }
+
+        // Back to the Fee Head list the user was on -- same search, cycle filter,
+        // sort and page. The forms post the page's own path + query; anything that
+        // is not a local URL falls back to the plain list.
+        private IActionResult BackToFeeHead(string? returnUrl)
+        {
+            if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                return LocalRedirect(returnUrl);
             return RedirectToAction(nameof(FeeHead));
         }
         [HttpGet]
@@ -317,7 +387,7 @@ namespace educore.Areas.ERP.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [HasPermission("fees.manage")]
-        public async Task<IActionResult> DeleteFeeHead(int id)
+        public async Task<IActionResult> DeleteFeeHead(int id, string? returnUrl)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
             int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
@@ -330,13 +400,13 @@ namespace educore.Areas.ERP.Controllers
             else
                 TempData["ErrorMessage"] = message;
 
-            return RedirectToAction(nameof(FeeHead));
+            return BackToFeeHead(returnUrl);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         [HasPermission("fees.manage")]
-        public async Task<IActionResult> ToggleFeeHeadStatus(int id)
+        public async Task<IActionResult> ToggleFeeHeadStatus(int id, string? returnUrl)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
             int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
@@ -349,7 +419,7 @@ namespace educore.Areas.ERP.Controllers
             else
                 TempData["ErrorMessage"] = message;
 
-            return RedirectToAction(nameof(FeeHead));
+            return BackToFeeHead(returnUrl);
         }
         #endregion
 
@@ -357,7 +427,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpGet]
         [HasPermission("fees.view")]
-        public async Task<IActionResult> FeeStructure()
+        public async Task<IActionResult> FeeStructure(string? academicYear)
         {
             int tenantId     = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
             int schoolId     = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
@@ -368,8 +438,12 @@ namespace educore.Areas.ERP.Controllers
             var academicYears = ayItems.Select(x => x.Text).ToList();
 
             // ── Classes from DB: configured via Academic Setup ───────────────
-            // Use the first available academic year to load the class list.
-            int firstAyId = ayItems.Any() ? Convert.ToInt32(ayItems.First().Value) : 0;
+            // The session picked in the dropdown (?academicYear=...), else the first
+            // one -- the list is ordered current-first. The class chips used to come
+            // from the first session whatever was picked, so a structure for next
+            // session was offered this session's classes.
+            var chosenAy = ayItems.FirstOrDefault(x => x.Text == academicYear) ?? ayItems.FirstOrDefault();
+            int firstAyId = chosenAy != null ? Convert.ToInt32(chosenAy.Value) : 0;
             var academicSetup = await _schoolSettingsService.GetAcademicSetupAsync(tenantId, schoolId, firstAyId, actionUserId);
             var availableClasses = academicSetup?.Classes ?? new List<string>();
 
@@ -393,7 +467,7 @@ namespace educore.Areas.ERP.Controllers
             }
 
             // Current academic year string (e.g. "2026-2027")
-            string currentAy = academicYears.FirstOrDefault()
+            string currentAy = chosenAy?.Text
                 ?? (Dates.Now.Month >= 4
                     ? $"{Dates.Now.Year}-{Dates.Now.Year + 1}"
                     : $"{Dates.Now.Year - 1}-{Dates.Now.Year}");
@@ -404,9 +478,11 @@ namespace educore.Areas.ERP.Controllers
                 AvailableClasses   = availableClasses,
                 AcademicYears      = academicYears,
                 ExistingStructures = existingStructures,
-                // An inactive head stays on structures already saved (the enrichment
-                // below carries its flag), but must not be offered for a new one.
-                FeeHeads           = rawFeeHeads.Where(fh => fh.IsActive).Select(fh => new FeeStructureDetailModel
+                // An inactive head must not be offered for a new structure, but it
+                // is still sent (flagged): the view keeps those rows hidden and
+                // shows one only when the structure being edited already has it --
+                // otherwise "Update" silently dropped it from that structure.
+                FeeHeads           = rawFeeHeads.Select(fh => new FeeStructureDetailModel
                 {
                     FeeHeadId   = fh.FeeHeadId,
                     FeeHeadName = fh.FeeHeadName,
@@ -422,7 +498,8 @@ namespace educore.Areas.ERP.Controllers
                     CollectionPoint = fh.CollectionPoint,
                     IsRefundable    = fh.IsRefundable,
                     Amount      = fh.DefaultAmount,
-                    IsSelected  = fh.FeeType == "Mandatory"
+                    IsActive    = fh.IsActive,
+                    IsSelected  = fh.IsActive && fh.FeeType == "Mandatory"
                 }).ToList()
             };
 
@@ -496,7 +573,8 @@ namespace educore.Areas.ERP.Controllers
             else
                 TempData["ErrorMessage"] = message;
 
-            return RedirectToAction(nameof(FeeStructure));
+            // Stay on the session that was saved, so its class chips and saved rows show.
+            return RedirectToAction(nameof(FeeStructure), new { academicYear = model.AcademicYear });
         }
 
         [HttpPost]
@@ -691,8 +769,9 @@ namespace educore.Areas.ERP.Controllers
         // can be re-saved without being rejected.
         private static readonly string[] AllowedStreams = { "gen", "pcm", "pcb", "com", "art", "voc", "sci" };
 
-        // Persists the full structure for one academic year (replace-all),
-        // matching the stored procedure's semantics.
+        // Persists the full structure for one academic year. Classes/sections not
+        // in the payload are removed; the rest are updated in place (ids kept, so
+        // subjects, exams, timetable and class teachers stay attached).
         [HttpPost]
         [ValidateAntiForgeryToken]
         [HasPermission("academics.manage")]
@@ -720,7 +799,7 @@ namespace educore.Areas.ERP.Controllers
                     return Json(new { success = false, message = $"Class name \"{name}\" is longer than {ClassNameMaxLength} characters." });
                 if (model.ClassDetails.Any(x => x.ClassName.Equals(name, StringComparison.OrdinalIgnoreCase)))
                     return Json(new { success = false, message = $"There are two classes named \"{name}\". Two streams need two class names, e.g. \"{name} Science (PCM)\" and \"{name} Commerce\"." });
-                if (c.Rank < 0 || c.Rank > RankMaxValue)
+                if (c.Rank < 1 || c.Rank > RankMaxValue)
                     return Json(new { success = false, message = $"Order for \"{name}\" must be between 1 and {RankMaxValue}." });
 
                 var stream = string.IsNullOrWhiteSpace(c.Stream) ? null : c.Stream!.Trim();
@@ -755,6 +834,7 @@ namespace educore.Areas.ERP.Controllers
                     sections.Add(new AcademicSectionDetail
                     {
                         SectionName  = sectionName,
+                        OriginalName = s.OriginalName?.Trim(),
                         DisplayOrder = sections.Count + 1,
                         Capacity     = s.Capacity,
                         RoomNo       = room
@@ -764,6 +844,7 @@ namespace educore.Areas.ERP.Controllers
                 model.ClassDetails.Add(new AcademicClassDetail
                 {
                     ClassName    = name,
+                    OriginalName = c.OriginalName?.Trim(),
                     DisplayOrder = c.Rank,
                     Stream       = stream,
                     Coordinator  = coordinator,
@@ -783,9 +864,12 @@ namespace educore.Areas.ERP.Controllers
                 return Json(new { success = false, message = ex.MessageText });
             }
 
-            return Json(new { success = result > 0 });
+            if (result <= 0)
+                return Json(new { success = false, message = "The classes could not be saved. Refresh the page and try again." });
+
+            return Json(new { success = true });
         }
-    
+
         #endregion
 
         #region AcademicYear
@@ -814,13 +898,25 @@ namespace educore.Areas.ERP.Controllers
 
             if (dto == null || string.IsNullOrWhiteSpace(dto.Name))
                 return Json(new { success = false, message = "Academic year name is required." });
+            // academic_years.academic_year_name is varchar(20).
+            if (dto.Name.Trim().Length > 20)
+                return Json(new { success = false, message = "Academic year name can be at most 20 characters." });
+
+            // Dates.Norm turns an unreadable date into null, so a typo would
+            // otherwise reach the database as "no date" and fail there.
+            var startDate = Dates.Norm(dto.StartDate);
+            var endDate   = Dates.Norm(dto.EndDate);
+            if (startDate == null || endDate == null)
+                return Json(new { success = false, message = "Start date and end date are both required." });
+            if (string.CompareOrdinal(endDate, startDate) <= 0)   // ISO text compares as dates
+                return Json(new { success = false, message = "End date must be after the start date." });
 
             var model = new AcademicYearModel
             {
                 AcademicYearId   = dto.Id,
                 AcademicYearName = dto.Name.Trim(),
-                StartDate        = Dates.Norm(dto.StartDate),
-                EndDate          = Dates.Norm(dto.EndDate),
+                StartDate        = startDate,
+                EndDate          = endDate,
                 IsCurrent        = dto.IsCurrent,
                 // Anything but the one other value means the default; the procedure
                 // checks again, and a CHECK constraint backs both up.
@@ -971,7 +1067,7 @@ namespace educore.Areas.ERP.Controllers
         [HasPermission("academics.manage")]
         public async Task<IActionResult> AssignClassTeacher([FromBody] AssignClassTeacherDto dto)
         {
-            var (ok, message) = await _classTeacherService.AssignAsync(dto.SectionId, dto.StaffId, SmTenant(), SmSchool(), SmUser());
+            var (ok, message) = await _classTeacherService.AssignAsync(dto?.SectionId ?? 0, dto?.StaffId, SmTenant(), SmSchool(), SmUser());
             return Json(new { success = ok, message });
         }
 
@@ -1318,6 +1414,7 @@ namespace educore.Areas.ERP.Controllers
     public class ClassSectionItemDto
     {
         public string? Name { get; set; }
+        public string? OriginalName { get; set; }   // name as loaded; null for a new class
         public int Rank { get; set; }
         public string? Stream { get; set; }
         public string? Coordinator { get; set; }
@@ -1328,6 +1425,7 @@ namespace educore.Areas.ERP.Controllers
     public class SectionItemDto
     {
         public string? Name { get; set; }
+        public string? OriginalName { get; set; }   // name as loaded; null for a new section
         public int? Capacity { get; set; }
         public string? Room { get; set; }
     }

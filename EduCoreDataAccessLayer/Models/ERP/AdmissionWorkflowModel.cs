@@ -33,6 +33,10 @@ namespace EduCoreDataAccessLayer.Models.ERP
         /// <summary>Prefix for auto-generated registration numbers, e.g. "REG-2026-".</summary>
         public string RegistrationNumberPrefix { get; set; } = "REG-";
 
+        // True when the saved settings could not be read. The page then shows
+        // defaults, and saving them would overwrite the real settings.
+        public bool LoadFailed { get; set; }
+
         // ── Admission ───────────────────────────────────────────────────────
 
         /// <summary>When true, the admission form can collect fee on the spot and issue a receipt.</summary>

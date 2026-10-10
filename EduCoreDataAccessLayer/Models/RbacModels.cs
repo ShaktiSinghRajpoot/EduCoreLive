@@ -46,6 +46,17 @@ namespace EduCoreDataAccessLayer.Models
         public int? ManageId { get; set; }
         public bool ViewGranted { get; set; }
         public bool ManageGranted { get; set; }
+
+        // Finer actions of the same feature beyond View/Manage, e.g. fees.collect,
+        // fees.cancel, fees.refund. Shown as extra ticks under the row.
+        public List<MatrixExtra> Extras { get; set; } = new();
+    }
+
+    public class MatrixExtra
+    {
+        public int PermissionId { get; set; }
+        public string Label { get; set; } = string.Empty;   // e.g. "Cancel receipts"
+        public bool Granted { get; set; }
     }
 
     public class MatrixGroup

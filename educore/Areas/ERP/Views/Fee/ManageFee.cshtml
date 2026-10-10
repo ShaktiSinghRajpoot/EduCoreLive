@@ -10,11 +10,11 @@
    Search stays the SAME cascade: Session → Admission No → Class → Section →
    Student. Pick a PERIOD (1/3/6/12) → dues auto-select → one Settlement panel
    does the maths: Dues − Discount (modal: flat/%/reason) + Extra charges
-   (modal) = Payable, paid via split tender. Collect → receipt. History re-prints.
-
-   NOTE: this commit is the DESIGN/VIEW port only. Split-tender + advance are
-   UI-present but not yet persisted; Collect still uses the existing per-item
-   endpoint (discount spread oldest-first as concession). Backend comes next.
+   (modal) = Payable, paid via split tender (each mode with its cheque no / UPI
+   ref) and/or the advance wallet. Collect → receipt. History lists receipts AND
+   refund vouchers, re-prints either, and cancels / refunds with an authoriser.
+   Each settlement carries a client ref, so a retried Collect never takes the
+   money twice. See docs/FeeModule.md.
    ─────────────────────────────────────────────────────────────────────────
 *@
 
@@ -180,7 +180,9 @@
     <label class="form-label" id="discValLbl">Amount (₹)</label>
     <input type="number" min="0" class="form-control mb-3" id="discVal" placeholder="0">
     <label class="form-label">Reason <span class="text-danger">*</span></label>
-    <input class="form-control" id="discReasonIn" placeholder="e.g. Principal approved / merit / staff ward">
+    <input class="form-control mb-3" id="discReasonIn" placeholder="e.g. sibling / merit / staff ward">
+    <label class="form-label">Approved by <span class="text-danger">*</span></label>
+    <select class="form-select" id="discApprovedIn"><option value="">— choose —</option><option>Principal</option><option>Accountant</option><option>Admin</option><option>Management</option></select>
     <div class="form-text mt-2" id="discPreview"></div>
   </div>
   <div class="modal-footer py-2">
@@ -196,8 +198,8 @@
     <div class="alert alert-warning py-2 small mb-3"><i class="bx bx-error me-1"></i>This reverses the <b id="cmAmt">₹0.00</b> payment and <b>re-opens the dues</b>. The receipt stays on record marked <b>Cancelled</b> (never deleted).</div>
     <label class="form-label">Reason for cancellation <span class="text-danger">*</span></label>
     <input class="form-control mb-3" id="cmReason" placeholder="e.g. Wrong student / duplicate / mode change">
-    <label class="form-label">Authorised by</label>
-    <select class="form-select" id="cmAuth"><option value="">— not specified —</option><option>Principal</option><option>Accountant</option><option>Admin</option></select>
+    <label class="form-label">Authorised by <span class="text-danger">*</span></label>
+    <select class="form-select" id="cmAuth"><option value="">— choose —</option><option>Principal</option><option>Accountant</option><option>Admin</option><option>Management</option></select>
   </div>
   <div class="modal-footer py-2">
     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep receipt</button>
@@ -217,8 +219,8 @@
     <div class="row g-2 mb-3">
       <div class="col-6"><label class="form-label">Refund via</label>
         <select class="form-select" id="rfMode"><option>Cash</option><option>Bank Transfer</option><option>Cheque</option><option>UPI</option></select></div>
-      <div class="col-6"><label class="form-label">Authorised by</label>
-        <select class="form-select" id="rfAuth"><option value="">— not specified —</option><option>Principal</option><option>Accountant</option><option>Admin</option></select></div>
+      <div class="col-6"><label class="form-label">Authorised by <span class="text-danger">*</span></label>
+        <select class="form-select" id="rfAuth"><option value="">— choose —</option><option>Principal</option><option>Accountant</option><option>Admin</option><option>Management</option></select></div>
     </div>
     <label class="form-label">Reason <span class="text-danger">*</span></label>
     <input class="form-control" id="rfReason" placeholder="e.g. TC issued / deposit returned / overpayment">
@@ -294,10 +296,18 @@ $(function () {
     var otherDues=[];
     var sel={};           // ledgerId -> {label, outstanding, dueDate}
     var extras=[];        // {label, amount, note}
-    var discount=null;    // {type:'flat'|'pct', value, reason}
+    var discount=null;    // {type:'flat'|'pct', value, reason, approvedBy}
     var discType='flat';
-    var tenders=[{mode:'Cash',amt:0}];
+    var tenders=[{mode:'Cash',amt:0,ref:''}];   // ref = cheque no / UPI ref / txn id
     var amtTouched=false, today={n:0,c:0}, advanceAvail=0;
+
+    // One id per settlement. Sent with Collect so a retry (double click, a
+    // timeout after the server already saved) returns the same receipt instead
+    // of taking the money twice. A new one is made after each success and
+    // whenever a student is opened.
+    var collectKey='';
+    function newCollectKey(){ collectKey = 'c' + Date.now() + '-' + Math.floor(Math.random()*1e9); }
+    newCollectKey();
 
     function fillSelect($el, items, ph){
         var h = ph ? '<option value="">'+ph+'</option>' : '';
@@ -357,11 +367,11 @@ $(function () {
 
     /* ── open student ── */
     function bucket(dues,c){ return (dues && (dues[c] || dues[c.toLowerCase()])) || []; }
-    function clearStudentView(){ currentStudent=null; sel={}; extras=[]; discount=null; tenders=[{mode:'Cash',amt:0}]; amtTouched=false; $duesPane.addClass('d-none'); $duesEmpty.removeClass('d-none'); }
+    function clearStudentView(){ currentStudent=null; sel={}; extras=[]; discount=null; tenders=[{mode:'Cash',amt:0,ref:''}]; amtTouched=false; $duesPane.addClass('d-none'); $duesEmpty.removeClass('d-none'); }
     function monthTitle(key){ var p=key.split('-'), names=['January','February','March','April','May','June','July','August','September','October','November','December']; return names[Number(p[1])-1]+' '+p[0]; }
 
     function openStudent(dues){
-        sel={}; extras=[]; discount=null; tenders=[{mode:'Cash',amt:0}]; amtTouched=false;
+        sel={}; extras=[]; discount=null; tenders=[{mode:'Cash',amt:0,ref:''}]; amtTouched=false; newCollectKey();
         var monthly = bucket(dues,'Monthly').slice().sort(function(a,b){ return (a.dueDate||'').localeCompare(b.dueDate||''); });
         var map={}; months=[];
         monthly.forEach(function(d){
@@ -404,7 +414,7 @@ $(function () {
         var s=!!sel[d.id];
         return '<div class="due'+(s?' sel':'')+'" data-id="'+d.id+'">'+
             '<label class="due-main"><input type="checkbox" class="form-check-input due-chk"'+(s?' checked':'')+'>'+
-              '<div class="due-info"><div class="due-label">'+EC.esc(d.label)+(deposit?'<span class="deposit-tag">refundable</span>':'')+'</div>'+
+              '<div class="due-info"><div class="due-label">'+EC.esc(d.label)+((deposit||d.refundable)?'<span class="deposit-tag">refundable</span>':'')+'</div>'+
               '<div class="due-meta">'+(d.overdue?'<span class="overdue">Overdue</span> · ':'')+'Due '+EC.esc(d.dueDate||'—')+'</div></div>'+
               '<div class="due-amt">'+EC.money(d.amount)+'</div></label></div>';
     }
@@ -426,14 +436,14 @@ $(function () {
     }
     $('#duesList').on('change','.due-chk', function(){
         var $row=$(this).closest('.due'), id=$row.data('id');
-        if(this.checked){ var d=allDues().find(function(x){return x.id===id;}); sel[id]={label:d.label,outstanding:d.amount,dueDate:d.dueDate||''}; }
+        if(this.checked){ var d=allDues().find(function(x){return x.id===id;}); sel[id]={label:d.label,outstanding:d.amount,dueDate:d.dueDate||'',refundable:!!d.refundable}; }
         else delete sel[id];
         $row.toggleClass('sel',this.checked); settle();
     });
     $('.chip').on('click', function(){
         $('.chip').removeClass('active'); $(this).addClass('active');
         var n=Number($(this).data('n')); sel={};
-        months.forEach(function(m,i){ if(i<n) m.dues.forEach(function(d){ sel[d.id]={label:d.label,outstanding:d.amount,dueDate:d.dueDate||''}; }); });
+        months.forEach(function(m,i){ if(i<n) m.dues.forEach(function(d){ sel[d.id]={label:d.label,outstanding:d.amount,dueDate:d.dueDate||'',refundable:!!d.refundable}; }); });
         var names=months.slice(0,n).map(function(m){return m.title;});
         $('#scope').text(names.length? (n+' month'+(n>1?'s':'')+' · '+names[0]+(n>1?' – '+names[names.length-1]:'')) : 'Nothing to select');
         renderDues(); settle();
@@ -471,16 +481,17 @@ $(function () {
     $('#discModal .fc-seg').on('click', function(){ setSeg($(this).data('t')); });
     $('#discVal').on('input', discPreview);
     function openDiscountModal(){
-        if(discount){ setSeg(discount.type); $('#discVal').val(discount.value); $('#discReasonIn').val(discount.reason||''); }
-        else { setSeg('flat'); $('#discVal').val(''); $('#discReasonIn').val(''); }
+        if(discount){ setSeg(discount.type); $('#discVal').val(discount.value); $('#discReasonIn').val(discount.reason||''); $('#discApprovedIn').val(discount.approvedBy||''); }
+        else { setSeg('flat'); $('#discVal').val(''); $('#discReasonIn').val(''); $('#discApprovedIn').val(''); }
         discPreview(); discModal.show();
     }
     $('#openDisc').on('click', openDiscountModal);
     $('#applyDisc').on('click', function(){
-        var v=EC.numPos($('#discVal').val()), reason=$('#discReasonIn').val().trim();
+        var v=EC.numPos($('#discVal').val()), reason=$('#discReasonIn').val().trim(), approvedBy=$('#discApprovedIn').val();
         if(v<=0){ ecToast('warning','Enter a discount value.'); return; }
         if(!reason){ ecToast('warning','A reason is required for a discount.'); return; }
-        discount={type:discType,value:v,reason:reason}; discModal.hide(); settle();
+        if(!approvedBy){ ecToast('warning','Choose who approved the discount.'); return; }
+        discount={type:discType,value:v,reason:reason,approvedBy:approvedBy}; discModal.hide(); settle();
     });
     function renderDiscount(){
         var $cell=$('#discCell'), $rsn=$('#discReason');
@@ -494,27 +505,46 @@ $(function () {
     }
 
     /* ── tenders (split payment) ── */
+    // What reference each mode carries. A cheque / DD number is required (a
+    // bounced cheque must be traceable to its receipt); the others are optional.
+    function refHint(mode){
+        if(mode==='Cheque') return 'Cheque no. (required)';
+        if(mode==='Demand Draft') return 'DD no. (required)';
+        if(mode==='UPI') return 'UPI ref / UTR (optional)';
+        if(mode==='Card') return 'Card txn ref (optional)';
+        if(mode==='Bank Transfer') return 'Bank ref / UTR (optional)';
+        return '';
+    }
+    function refRequired(mode){ return mode==='Cheque' || mode==='Demand Draft'; }
     function renderTenders(){
         var modes=['Cash','UPI','Card','Cheque','Demand Draft','Bank Transfer'];
         var h=tenders.map(function(t,i){
-            return '<div class="tender-row" data-i="'+i+'"><select class="form-select form-select-sm">'+
+            var hint=refHint(t.mode);
+            return '<div class="tender-wrap" data-i="'+i+'"><div class="tender-row"><select class="form-select form-select-sm">'+
                 modes.map(function(m){return '<option'+(m===t.mode?' selected':'')+'>'+m+'</option>';}).join('')+'</select>'+
                 '<input class="form-control form-control-sm t-amt" type="number" min="0" placeholder="₹" value="'+(t.amt||'')+'">'+
-                (tenders.length>1?'<button type="button" class="btn btn-sm btn-outline-danger rounded-circle rm"><i class="bx bx-x"></i></button>':'')+'</div>';
+                (tenders.length>1?'<button type="button" class="btn btn-sm btn-outline-danger rounded-circle rm"><i class="bx bx-x"></i></button>':'')+'</div>'+
+                (hint?'<input class="form-control form-control-sm t-ref mb-2" maxlength="60" placeholder="'+EC.esc(hint)+'" value="'+EC.esc(t.ref||'')+'">':'')+
+                '</div>';
         }).join('');
         $('#tenders').html(h);
     }
-    $('#tenders').on('change','select', function(){ tenders[$(this).closest('.tender-row').data('i')].mode=$(this).val(); });
-    $('#tenders').on('input','.t-amt', function(){ amtTouched=true; tenders[$(this).closest('.tender-row').data('i')].amt=EC.numPos($(this).val()); settle(); });
-    $('#tenders').on('click','.rm', function(){ tenders.splice($(this).closest('.tender-row').data('i'),1); renderTenders(); settle(); });
-    $('#addTender').on('click', function(){ tenders.push({mode:'UPI',amt:0}); renderTenders(); settle(); });
+    function tenderIndex(el){ return $(el).closest('.tender-wrap').data('i'); }
+    $('#tenders').on('change','select', function(){ tenders[tenderIndex(this)].mode=$(this).val(); renderTenders(); });
+    $('#tenders').on('input','.t-amt', function(){ amtTouched=true; tenders[tenderIndex(this)].amt=EC.numPos($(this).val()); settle(); });
+    $('#tenders').on('input','.t-ref', function(){ tenders[tenderIndex(this)].ref=$(this).val(); });
+    $('#tenders').on('click','.rm', function(){ tenders.splice(tenderIndex(this),1); renderTenders(); settle(); });
+    $('#addTender').on('click', function(){ tenders.push({mode:'UPI',amt:0,ref:''}); renderTenders(); settle(); });
 
     /* ── settlement maths ── */
     function selectedArr(){ return Object.keys(sel).map(function(k){ return sel[k]; }); }
     function calc(){
         var dues=selectedArr().reduce(function(t,x){return t+x.outstanding;},0), n=selectedArr().length;
         var ext=extras.filter(function(e){return e.amount>0&&(e.label||'').trim();}).reduce(function(t,e){return t+e.amount;},0);
-        var disc=discount ? Math.min(discount.type==='pct'?Math.round(dues*discount.value/100):discount.value, dues) : 0;
+        // A discount is worked out on, and capped at, the dues that can take one --
+        // never a refundable deposit.
+        var discBase=selectedArr().reduce(function(t,x){return t+(x.refundable?0:x.outstanding);},0);
+        var disc=discount ? Math.min(discount.type==='pct'?Math.round(discBase*discount.value/100):discount.value, discBase) : 0;
         var payable=Math.max(0, dues-disc+ext);
         return {dues:dues,ext:ext,disc:disc,payable:payable,n:n};
     }
@@ -543,7 +573,8 @@ $(function () {
     function buildItems(){
         var arr=selectedArr().slice().sort(function(a,b){ return (a.dueDate||'').localeCompare(b.dueDate||''); });
         var c=calc(), remD=c.disc;
-        arr.forEach(function(s){ var cc=Math.min(remD,s.outstanding); s._conc=cc; remD-=cc; s._net=s.outstanding-cc; });
+        // A discount never lands on a refundable deposit: it is handed back later in full.
+        arr.forEach(function(s){ var cc=s.refundable?0:Math.min(remD,s.outstanding); s._conc=cc; remD-=cc; s._net=s.outstanding-cc; });
         var cashForDues=Math.max(0, Math.min((tendersTotal()+advUseVal(c))-c.ext, c.dues-c.disc)), remC=cashForDues;
         arr.forEach(function(s){ var p=Math.min(remC,s._net); s._pay=p; remC-=p; });
         // map back to ledger ids
@@ -556,10 +587,13 @@ $(function () {
     /* ── collect ── */
     $('#collectBtn').on('click', function(){
         var items=buildItems();
-        var exs=extras.filter(function(e){return e.amount>0&&(e.label||'').trim();}).map(function(e){return {label:e.label,amount:e.amount};});
+        var exs=extras.filter(function(e){return e.amount>0&&(e.label||'').trim();}).map(function(e){return {label:e.label,amount:e.amount,note:e.note||''};});
         if(!items.length && !exs.length){ ecToast('warning','Pick a due or add an extra charge.'); return; }
         var advUse=advUseVal(calc());
-        var paidTenders = tenders.filter(function(t){ return EC.numPos(t.amt)>0; }).map(function(t){ return { mode:t.mode, amount:EC.numPos(t.amt) }; });
+        var paidTenders = tenders.filter(function(t){ return EC.numPos(t.amt)>0; })
+                                 .map(function(t){ return { mode:t.mode, amount:EC.numPos(t.amt), reference:(t.ref||'').trim() }; });
+        var missingRef = paidTenders.filter(function(t){ return refRequired(t.mode) && !t.reference; })[0];
+        if(missingRef){ ecToast('warning','Enter the '+(missingRef.mode==='Cheque'?'cheque':'DD')+' number.'); return; }
         var primaryMode = tenders.length>1 ? 'Mixed' : (tenders[0]&&tenders[0].mode) || 'Cash';
         var $btn=$(this); EC.buttonBusy($btn,'Collecting…');
         api.collect({ studentId:currentStudent.id, mode:primaryMode, reference:'', remarks:$('#pRemarks').val(),
@@ -567,7 +601,8 @@ $(function () {
                       discountType: discount ? (discount.type==='pct'?'Percent':'Flat') : null,
                       discountValue: discount ? discount.value : 0,
                       discountReason: discount ? discount.reason : null,
-                      tenders: paidTenders, advanceUsed: advUse })
+                      discountApprovedBy: discount ? discount.approvedBy : null,
+                      tenders: paidTenders, advanceUsed: advUse, clientRef: collectKey })
         .done(function(res){
             EC.buttonReset($btn);
             if(!res || !res.success){ ecToast('error',(res&&res.message)||'Could not record payment.'); return; }
@@ -578,27 +613,59 @@ $(function () {
             // available from the payment history list ("Print") whenever needed.
             api.dues(currentStudent.id).done(openStudent);
         })
-        .fail(function(){ EC.buttonReset($btn); ecToast('error','Could not record payment.'); });
+        .fail(function(){
+            // The server may have saved it before the connection dropped. The
+            // same settlement id goes with a retry, so collecting again is safe:
+            // it returns the receipt already issued instead of a second one.
+            EC.buttonReset($btn);
+            ecToast('error','Could not reach the server. Collect again to retry — the same payment is never taken twice.');
+        });
     });
 
-    /* ── history ── */
+    /* ── history: receipts (money in) and refund vouchers (money out) ── */
+    var historyRefunds=[];
+    function receiptRow(r){
+        var x=r.isCancelled;
+        var meta=[EC.esc(r.date||'—'), EC.esc(r.mode)];
+        if(r.reference) meta.push(EC.esc(r.reference));
+        if(r.concession>0) meta.push(EC.money(r.concession)+' off');
+        if(r.advanceUsed>0) meta.push(EC.money(r.advanceUsed)+' from advance');
+        if(r.advanceCredit>0) meta.push(EC.money(r.advanceCredit)+' to advance');
+        if(r.collectedBy) meta.push('by '+EC.esc(r.collectedBy));
+        var voided = x ? '<div class="hist-meta text-danger">Cancelled'+(r.cancelledAt?' '+EC.esc(r.cancelledAt):'')+
+                         (r.cancelledBy?' by '+EC.esc(r.cancelledBy):'')+(r.authorisedBy?' · authorised: '+EC.esc(r.authorisedBy):'')+
+                         (r.cancelReason?' · '+EC.esc(r.cancelReason):'')+'</div>' : '';
+        return '<div class="hist-row'+(x?' cancelled':'')+'"><div class="hist-info">'+
+               '<div class="hist-rcp'+(x?' strike':'')+'">'+EC.esc(r.receiptNo)+(x?' <span class="ec-badge ec-badge-default">Cancelled</span>':'')+'</div>'+
+               '<div class="hist-meta">'+meta.join(' · ')+'</div>'+voided+'</div>'+
+               '<div class="hist-amt'+(x?' strike':'')+'">'+EC.money(r.amount)+'</div>'+
+               '<button type="button" class="btn btn-outline-secondary btn-sm hist-print" data-rcp="'+EC.esc(r.receiptNo)+'" title="Re-print"><i class="bx bx-printer"></i></button>'+
+               (x?'':'<button type="button" class="btn btn-outline-danger btn-sm hist-cancel" data-rcp="'+EC.esc(r.receiptNo)+'" data-amt="'+r.amount+'" title="Cancel receipt"><i class="bx bx-x-circle"></i></button>')+
+               '</div>';
+    }
+    function refundRow(f,i){
+        var meta=[EC.esc(f.date||'—'), EC.esc(f.mode), 'against '+EC.esc(f.against||'—')];
+        if(f.refundedBy) meta.push('by '+EC.esc(f.refundedBy));
+        if(f.authorised) meta.push('authorised: '+EC.esc(f.authorised));
+        return '<div class="hist-row"><div class="hist-info">'+
+               '<div class="hist-rcp">'+EC.esc(f.refundNo)+' <span class="ec-badge ec-badge-default">Refund</span></div>'+
+               '<div class="hist-meta">'+meta.join(' · ')+'</div>'+
+               (f.reason?'<div class="hist-meta">'+EC.esc(f.reason)+'</div>':'')+'</div>'+
+               '<div class="hist-amt text-danger">−'+EC.money(f.amount)+'</div>'+
+               '<button type="button" class="btn btn-outline-secondary btn-sm hist-voucher" data-i="'+i+'" title="Print refund voucher"><i class="bx bx-printer"></i></button>'+
+               '</div>';
+    }
     function loadHistory(){
         if(!currentStudent) return;
         $('#histList').html('<div class="text-muted small">Loading…</div>');
-        api.history(currentStudent.id).done(function(rows){
-            if(!rows||!rows.length){ $('#histList').html('<div class="empty-pane"><i class="bx bx-receipt"></i><h6>No payments yet</h6><p class="mb-0">Collected receipts will appear here.</p></div>'); return; }
-            var h='';
-            rows.forEach(function(r){
-                var x=r.isCancelled;
-                h+='<div class="hist-row'+(x?' cancelled':'')+'"><div class="hist-info">'+
-                   '<div class="hist-rcp'+(x?' strike':'')+'">'+EC.esc(r.receiptNo)+(x?' <span class="ec-badge ec-badge-default">Cancelled</span>':'')+'</div>'+
-                   '<div class="hist-meta">'+EC.esc(r.date||'—')+' · '+EC.esc(r.mode)+(r.reference?' · '+EC.esc(r.reference):'')+(r.concession>0?' · '+EC.money(r.concession)+' off':'')+
-                       (x&&r.cancelReason?' · <span class="text-danger">'+EC.esc(r.cancelReason)+'</span>':'')+'</div></div>'+
-                   '<div class="hist-amt'+(x?' strike':'')+'">'+EC.money(r.amount)+'</div>'+
-                   '<button type="button" class="btn btn-outline-secondary btn-sm hist-print" data-rcp="'+EC.esc(r.receiptNo)+'" title="Re-print"><i class="bx bx-printer"></i></button>'+
-                   (x?'':'<button type="button" class="btn btn-outline-danger btn-sm hist-cancel" data-rcp="'+EC.esc(r.receiptNo)+'" data-amt="'+r.amount+'" title="Cancel receipt"><i class="bx bx-x-circle"></i></button>')+
-                   '</div>';
-            });
+        api.history(currentStudent.id).done(function(res){
+            var rows=(res&&res.receipts)||[];
+            historyRefunds=(res&&res.refunds)||[];
+            if(!rows.length && !historyRefunds.length){ $('#histList').html('<div class="empty-pane"><i class="bx bx-receipt"></i><h6>No payments yet</h6><p class="mb-0">Collected receipts will appear here.</p></div>'); return; }
+            var h=rows.map(receiptRow).join('');
+            if(historyRefunds.length){
+                h+='<div class="grp mt-3"><i class="bx bx-money-withdraw"></i>Refunds</div>'+historyRefunds.map(refundRow).join('');
+            }
             $('#histList').html(h);
         })
         .fail(function(){
@@ -608,6 +675,11 @@ $(function () {
     }
     $('#histList').on('click', '.hist-print', function () {
         EcReceipt.show($(this).data('rcp'));
+    });
+    $('#histList').on('click', '.hist-voucher', function () {
+        var f=historyRefunds[Number($(this).data('i'))]; if(!f || !currentStudent) return;
+        EcReceipt.showRefund(f, { name:currentStudent.name, admNo:currentStudent.admNo,
+                                  className:$class.val(), section:$section.val(), roll:currentStudent.roll });
     });
 
     /* ── cancel receipt ── */
@@ -620,6 +692,7 @@ $(function () {
     $('#cmConfirm').on('click', function(){
         var rcp=$('#cmNo').text(), reason=$('#cmReason').val().trim(), auth=$('#cmAuth').val();
         if(!reason){ ecToast('warning','A reason is required.'); return; }
+        if(!auth){ ecToast('warning','Choose who authorised the cancellation.'); return; }
         var $btn=$(this); EC.buttonBusy($btn);
         api.cancel({ receiptNo:rcp, reason:reason, authorizedBy:auth })
         .done(function(res){
@@ -645,9 +718,14 @@ $(function () {
             refundItemChanged(); refundModal.show();
         }).fail(function(){ ecToast('error','Could not load refundable amounts.'); });
     });
+    // ledgerId 0 is the student's advance (wallet) balance, refunded at exit.
     function refundItemChanged(){
         var r=refundables[Number($('#rfItem').val())]; if(!r) return;
-        $('#rfAvail').html('Paid '+EC.money(r.paid)+(r.refunded>0?' · already refunded '+EC.money(r.refunded):'')+' · <b>'+EC.money(r.refundable)+' refundable</b>');
+        if(r.ledgerId===0){
+            $('#rfAvail').html('Advance held for this student · <b>'+EC.money(r.refundable)+' refundable</b>');
+        } else {
+            $('#rfAvail').html('Paid '+EC.money(r.paid)+(r.refunded>0?' · already refunded '+EC.money(r.refunded):'')+' · <b>'+EC.money(r.refundable)+' refundable</b>');
+        }
         $('#rfAmt').val(r.refundable);
     }
     $('#rfItem').on('change', refundItemChanged);
@@ -655,8 +733,10 @@ $(function () {
         var r=refundables[Number($('#rfItem').val())]; if(!r){ ecToast('warning','Pick a charge to refund.'); return; }
         var amt=EC.numPos($('#rfAmt').val()), reason=$('#rfReason').val().trim();
         if(amt<=0){ ecToast('warning','Enter a refund amount.'); return; }
+        if(Math.abs(Math.round(amt*100)-amt*100)>1e-6){ ecToast('warning','Use at most two decimal places.'); return; }
         if(amt>r.refundable+0.001){ ecToast('warning','Amount exceeds the refundable balance ('+EC.money(r.refundable)+').'); return; }
         if(!reason){ ecToast('warning','A reason is required.'); return; }
+        if(!$('#rfAuth').val()){ ecToast('warning','Choose who authorised the refund.'); return; }
         var $btn=$(this); EC.buttonBusy($btn);
         api.refund({ studentId:currentStudent.id, ledgerId:r.ledgerId, amount:amt, mode:$('#rfMode').val(), reason:reason, authorizedBy:$('#rfAuth').val() })
         .done(function(res){

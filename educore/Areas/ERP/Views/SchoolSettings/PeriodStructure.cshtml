@@ -73,8 +73,10 @@
         <div class="ps-glance mb-2" id="glance"></div>
         <div class="ps-legend">
           <span><span class="ps-l-dot ps-g-class"></span>Class</span>
+          <span><span class="ps-l-dot ps-g-assembly"></span>Assembly</span>
           <span><span class="ps-l-dot ps-g-break"></span>Break</span>
           <span><span class="ps-l-dot ps-g-lunch"></span>Lunch</span>
+          <span><span class="ps-l-dot ps-g-diary"></span>Diary</span>
           <span class="ms-auto" id="totalDur"></span>
         </div>
       </div>
@@ -215,10 +217,6 @@ function render(){
       +  '<span class="ps-dur">'+(d>0?d+' min':'—')+'</span>'
       +  '<span class="ps-type '+typeKey(r.type)+'">'+typeLabel(r.type)+'</span>'
       +  '<div class="ps-acts">'
-      +     '<div class="ps-ord">'
-      +        '<button class="ps-ord-btn js-up" data-i="'+i+'"'+(i===0?' disabled':'')+'><i class="bx bx-chevron-up"></i></button>'
-      +        '<button class="ps-ord-btn js-down" data-i="'+i+'"'+(i===list.length-1?' disabled':'')+'><i class="bx bx-chevron-down"></i></button>'
-      +     '</div>'
       +     '<button class="ps-icon-btn js-edit" data-id="'+r.id+'"><i class="bx bx-edit-alt"></i></button>'
       +     '<button class="ps-icon-btn danger js-del" data-id="'+r.id+'"><i class="bx bx-trash"></i></button>'
       +  '</div>'
@@ -236,24 +234,19 @@ function render(){
 }
 
 function bindRows(){
-  document.querySelectorAll('.js-up').forEach(function(b){ b.addEventListener('click',function(){ move(parseInt(this.dataset.i,10),-1); }); });
-  document.querySelectorAll('.js-down').forEach(function(b){ b.addEventListener('click',function(){ move(parseInt(this.dataset.i,10),1); }); });
   document.querySelectorAll('.js-edit').forEach(function(b){ b.addEventListener('click',function(){ openModal(parseInt(this.dataset.id,10)); }); });
   document.querySelectorAll('.js-del').forEach(function(b){ b.addEventListener('click',function(){ del(parseInt(this.dataset.id,10)); }); });
 }
 
-function move(i,dir){
-  var list=rows(), j=i+dir;
-  if(j<0||j>=list.length) return;
-  var t=list[i]; list[i]=list[j]; list[j]=t;
-  render();
-}
+/* Periods are always in clock order (the server sorts by start time too), so
+   there are no up/down buttons: to move a period, change its time. */
 function del(id){
   var list=rows(), r=list.find(function(x){return x.id===id;});
   if(!r) return;
   EC.confirm({ title:'Remove from schedule?', name:r.name, okText:'Remove' }).then(function(ok){
     if(!ok) return;
     PERIODS=list.filter(function(x){return x.id!==id;});
+    dirty=true;
     render(); ecToast('info','Period removed. Click Save Schedule to keep the change.');
   });
 }
@@ -292,6 +285,7 @@ document.getElementById('pmSave').addEventListener('click',function(){
     rows().push({id:++nextId,name:name,start:start,end:end,type:type});
     ecToast('success','Period added.');
   }
+  dirty=true;
   /* keep chronological order */
   rows().sort(function(a,b){return toMin(a.start)-toMin(b.start);});
   bootstrap.Modal.getInstance(document.getElementById('periodModal')).hide();
@@ -312,10 +306,16 @@ document.getElementById('btnSave').addEventListener('click',function(){
     data:        JSON.stringify(payload)
   })
   .done(function(res){
-    if(res && res.success) ecToast('success', res.message || 'Schedule saved.');
+    if(res && res.success){ dirty=false; ecToast('success', res.message || 'Schedule saved.'); }
     else ecToast('error', (res && res.message) || 'Save failed.');
   })
   .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); });
+});
+
+/* Warn before leaving with edits that were never saved. */
+var dirty=false;
+window.addEventListener('beforeunload',function(e){
+  if(dirty){ e.preventDefault(); e.returnValue=''; }
 });
 
 /* init */

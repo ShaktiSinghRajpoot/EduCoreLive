@@ -6,6 +6,11 @@
 --  allocation is done. Reuses the existing receipt_counters sequence.
 --
 -- Target DB: PostgreSQL (educore). Safe to re-run.
+--
+-- SUPERSEDED: the live sp_registration_fee_record (part payments, row lock,
+-- admitted / withdrawn / deleted guards, mode + date checks) is in
+-- registration_fee_partial.sql. If you re-run this file, re-run that one after
+-- it, or this older procedure comes back as a second overload.
 -- ============================================================================
 
 -- ── 1. Allow enquiry-keyed payments on fee_payments ─────────────────────────

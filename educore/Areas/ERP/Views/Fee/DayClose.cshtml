@@ -8,6 +8,11 @@
    Day Close / shift reconciliation — the logged-in cashier totals their day's
    collection mode-wise, sees expected cash (cash collected − cash refunded),
    enters the counted cash, and records the difference. core.sp_fee_day_*.
+
+   Modes are the real tenders (a Cash+UPI receipt puts its cash in the Cash
+   line). A cancellation counts on the day it is made, so a closed day never
+   changes. A closed day is locked; "Re-open day" (reason required) unlocks it
+   and every close / re-open stays in the history below.
 *@
 
 @section PageStyles {
@@ -50,7 +55,7 @@
       <div class="col-12 col-lg-6">
         <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap">
           <div class="ec-section-icon"><i class="bx bx-credit-card"></i></div>
-          <div><h6 class="ec-section-title">Collection by mode</h6><div class="ec-section-subtitle">Your receipts only, cancelled excluded</div></div>
+          <div><h6 class="ec-section-title">Collection by mode</h6><div class="ec-section-subtitle">Your receipts only. A cancellation counts on the day it is made.</div></div>
         </div></div>
           <div class="ec-card-body p-0">
             <div class="table-responsive"><table class="table ec-table mb-0">
@@ -80,6 +85,22 @@
             <div class="mt-3"><label class="form-label">Remarks</label><input type="text" id="remarks" class="form-control" placeholder="Optional note"></div>
 
             <button id="btnClose" class="btn btn-primary w-100 mt-3 no-print"><i class="bx bx-lock-alt me-1"></i>Close day</button>
+            <button id="btnReopen" class="btn btn-outline-secondary w-100 mt-2 no-print d-none"><i class="bx bx-lock-open-alt me-1"></i>Re-open day</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- every close and re-open, newest first (never overwritten) -->
+      <div class="col-12" id="historyWrap" style="display:none">
+        <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap">
+          <div class="ec-section-icon"><i class="bx bx-history"></i></div>
+          <div><h6 class="ec-section-title">Close history</h6><div class="ec-section-subtitle">Every close and re-open of this day</div></div>
+        </div></div>
+          <div class="ec-card-body p-0">
+            <div class="table-responsive"><table class="table ec-table mb-0">
+              <thead><tr><th>When</th><th>Action</th><th>By</th><th class="text-end">Expected</th><th class="text-end">Counted</th><th class="text-end">Difference</th><th>Note</th></tr></thead>
+              <tbody id="historyRows"></tbody>
+            </table></div>
           </div>
         </div>
       </div>
@@ -96,7 +117,7 @@ $(function () {
     'use strict';
 
     var CSRF=$('input[name="__RequestVerificationToken"]').val();
-    var URL={ get:'@Url.Action("GetDayCollection","Fee",new{area="ERP"})', close:'@Url.Action("CloseDay","Fee",new{area="ERP"})' };
+    var URL={ get:'@Url.Action("GetDayCollection","Fee",new{area="ERP"})', close:'@Url.Action("CloseDay","Fee",new{area="ERP"})', reopen:'@Url.Action("ReopenDay","Fee",new{area="ERP"})' };
     var expected=0;
 
     function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -106,7 +127,7 @@ $(function () {
         $.getJSON(URL.get,{date:$('#dDate').val()}).done(function(d){
             expected=EC.num(d.expectedCash);
             $('#kCollected').text(EC.money(d.totalCollected));
-            $('#kReceipts').text(d.receiptCount + (d.cancelledCount>0?' (+'+d.cancelledCount+' cancelled)':''));
+            $('#kReceipts').text(d.receiptCount + (d.cancelledCount>0?' ('+d.cancelledCount+' cancelled today, −'+EC.money(d.cancelledAmount)+')':''));
             $('#kRefunds').text(EC.money(d.totalRefunded));
             $('#kExpected').text(EC.money(d.expectedCash));
             $('#rCashIn').text(EC.money(d.cashCollected));
@@ -128,16 +149,32 @@ $(function () {
                 $('#scopeNote').removeClass('d-none');
             } else $('#scopeNote').addClass('d-none');
 
-            // closed state
+            // closed state: locked until re-opened. No money can be collected or
+            // cancelled into a closed day, so the figures above stay as closed.
             if(d.isClosed){
-                $('#counted').val(d.countedCash); $('#remarks').val(d.closeRemarks||'');
+                $('#counted').val(d.countedCash).prop('disabled', true);
+                $('#remarks').val(d.closeRemarks||'').prop('disabled', true);
                 $('#closedBadge').removeClass('d-none');
-                $('#closedNote').removeClass('d-none'); $('#closedText').text('This day is already closed. Counted '+EC.money(d.countedCash)+', difference '+EC.money(d.difference)+'. Saving again updates it.');
-                $('#btnClose').html('<i class="bx bx-refresh me-1"></i>Update close');
+                $('#closedNote').removeClass('d-none');
+                $('#closedText').text('This day was closed'+(d.closedAt?' on '+d.closedAt:'')+'. Counted '+EC.money(d.countedCash)+', difference '+EC.money(d.difference)+'. Re-open it (with a reason) to record a new count.');
+                $('#btnClose').addClass('d-none'); $('#btnReopen').removeClass('d-none');
             } else {
-                $('#counted').val(''); $('#closedBadge').addClass('d-none'); $('#closedNote').addClass('d-none');
-                $('#btnClose').html('<i class="bx bx-lock-alt me-1"></i>Close day');
+                $('#counted').val('').prop('disabled', false); $('#remarks').val('').prop('disabled', false);
+                $('#closedBadge').addClass('d-none');
+                if(d.reopenedAt){
+                    $('#closedNote').removeClass('d-none');
+                    $('#closedText').text('Re-opened on '+d.reopenedAt+(d.reopenReason?' ('+d.reopenReason+')':'')+'. Close it again when the correction is done.');
+                } else $('#closedNote').addClass('d-none');
+                $('#btnClose').removeClass('d-none'); $('#btnReopen').addClass('d-none');
             }
+
+            var hist=(d.history||[]);
+            $('#historyWrap').toggle(hist.length>0);
+            $('#historyRows').html(hist.map(function(h){
+                return '<tr><td class="text-muted">'+EC.esc(h.at||'')+'</td><td class="fw-semibold">'+EC.esc(h.action==='Reopen'?'Re-opened':'Closed')+'</td><td>'+EC.esc(h.by||'')+'</td>'
+                     + '<td class="text-end">'+EC.money(h.expected)+'</td><td class="text-end">'+EC.money(h.counted)+'</td><td class="text-end">'+EC.money(h.diff)+'</td>'
+                     + '<td class="text-muted">'+EC.esc(h.note||'')+'</td></tr>';
+            }).join(''));
             diff();
         }).fail(function(){ ecToast('error','Could not load the day collection.'); });
     }
@@ -152,9 +189,28 @@ $(function () {
     $('#dDate').on('change', load);
     $('#btnPrint').on('click', function(){ window.print(); });
 
+    $('#btnReopen').on('click', function(){
+        var $btn=$(this);
+        EC.prompt({ title:'Re-open this day?', name:$('#dDate').val(), label:'Reason', required:true,
+                    message:'The current count stays in the history. Close the day again after the correction.',
+                    okText:'Re-open day', danger:false })
+        .then(function(reason){
+            if(reason===null) return;
+            EC.buttonBusy($btn);
+            $.ajax({url:URL.reopen,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},
+                    data:JSON.stringify({ date:$('#dDate').val(), reason:reason })})
+            .done(function(res){
+                EC.buttonReset($btn);
+                if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not re-open.'); return; }
+                ecToast('success',res.message||'Day re-opened.'); load();
+            }).fail(function(){ EC.buttonReset($btn); ecToast('error','Could not re-open the day.'); });
+        });
+    });
+
     $('#btnClose').on('click', function(){
         var counted=$('#counted').val();
         if(counted===''||isNaN(Number(counted))){ ecToast('warning','Enter the counted cash.'); return; }
+        if(Number(counted)<0){ ecToast('warning','Counted cash can not be negative.'); return; }
         var $btn=$(this); EC.buttonBusy($btn);
         $.ajax({url:URL.close,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},
                 data:JSON.stringify({ date:$('#dDate').val(), countedCash:Number(counted), remarks:$('#remarks').val() })})

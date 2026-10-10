@@ -1,13 +1,31 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- Fee receipt CANCEL (void) — ERP → Fee → Manage Fee → Payment History
 --
--- Cancelling a receipt must REVERSE exactly what core.sp_fee_payment_collect
--- applied: for every receipt line that hit a ledger row, give back the cash and
--- the concession so the due re-opens. The receipt itself is never deleted — it
--- is marked Cancelled (with reason + authoriser + who/when) for the audit trail,
--- and still re-prints (as a cancelled copy). Extras (ledger_id NULL) have no due
--- to reverse and are simply dropped from the live balance with the receipt.
+-- Cancelling a receipt must REVERSE exactly what was applied: for every receipt
+-- line that hit a ledger row, give back the cash and the concession so the due
+-- re-opens, and mirror the advance wallet. The receipt itself is never deleted —
+-- it is marked Cancelled (reason, authoriser, cancelled_by, cancelled_at) for
+-- the audit trail, and still re-prints as a CANCELLED copy. Extras (ledger_id
+-- NULL) have no due to reverse and drop out of the live balance with the receipt.
 --
+-- A cancel is refused when reversing it would rewrite money that has already
+-- moved on:
+--   • a line's ledger row has been REFUNDED (the cash already went back out;
+--     reversing would leave the row "refunded" more than it was paid);
+--   • the advance this receipt CREDITED has since been spent (reversing would
+--     drive the wallet negative). Cancel the receipts that used it first.
+--
+-- A REGISTRATION receipt has no ledger lines. Cancelling one recomputes the
+-- enquiry's registration_fee_paid from its live receipts, and -- if the enquiry
+-- has already become a student -- raises a due on the student's ledger for the
+-- reversed amount, so it is chased instead of silently forgotten.
+--
+-- Old receipts can be cancelled on a later day; the reversal belongs to the
+-- day it was cancelled (cancelled_at), which is how day close reads it. So a
+-- cashier who has already closed TODAY cannot cancel until an admin re-opens it.
+--
+-- Needs core.fn_user_display_name (fee_advance.sql) and core.fn_fee_day_closed
+-- (fee_day_close.sql).
 -- Target DB: PostgreSQL (educore). Safe to re-run.
 -- ============================================================================
 
@@ -32,11 +50,16 @@ CREATE OR REPLACE PROCEDURE core.sp_fee_receipt_cancel(
 LANGUAGE plpgsql
 AS $procedure$
 DECLARE
-    v_payment_id integer;
-    v_amount     numeric(12,2);
-    v_student_id integer;
-    v_adv_credit numeric(12,2);
-    v_adv_used   numeric(12,2);
+    v_payment_id   integer;
+    v_amount       numeric(12,2);
+    v_student_id   integer;
+    v_enquiry_id   integer;
+    v_type         varchar(20);
+    v_adv_credit   numeric(12,2);
+    v_adv_used     numeric(12,2);
+    v_balance      numeric(12,2);
+    v_refunded     varchar(200);
+    v_extra_msg    text := '';
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 OR p_receipt_no IS NULL THEN
         RAISE EXCEPTION 'Invalid request.';
@@ -45,10 +68,16 @@ BEGIN
         RAISE EXCEPTION 'A reason is required to cancel a receipt.';
     END IF;
 
+    -- The reversal belongs to TODAY for the cashier doing it. If that cashier
+    -- has already closed today, cancelling now would change a closed day.
+    IF core.fn_fee_day_closed(p_tenant_id, p_school_id, p_action_user_id, CURRENT_DATE) THEN
+        RAISE EXCEPTION 'Today is already closed for this counter. Ask an admin to re-open the day first.';
+    END IF;
+
     -- Lock the receipt so two cashiers can't cancel/collect it at once.
-    SELECT payment_id, amount, student_id,
+    SELECT payment_id, amount, student_id, enquiry_id, payment_type,
            COALESCE(advance_credit, 0), COALESCE(advance_used, 0)
-      INTO v_payment_id, v_amount, v_student_id, v_adv_credit, v_adv_used
+      INTO v_payment_id, v_amount, v_student_id, v_enquiry_id, v_type, v_adv_credit, v_adv_used
     FROM core.fee_payments
     WHERE tenant_id = p_tenant_id AND school_id = p_school_id
       AND receipt_no = p_receipt_no
@@ -58,6 +87,37 @@ BEGIN
     IF NOT FOUND THEN
         OPEN p_result FOR SELECT FALSE AS success, 'Receipt not found or already cancelled.' AS message, p_receipt_no AS receipt_no;
         RETURN;
+    END IF;
+
+    -- Lock the ledger rows this receipt touched, and refuse if any of their
+    -- money has already been refunded.
+    SELECT string_agg(DISTINCT sl.fee_head_name || COALESCE(' ' || sl.installment_label, ''), ', ')
+      INTO v_refunded
+      FROM core.student_ledger sl
+      JOIN core.fee_payment_details d ON d.ledger_id = sl.ledger_id
+     WHERE d.payment_id = v_payment_id
+       AND sl.tenant_id = p_tenant_id AND sl.school_id = p_school_id
+       AND sl.refund_amount > 0;
+    PERFORM 1 FROM core.student_ledger sl
+      JOIN core.fee_payment_details d ON d.ledger_id = sl.ledger_id
+     WHERE d.payment_id = v_payment_id
+       AND sl.tenant_id = p_tenant_id AND sl.school_id = p_school_id
+       FOR UPDATE OF sl;
+    IF v_refunded IS NOT NULL THEN
+        RAISE EXCEPTION 'This receipt cannot be cancelled: money on % has already been refunded.', v_refunded;
+    END IF;
+
+    -- The credit this receipt put in the wallet must still be there to take back.
+    IF v_student_id IS NOT NULL AND (v_adv_credit <> 0 OR v_adv_used <> 0) THEN
+        SELECT COALESCE(balance, 0) INTO v_balance
+          FROM core.student_advance
+         WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND student_id = v_student_id
+           FOR UPDATE;
+        v_balance := COALESCE(v_balance, 0);
+        IF v_balance - v_adv_credit + v_adv_used < -0.001 THEN
+            RAISE EXCEPTION 'This receipt cannot be cancelled: the % advance it created has already been used (balance %). Cancel the receipts that used it first.',
+                            to_char(v_adv_credit, 'FM999999990.00'), to_char(v_balance, 'FM999999990.00');
+        END IF;
     END IF;
 
     -- Reverse every line that hit a real ledger row (extras have no ledger row).
@@ -77,14 +137,8 @@ BEGIN
       AND sl.tenant_id = p_tenant_id
       AND sl.school_id = p_school_id;
 
-    -- Put the advance wallet back where it was. The collect proc moves it in two
-    -- directions on one receipt: a surplus is CREDITED, and anything drawn from
-    -- the wallet is USED. Cancelling used to reverse the ledger and leave both
-    -- alone, which lost real money in both directions — a cancelled overpayment
-    -- left the student holding credit they had never paid for, and cancelling a
-    -- receipt that had been settled from the wallet destroyed the balance the
-    -- parent had already handed over. Reversing is the exact mirror: take the
-    -- credit back out, put the used amount back in.
+    -- Put the advance wallet back where it was: take the credit back out, put
+    -- the used amount back in.
     IF v_student_id IS NOT NULL AND (v_adv_credit <> 0 OR v_adv_used <> 0) THEN
         UPDATE core.student_advance
            SET balance    = balance - v_adv_credit + v_adv_used,
@@ -102,14 +156,42 @@ BEGIN
         cancelled_at         = NOW()
     WHERE payment_id = v_payment_id;
 
+    -- A registration receipt: keep the enquiry's paid flag true to its receipts,
+    -- and if the family is already a student, put the money back on their account.
+    IF v_type = 'Registration' THEN
+        IF v_enquiry_id IS NOT NULL THEN
+            UPDATE core.enquiries e
+               SET registration_fee_paid =
+                       (core.fn_registration_fee_settled(p_tenant_id, p_school_id, e.enquiry_id) > 0
+                        AND COALESCE(e.registration_fee_amount, 0)
+                            - core.fn_registration_fee_settled(p_tenant_id, p_school_id, e.enquiry_id) <= 0.005)
+             WHERE e.enquiry_id = v_enquiry_id
+               AND e.tenant_id = p_tenant_id AND e.school_id = p_school_id;
+        END IF;
+
+        IF v_student_id IS NOT NULL AND v_amount > 0 THEN
+            INSERT INTO core.student_ledger
+                (tenant_id, school_id, student_id, fee_head_name, frequency, installment_label,
+                 due_date, amount_due, amount_paid, concession, status)
+            VALUES
+                (p_tenant_id, p_school_id, v_student_id,
+                 core.fn_registration_fee_head_name(p_tenant_id, p_school_id), 'One Time',
+                 left('Reversed ' || p_receipt_no, 40),
+                 to_char(CURRENT_DATE, 'YYYY-MM-DD'), v_amount, 0, 0, 'Pending');
+            v_extra_msg := ' ' || to_char(v_amount, 'FM999999990.00') || ' is now due on the student''s account.';
+        END IF;
+    END IF;
+
     OPEN p_result FOR
     SELECT TRUE AS success,
-           'Receipt ' || p_receipt_no || ' cancelled. ' || to_char(v_amount, 'FM999999990.00') || ' reversed.' AS message,
+           'Receipt ' || p_receipt_no || ' cancelled. ' || to_char(v_amount, 'FM999999990.00') || ' reversed.' || v_extra_msg AS message,
            p_receipt_no AS receipt_no;
 END;
 $procedure$;
 
--- ── 3. History now shows cancelled receipts too (flagged) ───────────────────
+-- ── 3. History: every receipt, cancelled ones flagged, with who and when ────
+-- Refund vouchers come from core.sp_fee_refund_history_get (fee_refund.sql),
+-- so this cursor keeps one row per receipt.
 CREATE OR REPLACE PROCEDURE core.sp_fee_payment_history_get(
     IN    p_tenant_id      integer,
     IN    p_school_id      integer,
@@ -132,7 +214,17 @@ BEGIN
            payment_mode,
            reference_no,
            is_cancelled,
-           cancel_reason
+           cancel_reason,
+           payment_type,
+           advance_used,
+           advance_credit,
+           created_by,
+           core.fn_user_display_name(created_by)   AS collected_by,
+           created_at,
+           cancelled_by,
+           core.fn_user_display_name(cancelled_by) AS cancelled_by_name,
+           cancelled_at,
+           cancel_authorized_by
     FROM core.fee_payments
     WHERE tenant_id = p_tenant_id
       AND school_id = p_school_id

@@ -34,6 +34,9 @@ namespace EduCoreDataAccessLayer.Models.ERP
     {
         public int AcademicClassId { get; set; }
         public string ClassName { get; set; } = string.Empty;
+        // The name the page loaded (null for a new class). Lets the save tell a
+        // rename from a delete + add, so the class keeps its id.
+        public string? OriginalName { get; set; }
         public int DisplayOrder { get; set; }
         public string? Stream { get; set; }
         public string? Coordinator { get; set; }
@@ -45,6 +48,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
     {
         public int AcademicClassSectionId { get; set; }
         public string SectionName { get; set; } = string.Empty;
+        public string? OriginalName { get; set; }   // as for the class: null when new
         public int DisplayOrder { get; set; }
         public int? Capacity { get; set; }
         public string? RoomNo { get; set; }

@@ -158,7 +158,7 @@ BEGIN
     c := 'b1';
     CALL core.sp_fee_payment_collect(c_tenant, c_school, c_user, v_sid,
          jsonb_build_array(jsonb_build_object('ledgerId', v_adm, 'amount', 4000, 'concession', 1000)),
-         '[]'::jsonb, 'Cash', NULL, NULL, CURRENT_DATE, v_year, NULL, 0, NULL, NULL, 0, c);
+         '[]'::jsonb, 'Cash', NULL, NULL, CURRENT_DATE, v_year, 'Flat', 1000, 'admission concession (reason required)', NULL, 0, c);
     FETCH c INTO k_ok, k_msg, k_rcpt, k_amt;
 
     PERFORM pg_temp.chk_eq('B1 the receipt is for the cash only', k_amt, 4000);

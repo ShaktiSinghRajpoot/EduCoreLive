@@ -16,6 +16,10 @@
 -- CREATE OR REPLACE, because adding parameters changes the signature and
 -- REPLACE cannot do that. DDL is transactional in Postgres, so wrapping
 -- the run in BEGIN/COMMIT makes the swap atomic.
+-- Later additions: registration_fee_paid is read DERIVED from the money
+-- (core.fn_registration_fee_is_paid -- apply registration_fee_partial.sql
+-- first) and never written by SaveEnquiry; DeleteEnquiry refuses admitted
+-- enquiries and enquiries with registration receipts, and logs the delete.
 -- ============================================================
 
 DROP PROCEDURE IF EXISTS core.sp_enquiry_crm_manage;
@@ -28,6 +32,7 @@ DECLARE
     v_sort_asc       BOOLEAN;
     v_enquiry_id     INTEGER;
     v_status_before  VARCHAR(60);
+    v_admission_id   INTEGER;
     v_today          DATE := CURRENT_DATE;
 BEGIN
 
@@ -66,7 +71,15 @@ BEGIN
                     e.notes,
                     e.estimated_fee,
                     e.registration_number,
-                    e.registration_fee_paid,
+                    -- Derived from the money, not the stored flag (see
+                    -- core.fn_registration_fee_is_paid in registration_fee_partial.sql).
+                    COALESCE(core.fn_registration_fee_is_paid(e.tenant_id, e.school_id, e.enquiry_id), FALSE)
+                                                                  AS registration_fee_paid,
+                    -- Any registration receipt at all (live or cancelled): such an
+                    -- enquiry is part of the money trail and cannot be deleted.
+                    EXISTS (SELECT 1 FROM core.fee_payments fp
+                             WHERE fp.tenant_id = e.tenant_id AND fp.school_id = e.school_id
+                               AND fp.enquiry_id = e.enquiry_id)  AS has_fee_receipts,
                     e.admission_id,
                     e.parent_email,
                     e.current_class,
@@ -174,6 +187,12 @@ BEGIN
             SELECT
                 e.*,
                 COALESCE(e.father_name, e.parent_name) AS derived_parent_name,
+                -- e.* carries the stored flag; screens use this derived one.
+                COALESCE(core.fn_registration_fee_is_paid(e.tenant_id, e.school_id, e.enquiry_id), FALSE)
+                                                       AS fee_paid_derived,
+                EXISTS (SELECT 1 FROM core.fee_payments fp
+                         WHERE fp.tenant_id = e.tenant_id AND fp.school_id = e.school_id
+                           AND fp.enquiry_id = e.enquiry_id) AS has_fee_receipts,
                 (v_today - e.enquiry_date::date)              AS days_since_enquiry,
                 (SELECT COUNT(*)::INTEGER FROM core.enquiry_followups f
                   WHERE f.enquiry_id = e.enquiry_id)   AS followup_count,
@@ -276,7 +295,8 @@ BEGIN
                 estimated_fee         = p_estimated_fee,
                 registration_number   = COALESCE(p_registration_number, registration_number),
                 registration_date     = COALESCE(p_registration_date::text,   registration_date),
-                registration_fee_paid = COALESCE(p_registration_fee_paid, registration_fee_paid),
+                -- registration_fee_paid is NOT written here: an edit form must never
+                -- be able to mark a fee paid. It follows the receipts.
                 parent_email          = p_parent_email,
                 current_class         = p_current_class,
                 current_school        = p_current_school,
@@ -346,7 +366,40 @@ BEGIN
         RETURN;
 
     -- ── DeleteEnquiry ─────────────────────────────────────────
+    -- A soft delete (is_active = FALSE). Refused when the enquiry is part of the
+    -- money trail: once admitted, or once any registration receipt exists, the
+    -- row is what the receipts, the Registrations list and the student's record
+    -- point back to -- deleting it hid the only place a receipt could be
+    -- reprinted. Withdraw the registration instead. The delete itself is written
+    -- to the status history, so who removed a lead, and when, is on record.
     ELSIF p_operation = 'DeleteEnquiry' THEN
+        SELECT status, admission_id INTO v_status_before, v_admission_id
+        FROM core.enquiries
+        WHERE enquiry_id = p_enquiry_id
+          AND tenant_id  = p_tenant_id
+          AND school_id  = p_school_id
+          AND is_active  = TRUE
+        FOR UPDATE;
+
+        IF NOT FOUND THEN
+            OPEN p_result FOR SELECT 0 AS success, 'Enquiry not found.' AS message;
+            RETURN;
+        END IF;
+
+        IF v_admission_id IS NOT NULL THEN
+            OPEN p_result FOR SELECT 0 AS success,
+                'This enquiry is already admitted and cannot be deleted.' AS message;
+            RETURN;
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM core.fee_payments
+                    WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                      AND enquiry_id = p_enquiry_id) THEN
+            OPEN p_result FOR SELECT 0 AS success,
+                'A registration fee receipt exists for this enquiry, so it cannot be deleted. Cancel the registration instead.' AS message;
+            RETURN;
+        END IF;
+
         UPDATE core.enquiries SET
             is_active  = FALSE,
             updated_by = p_action_user_id,
@@ -355,7 +408,15 @@ BEGIN
           AND tenant_id  = p_tenant_id
           AND school_id  = p_school_id;
 
-        OPEN p_result FOR SELECT 1 AS success;
+        INSERT INTO core.enquiry_status_history (
+            enquiry_id, tenant_id, school_id,
+            status_from, status_to, change_note, changed_by
+        ) VALUES (
+            p_enquiry_id, p_tenant_id, p_school_id,
+            v_status_before, 'Deleted', 'Enquiry deleted', p_action_user_id
+        );
+
+        OPEN p_result FOR SELECT 1 AS success, 'Enquiry deleted.' AS message;
         RETURN;
 
     END IF;

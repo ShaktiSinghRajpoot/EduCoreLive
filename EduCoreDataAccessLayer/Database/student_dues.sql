@@ -1,3 +1,5 @@
+-- SUPERSEDED: core.sp_student_dues_get now lives in student_dues_refundable.sql.
+-- Re-running THIS file brings back an old version that ignores concessions.
 -- ============================================================================
 -- Student Dues lookup
 --  Returns a student's outstanding ledger installments (amount_due > amount_paid)

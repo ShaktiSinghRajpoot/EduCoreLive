@@ -179,6 +179,8 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> Inactive(StudentExitListModel query)
         {
             await _admissionService.GetStudentExitListAsync(query, TenantId(), SchoolId(), UserId());
+            // The TC dialog opens on the school's default format (Settings > Documents).
+            ViewBag.TcFormat = await _schoolSettingsService.GetTcFormatAsync(TenantId(), SchoolId(), UserId());
             return View(query);
         }
 
@@ -282,6 +284,9 @@ namespace educore.Areas.ERP.Controllers
 
             var dues    = await _feeService.GetStudentDuesAsync(studentId, TenantId(), SchoolId(), UserId());
             var history = await _feeService.GetPaymentHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
+            // Whole-ledger totals. The dues list above holds only rows still owing,
+            // so summing it dropped every fully paid charge from "Total Paid".
+            var totals  = await _admissionService.GetStudentFeeTotalsAsync(studentId, TenantId(), SchoolId(), UserId());
 
             // month/year null on the first load: the page picks a month from the list
             // that comes back and asks again, so we do not guess which one it wants.
@@ -335,10 +340,13 @@ namespace educore.Areas.ERP.Controllers
                 {
                     // Outstanding is what the ledger says, not a recomputation here —
                     // core.student_ledger stays the single source of truth for money.
-                    totalDue    = dues.Sum(d => d.AmountDue),
-                    totalPaid   = dues.Sum(d => d.AmountPaid),
-                    concession  = dues.Sum(d => d.Concession),
-                    outstanding = dues.Sum(d => d.Outstanding),
+                    totalDue    = totals.TotalDue,
+                    totalPaid   = totals.TotalPaid,
+                    concession  = totals.TotalConcession,
+                    refunded    = totals.TotalRefunded,
+                    closed      = totals.TotalClosed,
+                    advance     = totals.AdvanceBalance,
+                    outstanding = totals.Outstanding,
                     rows = dues.Select(d => new
                     {
                         head        = d.FeeHeadName,
@@ -439,6 +447,25 @@ namespace educore.Areas.ERP.Controllers
                 roll      = e.RollNo,
                 status    = e.Status,
                 isCurrent = e.IsCurrent
+            }));
+        }
+
+        // Everything that changed the student's place or money outside a receipt:
+        // admission, concession, exit / reactivate, promotion (with the dues
+        // carried), class changes, bus assignments, closed dues and refunds.
+        public async Task<IActionResult> History(Guid id)
+        {
+            var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
+            if (studentId == 0) return Json(Array.Empty<object>());
+
+            var items = await _admissionService.GetStudentHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
+            return Json(items.Select(h => new
+            {
+                when   = h.HappenedAt,
+                action = h.Action,
+                detail = h.Detail,
+                amount = h.Amount,
+                by     = h.DoneBy
             }));
         }
 

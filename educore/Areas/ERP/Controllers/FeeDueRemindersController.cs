@@ -86,9 +86,10 @@ namespace educore.Areas.ERP.Controllers
 
             // Re-read the dues server-side for exactly these students: the outstanding
             // amount and contact details must come from our data, not the request.
-            var lookup = new FeeDueItem { Page = 1, PageSize = req.StudentIds.Count + 50 };
-            await _feePaymentService.GetFeeDueListAsync(lookup, tenantId, schoolId, userId);
-            var wanted = lookup.Items.Where(i => req.StudentIds.Contains(i.StudentId)).ToList();
+            // The WHOLE list is read: a first-page window (biggest dues first) used
+            // to drop any selected student who owed less than the top of the list.
+            var everyone = await LoadAllDuesAsync(new FeeDueItem(), tenantId, schoolId, userId);
+            var wanted = everyone.Where(i => req.StudentIds.Contains(i.StudentId)).ToList();
 
             if (wanted.Count == 0)
                 return Json(new { success = false, message = "None of the selected students have dues." });
@@ -159,17 +160,17 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> Export(FeeDueItem query)
         {
-            query.Page = 1;
-            query.PageSize = 10000;   // export the whole filtered set
-            await _feePaymentService.GetFeeDueListAsync(query, TenantId(), SchoolId(), UserId());
+            // The whole filtered set, page by page (PageSize is capped at 200 by
+            // ListModelBase, so a single big page silently stopped at 200 rows).
+            var rows = await LoadAllDuesAsync(query, TenantId(), SchoolId(), UserId());
 
             var sb = new StringBuilder();
-            sb.AppendLine("Student,Admission No,Class,Section,Mobile,Outstanding,Overdue Days,Bucket,Last Reminder");
-            foreach (var d in query.Items)
+            sb.AppendLine("Student,Admission No,Class,Section,Status,Mobile,Outstanding,Overdue Days,Bucket,Last Reminder");
+            foreach (var d in rows)
             {
                 sb.AppendLine(string.Join(',', new[]
                 {
-                    Csv(d.StudentName), Csv(d.AdmissionNo), Csv(d.ClassName), Csv(d.Section), Csv(d.Mobile),
+                    Csv(d.StudentName), Csv(d.AdmissionNo), Csv(d.ClassName), Csv(d.Section), Csv(d.StudentStatus), Csv(d.Mobile),
                     d.TotalOutstanding.ToString("0.00"), d.OverdueDays.ToString(), Csv(d.Bucket),
                     Csv(d.LastReminderAt?.ToString("dd MMM yyyy") ?? "Never")
                 }));
@@ -180,6 +181,32 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── helpers ──────────────────────────────────────────────
+
+        // Every row of the due list for the given filters, read 200 at a time.
+        private async Task<List<FeeDueItem>> LoadAllDuesAsync(FeeDueItem filter, int tenantId, int schoolId, int userId)
+        {
+            var all = new List<FeeDueItem>();
+            int page = 1;
+            while (true)
+            {
+                var q = new FeeDueItem
+                {
+                    Page         = page,
+                    PageSize     = 200,
+                    Search       = filter.Search,
+                    FilterClass  = filter.FilterClass,
+                    FilterBucket = filter.FilterBucket,
+                    SortColumn   = filter.SortColumn,
+                    SortDir      = filter.SortDir
+                };
+                await _feePaymentService.GetFeeDueListAsync(q, tenantId, schoolId, userId);
+                all.AddRange(q.Items);
+                if (q.Items.Count == 0 || all.Count >= q.TotalCount) break;
+                page++;
+            }
+            return all;
+        }
+
         private static string Csv(string? v) => "\"" + (v ?? "").Replace("\"", "\"\"") + "\"";
 
         // Merge tags the composer offers ({student_name}, {class}, {due_amount},

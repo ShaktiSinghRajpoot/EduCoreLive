@@ -103,7 +103,21 @@ namespace educore.Areas.ERP.Controllers
                     mobile              = r.Mobile,
                     status              = r.Status,
                     isAdmitted          = r.IsAdmitted,
-                    receiptNo           = r.ReceiptNo
+                    receiptNo           = r.ReceiptNo,
+                    feeAmount           = r.FeeAmount,
+                    settledAmount       = r.SettledAmount,
+                    balanceAmount       = r.BalanceAmount,
+                    // Every receipt, so a fee paid in parts keeps every slip
+                    // reprintable (and cancellable) from this list.
+                    receipts            = r.Receipts.Select(x => new
+                    {
+                        receiptNo = x.ReceiptNo,
+                        date      = x.Date,
+                        amount    = x.Amount,
+                        discount  = x.Discount,
+                        mode      = x.Mode,
+                        cancelled = x.Cancelled
+                    })
                 })
             });
         }
@@ -125,7 +139,8 @@ namespace educore.Areas.ERP.Controllers
 
         // ── POST: /ERP/Registration/MarkFeePaid (AJAX) ─────────
         [HttpPost]
-        [HasPermission("registration.manage")]
+        // Writes a receipt, so it is a money action (the class needs registration.view).
+        [HasPermission("fees.collect")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> MarkFeePaid([FromBody] MarkRegistrationFeeRequest req)
         {
@@ -134,46 +149,48 @@ namespace educore.Areas.ERP.Controllers
 
             int tenantId = TenantId(), schoolId = SchoolId(), actionUserId = UserId();
 
-            var (success, message) = await _registrationService.MarkFeePaidAsync(
+            // This used to flip a "fee paid" flag first (its own transaction) and
+            // only then try to write a receipt -- which it skipped whenever the fee
+            // lookup came back 0, leaving a registration marked paid with no money
+            // behind it. Now the receipt IS the action: nothing is marked, and paid
+            // is worked out from the receipts by the database.
+            var enquiry = await _enquiryService.GetEnquiryByIdAsync(req.EnquiryId, tenantId, schoolId, actionUserId);
+            if (enquiry == null)
+                return Json(new { success = false, message = "Registration not found." });
+
+            // The agreed fee: frozen on the enquiry at the first receipt; before
+            // that, the Registration-point total for the class -- the SAME resolved
+            // total the register modal shows (class-wise structure, else the fee
+            // head's default). The class-wise-only lookup returned 0 for a school
+            // using plain fee heads.
+            var (agreed, _, owed, _) = await _feePaymentService.GetRegistrationFeeSummaryAsync(
                 req.EnquiryId, tenantId, schoolId, actionUserId);
+            decimal regFee = agreed > 0
+                ? agreed
+                : await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
+                      enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
+                      "Registration", tenantId, schoolId, actionUserId);
+            if (agreed <= 0) owed = regFee;
 
-            // Flipping the "fee paid" flag must also issue a real receipt — the same
-            // way the CRM register modal does. The amount is master data (sum of the
-            // Registration-point Fee Heads for the enquiry's class), never client-supplied.
-            string? receiptNo = null;
-            decimal balance = 0m;
-            if (success > 0)
-            {
-                var enquiry = await _enquiryService.GetEnquiryByIdAsync(req.EnquiryId, tenantId, schoolId, actionUserId);
-                if (enquiry != null)
-                {
-                    decimal regFee = await _schoolSettingsService.GetCollectionPointTotalAsync(
-                        enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
-                        "Registration", tenantId, schoolId, actionUserId);
+            if (regFee <= 0)
+                return Json(new { success = false, message = "No registration fee is set up for this class. Add a Registration-point fee head first." });
+            if (owed <= 0)
+                return Json(new { success = false, message = "Nothing is outstanding on this registration." });
 
-                    if (regFee > 0)
-                    {
-                        // A part payment is allowed. No amount means "whatever is still
-                        // owed", which is what this button meant when the fee was a
-                        // yes/no -- so the old behaviour survives untouched.
-                        decimal cash = req.CollectAmount is > 0 ? req.CollectAmount.Value : regFee;
+            // A part payment is allowed. No amount means "whatever is still owed".
+            // The procedure refuses more than is outstanding.
+            decimal cash = req.CollectAmount is > 0 ? req.CollectAmount.Value : owed;
 
-                        var (paid, payMsg, rcp, bal) = await _feePaymentService.RecordRegistrationPaymentAsync(
-                            req.EnquiryId, cash,
-                            NullIfEmpty(req.PaymentMode) ?? "Cash",
-                            NullIfEmpty(req.PaymentReference),
-                            "Registration fee",
-                            enquiry.Session,
-                            tenantId, schoolId, actionUserId,
-                            feeAmount: regFee);
+            var (paid, message, receiptNo, balance) = await _feePaymentService.RecordRegistrationPaymentAsync(
+                req.EnquiryId, cash,
+                NullIfEmpty(req.PaymentMode) ?? "Cash",
+                NullIfEmpty(req.PaymentReference),
+                "Registration fee",
+                enquiry.Session,
+                tenantId, schoolId, actionUserId,
+                feeAmount: regFee);
 
-                        if (paid) { receiptNo = rcp; balance = bal; message = payMsg; }
-                        else      { message = payMsg; return Json(new { success = false, message }); }
-                    }
-                }
-            }
-
-            return Json(new { success = success > 0, message, receiptNo, balance });
+            return Json(new { success = paid, message, receiptNo = paid ? receiptNo : null, balance });
         }
 
         // ── GET: /ERP/Registration/FeeSummary ────────────────────
@@ -182,7 +199,8 @@ namespace educore.Areas.ERP.Controllers
         // used to post the full fee the moment it was clicked, with nothing shown
         // and nothing to confirm.
         [HttpGet]
-        [HasPermission("fees.view")]
+        // Read-only balance for the collect dialog; registration.view (class level) is
+        // enough -- fees.view hid the balance from a desk allowed to collect.
         public async Task<IActionResult> FeeSummary(int enquiryId)
         {
             if (enquiryId <= 0) return Json(new { success = false, message = "Invalid request." });
@@ -199,7 +217,7 @@ namespace educore.Areas.ERP.Controllers
                 var enquiry = await _enquiryService.GetEnquiryByIdAsync(enquiryId, tenantId, schoolId, actionUserId);
                 if (enquiry != null)
                 {
-                    fee = await _schoolSettingsService.GetCollectionPointTotalAsync(
+                    fee = await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
                         enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
                         "Registration", tenantId, schoolId, actionUserId);
                     balance = fee - settled;

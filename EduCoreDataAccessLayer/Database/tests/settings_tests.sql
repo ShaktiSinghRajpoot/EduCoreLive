@@ -190,11 +190,14 @@ BEGIN
     RAISE NOTICE '';
     RAISE NOTICE '-- C. Fee heads ----------------------------------------';
 
+    -- Fee type is Mandatory or Optional -- the proc refuses anything else now
+    -- (settings_fee_head_structure_tests B10). These calls used to pass 'Fee'.
+
     BEGIN
         c := 'c1';
         CALL core.sp_school_admin_fee_head_manage('SaveFeeHead',
              c_tenant, c_school, c_user, 0, '   ', 'Monthly', 100,
-             'Fee', 'Academic', 'Recurring', FALSE, c);
+             'Mandatory', 'Academic', 'Recurring', FALSE, c);
         PERFORM pg_temp.chk('C1 blank fee head name refused', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('C1 blank fee head name refused', TRUE, SQLERRM);
@@ -203,7 +206,7 @@ BEGIN
     c := 'c2';
     CALL core.sp_school_admin_fee_head_manage('SaveFeeHead',
          c_tenant, c_school, c_user, 0, 'ZZ Lab Fee', 'Monthly', 250,
-         'Fee', 'Academic', 'Recurring', FALSE, c);
+         'Mandatory', 'Academic', 'Recurring', FALSE, c);
 
     SELECT fee_head_id, default_amount INTO v_fh, v_dec FROM core.school_fee_heads
      WHERE tenant_id = c_tenant AND school_id = c_school AND fee_head_name = 'ZZ Lab Fee';
@@ -218,7 +221,7 @@ BEGIN
     c := 'c4';
     CALL core.sp_school_admin_fee_head_manage('SaveFeeHead',
          c_tenant, c_school, c_user, 0, 'ZZ Lab Fee', 'Monthly', 300,
-         'Fee', 'Academic', 'Recurring', FALSE, c);
+         'Mandatory', 'Academic', 'Recurring', FALSE, c);
 
     SELECT COUNT(*) INTO v_n FROM core.school_fee_heads
      WHERE tenant_id = c_tenant AND school_id = c_school
@@ -235,7 +238,7 @@ BEGIN
     c := 'c4c';
     CALL core.sp_school_admin_fee_head_manage('SaveFeeHead',
          c_tenant, c_school, c_user, 0, '  ZZ Lab Fee  ', 'Monthly', 350,
-         'Fee', 'Academic', 'Recurring', FALSE, c);
+         'Mandatory', 'Academic', 'Recurring', FALSE, c);
 
     SELECT COUNT(*) INTO v_n FROM core.school_fee_heads
      WHERE tenant_id = c_tenant AND school_id = c_school
@@ -247,7 +250,7 @@ BEGIN
     c := 'c5';
     CALL core.sp_school_admin_fee_head_manage('SaveFeeHead',
          c_tenant, c_school, c_user, 0, 'ZZ Deposit', 'One Time', 5000,
-         'Deposit', 'Academic', 'Admission', TRUE, c);
+         'Mandatory', 'Academic', 'Admission', TRUE, c);
 
     SELECT is_refundable INTO v_txt FROM core.school_fee_heads
      WHERE tenant_id = c_tenant AND school_id = c_school AND fee_head_name = 'ZZ Deposit';
@@ -329,7 +332,7 @@ BEGIN
         c := 'e2';
         CALL core.sp_school_admin_fee_head_manage('SaveFeeHead',
              1, 0, c_user, 0, 'ZZ Platform Fee', 'Monthly', 100,
-             'Fee', 'Academic', 'Recurring', FALSE, c);
+             'Mandatory', 'Academic', 'Recurring', FALSE, c);
         PERFORM pg_temp.chk('E2 platform scope fee head write refused', FALSE, 'it was accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('E2 platform scope fee head write refused', TRUE, SQLERRM);

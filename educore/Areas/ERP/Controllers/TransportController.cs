@@ -160,10 +160,11 @@ namespace educore.Areas.ERP.Controllers
 
             var start = Dates.Norm(req.StartDate) ?? Dates.Today;
 
-            int months = MonthsToYearEnd(req.Session, start);
-
+            // The proc bills from the start month to the END of the session, read
+            // from the session's real end date. This used to count months here
+            // from the session NAME on an April-March assumption.
             var (ok, msg, fare, made) = await _transportService.SaveAssignmentAsync(
-                req.StudentId, req.RouteId, req.StopId, NullIfEmpty(req.Session), start, months,
+                req.StudentId, req.RouteId, req.StopId, NullIfEmpty(req.Session), start, 12,
                 TenantId(), SchoolId(), UserId());
 
             return Json(new { success = ok, message = msg, monthlyFare = fare, monthsGenerated = made });
@@ -237,27 +238,6 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── Helpers ──────────────────────────────────────────────
-        // Bill from the start month through the end of the academic year (Indian
-        // April–March). Falls back to 12 months if the year can't be parsed.
-        private static int MonthsToYearEnd(string? academicYear, string? startIso)
-        {
-            // Dates travel as ISO text now, so this is the one spot that turns the
-            // start back into a real date - the month count is genuine arithmetic.
-            var start = Dates.Parse(startIso) ?? Dates.Now.Date;
-
-            int endYear;
-            if (!string.IsNullOrWhiteSpace(academicYear) && academicYear.Length >= 4 &&
-                int.TryParse(academicYear.Substring(0, 4), out var firstYear))
-                endYear = firstYear + 1;
-            else
-                endYear = start.Month >= 4 ? start.Year + 1 : start.Year;
-
-            var yearEnd = new DateTime(endYear, 3, 31);
-            if (yearEnd < start) return 1;
-            int months = (yearEnd.Year - start.Year) * 12 + (yearEnd.Month - start.Month) + 1;
-            return Math.Clamp(months, 1, 12);
-        }
-
         private async Task<int> ResolveAcademicYearIdAsync(string session)
         {
             var ayItems = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());

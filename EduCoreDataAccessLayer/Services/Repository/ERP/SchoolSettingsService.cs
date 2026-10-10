@@ -202,8 +202,23 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "basic_profile_cursor" }
             };
 
-            var dal = _db;
-            var ds = await dal.ExecuteProcedureWithCursorsAsync(SpBasicProfileManage, parameters);
+            DataSet ds;
+            try
+            {
+                ds = await _db.ExecuteProcedureWithCursorsAsync(SpBasicProfileManage, parameters);
+            }
+            catch (PostgresException ex)
+            {
+                // 0 makes the page say "could not be updated" instead of a bare 500.
+                _logger.LogWarning(ex, "SaveBasicProfile refused ({SqlState}) for tenant {TenantId}, school {SchoolId}",
+                    ex.SqlState, tenantId, schoolId);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SaveBasicProfile failed for tenant {TenantId}, school {SchoolId}", tenantId, schoolId);
+                return 0;
+            }
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return 0;
 
@@ -384,7 +399,19 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             };
 
             var dal = _db;
-            var ds = await dal.ExecuteProcedureWithCursorsAsync(SpAcademicSetupManage, parameters);
+            DataSet ds;
+            try
+            {
+                ds = await dal.ExecuteProcedureWithCursorsAsync(SpAcademicSetupManage, parameters);
+            }
+            catch (PostgresException ex)
+            {
+                // A proc RAISE (students still enrolled, bad capacity...). The
+                // controller turns it into the message the user sees.
+                _logger.LogWarning(ex, "Classes & Sections save refused ({SqlState}) for school {SchoolId}, year {YearId}",
+                    ex.SqlState, schoolId, model.AcademicYearId);
+                throw;
+            }
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                 return 0;
@@ -560,6 +587,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 .Select((c, idx) => new
                 {
                     className    = c.ClassName.Trim(),
+                    // Lets the proc update a renamed class in place (keeps its id).
+                    originalName = string.IsNullOrWhiteSpace(c.OriginalName) ? null : c.OriginalName.Trim(),
                     displayOrder = c.DisplayOrder > 0 ? c.DisplayOrder : idx + 1,
                     stream       = string.IsNullOrWhiteSpace(c.Stream) ? null : c.Stream.Trim(),
                     coordinator  = string.IsNullOrWhiteSpace(c.Coordinator) ? null : c.Coordinator.Trim(),
@@ -568,7 +597,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         .Where(s => !string.IsNullOrWhiteSpace(s.SectionName))
                         .Select(s => new
                         {
-                            sectionName = s.SectionName.Trim(),
+                            sectionName  = s.SectionName.Trim(),
+                            originalName = string.IsNullOrWhiteSpace(s.OriginalName) ? null : s.OriginalName.Trim(),
                             capacity    = s.Capacity,
                             roomNo      = string.IsNullOrWhiteSpace(s.RoomNo) ? null : s.RoomNo.Trim()
                         })
@@ -683,7 +713,18 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             };
 
             var dal = _db;
-            return await dal.ExecuteProcedureWithCursorsAsync(SpAcademicYearManage, parameters);
+            try
+            {
+                return await dal.ExecuteProcedureWithCursorsAsync(SpAcademicYearManage, parameters);
+            }
+            catch (PostgresException ex)
+            {
+                // A proc RAISE (overlap, rename in use, current session...). The
+                // controller turns it into the message the user sees.
+                _logger.LogWarning(ex, "Academic year {Operation} refused ({SqlState}) for school {SchoolId}",
+                    operation, ex.SqlState, schoolId);
+                throw;
+            }
         }
 
         #endregion
@@ -1001,6 +1042,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 model.FeeHeadNames = row["fee_head_names"] == DBNull.Value ? string.Empty : row["fee_head_names"].ToString() ?? string.Empty;
                 model.CreatedBy = row["created_by"] == DBNull.Value ? 0 : Convert.ToInt32(row["created_by"]);
                 model.UpdatedBy = row["updated_by"] == DBNull.Value ? 0 : Convert.ToInt32(row["updated_by"]);
+                model.CreatedByName = AsStr(row, "created_by_name");
+                model.UpdatedByName = AsStr(row, "updated_by_name");
                 model.UpdatedAt = row["updated_at"] == DBNull.Value ? null : Convert.ToDateTime(row["updated_at"]);
 
                 list.Add(model);
@@ -1352,7 +1395,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                 return 0;
 
-            return 1;
+            // The proc answers "not found" as a row with success = false; any row
+            // used to count as deleted, so the page said "deleted" for a failure.
+            return AsBool(ds.Tables[0].Rows[0], "success") ? 1 : 0;
         }
 
         #endregion

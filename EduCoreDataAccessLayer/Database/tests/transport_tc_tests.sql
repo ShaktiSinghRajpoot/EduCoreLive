@@ -169,8 +169,11 @@ BEGIN
     -- Pay one month first, so the two halves of the rule can be told apart.
     DECLARE v_lid integer; k1 boolean; k2 text; k3 varchar; k4 numeric;
     BEGIN
+        -- The re-assign in B5 CLOSED the far-stop rows (kept, with nothing
+        -- owing), so pick a month that is still open.
         SELECT ledger_id INTO v_lid FROM core.student_ledger
          WHERE student_id = v_sid AND LOWER(fee_head_name) LIKE '%transport%'
+           AND amount_due > amount_paid + concession
          ORDER BY due_date LIMIT 1;
 
         c := 'c0';
@@ -195,12 +198,20 @@ BEGIN
        AND amount_paid > 0;
     PERFORM pg_temp.chk_eq('C2 a paid bus month survives removal', v_n, 1);
 
-    -- ...while the months they will NOT ride are dropped, so nobody is chased for
-    -- a bus they no longer take.
-    SELECT COUNT(*) INTO v_n FROM core.student_ledger
+    -- ...while the months they will NOT ride stop being owed, so nobody is
+    -- chased for a bus they no longer take. They are CLOSED with a reason, not
+    -- deleted (transport_module.sql): this check used to count the rows away,
+    -- which only held while removal hard-deleted ledger rows.
+    SELECT COALESCE(SUM(amount_due - amount_paid - concession), 0) INTO v_n FROM core.student_ledger
      WHERE student_id = v_sid AND LOWER(fee_head_name) LIKE '%transport%'
        AND COALESCE(amount_paid, 0) = 0;
-    PERFORM pg_temp.chk_eq('C3 unpaid future bus months are dropped', v_n, 0);
+    PERFORM pg_temp.chk_eq('C3 unpaid future bus months are no longer owed', v_n, 0);
+
+    SELECT COUNT(*) INTO v_n FROM core.student_ledger
+     WHERE student_id = v_sid AND LOWER(fee_head_name) LIKE '%transport%'
+       AND COALESCE(amount_paid, 0) = 0
+       AND (close_reason IS NULL OR closed_by IS NULL OR closed_at IS NULL);
+    PERFORM pg_temp.chk_eq('C3b ...each closed row records why, who and when', v_n, 0);
 
     -- ══════════════════════════════════════════════════════════════════════
     RAISE NOTICE '';

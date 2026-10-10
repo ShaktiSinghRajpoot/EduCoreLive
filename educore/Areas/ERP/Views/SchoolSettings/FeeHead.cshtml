@@ -8,6 +8,9 @@
     // paged + sorted + filtered), the add-form binds Model's own fields, and the
     // filter/pager use Model.Search / Model.Page / Model.SortColumn.
     var feeHeads = Model.Items;
+    // Every form posts this back so Save / Delete / Toggle return to the same
+    // search, filter, sort and page instead of the plain first page.
+    var returnUrl = $"{Context.Request.PathBase}{Context.Request.Path}{Context.Request.QueryString}";
 }
 
 @section PageStyles {
@@ -136,6 +139,7 @@
                             @Html.AntiForgeryToken()
 
                             <input type="hidden" asp-for="FeeHeadId" id="FeeHeadId" />
+                            <input type="hidden" name="returnUrl" value="@returnUrl" />
 
                             <div class="mb-3">
                                 <label class="form-label">
@@ -392,6 +396,14 @@
                                                     {
                                                         <span class="badge bg-label-info ms-1">Refundable</span>
                                                     }
+                                                    @* An inactive head used to look exactly like an active one. *@
+                                                    @if (!item.IsActive)
+                                                    {
+                                                        <span class="badge bg-label-danger ms-1"
+                                                              title="Not charged on new admissions. It stays on past records.">
+                                                            Inactive
+                                                        </span>
+                                                    }
                                                     @*
                                                         A head can be perfectly valid and still never be charged, because
                                                         a switch on another screen silences it. Without this the page read
@@ -442,17 +454,38 @@
                                                 <i class="bx bx-edit"></i>
                                             </button>
 
+                                            @* Deactivate / re-activate. This is the safe way to stop
+                                               charging a head that already has money against it --
+                                               the delete refusal tells the user to do exactly this. *@
+                                            <form asp-action="ToggleFeeHeadStatus"
+                                                  asp-controller="SchoolSettings"
+                                                  method="post"
+                                                  class="d-inline">
+
+                                                @Html.AntiForgeryToken()
+
+                                                <input type="hidden" name="id" value="@item.FeeHeadId" />
+                                                <input type="hidden" name="returnUrl" value="@returnUrl" />
+
+                                                <button type="submit"
+                                                        class="btn btn-sm btn-outline-secondary fee-action-btn"
+                                                        title="@(item.IsActive ? "Mark inactive (stop charging on new admissions)" : "Mark active again")">
+                                                    <i class="bx @(item.IsActive ? "bx-toggle-right" : "bx-toggle-left")"></i>
+                                                </button>
+                                            </form>
+
                                             <form asp-action="DeleteFeeHead"
                                                   asp-controller="SchoolSettings"
                                                   method="post"
                                                   class="d-inline"
-                                                  data-ec-confirm="Delete this fee head?"
+                                                  data-ec-confirm="Delete this fee head? Its unpaid dues are removed from every student, it is taken off every class fee structure, and a structure left with no heads is retired. A head with money collected against it cannot be deleted — mark it inactive instead."
                                                   data-ec-confirm-name="@item.FeeHeadName"
                                                   data-ec-confirm-ok="Delete fee head">
 
                                                 @Html.AntiForgeryToken()
 
                                                 <input type="hidden" name="id" value="@item.FeeHeadId" />
+                                                <input type="hidden" name="returnUrl" value="@returnUrl" />
 
                                                 <button type="submit"
                                                         class="btn btn-sm btn-outline-danger fee-action-btn">
@@ -564,6 +597,9 @@
                     } else {
                         ecToast('error', response.message);
                     }
+                }).fail(function () {
+                    // A 403 or a server error used to do nothing at all.
+                    ecToast('error', 'Could not load this fee head. Please try again.');
                 });
             });
 

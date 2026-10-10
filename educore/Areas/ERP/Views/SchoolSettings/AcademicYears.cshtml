@@ -85,7 +85,12 @@
                         data-start="@y.StartDate" data-end="@y.EndDate"
                         data-current="@(y.IsCurrent ? "1" : "0")"
                         data-charge="@y.ChargeFeesFrom" data-students="@y.StudentCount" title="Edit"><i class="bx bx-edit-alt"></i>Edit</button>
-                <button class="ay-btn danger js-del" data-id="@y.AcademicYearId" data-name="@y.AcademicYearName" title="Delete"><i class="bx bx-trash"></i></button>
+                @* The current session cannot be deleted (the procedure refuses it):
+                   another session has to be made current first. *@
+                @if (!y.IsCurrent)
+                {
+                  <button class="ay-btn danger js-del" data-id="@y.AcademicYearId" data-name="@y.AcademicYearName" title="Delete"><i class="bx bx-trash"></i></button>
+                }
               </div>
             </div>
         }
@@ -119,7 +124,7 @@
         <div class="row g-3">
           <div class="col-12">
             <label class="form-label ay-modal-lbl">Academic Year Name</label>
-            <input type="text" class="form-control" id="mYearName" placeholder="e.g. 2027-2028">
+            <input type="text" class="form-control" id="mYearName" maxlength="20" placeholder="e.g. 2027-2028">
           </div>
           <div class="col-12 col-sm-6">
             <label class="form-label ay-modal-lbl">Start Date</label>
@@ -144,6 +149,9 @@
             <div class="form-check form-switch">
               <input class="form-check-input" type="checkbox" id="mCurrent">
               <label class="form-check-label" for="mCurrent" style="font-weight:700;font-size:.85rem;">Set as current session</label>
+            </div>
+            <div class="form-text d-none" id="mCurrentNote">
+              This is the current session. To change it, use <strong>Set current</strong> on another session.
             </div>
           </div>
         </div>
@@ -194,7 +202,7 @@ function openAdd(){
   document.getElementById('mYearName').value = '';
   document.getElementById('mStart').value = '';
   document.getElementById('mEnd').value = '';
-  document.getElementById('mCurrent').checked = false;
+  setCurrentSwitch(false);
   setChargeFrom('AdmissionMonth', 0);
   new bootstrap.Modal(document.getElementById('yearModal')).show();
 }
@@ -204,9 +212,19 @@ function openEdit(btn){
   document.getElementById('mYearName').value = btn.dataset.name || '';
   document.getElementById('mStart').value = btn.dataset.start || '';
   document.getElementById('mEnd').value = btn.dataset.end || '';
-  document.getElementById('mCurrent').checked = btn.dataset.current === '1';
+  setCurrentSwitch(btn.dataset.current === '1');
   setChargeFrom(btn.dataset.charge || 'AdmissionMonth', parseInt(btn.dataset.students, 10) || 0);
   new bootstrap.Modal(document.getElementById('yearModal')).show();
+}
+
+/* A school always has exactly one current session, so the current one cannot
+   be un-ticked here (the procedure refuses it too). It moves when another
+   session is set as current. */
+function setCurrentSwitch(isCurrent){
+  var sw = document.getElementById('mCurrent');
+  sw.checked = isCurrent;
+  sw.disabled = isCurrent;
+  document.getElementById('mCurrentNote').classList.toggle('d-none', !isCurrent);
 }
 
 /* A student's fee plan is generated once, at admission, and then frozen, so this
@@ -235,9 +253,15 @@ document.getElementById('yearSave').addEventListener('click',function(){
   if(!name){ ecToast('error','Academic year name is required.'); return; }
   var start=document.getElementById('mStart').value;
   var end=document.getElementById('mEnd').value;
-  if(start && end && end < start){ ecToast('error','End date cannot be before start date.'); return; }
+  // Both dates are required (the columns are NOT NULL), and a session has to
+  // last at least two days: the table checks end > start.
+  if(!start || !end){ ecToast('error','Start date and end date are both required.'); return; }
+  if(end <= start){ ecToast('error','End date must be after the start date.'); return; }
 
-  post(URL_SAVE, { id: editId||0, name:name, startDate:start||null, endDate:end||null,
+  // Busy until the reload, so a double click cannot create the year twice.
+  var btn=this;
+  EC.buttonBusy(btn, 'Saving…');
+  post(URL_SAVE, { id: editId||0, name:name, startDate:start, endDate:end,
                    isCurrent:document.getElementById('mCurrent').checked,
                    chargeFeesFrom:document.getElementById('mChargeFrom').value })
     .then(function(res){
@@ -245,9 +269,9 @@ document.getElementById('yearSave').addEventListener('click',function(){
         bootstrap.Modal.getInstance(document.getElementById('yearModal')).hide();
         ecToast('success','Academic year saved.');
         setTimeout(function(){ window.location.reload(); }, 600);
-      } else { ecToast('error',(res&&res.message)||'Save failed.'); }
+      } else { EC.buttonReset(btn); ecToast('error',(res&&res.message)||'Save failed.'); }
     })
-    .catch(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); });
+    .catch(function(xhr){ EC.buttonReset(btn); ecToast('error', EC.ajaxError(xhr, 'Save failed')); });
 });
 
 function setCurrent(id){

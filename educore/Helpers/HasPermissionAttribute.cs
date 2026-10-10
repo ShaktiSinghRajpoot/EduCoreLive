@@ -53,5 +53,25 @@ namespace educore.Helpers
             private static int ClaimInt(System.Security.Claims.ClaimsPrincipal u, string type) =>
                 int.TryParse(u.FindFirst(type)?.Value, out var v) ? v : 0;
         }
+
+        /// <summary>
+        /// The same check as the attribute, for use inside an action when only some
+        /// requests need the permission -- e.g. registering is enquiry.manage, but
+        /// registering AND taking the fee also needs fees.collect.
+        /// </summary>
+        public static async Task<bool> UserHasAsync(Controller controller, string permissionKey)
+        {
+            var ctx   = controller.HttpContext;
+            var perms = ctx.RequestServices.GetRequiredService<IPermissionService>();
+            int activeRoleId = ctx.Session.GetInt32(Common.SK_ActiveRoleId) ?? 0;
+            return await perms.HasPermissionAsync(
+                ClaimInt(ctx.User, Common.SK_TenantId),
+                ClaimInt(ctx.User, Common.SK_SchoolId),
+                ClaimInt(ctx.User, Common.SK_UserId),
+                permissionKey, activeRoleId);
+        }
+
+        private static int ClaimInt(System.Security.Claims.ClaimsPrincipal u, string type) =>
+            int.TryParse(u.FindFirst(type)?.Value, out var v) ? v : 0;
     }
 }

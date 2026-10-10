@@ -64,7 +64,13 @@
         <i class="bx bx-edit"></i>
     </button>
 }
-<button type="button" class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"
-        title="Delete" data-id="@Model.EnquiryId" data-name="@Model.StudentName">
-    <i class="bx bx-trash"></i>
-</button>
+@* An admitted enquiry, or one that holds a registration receipt, is part of the
+   money trail and cannot be deleted (the procedure refuses too). Withdraw it
+   from the Registrations page instead. *@
+@if (Model.AdmissionId == null && !Model.HasFeeReceipts)
+{
+    <button type="button" class="btn btn-sm btn-icon btn-outline-danger crm-action-btn btn-delete-enquiry"
+            title="Delete" data-id="@Model.EnquiryId" data-name="@Model.StudentName">
+        <i class="bx bx-trash"></i>
+    </button>
+}

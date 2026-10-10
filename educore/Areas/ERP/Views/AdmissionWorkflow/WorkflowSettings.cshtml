@@ -17,6 +17,14 @@
             method="post" id="awForm">
         @Html.AntiForgeryToken()
 
+        @if (Model.LoadFailed)
+        {
+          <div class="alert alert-danger mb-3">
+            Your saved workflow settings could not be loaded, so saving is turned off
+            to keep them from being overwritten with defaults. Reload the page or try again later.
+          </div>
+        }
+
         <!-- ── Page header ── -->
         <div class="ec-card mb-4">
           <div class="ec-card-header">
@@ -260,7 +268,7 @@
         <div class="ec-sticky-actions d-flex flex-column flex-sm-row justify-content-end gap-2">
           <a asp-area="ERP" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings"
              class="btn btn-outline-secondary">Cancel</a>
-          <button type="submit" class="btn btn-primary">
+          <button type="submit" class="btn btn-primary" @(Model.LoadFailed ? "disabled" : "")>
             <i class="bx bx-save me-1"></i> Save Settings
           </button>
         </div>
@@ -363,7 +371,7 @@ $(function () {
             if (res && res.success) { REG_FEE = res.registration; SEC_FEE = res.security; renderFees(); ecToast('success', 'Saved.'); }
             else { ecToast('error', (res && res.message) || 'Unable to save.'); }
         })
-        .fail(function () { ecToast('error', 'Something went wrong.'); })
+        .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
         .always(function () { EC.buttonReset($btn); });
     }
 
@@ -382,7 +390,7 @@ $(function () {
             if (res && res.success) { REG_FEE = res.registration; SEC_FEE = res.security; renderFees(); ecToast('success', 'Removed.'); }
             else { ecToast('error', (res && res.message) || 'Unable to remove.'); }
         })
-        .fail(function () { ecToast('error', 'Something went wrong.'); });
+        .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Remove failed')); });
         });
     });
 

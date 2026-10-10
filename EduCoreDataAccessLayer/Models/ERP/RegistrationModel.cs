@@ -19,13 +19,32 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string    Status              { get; set; } = string.Empty;
         public int?      AdmissionId         { get; set; }
 
-        /// <summary>Registration fee receipt, if one was issued (null when unpaid or cancelled).</summary>
+        /// <summary>Newest live registration fee receipt (null when none).</summary>
         public string?   ReceiptNo           { get; set; }
+
+        // Where the fee stands, from the receipts (never a stored flag).
+        public decimal   FeeAmount           { get; set; }
+        public decimal   SettledAmount       { get; set; }
+        public decimal   BalanceAmount       { get; set; }
+
+        /// <summary>Every registration receipt, cancelled ones included, oldest first.</summary>
+        public List<RegistrationReceiptItem> Receipts { get; set; } = new();
 
         // Convenience flags for the UI.
         public bool IsAdmitted => AdmissionId.HasValue;
         public string RegistrationDateDisplay =>
             string.IsNullOrWhiteSpace(RegistrationDate) ? "—" : Dates.Show(RegistrationDate);
+    }
+
+    // One registration fee receipt, for reprint / cancel from the Registrations list.
+    public class RegistrationReceiptItem
+    {
+        public string  ReceiptNo { get; set; } = string.Empty;
+        public string? Date      { get; set; }
+        public decimal Amount    { get; set; }
+        public decimal Discount  { get; set; }
+        public string? Mode      { get; set; }
+        public bool    Cancelled { get; set; }
     }
 
     public class RegistrationStats

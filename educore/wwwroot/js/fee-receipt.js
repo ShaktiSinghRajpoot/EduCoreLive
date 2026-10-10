@@ -81,8 +81,14 @@
         if (r.concession > 0) {
             var lbl = 'Concession' +
                 (r.discountType === 'Percent' ? ' (' + r.discountValue + '%)' : '') +
-                (r.discountReason ? ' <span class="rc-muted">' + EC.esc(r.discountReason) + '</span>' : '');
+                (r.discountReason ? ' <span class="rc-muted">' + EC.esc(r.discountReason) + '</span>' : '') +
+                (r.discountApprovedBy ? ' <span class="rc-muted">· approved by ' + EC.esc(r.discountApprovedBy) + '</span>' : '');
             out += '<tr><td colspan="' + cols + '">' + lbl + '</td><td class="rc-amt">−' + EC.money(r.concession) + '</td></tr>';
+        }
+        // A registration fee's discount sits on the receipt header, not on lines.
+        if (r.discountAmount > 0) {
+            var dl = 'Discount' + (r.discountReason ? ' <span class="rc-muted">' + EC.esc(r.discountReason) + '</span>' : '');
+            out += '<tr><td colspan="' + cols + '">' + dl + '</td><td class="rc-amt">−' + EC.money(r.discountAmount) + '</td></tr>';
         }
         if (r.advanceUsed > 0)
             out += '<tr><td colspan="' + cols + '">Paid from advance</td><td class="rc-amt">−' + EC.money(r.advanceUsed) + '</td></tr>';
@@ -112,7 +118,10 @@
             rows += '<div class="rc-kv"><span>Registration fee</span><b>' + EC.money(g.fee) + '</b></div>';
             if (g.paidBefore > 0)
                 rows += '<div class="rc-kv"><span>Received earlier</span><b>' + EC.money(g.paidBefore) + '</b></div>';
+            // Cash only: a discount is money not taken, so it is shown on its own.
             rows += '<div class="rc-kv"><span>Paid on this receipt</span><b>' + EC.money(g.thisReceipt) + '</b></div>';
+            if (g.discount > 0)
+                rows += '<div class="rc-kv"><span>Discount on this receipt</span><b>' + EC.money(g.discount) + '</b></div>';
             rows += '<div class="rc-kv rc-bal"><span>' + (g.balance > 0 ? 'Balance payable' : 'Balance') +
                     '</span><b>' + EC.money(g.balance) + '</b></div>';
         }
@@ -130,6 +139,30 @@
 
     function title(r) {
         return r.paymentType === 'Registration' ? 'REGISTRATION FEE RECEIPT' : 'FEE RECEIPT';
+    }
+
+    /* A voided receipt must never pass for a valid one when reprinted: a banner
+       under the title says CANCELLED, when, by whom and why. */
+    function cancelBanner(r) {
+        if (!r.isCancelled) return '';
+        var bits = [];
+        if (r.cancelledAt) bits.push('on ' + EC.esc(r.cancelledAt));
+        if (r.cancelledBy) bits.push('by ' + EC.esc(r.cancelledBy));
+        if (r.cancelAuthorisedBy) bits.push('authorised: ' + EC.esc(r.cancelAuthorisedBy));
+        return '<div class="rc-void"><b>CANCELLED</b>' + (bits.length ? ' ' + bits.join(' · ') : '') +
+               (r.cancelReason ? '<br/>Reason: ' + EC.esc(r.cancelReason) : '') +
+               '<br/>This receipt is void and is not proof of payment.</div>';
+    }
+
+    /* How it was paid. A split receipt lists each mode with its cheque no / UPI
+       ref instead of the bare word "Mixed". Wallet money is shown among the
+       adjustments ("Paid from advance"), so it is left out here. */
+    function modeText(r) {
+        var parts = (r.tenders || []).filter(function (t) { return t.mode !== 'Advance'; }).map(function (t) {
+            return EC.esc(t.mode) + ' ' + EC.money(t.amount) + (t.reference ? ' (' + EC.esc(t.reference) + ')' : '');
+        });
+        if (parts.length) return parts.join(' + ');
+        return EC.esc(r.mode || '-') + (r.reference ? ' · ' + EC.esc(r.reference) : '');
     }
 
     // School logo for the letterhead. The server sends an ABSOLUTE url because the
@@ -158,6 +191,7 @@
             '<div class="rc-title">' + title(r) + '</div>' +
             (copyLabel ? '<div class="rc-copy">' + copyLabel + '</div>' : '') +
           '</div>' +
+          cancelBanner(r) +
 
           '<div class="rc-meta">' +
             '<div><span>Receipt No</span><b>' + EC.esc(r.receiptNo) + '</b></div>' +
@@ -182,12 +216,12 @@
           '<div class="rc-words"><span>In words:</span> ' + EC.esc(amountWords(r.amount)) + '</div>' +
 
           '<div class="rc-pay">' +
-            '<div><span>Mode</span><b>' + EC.esc(r.mode || '-') + (r.reference ? ' · ' + EC.esc(r.reference) : '') + '</b></div>' +
+            '<div><span>Mode</span><b>' + modeText(r) + '</b></div>' +
             (r.remarks ? '<div><span>Note</span><b>' + EC.esc(r.remarks) + '</b></div>' : '') +
           '</div>' +
 
           '<div class="rc-sign">' +
-            '<div class="rc-sign-box"><div class="rc-line"></div>Cashier</div>' +
+            '<div class="rc-sign-box"><div class="rc-line"></div>Cashier' + (r.collectedBy ? ': ' + EC.esc(r.collectedBy) : '') + '</div>' +
             '<div class="rc-sign-box"><div class="rc-line"></div>Authorised Signatory</div>' +
           '</div>' +
           '<div class="rc-foot">System-generated receipt. Please retain for your records.</div>' +
@@ -210,6 +244,7 @@
             '</div>' +
             '<div class="rc-title">' + title(r) + '</div>' +
           '</div>' +
+          cancelBanner(r) +
           '<div class="rc-meta">' +
             '<div><span>Receipt</span><b>' + EC.esc(r.receiptNo) + '</b></div>' +
             '<div><span>Date</span><b>' + fmtDate(r.date) + '</b></div>' +
@@ -224,9 +259,9 @@
 
           balanceBlock(r) +
           '<div class="rc-words">' + EC.esc(amountWords(r.amount)) + '</div>' +
-          '<div class="rc-pay"><div><span>Mode</span><b>' + EC.esc(r.mode || '-') +
-              (r.reference ? ' · ' + EC.esc(r.reference) : '') + '</b></div></div>' +
-          '<div class="rc-sign"><div class="rc-sign-box"><div class="rc-line"></div>Cashier</div></div>' +
+          '<div class="rc-pay"><div><span>Mode</span><b>' + modeText(r) + '</b></div></div>' +
+          '<div class="rc-sign"><div class="rc-sign-box"><div class="rc-line"></div>Cashier' +
+              (r.collectedBy ? ': ' + EC.esc(r.collectedBy) : '') + '</div></div>' +
         '</div>';
     }
 
@@ -242,6 +277,7 @@
             (sch.address ? '<div class="rc-addr">' + EC.esc(sch.address) + '</div>' : '') +
             '<div class="rc-title">' + title(r) + '</div>' +
           '</div>' +
+          cancelBanner(r) +
           '<div class="rc-sep"></div>' +
           '<div class="rc-kv"><span>Receipt</span><b>' + EC.esc(r.receiptNo) + '</b></div>' +
           '<div class="rc-kv"><span>Date</span><b>' + fmtDate(r.date) + '</b></div>' +
@@ -253,8 +289,8 @@
           '<div class="rc-sep"></div>' +
           '<div class="rc-kv rc-tot"><span>TOTAL</span><b>' + EC.money(r.amount) + '</b></div>' +
           balanceBlock(r) +
-          '<div class="rc-kv"><span>Mode</span><b>' + EC.esc(r.mode || '-') + '</b></div>' +
-          (r.reference ? '<div class="rc-kv"><span>Ref</span><b>' + EC.esc(r.reference) + '</b></div>' : '') +
+          '<div class="rc-kv"><span>Mode</span><b>' + modeText(r) + '</b></div>' +
+          (r.collectedBy ? '<div class="rc-kv"><span>Cashier</span><b>' + EC.esc(r.collectedBy) + '</b></div>' : '') +
           '<div class="rc-sep"></div>' +
           '<div class="rc-words">' + EC.esc(amountWords(r.amount)) + '</div>' +
           '<div class="rc-foot">Thank you.<br/>System-generated receipt.</div>' +
@@ -281,7 +317,10 @@
         // Letterhead: logo beside the school name on paper formats, above it on 80mm.
         '.rc-lettermark{display:flex;align-items:center;justify-content:center;gap:10px}' +
         '.rc-lettertext{text-align:center}' +
-        '.rc-logo{object-fit:contain;flex:0 0 auto}';
+        '.rc-logo{object-fit:contain;flex:0 0 auto}' +
+        // CANCELLED banner on a voided receipt.
+        '.rc-void{border:2px solid #c00;color:#c00;padding:6px 8px;margin:8px 0;text-align:center;font-size:12px}' +
+        '.rc-void b{font-size:15px;letter-spacing:2px}';
 
         if (format === 'Thermal') {
             return base +
@@ -354,7 +393,44 @@
         '.rc-cut{border-top:1px dashed #999;margin:16px 0}';
     }
 
+    /* ---------- Refund voucher (money OUT) ----------
+       One simple layout for every format: the voucher number, who it was paid
+       to, against which charge (or the advance balance), how, why, who
+       authorised it and who paid it out. */
+    function renderRefund(v) {
+        var sch = v.school || {}, stu = v.student || {};
+        var cls = (stu.className || '-') + (stu.section ? ' - ' + stu.section : '');
+        return '' +
+        '<div class="rc rc-a5">' +
+          '<div class="rc-head">' +
+            '<div class="rc-lettermark">' + logoImg(sch, 'rc-logo') +
+              '<div class="rc-lettertext"><div class="rc-school">' + EC.esc(sch.name || 'School') + '</div>' +
+              (sch.address ? '<div class="rc-addr">' + EC.esc(sch.address) + '</div>' : '') + '</div>' +
+            '</div>' +
+            '<div class="rc-title">REFUND VOUCHER</div>' +
+          '</div>' +
+          '<div class="rc-meta">' +
+            '<div><span>Voucher</span><b>' + EC.esc(v.refundNo) + '</b></div>' +
+            '<div><span>Date</span><b>' + fmtDate(v.date) + '</b></div>' +
+          '</div>' +
+          '<div class="rc-inline"><b>' + EC.esc(stu.name || '-') + '</b> · ' + EC.esc(stu.admNo || '-') + ' · ' + EC.esc(cls) + '</div>' +
+          '<table class="rc-lines"><tbody>' +
+            '<tr><td>Refund against: ' + EC.esc(v.against || '-') + '</td><td class="rc-amt">' + EC.money(v.amount) + '</td></tr>' +
+          '</tbody><tfoot><tr><td>Total Refunded</td><td class="rc-amt">' + EC.money(v.amount) + '</td></tr></tfoot></table>' +
+          '<div class="rc-words">' + EC.esc(amountWords(v.amount)) + '</div>' +
+          '<div class="rc-pay"><div><span>Paid via</span><b>' + EC.esc(v.mode || '-') + '</b></div>' +
+            (v.reason ? '<div><span>Reason</span><b>' + EC.esc(v.reason) + '</b></div>' : '') +
+            (v.authorised ? '<div><span>Authorised by</span><b>' + EC.esc(v.authorised) + '</b></div>' : '') +
+          '</div>' +
+          '<div class="rc-sign">' +
+            '<div class="rc-sign-box"><div class="rc-line"></div>Paid by' + (v.refundedBy ? ': ' + EC.esc(v.refundedBy) : '') + '</div>' +
+            '<div class="rc-sign-box"><div class="rc-line"></div>Received by (parent)</div>' +
+          '</div>' +
+        '</div>';
+    }
+
     function buildHtml(r) {
+        if (r.kind === 'refund') return renderRefund(r);
         var f = r.format || 'A4';
         if (f === 'Thermal') return renderThermal(r);
         if (f === 'A5')      return renderA5(r);
@@ -414,6 +490,27 @@
             .fail(function () { ecToast('error', 'Could not load the receipt.'); });
     }
 
+    // A refund voucher from a Payment History row (refundNo, date, amount,
+    // mode, reason, authorised, refundedBy, against) plus the student shown on
+    // the page. Only the school letterhead is fetched.
+    function showRefund(row, student) {
+        if (!row) return;
+        function open(school) {
+            render({
+                kind: 'refund', format: 'A5', school: school || { name: 'School', address: '' },
+                receiptNo: row.refundNo, refundNo: row.refundNo, date: row.date, amount: row.amount,
+                mode: row.mode, reason: row.reason, authorised: row.authorised,
+                refundedBy: row.refundedBy, against: row.against, student: student || {}
+            });
+            var el = document.getElementById('ecReceiptModal');
+            if (!el) return;
+            $(el).find('.modal-title').text('Refund Voucher');
+            $(el).find('.modal-dialog').removeClass('modal-lg');
+            if (window.bootstrap) new window.bootstrap.Modal(el).show();
+        }
+        $.getJSON('/ERP/Fee/GetSchoolHeader').done(open).fail(function () { open(null); });
+    }
+
     $(function () {
         $(document).on('click', '#ecReceiptPrintBtn', printCurrent);
     });
@@ -466,6 +563,6 @@
         render(current);
     }
 
-    window.EcReceipt = { show: show, print: print, render: render, preview: preview, setFormat: setFormat };
+    window.EcReceipt = { show: show, print: print, render: render, preview: preview, setFormat: setFormat, showRefund: showRefund };
 
 })(window, jQuery);

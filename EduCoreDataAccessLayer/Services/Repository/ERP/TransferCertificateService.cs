@@ -5,6 +5,7 @@ using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Npgsql;
 using NpgsqlTypes;
+using Microsoft.Extensions.Logging;
 
 namespace EduCoreDataAccessLayer.Services.Repository.ERP
 {
@@ -13,9 +14,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private readonly PgExec _db;
         private const string Sp = "core.sp_tc_manage";
 
-        public TransferCertificateService(PgExec db)
+        private readonly ILogger<TransferCertificateService> _logger;
+
+        public TransferCertificateService(PgExec db, ILogger<TransferCertificateService> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         // The proc RAISEs its business rules ("clear the dues", "already issued"),
@@ -58,6 +62,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                // The dues / advance gate and the one-live-TC rule are proc RAISEs.
+                _logger.LogWarning(ex, "TC issue rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
                 return new TcIssueResult { Message = ex.MessageText };
             }
         }
@@ -129,6 +135,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "TC void rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
                 return (false, ex.MessageText);
             }
         }

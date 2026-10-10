@@ -214,6 +214,32 @@
                         </div>
                       </div>
                     </div>
+
+                    <!-- Activity & money history — everything that changed the
+                         student's place or money outside a receipt (Student/History). -->
+                    <div class="ec-card mt-3">
+                      <div class="ec-card-header">
+                        <div class="ec-section-title-wrap">
+                          <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
+                          <div>
+                            <div class="ec-section-title">Activity &amp; Money History</div>
+                            <div class="ec-section-subtitle">Admission, exit, promotion, class changes, bus, closed dues and refunds</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="ec-card-body pt-2">
+                        <div class="table-responsive">
+                          <table class="table table-sm align-middle mb-0">
+                            <thead>
+                              <tr><th>When</th><th>What</th><th>Detail</th><th class="text-end">Amount</th><th>By</th></tr>
+                            </thead>
+                            <tbody id="studentHistoryBody">
+                              <tr><td colspan="5" class="text-muted small">Loading…</td></tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
                 </div>
 
             </div>
@@ -234,6 +260,7 @@
 
 var STUDENT_ID = '@studentPublicId';   // uuid, so quoted
 var ENROL_HISTORY_URL = '@Url.Action("EnrolmentHistory","Student",new{area="ERP"})';
+var STUDENT_HISTORY_URL = '@Url.Action("History","Student",new{area="ERP"})';
 var DATA_URL          = '@Url.Action("DashboardData","Student",new{area="ERP"})';
 var charts = {};
 
@@ -759,9 +786,36 @@ function loadEnrolmentHistory(){
     });
 }
 
+/* ── Activity & money history ─────────────────
+   Every non-receipt event that touched the student's place or money. */
+function loadStudentHistory(){
+  var body=document.getElementById('studentHistoryBody');
+  if(!body) return;
+  if(!STUDENT_ID){ EC.listEmpty('#studentHistoryBody','No student selected.'); return; }
+
+  EC.listLoading('#studentHistoryBody');
+  $.getJSON(STUDENT_HISTORY_URL, { id:STUDENT_ID })
+    .done(function(rows){
+      if(!rows || !rows.length){ EC.listEmpty('#studentHistoryBody','No history yet.'); return; }
+      body.innerHTML=rows.map(function(r){
+        return '<tr>'
+          +'<td class="text-nowrap small">'+EC.esc(r.when||'—')+'</td>'
+          +'<td class="fw-bold">'+EC.esc(r.action)+'</td>'
+          +'<td class="small">'+EC.esc(r.detail||'')+'</td>'
+          +'<td class="text-end">'+(r.amount==null?'—':EC.money(r.amount))+'</td>'
+          +'<td class="small">'+EC.esc(r.by||'—')+'</td>'
+          +'</tr>';
+      }).join('');
+    })
+    .fail(function(){
+      EC.listEmpty('#studentHistoryBody','Could not load history. Please retry.','bx-error-circle');
+    });
+}
+
 /* ── Init ────────────────────────────────────── */
 loadDashboard();
 loadEnrolmentHistory();
+loadStudentHistory();
 
 })();
 </script>

@@ -85,9 +85,14 @@ BEGIN
     -- The till. fee_payments.amount is what was SETTLED on the ledger, not what
     -- crossed the counter — a parent handing over 2500 against a 1000 due leaves
     -- amount = 1000 and advance_credit = 1500. Real cash is therefore
-    -- amount + credit - used, and day close counts the same money a second way,
-    -- from the tender lines. If these two ever disagree the drawer will not
-    -- reconcile, and nobody will know which figure to trust.
+    -- amount + credit - used. The tender lines count the same money a second way.
+    -- If these two ever disagree the drawer will not reconcile, and nobody will
+    -- know which figure to trust.
+    --
+    -- (This comment used to say Day Close counted from the tender lines. It did
+    -- not -- it read the receipt header until 2026-10-10. Day Close now reads
+    -- core.fn_fee_money_lines, and money_reports_dayclose_tests.sql DC-10
+    -- checks it against the drawer.)
     SELECT COALESCE(SUM(amount + COALESCE(advance_credit,0) - COALESCE(advance_used,0)),0)
       INTO t_calc
       FROM core.fee_payments
@@ -275,7 +280,7 @@ BEGIN
     c := 's3';
     CALL core.sp_fee_payment_collect(c_tenant, c_school, c_user, v_sid,
          jsonb_build_array(jsonb_build_object('ledgerId', v_lid, 'amount', 4000, 'concession', 1000)),
-         '[]'::jsonb, 'Cash', NULL, NULL, CURRENT_DATE, v_year, NULL, 0, NULL, NULL, 0, c);
+         '[]'::jsonb, 'Cash', NULL, NULL, CURRENT_DATE, v_year, 'Flat', 1000, 'admission concession (reason required)', NULL, 0, c);
     FETCH c INTO k_ok, k_msg, k_rcpt, k_amt;
     v_cash_in := v_cash_in + 4000;
 
@@ -443,10 +448,12 @@ BEGIN
        AND COALESCE(amount_paid,0) > 0;
     PERFORM pg_temp.chk_eq('9.1 the month they rode and PAID for survives', v_n, 1);
 
+    -- Those months are closed, not deleted (student_money_lifecycle.sql): the row
+    -- stays with a reason, and nothing on it is owed any more.
     SELECT COUNT(*) INTO v_n FROM core.student_ledger
      WHERE student_id = v_sid AND LOWER(fee_head_name) LIKE '%transport%'
-       AND COALESCE(amount_paid,0) = 0;
-    PERFORM pg_temp.chk_eq('9.2 the months they will not ride are dropped', v_n, 0);
+       AND COALESCE(amount_due,0) - COALESCE(amount_paid,0) - COALESCE(concession,0) > 0;
+    PERFORM pg_temp.chk_eq('9.2 the months they will not ride are no longer owed', v_n, 0);
 
     -- THE ONE THAT MATTERS HERE: dropping unpaid dues must not delete the
     -- RECEIPT for the month that was paid, or the cash book loses 600.

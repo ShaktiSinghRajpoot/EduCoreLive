@@ -25,6 +25,9 @@
         public string FeeHeadNames { get; set; } = string.Empty;
         public int CreatedBy { get; set; }
         public int UpdatedBy { get; set; }
+        // Display names for the audit columns (the ids above printed as "39").
+        public string? CreatedByName { get; set; }
+        public string? UpdatedByName { get; set; }
         public DateTime? UpdatedAt { get; set; }
 
         public List<string> SelectedClasses { get; set; } = new List<string>();

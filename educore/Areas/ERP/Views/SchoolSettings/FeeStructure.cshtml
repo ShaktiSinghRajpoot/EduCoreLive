@@ -204,6 +204,17 @@
                                Quarterly and Half Yearly used to be filed under "Yearly —
                                collected once per year" while the biller charged them 4x and
                                2x, so the page contradicted the money. *@
+                            @if (!feeHeads.Any(h => h.IsActive))
+                            {
+                                <div class="warning-box mb-4">
+                                    <i class="bx bx-info-circle me-1"></i>
+                                    <strong>No active fee heads.</strong>
+                                    Create them in
+                                    <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeHead">Fee Head Master</a>
+                                    before building a fee structure.
+                                </div>
+                            }
+
                             @foreach (var group in new[]
                                                         {
                                                         new { Key="One Time",    Title="One Time Charges",     Sub="Charged once, at admission." },
@@ -215,7 +226,7 @@
                             {
                                 // Five cycles exist but most schools use two or three, and an
                                 // empty heading reads like something failed to load.
-                                if (!feeHeads.Any(h => h.Frequency == group.Key)) { continue; }
+                                if (!feeHeads.Any(h => h.IsActive && h.Frequency == group.Key)) { continue; }
 
                                 <div class="mb-4">
                                     <div class="mb-3">
@@ -225,11 +236,47 @@
 
                                     @for (int i = 0; i < feeHeads.Count; i++)
                                     {
-                                        if (feeHeads[i].Frequency == group.Key)
+                                        if (feeHeads[i].IsActive && feeHeads[i].Frequency == group.Key)
                                         {
-                                            var isMandatory = feeHeads[i].FeeType == "Mandatory";
+                                            HeadRow(i);
+                                        }
+                                    }
+                                </div>
+                            }
 
-                                            <div class="fee-head-row"
+                            @*
+                                Inactive heads are not offered for a new structure, but a structure
+                                that already has one must keep it when edited (Update used to drop
+                                it silently). Their rows live here, hidden; the edit loader shows
+                                this block when the structure being edited uses one of them.
+                                Every head is rendered somewhere, so the FeeHeads[i] indexes have
+                                no gaps (MVC stops binding at the first gap).
+                            *@
+                            @if (feeHeads.Any(h => !h.IsActive))
+                            {
+                                <div class="mb-4 d-none" id="inactiveHeadsBlock">
+                                    <div class="mb-3">
+                                        <div class="fee-group-title">Inactive heads on this structure</div>
+                                        <div class="fee-group-subtitle">Kept on this class's structure. New admissions are not charged for them.</div>
+                                    </div>
+                                    @for (int i = 0; i < feeHeads.Count; i++)
+                                    {
+                                        if (!feeHeads[i].IsActive)
+                                        {
+                                            HeadRow(i);
+                                        }
+                                    }
+                                </div>
+                            }
+
+                            @{
+                                // One fee head row. Used by the cycle groups (active heads) and
+                                // by the hidden inactive block, so the markup lives in one place.
+                                void HeadRow(int i)
+                                {
+                                            var isMandatory = feeHeads[i].IsActive && feeHeads[i].FeeType == "Mandatory";
+
+                                            <div class="fee-head-row @(feeHeads[i].IsActive ? "" : "fee-head-inactive")"
                                                  data-cycle="@feeHeads[i].Frequency"
                                                  data-type="@feeHeads[i].FeeType"
                                                  data-fee-head-name="@feeHeads[i].FeeHeadName">
@@ -284,9 +331,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                        }
-                                    }
-                                </div>
+                                }
                             }
 
                             <div class="ec-sticky-actions">
@@ -351,6 +396,16 @@
                             <div class="summary-row">
                                 <span class="summary-label">Monthly</span>
                                 <span class="summary-value" id="monthlyTotal">₹0.00 / month</span>
+                            </div>
+
+                            <div class="summary-row">
+                                <span class="summary-label">Quarterly</span>
+                                <span class="summary-value" id="quarterlyTotal">₹0 / quarter</span>
+                            </div>
+
+                            <div class="summary-row">
+                                <span class="summary-label">Half Yearly</span>
+                                <span class="summary-value" id="halfYearlyTotal">₹0 / half-year</span>
                             </div>
 
                             <div class="summary-row">
@@ -475,17 +530,32 @@
                                         <span class="ec-pill">@(item.IsActive ? "Active" : "Inactive")</span>
                                     </td>
 
-                                    <td>@item.CreatedBy</td>
-                                    <td>@item.UpdatedBy</td>
+                                    @* Names, not the raw user ids ("39") these columns used to print. *@
+                                    <td>@(item.CreatedByName ?? (item.CreatedBy > 0 ? item.CreatedBy.ToString() : ""))</td>
+                                    <td>@(item.UpdatedByName ?? (item.UpdatedBy > 0 ? item.UpdatedBy.ToString() : ""))</td>
                                     <td>@item.UpdatedAt?.ToString("dd MMM yyyy")</td>
 
-                                    <td class="text-end">
+                                    <td class="text-end text-nowrap">
                                         <button type="button"
                                                 class="btn btn-sm btn-outline-primary fee-action-btn edit-structure-btn"
                                                 data-class="@item.ClassName"
                                                 data-year="@item.AcademicYear">
                                             <i class="bx bx-edit"></i>
                                         </button>
+
+                                        @* The delete action existed with no way to reach it. Admitted
+                                           students keep their dues -- ledgers are frozen at admission. *@
+                                        <form asp-area="ERP" asp-controller="SchoolSettings" asp-action="DeleteFeeStructure"
+                                              method="post" class="d-inline"
+                                              data-ec-confirm="Delete this class fee structure? New admissions to this class will have no fee structure until you save one again. Students already admitted keep their dues."
+                                              data-ec-confirm-name="@($"{item.ClassName} — {item.AcademicYear}")"
+                                              data-ec-confirm-ok="Delete structure">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="id" value="@item.FeeStructureId" />
+                                            <button type="submit" class="btn btn-sm btn-outline-danger fee-action-btn">
+                                                <i class="bx bx-trash"></i>
+                                            </button>
+                                        </form>
                                     </td>
                                 </tr>
                             }
@@ -575,8 +645,9 @@
                 let selectedClassHtml = '';
                 let selectedFeeHeadHtml = '';
 
+                // Names are user-typed: escape before they go into .html().
                 $('.class-checkbox:checked').each(function () {
-                    selectedClassHtml += `<span class="summary-chip">${$(this).val()}</span>`;
+                    selectedClassHtml += '<span class="summary-chip">' + EC.esc($(this).val()) + '</span>';
                 });
 
                 $('#selectedClassCount').text($('.class-checkbox:checked').length);
@@ -596,9 +667,9 @@
 
                     let cycle = ($(this).data('cycle') || '').toString().toLowerCase();
                     let amount = parseFloat($(this).find('.fee-amount').val()) || 0;
-                    let feeHeadName = ($(this).data('fee-head-name') || '').toString();
+                    let feeHeadName = $(this).attr('data-fee-head-name') || '';
 
-                    selectedFeeHeadHtml += `<span class="summary-chip">${feeHeadName}</span>`;
+                    selectedFeeHeadHtml += '<span class="summary-chip">' + EC.esc(feeHeadName) + '</span>';
 
                     if (cycle === 'one time') oneTime += amount;
                     else if (cycle === 'monthly') monthly += amount;
@@ -613,6 +684,8 @@
                 $('#selectedFeeHeadCount').text(selectedFeeHeads);
                 $('#oneTimeTotal').text(formatINR(oneTime));
                 $('#monthlyTotal').text(formatINR(monthly) + ' / month');
+                $('#quarterlyTotal').text(formatINR(quarterly) + ' / quarter');
+                $('#halfYearlyTotal').text(formatINR(halfYearly) + ' / half-year');
                 $('#yearlyTotal').text(formatINR(yearly) + ' / year');
                 $('#annualTotal').text(formatINR(annualTotal));
 
@@ -663,12 +736,26 @@
 
             $(document).on('change', '.fee-head-checkbox', updateSummary);
             $(document).on('input', '.fee-amount', updateSummary);
-            $('#AcademicYear').on('change', updateSummary);
+
+            // The class chips and the "already has a structure" marks belong to one
+            // session, so picking another session reloads the page for it. In edit
+            // mode the dropdown is how a class's structure is copied to another
+            // session, so there it only updates the summary.
+            $('#AcademicYear').on('change', function () {
+                let year = $(this).val();
+                if ($('#IsEditMode').val() !== 'true' && year) {
+                    window.location.href = window.location.pathname + '?academicYear=' + encodeURIComponent(year);
+                    return;
+                }
+                updateSummary();
+            });
 
             $('#selectMandatoryBtn').on('click', function () {
                 $('.fee-head-row').each(function () {
-                    let type = ($(this).data('type') || '').toString().toLowerCase();
-                    $(this).find('.fee-head-checkbox').prop('checked', type === 'mandatory');
+                    let type = ($(this).attr('data-type') || '').toLowerCase();
+                    // Inactive heads are never pre-selected.
+                    let active = !$(this).hasClass('fee-head-inactive');
+                    $(this).find('.fee-head-checkbox').prop('checked', active && type === 'mandatory');
                 });
 
                 updateSummary();
@@ -676,8 +763,9 @@
             });
 
             $('.edit-structure-btn').on('click', function () {
-                let className = $(this).data('class');
-                let year      = $(this).data('year');
+                // attr, not data(): jQuery's data() turns a class named "5" into the number 5.
+                let className = $(this).attr('data-class');
+                let year      = $(this).attr('data-year');
 
                 $('#IsEditMode').val('true');
                 $('#EditClassName').val(className);
@@ -722,6 +810,7 @@
                             });
 
                             // For each fee head row: check it if it was saved, set the saved amount
+                            let usesInactive = false;
                             $('.fee-head-row').each(function () {
                                 let feeHeadIdInput = $(this).find('input[name$=".FeeHeadId"]');
                                 let feeHeadId = parseInt(feeHeadIdInput.val());
@@ -729,10 +818,15 @@
                                 if (savedMap.hasOwnProperty(feeHeadId)) {
                                     $(this).find('.fee-head-checkbox').prop('checked', true);
                                     $(this).find('.fee-amount').val(savedMap[feeHeadId]);
+                                    if ($(this).hasClass('fee-head-inactive')) usesInactive = true;
                                 } else {
                                     $(this).find('.fee-head-checkbox').prop('checked', false);
                                 }
                             });
+
+                            // Show the inactive heads this structure still carries, so
+                            // Update keeps them (or the user can untick them on purpose).
+                            $('#inactiveHeadsBlock').toggleClass('d-none', !usesInactive);
 
                             ecToast('info', 'Edit mode — ' + className + ' structure loaded from database.');
                         } else {
@@ -752,7 +846,9 @@
                 }, 300);
             });
 
-            $('#exitEditModeBtn').on('click', function () {
+            // Leave edit mode: back to "new structure" state. Inactive heads are
+            // hidden and unticked again, since they are never offered for a new one.
+            function exitEditMode() {
                 $('#IsEditMode').val('false');
                 $('#EditClassName').val('');
                 $('#editModeBox').addClass('d-none');
@@ -761,8 +857,24 @@
                 $('.class-checkbox').prop('checked', false);
                 $('.class-chip-card').removeClass('active');
 
+                $('#inactiveHeadsBlock').addClass('d-none');
+                $('.fee-head-inactive .fee-head-checkbox').prop('checked', false);
+            }
+
+            $('#exitEditModeBtn').on('click', function () {
+                exitEditMode();
                 updateSummary();
                 ecToast('info', 'Edit mode closed.');
+            });
+
+            // The Reset button is a plain type="reset": the browser puts the inputs
+            // back to their defaults but knows nothing of edit mode or the summary.
+            // Hidden inputs are not reset by the browser at all. Run after it.
+            $('#feeStructureForm').on('reset', function () {
+                setTimeout(function () {
+                    exitEditMode();
+                    updateSummary();
+                }, 0);
             });
 
             $('#feeStructureForm').on('submit', function (e) {
@@ -800,8 +912,10 @@
                 let searchText = $(this).val().toLowerCase().trim();
 
                 $('.structure-row').each(function () {
-                    let className = ($(this).data('class') || '').toLowerCase();
-                    let heads = ($(this).data('heads') || '').toLowerCase();
+                    // attr, not data(): data() turns a class named "5" into the number 5,
+                    // and (5).toLowerCase() threw, so the search did nothing at all.
+                    let className = ($(this).attr('data-class') || '').toLowerCase();
+                    let heads = ($(this).attr('data-heads') || '').toLowerCase();
 
                     $(this).toggle(
                         className.includes(searchText) || heads.includes(searchText)

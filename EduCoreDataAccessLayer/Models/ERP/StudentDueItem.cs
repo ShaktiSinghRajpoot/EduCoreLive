@@ -15,5 +15,6 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal   AmountPaid       { get; set; }
         public decimal   Concession       { get; set; }
         public decimal   Outstanding      { get; set; }
+        public bool      IsRefundable     { get; set; }
     }
 }

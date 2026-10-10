@@ -1,7 +1,14 @@
 -- ============================================================================
 -- Fee Reports — Concession & Cancellation register (audit)
---   • Concessions: active receipts that carried a discount/waiver in the range.
---   • Cancellations: receipts voided in the range (with reason + authoriser).
+--   • Concessions: every receipt issued in the range that carried a discount,
+--     concession or waiver -- fee counter concessions (concession_total) AND
+--     registration discounts (discount_amount) -- with who gave it. A receipt
+--     cancelled later stays listed, flagged, so a past range never changes;
+--     the page totals only the live ones.
+--   • Cancellations: receipts voided in the range, with reason, authoriser and
+--     the USER who cancelled (the authoriser is free text; the user is not).
+-- Blank range = month to date, the same default as the other registers.
+-- Apply AFTER fee_day_close.sql (fn_user_display_name).
 -- One proc, two result sets. Read-only. Safe to re-run.
 -- ============================================================================
 CREATE OR REPLACE PROCEDURE core.sp_fee_concession_cancel_register(
@@ -16,7 +23,7 @@ CREATE OR REPLACE PROCEDURE core.sp_fee_concession_cancel_register(
 LANGUAGE plpgsql
 AS $procedure$
 DECLARE
-    v_from date := COALESCE(p_from, CURRENT_DATE);
+    v_from date := COALESCE(p_from, date_trunc('month', CURRENT_DATE)::date);
     v_to   date := COALESCE(p_to,   CURRENT_DATE);
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
@@ -25,7 +32,11 @@ BEGIN
 
     OPEN p_concessions FOR
     SELECT p.receipt_no, p.payment_date, p.concession_total,
+           COALESCE(p.concession_total, 0) + COALESCE(p.discount_amount, 0) AS concession_amount,
+           COALESCE(NULLIF(TRIM(p.payment_type), ''), 'Fee') AS payment_type,
            p.discount_type, p.discount_value, p.discount_reason,
+           COALESCE(p.is_cancelled, FALSE) AS is_cancelled,
+           core.fn_user_display_name(p.created_by) AS given_by_name,
            COALESCE(s.student_name, e.student_name, '—') AS student_name,
            COALESCE(s.admission_no,
                     CASE WHEN e.enquiry_id IS NOT NULL
@@ -35,13 +46,16 @@ BEGIN
     LEFT JOIN core.students  s ON s.student_id = p.student_id
     LEFT JOIN core.enquiries e ON e.enquiry_id = p.enquiry_id
     WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
-      AND p.is_cancelled = FALSE AND p.concession_total > 0
-      AND p.payment_date::date BETWEEN v_from AND v_to
+      AND COALESCE(p.concession_total, 0) + COALESCE(p.discount_amount, 0) > 0
+      AND p.payment_date BETWEEN to_char(v_from, 'YYYY-MM-DD') AND to_char(v_to, 'YYYY-MM-DD')
     ORDER BY p.payment_date, p.payment_id;
 
     OPEN p_cancels FOR
     SELECT p.receipt_no, p.payment_date, p.amount,
            p.cancel_reason, p.cancel_authorized_by, p.cancelled_at,
+           p.cancelled_by,
+           core.fn_user_display_name(p.cancelled_by) AS cancelled_by_name,
+           core.fn_user_display_name(p.created_by)   AS collected_by_name,
            COALESCE(s.student_name, e.student_name, '—') AS student_name,
            COALESCE(s.admission_no,
                     CASE WHEN e.enquiry_id IS NOT NULL

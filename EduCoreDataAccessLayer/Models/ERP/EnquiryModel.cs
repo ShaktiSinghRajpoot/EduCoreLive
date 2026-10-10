@@ -45,7 +45,10 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal?  EstimatedFee           { get; set; }
         public string?   RegistrationNumber     { get; set; }
         public string? RegistrationDate       { get; set; }
-        public bool      RegistrationFeePaid    { get; set; }
+        public bool      RegistrationFeePaid    { get; set; }   // derived from receipts by the proc
+        // True once any registration receipt exists: such an enquiry is part of
+        // the money trail and cannot be deleted (the proc refuses; the UI hides Delete).
+        public bool      HasFeeReceipts         { get; set; }
         // Conversion
         public int?      AdmissionId            { get; set; }
         // Additional enquiry details (v2.1)

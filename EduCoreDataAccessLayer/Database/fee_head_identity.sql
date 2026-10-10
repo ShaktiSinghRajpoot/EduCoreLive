@@ -79,6 +79,11 @@ DECLARE
     v_moved     integer := 0;
     v_n         integer;
     v_active    boolean;
+    v_freq      varchar(30);
+    v_old_freq  varchar(30);
+    v_clash     text;
+    v_type      varchar(30);
+    v_restruct  integer := 0;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -131,9 +136,28 @@ BEGIN
         IF COALESCE(p_default_amount, 0) < 0 THEN
             RAISE EXCEPTION 'Amount for "%" cannot be negative.', v_name;
         END IF;
-        IF lower(trim(COALESCE(p_frequency, ''))) NOT IN
-               ('one time', 'monthly', 'quarterly', 'half yearly', 'yearly') THEN
+        -- Validate AND store the canonical spelling. Every reader matches the
+        -- cycle by exact text (the Fee Structure page groups on "Monthly" etc.),
+        -- so " monthly " used to pass here and then vanish from that page.
+        v_freq := CASE lower(trim(COALESCE(p_frequency, '')))
+                      WHEN 'one time'    THEN 'One Time'
+                      WHEN 'monthly'     THEN 'Monthly'
+                      WHEN 'quarterly'   THEN 'Quarterly'
+                      WHEN 'half yearly' THEN 'Half Yearly'
+                      WHEN 'yearly'      THEN 'Yearly'
+                  END;
+        IF v_freq IS NULL THEN
             RAISE EXCEPTION 'Unknown billing cycle "%" for "%".', p_frequency, v_name;
+        END IF;
+
+        -- Mandatory / Optional drives the summary tiles and which heads the
+        -- Fee Structure page ticks by default; anything else is neither.
+        v_type := CASE lower(trim(COALESCE(p_fee_type, '')))
+                      WHEN 'mandatory' THEN 'Mandatory'
+                      WHEN 'optional'  THEN 'Optional'
+                  END;
+        IF v_type IS NULL THEN
+            RAISE EXCEPTION 'Fee type for "%" must be Mandatory or Optional.', v_name;
         END IF;
         IF COALESCE(p_collection_point, 'Recurring') NOT IN
                ('Registration', 'Admission', 'Recurring') THEN
@@ -155,9 +179,33 @@ BEGIN
             RAISE EXCEPTION 'A fee head named "%" already exists.', v_name;
         END IF;
 
+        -- The create-form upsert above is only safe when the existing head is
+        -- the same KIND of charge. The Admission Workflow fee cards send id 0
+        -- plus a typed name, so typing "Admission Fee" on the deposit card used
+        -- to turn the real Admission Fee into a refundable deposit (and "Tution
+        -- Fee" on the registration card made tuition one-time). A same-name head
+        -- at a different collection point, or refundable where the existing one
+        -- is not (or the other way round), is a different charge: refuse.
+        IF COALESCE(p_fee_head_id, 0) = 0 THEN
+            SELECT CASE WHEN COALESCE(is_refundable, FALSE) THEN 'refundable ' ELSE '' END
+                   || collection_point
+              INTO v_clash
+              FROM core.school_fee_heads
+             WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+               AND COALESCE(is_deleted, FALSE) = FALSE
+               AND lower(trim(fee_head_name)) = lower(v_name)
+               AND (collection_point IS DISTINCT FROM COALESCE(p_collection_point, 'Recurring')
+                    OR COALESCE(is_refundable, FALSE) <> COALESCE(p_is_refundable, FALSE))
+             LIMIT 1;
+            IF FOUND THEN
+                RAISE EXCEPTION 'A fee head called "%" already exists as a % charge. Please use a different name.',
+                                v_name, v_clash;
+            END IF;
+        END IF;
+
         IF COALESCE(p_fee_head_id, 0) > 0 THEN
 
-            SELECT fee_head_name INTO v_old_name
+            SELECT fee_head_name, frequency INTO v_old_name, v_old_freq
             FROM core.school_fee_heads
             WHERE tenant_id = p_tenant_id AND school_id = p_school_id
               AND fee_head_id = p_fee_head_id
@@ -170,9 +218,9 @@ BEGIN
 
             UPDATE core.school_fee_heads
             SET fee_head_name    = v_name,
-                frequency        = p_frequency,
+                frequency        = v_freq,
                 default_amount   = COALESCE(p_default_amount, 0),
-                fee_type         = p_fee_type,
+                fee_type         = v_type,
                 fee_group        = COALESCE(p_fee_group, 'Academic'),
                 collection_point = COALESCE(p_collection_point, 'Recurring'),
                 is_refundable    = COALESCE(p_is_refundable, FALSE),
@@ -205,9 +253,61 @@ BEGIN
                 -- Receipt lines move too. A receipt is a snapshot of amounts,
                 -- not of spelling, and leaving them behind is what splits a
                 -- collection report down the middle.
-                UPDATE core.fee_payment_details SET fee_head_name = v_name
-                 WHERE fee_head_name = v_old_name;
+                -- Only THIS school's receipts: the detail table has no tenant
+                -- column, so scope it through its receipt header. Unscoped, a
+                -- rename here rewrote every school's receipts with that name.
+                UPDATE core.fee_payment_details d SET fee_head_name = v_name
+                  FROM core.fee_payments p
+                 WHERE p.payment_id = d.payment_id
+                   AND p.tenant_id = p_tenant_id AND p.school_id = p_school_id
+                   AND d.fee_head_name = v_old_name;
                 GET DIAGNOSTICS v_n = ROW_COUNT; v_moved := v_moved + v_n;
+            END IF;
+
+            -- A new billing cycle has to reach the class structures that already
+            -- carry this head. Admission bills from the structure line's cycle,
+            -- so leaving it behind kept billing the old cycle while the page
+            -- showed the new one. Ledgers already written stay as they are
+            -- (they are frozen at admission); only future admissions change.
+            IF v_old_freq IS DISTINCT FROM v_freq THEN
+                UPDATE core.school_fee_structure_details SET frequency = v_freq,
+                       updated_by = p_action_user_id, updated_at = NOW()
+                 WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                   AND fee_head_id = p_fee_head_id;
+
+                -- Re-derive the rollups of every structure that holds the head,
+                -- from its live lines, the same way the save computes them.
+                UPDATE core.school_fee_structures fs
+                SET one_time_total    = t.one_time,
+                    monthly_total     = t.monthly,
+                    quarterly_total   = t.quarterly,
+                    half_yearly_total = t.half_yearly,
+                    yearly_total      = t.yearly,
+                    annual_total      = t.one_time + t.monthly * 12 + t.quarterly * 4
+                                      + t.half_yearly * 2 + t.yearly,
+                    updated_by        = p_action_user_id,
+                    updated_at        = NOW()
+                FROM (
+                    SELECT d.fee_structure_id,
+                           COALESCE(SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'one time'), 0)    AS one_time,
+                           COALESCE(SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'monthly'), 0)     AS monthly,
+                           COALESCE(SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'quarterly'), 0)   AS quarterly,
+                           COALESCE(SUM(d.amount) FILTER (WHERE lower(d.frequency) = 'half yearly'), 0) AS half_yearly,
+                           COALESCE(SUM(d.amount) FILTER (WHERE lower(d.frequency) NOT IN
+                                    ('one time','monthly','quarterly','half yearly')), 0)                AS yearly
+                      FROM core.school_fee_structure_details d
+                     WHERE d.tenant_id = p_tenant_id AND d.school_id = p_school_id
+                       AND COALESCE(d.is_deleted, FALSE) = FALSE
+                       AND d.fee_structure_id IN (
+                           SELECT fee_structure_id FROM core.school_fee_structure_details
+                            WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                              AND fee_head_id = p_fee_head_id
+                              AND COALESCE(is_deleted, FALSE) = FALSE)
+                     GROUP BY d.fee_structure_id
+                ) t
+                WHERE fs.fee_structure_id = t.fee_structure_id
+                  AND COALESCE(fs.is_deleted, FALSE) = FALSE;
+                GET DIAGNOSTICS v_restruct = ROW_COUNT;
             END IF;
 
         ELSE
@@ -216,8 +316,8 @@ BEGIN
                  fee_type, fee_group, collection_point, is_refundable,
                  is_active, is_deleted, created_by, created_at)
             VALUES
-                (p_tenant_id, p_school_id, v_name, p_frequency, COALESCE(p_default_amount, 0),
-                 p_fee_type, COALESCE(p_fee_group, 'Academic'),
+                (p_tenant_id, p_school_id, v_name, v_freq, COALESCE(p_default_amount, 0),
+                 v_type, COALESCE(p_fee_group, 'Academic'),
                  COALESCE(p_collection_point, 'Recurring'), COALESCE(p_is_refundable, FALSE),
                  TRUE, FALSE, p_action_user_id, NOW())
             ON CONFLICT (tenant_id, school_id, lower(fee_head_name))
@@ -241,7 +341,11 @@ BEGIN
                     THEN format('"%s" saved — renamed from "%s" on %s existing row(s).',
                                 v_name, v_old_name, v_moved)
                     ELSE format('"%s" saved.', v_name)
-               END AS message;
+               END
+               || CASE WHEN v_restruct > 0
+                       THEN format(' Billing cycle changed to %s on %s class fee structure(s); students already admitted keep their existing dues.',
+                                   v_freq, v_restruct)
+                       ELSE '' END AS message;
 
     ELSIF p_operation = 'ToggleFeeHeadStatus' THEN
 
@@ -306,3 +410,33 @@ COMMENT ON FUNCTION core.fn_fee_head_delete_guard(integer, integer, varchar) IS
 -- procedures now say out loud. Kept "in case", it is the same dead weight as
 -- registration_fee_amount sitting at 0.00 long after the amounts moved.
 ALTER TABLE core.school_fee_heads DROP COLUMN IF EXISTS display_order;
+
+
+-- ── 5. Billing cycles in their one canonical spelling ──────────────────────
+-- The save used to validate lower(trim(cycle)) but store whatever was typed, so
+-- " monthly " could reach the table. The Fee Structure page files heads by the
+-- exact text and skipped such a head, which also left a hole in the posted
+-- FeeHeads[i] indexes and dropped every head after it on save. The save now
+-- stores the canonical form; this brings any older rows into line.
+-- Safe to re-run: it only touches rows that are not already canonical.
+UPDATE core.school_fee_heads
+   SET frequency = CASE lower(trim(frequency))
+                       WHEN 'one time'    THEN 'One Time'
+                       WHEN 'monthly'     THEN 'Monthly'
+                       WHEN 'quarterly'   THEN 'Quarterly'
+                       WHEN 'half yearly' THEN 'Half Yearly'
+                       WHEN 'yearly'      THEN 'Yearly'
+                   END
+ WHERE lower(trim(frequency)) IN ('one time','monthly','quarterly','half yearly','yearly')
+   AND frequency NOT IN ('One Time','Monthly','Quarterly','Half Yearly','Yearly');
+
+UPDATE core.school_fee_structure_details
+   SET frequency = CASE lower(trim(frequency))
+                       WHEN 'one time'    THEN 'One Time'
+                       WHEN 'monthly'     THEN 'Monthly'
+                       WHEN 'quarterly'   THEN 'Quarterly'
+                       WHEN 'half yearly' THEN 'Half Yearly'
+                       WHEN 'yearly'      THEN 'Yearly'
+                   END
+ WHERE lower(trim(frequency)) IN ('one time','monthly','quarterly','half yearly','yearly')
+   AND frequency NOT IN ('One Time','Monthly','Quarterly','Half Yearly','Yearly');

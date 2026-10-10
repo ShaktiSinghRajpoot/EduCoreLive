@@ -115,6 +115,10 @@ BEGIN
                    ) AS annual
             FROM core.school_fee_structure_details d
             WHERE d.fee_structure_id = ANY(v_structs)
+              -- Only live lines. A head dropped from a structure earlier is kept
+              -- as a soft-deleted line; counting it put its amount back into the
+              -- totals the moment any other head was deleted.
+              AND COALESCE(d.is_deleted, FALSE) = FALSE
             GROUP BY d.fee_structure_id
         ) t
         WHERE fs.fee_structure_id = t.fee_structure_id;
@@ -135,7 +139,8 @@ BEGIN
           AND COALESCE(fs.is_deleted, FALSE) = FALSE
           AND NOT EXISTS (
               SELECT 1 FROM core.school_fee_structure_details d
-              WHERE d.fee_structure_id = fs.fee_structure_id);
+              WHERE d.fee_structure_id = fs.fee_structure_id
+                AND COALESCE(d.is_deleted, FALSE) = FALSE);
         GET DIAGNOSTICS v_emptied = ROW_COUNT;
     END IF;
 

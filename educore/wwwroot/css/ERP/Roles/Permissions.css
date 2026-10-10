@@ -10,3 +10,7 @@
 .pm-cell input{ width:1.25rem; height:1.25rem; cursor:pointer; }
 .pm-cell .muted{ color:var(--ec-text-light); font-size:.8rem; }
 .pm-sticky{ position:sticky; bottom:0; background:rgba(255,255,255,.96); backdrop-filter:blur(8px); border-top:1px solid var(--ec-border); padding:.9rem 1.1rem; display:flex; justify-content:space-between; align-items:center; gap:.75rem; border-radius:0 0 var(--ec-radius) var(--ec-radius); z-index:5; }
+
+/* Finer actions of a feature (fees.collect, fees.cancel ...) under its row */
+.pm-extras{ display:flex; flex-wrap:wrap; gap:.4rem 1.25rem; padding:.25rem 0 .6rem 1.25rem; }
+.pm-extra{ display:inline-flex; align-items:center; gap:.4rem; font-size:.85rem; cursor:pointer; }

@@ -1,10 +1,13 @@
-﻿-- ============================================================
+-- ============================================================
 --  Student master expansion — real-ERP admission record
 --  Adds identity/demographics, previous school, full parent
 --  details, and a documents checklist to core.students, and
 --  extends core.sp_admission_manage (SaveAdmission) to persist
 --  them. Parameters bind by name (Npgsql StoredProcedure), so
 --  the new params are additive and safe for existing callers.
+--
+--  Depends on student_money_lifecycle.sql (fn_fee_plan_problem,
+--  fn_student_bill_plan) -- apply that first.
 -- ============================================================
 
 -- ── 1. New columns (idempotent) ─────────────────────────────
@@ -216,6 +219,40 @@ BEGIN
         -- No matching year row (a back-dated or free-typed session name).
         v_charge_from := COALESCE(v_charge_from, 'AdmissionMonth');
 
+        -- The fee plan arrives from the admission form. A negative amount or the
+        -- same head twice is refused before anything is written.
+        IF core.fn_fee_plan_problem(p_fee_plan_json) IS NOT NULL THEN
+            OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                core.fn_fee_plan_problem(p_fee_plan_json) AS message, NULL::TEXT AS admission_no;
+            RETURN;
+        END IF;
+
+        -- An enquiry becomes ONE student. The row is locked so two clerks
+        -- converting the same enquiry at once cannot both get through.
+        IF p_enquiry_id IS NOT NULL AND p_enquiry_id > 0 THEN
+            PERFORM 1 FROM core.enquiries
+             WHERE enquiry_id = p_enquiry_id
+               AND tenant_id = p_tenant_id AND school_id = p_school_id
+               FOR UPDATE;
+            IF EXISTS (SELECT 1 FROM core.enquiries e
+                        JOIN core.students s ON s.student_id = e.admission_id
+                       WHERE e.enquiry_id = p_enquiry_id
+                         AND e.tenant_id = p_tenant_id AND e.school_id = p_school_id) THEN
+                OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                    'This enquiry has already been admitted.' AS message, NULL::TEXT AS admission_no;
+                RETURN;
+            END IF;
+        END IF;
+
+        -- Two identical submits arriving together both passed the COUNT below
+        -- before either inserted. A transaction-scoped advisory lock on the
+        -- same name + dob + mobile makes the second one wait for the first and
+        -- then see its row. Released automatically at commit / rollback.
+        PERFORM pg_advisory_xact_lock(hashtext(
+            'admission:' || p_tenant_id || ':' || p_school_id || ':' ||
+            regexp_replace(LOWER(TRIM(COALESCE(p_student_name, ''))), '\s+', ' ', 'g') || ':' ||
+            COALESCE(p_dob::text, '') || ':' || COALESCE(p_mobile, '')));
+
         -- Duplicate guard: same name + dob + mobile already admitted. Name is
         -- whitespace-collapsed + lower-cased so trivial typos ("Rahul  Kumar" vs
         -- "Rahul Kumar", different casing) no longer slip a duplicate through.
@@ -320,134 +357,14 @@ BEGIN
             p_tenant_id, p_school_id, v_student_id,
             v_year, p_class_name, p_section, p_roll_no, p_action_user_id);
 
-        -- Freeze the fee plan + generate ledger rows
-        IF p_fee_plan_json IS NOT NULL THEN
-            FOR v_item IN SELECT * FROM jsonb_array_elements(p_fee_plan_json)
-            LOOP
-                INSERT INTO core.student_fee_plan (
-                    tenant_id, school_id, student_id,
-                    fee_head_id, fee_head_name, frequency, amount, is_optional
-                ) VALUES (
-                    p_tenant_id, p_school_id, v_student_id,
-                    NULLIF((v_item->>'feeHeadId'), '')::INTEGER,
-                    COALESCE(v_item->>'feeHeadName', 'Fee'),
-                    COALESCE(v_item->>'frequency', 'Yearly'),
-                    COALESCE((v_item->>'amount')::NUMERIC, 0),
-                    COALESCE((v_item->>'isOptional')::BOOLEAN, FALSE)
-                );
-
-                -- Ledger generation
-                v_freq := COALESCE(v_item->>'frequency', 'Yearly');
-
-                -- How many months one installment covers. A recurring cycle bills in
-                -- installments across the session; everything else is a single row.
-                -- Quarterly used to fall into the single-row branch, so a school with
-                -- "Exam Fee, Quarterly, 250" billed 250 for the whole year instead of
-                -- 4 x 250 -- while the Fee Structure annual total (quarterly x 4) and
-                -- the Fee Collection Quarterly tab both already assumed 4.
-                v_step := CASE lower(trim(v_freq))
-                              WHEN 'monthly'     THEN 1
-                              WHEN 'quarterly'   THEN 3
-                              WHEN 'half yearly' THEN 6
-                              ELSE 0
-                          END;
-
-                IF v_step > 0 THEN
-                    -- Recurring: one installment per cycle from the first billing month
-                    -- up to the SESSION END month (not a fixed 12 that spills into the
-                    -- next session). First month = admission month (default) or the
-                    -- session start when the school bills the full session.
-                    IF v_charge_from = 'SessionStart' AND v_sess_start IS NOT NULL THEN
-                        v_month_start := DATE_TRUNC('month', v_sess_start)::DATE;
-                    ELSE
-                        v_month_start := DATE_TRUNC('month', v_adm_date)::DATE;
-                    END IF;
-
-                    -- Never bill before the session starts. "First month = admission
-                    -- month" exists for a MID-session joiner (admitted in August, bill
-                    -- Aug-Mar). When the admission date is EARLIER than the session —
-                    -- an existing student carried forward, or a back-dated entry — that
-                    -- same rule walks backwards for years: a student admitted in 2017
-                    -- sitting in the 2026-27 session was billed 120 monthly
-                    -- installments instead of 12, a 10x overcharge. Clamp to the
-                    -- session start so a session can only ever bill its own months.
-                    IF v_sess_start IS NOT NULL AND v_month_start < DATE_TRUNC('month', v_sess_start)::DATE THEN
-                        v_month_start := DATE_TRUNC('month', v_sess_start)::DATE;
-                    END IF;
-
-                    -- A school's quarters are its OWN calendar -- Apr-Jun, Jul-Sep,
-                    -- Oct-Dec, Jan-Mar -- and they are the same quarters for every
-                    -- student. A child joining in September joins DURING Jul-Sep; they
-                    -- do not get a private Sep-Nov window. So snap the first billing
-                    -- month back to the start of the cycle it falls inside, counting
-                    -- cycles from the session start. Monthly needs no snapping (a month
-                    -- is already aligned), which is why this only runs for v_step > 1.
-                    IF v_step > 1 AND v_sess_start IS NOT NULL THEN
-                        v_sess_month := DATE_TRUNC('month', v_sess_start)::DATE;
-                        -- Whole cycles between the session start and the first billing
-                        -- month, as a count of months divided by the cycle length.
-                        v_cycles := FLOOR(
-                            ( (EXTRACT(YEAR  FROM v_month_start) * 12
-                             + EXTRACT(MONTH FROM v_month_start))
-                            - (EXTRACT(YEAR  FROM v_sess_month)  * 12
-                             + EXTRACT(MONTH FROM v_sess_month)) ) / v_step );
-                        v_month_start := (v_sess_month
-                                          + make_interval(months => v_cycles * v_step))::DATE;
-                    END IF;
-
-                    -- Last billing month = session end month; fall back to 11 months on
-                    -- (a full year) if the academic year has no end date configured.
-                    IF v_sess_end IS NOT NULL THEN
-                        v_month_end := DATE_TRUNC('month', v_sess_end)::DATE;
-                    ELSE
-                        v_month_end := (v_month_start + INTERVAL '11 months')::DATE;
-                    END IF;
-
-                    v_m := v_month_start;
-                    WHILE v_m <= v_month_end LOOP
-                        -- Last month this installment covers, never past the session end,
-                        -- so a joiner who arrives inside the final quarter gets one row
-                        -- labelled for the months that are actually left.
-                        v_period_end := LEAST(
-                            (v_m + make_interval(months => v_step - 1))::DATE,
-                            v_month_end);
-
-                        INSERT INTO core.student_ledger (
-                            tenant_id, school_id, student_id,
-                            fee_head_name, frequency, installment_label,
-                            due_date, amount_due, status
-                        ) VALUES (
-                            p_tenant_id, p_school_id, v_student_id,
-                            COALESCE(v_item->>'feeHeadName', 'Fee'), v_freq,
-                            -- "Apr 2026" for a month, "Apr 2026 - Jun 2026" for a cycle
-                            -- that spans several. installment_label is varchar(40).
-                            CASE WHEN v_step = 1 OR v_period_end = v_m
-                                 THEN TO_CHAR(v_m, 'Mon YYYY')
-                                 ELSE TO_CHAR(v_m, 'Mon YYYY') || ' - ' ||
-                                      TO_CHAR(v_period_end, 'Mon YYYY')
-                            END,
-                            v_m,
-                            COALESCE((v_item->>'amount')::NUMERIC, 0), 'Pending'
-                        );
-                        v_m := (v_m + make_interval(months => v_step))::DATE;
-                    END LOOP;
-                ELSE
-                    INSERT INTO core.student_ledger (
-                        tenant_id, school_id, student_id,
-                        fee_head_name, frequency, installment_label,
-                        due_date, amount_due, status
-                    ) VALUES (
-                        p_tenant_id, p_school_id, v_student_id,
-                        COALESCE(v_item->>'feeHeadName', 'Fee'),
-                        v_freq,
-                        CASE WHEN v_freq = 'One Time'
-                             THEN 'Admission' ELSE 'Annual' END,
-                        v_adm_date,
-                        COALESCE((v_item->>'amount')::NUMERIC, 0), 'Pending'
-                    );
-                END IF;
-            END LOOP;
-        END IF;
+        -- Freeze the fee plan + generate ledger rows. The month arithmetic
+        -- (charge-from policy, quarter snapping, session end) moved to
+        -- core.fn_plan_periods / core.fn_student_bill_plan in
+        -- student_money_lifecycle.sql, so promotion and a class change bill a
+        -- plan exactly the way admission does. The plan was validated above.
+        PERFORM core.fn_student_bill_plan(
+            p_tenant_id, p_school_id, p_action_user_id, v_student_id,
+            v_year, v_adm_date, p_fee_plan_json);
 
         -- Carry an unpaid registration balance onto the student as a real due.
         -- A family can pay part of the registration fee (registration_fee_partial.sql)
@@ -475,12 +392,12 @@ BEGIN
                 INSERT INTO core.student_ledger (
                     tenant_id, school_id, student_id,
                     fee_head_name, frequency, installment_label,
-                    due_date, amount_due, status
+                    due_date, amount_due, status, academic_year
                 ) VALUES (
                     p_tenant_id, p_school_id, v_student_id,
                     core.fn_registration_fee_head_name(p_tenant_id, p_school_id),
                     'One Time', 'Registration',
-                    v_adm_date, ROUND(v_reg_balance, 2), 'Pending'
+                    v_adm_date, ROUND(v_reg_balance, 2), 'Pending', v_year
                 );
 
                 INSERT INTO core.admission_audit (tenant_id, school_id, student_id, action, detail, action_by)
@@ -569,17 +486,18 @@ BEGIN
                     COALESCE(e.academic_year, s.academic_year) AS academic_year,
                     s.admission_date, s.guardian_name, s.mobile,
                     s.annual_total, s.status, s.approval_status, s.enquiry_id,
+                    -- Concession settles a due as surely as cash does. Leaving
+                    -- it out showed a fully settled student as owing / Partial.
                     COALESCE((
                         SELECT CASE
-                            WHEN SUM(l.amount_due) = 0 THEN 'Paid'
-                            WHEN SUM(l.amount_paid) = 0 THEN 'Pending'
-                            WHEN SUM(l.amount_paid) >= SUM(l.amount_due) THEN 'Paid'
+                            WHEN SUM(l.amount_due - l.amount_paid - l.concession) <= 0 THEN 'Paid'
+                            WHEN SUM(l.amount_paid + l.concession) = 0 THEN 'Pending'
                             ELSE 'Partial' END
                         FROM core.student_ledger l
                         WHERE l.student_id = s.student_id
                     ), 'Pending') AS fee_status,
                     COALESCE((
-                        SELECT SUM(l.amount_due - l.amount_paid)
+                        SELECT SUM(l.amount_due - l.amount_paid - l.concession)
                         FROM core.student_ledger l
                         WHERE l.student_id = s.student_id
                     ), 0) AS fee_due

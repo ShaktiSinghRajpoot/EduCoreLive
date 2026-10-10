@@ -18,7 +18,7 @@
 
     // Ageing badge from days overdue (0 = nothing overdue yet).
     (string cls, string txt) DaysBadge(int d) =>
-        d == 0 ? ("fdr-od-a", "—") : d <= 30 ? ("fdr-od-a", d + "d") : d <= 60 ? ("fdr-od-b", d + "d") : ("fdr-od-c", d + "d");
+        d == 0 ? ("fdr-od-a", "Due today") : d <= 30 ? ("fdr-od-a", d + "d") : d <= 60 ? ("fdr-od-b", d + "d") : ("fdr-od-c", d + "d");
 
     // Server-side sort header link: keeps filters, drops Page, toggles direction.
     string SortUrl(string col)
@@ -120,9 +120,9 @@
                                     }
                                 </select>
                                 <select name="FilterBucket" class="form-select form-select-sm" style="min-width:7rem">
+                                    @* Only money that has fallen due is listed, so there is no "not due yet" bucket. *@
                                     <option value="">Overdue</option>
-                                    <option value="NotDue" selected="@Sel("NotDue", Model.FilterBucket)">Not due yet</option>
-                                    <option value="0-30"   selected="@Sel("0-30", Model.FilterBucket)">0–30 d</option>
+                                    <option value="0-30"  selected="@Sel("0-30", Model.FilterBucket)">0–30 d</option>
                                     <option value="31-60"  selected="@Sel("31-60", Model.FilterBucket)">31–60 d</option>
                                     <option value="60+"    selected="@Sel("60+", Model.FilterBucket)">60+ d</option>
                                 </select>
@@ -158,7 +158,12 @@
                                             <div class="d-flex align-items-center gap-2">
                                                 <span class="fdr-avatar bg-label-@color text-@color">@Initials(d.StudentName)</span>
                                                 <div class="lh-sm">
-                                                    <div class="fw-semibold">@d.StudentName</div>
+                                                    <div class="fw-semibold">@d.StudentName
+                                                        @if (!string.IsNullOrWhiteSpace(d.StudentStatus) && d.StudentStatus != "Active")
+                                                        {
+                                                            <span class="badge bg-label-secondary ms-1" title="Has left the school but still owes">@d.StudentStatus</span>
+                                                        }
+                                                    </div>
                                                     <small class="text-muted">@(string.IsNullOrWhiteSpace(d.AdmissionNo) ? "—" : d.AdmissionNo)@(string.IsNullOrWhiteSpace(d.Mobile) ? "" : " · " + d.Mobile)</small>
                                                 </div>
                                             </div>

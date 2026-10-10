@@ -2,7 +2,8 @@
 -- Enquiry Registration
 -- Registers an enquiry: issues a registration number, records the date and
 -- (optional) fee, and moves the lead to "Registration Done".
--- Registration data lives on core.enquiries (registration_number/date/fee_paid).
+-- Registration data lives on core.enquiries (registration_number/date). The fee is
+-- taken by sp_registration_fee_record (registration_fee_partial.sql).
 --
 -- Target DB: PostgreSQL (educore)
 -- Safe to re-run (idempotent).
@@ -26,7 +27,7 @@ CREATE OR REPLACE PROCEDURE core.sp_enquiry_register(
     IN    p_enquiry_id            integer,
     IN    p_registration_number   varchar   DEFAULT NULL,   -- manual number (optional)
     IN    p_registration_date     date      DEFAULT NULL,   -- defaults to today
-    IN    p_registration_fee_paid boolean   DEFAULT FALSE,
+    IN    p_registration_fee_paid boolean   DEFAULT FALSE,   -- IGNORED: kept for callers; paid follows the receipts
     IN    p_auto_generate         boolean   DEFAULT TRUE,
     IN    p_prefix                varchar   DEFAULT 'REG-',
     INOUT p_result                refcursor DEFAULT 'result_cursor'::refcursor
@@ -53,7 +54,8 @@ BEGIN
     WHERE enquiry_id = p_enquiry_id
       AND tenant_id  = p_tenant_id
       AND school_id  = p_school_id
-      AND COALESCE(is_active, TRUE) = TRUE;
+      AND COALESCE(is_active, TRUE) = TRUE
+    FOR UPDATE;   -- a double click must not register the same enquiry twice at once
 
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Enquiry not found.';
@@ -61,6 +63,19 @@ BEGIN
 
     IF v_admission IS NOT NULL THEN
         RAISE EXCEPTION 'This enquiry is already admitted.';
+    END IF;
+
+    -- Already registered and nothing new asked for (a retry or a double click):
+    -- answer with the number it already has and write nothing, so the history
+    -- does not grow a "Registration Done -> Registration Done" row.
+    IF v_status = 'Registration Done' AND v_existing IS NOT NULL
+       AND (NULLIF(trim(p_registration_number), '') IS NULL
+            OR lower(trim(p_registration_number)) = lower(v_existing)) THEN
+        OPEN p_result FOR
+        SELECT TRUE AS success,
+               'Already registered.' AS message,
+               v_existing AS registration_number;
+        RETURN;
     END IF;
 
     v_reg_date := COALESCE(p_registration_date, CURRENT_DATE);
@@ -87,10 +102,23 @@ BEGIN
         END IF;
     END IF;
 
+    -- A typed number must not already belong to another enquiry of this
+    -- session (auto numbers come from the counter, so they never clash).
+    IF EXISTS (SELECT 1 FROM core.enquiries
+               WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                 AND enquiry_id <> p_enquiry_id
+                 AND COALESCE(is_active, TRUE) = TRUE
+                 AND session IS NOT DISTINCT FROM v_session
+                 AND lower(registration_number) = lower(v_reg_number)) THEN
+        RAISE EXCEPTION 'Registration number % is already used by another student.', v_reg_number;
+    END IF;
+
     UPDATE core.enquiries
     SET registration_number   = v_reg_number,
         registration_date     = v_reg_date,
-        registration_fee_paid = COALESCE(p_registration_fee_paid, FALSE),
+        -- Never taken from the caller: the browser's "fee paid" tick used to land
+        -- here and mark the fee paid with no receipt. Paid follows the money.
+        registration_fee_paid = COALESCE(core.fn_registration_fee_is_paid(p_tenant_id, p_school_id, p_enquiry_id), FALSE),
         status                = 'Registration Done',
         updated_by            = p_action_user_id,
         updated_at            = NOW()

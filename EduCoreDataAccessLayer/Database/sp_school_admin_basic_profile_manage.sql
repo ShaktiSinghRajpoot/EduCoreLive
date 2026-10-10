@@ -265,7 +265,16 @@ BEGIN
             -- partial save) cannot blank out geography the wizard already set.
             country_id = COALESCE(EXCLUDED.country_id, core.school_addresses.country_id),
             state_id = COALESCE(EXCLUDED.state_id, core.school_addresses.state_id),
-            district_id = COALESCE(EXCLUDED.district_id, core.school_addresses.district_id),
+            -- The district id must never outlive its text or its state: no district
+            -- text means no district, and a new state drops the old state's district.
+            -- (A plain COALESCE kept Gurugram after the state moved to Delhi.)
+            district_id = CASE
+                WHEN NULLIF(trim(EXCLUDED.district), '') IS NULL THEN NULL
+                WHEN EXCLUDED.district_id IS NOT NULL THEN EXCLUDED.district_id
+                WHEN COALESCE(EXCLUDED.state_id, core.school_addresses.state_id)
+                     IS DISTINCT FROM core.school_addresses.state_id THEN NULL
+                ELSE core.school_addresses.district_id
+            END,
             state = EXCLUDED.state,
             pincode = EXCLUDED.pincode,
             updated_by = p_action_user_id,

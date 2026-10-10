@@ -2,6 +2,7 @@ using System.Data;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -10,11 +11,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     public class ClassTeacherService : IClassTeacherService
     {
         private readonly PgExec _db;
+        private readonly ILogger<ClassTeacherService> _logger;
         private const string Sp = "core.sp_class_teacher_manage";
 
-        public ClassTeacherService(PgExec db)
+        public ClassTeacherService(PgExec db, ILogger<ClassTeacherService> logger)
         {
             _db = db;
+            _logger = logger;
         }
 
         public async Task<List<ClassTeacherSection>> GetGridAsync(
@@ -79,6 +82,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
             catch (PostgresException ex)
             {
+                _logger.LogWarning(ex, "Class teacher assign refused (SqlState {SqlState}) for section {SectionId}",
+                    ex.SqlState, sectionId);
                 return (false, ex.MessageText);
             }
         }

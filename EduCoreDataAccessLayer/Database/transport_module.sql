@@ -334,6 +334,7 @@ END;
 $procedure$;
 
 -- ── Student assignment (snapshots fare + generates monthly transport dues) ──
+-- Depends on student_money_lifecycle.sql (fn_ledger_close and the close columns).
 CREATE OR REPLACE PROCEDURE core.sp_transport_assign_manage(
     IN    p_operation      varchar,
     IN    p_tenant_id      integer,
@@ -357,6 +358,16 @@ DECLARE
     v_month_start date;
     v_i           integer;
     v_made        integer := 0;
+    v_student_year varchar;
+    v_year        varchar;
+    v_sess_end    date;
+    v_months      integer;
+    v_max         integer;
+    v_due         date;
+    v_already     numeric(12,2);
+    v_closed      numeric(12,2);
+    v_reason      varchar(200);
+    r             record;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 OR p_student_id <= 0 THEN
         RAISE EXCEPTION 'Invalid request.';
@@ -375,53 +386,100 @@ BEGIN
         LIMIT 1;
 
     ELSIF p_operation = 'SaveAssignment' THEN
-        SELECT monthly_fare, stop_name INTO v_fare, v_stop_name
-        FROM core.transport_stops
-        WHERE stop_id = p_stop_id AND route_id = p_route_id
-          AND tenant_id = p_tenant_id AND school_id = p_school_id;
+        -- The student must be ours and still on the roll. Without this a stop
+        -- of this school could be billed to ANY student id, including another
+        -- school's, with the ledger rows written under this school's tenant.
+        SELECT academic_year INTO v_student_year
+        FROM core.students
+        WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+          AND is_active = TRUE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Student not found, or no longer on the roll.';
+        END IF;
+
+        SELECT s.monthly_fare, s.stop_name, rt.route_name INTO v_fare, v_stop_name, v_route_name
+        FROM core.transport_stops s
+        JOIN core.transport_routes rt ON rt.route_id = s.route_id
+        WHERE s.stop_id = p_stop_id AND s.route_id = p_route_id
+          AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id;
         IF NOT FOUND THEN
             RAISE EXCEPTION 'Selected stop not found.';
         END IF;
 
         v_start := COALESCE(p_start_date, CURRENT_DATE);
+        v_year  := COALESCE(NULLIF(TRIM(p_academic_year), ''), v_student_year);
 
-        -- Replace any current assignment + remove its FUTURE unpaid transport dues,
-        -- so re-assigning (changed stop/fare) re-bills cleanly without touching
-        -- months already paid.
+        -- Bill to the end of the SESSION the assignment is for, read from its
+        -- real end date. The controllers used to send a month count worked out
+        -- from the session NAME on an April-March assumption, and this proc
+        -- trusted it, so a 12-month count from October ran into the next session.
+        SELECT end_date INTO v_sess_end
+        FROM academic.academic_years
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+          AND academic_year_name = v_year AND COALESCE(is_deleted, FALSE) = FALSE
+        LIMIT 1;
+
+        v_months := GREATEST(COALESCE(NULLIF(p_months, 0), 12), 1);
+        IF v_sess_end IS NOT NULL THEN
+            v_max := ((EXTRACT(YEAR FROM v_sess_end) * 12 + EXTRACT(MONTH FROM v_sess_end))
+                    - (EXTRACT(YEAR FROM v_start)    * 12 + EXTRACT(MONTH FROM v_start)))::integer + 1;
+            IF v_max <= 0 THEN
+                RAISE EXCEPTION 'The start date is after session % ends.', v_year;
+            END IF;
+            v_months := LEAST(v_months, v_max);
+        END IF;
+
+        -- Replace the current assignment. Its unpaid dues from the start month
+        -- on are CLOSED, not deleted: the row stays (a cancelled receipt may
+        -- still point at it) with the reason, who and when, and only the part
+        -- nobody paid is taken off. See student_money_lifecycle.sql.
+        v_reason := 'Route changed on ' || to_char(v_start, 'YYYY-MM-DD');
+        FOR r IN
+            SELECT ledger_id FROM core.student_ledger
+            WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+              AND fee_head_name = 'Transport Fee'
+              AND due_date::date >= DATE_TRUNC('month', v_start)::date
+              AND amount_due - amount_paid - concession > 0
+        LOOP
+            PERFORM core.fn_ledger_close(r.ledger_id, v_reason, 'Transport', p_action_user_id);
+        END LOOP;
+
         UPDATE core.student_transport
-        SET is_active = FALSE, is_deleted = TRUE, updated_by = p_action_user_id, updated_at = NOW()
+        SET is_active = FALSE, is_deleted = TRUE,
+            end_reason = 'Replaced by ' || COALESCE(v_route_name, '') || ' / ' || COALESCE(v_stop_name, '') ||
+                         ' on ' || to_char(v_start, 'YYYY-MM-DD'),
+            ended_by = p_action_user_id, ended_at = NOW(),
+            updated_by = p_action_user_id, updated_at = NOW()
         WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
           AND is_active = TRUE;
-
-        DELETE FROM core.student_ledger
-        WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
-          AND fee_head_name = 'Transport Fee'
-          AND amount_paid = 0 AND concession = 0
-          AND due_date::date >= DATE_TRUNC('month', v_start)::date;
 
         INSERT INTO core.student_transport
             (tenant_id, school_id, student_id, route_id, stop_id, monthly_fare,
              academic_year, start_date, created_by)
         VALUES
             (p_tenant_id, p_school_id, p_student_id, p_route_id, p_stop_id, v_fare,
-             p_academic_year, v_start, p_action_user_id);
+             v_year, v_start, p_action_user_id);
 
-        -- Generate monthly 'Transport Fee' dues (skip a month if one already exists).
+        -- One 'Transport Fee' due per month. A month that already holds settled
+        -- money (paid, or paid then closed) is only topped up to the new fare,
+        -- so a part-paid month is never charged twice.
         v_month_start := DATE_TRUNC('month', v_start)::date;
-        FOR v_i IN 0 .. GREATEST(COALESCE(p_months, 12), 1) - 1 LOOP
-            IF NOT EXISTS (
-                SELECT 1 FROM core.student_ledger
-                WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
-                  AND fee_head_name = 'Transport Fee'
-                  AND due_date::date = (v_month_start + (v_i || ' month')::interval)::date
-            ) THEN
+        FOR v_i IN 0 .. v_months - 1 LOOP
+            v_due := (v_month_start + make_interval(months => v_i))::date;
+
+            SELECT COALESCE(SUM(amount_due), 0) INTO v_already
+            FROM core.student_ledger
+            WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+              AND fee_head_name = 'Transport Fee'
+              AND due_date::date = v_due;
+
+            IF v_already < v_fare THEN
                 INSERT INTO core.student_ledger
                     (tenant_id, school_id, student_id, fee_head_name, frequency,
-                     installment_label, due_date, amount_due, status)
+                     installment_label, due_date, amount_due, status, academic_year)
                 VALUES
                     (p_tenant_id, p_school_id, p_student_id, 'Transport Fee', 'Monthly',
-                     TO_CHAR(v_month_start + (v_i || ' month')::interval, 'Mon YYYY'),
-                     (v_month_start + (v_i || ' month')::interval)::date, v_fare, 'Pending');
+                     TO_CHAR(v_due, 'Mon YYYY'), v_due, v_fare - v_already, 'Pending', v_year);
                 v_made := v_made + 1;
             END IF;
         END LOOP;
@@ -432,19 +490,33 @@ BEGIN
                v_fare AS monthly_fare, v_made AS months_generated;
 
     ELSIF p_operation = 'RemoveAssignment' THEN
+        -- Unpaid bus dues from this month on are CLOSED with a reason (never
+        -- deleted), including the unpaid part of a month that was paid in
+        -- part. Money already taken stays on the row and can be refunded.
+        v_reason := 'Transport removed on ' || to_char(CURRENT_DATE, 'YYYY-MM-DD');
+        v_closed := 0;
+        FOR r IN
+            SELECT ledger_id FROM core.student_ledger
+            WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+              AND fee_head_name = 'Transport Fee'
+              AND due_date::date >= DATE_TRUNC('month', CURRENT_DATE)::date
+              AND amount_due - amount_paid - concession > 0
+        LOOP
+            v_closed := v_closed + core.fn_ledger_close(r.ledger_id, v_reason, 'Transport', p_action_user_id);
+        END LOOP;
+
         UPDATE core.student_transport
-        SET is_active = FALSE, is_deleted = TRUE, updated_by = p_action_user_id, updated_at = NOW()
+        SET is_active = FALSE, is_deleted = TRUE,
+            end_reason = v_reason, ended_by = p_action_user_id, ended_at = NOW(),
+            updated_by = p_action_user_id, updated_at = NOW()
         WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
           AND is_active = TRUE;
 
-        -- Drop future unpaid transport dues; keep paid history intact.
-        DELETE FROM core.student_ledger
-        WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
-          AND fee_head_name = 'Transport Fee'
-          AND amount_paid = 0 AND concession = 0
-          AND due_date::date >= DATE_TRUNC('month', CURRENT_DATE)::date;
-
-        OPEN p_result FOR SELECT TRUE AS success, 'Transport removed.' AS message;
+        OPEN p_result FOR SELECT TRUE AS success,
+               'Transport removed.' ||
+               CASE WHEN v_closed > 0
+                    THEN ' ' || to_char(v_closed, 'FM99999990.00') || ' of unpaid bus fees closed.'
+                    ELSE '' END AS message;
 
     ELSE
         RAISE EXCEPTION 'Invalid operation %', p_operation;

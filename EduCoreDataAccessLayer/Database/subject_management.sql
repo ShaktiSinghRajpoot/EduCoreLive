@@ -143,10 +143,14 @@ BEGIN
         IF p_academic_class_id IS NULL THEN
             RAISE EXCEPTION 'Pick a class first.';
         END IF;
-        IF NOT EXISTS (SELECT 1 FROM academic.academic_classes
-                       WHERE academic_class_id = p_academic_class_id
-                         AND tenant_id = p_tenant_id AND school_id = p_school_id
-                         AND NOT is_deleted) THEN
+        -- The class belongs to exactly one session, so save under that session.
+        -- Defaulting to the current year wrote next session's class under this one.
+        SELECT academic_year_id INTO v_year
+        FROM academic.academic_classes
+        WHERE academic_class_id = p_academic_class_id
+          AND tenant_id = p_tenant_id AND school_id = p_school_id
+          AND NOT is_deleted AND is_active;
+        IF v_year IS NULL THEN
             RAISE EXCEPTION 'That class does not belong to this school.';
         END IF;
 
@@ -157,6 +161,9 @@ BEGIN
         FOR v_name IN SELECT trim(value #>> '{}') FROM jsonb_array_elements(v_items)
         LOOP
             CONTINUE WHEN v_name IS NULL OR v_name = '';
+            IF length(v_name) > 80 THEN
+                RAISE EXCEPTION 'Subject name "%" is too long (80 characters max).', left(v_name, 30) || '...';
+            END IF;
 
             SELECT subject_id INTO v_sid
             FROM academic.school_subjects
@@ -179,8 +186,21 @@ BEGIN
             ON CONFLICT (tenant_id, school_id, academic_year_id, academic_class_id, subject_id)
             DO UPDATE SET display_order = EXCLUDED.display_order;
 
-            v_keep := v_keep || v_sid;
+            -- The same name twice is one subject; count it once.
+            IF NOT (v_sid = ANY (v_keep)) THEN
+                v_keep := v_keep || v_sid;
+            END IF;
         END LOOP;
+
+        -- A subject taken off the class can no longer sit in its sections' timetable.
+        DELETE FROM academic.timetable t
+        USING academic.academic_class_sections sec
+        WHERE sec.academic_class_section_id = t.academic_class_section_id
+          AND sec.academic_class_id = p_academic_class_id
+          AND t.tenant_id = p_tenant_id
+          AND t.school_id = p_school_id
+          AND t.academic_year_id = v_year
+          AND NOT (t.subject_id = ANY (v_keep));
 
         -- Replace-all: anything the page no longer lists is unmapped. The subject
         -- stays in the master (other classes may still use it).
@@ -193,7 +213,7 @@ BEGIN
 
         OPEN p_result FOR
         SELECT TRUE AS success,
-               v_ord AS subject_count,
+               cardinality(v_keep) AS subject_count,
                'Subjects saved.' AS message;
 
         OPEN p_result2 FOR SELECT 1 WHERE FALSE;

@@ -199,7 +199,7 @@
                     if (res && res.success) ecToast('success', res.message || 'Saved.');
                     else ecToast('error', (res && res.message) || 'Could not save.');
                 })
-                .fail(function () { ecToast('error', 'Something went wrong.'); })
+                .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
                 .always(function () { EC.buttonReset($btn); });
             });
 
@@ -227,7 +227,7 @@
                     if (res && res.success) ecToast('success', res.message || 'Saved.');
                     else ecToast('error', (res && res.message) || 'Could not save.');
                 })
-                .fail(function () { ecToast('error', 'Something went wrong.'); })
+                .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
                 .always(function () { EC.buttonReset($btn); });
             });
 
@@ -254,7 +254,7 @@
                     if (res && res.success) ecToast('success', res.message || 'Saved.');
                     else ecToast('error', (res && res.message) || 'Could not save.');
                 })
-                .fail(function () { ecToast('error', 'Something went wrong.'); })
+                .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
                 .always(function () { EC.buttonReset($btn); });
             });
 

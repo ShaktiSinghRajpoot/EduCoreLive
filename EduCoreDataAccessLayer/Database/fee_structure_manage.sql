@@ -64,6 +64,7 @@ DECLARE
     v_yearly      numeric := 0;
     v_annual      numeric := 0;
     v_count       INTEGER := 0;
+    v_bad         text;
 BEGIN
 
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
@@ -92,6 +93,15 @@ BEGIN
             COUNT(fsd.fee_structure_detail_id)::int AS head_count,
             fs.created_by,
             fs.updated_by,
+            -- The page printed the raw user id ("39"); give it a name to show.
+            (SELECT COALESCE(NULLIF(trim(up.full_name), ''), u.email)
+               FROM core.users u
+               LEFT JOIN core.user_profiles up ON up.user_id = u.user_id
+              WHERE u.user_id = fs.created_by LIMIT 1) AS created_by_name,
+            (SELECT COALESCE(NULLIF(trim(up.full_name), ''), u.email)
+               FROM core.users u
+               LEFT JOIN core.user_profiles up ON up.user_id = u.user_id
+              WHERE u.user_id = fs.updated_by LIMIT 1) AS updated_by_name,
             COALESCE(fs.updated_at, fs.created_at) AS updated_at
         FROM core.school_fee_structures fs
         LEFT JOIN core.school_fee_structure_details fsd
@@ -141,12 +151,60 @@ BEGIN
 
         -- One class, its whole structure, one transaction. p_details is
         -- [{feeHeadId, feeHeadName, frequency, amount}, ...].
+        IF trim(COALESCE(p_class_name, '')) = '' THEN
+            RAISE EXCEPTION 'Select a class for the fee structure.';
+        END IF;
+        IF trim(COALESCE(p_academic_year, '')) = '' THEN
+            RAISE EXCEPTION 'Select an academic year for %.', p_class_name;
+        END IF;
         IF p_details IS NULL OR jsonb_array_length(p_details) = 0 THEN
             RAISE EXCEPTION 'No fee heads were sent for %.', p_class_name;
         END IF;
 
-        -- Rollups are computed HERE, from the rows actually being written, so the
-        -- stored totals cannot drift from the stored details.
+        -- Only the fee head ID and the amount are taken from the post. The page
+        -- sends the name and cycle too, in hidden inputs, and they used to be
+        -- stored as sent -- so a structure could carry another school's head, a
+        -- deleted head, or a cycle the master never had. Every line must be a
+        -- live head of THIS school; its name and cycle come from the master.
+        -- (An inactive head is allowed: it stays on a structure that already
+        -- has it, and admission skips it by its flag.)
+        SELECT COALESCE(d->>'feeHeadName', d->>'feeHeadId', '(no fee head id)') INTO v_bad
+          FROM jsonb_array_elements(p_details) AS d
+         WHERE NOT EXISTS (
+               SELECT 1 FROM core.school_fee_heads h
+                WHERE h.fee_head_id = NULLIF(d->>'feeHeadId', '')::int
+                  AND h.tenant_id = p_tenant_id AND h.school_id = p_school_id
+                  AND COALESCE(h.is_deleted, FALSE) = FALSE)
+         LIMIT 1;
+        IF FOUND THEN
+            RAISE EXCEPTION '"%" is not a fee head of this school (it may have been deleted). Reload the page and try again.', v_bad;
+        END IF;
+
+        -- The fee head master refuses a negative amount; this is the amount that
+        -- actually reaches the ledger, so it gets the same rule.
+        SELECT h.fee_head_name INTO v_bad
+          FROM jsonb_array_elements(p_details) AS d
+          JOIN core.school_fee_heads h ON h.fee_head_id = (d->>'feeHeadId')::int
+         WHERE COALESCE((d->>'amount')::numeric, 0) < 0
+         LIMIT 1;
+        IF FOUND THEN
+            RAISE EXCEPTION 'Amount for "%" cannot be negative.', v_bad;
+        END IF;
+
+        SELECT h.fee_head_name INTO v_bad
+          FROM jsonb_array_elements(p_details) AS d
+          JOIN core.school_fee_heads h ON h.fee_head_id = (d->>'feeHeadId')::int
+         GROUP BY h.fee_head_name
+        HAVING COUNT(*) > 1
+         LIMIT 1;
+        IF FOUND THEN
+            RAISE EXCEPTION '"%" is listed twice for %.', v_bad, p_class_name;
+        END IF;
+
+        -- Rollups are computed HERE, from the rows actually being written --
+        -- the master's cycle and the amount rounded to paise exactly as the
+        -- numeric(12,2) column will store it -- so the totals cannot drift from
+        -- the stored details.
         SELECT
             COALESCE(SUM(amount) FILTER (WHERE cycle = 'one time'),    0),
             COALESCE(SUM(amount) FILTER (WHERE cycle = 'monthly'),     0),
@@ -157,9 +215,10 @@ BEGIN
             COUNT(*)
           INTO v_one_time, v_monthly, v_quarterly, v_half_yearly, v_yearly, v_count
         FROM (
-            SELECT lower(trim(COALESCE(d->>'frequency', 'Yearly'))) AS cycle,
-                   COALESCE((d->>'amount')::numeric, 0)             AS amount
+            SELECT lower(trim(h.frequency))                           AS cycle,
+                   ROUND(COALESCE((d->>'amount')::numeric, 0), 2)     AS amount
             FROM jsonb_array_elements(p_details) AS d
+            JOIN core.school_fee_heads h ON h.fee_head_id = (d->>'feeHeadId')::int
         ) t;
 
         v_annual := v_one_time + (v_monthly * 12) + (v_quarterly * 4)
@@ -205,12 +264,13 @@ BEGIN
              frequency, amount, is_selected, is_deleted, created_by, created_at)
         SELECT
             p_tenant_id, p_school_id, v_fee_structure_id,
-            NULLIF(COALESCE((d->>'feeHeadId')::int, 0), 0),
-            COALESCE(d->>'feeHeadName', 'Fee'),
-            COALESCE(d->>'frequency', 'Yearly'),
-            COALESCE((d->>'amount')::numeric, 0),
+            h.fee_head_id,
+            h.fee_head_name,
+            h.frequency,
+            ROUND(COALESCE((d->>'amount')::numeric, 0), 2),
             TRUE, FALSE, p_action_user_id, NOW()
         FROM jsonb_array_elements(p_details) AS d
+        JOIN core.school_fee_heads h ON h.fee_head_id = (d->>'feeHeadId')::int
         ON CONFLICT (tenant_id, school_id, fee_structure_id, fee_head_id)
         DO UPDATE SET
             fee_head_name = EXCLUDED.fee_head_name,

@@ -67,6 +67,18 @@
                 else { <span class="muted">—</span> }
               </div>
             </div>
+            @if (row.Extras.Any())
+            {
+              <div class="pm-extras">
+                @foreach (var x in row.Extras)
+                {
+                  <label class="pm-extra">
+                    <input type="checkbox" name="permissionIds" value="@x.PermissionId" class="cb-extra" data-feat="@row.FeatureLabel" checked="@x.Granted" />
+                    <span>@x.Label</span>
+                  </label>
+                }
+              </div>
+            }
           }
         </div>
       }
@@ -88,6 +100,14 @@
       if(!cb.checked) return;
       var feat = cb.getAttribute('data-feat');
       var view = document.querySelector('.cb-view[data-feat="'+CSS.escape(feat)+'"]');
+      if(view) view.checked = true;
+    });
+  });
+  // Any finer action (collect, cancel, refund...) also needs View of that feature.
+  document.querySelectorAll('.cb-extra').forEach(function(cb){
+    cb.addEventListener('change', function(){
+      if(!cb.checked) return;
+      var view = document.querySelector('.cb-view[data-feat="'+CSS.escape(cb.getAttribute('data-feat'))+'"]');
       if(view) view.checked = true;
     });
   });

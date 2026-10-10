@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- Transfer Certificate (TC) — issue, register and reprint.
 --
 -- A TC is a LEGAL document. Once issued it must reprint identically forever, so
@@ -212,6 +212,7 @@ DECLARE
     v_fmt    varchar(20);
     v_offset integer;
     v_was_printed boolean;
+    v_wallet numeric(12,2);
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -249,6 +250,19 @@ BEGIN
             -- RAISE has no printf specifiers; format the amount ourselves.
             RAISE EXCEPTION 'Clear the pending dues of % before issuing the certificate.',
                 to_char(v_dues, 'FM99,99,99,990.00');
+        END IF;
+
+        -- Money the school still holds for the family blocks the TC too. An
+        -- advance balance (overpayment / prepaid) has to be refunded first,
+        -- with a voucher, or it would simply stay with the school after the
+        -- child has gone.
+        SELECT COALESCE(balance, 0) INTO v_wallet
+        FROM core.student_advance
+        WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
+
+        IF COALESCE(v_wallet, 0) > 0 THEN
+            RAISE EXCEPTION 'Refund the advance balance of % to the family before issuing the certificate.',
+                to_char(v_wallet, 'FM99,99,99,990.00');
         END IF;
 
         -- One live TC per student. If a valid one already exists, re-open it
@@ -360,6 +374,11 @@ BEGIN
     -- A mistaken TC is voided, not deleted — the number is retired for audit and
     -- the student becomes eligible for a fresh issue.
     IF p_operation = 'Void' THEN
+        -- A retired certificate number must say why it was retired.
+        IF COALESCE(TRIM(p_reason), '') = '' THEN
+            RAISE EXCEPTION 'A reason is required to void a certificate.';
+        END IF;
+
         UPDATE core.tc_register
         SET is_void = TRUE, void_reason = NULLIF(TRIM(p_reason), ''),
             voided_by = p_action_user_id, voided_at = now()

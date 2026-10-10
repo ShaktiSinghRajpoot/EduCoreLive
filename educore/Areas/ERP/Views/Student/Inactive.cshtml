@@ -363,6 +363,9 @@
             $('#tcBoardFields').toggleClass('d-none', $(this).val() !== 'Board');
         });
 
+        // The default saved under Settings > Documents; Basic if never set.
+        var TC_DEFAULT_FORMAT = '@(ViewBag.TcFormat == "Board" ? "Board" : "Basic")';
+
         $('.btn-tc').on('click', function () {
             $('#tcStudentId').val($(this).data('id'));
             $('#tcStudentName').text($(this).data('name'));
@@ -370,7 +373,7 @@
             var dues = parseFloat($(this).data('dues')) || 0;
             $('#tcDuesWarn').toggleClass('d-none', dues <= 0);
             $('#tcResult, #tcReason, #tcRemarks').val('');
-            $('#tcFormat').val('Basic').trigger('change');
+            $('#tcFormat').val(TC_DEFAULT_FORMAT).trigger('change');
             tcModal.show();
         });
 

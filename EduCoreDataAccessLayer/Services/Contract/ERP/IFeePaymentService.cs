@@ -89,7 +89,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             decimal              discountValue  = 0,      // entered ₹ or %
             string?              discountReason = null,
             List<FeeTenderItem>? tenders        = null,   // split payment modes
-            decimal              advanceUsed    = 0);     // drawn from the wallet
+            decimal              advanceUsed    = 0,      // drawn from the wallet
+            string?              clientRef      = null,   // one id per settlement: a retry is not a new payment
+            string?              discountApprovedBy = null);
 
         /// <summary>The student's current advance / credit balance.</summary>
         Task<decimal> GetStudentAdvanceAsync(
@@ -97,6 +99,10 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         /// <summary>Every receipt issued for a student, newest first.</summary>
         Task<List<FeePaymentHistoryItem>> GetPaymentHistoryAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Every refund voucher for a student (charges and advance), newest first.</summary>
+        Task<List<FeeRefundHistoryItem>> GetRefundHistoryAsync(
             int studentId, int tenantId, int schoolId, int actionUserId);
 
         /// <summary>A single receipt (header + lines) for re-printing.</summary>
@@ -145,8 +151,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             int tenantId, int schoolId, int actionUserId);
 
         /// <summary>Collection register for a date range (receipts + mode + head totals), school-wide.</summary>
+        /// <summary>Re-open a closed day (reason required). The earlier count stays in the history.</summary>
+        Task<(bool Success, string Message)> ReopenDayAsync(
+            string? date, int cashierId, string reason, int tenantId, int schoolId, int actionUserId);
+
         Task<CollectionRegister> GetCollectionRegisterAsync(
-            string? from, string? to, int tenantId, int schoolId, int actionUserId);
+            string? from, string? to, int tenantId, int schoolId, int actionUserId,
+            string? className = null, string? section = null);
 
         /// <summary>Students who still owe, with class-wise aging (optionally filtered by class/section).</summary>
         Task<List<DefaulterRow>> GetDefaultersAsync(

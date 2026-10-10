@@ -123,8 +123,8 @@
 
         <div class="cs-empty d-none" id="emptyState">
           <div class="cs-empty-ic"><i class="bx bx-search-alt"></i></div>
-          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No classes found</h6>
-          <p class="text-muted small mb-0">Try a different search, or add a class.</p>
+          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);" id="emptyTitle">No classes found</h6>
+          <p class="text-muted small mb-0" id="emptyText">Try a different search, or add a class.</p>
         </div>
       </div>
     </div>
@@ -257,12 +257,13 @@ var DATA=(seed||[]).map(function(c,i){
   return {
     id:++nextClassId,
     name:c.name,
+    orig:c.name,   /* name as saved; sent back so a rename keeps the class's id */
     rank:c.rank||(i+1),
     stream:c.stream||'gen',
     coord:c.coordinator||'',
     coordStaffId:c.coordinatorStaffId||null,
     sections:(c.sections||[]).map(function(s){
-      return {id:++nextSecId, name:s.name, cap:(s.capacity||0), str:(s.strength||0), room:(s.room||''), teacher:(s.teacher||'')};
+      return {id:++nextSecId, name:s.name, orig:s.name, cap:(s.capacity||0), str:(s.strength||0), room:(s.room||''), teacher:(s.teacher||'')};
     })
   };
 });
@@ -273,15 +274,30 @@ function classCap(c){ return c.sections.reduce(function(a,s){return a+(s.cap||0)
 function streamLbl(s){ return {gen:'Not Applicable',pcm:'Science (PCM)',pcb:'Science (PCB)',com:'Commerce',art:'Arts / Humanities',voc:'Vocational',sci:'Science'}[s]||'Not Applicable'; }
 function barCls(pct){ return pct>=100?'full':(pct>=85?'warn':'ok'); }
 
-/* -- Persist the whole structure for the selected year (replace-all) -- */
+/* -- Persist the whole structure for the selected year --
+   Each save sends the whole structure, so two in flight could finish in the
+   wrong order and the older one would win. Only one runs at a time; an edit
+   made meanwhile is saved (with the latest data) when it finishes. */
+var saving=false, saveAgain=false, saveAgainMsg=null;
+
 function persist(okMsg){
   if(!ACADEMIC_YEAR_ID){ ecToast('error','Select an academic year first.'); return; }
+  if(saving){ saveAgain=true; saveAgainMsg=okMsg; return; }
+  saving=true;
+
+  /* originalName = the name the server has now, so a rename updates the same
+     class/section (keeping its subjects, timetable and class teacher). */
+  var sent=[];   /* [item, name sent] -- becomes item.orig once saved */
   var payload={
     academicYearId:ACADEMIC_YEAR_ID,
     classes:DATA.slice().sort(function(a,b){return a.rank-b.rank;}).map(function(c){
+      sent.push([c, c.name]);
       return {
-        name:c.name, rank:c.rank, stream:c.stream, coordinator:c.coord, coordinatorStaffId:c.coordStaffId,
-        sections:c.sections.map(function(s){ return {name:s.name, capacity:s.cap||null, room:s.room}; })
+        name:c.name, originalName:c.orig||null, rank:c.rank, stream:c.stream, coordinator:c.coord, coordinatorStaffId:c.coordStaffId,
+        sections:c.sections.map(function(s){
+          sent.push([s, s.name]);
+          return {name:s.name, originalName:s.orig||null, capacity:s.cap||null, room:s.room};
+        })
       };
     })
   };
@@ -294,13 +310,27 @@ function persist(okMsg){
     data:        JSON.stringify(payload)
   })
   .done(function(res){
-    if(res && res.success){ if(okMsg) ecToast('success', okMsg); }
-    else {
+    if(res && res.success){
+      sent.forEach(function(p){ p[0].orig=p[1]; });
+      if(okMsg) ecToast('success', okMsg);
+      saving=false;
+      if(saveAgain){ saveAgain=false; persist(saveAgainMsg); }
+    } else {
       ecToast('error',(res && res.message) || 'Save failed.');
-      setTimeout(function(){ window.location.reload(); }, 1200); /* resync from server */
+      resync();
     }
   })
-  .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); });
+  .fail(function(xhr){
+    ecToast('error', EC.ajaxError(xhr, 'Save failed'));
+    resync();
+  });
+}
+
+/* The page already shows the change, so after a refused or failed save the
+   only honest state is the server's: reload it. */
+function resync(){
+  saveAgain=false;
+  setTimeout(function(){ window.location.reload(); }, 1200);
 }
 
 /* -- Copy the previous session's structure into this (empty) one -- */
@@ -409,6 +439,11 @@ function render(){
       +'</div>';
   });
 
+  /* An empty session and a search with no hits need different words. */
+  document.getElementById('emptyTitle').textContent=DATA.length?'No classes found':'No classes yet';
+  document.getElementById('emptyText').textContent=DATA.length
+    ?'Try a different search, or add a class.'
+    :'Click Add Class to build this session’s classes and sections.';
   if(!matched){ box.innerHTML=''; empty.classList.remove('d-none'); }
   else { box.innerHTML=html; empty.classList.add('d-none'); }
 
@@ -459,8 +494,9 @@ document.getElementById('btnAddClass').addEventListener('click',function(){ open
 /* The saved class name carries the stream: "Class 11" + Science (PCM) is stored as
    "Class 11 Science (PCM)". The name is the key students, fees and reports resolve
    on, so two streams of one class must not end up sharing a name. The suffix is
-   added only when adding a class -- renaming a saved class would orphan the
-   students already enrolled under the old name. */
+   added only when adding a class. Renaming a saved class is allowed: the save
+   keeps its id and carries the name into its fee structure, and the server
+   refuses it while students are enrolled under the old name. */
 function composedName(name,stream){
   if(!stream || stream==='gen') return name;
   var suffix=streamLbl(stream);
@@ -481,8 +517,11 @@ document.getElementById('mClassStream').addEventListener('change',updateNamePrev
 document.getElementById('classSave').addEventListener('click',function(){
   var name=document.getElementById('mClassName').value.trim();
   if(!name){ ecToast('error','Class name is required.'); return; }
-  var rank=parseInt(document.getElementById('mClassRank').value,10)||(DATA.length+1);
-  if(rank<1 || rank>999){ ecToast('error','Order must be between 1 and 999.'); return; }
+  /* Blank means "next in line"; anything typed must be 1..999 (0 used to be
+     swapped silently for the next rank). */
+  var rankTxt=document.getElementById('mClassRank').value.trim();
+  var rank=rankTxt==='' ? DATA.length+1 : Number(rankTxt);
+  if(!(rank>=1 && rank<=999) || Math.floor(rank)!==rank){ ecToast('error','Order must be a whole number between 1 and 999.'); return; }
   var stream=document.getElementById('mClassStream').value;
   var coordSel=document.getElementById('mClassCoord');
   var coordStaffId=parseInt(coordSel.value,10)||null;
@@ -544,8 +583,12 @@ document.getElementById('secSave').addEventListener('click',function(){
   if(!c) return;
   var name=document.getElementById('mSecName').value.trim();
   if(!name){ ecToast('error','Section name is required.'); return; }
-  var cap=parseInt(document.getElementById('mSecCap').value,10)||0;
-  if(cap<0 || cap>5000){ ecToast('error','Capacity must be between 1 and 5000.'); return; }
+  /* Blank capacity = no limit (stored as NULL); a typed value must be 1..5000. */
+  var capTxt=document.getElementById('mSecCap').value.trim();
+  var cap=capTxt==='' ? 0 : Number(capTxt);
+  if(capTxt!=='' && (!(cap>=1 && cap<=5000) || Math.floor(cap)!==cap)){
+    ecToast('error','Capacity must be a whole number between 1 and 5000, or blank for no limit.'); return;
+  }
   var room=document.getElementById('mSecRoom').value.trim();
   var dup=c.sections.some(function(x){return x.name.toLowerCase()===name.toLowerCase() && x.id!==secCtx.secId;});
   if(dup){ ecToast('warning','This section already exists in '+c.name+'.'); return; }

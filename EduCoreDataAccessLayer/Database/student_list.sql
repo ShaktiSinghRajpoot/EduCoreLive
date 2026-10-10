@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- core.sp_student_list
 -- Server-side listing for the "All Students" page (Student/StudentList).
 --
@@ -58,17 +58,18 @@ BEGIN
                 s.admission_date, s.created_at, s.guardian_name, s.mobile,
                 s.annual_total, s.status, s.approval_status, s.enquiry_id,
                 s.photo_url,
+                -- Concession settles a due as surely as cash does. Leaving it
+                -- out showed a fully settled student as owing / Partial.
                 COALESCE((
                     SELECT CASE
-                        WHEN SUM(l.amount_due) = 0 THEN 'Paid'
-                        WHEN SUM(l.amount_paid) = 0 THEN 'Pending'
-                        WHEN SUM(l.amount_paid) >= SUM(l.amount_due) THEN 'Paid'
+                        WHEN SUM(l.amount_due - l.amount_paid - l.concession) <= 0 THEN 'Paid'
+                        WHEN SUM(l.amount_paid + l.concession) = 0 THEN 'Pending'
                         ELSE 'Partial' END
                     FROM core.student_ledger l
                     WHERE l.student_id = s.student_id
                 ), 'Pending') AS fee_status,
                 COALESCE((
-                    SELECT SUM(l.amount_due - l.amount_paid)
+                    SELECT SUM(l.amount_due - l.amount_paid - l.concession)
                     FROM core.student_ledger l
                     WHERE l.student_id = s.student_id
                 ), 0) AS fee_due

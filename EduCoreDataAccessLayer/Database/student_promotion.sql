@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- Bulk student promotion — moving a class into the next academic session.
 --
 -- core.students holds ONE row per student: class_name, section and
@@ -24,6 +24,11 @@
 -- (see academic_session_rollover.sql). Classes are per-session rows, so a new
 -- session is empty until the structure is copied forward, and promoting into an
 -- empty session would write students onto classes that do not exist.
+--
+-- MONEY: Promote / Retain bill the target class's recurring fee structure for
+-- the new session (once per student per session) and re-bill a kept bus route;
+-- PassOut closes later dues like an exit. Depends on student_money_lifecycle.sql,
+-- transport_module.sql and student_exit.sql -- apply those first.
 -- ============================================================================
 
 -- ── history ────────────────────────────────────────────────────────────────
@@ -155,6 +160,13 @@ DECLARE
     v_retained    integer := 0;
     v_passed      integer := 0;
     v_skipped     text[]  := '{}';
+    v_tgt_start   date;
+    v_plan        jsonb;
+    v_billed      integer := 0;
+    v_unbilled    text[]  := '{}';
+    v_route       integer;
+    v_stop        integer;
+    v_bus         refcursor;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -168,7 +180,7 @@ BEGIN
         RAISE EXCEPTION 'The new session must be different from the current session.';
     END IF;
 
-    SELECT academic_year_id INTO v_tgt_year_id
+    SELECT academic_year_id, start_date::date INTO v_tgt_year_id, v_tgt_start
     FROM   academic.academic_years
     WHERE  tenant_id = p_tenant_id
       AND  school_id = p_school_id
@@ -464,7 +476,49 @@ BEGIN
                 PERFORM core.fn_student_enrolment_close(
                     s.student_id, s.academic_year, 'PassedOut', p_action_user_id);
 
+                -- Same money rule as a manual exit: anything due after today
+                -- is closed with a reason and the bus ends.
+                PERFORM core.fn_student_leave_money(
+                    p_tenant_id, p_school_id, s.student_id, CURRENT_DATE, p_action_user_id);
+
                 v_passed := v_passed + 1;
+            END IF;
+
+            -- 4. Bill the new session (Promote and Retain).
+            --
+            --    The class's recurring fee structure for the TARGET session is
+            --    billed exactly the way admission bills a plan
+            --    (core.fn_student_bill_plan), from the session start. The
+            --    admission fee and deposit are not charged again. Billing is
+            --    once per student per session, so a repeated run never adds a
+            --    second plan. Before this, promotion created no dues at all
+            --    for the new year. Old unpaid dues are untouched: they carry.
+            IF v_outcome IN ('Promote', 'Retain') THEN
+                v_plan := core.fn_class_fee_plan(p_tenant_id, p_school_id, v_to_class, v_tgt);
+                IF v_plan IS NULL THEN
+                    v_unbilled := v_unbilled || (s.student_name || ' (' || v_to_class || ')');
+                ELSIF core.fn_student_bill_plan(p_tenant_id, p_school_id, p_action_user_id,
+                          s.student_id, v_tgt, COALESCE(v_tgt_start, CURRENT_DATE), v_plan) > 0 THEN
+                    v_billed := v_billed + 1;
+                END IF;
+
+                -- A student who keeps a bus route is billed for it in the new
+                -- session too, at the stop's current fare.
+                v_route := NULL;
+                SELECT route_id, stop_id INTO v_route, v_stop
+                FROM core.student_transport
+                WHERE student_id = s.student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+                  AND is_active = TRUE AND COALESCE(is_deleted, FALSE) = FALSE
+                ORDER BY assignment_id DESC
+                LIMIT 1;
+
+                IF v_route IS NOT NULL THEN
+                    v_bus := 'promote_bus_' || s.student_id;
+                    CALL core.sp_transport_assign_manage('SaveAssignment', p_tenant_id, p_school_id,
+                         p_action_user_id, s.student_id, v_route, v_stop, v_tgt,
+                         COALESCE(v_tgt_start, CURRENT_DATE), 12, v_bus);
+                    CLOSE v_bus;
+                END IF;
             END IF;
 
             INSERT INTO core.student_promotion_history (
@@ -494,7 +548,13 @@ BEGIN
            COALESCE(array_length(v_skipped, 1), 0) AS skipped,
            array_to_string(v_skipped, '; ')       AS skipped_detail,
            v_promoted || ' promoted, ' || v_retained || ' retained, ' ||
-           v_passed   || ' passed out.'           AS message;
+           v_passed   || ' passed out. ' ||
+           v_billed   || ' billed for ' || v_tgt || '.' ||
+           CASE WHEN array_length(v_unbilled, 1) > 0
+                THEN ' Not billed — no fee structure for ' || v_tgt || ': ' ||
+                     array_to_string(v_unbilled, ', ') || '.'
+                ELSE '' END                       AS message,
+           v_billed                               AS billed;
     RETURN;
 END;
 $procedure$;

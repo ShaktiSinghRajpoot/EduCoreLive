@@ -22,12 +22,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpReminderHistory = "core.sp_fee_reminder_history";
         private const string SpCollect = "core.sp_fee_payment_collect";
         private const string SpHistory = "core.sp_fee_payment_history_get";
+        private const string SpRefundHistory = "core.sp_fee_refund_history_get";
         private const string SpReceipt = "core.sp_fee_receipt_get";
         private const string SpCancel = "core.sp_fee_receipt_cancel";
         private const string SpRefundables = "core.sp_student_refundables_get";
         private const string SpRefund = "core.sp_fee_refund_record";
         private const string SpDayCollection = "core.sp_fee_day_collection_get";
         private const string SpDayClose = "core.sp_fee_day_close";
+        private const string SpDayReopen = "core.sp_fee_day_reopen";
         private const string SpCollectionRegister = "core.sp_fee_collection_register";
         private const string SpDefaulters = "core.sp_fee_defaulters_get";
         private const string SpAdvanceGet = "core.sp_student_advance_get";
@@ -236,6 +238,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         RollNo           = DbRead.NStr(reader, cols, "roll_no"),
                         Mobile           = DbRead.NStr(reader, cols, "mobile"),
                         ParentEmail      = DbRead.NStr(reader, cols, "parent_email"),
+                        StudentStatus    = DbRead.NStr(reader, cols, "student_status"),
                         TotalOutstanding = DbRead.Dec(reader, cols, "total_outstanding"),
                         OverdueDays      = DbRead.Int(reader, cols, "overdue_days"),
                         Bucket           = DbRead.Str(reader, cols, "bucket"),
@@ -358,7 +361,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         AmountDue        = DbRead.Dec(reader, cols, "amount_due"),
                         AmountPaid       = DbRead.Dec(reader, cols, "amount_paid"),
                         Concession       = DbRead.Dec(reader, cols, "concession"),
-                        Outstanding      = DbRead.Dec(reader, cols, "outstanding")
+                        Outstanding      = DbRead.Dec(reader, cols, "outstanding"),
+                        IsRefundable     = DbRead.Bool(reader, cols, "is_refundable")
                     });
                 }
             });
@@ -370,7 +374,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             int studentId, List<FeeCollectItem> items, List<FeeExtraItem> extras, string paymentMode, string? referenceNo,
             string? remarks, string? finYear, int tenantId, int schoolId, int actionUserId,
             string? discountType = null, decimal discountValue = 0, string? discountReason = null,
-            List<FeeTenderItem>? tenders = null, decimal advanceUsed = 0)
+            List<FeeTenderItem>? tenders = null, decimal advanceUsed = 0,
+            string? clientRef = null, string? discountApprovedBy = null)
         {
             if (tenantId <= 1 || schoolId <= 0 || studentId <= 0)
                 return new FeeCollectResult { Message = "Invalid request." };
@@ -389,7 +394,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var extrasJson = JsonSerializer.Serialize(extras.Select(e => new
             {
                 label  = e.Label,
-                amount = e.Amount
+                amount = e.Amount,
+                note   = e.Note
             }));
             var tendersJson = (tenders != null && tenders.Count > 0)
                 ? JsonSerializer.Serialize(tenders.Where(t => t.Amount > 0).Select(t => new
@@ -418,7 +424,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_discount_reason", NpgsqlDbType.Text)    { Value = (object?)discountReason ?? DBNull.Value },
                 new("p_tenders",         NpgsqlDbType.Jsonb)   { Value = (object?)tendersJson ?? DBNull.Value },
                 new("p_advance_used",    NpgsqlDbType.Numeric) { Value = advanceUsed },
-                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" },
+                // These two follow p_result in the proc (so old positional callers keep working).
+                new("p_client_ref",           NpgsqlDbType.Text) { Value = (object?)clientRef ?? DBNull.Value },
+                new("p_discount_approved_by", NpgsqlDbType.Text) { Value = (object?)discountApprovedBy ?? DBNull.Value }
             };
 
             try
@@ -485,7 +494,53 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         PaymentMode     = DbRead.Str(reader, cols, "payment_mode"),
                         ReferenceNo     = DbRead.NStr(reader, cols, "reference_no"),
                         IsCancelled     = DbRead.Bool(reader, cols, "is_cancelled"),
-                        CancelReason    = DbRead.NStr(reader, cols, "cancel_reason")
+                        CancelReason    = DbRead.NStr(reader, cols, "cancel_reason"),
+                        PaymentType     = DbRead.NStr(reader, cols, "payment_type") ?? "Fee",
+                        AdvanceUsed     = DbRead.Dec(reader, cols, "advance_used"),
+                        AdvanceCredit   = DbRead.Dec(reader, cols, "advance_credit"),
+                        CollectedBy     = DbRead.NStr(reader, cols, "collected_by"),
+                        CreatedAt       = DbRead.DateTimeN(reader, cols, "created_at"),
+                        CancelledByName = DbRead.NStr(reader, cols, "cancelled_by_name"),
+                        CancelledAt     = DbRead.DateTimeN(reader, cols, "cancelled_at"),
+                        CancelAuthorizedBy = DbRead.NStr(reader, cols, "cancel_authorized_by")
+                    });
+                }
+            });
+
+            return list;
+        }
+
+        public async Task<List<FeeRefundHistoryItem>> GetRefundHistoryAsync(
+            int studentId, int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<FeeRefundHistoryItem>();
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0)
+                return list;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_student_id",     NpgsqlDbType.Integer) { Value = studentId },
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
+            };
+
+            await _db.ExecuteCursorsAsync(SpRefundHistory, parameters, async reader =>
+            {
+                var cols = reader.Columns();
+                while (await reader.ReadAsync())
+                {
+                    list.Add(new FeeRefundHistoryItem
+                    {
+                        RefundNo     = DbRead.Str(reader, cols, "refund_no"),
+                        RefundDate   = DbRead.NStr(reader, cols, "refund_date"),
+                        Amount       = DbRead.Dec(reader, cols, "amount"),
+                        Mode         = DbRead.Str(reader, cols, "refund_mode"),
+                        Reason       = DbRead.NStr(reader, cols, "reason"),
+                        AuthorizedBy = DbRead.NStr(reader, cols, "authorized_by"),
+                        RefundedBy   = DbRead.NStr(reader, cols, "refunded_by_name"),
+                        Against      = DbRead.NStr(reader, cols, "against")
                     });
                 }
             });
@@ -581,7 +636,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             int studentId, int ledgerId, decimal amount, string mode, string reason,
             string? authorizedBy, int tenantId, int schoolId, int actionUserId)
         {
-            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0 || ledgerId <= 0)
+            // ledgerId 0 = refund the student's advance (wallet) balance.
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0 || ledgerId < 0)
                 return (false, "Invalid request.", null);
             if (amount <= 0)
                 return (false, "Refund amount must be greater than zero.", null);
@@ -645,7 +701,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
                 new("p_date",           NpgsqlDbType.Unknown)    { Value = (object?)date ?? DBNull.Value },
                 new("p_summary", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "summary_cursor" },
-                new("p_modes",   NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "modes_cursor" }
+                new("p_modes",   NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "modes_cursor" },
+                new("p_history", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "history_cursor" }
             };
 
             await _db.ExecuteCursorsAsync(SpDayCollection, parameters,
@@ -659,6 +716,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         day.TotalCollected = DbRead.Dec(reader, cols, "total_collected");
                         day.ReceiptCount   = DbRead.Int(reader, cols, "receipt_count");
                         day.CancelledCount = DbRead.Int(reader, cols, "cancelled_count");
+                        day.CancelledAmount = DbRead.Dec(reader, cols, "cancelled_amount");
                         day.CashCollected  = DbRead.Dec(reader, cols, "cash_collected");
                         day.TotalRefunded  = DbRead.Dec(reader, cols, "total_refunded");
                         day.CashRefunded   = DbRead.Dec(reader, cols, "cash_refunded");
@@ -667,6 +725,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         day.CountedCash    = DbRead.Dec(reader, cols, "counted_cash");
                         day.Difference     = DbRead.Dec(reader, cols, "difference");
                         day.CloseRemarks   = DbRead.NStr(reader, cols, "close_remarks");
+                        day.ClosedAt       = DbRead.DateTimeN(reader, cols, "closed_at");
+                        day.ClosedTotalCollected = DbRead.Dec(reader, cols, "closed_total_collected");
+                        day.ClosedExpectedCash   = DbRead.Dec(reader, cols, "closed_expected_cash");
+                        day.ReopenedAt     = DbRead.DateTimeN(reader, cols, "reopened_at");
+                        day.ReopenReason   = DbRead.NStr(reader, cols, "reopen_reason");
                         day.SchoolCollected = DbRead.Dec(reader, cols, "school_collected");
                         day.SchoolReceipts  = DbRead.Int(reader, cols, "school_receipts");
                     }
@@ -682,6 +745,25 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             Mode   = DbRead.Str(reader, cols, "payment_mode"),
                             Amount = DbRead.Dec(reader, cols, "amount"),
                             Count  = DbRead.Int(reader, cols, "cnt")
+                        });
+                    }
+                },
+                // cursor 2: close / re-open history (newest first)
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                    {
+                        day.History.Add(new DayCloseLogRow
+                        {
+                            Action         = DbRead.Str(reader, cols, "action"),
+                            ActionAt       = DbRead.DateTimeN(reader, cols, "action_at"),
+                            ActionBy       = DbRead.NStr(reader, cols, "action_by_name"),
+                            TotalCollected = DbRead.Dec(reader, cols, "total_collected"),
+                            ExpectedCash   = DbRead.Dec(reader, cols, "expected_cash"),
+                            CountedCash    = DbRead.Dec(reader, cols, "counted_cash"),
+                            Difference     = DbRead.Dec(reader, cols, "difference"),
+                            Note           = DbRead.NStr(reader, cols, "note")
                         });
                     }
                 });
@@ -736,8 +818,54 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
         }
 
+        public async Task<(bool Success, string Message)> ReopenDayAsync(
+            string? date, int cashierId, string reason, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || cashierId <= 0)
+                return (false, "Invalid request.");
+            if (string.IsNullOrWhiteSpace(reason))
+                return (false, "A reason is required to re-open a closed day.");
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_cashier_id",     NpgsqlDbType.Integer) { Value = cashierId },
+                new("p_date",           NpgsqlDbType.Unknown) { Value = (object?)date ?? DBNull.Value },
+                new("p_reason",         NpgsqlDbType.Text)    { Value = reason.Trim() },
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
+            };
+
+            try
+            {
+                (bool ok, string msg)? outcome = null;
+                await _db.ExecuteCursorsAsync(SpDayReopen, parameters, async reader =>
+                {
+                    var cols = reader.Columns();
+                    if (await reader.ReadAsync())
+                    {
+                        bool ok = DbRead.Bool(reader, cols, "success");
+                        outcome = (ok, DbRead.NStr(reader, cols, "message") ?? (ok ? "Day re-opened." : "Could not re-open."));
+                    }
+                });
+                return outcome ?? (false, "No response.");
+            }
+            catch (PostgresException pex)
+            {
+                _logger.LogWarning(pex, "Day re-open rejected for school {SchoolId}, date {Date}. SqlState {SqlState}", schoolId, date, pex.SqlState);
+                return (false, pex.MessageText);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error re-opening day for school {SchoolId}, date {Date}.", schoolId, date);
+                return (false, "Unable to re-open the day.");
+            }
+        }
+
         public async Task<CollectionRegister> GetCollectionRegisterAsync(
-            string? from, string? to, int tenantId, int schoolId, int actionUserId)
+            string? from, string? to, int tenantId, int schoolId, int actionUserId,
+            string? className = null, string? section = null)
         {
             var reg = new CollectionRegister
             {
@@ -754,6 +882,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
                 new("p_from",           NpgsqlDbType.Unknown)    { Value = (object?)from ?? DBNull.Value },
                 new("p_to",             NpgsqlDbType.Unknown)    { Value = (object?)to   ?? DBNull.Value },
+                new("p_class",          NpgsqlDbType.Varchar)    { Value = (object?)className ?? DBNull.Value },
+                new("p_section",        NpgsqlDbType.Varchar)    { Value = (object?)section   ?? DBNull.Value },
                 new("p_receipts", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "receipts_cursor" },
                 new("p_modes",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "modes_cursor" },
                 new("p_heads",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "heads_cursor" }
@@ -767,6 +897,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     {
                         reg.Receipts.Add(new RegisterReceipt
                         {
+                            Entry       = DbRead.Str(reader, cols, "entry"),
+                            LineDate    = DbRead.NStr(reader, cols, "line_date"),
+                            IsCancelled = DbRead.Bool(reader, cols, "is_cancelled"),
+                            CancelledAt = DbRead.DateTimeN(reader, cols, "cancelled_at"),
+                            CancelReason = DbRead.NStr(reader, cols, "cancel_reason"),
+                            CashierName = DbRead.NStr(reader, cols, "cashier_name"),
                             ReceiptNo   = DbRead.Str(reader, cols, "receipt_no"),
                             Date        = DbRead.NStr(reader, cols, "payment_date"),
                             Amount      = DbRead.Dec(reader, cols, "amount"),
@@ -842,6 +978,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             Mode             = DbRead.NStr(reader, cols, "refund_mode"),
                             Reason           = DbRead.NStr(reader, cols, "reason"),
                             AuthorizedBy     = DbRead.NStr(reader, cols, "authorized_by"),
+                            RefundedByName   = DbRead.NStr(reader, cols, "refunded_by_name"),
                             StudentName      = DbRead.Str(reader, cols, "student_name"),
                             AdmissionNo      = DbRead.Str(reader, cols, "admission_no"),
                             ClassName        = DbRead.NStr(reader, cols, "class_name"),
@@ -894,7 +1031,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         {
                             ReceiptNo     = DbRead.Str(reader, cols, "receipt_no"),
                             Date          = DbRead.NStr(reader, cols, "payment_date"),
-                            Concession    = DbRead.Dec(reader, cols, "concession_total"),
+                            Concession    = DbRead.Dec(reader, cols, "concession_amount"),
+                            PaymentType   = DbRead.NStr(reader, cols, "payment_type"),
+                            IsCancelled   = DbRead.Bool(reader, cols, "is_cancelled"),
+                            GivenBy       = DbRead.NStr(reader, cols, "given_by_name"),
                             DiscountType  = DbRead.NStr(reader, cols, "discount_type"),
                             DiscountValue = DbRead.Dec(reader, cols, "discount_value"),
                             Reason        = DbRead.NStr(reader, cols, "discount_reason"),
@@ -916,6 +1056,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             Reason       = DbRead.NStr(reader, cols, "cancel_reason"),
                             AuthorizedBy = DbRead.NStr(reader, cols, "cancel_authorized_by"),
                             CancelledAt  = DbRead.DateTimeN(reader, cols, "cancelled_at"),
+                            CancelledBy  = DbRead.NStr(reader, cols, "cancelled_by_name"),
+                            CollectedBy  = DbRead.NStr(reader, cols, "collected_by_name"),
                             Student      = DbRead.Str(reader, cols, "student_name"),
                             AdmNo        = DbRead.Str(reader, cols, "admission_no")
                         });
@@ -975,6 +1117,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 {
                     list.Add(new DefaulterRow
                     {
+                        Entry            = DbRead.Str(reader, cols, "entry"),
+                        StudentStatus    = DbRead.NStr(reader, cols, "student_status"),
                         StudentId        = DbRead.Int(reader, cols, "student_id"),
                         StudentName      = DbRead.Str(reader, cols, "student_name"),
                         AdmissionNo      = DbRead.Str(reader, cols, "admission_no"),
@@ -1039,7 +1183,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                                 AdmissionNo     = DbRead.Str(reader, cols, "admission_no"),
                                 ClassName       = DbRead.Str(reader, cols, "class_name"),
                                 Section         = DbRead.NStr(reader, cols, "section"),
-                                RollNo          = DbRead.NStr(reader, cols, "roll_no")
+                                RollNo          = DbRead.NStr(reader, cols, "roll_no"),
+                                DiscountAmount  = DbRead.Dec(reader, cols, "discount_amount"),
+                                DiscountApprovedBy = DbRead.NStr(reader, cols, "discount_approved_by"),
+                                CollectedBy     = DbRead.NStr(reader, cols, "collected_by"),
+                                IsCancelled     = DbRead.Bool(reader, cols, "is_cancelled"),
+                                CancelReason    = DbRead.NStr(reader, cols, "cancel_reason"),
+                                CancelAuthorizedBy = DbRead.NStr(reader, cols, "cancel_authorized_by"),
+                                CancelledAt     = DbRead.DateTimeN(reader, cols, "cancelled_at"),
+                                CancelledByName = DbRead.NStr(reader, cols, "cancelled_by_name"),
+                                Tenders         = ParseTenders(DbRead.NStr(reader, cols, "tenders"))
                             };
                         }
                     },
@@ -1062,11 +1215,37 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
                 return receipt;
             }
+            catch (PostgresException pex)
+            {
+                // Usually "Receipt not found." (wrong number, or another school's).
+                _logger.LogWarning(pex, "Receipt {ReceiptNo} not loaded for school {SchoolId}. SqlState {SqlState}", receiptNo, schoolId, pex.SqlState);
+                return null;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to load receipt {ReceiptNo} for school {SchoolId}.", receiptNo, schoolId);
                 return null;
             }
+        }
+
+        // The receipt header carries its tenders as a JSON array:
+        // [{"mode":"Cash","amount":2000,"reference":null}, ...]
+        private static List<FeeTenderItem> ParseTenders(string? json)
+        {
+            var list = new List<FeeTenderItem>();
+            if (string.IsNullOrWhiteSpace(json)) return list;
+
+            using var doc = JsonDocument.Parse(json);
+            foreach (var t in doc.RootElement.EnumerateArray())
+            {
+                list.Add(new FeeTenderItem
+                {
+                    Mode      = t.TryGetProperty("mode", out var m) && m.ValueKind == JsonValueKind.String ? m.GetString()! : "Cash",
+                    Amount    = t.TryGetProperty("amount", out var a) && a.ValueKind == JsonValueKind.Number ? a.GetDecimal() : 0,
+                    Reference = t.TryGetProperty("reference", out var r) && r.ValueKind == JsonValueKind.String ? r.GetString() : null
+                });
+            }
+            return list;
         }
     }
 }

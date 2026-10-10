@@ -56,6 +56,13 @@ BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 OR p_student_id <= 0 THEN
         RAISE EXCEPTION 'Invalid request.';
     END IF;
+    -- The student must belong to this school, or another school's child could
+    -- be written into this school's reminder history.
+    IF NOT EXISTS (SELECT 1 FROM core.students
+                   WHERE student_id = p_student_id
+                     AND tenant_id = p_tenant_id AND school_id = p_school_id) THEN
+        RAISE EXCEPTION 'Student not found in this school.';
+    END IF;
 
     INSERT INTO core.fee_reminder_log
         (tenant_id, school_id, student_id, channels_requested, channels_delivered,

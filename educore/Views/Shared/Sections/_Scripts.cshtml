@@ -65,7 +65,10 @@
         // recurse; dropping it would swallow the message entirely.
         if (typeof toastr === 'undefined') { try { alert(message); } catch (e) {} return; }
         var fn = (type && typeof toastr[type] === 'function') ? type : 'info';
-        toastr[fn](message);
+        // Messages are plain text. toastr renders HTML by default, and many
+        // messages carry user-typed names (a fee head called "<img onerror=…>"
+        // ran as script in the "saved" toast), so always escape.
+        toastr[fn](message, null, { escapeHtml: true });
     };
 
     // ── Global double-submit guard ──────────────────────────────────────

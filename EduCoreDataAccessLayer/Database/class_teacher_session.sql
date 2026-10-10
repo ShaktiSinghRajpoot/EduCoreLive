@@ -85,6 +85,9 @@ BEGIN
         WHERE st.tenant_id = p_tenant_id AND st.school_id = p_school_id
           AND COALESCE(st.is_deleted, FALSE) = FALSE
           AND COALESCE(st.is_active, TRUE)   = TRUE
+          -- Only teaching staff, same rule as the Classes & Sections coordinator
+          -- list. Without it Auto-balance could make a driver a class teacher.
+          AND LOWER(COALESCE(st.staff_type, '')) = 'teaching'
         ORDER BY st.full_name;
         RETURN;
     END IF;
@@ -93,6 +96,18 @@ BEGIN
     -- The section id already identifies one session's row, so no year filter is
     -- needed; the scope check below is what keeps it to this school.
     IF p_operation = 'Assign' THEN
+        -- The staff id comes from the browser, so check it is an active teacher
+        -- of THIS school. There is no foreign key to catch a wrong id.
+        IF NULLIF(p_staff_id, 0) IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM core.staff st
+            WHERE st.staff_id = p_staff_id
+              AND st.tenant_id = p_tenant_id AND st.school_id = p_school_id
+              AND COALESCE(st.is_deleted, FALSE) = FALSE
+              AND COALESCE(st.is_active, TRUE)   = TRUE
+              AND LOWER(COALESCE(st.staff_type, '')) = 'teaching') THEN
+            RAISE EXCEPTION 'Pick an active teacher of this school.';
+        END IF;
+
         UPDATE academic.academic_class_sections
         SET class_teacher_staff_id = NULLIF(p_staff_id, 0),
             updated_by = p_action_user_id,

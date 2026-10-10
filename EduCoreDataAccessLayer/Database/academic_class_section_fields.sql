@@ -22,6 +22,8 @@ ALTER TABLE academic.academic_class_sections
     -- of script apply order.
     ADD COLUMN IF NOT EXISTS class_teacher_staff_id integer;
 
+-- NOTE: the procedure below is SUPERSEDED by academic_year_class_section_fixes.sql
+--       (run that script, not this block, to get the current definition).
 CREATE OR REPLACE PROCEDURE academic.sp_school_admin_academic_setup_manage(
     IN p_operation          character varying,
     IN p_tenant_id          integer,

@@ -16,6 +16,7 @@
     {
         public string  Label  { get; set; } = string.Empty;
         public decimal Amount { get; set; }
+        public string? Note   { get; set; }   // cashier's note, kept on the receipt line
     }
 
     /// <summary>One payment mode + amount in a split-tender collection.</summary>
@@ -48,15 +49,43 @@
         public string?   ReferenceNo     { get; set; }
         public bool      IsCancelled     { get; set; }
         public string?   CancelReason    { get; set; }
+        public string    PaymentType     { get; set; } = "Fee";
+        public decimal   AdvanceUsed     { get; set; }
+        public decimal   AdvanceCredit   { get; set; }
+        /// <summary>Who took the money, and when it was entered.</summary>
+        public string?   CollectedBy     { get; set; }
+        public DateTime? CreatedAt       { get; set; }
+        /// <summary>Who voided it, when, and who authorised that.</summary>
+        public string?   CancelledByName { get; set; }
+        public DateTime? CancelledAt     { get; set; }
+        public string?   CancelAuthorizedBy { get; set; }
+    }
+
+    /// <summary>One refund voucher in a student's payment history.</summary>
+    public class FeeRefundHistoryItem
+    {
+        public string    RefundNo       { get; set; } = string.Empty;
+        public string?   RefundDate     { get; set; }
+        public decimal   Amount         { get; set; }
+        public string    Mode           { get; set; } = string.Empty;
+        public string?   Reason         { get; set; }
+        public string?   AuthorizedBy   { get; set; }
+        public string?   RefundedBy     { get; set; }
+        /// <summary>The charge refunded, or "Advance balance" for a wallet refund.</summary>
+        public string?   Against        { get; set; }
     }
 
     /// <summary>A cashier's day collection summary + mode-wise breakup for reconciliation.</summary>
     public class DayCollection
     {
         public string         Date           { get; set; }
+        /// <summary>Receipts issued this day minus cancellations made this day.</summary>
         public decimal          TotalCollected { get; set; }
+        /// <summary>Receipts issued this day (a later cancel does not remove one).</summary>
         public int              ReceiptCount   { get; set; }
+        /// <summary>Cancellations made this day, by this cashier.</summary>
         public int              CancelledCount { get; set; }
+        public decimal          CancelledAmount { get; set; }
         public decimal          CashCollected  { get; set; }
         public decimal          TotalRefunded  { get; set; }
         public decimal          CashRefunded   { get; set; }
@@ -65,6 +94,14 @@
         public decimal          CountedCash    { get; set; }
         public decimal          Difference     { get; set; }
         public string?          CloseRemarks   { get; set; }
+        public DateTime?        ClosedAt       { get; set; }
+        public decimal          ClosedTotalCollected { get; set; }
+        public decimal          ClosedExpectedCash   { get; set; }
+        public DateTime?        ReopenedAt     { get; set; }
+        public string?          ReopenReason   { get; set; }
+
+        /// <summary>Every close and re-open of this drawer for the day, newest first.</summary>
+        public List<DayCloseLogRow> History    { get; set; } = new();
 
         // The same day across every cashier. Only used to explain a zero -- see
         // the note on the DayClose page. It is not part of the reconciliation.
@@ -72,6 +109,19 @@
         public int              SchoolReceipts  { get; set; }
 
         public List<DayModeRow> Modes          { get; set; } = new();
+    }
+
+    /// <summary>One close or re-open of a cashier's day (never overwritten).</summary>
+    public class DayCloseLogRow
+    {
+        public string    Action         { get; set; } = string.Empty;   // Close | Reopen
+        public DateTime? ActionAt       { get; set; }
+        public string?   ActionBy       { get; set; }
+        public decimal   TotalCollected { get; set; }
+        public decimal   ExpectedCash   { get; set; }
+        public decimal   CountedCash    { get; set; }
+        public decimal   Difference     { get; set; }
+        public string?   Note           { get; set; }
     }
 
     public class DayModeRow
@@ -94,6 +144,14 @@
 
     public class RegisterReceipt
     {
+        /// <summary>"Receipt" (+, on its issue day) or "Cancellation" (-, on the cancel day).</summary>
+        public string    Entry       { get; set; } = "Receipt";
+        /// <summary>The day this line counts on: issue day, or cancel day for a cancellation.</summary>
+        public string?   LineDate    { get; set; }
+        public bool      IsCancelled { get; set; }
+        public DateTime? CancelledAt { get; set; }
+        public string?   CancelReason { get; set; }
+        public string?   CashierName { get; set; }
         public string    ReceiptNo   { get; set; } = string.Empty;
         public string? Date        { get; set; }
         public decimal   Amount      { get; set; }
@@ -129,6 +187,8 @@
         public string?   Mode             { get; set; }
         public string?   Reason           { get; set; }
         public string?   AuthorizedBy     { get; set; }
+        /// <summary>The user who recorded the refund (AuthorizedBy is free text).</summary>
+        public string?   RefundedByName   { get; set; }
         public string    StudentName      { get; set; } = string.Empty;
         public string    AdmissionNo      { get; set; } = string.Empty;
         public string?   ClassName        { get; set; }
@@ -154,6 +214,10 @@
     /// <summary>A student who still owes, with class-wise aging of the outstanding.</summary>
     public class DefaulterRow
     {
+        /// <summary>"Student", or "Registration" for a fee part-paid before admission.</summary>
+        public string   Entry            { get; set; } = "Student";
+        /// <summary>Active, or how the student left (Transfer, Passout ...), or Registered.</summary>
+        public string?  StudentStatus    { get; set; }
         public int      StudentId        { get; set; }
         public string   StudentName      { get; set; } = string.Empty;
         public string   AdmissionNo      { get; set; } = string.Empty;
@@ -172,7 +236,11 @@
     {
         public string    ReceiptNo     { get; set; } = string.Empty;
         public string? Date          { get; set; }
+        /// <summary>Concession + discount on the receipt (incl. a registration discount).</summary>
         public decimal   Concession    { get; set; }
+        public string?   PaymentType   { get; set; }
+        public bool      IsCancelled   { get; set; }
+        public string?   GivenBy       { get; set; }
         public string?   DiscountType  { get; set; }
         public decimal   DiscountValue { get; set; }
         public string?   Reason        { get; set; }
@@ -189,6 +257,9 @@
         public string?     Reason       { get; set; }
         public string?     AuthorizedBy { get; set; }
         public DateTime?   CancelledAt  { get; set; }
+        /// <summary>The user who cancelled it, and the one who had collected it.</summary>
+        public string?     CancelledBy  { get; set; }
+        public string?     CollectedBy  { get; set; }
         public string      Student      { get; set; } = string.Empty;
         public string      AdmNo        { get; set; } = string.Empty;
     }
@@ -230,6 +301,18 @@
         public string    ClassName       { get; set; } = string.Empty;
         public string?   Section         { get; set; }
         public string?   RollNo          { get; set; }
+        /// <summary>Registration-fee discount (registration receipts carry it on the header).</summary>
+        public decimal   DiscountAmount  { get; set; }
+        public string?   DiscountApprovedBy { get; set; }
+        public string?   CollectedBy     { get; set; }
+        /// <summary>A voided receipt must print as CANCELLED.</summary>
+        public bool      IsCancelled     { get; set; }
+        public string?   CancelReason    { get; set; }
+        public string?   CancelAuthorizedBy { get; set; }
+        public DateTime? CancelledAt     { get; set; }
+        public string?   CancelledByName { get; set; }
+        /// <summary>How it was paid, mode by mode (cheque no / UPI ref in Reference).</summary>
+        public List<FeeTenderItem> Tenders { get; set; } = new();
         public List<FeeReceiptLine> Lines { get; set; } = new();
     }
 

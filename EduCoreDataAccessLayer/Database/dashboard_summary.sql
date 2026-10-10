@@ -16,9 +16,16 @@
 --   The calling page hides those cards rather than drawing empty ones.
 --
 -- CONVENTIONS kept in step with the rest of the app:
---   * A cancelled receipt (is_cancelled) is never counted as collection.
+--   * Collection is read through core.fn_fee_money_lines (fee_day_close.sql),
+--     exactly as Day Close and the Collection Register read it: a receipt counts
+--     on the day it was issued, a cancellation is a negative on the day it was
+--     cancelled (so yesterday's figure never changes), and modes are the real
+--     tenders, never "Mixed". Apply this file AFTER fee_day_close.sql.
 --   * Outstanding is read from core.student_ledger, the single source of truth
---     for money — never recomputed from payments.
+--     for money — never recomputed from payments. It is what has FALLEN DUE
+--     (due_date on or before today), the same rule as Defaulters and the Fee Due
+--     list; next months' instalments are not a debt yet. Students who have left
+--     still count while they owe.
 --   * "Today's attendance" counts only classes that actually took a register;
 --     a class nobody marked is not a class that was absent.
 --
@@ -72,28 +79,32 @@ BEGIN
             AND st.is_deleted = FALSE AND COALESCE(st.status,'Active') = 'Active')::int
             AS staff,
 
-        -- Cancelled receipts are not collection.
-        (SELECT COALESCE(SUM(fp.amount), 0) FROM core.fee_payments fp
-          WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
-            AND fp.payment_date::date = CURRENT_DATE
-            AND COALESCE(fp.is_cancelled, FALSE) = FALSE)
+        -- Receipts issued today minus cancellations made today.
+        (SELECT COALESCE(SUM(ml.amount), 0)
+           FROM core.fn_fee_money_lines(p_tenant_id, p_school_id, CURRENT_DATE, CURRENT_DATE) ml)
             AS today_collection,
 
-        (SELECT COALESCE(SUM(fp.amount), 0) FROM core.fee_payments fp
-          WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
-            AND fp.payment_date::date = CURRENT_DATE - 1
-            AND COALESCE(fp.is_cancelled, FALSE) = FALSE)
+        (SELECT COALESCE(SUM(ml.amount), 0)
+           FROM core.fn_fee_money_lines(p_tenant_id, p_school_id, CURRENT_DATE - 1, CURRENT_DATE - 1) ml)
             AS yesterday_collection,
 
-        -- The ledger is the single source of truth for what is owed.
-        (SELECT COALESCE(SUM(GREATEST(l.amount_due - l.amount_paid - COALESCE(l.concession,0), 0)), 0)
+        -- The ledger is the single source of truth for what is owed: rows that
+        -- have fallen due, for students of this school.
+        (SELECT COALESCE(SUM(l.amount_due - l.amount_paid - COALESCE(l.concession,0)), 0)
            FROM core.student_ledger l
-          WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id)
+           JOIN core.students s ON s.student_id = l.student_id
+                               AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id
+          WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
+            AND l.amount_due > l.amount_paid + COALESCE(l.concession,0)
+            AND (l.due_date IS NULL OR l.due_date::date <= CURRENT_DATE))
             AS outstanding,
 
         (SELECT COUNT(DISTINCT l.student_id) FROM core.student_ledger l
+           JOIN core.students s ON s.student_id = l.student_id
+                               AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id
           WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
-            AND (l.amount_due - l.amount_paid - COALESCE(l.concession,0)) > 0)::int
+            AND l.amount_due > l.amount_paid + COALESCE(l.concession,0)
+            AND (l.due_date IS NULL OR l.due_date::date <= CURRENT_DATE))::int
             AS due_students,
 
         (SELECT COUNT(*) FROM core.staff_leave sl
@@ -119,10 +130,8 @@ BEGIN
     -- than a missing point the line would skip over.
     OPEN p_trend FOR
     SELECT g.d::date AS d,
-           COALESCE((SELECT SUM(fp.amount) FROM core.fee_payments fp
-                      WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
-                        AND fp.payment_date::date = g.d::date
-                        AND COALESCE(fp.is_cancelled, FALSE) = FALSE), 0) AS amount
+           COALESCE((SELECT SUM(ml.amount)
+                       FROM core.fn_fee_money_lines(p_tenant_id, p_school_id, g.d::date, g.d::date) ml), 0) AS amount
     FROM generate_series(CURRENT_DATE - 6, CURRENT_DATE, INTERVAL '1 day') AS g(d)
     ORDER BY d;
 
@@ -139,38 +148,51 @@ BEGIN
 
     -- ── 4. Collection by payment mode, this month ───────────────────────────
     OPEN p_modes FOR
-    SELECT COALESCE(NULLIF(TRIM(fp.payment_mode), ''), 'Other') AS mode,
-           SUM(fp.amount) AS amount
-    FROM core.fee_payments fp
-    WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
-      AND COALESCE(fp.is_cancelled, FALSE) = FALSE
-      AND fp.payment_date::date >= DATE_TRUNC('month', CURRENT_DATE)::date
-    GROUP BY 1
+    -- By real tender. 'Advance' (paid from the wallet) and 'To wallet' (surplus
+    -- saved to it) are not new money in a mode, so the chart leaves them out.
+    SELECT ml.mode, SUM(ml.amount) AS amount
+    FROM core.fn_fee_money_lines(p_tenant_id, p_school_id,
+                                 DATE_TRUNC('month', CURRENT_DATE)::date, CURRENT_DATE) ml
+    WHERE ml.mode NOT IN ('Advance', 'To wallet')
+    GROUP BY ml.mode
+    HAVING SUM(ml.amount) <> 0
     ORDER BY amount DESC;
 
     -- ── 5. Highest outstanding ──────────────────────────────────────────────
     OPEN p_defaulters FOR
+    -- The ledger is summed FIRST and the last payment looked up on its own:
+    -- joining payments into the ledger GROUP BY multiplied every figure by the
+    -- number of receipts the student had.
     SELECT s.student_id, s.public_id, s.student_name, s.class_name, s.section,
-           SUM(l.amount_due)                                  AS total,
-           SUM(l.amount_paid)                                 AS paid,
-           SUM(GREATEST(l.amount_due - l.amount_paid - COALESCE(l.concession,0), 0)) AS due,
-           MAX(fp.payment_date)                               AS last_payment
-    FROM core.student_ledger l
-    JOIN core.students s ON s.student_id = l.student_id AND s.is_active
-    LEFT JOIN core.fee_payments fp
-           ON fp.student_id = s.student_id AND COALESCE(fp.is_cancelled, FALSE) = FALSE
-    WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
-    GROUP BY s.student_id, s.public_id, s.student_name, s.class_name, s.section
-    HAVING SUM(GREATEST(l.amount_due - l.amount_paid - COALESCE(l.concession,0), 0)) > 0
-    ORDER BY due DESC
+           l.total, l.paid, l.due,
+           (SELECT MAX(fp.payment_date) FROM core.fee_payments fp
+             WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
+               AND fp.student_id = s.student_id
+               AND COALESCE(fp.is_cancelled, FALSE) = FALSE) AS last_payment
+    FROM (SELECT ll.student_id,
+                 SUM(ll.amount_due)  AS total,
+                 SUM(ll.amount_paid) AS paid,
+                 COALESCE(SUM(ll.amount_due - ll.amount_paid - COALESCE(ll.concession,0))
+                          FILTER (WHERE ll.amount_due > ll.amount_paid + COALESCE(ll.concession,0)
+                                    AND (ll.due_date IS NULL OR ll.due_date::date <= CURRENT_DATE)), 0) AS due
+          FROM core.student_ledger ll
+          WHERE ll.tenant_id = p_tenant_id AND ll.school_id = p_school_id
+          GROUP BY ll.student_id) l
+    JOIN core.students s ON s.student_id = l.student_id
+                        AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id
+    WHERE l.due > 0
+    ORDER BY l.due DESC
     LIMIT 10;
 
     -- ── 6. Recent receipts ──────────────────────────────────────────────────
     OPEN p_recent FOR
+    -- A registration receipt has no student yet: name it from the enquiry.
     SELECT fp.receipt_no, fp.amount, fp.payment_mode, fp.payment_date,
-           s.student_name, s.class_name
+           COALESCE(s.student_name, e.student_name) AS student_name,
+           COALESCE(s.class_name, e.class_name)     AS class_name
     FROM core.fee_payments fp
-    JOIN core.students s ON s.student_id = fp.student_id
+    LEFT JOIN core.students  s ON s.student_id = fp.student_id
+    LEFT JOIN core.enquiries e ON e.enquiry_id = fp.enquiry_id
     WHERE fp.tenant_id = p_tenant_id AND fp.school_id = p_school_id
       AND COALESCE(fp.is_cancelled, FALSE) = FALSE
     ORDER BY fp.payment_date DESC, fp.payment_id DESC

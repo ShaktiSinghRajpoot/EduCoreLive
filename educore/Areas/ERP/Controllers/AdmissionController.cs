@@ -240,20 +240,44 @@ namespace educore.Areas.ERP.Controllers
             if (dob != null && string.CompareOrdinal(dob, joined) > 0)
                 errors.Add("Date of birth cannot be after the admission date.");
 
-            var (feePlan, totals, concession) = ParseLedger(form);
+            // The fee plan and every amount are built HERE from the school's fee
+            // structure. They used to be read from the page's LedgerPreviewJson,
+            // so the posted amounts, heads and totals were whatever the browser
+            // sent. The page still chooses the concession type, value and target.
+            List<AdmissionFee>? fees = null;
+            if (!string.IsNullOrWhiteSpace(form.ClassName) && !string.IsNullOrWhiteSpace(form.AcademicYear))
+            {
+                var (built, feeError) = await BuildAdmissionFeesAsync(
+                    form.ClassName.Trim(), form.AcademicYear.Trim(), tenantId, schoolId, userId);
+                if (built == null) errors.Add(feeError!);
+                fees = built;
+            }
 
-            if (concession.Amount > 0 && string.IsNullOrWhiteSpace(form.DiscountReason))
+            var quote = fees == null
+                ? new AdmissionQuote()
+                : QuoteAdmission(fees,
+                      await _admissionService.GetPlanInstalmentsAsync(form.AcademicYear!.Trim(), tenantId, schoolId, userId),
+                      form.DiscountType, form.DiscountValue ?? 0m, form.DiscountApplyTo);
+
+            if (quote.Concession > 0 && string.IsNullOrWhiteSpace(form.DiscountReason))
                 errors.Add("A concession reason is required when a discount is applied.");
 
             // Overpay guard (mirrors the client): at admission you can collect at most the
             // amount due now. Advance / prepay must go through the Fee counter (ManageFee),
             // which has the advance-wallet support the admission screen intentionally omits.
-            // This stops cash beyond the dues being silently dropped by the allocation.
-            if (form.CollectFeeNow && (form.PaymentAmount ?? 0m) > totals.PayToday + 0.01m)
-                errors.Add($"Amount to collect cannot exceed ₹{totals.PayToday:0} due now. Use the Fee counter for advance/prepay.");
+            if (form.CollectFeeNow && (form.PaymentAmount ?? 0m) > quote.PayToday + 0.01m)
+                errors.Add($"Amount to collect cannot exceed ₹{quote.PayToday:0} due now. Use the Fee counter for advance/prepay.");
 
             if (errors.Count > 0)
                 return Json(new { success = false, message = string.Join(" ", errors) });
+
+            // Admitting is students.manage; taking money or giving a concession at the
+            // same time is fee work. Checked before anything is saved.
+            if (form.CollectFeeNow && (form.PaymentAmount ?? 0m) > 0
+                && !await HasPermissionAttribute.UserHasAsync(this, "fees.collect"))
+                return Json(new { success = false, message = "You do not have permission to collect fees. Admit without collecting, and collect at the Fee counter." });
+            if (quote.Concession > 0 && !await HasPermissionAttribute.UserHasAsync(this, "fees.concession"))
+                return Json(new { success = false, message = "You do not have permission to give a concession." });
 
             // Registration gate — enforce on the actual mutation, not just the UI.
             // Covers BOTH paths: an enquiry that hasn't completed registration, and
@@ -301,15 +325,22 @@ namespace educore.Areas.ERP.Controllers
                 MotherEmail         = NullIfEmpty(form.MotherEmail),
                 AnnualIncome        = form.AnnualIncome,
                 DocumentsJson       = NormalizeJsonArray(form.DocumentsJson),
-                PayTodayTotal    = totals.PayToday,
-                MonthlyTotal     = totals.Monthly,
-                YearlyTotal      = totals.Yearly,
-                AnnualTotal      = totals.Annual,
-                ConcessionType   = NullIfEmpty(form.DiscountType),
-                ConcessionValue  = concession.Value,
-                ConcessionAmount = concession.Amount,
+                PayTodayTotal    = quote.PayToday,
+                MonthlyTotal     = quote.Monthly,
+                YearlyTotal      = quote.Yearly,
+                AnnualTotal      = quote.Annual,
+                ConcessionType   = quote.Concession > 0 ? NullIfEmpty(form.DiscountType) : null,
+                ConcessionValue  = quote.Concession > 0 ? (form.DiscountValue ?? 0m) : 0m,
+                ConcessionAmount = quote.Concession,
                 ConcessionReason = NullIfEmpty(form.DiscountReason),
-                FeePlan          = feePlan,
+                FeePlan          = (fees ?? new List<AdmissionFee>()).Select(f => new StudentFeePlanItem
+                {
+                    FeeHeadId   = f.FeeHeadId > 0 ? f.FeeHeadId : null,
+                    FeeHeadName = f.FeeHeadName,
+                    Frequency   = f.Frequency,
+                    Amount      = f.Amount,
+                    IsOptional  = false
+                }).ToList(),
                 EnquiryId        = form.EnquiryId is > 0 ? form.EnquiryId : null
             };
 
@@ -326,37 +357,43 @@ namespace educore.Areas.ERP.Controllers
             // Both the cash collected now AND any admission-time concession are pushed
             // through the shared fee engine (CollectPaymentAsync), so core.student_ledger
             // stays the single source of truth. A discount on its own — even when no cash
-            // is taken (school doesn't collect at admission, or the cashier unticked
-            // "Collect Fee Now") — still writes a concession voucher onto the ledger.
-            // Otherwise the discounted portion would linger forever as a phantom due.
+            // is taken — still writes a concession voucher onto the ledger.
+            //
+            // The admission, the receipt and the bus assignment are three separate
+            // database calls. Whatever happens to the receipt or the bus is therefore
+            // reported back (feeMessage / feeFailed / transportMessage) and the page
+            // shows it: a failed receipt used to be reported here and then never shown.
             string? receiptNo = null;
             string? feeMessage = null;
+            bool feeFailed = false;
+            string? transportMessage = null;
             if (result.Success && result.StudentId > 0)
             {
                 var workflow   = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
                 var payAmount  = (form.CollectFeeNow && workflow.CollectFeeAtAdmission) ? (form.PaymentAmount ?? 0m) : 0m;
-                var concAmount = concession.Amount;
+
+                // A concession above the approval limit is recorded on the admission
+                // as Pending Approval (sp_admission_manage) and NOT written onto the
+                // ledger: it used to be applied at once, so the approval meant nothing.
+                var concAmount = quote.Concession > ConcessionCap ? 0m : quote.Concession;
+                string pendingNote = quote.Concession > ConcessionCap
+                    ? $" The concession of ₹{quote.Concession:N0} is above the approval limit of ₹{ConcessionCap:N0} and was not applied — apply it from Fee → Collect Fees once approved."
+                    : string.Empty;
 
                 if (payAmount > 0 || concAmount > 0)
                 {
-                    // Itemise the lump cash + concession across the just-created dues so the
-                    // receipt lists each charge (admission fee, security, …) instead of one
-                    // opaque line, and the concession is recorded as real concession on each
-                    // ledger row. Admission-point charges are settled first (that's what the
-                    // cashier is collecting now), then the earliest scheduled dues — never
-                    // over-allocating a row and never dropping cash.
-                    var dues  = await _feePaymentService.GetStudentDuesAsync(result.StudentId, tenantId, schoolId, userId);
+                    var dues = await _feePaymentService.GetStudentDuesAsync(result.StudentId, tenantId, schoolId, userId);
 
-                    // Refundable deposit heads (Caution Money etc.) — the discount must skip
-                    // these. The ledger doesn't carry the flag, so read it from the structure.
-                    var structure = await _schoolSettingsService.GetFeeStructureDetailsAsync(
-                        model.ClassName, model.AcademicYear, tenantId, schoolId, userId);
-                    var refundableHeads = (structure ?? new List<FeeStructureDetailModel>())
-                        .Where(s => s.IsRefundable)
-                        .Select(s => s.FeeHeadName)
+                    // Refundable deposit heads — the discount must skip these. Taken from
+                    // the same list the plan was built from, so the fallback deposit
+                    // (named after its real fee head now) is included.
+                    var refundableHeads = (fees ?? new List<AdmissionFee>())
+                        .Where(f => f.IsRefundable)
+                        .Select(f => f.FeeHeadName)
                         .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                    var items = AllocateAdmissionPayment(dues, payAmount, concAmount, refundableHeads);
+                    bool spreadOverYear = IsAnnual(form.DiscountApplyTo);
+                    var items = AllocateAdmissionPayment(dues, payAmount, concAmount, spreadOverYear, refundableHeads);
 
                     if (items.Count > 0)
                     {
@@ -368,41 +405,53 @@ namespace educore.Areas.ERP.Controllers
                             model.AcademicYear,
                             tenantId, schoolId, userId,
                             discountType:   MapDiscountType(form.DiscountType),
-                            discountValue:  concession.Value,
+                            discountValue:  form.DiscountValue ?? 0m,
                             discountReason: NullIfEmpty(form.DiscountReason));
 
-                        receiptNo  = res.ReceiptNo;
+                        receiptNo = res.Success ? res.ReceiptNo : null;
 
-                        // What is still due now, after this cash and any concession. A
-                        // parent paying 4,000 of 10,000 is normal; being told nothing
-                        // about the other 6,000 at the counter is how it gets forgotten.
-                        decimal stillDue = totals.PayToday - payAmount - concAmount;
-                        string  balance  = stillDue > 0.005m
+                        // What is still due on the one-time charges after this cash and
+                        // concession, worked out from the real ledger rows.
+                        var admissionRows = dues.Where(d => IsAdmissionLabel(d.InstallmentLabel)).Select(d => d.LedgerId).ToHashSet();
+                        decimal stillDue = dues.Where(d => admissionRows.Contains(d.LedgerId)).Sum(d => d.Outstanding)
+                                         - items.Where(i => admissionRows.Contains(i.LedgerId)).Sum(i => i.Amount + i.Concession);
+                        string balance = stillDue > 0.005m
                             ? $" ₹{stillDue:N0} is still due — collect it from Fee → Collect Fees."
                             : string.Empty;
 
-                        feeMessage = !res.Success
-                            ? $"Admission saved, but payment failed: {res.Message}"
-                            : (payAmount > 0 ? $"Receipt {res.ReceiptNo} generated.{balance}"
-                                             : $"Concession recorded (receipt {res.ReceiptNo}).{balance}");
+                        if (!res.Success)
+                        {
+                            feeFailed  = true;
+                            feeMessage = $"Admission saved, but the payment was NOT recorded: {res.Message} No receipt was issued — do not keep the cash; collect it again from Fee → Collect Fees.";
+                        }
+                        else
+                        {
+                            feeMessage = (payAmount > 0 ? $"Receipt {res.ReceiptNo} generated."
+                                                        : $"Concession recorded (receipt {res.ReceiptNo}).") + balance;
+                        }
                     }
                     else if (payAmount > 0)
                     {
-                        feeMessage = "Admission saved, but no outstanding dues were found to collect against.";
+                        feeFailed  = true;
+                        feeMessage = "Admission saved, but no outstanding dues were found to collect against. No receipt was issued.";
                     }
                 }
+
+                if (pendingNote.Length > 0)
+                    feeMessage = (feeMessage ?? "Admission saved.") + pendingNote;
             }
 
             // ── Assign transport (optional) ── generates monthly bus-fee dues
-            // through the end of the academic year, just like the mid-year Assign page.
+            // through the end of the session; the proc reads the session's real
+            // end date, so no month count is worked out here any more.
             if (result.Success && result.StudentId > 0 && form.TransportRouteId is > 0 && form.TransportStopId is > 0)
             {
-                var admDate = model.AdmissionDate ?? Dates.Today;
-                int months = MonthsToYearEnd(model.AcademicYear, admDate);
-                await _transportService.SaveAssignmentAsync(
+                var (busOk, busMsg, _, _) = await _transportService.SaveAssignmentAsync(
                     result.StudentId, form.TransportRouteId.Value, form.TransportStopId.Value,
-                    model.AcademicYear, admDate, months,
+                    model.AcademicYear, model.AdmissionDate ?? Dates.Today, 12,
                     tenantId, schoolId, userId);
+                if (!busOk)
+                    transportMessage = $"Admission saved, but the bus was NOT assigned: {busMsg} Assign it from Transport → Assign.";
             }
 
             return Json(new
@@ -412,7 +461,9 @@ namespace educore.Areas.ERP.Controllers
                 admissionNo = result.AdmissionNo,
                 studentId  = result.StudentId,
                 receiptNo,
-                feeMessage
+                feeMessage,
+                feeFailed,
+                transportMessage
             });
         }
 
@@ -461,8 +512,9 @@ namespace educore.Areas.ERP.Controllers
 
         // ── GET: /ERP/Admission/GetFeeStructure (AJAX) ───────────
         // Returns the real, DB-configured fee heads for a class + year,
-        // grouped for the admission fee preview. Replaces the old
-        // hardcoded JS fee table.
+        // grouped for the admission fee preview, plus how many instalments
+        // each billing cycle produces for someone joining today (so the annual
+        // estimate matches what the ledger will actually bill).
         [HttpGet]
         public async Task<IActionResult> GetFeeStructure(string className, string academicYear)
         {
@@ -471,70 +523,170 @@ namespace educore.Areas.ERP.Controllers
 
             int tenantId = TenantId(), schoolId = SchoolId(), userId = UserId();
 
+            var (built, error) = await BuildAdmissionFeesAsync(className.Trim(), academicYear.Trim(), tenantId, schoolId, userId);
+            if (built == null)
+                return Json(new { success = false, message = error });
+
+            var instalments = await _admissionService.GetPlanInstalmentsAsync(academicYear.Trim(), tenantId, schoolId, userId);
+
+            var fees = built.Select(f => new
+            {
+                feeHeadId       = f.FeeHeadId,
+                feeHeadName     = f.FeeHeadName,
+                frequency       = f.Frequency,
+                amount          = f.Amount,
+                collectionPoint = f.CollectionPoint,
+                isRefundable    = f.IsRefundable,
+                group           = f.IsAdmissionPoint ? "One Time Payable Now" : GroupForFrequency(f.Frequency),
+                // Due-now vs scheduled is driven by the Collection Point, not the billing cycle.
+                stage           = f.IsAdmissionPoint ? "Admission" : StageForFrequency(f.Frequency),
+                // All configured heads are part of the class structure → mandatory.
+                mandatory       = true,
+                instalments     = f.IsAdmissionPoint ? 1 : InstalmentsFor(instalments, f.Frequency)
+            }).ToList();
+
+            return Json(new { success = true, fees });
+        }
+
+        // One fee line the admission will charge.
+        private sealed class AdmissionFee
+        {
+            public int     FeeHeadId       { get; set; }
+            public string  FeeHeadName     { get; set; } = string.Empty;
+            public string  Frequency       { get; set; } = "Yearly";
+            public decimal Amount          { get; set; }
+            public string  CollectionPoint { get; set; } = "Recurring";
+            public bool    IsRefundable    { get; set; }
+            public bool    IsAdmissionPoint => string.Equals(CollectionPoint, "Admission", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // What an admission costs, worked out on the server.
+        private sealed class AdmissionQuote
+        {
+            public decimal PayToday   { get; set; }   // one-time charges due now, after their share of concession
+            public decimal Monthly    { get; set; }
+            public decimal Yearly     { get; set; }
+            public decimal Annual     { get; set; }   // what the session will bill, after concession
+            public decimal Concession { get; set; }
+        }
+
+        // The fee lines for a class + session, the one list both the preview and
+        // the save use.
+        //   * Registration-point heads are never charged here (taken at registration).
+        //   * A head switched off in the Fee Head master is not charged.
+        //   * A refundable Admission head (the security deposit) only when the school
+        //     enables the security deposit in Workflow Settings.
+        //   * Deposit enabled but the class structure has none: each active refundable
+        //     Admission head from the master is added under its OWN id and name. It
+        //     used to be added as one line called "Security Deposit", a name no fee
+        //     head has, so the refund screen could not tell it was refundable and
+        //     the admission concession could land on it.
+        private async Task<(List<AdmissionFee>? Fees, string? Error)> BuildAdmissionFeesAsync(
+            string className, string academicYear, int tenantId, int schoolId, int userId)
+        {
             var details = await _schoolSettingsService.GetFeeStructureDetailsAsync(
                 className, academicYear, tenantId, schoolId, userId);
 
             if (details == null || details.Count == 0)
-                return Json(new { success = false, message = "No fee structure configured for this class and year. Configure it under School Settings → Fee Structure." });
+                return (null, "No fee structure configured for this class and year. Configure it under School Settings → Fee Structure.");
 
             var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
 
-            // Admission collects Admission-point heads (admission fee, security deposit)
-            // as "due now", and Recurring heads as "scheduled / billed later". It never
-            // collects Registration-point heads (those are taken at the registration step).
-            // A refundable Admission head (the security deposit) is only charged when the
-            // school enables the security deposit toggle in Workflow Settings.
-            // A head switched off in the Fee Head master is not charged again. It stays
-            // on the saved structure and on every record already written -- the flag is
-            // the safe alternative to deleting a head that has ledger history.
-            var visible = details.Where(d =>
-                d.IsActive &&
-                !string.Equals(d.CollectionPoint, "Registration", StringComparison.OrdinalIgnoreCase) &&
-                (!(IsAdmissionPoint(d.CollectionPoint) && d.IsRefundable) || workflow.EnableSecurityFee));
-
-            var fees = visible.Select(d => new
-            {
-                feeHeadId       = d.FeeHeadId,
-                feeHeadName     = d.FeeHeadName,
-                frequency       = string.IsNullOrWhiteSpace(d.Frequency) ? "Yearly" : d.Frequency,
-                amount          = d.Amount,
-                collectionPoint = string.IsNullOrWhiteSpace(d.CollectionPoint) ? "Recurring" : d.CollectionPoint,
-                isRefundable    = d.IsRefundable,
-                group           = IsAdmissionPoint(d.CollectionPoint) ? "One Time Payable Now" : GroupForFrequency(d.Frequency),
-                // Due-now vs scheduled is driven by the Collection Point, not the billing cycle.
-                stage           = IsAdmissionPoint(d.CollectionPoint) ? "Admission" : StageForFrequency(d.Frequency),
-                // All configured heads are part of the class structure → mandatory by default.
-                mandatory       = true
-            }).ToList();
-
-            // Security deposit: enabled but the class Fee Structure has no refundable
-            // Admission head → add it from the flat fee-head amount (the simple / inline
-            // Workflow-Settings setup). It stays REFUNDABLE (isRefundable = true), so it
-            // flows to the ledger as a returnable deposit, not a normal charge.
-            if (workflow.EnableSecurityFee &&
-                !fees.Any(f => IsAdmissionPoint(f.collectionPoint) && f.isRefundable))
-            {
-                decimal secAmount = await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
-                    className, academicYear, "Admission", tenantId, schoolId, userId, refundableOnly: true);
-                if (secAmount > 0)
+            var fees = details
+                .Where(d => d.IsActive &&
+                            !string.Equals(d.CollectionPoint, "Registration", StringComparison.OrdinalIgnoreCase) &&
+                            (!(IsAdmissionPoint(d.CollectionPoint) && d.IsRefundable) || workflow.EnableSecurityFee))
+                .Select(d => new AdmissionFee
                 {
-                    fees.Add(new
+                    FeeHeadId       = d.FeeHeadId,
+                    FeeHeadName     = (d.FeeHeadName ?? string.Empty).Trim(),
+                    Frequency       = string.IsNullOrWhiteSpace(d.Frequency) ? "Yearly" : d.Frequency,
+                    Amount          = d.Amount,
+                    CollectionPoint = string.IsNullOrWhiteSpace(d.CollectionPoint) ? "Recurring" : d.CollectionPoint,
+                    IsRefundable    = d.IsRefundable
+                })
+                .ToList();
+
+            if (workflow.EnableSecurityFee && !fees.Any(f => f.IsAdmissionPoint && f.IsRefundable))
+            {
+                var heads = await _schoolSettingsService.GetFeeHeadAsync(tenantId, schoolId, userId);
+                foreach (var h in heads.Where(h => h.IsActive && h.IsRefundable && h.DefaultAmount > 0 &&
+                                                   IsAdmissionPoint(h.CollectionPoint)))
+                {
+                    if (fees.Any(f => string.Equals(f.FeeHeadName, h.FeeHeadName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                        continue;
+                    fees.Add(new AdmissionFee
                     {
-                        feeHeadId       = 0,
-                        feeHeadName     = "Security Deposit",
-                        frequency       = "One Time",
-                        amount          = secAmount,
-                        collectionPoint = "Admission",
-                        isRefundable    = true,
-                        group           = "One Time Payable Now",
-                        stage           = "Admission",
-                        mandatory       = true
+                        FeeHeadId       = h.FeeHeadId,
+                        FeeHeadName     = h.FeeHeadName.Trim(),
+                        Frequency       = "One Time",
+                        Amount          = h.DefaultAmount,
+                        CollectionPoint = "Admission",
+                        IsRefundable    = true
                     });
                 }
             }
 
-            return Json(new { success = true, fees });
+            return (fees, null);
         }
+
+        // Totals and concession for a fee list. The concession never touches a
+        // refundable deposit. "Estimated annual" uses the instalments the session
+        // will really bill (a student joining in October pays six months, not twelve).
+        private static AdmissionQuote QuoteAdmission(
+            List<AdmissionFee> fees, Dictionary<string, int> instalments,
+            string? discountType, decimal discountValue, string? applyTo)
+        {
+            var q = new AdmissionQuote();
+            decimal discountableNow = 0, discountableAnnual = 0;
+
+            foreach (var f in fees)
+            {
+                int n = f.IsAdmissionPoint ? 1 : InstalmentsFor(instalments, f.Frequency);
+                decimal yearAmount = f.Amount * n;
+                q.Annual += yearAmount;
+                if (!f.IsRefundable) discountableAnnual += yearAmount;
+
+                if (f.IsAdmissionPoint)
+                {
+                    q.PayToday += f.Amount;
+                    if (!f.IsRefundable) discountableNow += f.Amount;
+                }
+                else if (string.Equals(f.Frequency, "Monthly", StringComparison.OrdinalIgnoreCase)) q.Monthly += f.Amount;
+                else if (string.Equals(f.Frequency, "Yearly", StringComparison.OrdinalIgnoreCase))  q.Yearly  += f.Amount;
+            }
+
+            bool annual = IsAnnual(applyTo);
+            decimal discBase = annual ? discountableAnnual : discountableNow;
+            if (discountValue > 0 && discBase > 0)
+            {
+                q.Concession = string.Equals(discountType, "percentage", StringComparison.OrdinalIgnoreCase)
+                    ? Math.Round(discBase * Math.Min(discountValue, 100m) / 100m, 0, MidpointRounding.AwayFromZero)
+                    : Math.Min(discountValue, discBase);
+            }
+
+            // The share of the concession that lands on today's one-time charges.
+            decimal nowShare = !annual ? q.Concession
+                             : discountableAnnual > 0 ? Math.Round(q.Concession * discountableNow / discountableAnnual, 2)
+                             : 0m;
+            if (q.Concession > ConcessionCap) nowShare = 0m;   // not applied until approved
+
+            q.PayToday -= nowShare;
+            q.Annual   -= q.Concession > ConcessionCap ? 0m : q.Concession;
+            return q;
+        }
+
+        private static int InstalmentsFor(Dictionary<string, int> instalments, string? frequency) =>
+            instalments.TryGetValue(string.IsNullOrWhiteSpace(frequency) ? "Yearly" : frequency, out var n) && n > 0 ? n : 1;
+
+        private static bool IsAnnual(string? applyTo) =>
+            string.Equals(applyTo, "annual", StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsAdmissionLabel(string? label) =>
+            string.Equals(label, "Admission", StringComparison.OrdinalIgnoreCase);
+
+        // Above this the concession waits for approval (matches sp_admission_manage's default cap).
+        private const decimal ConcessionCap = 100000m;
 
         private static bool IsAdmissionPoint(string? collectionPoint) =>
             string.Equals(collectionPoint, "Admission", StringComparison.OrdinalIgnoreCase);
@@ -659,97 +811,26 @@ namespace educore.Areas.ERP.Controllers
             ViewBag.EnableTransport = workflow.EnableTransport;
         }
 
-        // ── Ledger JSON parsing ──────────────────────────────────
-        private static (List<StudentFeePlanItem> Fees,
-                        (decimal PayToday, decimal Monthly, decimal Yearly, decimal Annual) Totals,
-                        (decimal Value, decimal Amount) Concession)
-            ParseLedger(AdmissionFormModel form)
-        {
-            var fees = new List<StudentFeePlanItem>();
-            decimal payToday = 0, monthly = 0, yearly = 0, annual = 0, concValue = 0, concAmount = 0;
-
-            if (!string.IsNullOrWhiteSpace(form.LedgerPreviewJson))
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(form.LedgerPreviewJson);
-                    var root = doc.RootElement;
-
-                    if (root.TryGetProperty("selectedFees", out var sel) && sel.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var f in sel.EnumerateArray())
-                        {
-                            fees.Add(new StudentFeePlanItem
-                            {
-                                FeeHeadId   = GetInt(f, "feeHeadId") is int id and > 0 ? id : (GetInt(f, "id") is int id2 and > 0 ? id2 : null),
-                                FeeHeadName = GetStr(f, "feeHeadName") ?? GetStr(f, "name") ?? "Fee",
-                                Frequency   = NormalizeFreq(GetStr(f, "frequency") ?? GetStr(f, "cycle")),
-                                Amount      = GetDec(f, "amount"),
-                                IsOptional  = f.TryGetProperty("mandatory", out var m) && m.ValueKind == JsonValueKind.False
-                            });
-                        }
-                    }
-
-                    // NOTE: store add-ons (uniform/tie/belt/books) are deliberately NOT
-                    // booked here. They are store/inventory sales, not school fees — mixing
-                    // them into the fee ledger pollutes fee revenue and there is no inventory
-                    // backend to track stock. The admission panel keeps them as a handover
-                    // checklist only; selling them belongs in a dedicated Store module.
-
-                    if (root.TryGetProperty("summary", out var sum))
-                    {
-                        payToday = GetDec(sum, "payToday");
-                        monthly  = GetDec(sum, "monthlyRecurring");
-                        yearly   = GetDec(sum, "yearlyScheduled");
-                        annual   = GetDec(sum, "estimatedAnnual");
-                    }
-
-                    if (root.TryGetProperty("concession", out var con))
-                    {
-                        concValue  = GetDec(con, "value");
-                        concAmount = GetDec(con, "calculatedAmount");
-                    }
-                }
-                catch (JsonException) { /* malformed payload → treated as empty plan; validation still guards required fields */ }
-            }
-
-            return (fees, (payToday, monthly, yearly, annual), (concValue, concAmount));
-        }
-
-        // Bill transport from the admission month through the end of the academic
-        // year (Indian April–March), capped at 12. Falls back to 12 if unparsable.
-        private static int MonthsToYearEnd(string? academicYear, string? startIso)
-        {
-            // Dates travel as ISO text now, so this is the one spot that turns the
-            // start back into a real date - the month count is genuine arithmetic.
-            var start = Dates.Parse(startIso) ?? Dates.Now.Date;
-
-            int endYear;
-            if (!string.IsNullOrWhiteSpace(academicYear) && academicYear.Length >= 4 &&
-                int.TryParse(academicYear.Substring(0, 4), out var firstYear))
-                endYear = firstYear + 1;
-            else
-                endYear = start.Month >= 4 ? start.Year + 1 : start.Year;
-
-            var yearEnd = new DateTime(endYear, 3, 31);
-            if (yearEnd < start) return 1;
-            int months = (yearEnd.Year - start.Year) * 12 + (yearEnd.Month - start.Month) + 1;
-            return Math.Clamp(months, 1, 12);
-        }
-
         // Spreads the lump "collect at admission" cash AND any concession across the
         // student's freshly created dues, so the receipt is itemised and the discount is
-        // recorded as real concession on each ledger row (not a phantom unpaid balance).
-        // Admission-point charges (ledger label 'Admission') are settled first, then the
-        // earliest remaining dues by due date. The concession is written off first so each
-        // due's payable balance shrinks before cash is applied; every line is capped at its
-        // outstanding so a row is never over-allocated and no money is dropped.
+        // recorded as real concession on each ledger row.
+        //
+        // Concession: shared out IN PROPORTION across the dues it applies to — the
+        // one-time charges for "Pay Today", every due of the session for "Estimated
+        // annual" — never a refundable deposit, never a carried registration balance.
+        // It used to be written off from the first rows onwards, so an annual
+        // discount wiped the admission fee and the cash then spilled into tuition.
+        //
+        // Cash: admission-point charges first (that is what is being collected now),
+        // then the earliest remaining dues. Every line is capped at its outstanding,
+        // so a row is never over-allocated and no money is dropped.
         private static List<FeeCollectItem> AllocateAdmissionPayment(
-            List<StudentDueItem> dues, decimal cash, decimal concession, HashSet<string> refundableHeads)
+            List<StudentDueItem> dues, decimal cash, decimal concession, bool spreadOverYear,
+            HashSet<string> refundableHeads)
         {
             var ordered = dues
                 .Where(d => d.Outstanding > 0)
-                .OrderByDescending(d => string.Equals(d.InstallmentLabel, "Admission", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(d => IsAdmissionLabel(d.InstallmentLabel))
                 .ThenBy(d => d.DueDate ?? "9999-12-31")
                 .ThenBy(d => d.LedgerId)
                 .ToList();
@@ -757,21 +838,26 @@ namespace educore.Areas.ERP.Controllers
             var concByLedger = new Dictionary<int, decimal>();
             var cashByLedger = new Dictionary<int, decimal>();
 
-            // 1) Write off the concession first so each due's payable balance shrinks —
-            //    but NEVER against a refundable deposit (e.g. Caution Money). A discount
-            //    applies to income heads only; a deposit is a liability the school returns,
-            //    so it must always be collected in full. Cash (step 2) still fills it.
-            decimal concLeft = concession;
-            foreach (var d in ordered)
+            var eligible = ordered
+                .Where(d => !refundableHeads.Contains(d.FeeHeadName)
+                         && !string.Equals(d.InstallmentLabel, "Registration", StringComparison.OrdinalIgnoreCase)
+                         && (spreadOverYear || IsAdmissionLabel(d.InstallmentLabel)))
+                .ToList();
+            decimal baseSum = eligible.Sum(d => d.Outstanding);
+            decimal concLeft = Math.Min(concession, baseSum);
+
+            for (int i = 0; i < eligible.Count && concLeft > 0; i++)
             {
-                if (concLeft <= 0) break;
-                if (refundableHeads.Contains(d.FeeHeadName)) continue;
-                decimal take = Math.Min(concLeft, d.Outstanding);
+                var d = eligible[i];
+                decimal take = i == eligible.Count - 1
+                    ? concLeft
+                    : Math.Round(concession * d.Outstanding / baseSum, 2);
+                take = Math.Min(Math.Min(take, d.Outstanding), concLeft);
+                if (take <= 0) continue;
                 concByLedger[d.LedgerId] = take;
                 concLeft -= take;
             }
 
-            // 2) Apply cash to whatever each due still owes after concession.
             decimal cashLeft = cash;
             foreach (var d in ordered)
             {
@@ -800,21 +886,6 @@ namespace educore.Areas.ERP.Controllers
             string.Equals(t, "percentage", StringComparison.OrdinalIgnoreCase) ? "Percent"
             : string.Equals(t, "fixed", StringComparison.OrdinalIgnoreCase)     ? "Flat"
             : null;
-
-        private static string NormalizeFreq(string? f) => f switch
-        {
-            "Monthly"     => "Monthly",
-            "Quarterly"   => "Quarterly",
-            "Half Yearly" => "Half Yearly",
-            "HalfYearly"  => "Half Yearly",
-            "One Time"    => "One Time",
-            "OneTime"     => "One Time",
-            _             => "Yearly"
-        };
-
-        private static int?    GetInt(JsonElement e, string p) => e.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : null;
-        private static decimal GetDec(JsonElement e, string p) => e.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDecimal() : 0m;
-        private static string? GetStr(JsonElement e, string p) => e.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
 
         // ── Claims helpers ───────────────────────────────────────
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");

@@ -4104,3 +4104,249 @@ One consequence worth naming: `EnquiryModel.TimeAgo` used to compare
 India time that assumption would have made every follow-up read five hours stale
 -- the exact symptom a comment there already warned about. Both sides of that
 subtraction are now the school's clock.
+
+### [2026-10-10] Classes & Sections saved in place; academic years can no longer lose their current session
+
+**Files changed**
+- `Database/academic_year_class_section_fixes.sql` (new; supersedes the year proc in
+  `fee_charge_from_per_year.sql` and the setup proc in `academic_class_section_fields.sql`)
+- `Services/Repository/ERP/SchoolSettingsService.cs` (setup JSON carries `originalName`;
+  PostgresException logged at Warning), `Models/ERP/AcademicSetupModel.cs`
+- `Areas/ERP/Controllers/SchoolSettingsController.cs` (ClassSection + AcademicYear actions, DTOs)
+- `Areas/ERP/Views/SchoolSettings/AcademicYears.cshtml`, `ClassSection.cshtml`
+- `Database/tests/settings_years_classes_tests.sql` (new, 177 checks)
+
+**What and why**
+- **Classes & Sections save is no longer delete-all + re-insert.** Every save gave every
+  class and section a new id, and `class_subjects`, `exam_subjects` and `timetable` (keyed
+  by id) were left pointing at deleted rows — an unchanged Save took a school's subject
+  mappings from 49 to 0. The proc now matches each class/section by the name the page
+  loaded (`originalName`), then by name, updates it in place and only soft-deletes what was
+  really removed. A renamed class keeps its id and carries its name into the session's fee
+  structures; renaming one that has students is still refused.
+- **A session can not be renamed once anything stores its name** (students, enrolment, fee
+  structures, attendance, transport, TC register, enquiries, admission/registration
+  counters). Refusing was chosen over a cascade: nine tables, counters that would restart
+  numbering, and receipts/TCs already printed with the old name.
+- **The school always has exactly one current session**: set-current/edit/delete check the
+  id belongs to this school first (an unknown id used to clear every flag), and the current
+  session can not be un-ticked or deleted.
+- Overlapping sessions refused; dates required with end after start; name ≤ 20; a deleted
+  session's name can be reused (`uq_academic_year` replaced by a partial unique index).
+
+### [2026-10-10] School Settings test pass: subjects, class teacher, periods, profile, workflow, fees
+
+A real-world test pass over the ten School Settings pages (four new SQL suites in
+`Database/tests/settings_*_tests.sql`, 604 checks, all rolled back). Every bug they found
+is fixed; the year/class-section part is the entry above.
+
+**New scripts:** `Database/school_scope_fk.sql` — composite FKs `(tenant_id, school_id)` from
+`school_profiles/addresses/contacts/settings/admission_workflow_settings` to `core.schools`,
+so a tenant/school pair that does not exist can never get settings rows (the procs only
+checked `tenant > 1 && school > 0`). Purge already deletes these children first.
+
+**Subjects / class teacher / periods**
+- `subject_management.sql`: a save goes under the class's OWN session (it defaulted to the
+  current one, so next session's classes were saved into this session); duplicate names
+  counted once; a subject taken off a class also leaves that class's timetable; inactive
+  classes refused; names over 80 chars get a readable message.
+- `class_teacher_session*.sql`: the teacher pool and Assign accept only active *teaching*
+  staff of the same school (any staff id was accepted, including another school's).
+- `period_structure.sql`: the save renumbers periods, and timetable lessons are keyed by that
+  number — so adding an assembly moved every lesson one period. Lessons now follow their
+  period by label; removing (or making non-teaching) a period that has lessons is refused.
+- Views: stored XSS in subject pills (`EC.esc`), numeric class/subject names (`attr` not
+  `data`), dirty-state after switching class, Period Structure's fake up/down reorder removed,
+  full legend, unsaved-changes warning; an inactive class teacher no longer shows "Unassigned".
+
+**Profile / Documents / Workflow**
+- District id can no longer outlive its text or state (`COALESCE` kept Gurugram under Delhi).
+- Manual registration numbers must be unique per session (`enquiry_registration.sql`).
+- Workflow fee cards can not take over another head by typing its name (controller guard +
+  fee-head proc rule) and re-activate a switched-off head; a failed settings read disables Save.
+- BasicProfile: website without a scheme gets `https://`, bad logo extension is a validation
+  message (was a 500), established year capped at this year, read-only data kept after a
+  failed save, DB errors logged. The TC dialog opens on the saved default format.
+
+**Fee head / structure** (`fee_head_identity.sql`, `fee_structure_manage.sql`,
+`fee_head_list.sql`, `fee_head_cascade_delete.sql`)
+- A rename rewrote receipt lines of EVERY school with that head name; now scoped to this school.
+- Structure lines must be live heads of this school; name/cycle come from the master;
+  negative amounts, blank class/session refused; totals from rounded amounts.
+- A billing-cycle change now updates this school's saved structures (admitted ledgers stay).
+- Cycle stored in its standard spelling; fee type must be Mandatory/Optional.
+- `ecToast` escapes HTML (TempData messages carried head names into toastr).
+
+### [2026-10-10] Money across admission and the student lifecycle: closed, never deleted
+
+Test pass `tests/money_admission_lifecycle_tests.sql` (catalog
+`educore/docs/test-cases/money_admission_lifecycle.md`) found 26 bugs; all fixed here.
+
+**New building blocks — `student_money_lifecycle.sql` (apply FIRST, then the procs below).**
+- `student_ledger` gains `academic_year`, `fee_head_id` and a CLOSE trail: `closed_amount`,
+  `close_reason`, `close_source`, `closed_by`, `closed_at`. Closing a due drops `amount_due`
+  to what was settled and keeps the rest in `closed_amount`, so every existing "outstanding"
+  formula reads 0 without being changed, receipt lines keep pointing at a real row, and the
+  close can be undone exactly (`fn_ledger_close` / `fn_ledger_reopen`).
+- `fn_plan_periods` + `fn_student_bill_plan`: the month arithmetic moved out of
+  `sp_admission_manage` so admission, promotion and a class change bill a plan the same
+  way. One plan per student per session (`student_fee_plan.academic_year/is_current`).
+- `fn_class_fee_plan` (recurring heads of a class structure), `sp_plan_instalments`,
+  `sp_student_fee_totals`, `sp_student_history_get` (audit + promotion + closed dues + bus +
+  refunds — none of that was readable anywhere before).
+
+**Procs** — `student_master_fields.sql` (plan validation, advisory lock against concurrent
+duplicate admissions, one admission per enquiry with `FOR UPDATE`, list Fee Due honours
+concession) · `transport_module.sql` (student must be this school's and active; billing
+clamped
+to the session's real end date; route change / removal CLOSE unpaid months with a reason
+instead of deleting them; a part-paid month is topped up, not re-billed) · `student_exit.sql`
+(exit closes dues after the leaving date and ends the bus; reactivate restores exactly that,
+writes an audit row, refused while a live TC exists) · `student_promotion.sql` (Promote /
+Retain bill the target class's recurring structure for the new session and re-bill a kept
+bus route; PassOut closes later dues) · `student_update.sql` (class must exist in the
+student's session, section in the class; enrolment follows; class change closes the old
+class's later instalments and bills the new one from next month when it has a structure;
+audit row) · `transfer_certificate.sql` (TC refused while the advance wallet holds money;
+void needs a reason) · `student_list.sql` (Fee Due honours concession).
+
+**C#** — `AdmissionController` builds the plan, totals and concession on the server from the
+fee structure (the browser used to supply amounts), shares an "Estimated annual" concession
+in proportion instead of front-loading it, holds an over-cap concession for approval, names
+the fallback deposit after its real fee head, and reports receipt / bus failures; the
+Create page shows them (`feeMessage` was never read). Transport month counts are left to
+the proc. Student Dashboard totals come from the whole ledger, plus an Activity & Money
+History card. `AdmissionService` / `TransferCertificateService` log `PostgresException`.
+`transport_tc_tests.sql` C3 was updated: it counted deleted rows, now it checks that the
+closed rows are no longer owed and carry a reason.
+
+### [2026-10-10] Money reports and Day Close: one story, and a closed day that stays closed
+
+A test pass over Day Close, the three report tabs, Fee Due reminders and the dashboard
+money tiles (`Database/tests/money_reports_dayclose_tests.sql`, catalog
+`educore/docs/test-cases/money_reports_dayclose.md`) found 31 bugs. All of them are
+fixed in the files below.
+
+**Files changed**
+- `Database/fee_day_close.sql` — new `core.fn_fee_money_lines`, `core.fn_fee_day_closed`,
+  `core.fn_user_display_name`, `core.sp_fee_day_reopen`, table `core.fee_day_close_log`,
+  columns `fee_day_close.reopened_at/by/reason`; `sp_fee_day_collection_get` gained a
+  history cursor (old 2-cursor overload dropped).
+- `Database/fee_reports.sql` — register gained `p_class/p_section` (old overload dropped);
+  defaulters rewritten.
+- `Database/dashboard_summary.sql`, `fee_due_list.sql`, `fee_concession_cancel_report.sql`,
+  `fee_refund_register.sql`, `fee_reminder_log.sql`.
+- `FeePaymentService.cs` / `IFeePaymentService.cs` (report methods + `ReopenDayAsync`),
+  `Models/ERP/FeeCollection.cs`, `FeeDueModel.cs`, `FeeController.cs` (report actions +
+  `ReopenDay`), `FeeDueRemindersController.cs`, views `Fee/DayClose`, `Fee/Reports`,
+  `FeeDueReminders/Index`.
+- Apply order: `fee_day_close.sql` first. The other report scripts call its functions.
+
+**What and why**
+- **Expected cash was wrong whenever a receipt was not plain cash.** Every report grouped by
+  the receipt *header*. That header says "Mixed" for Cash+UPI and records the settled amount
+  for an overpayment or a wallet payment. On the test day an exact drawer count of 10,800
+  was recorded as "Excess 1,400". `fn_fee_money_lines` turns receipts into tender lines.
+  Day Close, the register and the dashboard all read it now, so they cannot disagree.
+  `FeeModule.md` claimed this had been done since the split-tender work; it had not.
+- **A closed day changed afterwards.** Two causes: money could still be collected into a
+  closed day, and cancelling an old receipt removed it from its own day. User decision:
+  a cancellation counts on the day it is cancelled, in the canceller's drawer, as a
+  negative line. `fn_fee_day_closed` is the lock that the collect and cancel procs call.
+  Re-closing used to overwrite the first count. Now a close must be re-opened with a
+  reason, and every close and re-open is kept. Future dates and negative counts are refused.
+- **"Outstanding" overstated the debt.**
+  - It included every instalment for the rest of the year. A family paid up to date was
+    listed as a defaulter, and a reminder told a parent they owed the whole year.
+  - It is now what has *fallen due*, under one rule for Defaulters, the Fee Due list and the
+    Dashboard.
+  - Students who left are listed while they owe. The Fee Due list used to hide them, so the
+    two totals disagreed.
+  - A registration fee part-paid before admission is its own Defaulters row.
+- **The dashboard's "Highest outstanding" multiplied each student's dues by their receipt
+  count.** It joined payments into the ledger GROUP BY.
+- **Audit gaps.**
+  - The concession register missed registration discounts.
+  - No register showed the *user* who cancelled or refunded; only a free-text authoriser.
+  - SendReminders dropped selected students who were outside the first page.
+  - Export stopped at 200 rows, because ListModelBase caps PageSize. It now reads every page.
+  - The reminder log accepted another school's student.
+  - DayClose's "the school took ₹X at other counters" note never showed: the JSON never
+    carried `schoolCollected`.
+
+**Still for other owners:** `sp_fee_receipt_cancel` must refuse when
+`core.fn_fee_day_closed(tenant, school, canceller, today)` is true. Until it does, DC-21 and
+DC-21a stay red, and a closed day can still move by a cancel from that cashier.
+
+---
+
+### 2026-10-10 — Fee collection: every money path leaves a history (collect / cancel / refund / reprint)
+
+Found by `tests/money_fee_collection_tests.sql` (catalog: `educore/docs/test-cases/money_fee_collection.md`).
+
+- **Collect engine (`fee_advance.sql`).**
+  - The same due sent twice in one request was paid twice over. Lines are now merged per
+    ledger row, and every row is locked `FOR UPDATE` in id order before its outstanding is
+    checked. Two counters can no longer over-collect it either.
+  - An extras-only receipt never checked whose student it was, so it was issued for another
+    school's student or an id that does not exist. The student must now belong to the school.
+  - A negative tender, an `Advance` tender (dues settled from an empty wallet), advance used
+    beyond the bill (the wallet lost the excess), a concession with no reason, a concession on a
+    refundable deposit, and a cheque / DD with no number are all refused.
+  - `client_ref` (unique per school) means a retried Collect returns the first receipt.
+  - `discount_approved_by` records who approved a concession.
+  - Collecting after the counter closed today is refused (`fn_fee_day_closed`).
+  - The signature grew to 19 args. The two new ones come *after* `p_result`, so positional
+    callers keep working.
+- **Cancel (`fee_receipt_cancel.sql`).**
+  - Refused when money on the receipt was already refunded, or when the credit it created was
+    already spent (the wallet went to −1400).
+  - Refused when the canceller's today is closed.
+  - A registration receipt recomputes the enquiry's paid flag. After admission it raises a due
+    for the reversed amount.
+  - History now returns who collected and who cancelled, when, and on whose authority.
+- **Refund (`fee_refund.sql`).**
+  - The advance wallet can be refunded at exit (ledger id 0).
+  - Vouchers are numbered per school per year.
+  - More than two decimals is refused (0.004 used to make a ₹0.00 voucher).
+  - Refundability is looked up by the head's id, not its name.
+  - A closed-today cashier can't refund.
+  - New `sp_fee_refund_history_get` puts refunds in the student's Payment History.
+- **Reprint.** `sp_fee_receipt_get` returns `is_cancelled` with who, when and why, plus the
+  cashier, the discount amount and approver, and the tender split with references.
+  `fee-receipt.js` prints a CANCELLED banner, the split mode by mode, and the cashier.
+  A refund voucher can be printed.
+- **Counter (`ManageFee.cshtml`).**
+  - Each tender has a reference input; a cheque or DD number is required.
+  - Discount needs "Approved by"; cancel and refund need an authoriser.
+  - The extra-charge note is now sent.
+  - History lists refunds, the wallet is refundable, and a settlement id goes with every Collect.
+- **Database guards (`fee_money_guards.sql`, new).**
+  - A ledger CHECK enforces: amounts ≥ 0, paid + concession ≤ due, refunded ≤ paid.
+  - Wallet ≥ 0, and tender lines > 0.
+  - The ledger and wallet FKs to `students` changed from CASCADE to RESTRICT. `sp_school_purge`
+    deletes those rows first, so it still works.
+  - Receipt lines and tenders still cascade from their header on purpose: only purge deletes
+    a header.
+- **Tests.**
+  - `money_fee_collection_tests.sql`: 122 / 0.
+  - Older suites now pass a concession reason (`admission_fee_tests`, `money_trail_tests`).
+  - `settings_fee_head_structure_tests` J14 now takes the money and refunds it through the
+    procs, instead of writing an impossible "refunded but never paid" row.
+
+### [2026-10-10] Fee permissions split; refundable tag on the counter; one deploy bundle
+
+- **`fee_permissions_split.sql`**: `fees.collect`, `fees.cancel`, `fees.refund`, `fees.concession`
+  added; every role holding `fees.manage` was granted all four, so nobody lost access. Collect /
+  CancelReceipt / Refund use them; a concession inside Collect, registration with a fee
+  (RegisterEnquiry, RegisterWalkin), Registration MarkFeePaid and money taken at admission are
+  checked in the action via `HasPermissionAttribute.UserHasAsync`. The Roles page shows finer
+  actions as extra ticks under the View/Manage row (`MatrixFeatureRow.Extras`).
+  `fees.manage` still covers fee setup, day close and re-open.
+- **`student_dues_refundable.sql`**: `sp_student_dues_get` returns `is_refundable`; ManageFee tags
+  those dues and keeps a discount off them. `student_dues.sql` is marked SUPERSEDED: re-running
+  it brings back a version that ignores concession.
+- `fn_user_display_name` was defined differently in `fee_advance.sql` and `fee_day_close.sql`;
+  the two are now identical so run order cannot change it.
+- **`deploy_2026_10_10.sql`** runs every changed script in dependency order (verified end to end
+  locally, then all 24 suites: 1,578 checks green).

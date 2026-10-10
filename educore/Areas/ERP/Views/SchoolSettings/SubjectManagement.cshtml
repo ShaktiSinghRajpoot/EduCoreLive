@@ -217,6 +217,7 @@ $(document).ready(function () {
     let activeClass   = null;   // display name
     let activeId      = 0;      // academic_class_id
     let originalSnap  = [];     // snapshot of subjects when class was loaded
+    const savedData   = {};     // what the server holds per class, for the dirty check
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -279,7 +280,9 @@ $(document).ready(function () {
     }
 
     function buildPill(subject) {
-        const safe = $('<div>').text(subject).html();
+        // EC.esc also escapes quotes; the old $('<div>').text().html() did not,
+        // so a subject name with a " broke out of the data-subject attribute.
+        const safe = EC.esc(subject);
         return $(`
             <span class="sm-pill" data-subject="${safe}">
                 <span>${safe}</span>
@@ -328,7 +331,9 @@ $(document).ready(function () {
     function loadClass(id, cls) {
         activeId     = id;
         activeClass  = cls;
-        originalSnap = [...getSubjects(id)];
+        // Compare against what is saved, not the working copy — otherwise unsaved
+        // edits looked saved after switching to another class and back.
+        originalSnap = [...(savedData[id] || getSubjects(id))];
 
         // Highlight left panel
         $('#classList .sm-class-item').removeClass('active');
@@ -354,7 +359,7 @@ $(document).ready(function () {
     $(document).on('click', '.sm-class-item', function() {
         const $item = $(this);
         const id  = parseInt($item.data('id'), 10);
-        const cls = $item.data('class');
+        const cls = $item.attr('data-class');
         if (!id || id === activeId) return;
 
         if (subjectData[id]) { loadClass(id, cls); return; }
@@ -377,6 +382,7 @@ $(document).ready(function () {
         $.getJSON(LOAD_URL, { classId: id, academicYearId: SESSION_ID })
             .done(function(list) {
                 subjectData[id] = list || [];
+                savedData[id]   = [...subjectData[id]];
                 loadClass(id, cls);
             })
             .fail(function() {
@@ -422,7 +428,7 @@ $(document).ready(function () {
 
     // ── Remove pill ───────────────────────────────────────────────────────────
     $(document).on('click', '.sm-pill-remove', function() {
-        const s = $(this).closest('.sm-pill').data('subject');
+        const s = $(this).closest('.sm-pill').attr('data-subject');
         if (!activeId) return;
         const subjects = getSubjects(activeId).filter(x => x !== s);
         setSubjects(activeId, subjects);
@@ -454,6 +460,7 @@ $(document).ready(function () {
         .done(function(res) {
             if (res && res.success) {
                 originalSnap = [...subjects];
+                savedData[activeId] = [...subjects];
                 updateDirty();
                 updateClassBadge(activeId);
                 mirrorToLocalStorage();
@@ -472,7 +479,7 @@ $(document).ready(function () {
         const byName = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
         $('#classList .sm-class-item').each(function() {
             const id = parseInt($(this).data('id'), 10);
-            if (subjectData[id]) byName[$(this).data('class')] = subjectData[id];
+            if (subjectData[id]) byName[$(this).attr('data-class')] = subjectData[id];
         });
         localStorage.setItem(LS_KEY, JSON.stringify(byName));
     }

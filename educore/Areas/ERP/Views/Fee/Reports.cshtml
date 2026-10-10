@@ -8,6 +8,13 @@
    Fee Reports — Collection Register (date range, by mode + by head) and
    Defaulters / Outstanding (class-wise aging). core.sp_fee_collection_register
    and core.sp_fee_defaulters_get. Read-only; CSV export + print client-side.
+
+   The register tells the same story as Day Close: modes are the real tenders,
+   a receipt stays on the day it was issued, and a cancellation is its own
+   negative line on the day it was cancelled -- so a past range never changes.
+   Defaulters counts only what has FALLEN DUE ("Not due" is shown apart), lists
+   students who left while they still owe, and registration fees part-paid
+   before admission.
 *@
 
 @section PageStyles {
@@ -37,9 +44,11 @@
     <div id="v-register">
       <div class="filter-bar p-3 mb-3 no-print">
         <div class="row g-2 align-items-end">
-          <div class="col-6 col-md-3"><label class="form-label">From</label><input type="date" id="rFrom" class="form-control"></div>
-          <div class="col-6 col-md-3"><label class="form-label">To</label><input type="date" id="rTo" class="form-control"></div>
-          <div class="col-12 col-md-6 d-flex gap-2">
+          <div class="col-6 col-md-2"><label class="form-label">From</label><input type="date" id="rFrom" class="form-control"></div>
+          <div class="col-6 col-md-2"><label class="form-label">To</label><input type="date" id="rTo" class="form-control"></div>
+          <div class="col-6 col-md-2"><label class="form-label">Class</label><select id="rClass" class="form-select"><option value="">All classes</option></select></div>
+          <div class="col-6 col-md-2"><label class="form-label">Section</label><input id="rSection" class="form-control" placeholder="All"></div>
+          <div class="col-12 col-md-4 d-flex gap-2">
             <button id="rLoad" class="btn btn-primary"><i class="bx bx-search me-1"></i>Load</button>
             <button id="rCsv" class="btn btn-outline-secondary"><i class="bx bx-download me-1"></i>CSV</button>
             <button id="rPrint" class="btn btn-outline-secondary"><i class="bx bx-printer me-1"></i>Print</button>
@@ -85,7 +94,7 @@
             <div class="ec-card-body p-0">
               <div class="table-responsive">
                 <table class="table ec-table mb-0">
-                  <thead><tr><th>Date</th><th>Refund No</th><th>Student</th><th>Class</th><th>Against</th><th>Mode</th><th>Reason</th><th>Authorised</th><th class="text-end">Amount</th></tr></thead>
+                  <thead><tr><th>Date</th><th>Refund No</th><th>Student</th><th>Class</th><th>Against</th><th>Mode</th><th>Reason</th><th>Authorised</th><th>By</th><th class="text-end">Amount</th></tr></thead>
                   <tbody id="rRefundRows"></tbody>
                 </table>
               </div>
@@ -117,7 +126,7 @@
       <div class="ec-card"><div class="ec-card-body p-0">
         <div class="table-responsive" style="max-height:600px;overflow:auto">
           <table class="table ec-table mb-0">
-            <thead><tr><th>Student</th><th>Adm No</th><th>Class</th><th class="text-end">Not due</th><th class="text-end">0–30d</th><th class="text-end">31–60d</th><th class="text-end">60+d</th><th class="text-end">Outstanding</th></tr></thead>
+            <thead><tr><th>Student</th><th>Adm No</th><th>Class</th><th class="text-end">Not due</th><th class="text-end">0–30d</th><th class="text-end">31–60d</th><th class="text-end">60+d</th><th class="text-end" title="What has fallen due and is unpaid">Outstanding</th></tr></thead>
             <tbody id="dRows"></tbody>
           </table>
         </div>
@@ -132,6 +141,7 @@
           <div class="col-6 col-md-3"><label class="form-label">To</label><input type="date" id="aTo" class="form-control"></div>
           <div class="col-12 col-md-6 d-flex gap-2">
             <button id="aLoad" class="btn btn-primary"><i class="bx bx-search me-1"></i>Load</button>
+            <button id="aCsv" class="btn btn-outline-secondary"><i class="bx bx-download me-1"></i>CSV</button>
             <button id="aPrint" class="btn btn-outline-secondary"><i class="bx bx-printer me-1"></i>Print</button>
           </div>
         </div>
@@ -144,13 +154,13 @@
 
       <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap"><div class="ec-section-icon"><i class="bx bx-purchase-tag"></i></div><h6 class="ec-section-title mb-0">Concessions / discounts given</h6></div></div>
         <div class="ec-card-body p-0"><div class="table-responsive">
-          <table class="table ec-table mb-0"><thead><tr><th>Date</th><th>Receipt</th><th>Student</th><th>Type</th><th>Reason</th><th class="text-end">Concession</th></tr></thead><tbody id="aConcRows"></tbody></table>
+          <table class="table ec-table mb-0"><thead><tr><th>Date</th><th>Receipt</th><th>Student</th><th>Type</th><th>Reason</th><th>Given by</th><th class="text-end">Concession</th></tr></thead><tbody id="aConcRows"></tbody></table>
         </div></div>
       </div>
 
       <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap"><div class="ec-section-icon"><i class="bx bx-x-circle"></i></div><h6 class="ec-section-title mb-0">Cancelled receipts</h6></div></div>
         <div class="ec-card-body p-0"><div class="table-responsive">
-          <table class="table ec-table mb-0"><thead><tr><th>Cancelled</th><th>Receipt</th><th>Student</th><th>Reason</th><th>Authorised by</th><th class="text-end">Amount</th></tr></thead><tbody id="aCancRows"></tbody></table>
+          <table class="table ec-table mb-0"><thead><tr><th>Cancelled</th><th>Receipt</th><th>Student</th><th>Reason</th><th>Authorised by</th><th>Cancelled by</th><th>Collected by</th><th class="text-end">Amount</th></tr></thead><tbody id="aCancRows"></tbody></table>
         </div></div>
       </div>
     </div>
@@ -185,9 +195,9 @@ $(function () {
     var regData={receipts:[]};
     $('#rFrom').val(monthStart()); $('#rTo').val(todayStr());
     function loadReg(){
-        $.getJSON(URL.reg,{from:$('#rFrom').val(),to:$('#rTo').val()}).done(function(d){
+        $.getJSON(URL.reg,{from:$('#rFrom').val(),to:$('#rTo').val(),className:$('#rClass').val(),section:$('#rSection').val()}).done(function(d){
             regData=d;
-            $('#rTotal').text(EC.money(d.total)); $('#rCount').text((d.receipts||[]).length);
+            $('#rTotal').text(EC.money(d.total)); $('#rCount').text(d.receiptCount||0);
             $('#rRefund').text(EC.money(d.refundTotal)); $('#rNet').text(EC.money(d.net));
 
             // Refunds panel: only shown when there is money out in this range.
@@ -202,15 +212,21 @@ $(function () {
                      + '<td>'+EC.esc(r.mode)+'</td>'
                      + '<td class="text-muted" style="font-size:.78rem">'+EC.esc(r.reason||'—')+'</td>'
                      + '<td class="text-muted" style="font-size:.78rem">'+EC.esc(r.authorised||'—')+'</td>'
+                     + '<td class="text-muted" style="font-size:.78rem">'+EC.esc(r.by||'—')+'</td>'
                      + '<td class="num fw-bold" style="color:var(--dng)">-'+EC.money(r.amount)+'</td></tr>';
             }).join(''));
             $('#rModes').html((d.modes||[]).length? d.modes.map(function(m){ return '<span class="chip">'+EC.esc(m.mode)+' <b>'+EC.money(m.amount)+'</b></span>'; }).join('') : '<span class="text-muted">—</span>');
             $('#rHeads').html((d.heads||[]).length? d.heads.map(function(h){ return '<tr><td>'+EC.esc(h.head)+'</td><td class="num">'+EC.money(h.amount)+'</td></tr>'; }).join('') : '<tr><td colspan="2" class="text-muted text-center py-3">—</td></tr>');
             $('#rRows').html((d.receipts||[]).length? d.receipts.map(function(r){
                 var typeCls = r.type === 'Registration' ? 'bg-label-warning' : 'bg-label-info';
-                return '<tr><td class="text-muted">'+EC.esc(r.date||'—')+'</td>'
+                var isRev = r.entry === 'Cancellation';
+                // A cancellation is its own red line on the day it was made. The
+                // original receipt keeps its day and just says it was cancelled later.
+                var note = isRev ? '<div class="text-danger" style="font-size:.72rem">Cancelled'+(r.cashier?' by '+EC.esc(r.cashier):'')+(r.cancelReason?': '+EC.esc(r.cancelReason):'')+' (receipt of '+EC.esc(r.date||'')+')</div>'
+                         : (r.cancelled ? '<div class="text-muted" style="font-size:.72rem">Cancelled later</div>' : '');
+                return '<tr'+(isRev?' class="table-danger"':'')+'><td class="text-muted">'+EC.esc(r.lineDate||r.date||'—')+'</td>'
                      + '<td class="fw-semibold">'+EC.esc(r.receiptNo)
-                     + (r.reference ? '<div class="text-muted" style="font-size:.72rem">Ref '+EC.esc(r.reference)+'</div>' : '')+'</td>'
+                     + (r.reference ? '<div class="text-muted" style="font-size:.72rem">Ref '+EC.esc(r.reference)+'</div>' : '')+note+'</td>'
                      + '<td><span class="badge '+typeCls+'">'+EC.esc(r.type||'Fee')+'</span></td>'
                      + '<td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td>'
                      + '<td>'+EC.esc(r.cls)+'</td>'
@@ -228,28 +244,33 @@ $(function () {
     });
 
     $('#rRefundCsv').on('click', function(){
-        var rows=[['Date','Refund No','Student','Adm No','Class','Against','Mode','Reason','Authorised','Amount']];
-        (regData.refunds||[]).forEach(function(r){ rows.push([r.date,r.refundNo,r.student,r.admNo,r.cls,r.against,r.mode,r.reason,r.authorised,r.amount]); });
+        var rows=[['Date','Refund No','Student','Adm No','Class','Against','Mode','Reason','Authorised','By','Amount']];
+        (regData.refunds||[]).forEach(function(r){ rows.push([r.date,r.refundNo,r.student,r.admNo,r.cls,r.against,r.mode,r.reason,r.authorised,r.by,r.amount]); });
         csv(rows,'refunds.csv');
     });
     $('#rLoad').on('click', loadReg);
     $('#rPrint').on('click', function(){ window.print(); });
     $('#rCsv').on('click', function(){
-        var rows=[['Date','Receipt','Type','Student','Adm/Reg No','Class','For (fee heads)','Mode','Reference','Discount','Amount']];
-        (regData.receipts||[]).forEach(function(r){ rows.push([r.date,r.receiptNo,r.type,r.student,r.admNo,r.cls,r.heads,r.mode,r.reference,r.discount,r.amount]); });
+        var rows=[['Date','Entry','Receipt','Receipt date','Type','Student','Adm/Reg No','Class','For (fee heads)','Mode','Reference','Discount','Amount','By']];
+        (regData.receipts||[]).forEach(function(r){ rows.push([r.lineDate,r.entry,r.receiptNo,r.date,r.type,r.student,r.admNo,r.cls,r.heads,r.mode,r.reference,r.discount,r.amount,r.cashier]); });
+        rows.push(['','','','','','','','','','','','Total',regData.total,'']);
         csv(rows,'collection-register.csv');
     });
 
     // ── defaulters ──
     var defData=[];
-    $.getJSON(URL.classes).done(function(c){ var h='<option value="">All classes</option>'; (c||[]).forEach(function(x){ h+='<option>'+EC.esc(x)+'</option>'; }); $('#dClass').html(h); });
+    $.getJSON(URL.classes).done(function(c){ var h='<option value="">All classes</option>'; (c||[]).forEach(function(x){ h+='<option>'+EC.esc(x)+'</option>'; }); $('#dClass').html(h); $('#rClass').html(h); });
     function loadDef(){
         $.getJSON(URL.def,{className:$('#dClass').val(),section:$('#dSection').val()}).done(function(rows){
             defData=rows||[];
             var tot=defData.reduce(function(t,r){ return t+Number(r.outstanding||0); },0);
             $('#dTotal').text(EC.money(tot)); $('#dCount').text(defData.length);
             $('#dRows').html(defData.length? defData.map(function(r){
-                return '<tr><td class="fw-semibold">'+EC.esc(r.student)+(r.roll?'<div class="text-muted" style="font-size:.72rem">Roll '+EC.esc(r.roll)+'</div>':'')+'</td><td>'+EC.esc(r.admNo)+'</td><td>'+EC.esc(r.cls)+'</td>'+
+                // Say when the row is not a current student: left the school, or a
+                // registration fee still part-paid before admission.
+                var tag = r.entry==='Registration' ? '<span class="badge bg-label-warning ms-1">Registration</span>'
+                        : (r.status && r.status!=='Active' ? '<span class="badge bg-label-secondary ms-1">'+EC.esc(r.status)+'</span>' : '');
+                return '<tr><td class="fw-semibold">'+EC.esc(r.student)+tag+(r.roll?'<div class="text-muted" style="font-size:.72rem">Roll '+EC.esc(r.roll)+'</div>':'')+'</td><td>'+EC.esc(r.admNo)+'</td><td>'+EC.esc(r.cls)+'</td>'+
                        '<td class="num age0">'+EC.money(r.notDue)+'</td><td class="num age1">'+EC.money(r.d0_30)+'</td><td class="num age2">'+EC.money(r.d31_60)+'</td><td class="num age3">'+EC.money(r.d60plus)+'</td>'+
                        '<td class="num fw-bold">'+EC.money(r.outstanding)+'</td></tr>';
             }).join('') : '<tr><td colspan="8" class="text-muted text-center py-4">No outstanding dues. 🎉</td></tr>');
@@ -258,27 +279,38 @@ $(function () {
     $('#dLoad').on('click', loadDef);
     $('#dPrint').on('click', function(){ window.print(); });
     $('#dCsv').on('click', function(){
-        var rows=[['Student','Adm No','Class','Roll','Not due','0-30','31-60','60+','Outstanding']];
-        defData.forEach(function(r){ rows.push([r.student,r.admNo,r.cls,r.roll,r.notDue,r.d0_30,r.d31_60,r.d60plus,r.outstanding]); });
+        var rows=[['Student','Status','Adm/Reg No','Class','Roll','Not due','0-30','31-60','60+','Outstanding']];
+        defData.forEach(function(r){ rows.push([r.student,r.status,r.admNo,r.cls,r.roll,r.notDue,r.d0_30,r.d31_60,r.d60plus,r.outstanding]); });
         csv(rows,'defaulters.csv');
     });
 
     // ── concessions & cancellations ──
+    var auditData={concessions:[],cancels:[]};
     $('#aFrom').val(monthStart()); $('#aTo').val(todayStr());
     function loadAudit(){
         $.getJSON(URL.audit,{from:$('#aFrom').val(),to:$('#aTo').val()}).done(function(d){
+            auditData=d;
             var conc=d.concessions||[], canc=d.cancels||[];
-            $('#aConcTotal').text(EC.money(conc.reduce(function(t,r){return t+Number(r.amount||0);},0)));
+            // A concession on a receipt cancelled later was reversed with it: it
+            // stays listed (struck through) but is not counted.
+            $('#aConcTotal').text(EC.money(conc.reduce(function(t,r){return t+(r.cancelled?0:Number(r.amount||0));},0)));
             $('#aCancCount').text(canc.length);
             $('#aConcRows').html(conc.length? conc.map(function(r){
-                return '<tr><td class="text-muted">'+EC.esc(r.date||'—')+'</td><td class="fw-semibold">'+EC.esc(r.receiptNo)+'</td><td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td><td>'+EC.esc(r.kind||'—')+'</td><td>'+EC.esc(r.reason||'—')+'</td><td class="num fw-bold" style="color:var(--info)">'+EC.money(r.amount)+'</td></tr>';
-            }).join('') : '<tr><td colspan="6" class="text-muted text-center py-4">No concessions in this range.</td></tr>');
+                var kind=(r.type==='Registration'?'Registration · ':'')+(r.kind||'—');
+                return '<tr'+(r.cancelled?' class="text-decoration-line-through text-muted" title="Receipt cancelled later"':'')+'><td class="text-muted">'+EC.esc(r.date||'—')+'</td><td class="fw-semibold">'+EC.esc(r.receiptNo)+'</td><td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td><td>'+EC.esc(kind)+'</td><td>'+EC.esc(r.reason||'—')+'</td><td>'+EC.esc(r.givenBy||'—')+'</td><td class="num fw-bold" style="color:var(--info)">'+EC.money(r.amount)+'</td></tr>';
+            }).join('') : '<tr><td colspan="7" class="text-muted text-center py-4">No concessions in this range.</td></tr>');
             $('#aCancRows').html(canc.length? canc.map(function(r){
-                return '<tr><td class="text-muted">'+EC.esc(r.cancelledAt||r.date||'—')+'</td><td class="fw-semibold">'+EC.esc(r.receiptNo)+'</td><td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td><td>'+EC.esc(r.reason||'—')+'</td><td>'+EC.esc(r.authorisedBy||'—')+'</td><td class="num fw-bold" style="color:var(--dng)">'+EC.money(r.amount)+'</td></tr>';
-            }).join('') : '<tr><td colspan="6" class="text-muted text-center py-4">No cancellations in this range.</td></tr>');
+                return '<tr><td class="text-muted">'+EC.esc(r.cancelledAt||r.date||'—')+'</td><td class="fw-semibold">'+EC.esc(r.receiptNo)+'</td><td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td><td>'+EC.esc(r.reason||'—')+'</td><td>'+EC.esc(r.authorisedBy||'—')+'</td><td>'+EC.esc(r.cancelledBy||'—')+'</td><td>'+EC.esc(r.collectedBy||'—')+'</td><td class="num fw-bold" style="color:var(--dng)">'+EC.money(r.amount)+'</td></tr>';
+            }).join('') : '<tr><td colspan="8" class="text-muted text-center py-4">No cancellations in this range.</td></tr>');
         }).fail(function(){ ecToast('error','Could not load the register.'); });
     }
     $('#aLoad').on('click', loadAudit);
+    $('#aCsv').on('click', function(){
+        var rows=[['Register','Date','Receipt','Student','Adm/Reg No','Type','Reason','Authorised','By','Collected by','Cancelled later','Amount']];
+        (auditData.concessions||[]).forEach(function(r){ rows.push(['Concession',r.date,r.receiptNo,r.student,r.admNo,(r.type==='Registration'?'Registration ':'')+(r.kind||''),r.reason,'',r.givenBy,'',r.cancelled?'Yes':'',r.amount]); });
+        (auditData.cancels||[]).forEach(function(r){ rows.push(['Cancellation',r.cancelledAt||r.date,r.receiptNo,r.student,r.admNo,'',r.reason,r.authorisedBy,r.cancelledBy,r.collectedBy,'',r.amount]); });
+        csv(rows,'concessions-cancellations.csv');
+    });
     $('#aPrint').on('click', function(){ window.print(); });
 
     loadReg(); loadAudit();

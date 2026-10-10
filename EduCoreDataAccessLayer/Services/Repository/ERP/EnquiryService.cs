@@ -433,10 +433,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         // ── Delete ───────────────────────────────────────────────
-        public async Task<int> DeleteEnquiryAsync(
+        public async Task<(int Success, string Message)> DeleteEnquiryAsync(
             int enquiryId, int tenantId, int schoolId, int actionUserId)
         {
-            if (tenantId <= 1 || schoolId <= 0 || enquiryId <= 0) return 0;
+            if (tenantId <= 1 || schoolId <= 0 || enquiryId <= 0) return (0, "Invalid request.");
 
             var parameters = new NpgsqlParameter[]
             {
@@ -451,7 +451,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
             var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
-            return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0 ? 1 : 0;
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (0, "Unable to delete.");
+
+            // Read what the proc decided. It refuses admitted enquiries and ones
+            // holding a registration receipt; "a row came back" is not success.
+            var row = ds.Tables[0].Rows[0];
+            int success = IntVal(row, "success");
+            string msg  = NullStr(row, "message") ?? (success > 0 ? "Enquiry deleted." : "Unable to delete.");
+            return (success, msg);
         }
 
         // ── Private mappers ──────────────────────────────────────
@@ -513,7 +520,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             m.EstimatedFee          = Has(row,"estimated_fee") && row["estimated_fee"] != DBNull.Value
                                         ? Convert.ToDecimal(row["estimated_fee"]) : null;
             m.RegistrationNumber    = NullStr(row, "registration_number");
-            m.RegistrationFeePaid   = BoolVal(row, "registration_fee_paid");
+            // GetEnquiryById returns e.* (the stored, cached flag) plus the derived
+            // value; prefer the derived one, which follows the receipts.
+            m.RegistrationFeePaid   = Has(row, "fee_paid_derived")
+                                        ? BoolVal(row, "fee_paid_derived")
+                                        : BoolVal(row, "registration_fee_paid");
+            m.HasFeeReceipts        = BoolVal(row, "has_fee_receipts");
             m.ParentEmail           = NullStr(row, "parent_email");
             m.CurrentClass          = NullStr(row, "current_class");
             m.CurrentSchool         = NullStr(row, "current_school");

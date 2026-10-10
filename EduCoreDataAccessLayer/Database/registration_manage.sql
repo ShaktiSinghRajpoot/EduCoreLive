@@ -1,7 +1,8 @@
 -- ============================================================================
 -- Registration Register
 -- Lists registered enquiries with their registration number + details, and
--- supports cancel / mark-fee-collected actions. Registration data lives on
+-- supports the cancel (withdraw) action. Taking the fee is
+-- sp_registration_fee_record (registration_fee_partial.sql). Registration data lives on
 -- core.enquiries. Convert-to-admission reuses the existing admission flow.
 --
 -- Target DB: PostgreSQL (educore)
@@ -36,69 +37,94 @@ BEGIN
     END IF;
 
     -- ── Paged list of registered students ───────────────────────────────────
+    -- registration_fee_paid is DERIVED from the money (fn_registration_fee_is_paid),
+    -- never read from the stored flag: the flag used to be set by a button or a
+    -- browser tick and said "Paid" with nothing received.
     IF p_operation = 'List' THEN
         v_size   := COALESCE(NULLIF(p_page_size, 0), 10);
         v_offset := GREATEST(COALESCE(p_page, 1) - 1, 0) * v_size;
 
         OPEN p_result FOR
+        WITH reg AS (
+            SELECT e.*,
+                   COALESCE(core.fn_registration_fee_is_paid(e.tenant_id, e.school_id, e.enquiry_id), FALSE) AS fee_paid,
+                   core.fn_registration_fee_settled(e.tenant_id, e.school_id, e.enquiry_id) AS fee_settled
+            FROM core.enquiries e
+            WHERE e.tenant_id = p_tenant_id
+              AND e.school_id = p_school_id
+              AND e.is_active = TRUE
+              AND e.registration_number IS NOT NULL
+              AND (p_search IS NULL OR p_search = '' OR
+                   e.student_name        ILIKE '%' || p_search || '%' OR
+                   e.registration_number ILIKE '%' || p_search || '%' OR
+                   e.mobile              ILIKE '%' || p_search || '%')
+              AND (p_session IS NULL OR p_session = '' OR e.session = p_session)
+              AND (p_class   IS NULL OR p_class   = '' OR e.class_name = p_class)
+        )
         SELECT
-            e.enquiry_id,
-            e.registration_number,
-            e.registration_date,
-            e.registration_fee_paid,
-            e.student_name,
-            e.class_name,
-            e.session,
-            COALESCE(NULLIF(trim(e.father_name), ''), e.parent_name) AS parent_name,
-            e.mobile,
-            e.status,
-            e.admission_id,
+            r.enquiry_id,
+            r.registration_number,
+            r.registration_date,
+            r.fee_paid                                         AS registration_fee_paid,
+            COALESCE(r.registration_fee_amount, 0)             AS fee_amount,
+            r.fee_settled                                      AS settled_amount,
+            GREATEST(COALESCE(r.registration_fee_amount, 0) - r.fee_settled, 0) AS balance_amount,
+            r.student_name,
+            r.class_name,
+            r.session,
+            COALESCE(NULLIF(trim(r.father_name), ''), r.parent_name) AS parent_name,
+            r.mobile,
+            r.status,
+            r.admission_id,
             rc.receipt_no,
+            rc.receipts,
             COUNT(*) OVER() AS total_count
-        FROM core.enquiries e
-        -- The registration fee receipt hangs off enquiry_id, not student_id, so it
-        -- never appears in a student's payment history — this list is the only place
-        -- the counter can re-print it.
+        FROM reg r
+        -- Before admission the registration receipts hang off enquiry_id only, so
+        -- this list is the one place the counter can re-print or cancel them.
+        -- EVERY receipt comes back (cancelled ones flagged), not just the newest:
+        -- a fee paid in two parts has two slips, and both must stay reachable.
         LEFT JOIN LATERAL (
-            SELECT p.receipt_no
+            SELECT (array_agg(p.receipt_no ORDER BY p.payment_id DESC)
+                       FILTER (WHERE p.is_cancelled = FALSE))[1] AS receipt_no,
+                   jsonb_agg(jsonb_build_object(
+                       'receiptNo', p.receipt_no,
+                       'date',      p.payment_date,
+                       'amount',    p.amount,
+                       'discount',  p.discount_amount,
+                       'mode',      p.payment_mode,
+                       'cancelled', p.is_cancelled) ORDER BY p.payment_id) AS receipts
             FROM core.fee_payments p
-            WHERE p.tenant_id    = e.tenant_id
-              AND p.school_id    = e.school_id
-              AND p.enquiry_id   = e.enquiry_id
+            WHERE p.tenant_id    = r.tenant_id
+              AND p.school_id    = r.school_id
+              AND p.enquiry_id   = r.enquiry_id
               AND p.payment_type = 'Registration'
-              AND p.is_cancelled = FALSE
-            ORDER BY p.payment_id DESC
-            LIMIT 1
         ) rc ON TRUE
-        WHERE e.tenant_id = p_tenant_id
-          AND e.school_id = p_school_id
-          AND e.is_active = TRUE
-          AND e.registration_number IS NOT NULL
-          AND (p_search IS NULL OR p_search = '' OR
-               e.student_name        ILIKE '%' || p_search || '%' OR
-               e.registration_number ILIKE '%' || p_search || '%' OR
-               e.mobile              ILIKE '%' || p_search || '%')
-          AND (p_session IS NULL OR p_session = '' OR e.session = p_session)
-          AND (p_class   IS NULL OR p_class   = '' OR e.class_name = p_class)
-          AND (p_fee_status IS NULL OR p_fee_status = '' OR
-               (p_fee_status = 'paid'   AND e.registration_fee_paid = TRUE) OR
-               (p_fee_status = 'unpaid' AND COALESCE(e.registration_fee_paid, FALSE) = FALSE))
-        ORDER BY e.registration_date DESC NULLS LAST, e.enquiry_id DESC
+        WHERE (p_fee_status IS NULL OR p_fee_status = '' OR
+               (p_fee_status = 'paid'    AND r.fee_paid) OR
+               (p_fee_status = 'unpaid'  AND NOT r.fee_paid) OR
+               (p_fee_status = 'partial' AND NOT r.fee_paid AND r.fee_settled > 0))
+        ORDER BY r.registration_date DESC NULLS LAST, r.enquiry_id DESC
         OFFSET v_offset LIMIT v_size;
 
     -- ── KPI counts ──────────────────────────────────────────────────────────
     ELSIF p_operation = 'Stats' THEN
         OPEN p_result FOR
+        WITH reg AS (
+            SELECT e.admission_id,
+                   COALESCE(core.fn_registration_fee_is_paid(e.tenant_id, e.school_id, e.enquiry_id), FALSE) AS fee_paid
+            FROM core.enquiries e
+            WHERE e.tenant_id = p_tenant_id
+              AND e.school_id = p_school_id
+              AND e.is_active = TRUE
+              AND e.registration_number IS NOT NULL
+        )
         SELECT
-            COUNT(*)                                                        AS total_registered,
-            COUNT(*) FILTER (WHERE registration_fee_paid = TRUE)            AS fee_collected,
-            COUNT(*) FILTER (WHERE COALESCE(registration_fee_paid, FALSE) = FALSE) AS fee_pending,
-            COUNT(*) FILTER (WHERE admission_id IS NOT NULL)                AS converted
-        FROM core.enquiries
-        WHERE tenant_id = p_tenant_id
-          AND school_id = p_school_id
-          AND is_active = TRUE
-          AND registration_number IS NOT NULL;
+            COUNT(*)                                         AS total_registered,
+            COUNT(*) FILTER (WHERE fee_paid)                 AS fee_collected,
+            COUNT(*) FILTER (WHERE NOT fee_paid)             AS fee_pending,
+            COUNT(*) FILTER (WHERE admission_id IS NOT NULL) AS converted
+        FROM reg;
 
     -- ── Cancel a registration (parent withdrew → Not Interested) ────────────
     -- The registration NUMBER, DATE and FEE are intentionally RETAINED: the
@@ -107,7 +133,9 @@ BEGIN
     ELSIF p_operation = 'Cancel' THEN
         SELECT status, admission_id INTO v_status, v_admission
         FROM core.enquiries
-        WHERE enquiry_id = p_enquiry_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
+        WHERE enquiry_id = p_enquiry_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+          AND is_active = TRUE AND registration_number IS NOT NULL
+        FOR UPDATE;
 
         IF NOT FOUND THEN
             RAISE EXCEPTION 'Registration not found.';
@@ -132,20 +160,10 @@ BEGIN
 
         OPEN p_result FOR SELECT TRUE AS success, 'Registration cancelled. Lead marked Not Interested.' AS message;
 
-    -- ── Mark the registration fee as collected ──────────────────────────────
-    ELSIF p_operation = 'MarkFeePaid' THEN
-        UPDATE core.enquiries
-        SET registration_fee_paid = TRUE,
-            updated_by            = p_action_user_id,
-            updated_at            = NOW()
-        WHERE enquiry_id = p_enquiry_id AND tenant_id = p_tenant_id AND school_id = p_school_id
-          AND registration_number IS NOT NULL;
-
-        IF NOT FOUND THEN
-            RAISE EXCEPTION 'Registration not found.';
-        END IF;
-
-        OPEN p_result FOR SELECT TRUE AS success, 'Registration fee marked as collected.' AS message;
+    -- (MarkFeePaid is gone on purpose. It set registration_fee_paid = TRUE on its
+    -- own, before -- and sometimes without -- any receipt. Paid now follows the
+    -- money: sp_registration_fee_record writes the receipt, and every screen
+    -- reads fn_registration_fee_is_paid.)
 
     ELSE
         RAISE EXCEPTION 'Invalid operation %', p_operation;
