@@ -4608,3 +4608,12 @@ Suite `tests/hr_leave_payroll_tests.sql` went from 73 passed / 32 failed to **14
   6. `school_purge.sql`
 
   Regenerate `deploy_2026_10_10b_parts/part2.sql` first, or leave it out: it still holds the old `sp_staff_manage`.
+
+### [2026-10-10] Login limit counts only failed sign-ins
+
+The "login" rate limiter (5 requests / 5 min per IP) counted correct logins too, and a
+school office shares one IP, so the 6th teacher signing in at 9am was blocked. Login now
+uses `Helpers/LoginThrottle.cs`: only unknown-account / wrong-password / inactive-account
+attempts count, 10 per 5 minutes per IP, then that IP waits out the window. The forgot-
+password and OTP pages keep a request limiter of their own ("otp", 5 / 5 min per IP), no
+longer shared with login. In-memory, per app instance (like AppCache).

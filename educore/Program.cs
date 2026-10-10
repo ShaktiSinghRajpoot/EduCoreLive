@@ -1,4 +1,4 @@
-﻿using educore.Models;
+using educore.Models;
 using educore.Services;
 using educore.Services.Notifications;
 using EduCoreDataAccessLayer.Helpers;
@@ -118,12 +118,14 @@ builder.Services.AddAuthorization(options =>
     });
 });
 
-// WHY: throttle login attempts to blunt brute-force / credential-stuffing. We partition by
-// client IP so one attacker's IP gets blocked without affecting other users. The "login"
-// policy is applied only to the login POST via [EnableRateLimiting("login")] on the action.
+// WHY: throttle the password-reset (OTP) pages to blunt OTP spam and account enumeration,
+// partitioned by client IP. Login itself is NOT here: it uses LoginThrottle, which counts
+// only failed sign-ins, because this limiter counts every request and a school office
+// (one shared IP) signing in together used to lock itself out.
+builder.Services.AddSingleton<educore.Helpers.LoginThrottle>();
 builder.Services.AddRateLimiter(options =>
 {
-    options.AddPolicy("login", httpContext =>
+    options.AddPolicy("otp", httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             factory: _ => new FixedWindowRateLimiterOptions
@@ -318,7 +320,7 @@ if (!string.Equals(
 
 app.UseRouting();
 
-// WHY: must sit after UseRouting so endpoint-specific policies (the "login" policy) resolve.
+// WHY: must sit after UseRouting so endpoint-specific policies (the "otp" policy) resolve.
 app.UseRateLimiter();
 
 app.UseSession();

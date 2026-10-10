@@ -1,4 +1,4 @@
-﻿using educore.Models;
+using educore.Models;
 using educore.Services;
 using educore.Helpers;
 using educore.Services.Notifications;
@@ -28,6 +28,7 @@ namespace educore.Controllers
         private readonly INotificationService _notificationService;
         private readonly IPermissionService _perms;
         private readonly AppCache _cache;
+        private readonly LoginThrottle _throttle;
 
         // Encrypts/decrypts values that leave the server (query strings, custom cookies).
         // Built once here — CreateProtector is cheap but the purpose string must be the same
@@ -39,9 +40,10 @@ namespace educore.Controllers
         // Session key for the half-logged-in user waiting on the multi-role picker.
         private const string PendingUserIdKey = "PendingUserId";
 
-        public AccountController(ILoginService loginService, IBaseService baseService, INotificationService notificationService, IPermissionService perms, IDataProtectionProvider dataProtectionProvider, IOptions<AppSettings> appSettings, AppCache cache)
+        public AccountController(ILoginService loginService, IBaseService baseService, INotificationService notificationService, IPermissionService perms, IDataProtectionProvider dataProtectionProvider, IOptions<AppSettings> appSettings, AppCache cache, LoginThrottle throttle)
         {
             _cache = cache;
+            _throttle = throttle;
             _loginService = loginService;
             _baseService = baseService;
             _notificationService = notificationService;
@@ -91,9 +93,18 @@ namespace educore.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [EnableRateLimiting("login")]   // WHY: 5 attempts / 5 min per IP — blunts brute-force.
+        // Brute-force guard: LoginThrottle counts only FAILED attempts (10 per 5 min per IP),
+        // so a school office signing in together is never blocked by its own correct logins.
         public async Task<IActionResult> Login(UserViewModel model, string? returnUrl)
         {
+            string? clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+            if (_throttle.IsBlocked(clientIp))
+            {
+                TempData["Result"] = "0";
+                TempData["Message"] = "Too many failed sign-in attempts from this network. Please wait a few minutes and try again.";
+                return View(model);
+            }
+
             if (!ModelState.IsValid)
                 return View(model);
 
@@ -110,6 +121,7 @@ namespace educore.Controllers
             if (user == null || user.UserId == 0)
             {
                 await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid email", HttpContext);
+                _throttle.RecordFailure(clientIp);
                 TempData["Result"] = "0";
                 TempData["Message"] = "Invalid email/mobile number or password.";
                 return View(model);
@@ -118,6 +130,7 @@ namespace educore.Controllers
             if (!user.IsActive || user.IsDeleted)
             {
                 await _loginService.SaveLoginAttemptAsync(model.Email, false, "Inactive or deleted account", HttpContext);
+                _throttle.RecordFailure(clientIp);
                 TempData["Result"] = "0";
                 TempData["Message"] = "Your account is not active or deleted.";
                 return View(model);
@@ -128,6 +141,7 @@ namespace educore.Controllers
             if (!isPasswordValid)
             {
                 await _loginService.SaveLoginAttemptAsync(model.Email, false, "Invalid password", HttpContext);
+                _throttle.RecordFailure(clientIp);
                 TempData["Result"] = "0";
                 TempData["Message"] = "Invalid email/mobile number or password.";
                 return View(model);
@@ -458,7 +472,7 @@ namespace educore.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [EnableRateLimiting("login")]   // WHY: share the 5/5-min IP budget — blunts OTP spam + account enumeration.
+        [EnableRateLimiting("otp")]     // WHY: own 5/5-min IP budget (not shared with login) — blunts OTP spam + enumeration.
         public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
         {
             if (!ModelState.IsValid)
@@ -499,7 +513,7 @@ namespace educore.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [EnableRateLimiting("login")]
+        [EnableRateLimiting("otp")]
         public async Task<IActionResult> VerifyOtp(VerifyOtpViewModel model)
         {
             var userId = ReadProtectedUserId(ResetUserIdKey);
