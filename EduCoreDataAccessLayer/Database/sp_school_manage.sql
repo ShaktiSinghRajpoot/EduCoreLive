@@ -1002,5 +1002,4 @@ BEGIN
         v_school_id AS school_id,
         v_tenant_id AS tenant_id;
 END;
-$procedure$
-
+$procedure$;
