@@ -2,8 +2,9 @@
 
 **Scope:** `Areas/ERP/Controllers/InventoryController.cs`, `Views/Inventory/{InventoryItem,PurchaseEntry}.cshtml`,
 `EduCoreDataAccessLayer/Services/Repository/ERP/InventoryService.cs`, and procs
-`core.sp_inventory_manage` / `core.sp_inventory_purchase_manage` (`Database/inventory.sql`). No later
-script redefines them. The live definitions were read with `pg_get_functiondef` and match the script.
+`core.sp_inventory_manage` / `core.sp_inventory_purchase_manage` (`Database/inventory.sql`, plus the
+helpers `core.fn_inventory_default_location` / `fn_inventory_post_movement` / `fn_inventory_user_name`
+since the locations revision). No later script redefines them. The live definitions were read with `pg_get_functiondef` and match the script.
 
 **SQL suite:** `EduCoreDataAccessLayer/Database/tests/inventory_store_tests.sql`. It goes deeper than
 `tests/inventory_tests.sql` (49 checks, all PASS) and repeats none of its checks. It runs in one
@@ -15,7 +16,10 @@ export PGPASSWORD=root; "/c/Program Files/PostgreSQL/16/bin/psql.exe" -U postgre
 ```
 
 **First run (2026-10-10):** `RESULT: 106 passed, 10 failed`, all 10 app bugs.
-**After the fixes (2026-10-10):** `RESULT: 142 passed, 0 failed`; `inventory_tests.sql` 49/49. The suite now
+**After the fixes (2026-10-10):** `RESULT: 142 passed, 0 failed`; `inventory_tests.sql` 49/49.
+**Store locations / transfers / returns / supplier screen (2026-10-10b):** new suite
+`tests/inventory_locations_tests.sql`, `RESULT: 111 passed, 0 failed`, first run. See section L below.
+Both older suites still 142/0 and 49/0, and all 31 suites in `Database/tests` are green. The suite now
 asserts the corrected behaviour (no `BUG` names left). After the rollback, 0 `ZZS%` rows are left.
 Fixes are in `Database/inventory.sql` (re-runnable, applied with `psql -v ON_ERROR_STOP=1 -f`),
 `InventoryService.cs`, `InventoryModels.cs`, `InventoryController.cs` and both Inventory views.
@@ -100,7 +104,7 @@ proc does that (LED-07), but there is no trigger guard.
 | MOV-11 | Deleted item | Return on deleted, delete twice, GetItem, ItemLedger | refused / refused / 0 rows / history still readable | proc | SQL MOV-11..11d | PASS |
 | MOV-12 | Huge qty | Return 1e13 | refused, no ledger row | DB | SQL MOV-12/12b | PASS |
 | MOV-13 | Inactive item | Issue 1 | accepted | proc | SQL MOV-13 (doc) | FIXED (rule D-6): Issue of an Inactive item refused; its old stock can still be returned, written off or counted (MOV-13b) |
-| MOV-14 | Transfer between stores/departments | n/a | not supported (only Issue with free-text "issued to") | proc | static `inventory.sql` MOVESTOCK type list | FUTURE FEATURE (D-10) |
+| MOV-14 | Transfer between stores/departments | n/a | not supported (only Issue with free-text "issued to") | proc | static `inventory.sql` MOVESTOCK type list | BUILT (D-10): store locations + `Transfer`, see section L (TRF-*) |
 
 ## D. Suppliers (SUP)
 
@@ -117,7 +121,7 @@ proc does that (LED-07), but there is no trigger guard.
 | SUP-09 | Deleted supplier on a new bill | refused | proc | SQL SUP-09 | PASS |
 | SUP-10 | Re-add the same supplier name, re-enter an old bill number | accepted: same bill counted twice (index keyed on `supplier_id`) | DB index `inventory.sql:156` | SQL SUP-10 (doc) | KEPT (rule D-9): documented, no change |
 | SUP-11 | XSS in supplier name | escaped | view | static `PurchaseEntry.cshtml:82` (Razor `@`), `:454,527` (`EC.esc`) | PASS |
-| SUP-12 | Supplier list / edit / delete screen | exists | view | static: no page calls `Suppliers` for a list, `SaveSupplier` with an id, or `DeleteSupplier` | GAP (feature, not in this pass): supplier list/edit/delete screen |
+| SUP-12 | Supplier list / edit / delete screen | exists | view | `Views/Inventory/SupplierMaster.cshtml` | BUILT: list, search, status filter, add/edit, activate/deactivate, remove (soft), bills per supplier (section L, SUL-*) |
 
 ## E. Purchases (PUR)
 
@@ -147,7 +151,7 @@ proc does that (LED-07), but there is no trigger guard.
 | PUR-22 | Cross-school Get | | 0 rows in both cursors | proc | SQL PUR-22 | PASS |
 | PUR-23 | Cross-school List | | none of ours | proc | SQL PUR-23 | PASS |
 | PUR-24 | Future date | | refused | proc | existing `inventory_tests.sql` E2 | PASS |
-| PUR-25 | Purchase detail view | view lines of a saved bill | exists | view | static: `Purchase(id)` (`InventoryController.cs:194`) is called by no page | GAP (feature, not in this pass): purchase detail view |
+| PUR-25 | Purchase detail view | view lines of a saved bill | exists | view | `PurchaseEntry.cshtml` history → View | BUILT: lines with returned qty/amount, returns (who/when/reason), cancel status, entered/cancelled by and at, return-to-supplier form (section L) |
 | PUR-26 | Default date on the form | today (school clock) | local date | view | static `PurchaseEntry.cshtml:428,541` `toISOString()` | FIXED: default and `max` come from the server's school date (`Dates.Today`) |
 
 ## F. Cancelling a purchase (CAN)
@@ -209,12 +213,84 @@ proc does that (LED-07), but there is no trigger guard.
 
 ---
 
+## L. Store locations, transfers, returns to supplier, supplier screen (2026-10-10b)
+
+**Suite:** `EduCoreDataAccessLayer/Database/tests/inventory_locations_tests.sql` (same harness,
+fixture 24/34/39, other school 23/33, rolls back). It re-runs `../inventory.sql` twice inside its
+transaction to test the migration.
+
+```
+export PGPASSWORD=root; "/c/Program Files/PostgreSQL/16/bin/psql.exe" -U postgres -d educore -q \
+  -f EduCoreDataAccessLayer/Database/tests/inventory_locations_tests.sql 2>&1 | sed 's/^psql:[^ ]* NOTICE:  //'
+```
+
+**Result:** `RESULT: 111 passed, 0 failed`. After the rollback, 0 `ZZL%` rows are left.
+
+**Rules under test:**
+`current_stock = SUM(location stock) = SUM(ledger)`; per location, stock = SUM(ledger rows at it);
+`balance_after` (item) and `location_balance_after` (location) are running sums; no location below 0.
+
+**Decisions taken (document, not ask):**
+- The default location ("Main Store") is created on first need, can be renamed, never deactivated.
+  A movement, opening stock or bill with no location goes there.
+- A location that still holds stock cannot be deactivated. Inactive locations take no movement,
+  transfer or bill.
+- A transfer needs a reason. The return movement type is `SupplierReturn` (`Return` already
+  means "came back into the store").
+- **Cancelling a bill that has returns reverses only the remainder** (bought - returned per line),
+  at the bill's location. Refusing instead would leave a partly returned bill impossible to
+  cancel; reversing the whole bill would take the returned goods out twice. Per line, Purchase +
+  SupplierReturn + PurchaseCancel nets to 0. No return after a cancel. A fully returned bill
+  cancels with no movement.
+- Supplier deactivate is allowed; an inactive supplier keeps its bills but cannot take a new bill.
+  Remove is a soft delete (existing behaviour). GSTIN must be 15 letters/digits, stored uppercase.
+
+| ID | Scenario | Expected | Result |
+|---|---|---|---|
+| MIG-01..01b | Legacy school (rows written without locations) after the migration | exactly one default location, "Main Store" | PASS |
+| MIG-02..02b | Legacy movements | all in the default location; none anywhere without a location | PASS |
+| MIG-03 | Legacy bill | `location_id` = default | PASS |
+| MIG-04..04c | Item totals | unchanged; = sum of location stock; Legacy A 35 at Main Store | PASS |
+| MIG-05..05b | `location_balance_after` on old rows | back-filled as a running sum per location | PASS |
+| MIG-06 | Whole database | every item: total = sum of locations | PASS |
+| MIG-07..07b | Re-run the script | no new location / stock row / quantity / movement; `location_id` NOT NULL | PASS |
+| LOC-01..05b | List, add (trimmed), duplicate (any case/spaces), blank, >100 chars, rename, rename onto another | as stated | PASS |
+| LOC-06..06c, 09 | Cross-school rename / deactivate / list | refused / not listed; ours unchanged | PASS |
+| LOC-07 | Deactivate the default | refused | PASS |
+| LOC-08..08b | Deactivate a location holding stock; re-activate | refused with counts; re-activate works | PASS |
+| LOC-10..12b | Opening stock: default, chosen, foreign (no half item), inactive location | as stated | PASS |
+| LOC-13 | `ListItems` with a location | stock at that location | PASS |
+| MVL-01..05 | Issue where none is held, issue to default, stock-take vs location stock, inactive / foreign location | refused by location name / default used / difference at that location / refused | PASS |
+| TRF-01..01c | Transfer 10 Main → Lab | 35 / 10, total unchanged; one transfer row (who, trimmed reason); paired Out/In rows with rate | PASS |
+| TRF-02..08c | More than the source holds (nothing written), same location, inactive item, inactive destination / source, 3 decimals, 0, blank reason, no destination, foreign location, other school's call | all refused, our stock untouched | PASS |
+| TRF-09..12 | Transfer list (names, who), other school sees none, history shows location / other side / location balance, running sums, `ItemStock` | as stated | PASS |
+| PUL-01..03b | Bill into the lab (rows at the lab), foreign location, inactive supplier refused then re-activated (no location → default) | as stated | PASS |
+| RET-01..01c | Return 5 of a line | lab stock down, amount 210 (rate + tax), return row, `SupplierReturn` row linked to bill and line | PASS |
+| RET-02..06b | More than bought - returned, same line twice summing over, blank reason, other bill's line, 3 decimals, 0 | refused | PASS |
+| RET-07..07b | Return that would take the bill's location below 0; two-line return checked per item | refused by location name; accepted | PASS |
+| RET-08..10 | Other school's return / read; `Get` header and lines with returned qty/amount; `Returns` list; `List` returned columns | refused / 0 rows / as stated | PASS |
+| CWR-01..01b | Cancel when the remainder is no longer at the location | refused whole, nothing reversed | PASS |
+| CWR-02..02c | Cancel with returns | only the remainder reversed, at the lab, with reason and line; per line nets to 0 | PASS |
+| CWR-03..04 | Return after cancel; cancel a fully returned bill | refused; cancelled with no movement | PASS |
+| SUL-01..07 | Bad email, bad GSTIN, GSTIN uppercased, inactive still listed, Active filter, search by mobile / GSTIN, bill count/total/last date (live bills), cross-school deactivate, soft delete keeps bill name, bills of one supplier | as stated | PASS |
+| INV-01..06 | Three figures agree; pairs = ledger; running sums; table refuses location stock < 0; Recount (other school leaves ours, ours repairs); no proc deletes or edits ledger / lines / returns / transfers | as stated | PASS |
+| CUR-01 | List and Cancel open the second cursor | FETCH works | PASS (was a live bug: the app FETCHes every refcursor, and an unopened one failed) |
+| TEN-L1..L3 | Platform scope, other school's `ItemStock`, every location reference inside its own school | refused / 0 / 0 | PASS |
+
+**UI (static + node syntax check of each inline script):** `InventoryItem` (location filter,
+location on movement and opening stock, transfer dialog, per-location badges and location column
+in history), `PurchaseEntry` ("goods go to", View → detail, return to supplier, cancel), new
+`StoreLocations` and `SupplierMaster` pages and menu entries. Every DB string goes through
+`EC.esc`; numeric attributes read with `.attr`. Not clicked through in a browser in this pass.
+
+---
+
 ## Business decisions (approved defaults, applied 2026-10-10)
 
 D-1 view/manage split, cancel = manage. D-2 Stock-take movement. D-3 value at cost price, labelled.
 D-4 future refused, back-dated allowed, history in date order. D-5 reason required. D-6 Inactive items
 cannot be issued or bought. D-7 no-supplier bills allowed, number unique among them. D-8 unit frozen once
-stock moved. D-9 unchanged. D-10 transfers / partial returns are a future feature. D-11 at most 2 decimals.
+stock moved. D-9 unchanged. D-10 transfers / partial returns: built 2026-10-10b (section L). D-11 at most 2 decimals.
 
 The original questions:
 

@@ -13,6 +13,8 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         #region School Basic Profile
         Task<SchoolManageModel?> GetBasicProfileAsync(int tenantId, int schoolId, int actionUserId);
         Task<int> SaveBasicProfileAsync(SchoolManageModel model, int tenantId, int schoolId, int actionUserId);
+        /// <summary>Clears the school's logo. RemovedUrl is the old logo URL (null when there was none).</summary>
+        Task<(bool Success, string Message, string? RemovedUrl)> RemoveLogoAsync(int tenantId, int schoolId, int actionUserId);
         Task<SchoolDropdownModel> GetBasicProfileDropdownsAsync(int tenantId, int schoolId);
         #endregion
 
@@ -31,10 +33,14 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         #endregion
 
         #region Period Structure
-        /// <summary>The school's daily bell schedule, in order.</summary>
-        Task<List<PeriodStructureItem>> GetPeriodStructureAsync(int tenantId, int schoolId, int actionUserId);
+        /// <summary>A bell schedule, in order: the default (dayOfWeek null), or the one that weekday runs on.</summary>
+        Task<List<PeriodStructureItem>> GetPeriodStructureAsync(int tenantId, int schoolId, int actionUserId, int? dayOfWeek = null);
+        /// <summary>Every schedule: default rows (DayOfWeek null) plus each weekday's own rows.</summary>
+        Task<List<PeriodStructureItem>> GetAllPeriodSchedulesAsync(int tenantId, int schoolId, int actionUserId);
         /// <summary>Replace-all save of the school's bell schedule.</summary>
-        Task<PeriodStructureSaveResult> SavePeriodStructureAsync(List<PeriodStructureItem> items, int tenantId, int schoolId, int actionUserId);
+        Task<PeriodStructureSaveResult> SavePeriodStructureAsync(List<PeriodStructureItem> items, int tenantId, int schoolId, int actionUserId, int? dayOfWeek = null);
+        /// <summary>Drops a weekday's own schedule so it runs on the default again.</summary>
+        Task<PeriodStructureSaveResult> UseDefaultScheduleAsync(int dayOfWeek, int tenantId, int schoolId, int actionUserId);
         #endregion
 
         #region Academic Year

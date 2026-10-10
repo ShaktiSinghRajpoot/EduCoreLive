@@ -4,10 +4,15 @@
 -- The exam module already answers "one sheet: this exam, this subject, this
 -- section" (marks entry). This is the other axis: one student, every exam.
 --
--- PUBLISHED EXAMS ONLY. academic.exams.status is 'Draft' until the school
--- publishes it, and a draft is a sheet the teacher is still typing into —
--- half-entered marks are not a result. The Marks Entry screen is where unpublished
--- work is seen; this is the parent-facing view.
+-- PUBLISHED RESULTS ONLY. An exam shows here only when its datesheet is
+-- published (status) AND its results are published (results_status, see
+-- exam_results_publish.sql). Results publish only once every mark sheet is
+-- finalised, so half-entered marks are never a result. The Marks Entry and Result
+-- Sheet screens are where unpublished work is seen; this is the parent-facing view.
+--
+-- GRADE AND RANK come from academic.fn_exam_class_result: the grade from the
+-- school's grade scale, the rank by overall percentage within the class and the
+-- section, ties sharing a rank.
 --
 -- ABSENT IS NOT ZERO. is_absent means the student did not sit the paper, which
 -- is a different fact from scoring 0. An absent subject is reported as absent and
@@ -30,6 +35,7 @@ LANGUAGE plpgsql
 AS $procedure$
 DECLARE
     v_exam_id integer;
+    v_class   integer;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 OR COALESCE(p_student_id, 0) <= 0 THEN
         OPEN p_exams   FOR SELECT NULL::int AS exam_id, NULL::text AS exam_name WHERE FALSE;
@@ -50,6 +56,7 @@ BEGIN
       AND m.student_id = p_student_id
       AND COALESCE(e.is_deleted, FALSE) = FALSE
       AND e.status = 'Published'
+      AND e.results_status = 'Published'
     ORDER BY e.start_date DESC NULLS LAST, e.exam_id DESC;
 
     -- Default to their most recent published exam.
@@ -61,6 +68,7 @@ BEGIN
           AND m.student_id = p_student_id
           AND COALESCE(e.is_deleted, FALSE) = FALSE
           AND e.status = 'Published'
+          AND e.results_status = 'Published'
         ORDER BY e.start_date DESC NULLS LAST, e.exam_id DESC
         LIMIT 1;
     ELSE
@@ -73,6 +81,7 @@ BEGIN
           AND m.student_id = p_student_id
           AND COALESCE(e.is_deleted, FALSE) = FALSE
           AND e.status = 'Published'
+          AND e.results_status = 'Published'
         LIMIT 1;
     END IF;
 
@@ -94,7 +103,10 @@ BEGIN
                 WHEN es.pass_marks IS NULL        THEN NULL
                 ELSE m.marks_obtained >= es.pass_marks END          AS passed,
            CASE WHEN COALESCE(m.is_absent, FALSE) OR COALESCE(es.max_marks, 0) = 0 THEN NULL
-                ELSE ROUND(m.marks_obtained * 100.0 / es.max_marks, 1) END AS percent
+                ELSE ROUND(m.marks_obtained * 100.0 / es.max_marks, 1) END AS percent,
+           academic.fn_grade_for_percent(p_tenant_id, p_school_id,
+               CASE WHEN m.marks_obtained IS NULL OR COALESCE(es.max_marks, 0) = 0 THEN NULL
+                    ELSE ROUND(m.marks_obtained * 100.0 / es.max_marks, 2) END) AS grade
     FROM academic.exam_marks m
     -- The paper is (exam, CLASS, subject): the same subject can sit on several
     -- classes' datesheets with different max marks. A mark whose paper is no
@@ -110,7 +122,15 @@ BEGIN
       AND m.tenant_id  = p_tenant_id AND m.school_id = p_school_id
     ORDER BY es.display_order NULLS LAST, subject;
 
+    -- The class they sat this exam in (a mark row carries it).
+    SELECT m.academic_class_id INTO v_class
+    FROM academic.exam_marks m
+    WHERE m.exam_id = v_exam_id AND m.student_id = p_student_id
+      AND m.tenant_id = p_tenant_id AND m.school_id = p_school_id
+    LIMIT 1;
+
     -- ── 3. Totals, absences and not-yet-entered marks excluded ─────────────
+    -- grade / rank columns come last so older positional readers still line up.
     OPEN p_summary FOR
     SELECT COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL)::int   AS subjects,
            COALESCE(SUM(m.marks_obtained) FILTER (WHERE m.marks_obtained IS NOT NULL), 0) AS obtained,
@@ -123,7 +143,12 @@ BEGIN
            COUNT(*) FILTER (WHERE COALESCE(m.is_absent, FALSE))::int       AS absent_count,
            COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL
                               AND es.pass_marks IS NOT NULL
-                              AND m.marks_obtained < es.pass_marks)::int   AS failed_count
+                              AND m.marks_obtained < es.pass_marks)::int   AS failed_count,
+           MAX(r.out_grade)                                                AS grade,
+           MAX(r.out_class_rank)                                           AS class_rank,
+           MAX(r.out_class_size)                                           AS class_size,
+           MAX(r.out_section_rank)                                         AS section_rank,
+           MAX(r.out_section_size)                                         AS section_size
     FROM academic.exam_marks m
     -- The paper is (exam, CLASS, subject): the same subject can sit on several
     -- classes' datesheets with different max marks. A mark whose paper is no
@@ -131,6 +156,8 @@ BEGIN
     JOIN academic.exam_subjects es
       ON es.exam_id = m.exam_id AND es.subject_id = m.subject_id
      AND es.academic_class_id = m.academic_class_id
+    LEFT JOIN academic.fn_exam_class_result(p_tenant_id, p_school_id, v_exam_id, v_class) r
+           ON r.out_student_id = m.student_id
     WHERE m.exam_id    = v_exam_id
       AND m.student_id = p_student_id
       AND m.tenant_id  = p_tenant_id AND m.school_id = p_school_id;

@@ -48,7 +48,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         ClassCount   = IntVal(row, "class_count"),
                         SubjectCount = IntVal(row, "subject_count"),
                         ClassNames   = Str(row, "class_names"),
-                        Status       = Str(row, "status")
+                        Status       = Str(row, "status"),
+                        ResultsStatus = Str(row, "results_status")
                     });
 
             // Second cursor carries the academic year, so the page needs no extra call.
@@ -292,7 +293,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     StartDate        = DateStr(row, "start_date"),
                     EndDate          = DateStr(row, "end_date"),
                     Status           = Str(row, "status"),
-                    SubjectCount     = IntVal(row, "subject_count")
+                    SubjectCount     = IntVal(row, "subject_count"),
+                    ResultsStatus    = Str(row, "results_status")
                 });
 
             return list;
@@ -456,6 +458,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 sheet.SubjectName = Str(meta, "subject_name");
                 sheet.IsFinalized = BoolVal(meta, "is_finalized");
                 sheet.FinalizedAt = NullDateStr(meta, "finalized_at");
+                sheet.ResultsPublished = BoolVal(meta, "results_published");
             }
 
             return sheet;
@@ -506,7 +509,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         // exam has no pass mark), which is not the same as failed.
                         Passed    = Has(row, "passed") && row["passed"] != DBNull.Value
                                       ? Convert.ToBoolean(row["passed"]) : null,
-                        Percent   = DecValN(row, "percent")
+                        Percent   = DecValN(row, "percent"),
+                        Grade     = Has(row, "grade") && row["grade"] != DBNull.Value ? row["grade"].ToString() : null
                     });
 
             if (ds.Tables.Count > 2 && ds.Tables[2].Rows.Count > 0)
@@ -518,6 +522,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 result.Percent      = DecVal(row, "percent", 0m);
                 result.AbsentCount  = IntVal(row, "absent_count");
                 result.FailedCount  = IntVal(row, "failed_count");
+                result.Grade        = Has(row, "grade") && row["grade"] != DBNull.Value ? row["grade"].ToString() : null;
+                result.ClassRank    = Has(row, "class_rank") && row["class_rank"] != DBNull.Value ? Convert.ToInt32(row["class_rank"]) : null;
+                result.ClassSize    = IntVal(row, "class_size");
+                result.SectionRank  = Has(row, "section_rank") && row["section_rank"] != DBNull.Value ? Convert.ToInt32(row["section_rank"]) : null;
+                result.SectionSize  = IntVal(row, "section_size");
             }
 
             return result;

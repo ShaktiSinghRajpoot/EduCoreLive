@@ -54,6 +54,7 @@ namespace educore.Areas.ERP.Controllers
             if (model == null) return RedirectToAction("AccessDenied", "Account", new { area = "" });
 
             await FillDropdowns(model, tenantId, schoolId);
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "settings.manage");
 
             return View(model);
         }
@@ -113,6 +114,25 @@ namespace educore.Areas.ERP.Controllers
                 }
             }
 
+            // Official / alternate phone may be a landline too (PhoneRules). The model's
+            // mobile-only regex stays for the SuperAdmin wizard, so drop its verdict
+            // here and apply the wider rule. Stored as digits only.
+            ModelState.Remove(nameof(model.Phone));
+            ModelState.Remove(nameof(model.AlternatePhone));
+            if (string.IsNullOrWhiteSpace(model.Phone))
+                ModelState.AddModelError(nameof(model.Phone), "Phone number is required.");
+            else if (!PhoneRules.IsValid(model.Phone))
+                ModelState.AddModelError(nameof(model.Phone), PhoneRules.Message);
+            else
+                model.Phone = PhoneRules.Clean(model.Phone)!;
+
+            if (string.IsNullOrWhiteSpace(model.AlternatePhone))
+                model.AlternatePhone = null;
+            else if (!PhoneRules.IsValid(model.AlternatePhone))
+                ModelState.AddModelError(nameof(model.AlternatePhone), PhoneRules.Message);
+            else
+                model.AlternatePhone = PhoneRules.Clean(model.AlternatePhone);
+
             // The model allows up to 2100; a school cannot be established in the future.
             if (model.EstablishedYear > Dates.Now.Year)
                 ModelState.AddModelError(nameof(model.EstablishedYear), "Enter valid established year.");
@@ -169,6 +189,38 @@ namespace educore.Areas.ERP.Controllers
 
             return RedirectToAction(nameof(BasicProfile));
         }
+
+        // Take the logo off (receipts, TC and ID cards then print without one).
+        // The proc clears logo_url and hands back the old URL; the file is deleted
+        // only when that URL is in THIS school's upload folder, and the name is cut
+        // down to a bare file name so the path cannot walk anywhere else (the same
+        // rule as the student photo replace in StudentController).
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("settings.manage")]
+        public async Task<IActionResult> RemoveLogo()
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var (ok, message, oldUrl) = await _schoolSettingsService.RemoveLogoAsync(tenantId, schoolId, actionUserId);
+
+            var prefix = UploadPaths.UrlFor("schools", tenantId, schoolId, "");
+            if (ok && !string.IsNullOrWhiteSpace(oldUrl)
+                   && oldUrl.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var oldName = Path.GetFileName(oldUrl);
+                if (!string.IsNullOrWhiteSpace(oldName))
+                {
+                    var folder = UploadPaths.FolderFor(_config, _webHostEnvironment, "schools", tenantId, schoolId);
+                    try { System.IO.File.Delete(Path.Combine(folder, oldName)); } catch { }
+                }
+            }
+
+            return Json(new { success = ok, message });
+        }
+
         private async Task<string> SaveSchoolImageAsync(IFormFile file, int tenantId, int schoolId, string imageType)
         {
             string extension = Path.GetExtension(file.FileName).ToLower();
@@ -1155,8 +1207,9 @@ namespace educore.Areas.ERP.Controllers
         #endregion
 
         #region PeriodStructure
-        // The daily bell schedule — one schedule per school. The list seeds the
-        // page; Save posts the whole schedule back (replace-all).
+        // The daily bell schedule: a default schedule plus an optional custom one
+        // per weekday (e.g. a short Saturday). Every schedule seeds the page; Save
+        // posts one schedule back (replace-all), "Use default" drops a day's own.
         [HasPermission("academics.view")]
         public async Task<IActionResult> PeriodStructure()
         {
@@ -1164,12 +1217,14 @@ namespace educore.Areas.ERP.Controllers
             int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
             int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
-            var periods = await _schoolSettingsService.GetPeriodStructureAsync(tenantId, schoolId, actionUserId);
+            var periods = await _schoolSettingsService.GetAllPeriodSchedulesAsync(tenantId, schoolId, actionUserId);
 
-            // Shape the page's JS consumes: name / start / end / type.
+            // Shape the page's JS consumes: name / start / end / type, plus the day
+            // the row belongs to (null = the default schedule).
             var shaped = periods.Select(p => new
             {
                 id    = p.PeriodId,
+                day   = p.DayOfWeek,
                 name  = p.Label,
                 start = p.StartTime,
                 end   = p.EndTime,
@@ -1177,7 +1232,23 @@ namespace educore.Areas.ERP.Controllers
             });
             ViewBag.PeriodJson = System.Text.Json.JsonSerializer.Serialize(shaped);
 
+            // The day selector lists the weekdays that are not weekly offs.
+            var today    = Dates.Now.Date;
+            var calendar = await _schoolCalendarService.GetCalendarAsync(today, today, tenantId, schoolId, actionUserId);
+            ViewBag.WeeklyOffJson = System.Text.Json.JsonSerializer.Serialize(calendar.WeeklyOffDays);
+
             return View();
+        }
+
+        public class PeriodDayDto { public int Day { get; set; } }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> UseDefaultPeriodSchedule([FromBody] PeriodDayDto dto)
+        {
+            var result = await _schoolSettingsService.UseDefaultScheduleAsync(dto?.Day ?? -1, SmTenant(), SmSchool(), SmUser());
+            return Json(new { success = result.Success, message = result.Message });
         }
 
         // Smart Bell — a live kiosk display driven by the same schedule. Read-only:
@@ -1207,7 +1278,8 @@ namespace educore.Areas.ERP.Controllers
             int tenantId = SmTenant(), schoolId = SmSchool(), actionUserId = SmUser();
 
             var now     = Dates.Now;                       // the school's clock — the single source of truth
-            var periods = await _schoolSettingsService.GetPeriodStructureAsync(tenantId, schoolId, actionUserId);
+            // Today's own schedule (a short Saturday rings only its periods), or the default.
+            var periods = await _schoolSettingsService.GetPeriodStructureAsync(tenantId, schoolId, actionUserId, (int)now.DayOfWeek);
             var day     = await _schoolCalendarService.GetDayStatusAsync(now.Date, tenantId, schoolId, actionUserId);
 
             return new
@@ -1265,6 +1337,11 @@ namespace educore.Areas.ERP.Controllers
 
             var posted = dto?.Periods ?? new List<PeriodItemDto>();
 
+            // null = the default schedule; 0..6 = that weekday's own schedule.
+            var day = dto?.Day;
+            if (day is < 0 or > 6)
+                return Json(new { success = false, message = "Pick a day of the week." });
+
             // This schedule drives the timetable grid AND the Smart Bell kiosk, so
             // an empty save does not just clear a page - it stops the bell ringing.
             if (posted.Count == 0)
@@ -1320,7 +1397,7 @@ namespace educore.Areas.ERP.Controllers
                     });
             }
 
-            var result = await _schoolSettingsService.SavePeriodStructureAsync(items, tenantId, schoolId, actionUserId);
+            var result = await _schoolSettingsService.SavePeriodStructureAsync(items, tenantId, schoolId, actionUserId, day);
             return Json(new { success = result.Success, message = result.Message });
         }
         #endregion
@@ -1380,6 +1457,43 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = result.Success, message = result.Message });
         }
 
+        public class CalendarRangeDto
+        {
+            public string  From       { get; set; } = string.Empty;   // yyyy-MM-dd
+            public string  To         { get; set; } = string.Empty;   // yyyy-MM-dd
+            public string  DayType    { get; set; } = "holiday";
+            public string  Title      { get; set; } = string.Empty;
+            public string? HalfDayEnd { get; set; }
+        }
+
+        // A holiday (or half day / working day) over a date range: one entry per
+        // day. Days that already have an entry are skipped and reported.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> SaveCalendarRange([FromBody] CalendarRangeDto dto)
+        {
+            var result = await _schoolCalendarService.SaveRangeAsync(dto?.From ?? string.Empty, dto?.To ?? string.Empty,
+                new SchoolCalendarEntry
+                {
+                    DayType    = dto?.DayType ?? "holiday",
+                    Title      = dto?.Title ?? string.Empty,
+                    HalfDayEnd = dto?.HalfDayEnd
+                }, SmTenant(), SmSchool(), SmUser());
+
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> DeleteCalendarRange([FromBody] CalendarRangeDto dto)
+        {
+            var result = await _schoolCalendarService.DeleteRangeAsync(dto?.From ?? string.Empty, dto?.To ?? string.Empty,
+                SmTenant(), SmSchool(), SmUser());
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
         public class IdDto { public int Id { get; set; } }
         public class WeeklyOffDto { public List<int> Days { get; set; } = new(); }
 
@@ -1430,9 +1544,10 @@ namespace educore.Areas.ERP.Controllers
         public string? Room { get; set; }
     }
 
-    // ── Payload for the Period Structure save (whole schedule, replace-all) ──
+    // ── Payload for the Period Structure save (one whole schedule, replace-all) ──
     public class PeriodStructureSaveDto
     {
+        public int? Day { get; set; }        // null = the default schedule, 0 = Sunday … 6 = Saturday
         public List<PeriodItemDto> Periods { get; set; } = new();
     }
 
@@ -1441,7 +1556,7 @@ namespace educore.Areas.ERP.Controllers
         public string? Name  { get; set; }
         public string? Start { get; set; }   // HH:mm
         public string? End   { get; set; }   // HH:mm
-        public string? Type  { get; set; }   // class | break | lunch
+        public string? Type  { get; set; }   // class | assembly | break | lunch | diary
     }
 
     // ── Payload for Academic Year / Session save ──

@@ -30,11 +30,21 @@ namespace educore.Areas.ERP.Controllers
         // so there is no second source here to disagree with them.
         public IActionResult InventoryItem() => View();
 
+        // Store locations (add / rename / deactivate) and the transfer history.
+        public IActionResult StoreLocations() => View();
+
+        // Supplier list / search / add / edit / deactivate / remove.
+        public IActionResult SupplierMaster() => View();
+
         public async Task<IActionResult> PurchaseEntry()
         {
             // Both pickers come from the database; the shell had them hardcoded.
-            // Inactive items are left out: the proc refuses to buy them anyway.
-            ViewBag.Suppliers = await _inventory.GetSuppliersAsync(TenantId(), SchoolId(), UserId());
+            // Inactive items and inactive suppliers are left out: the proc
+            // refuses both on a new bill anyway.
+            ViewBag.Suppliers = (await _inventory.GetSuppliersAsync(TenantId(), SchoolId(), UserId()))
+                                .Where(s => s.IsActive).ToList();
+            ViewBag.Locations = (await _inventory.GetLocationsAsync(TenantId(), SchoolId(), UserId()))
+                                .Where(l => l.IsActive).ToList();
             ViewBag.Items     = (await _inventory.GetItemsAsync(TenantId(), SchoolId(), UserId()))
                                 .Where(i => i.IsActive).ToList();
             // The school's date, not the browser's UTC one (toISOString), so the
@@ -46,10 +56,11 @@ namespace educore.Areas.ERP.Controllers
         // ── Items ───────────────────────────────────────────────────────────
         // The page searches and filters client-side, so it loads the list once.
         // A school's store is small enough for that.
+        // With a location, stock / value / status are the figures AT that location.
         [HttpGet]
-        public async Task<IActionResult> Items(string? search = null, string? status = null)
+        public async Task<IActionResult> Items(string? search = null, string? status = null, int? location = null)
         {
-            var rows = await _inventory.GetItemsAsync(TenantId(), SchoolId(), UserId(), search, status);
+            var rows = await _inventory.GetItemsAsync(TenantId(), SchoolId(), UserId(), search, status, location);
 
             return Json(rows.Select(r => new
             {
@@ -63,7 +74,9 @@ namespace educore.Areas.ERP.Controllers
                 stock    = r.CurrentStock,
                 minStock = r.MinStock,
                 value    = r.StockValue,
-                status   = r.StockStatus
+                status   = r.StockStatus,
+                active   = r.IsActive,
+                places   = r.LocationsHeld
             }));
         }
 
@@ -141,15 +154,103 @@ namespace educore.Areas.ERP.Controllers
                 by      = r.CreatedBy,
                 invoice = r.InvoiceNo,
                 to      = r.IssuedTo,
-                remarks = r.Remarks
+                remarks = r.Remarks,
+                place   = r.LocationName,
+                placeBalance = r.LocationBalance,
+                with    = r.TransferWith
+            }));
+        }
+
+        // One item's stock, location by location.
+        [HttpGet]
+        public async Task<IActionResult> ItemStock(int id)
+        {
+            var rows = await _inventory.GetItemStockByLocationAsync(id, TenantId(), SchoolId(), UserId());
+            return Json(rows.Select(r => new
+            {
+                id        = r.LocationId,
+                name      = r.LocationName,
+                isDefault = r.IsDefault,
+                active    = r.IsActive,
+                qty       = r.Quantity
+            }));
+        }
+
+        // ── Locations and transfers ─────────────────────────────────────────
+        [HttpGet]
+        public async Task<IActionResult> Locations()
+        {
+            var rows = await _inventory.GetLocationsAsync(TenantId(), SchoolId(), UserId());
+            return Json(rows.Select(r => new
+            {
+                id        = r.LocationId,
+                name      = r.LocationName,
+                isDefault = r.IsDefault,
+                active    = r.IsActive,
+                items     = r.ItemCount,
+                qty       = r.TotalQty,
+                value     = r.StockValue
+            }));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> SaveLocation([FromBody] LocationRequest req)
+        {
+            if (req == null) return Json(new { success = false, message = "Nothing to save." });
+
+            var res = await _inventory.SaveLocationAsync(req.Id, req.Name, TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message, id = res.Id });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> SetLocationActive([FromBody] ActiveRequest req)
+        {
+            if (req == null) return Json(new { success = false, message = "Nothing to change." });
+
+            var res = await _inventory.SetLocationActiveAsync(req.Id, req.Active, TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> TransferStock([FromBody] StockTransferInput input)
+        {
+            if (input == null) return Json(new { success = false, message = "Nothing to transfer." });
+
+            var res = await _inventory.TransferStockAsync(input, TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message, stock = res.CurrentStock });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Transfers(int? itemId = null, int? location = null)
+        {
+            var rows = await _inventory.GetTransfersAsync(TenantId(), SchoolId(), UserId(), itemId, location);
+            return Json(rows.Select(r => new
+            {
+                id      = r.TransferId,
+                date    = Dates.Show(r.TransferDate),
+                item    = r.ItemName,
+                unit    = r.UnitType,
+                from    = r.FromLocation,
+                to      = r.ToLocation,
+                qty     = r.Quantity,
+                reason  = r.Reason,
+                by      = r.CreatedBy,
+                at      = r.CreatedAt
             }));
         }
 
         // ── Suppliers ───────────────────────────────────────────────────────
+        // status: null = all live suppliers, "Active" or "Inactive".
         [HttpGet]
-        public async Task<IActionResult> Suppliers()
+        public async Task<IActionResult> Suppliers(string? search = null, string? status = null)
         {
-            var rows = await _inventory.GetSuppliersAsync(TenantId(), SchoolId(), UserId());
+            var rows = await _inventory.GetSuppliersAsync(TenantId(), SchoolId(), UserId(), search, status);
 
             return Json(rows.Select(r => new
             {
@@ -159,7 +260,11 @@ namespace educore.Areas.ERP.Controllers
                 mobile  = r.Mobile,
                 email   = r.Email,
                 address = r.Address,
-                gstin   = r.Gstin
+                gstin   = r.Gstin,
+                active  = r.IsActive,
+                bills   = r.BillCount,
+                billed  = r.TotalBilled,
+                lastBill = Dates.Show(r.LastBillDate)
             }));
         }
 
@@ -183,11 +288,22 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = res.Success, message = res.Message });
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> SetSupplierActive([FromBody] ActiveRequest req)
+        {
+            if (req == null) return Json(new { success = false, message = "Nothing to change." });
+
+            var res = await _inventory.SetSupplierActiveAsync(req.Id, req.Active, TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message });
+        }
+
         // ── Purchases ───────────────────────────────────────────────────────
         [HttpGet]
-        public async Task<IActionResult> Purchases(string? from = null, string? to = null)
+        public async Task<IActionResult> Purchases(string? from = null, string? to = null, int? supplierId = null)
         {
-            var rows = await _inventory.GetPurchasesAsync(TenantId(), SchoolId(), UserId(), from, to);
+            var rows = await _inventory.GetPurchasesAsync(TenantId(), SchoolId(), UserId(), from, to, supplierId);
 
             return Json(rows.Select(r => new
             {
@@ -202,7 +318,10 @@ namespace educore.Areas.ERP.Controllers
                 tax       = r.TaxTotal,
                 total     = r.GrandTotal,
                 lines     = r.LineCount,
-                cancelled = r.IsCancelled
+                cancelled = r.IsCancelled,
+                place     = r.LocationName,
+                returnedQty    = r.ReturnedQty,
+                returnedAmount = r.ReturnedAmount
             }));
         }
 
@@ -216,7 +335,7 @@ namespace educore.Areas.ERP.Controllers
             {
                 success   = true,
                 id        = p.PurchaseId,
-                date      = p.PurchaseDate,
+                date      = Dates.Show(p.PurchaseDate),
                 supplier  = p.SupplierName,
                 invoice   = p.InvoiceNo,
                 mode      = p.PaymentMode,
@@ -226,14 +345,35 @@ namespace educore.Areas.ERP.Controllers
                 total     = p.GrandTotal,
                 cancelled = p.IsCancelled,
                 reason    = p.CancelReason,
+                place     = p.LocationName,
+                createdBy = p.CreatedBy,
+                createdAt = p.CreatedAt,
+                cancelledBy = p.CancelledBy,
+                cancelledAt = p.CancelledAt,
+                returnedAmount = p.ReturnedAmount,
                 lines     = p.Lines.Select(l => new
                 {
+                    lineId = l.PurchaseItemId,
                     itemId = l.ItemId,
                     name   = l.ItemName,
+                    unit   = l.UnitType,
                     qty    = l.Quantity,
                     price  = l.UnitPrice,
                     tax    = l.TaxPercent,
-                    total  = l.LineTotal
+                    total  = l.LineTotal,
+                    returnedQty    = l.ReturnedQty,
+                    returnedAmount = l.ReturnedAmount
+                }),
+                returns   = p.Returns.Select(r => new
+                {
+                    date   = Dates.Show(r.ReturnDate),
+                    name   = r.ItemName,
+                    qty    = r.Quantity,
+                    amount = r.Amount,
+                    reason = r.Reason,
+                    place  = r.LocationName,
+                    by     = r.CreatedBy,
+                    at     = r.CreatedAt
                 })
             });
         }
@@ -259,8 +399,22 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = res.Success, message = res.Message });
         }
 
+        // Return part of a bill to its supplier (some quantity of some lines).
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> ReturnToSupplier([FromBody] PurchaseReturnInput input)
+        {
+            if (input == null) return Json(new { success = false, message = "Nothing to return." });
+
+            var res = await _inventory.ReturnToSupplierAsync(input, TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message });
+        }
+
         // Small request shapes for the JSON posts above.
-        public class IdRequest     { public int Id { get; set; } }
-        public class CancelRequest { public int Id { get; set; } public string? Reason { get; set; } }
+        public class IdRequest       { public int Id { get; set; } }
+        public class CancelRequest   { public int Id { get; set; } public string? Reason { get; set; } }
+        public class LocationRequest { public int Id { get; set; } public string? Name { get; set; } }
+        public class ActiveRequest   { public int Id { get; set; } public bool Active { get; set; } }
     }
 }

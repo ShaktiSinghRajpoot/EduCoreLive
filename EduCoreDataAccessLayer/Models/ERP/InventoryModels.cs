@@ -25,6 +25,9 @@
         /// so it can never disagree with the quantity shown beside it.
         public string  StockStatus  { get; set; } = string.Empty;
         public bool    IsActive     { get; set; }
+
+        /// How many locations hold some of it.
+        public int     LocationsHeld { get; set; }
     }
 
     /// What the Add/Edit item form posts.
@@ -48,6 +51,9 @@
         public string? Model        { get; set; }
         public string? Description  { get; set; }
         public bool    IsActive     { get; set; } = true;
+
+        /// Where the opening stock goes. Null = the default location.
+        public int?    LocationId   { get; set; }
     }
 
     // ── Stock movement ──────────────────────────────────────────────────────
@@ -75,6 +81,14 @@
         public string   IssuedTo     { get; set; } = string.Empty;
         public string   Remarks      { get; set; } = string.Empty;
         public int      ReferenceId  { get; set; }
+
+        public string   LocationName    { get; set; } = string.Empty;
+
+        /// Running total at this row's location, in the same order as Balance.
+        public decimal  LocationBalance { get; set; }
+
+        /// For a transfer row: the location on the other side.
+        public string   TransferWith    { get; set; } = string.Empty;
     }
 
     public class StockMovementInput
@@ -86,6 +100,55 @@
         public decimal Quantity     { get; set; }
         public string? IssuedTo     { get; set; }
         public string? Remarks      { get; set; }
+
+        /// Where it happens. Null = the default location.
+        public int?    LocationId   { get; set; }
+    }
+
+    // ── Locations and transfers ─────────────────────────────────────────────
+    public class InventoryLocation
+    {
+        public int     LocationId   { get; set; }
+        public string  LocationName { get; set; } = string.Empty;
+        public bool    IsDefault    { get; set; }
+        public bool    IsActive     { get; set; }
+        public int     ItemCount    { get; set; }
+        public decimal TotalQty     { get; set; }
+        public decimal StockValue   { get; set; }
+    }
+
+    /// One item's stock at one location.
+    public class ItemLocationStock
+    {
+        public int     LocationId   { get; set; }
+        public string  LocationName { get; set; } = string.Empty;
+        public bool    IsDefault    { get; set; }
+        public bool    IsActive     { get; set; }
+        public decimal Quantity     { get; set; }
+    }
+
+    public class StockTransferInput
+    {
+        public int     ItemId         { get; set; }
+        public int?    FromLocationId { get; set; }
+        public int     ToLocationId   { get; set; }
+        public decimal Quantity       { get; set; }
+        public string? Reason         { get; set; }
+    }
+
+    public class StockTransfer
+    {
+        public int     TransferId   { get; set; }
+        public string  TransferDate { get; set; } = string.Empty;
+        public int     ItemId       { get; set; }
+        public string  ItemName     { get; set; } = string.Empty;
+        public string  UnitType     { get; set; } = string.Empty;
+        public string  FromLocation { get; set; } = string.Empty;
+        public string  ToLocation   { get; set; } = string.Empty;
+        public decimal Quantity     { get; set; }
+        public string  Reason       { get; set; } = string.Empty;
+        public string  CreatedBy    { get; set; } = string.Empty;
+        public string  CreatedAt    { get; set; } = string.Empty;
     }
 
     // ── Suppliers ───────────────────────────────────────────────────────────
@@ -99,6 +162,11 @@
         public string  Address       { get; set; } = string.Empty;
         public string  Gstin         { get; set; } = string.Empty;
         public bool    IsActive      { get; set; }
+
+        // Read-only figures for the supplier screen (live bills only).
+        public int     BillCount     { get; set; }
+        public decimal TotalBilled   { get; set; }
+        public string  LastBillDate  { get; set; } = string.Empty;
     }
 
     // ── Purchases ───────────────────────────────────────────────────────────
@@ -115,16 +183,54 @@
         public bool     IsCancelled  { get; set; }
         public int      LineCount    { get; set; }
         public decimal  ItemQty      { get; set; }
+        public string   LocationName   { get; set; } = string.Empty;
+        public decimal  ReturnedQty    { get; set; }
+        public decimal  ReturnedAmount { get; set; }
     }
 
     public class PurchaseLine
     {
+        public int     PurchaseItemId { get; set; }
         public int     ItemId     { get; set; }
         public string  ItemName   { get; set; } = string.Empty;
         public decimal Quantity   { get; set; }
         public decimal UnitPrice  { get; set; }
         public decimal TaxPercent { get; set; }
         public decimal LineTotal  { get; set; }
+        public string  UnitType   { get; set; } = string.Empty;
+        public decimal ReturnedQty    { get; set; }
+        public decimal ReturnedAmount { get; set; }
+    }
+
+    /// One return-to-supplier row of a bill.
+    public class PurchaseReturn
+    {
+        public int     ReturnId       { get; set; }
+        public string  ReturnDate     { get; set; } = string.Empty;
+        public int     PurchaseItemId { get; set; }
+        public string  ItemName       { get; set; } = string.Empty;
+        public decimal Quantity       { get; set; }
+        public decimal UnitPrice      { get; set; }
+        public decimal TaxPercent     { get; set; }
+        public decimal Amount         { get; set; }
+        public string  Reason         { get; set; } = string.Empty;
+        public string  LocationName   { get; set; } = string.Empty;
+        public string  CreatedBy      { get; set; } = string.Empty;
+        public string  CreatedAt      { get; set; } = string.Empty;
+    }
+
+    /// What the "Return to supplier" form posts.
+    public class PurchaseReturnInput
+    {
+        public int     PurchaseId { get; set; }
+        public string? Reason     { get; set; }
+        public List<PurchaseReturnLineInput> Lines { get; set; } = new();
+    }
+
+    public class PurchaseReturnLineInput
+    {
+        public int     PurchaseItemId { get; set; }
+        public decimal Quantity       { get; set; }
     }
 
     public class PurchaseDetail
@@ -141,7 +247,14 @@
         public decimal  GrandTotal   { get; set; }
         public bool     IsCancelled  { get; set; }
         public string   CancelReason { get; set; } = string.Empty;
+        public string   LocationName    { get; set; } = string.Empty;
+        public string   CreatedBy       { get; set; } = string.Empty;
+        public string   CreatedAt       { get; set; } = string.Empty;
+        public string   CancelledBy     { get; set; } = string.Empty;
+        public string   CancelledAt     { get; set; } = string.Empty;
+        public decimal  ReturnedAmount  { get; set; }
         public List<PurchaseLine> Lines { get; set; } = new();
+        public List<PurchaseReturn> Returns { get; set; } = new();
     }
 
     /// What the purchase form posts.
@@ -152,6 +265,9 @@
         public string?   InvoiceNo    { get; set; }
         public string?   PaymentMode  { get; set; }
         public string?   Remarks      { get; set; }
+
+        /// Where the goods go. Null = the default location.
+        public int?      LocationId   { get; set; }
         public List<PurchaseLineInput> Items { get; set; } = new();
     }
 

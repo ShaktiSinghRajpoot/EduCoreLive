@@ -22,9 +22,14 @@
             <div class="ec-page-subtitle">Manage uniforms, books, stationery, sports, furniture and lab items.</div>
           </div>
         </div>
-        <button class="btn btn-primary d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#itemModal">
-          <i class="bx bx-plus"></i><span>Add Item</span>
-        </button>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="StoreLocations">
+            <i class="bx bx-map-pin"></i><span>Store Locations</span>
+          </a>
+          <button class="btn btn-primary d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#itemModal">
+            <i class="bx bx-plus"></i><span>Add Item</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -75,6 +80,10 @@
           </div>
 
           <div class="iv-fbar-div"></div>
+
+          <select class="iv-chip" id="fLocation" title="Show the stock at one location">
+            <option value="">All locations</option>
+          </select>
 
           <select class="iv-chip" id="fCategory">
             <option value="">Category</option>
@@ -229,9 +238,10 @@
                             </div>
 
                             <div class="row g-3">
-                                <div class="col-12 col-md-6 col-lg-3">
+                                <div class="col-12 col-md-6 col-lg-3" id="openingWrap">
                                     <label class="form-label">Opening Stock</label>
                                     <input type="number" class="form-control" id="openingStock" min="0" step="0.01" placeholder="0">
+                                    <select class="form-select form-select-sm mt-1" id="openingLocation" title="Where the opening stock is kept"></select>
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label">Minimum Stock Alert</label>
@@ -306,6 +316,11 @@
       <div class="modal-body">
         <input type="hidden" id="mvItemId">
         <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Location</label>
+            <select class="form-select" id="mvLocation"></select>
+            <div class="form-text" id="mvAtLabel">&nbsp;</div>
+          </div>
           <div class="col-12 col-sm-6">
             <label class="form-label">What happened</label>
             <select class="form-select" id="mvType">
@@ -340,6 +355,48 @@
   </div>
 </div>
 
+<div class="modal fade" id="transferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold">Transfer Stock</h5>
+          <small class="text-muted" id="trItemLabel">—</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="trItemId">
+        <div class="row g-3">
+          <div class="col-12 col-sm-6">
+            <label class="form-label">From</label>
+            <select class="form-select" id="trFrom"></select>
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">To</label>
+            <select class="form-select" id="trTo"></select>
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">Quantity</label>
+            <input type="number" class="form-control" id="trQty" min="0" step="0.01" placeholder="0">
+            <div class="form-text" id="trAtLabel">&nbsp;</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Reason</label>
+            <textarea class="form-control" id="trReason" rows="2" placeholder="Why is it moving? (required)"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer flex-column flex-sm-row">
+        <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary w-100 w-sm-auto" id="saveTransferBtn">
+          <i class="bx bx-transfer-alt me-1"></i> Transfer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="ledgerModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content rounded-4 border-0">
@@ -351,13 +408,14 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+        <div class="d-flex flex-wrap gap-2 mb-3" id="ledgerPlaces"></div>
         <div class="table-responsive">
           <table class="table align-middle mb-0">
             <thead>
               <tr>
-                <th>Date</th><th>Movement</th>
+                <th>Date</th><th>Movement</th><th>Location</th>
                 <th class="text-end">Qty</th><th class="text-end">Rate</th>
-                <th class="text-end">Balance</th><th>By</th>
+                <th class="text-end" title="Item total, all locations">Balance</th><th>By</th>
                 <th>Issued to</th><th>Remarks</th>
               </tr>
             </thead>
@@ -382,6 +440,11 @@
     var DELETE_URL   = '@Url.Action("DeleteItem", "Inventory", new { area = "ERP" })';
     var MOVE_URL     = '@Url.Action("MoveStock", "Inventory", new { area = "ERP" })';
     var LEDGER_URL   = '@Url.Action("Ledger", "Inventory", new { area = "ERP" })';
+    var LOCS_URL     = '@Url.Action("Locations", "Inventory", new { area = "ERP" })';
+    var STOCK_URL    = '@Url.Action("ItemStock", "Inventory", new { area = "ERP" })';
+    var TRANSFER_URL = '@Url.Action("TransferStock", "Inventory", new { area = "ERP" })';
+
+    var locations = [];  // active store locations, default first
 
     var rows = [];      // everything the server sent, unfiltered
     var page = 1;
@@ -414,12 +477,32 @@
         return '<span class="badge ' + cls + '">' + EC.esc(s) + '</span>';
     }
 
+    // ── Locations ───────────────────────────────────────────────────────────
+    // Options for a location picker. The default location comes first, so a
+    // fresh picker is already on it.
+    function locationOptions(selected) {
+        return locations.map(function (l) {
+            return '<option value="' + l.id + '"' + (l.id === selected ? ' selected' : '') + '>' +
+                   EC.esc(l.name) + (l.isDefault ? ' (default)' : '') + '</option>';
+        }).join('');
+    }
+
+    function loadLocations() {
+        return $.get(LOCS_URL).done(function (d) {
+            locations = (d || []).filter(function (l) { return l.active; });
+            var keep = $('#fLocation').val();
+            $('#fLocation').html('<option value="">All locations</option>' + locationOptions(0)).val(keep);
+            $('#openingLocation').html(locationOptions(0));
+        });
+    }
+
     // ── Load ────────────────────────────────────────────────────────────────
     function load() {
         EC.listLoading('#itemTableBody', 'Loading items…');
         $('#resultText').text('Loading…');
 
-        $.get(ITEMS_URL)
+        var loc = $('#fLocation').val();
+        $.get(ITEMS_URL, loc ? { location: loc } : {})
             .done(function (d) {
                 rows = d || [];
                 page = 1;
@@ -486,7 +569,8 @@
         $('#emptyDesk').toggleClass('d-none', list.length > 0);
         $('#emptyMob').toggleClass('d-none', list.length > 0);
         $('#clearBtn').toggleClass('d-none', !(
-            $('#ivSearch').val() || $('#fCategory').val() || $('#fType').val() || $('#fStock').val()));
+            $('#ivSearch').val() || $('#fCategory').val() || $('#fType').val() || $('#fStock').val() ||
+            $('#fLocation').val()));
 
         if (!list.length) {
             $('#itemTableBody').empty();
@@ -510,7 +594,8 @@
                 '<td>' + statusBadge(r.status) + '</td>' +
                 '<td class="text-end text-nowrap">' +
                     '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '" title="Stock movement"><i class="bx bx-transfer"></i></button>' +
-                    '<button class="btn btn-sm btn-icon btn-text-secondary" data-hist="' + r.id + '" title="Stock history"><i class="bx bx-history"></i></button>' +
+                    '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '" title="Transfer to another location"><i class="bx bx-transfer-alt"></i></button>' +
+                    '<button class="btn btn-sm btn-icon btn-text-secondary" data-hist="' + r.id + '" title="Stock history and locations"><i class="bx bx-history"></i></button>' +
                     '<button class="btn btn-sm btn-icon btn-text-secondary" data-edit="' + r.id + '" title="Edit"><i class="bx bx-edit"></i></button>' +
                     '<button class="btn btn-sm btn-icon btn-text-danger" data-del="' + r.id + '" title="Delete"><i class="bx bx-trash"></i></button>' +
                 '</td></tr>';
@@ -528,6 +613,8 @@
                         ' · min ' + EC.num(r.minStock) + '</div>' +
                     '<div>' +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '"><i class="bx bx-transfer"></i></button>' +
+                        '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '"><i class="bx bx-transfer-alt"></i></button>' +
+                        '<button class="btn btn-sm btn-icon btn-text-secondary" data-hist="' + r.id + '"><i class="bx bx-history"></i></button>' +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-edit="' + r.id + '"><i class="bx bx-edit"></i></button>' +
                     '</div></div></div>';
         }).join(''));
@@ -552,7 +639,8 @@
         $('#unitType').val('Piece');
         $('#openingStock,#minimumStock,#costPrice,#sellingPrice').val('');
         $('#itemStatus').val('Active');
-        $('#openingStock').closest('.col-12').removeClass('d-none');
+        $('#openingWrap').removeClass('d-none');
+        $('#openingLocation').html(locationOptions(0));
         $('#itemModalTitle').text('Add Inventory Item');
     }
 
@@ -584,7 +672,7 @@
 
                 // Opening stock is only meaningful when creating. Stock moves
                 // through a movement, so an edit cannot invent inventory.
-                $('#openingStock').closest('.col-12').addClass('d-none');
+                $('#openingWrap').addClass('d-none');
                 $('#itemModalTitle').text('Edit Inventory Item');
                 new bootstrap.Modal(document.getElementById('itemModal')).show();
             })
@@ -621,7 +709,8 @@
             brand:        $.trim($('#brand').val()),
             model:        $.trim($('#model').val()),
             description:  $.trim($('#description').val()),
-            isActive:     $('#itemStatus').val() === 'Active'
+            isActive:     $('#itemStatus').val() === 'Active',
+            locationId:   EC.num($('#openingLocation').val()) || null
         })
         .done(function (res) {
             if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not save.'); return; }
@@ -640,12 +729,37 @@
         var r = rows.find(function (x) { return x.id === id; });
         if (!r) return;
         $('#mvItemId').val(id);
-        $('#stockItemLabel').text(r.name + ' — ' + EC.num(r.stock) + ' ' + r.unit + ' in stock');
+        $('#stockItemLabel').text(r.name + ' (' + r.unit + ')');
         $('#mvType').val('Issue');
         $('#mvQty,#mvIssuedTo,#mvRemarks').val('');
+        // Start on the location the list is filtered to, else the default.
+        $('#mvLocation').html(locationOptions(EC.num($('#fLocation').val())));
         moveTypeChanged();
+        loadItemStock(id);
         new bootstrap.Modal(document.getElementById('stockModal')).show();
     }
+
+    // The item's stock per location, for the "at this location" hints.
+    var itemStock = [];
+    function loadItemStock(id) {
+        itemStock = [];
+        $('#mvAtLabel,#trAtLabel').html('&nbsp;');
+        return $.get(STOCK_URL, { id: id }).done(function (d) {
+            itemStock = d || [];
+            showAt();
+        });
+    }
+
+    function qtyAt(locId) {
+        var s = itemStock.find(function (x) { return x.id === locId; });
+        return s ? EC.num(s.qty) : 0;
+    }
+
+    function showAt() {
+        $('#mvAtLabel').text(qtyAt(EC.num($('#mvLocation').val())) + ' in stock here');
+        $('#trAtLabel').text(qtyAt(EC.num($('#trFrom').val())) + ' available at the source');
+    }
+    $('#mvLocation,#trFrom').on('change', showAt);
 
     // "Issued to" only means something when stock is going out. A stock-take
     // asks for the quantity COUNTED (the server records the difference) and
@@ -677,7 +791,8 @@
             movementType: type,
             quantity:     qty,
             issuedTo:     $.trim($('#mvIssuedTo').val()),
-            remarks:      $.trim($('#mvRemarks').val())
+            remarks:      $.trim($('#mvRemarks').val()),
+            locationId:   EC.num($('#mvLocation').val()) || null
         })
         .done(function (res) {
             // The proc refuses by name and amount ("Only 3 Piece of School Tie
@@ -691,18 +806,75 @@
         .always(function () { EC.buttonReset($btn); });
     });
 
+    // ── Transfer ────────────────────────────────────────────────────────────
+    function openTransfer(id) {
+        var r = rows.find(function (x) { return x.id === id; });
+        if (!r) return;
+        if (locations.length < 2) {
+            ecToast('warning', 'Add a second store location first (Store Locations page).');
+            return;
+        }
+        $('#trItemId').val(id);
+        $('#trItemLabel').text(r.name + ' (' + r.unit + ')');
+        $('#trQty,#trReason').val('');
+        $('#trFrom').html(locationOptions(EC.num($('#fLocation').val())));
+        $('#trTo').html('<option value="">Choose…</option>' + locationOptions(0));
+        loadItemStock(id);
+        new bootstrap.Modal(document.getElementById('transferModal')).show();
+    }
+
+    $('#saveTransferBtn').on('click', function () {
+        var $btn = $(this);
+        var raw  = $.trim($('#trQty').val());
+        var qty  = EC.numPos(raw);
+        var from = EC.num($('#trFrom').val());
+        var to   = EC.num($('#trTo').val());
+        if (!to)          { ecToast('warning', 'Choose where the stock is going.'); $('#trTo').focus(); return; }
+        if (from === to)  { ecToast('warning', 'Choose two different locations.'); $('#trTo').focus(); return; }
+        if (!twoDp(raw))  { ecToast('warning', 'Use at most 2 decimal places.'); $('#trQty').focus(); return; }
+        if (qty <= 0)     { ecToast('warning', 'Enter a quantity.'); $('#trQty').focus(); return; }
+        if (!$.trim($('#trReason').val())) { ecToast('warning', 'Give a reason for the transfer.'); $('#trReason').focus(); return; }
+
+        EC.buttonBusy($btn, 'Moving…');
+        postJson(TRANSFER_URL, {
+            itemId:         EC.num($('#trItemId').val()),
+            fromLocationId: from,
+            toLocationId:   to,
+            quantity:       qty,
+            reason:         $.trim($('#trReason').val())
+        })
+        .done(function (res) {
+            if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not transfer.'); return; }
+            ecToast('success', res.message);
+            bootstrap.Modal.getInstance(document.getElementById('transferModal')).hide();
+            load();
+        })
+        .fail(function () { ecToast('error', 'Could not transfer the stock.'); })
+        .always(function () { EC.buttonReset($btn); });
+    });
+
     // ── History ─────────────────────────────────────────────────────────────
     var MOVE_LABELS = {
         Opening: 'Opening stock', Purchase: 'Purchase', PurchaseCancel: 'Purchase cancelled',
         Issue: 'Issue', Return: 'Return', Damage: 'Damage / lost',
-        Adjustment: 'Adjustment', StockTake: 'Stock-take'
+        Adjustment: 'Adjustment', StockTake: 'Stock-take',
+        TransferOut: 'Transfer out', TransferIn: 'Transfer in', SupplierReturn: 'Returned to supplier'
     };
 
     function openHistory(id) {
         var r = rows.find(function (x) { return x.id === id; });
         $('#ledgerItemLabel').text(r ? r.name : '');
         EC.listLoading('#ledgerBody', 'Loading history…');
+        $('#ledgerPlaces').empty();
         new bootstrap.Modal(document.getElementById('ledgerModal')).show();
+
+        // Where the stock is now, location by location.
+        $.get(STOCK_URL, { id: id }).done(function (d) {
+            $('#ledgerPlaces').html((d || []).map(function (s) {
+                return '<span class="badge ' + (EC.num(s.qty) > 0 ? 'bg-label-primary' : 'bg-label-secondary') + '">' +
+                       EC.esc(s.name) + ': ' + EC.num(s.qty) + '</span>';
+            }).join(''));
+        });
 
         $.get(LEDGER_URL, { id: id })
             .done(function (d) {
@@ -716,9 +888,12 @@
                     var q = EC.num(m.qty);
                     var label = MOVE_LABELS[m.type] || m.type;
                     if (m.invoice) label += ' · Bill ' + m.invoice;
+                    if (m.with) label += (m.type === 'TransferOut' ? ' → ' : ' ← ') + m.with;
                     return '<tr>' +
                         '<td>' + EC.esc(m.date) + '</td>' +
                         '<td>' + EC.esc(label) + '</td>' +
+                        '<td class="small">' + EC.esc(m.place || '—') +
+                            (m.place ? '<div class="text-muted">bal ' + EC.num(m.placeBalance) + '</div>' : '') + '</td>' +
                         '<td class="text-end ' + (q < 0 ? 'text-danger' : 'text-success') + '">' +
                             (q > 0 ? '+' : '') + q + '</td>' +
                         '<td class="text-end">' + (m.rate === null || m.rate === undefined ? '—' : EC.money(m.rate)) + '</td>' +
@@ -762,16 +937,21 @@
     $(document)
         .on('click', '[data-edit]', function () { openEdit(EC.num($(this).data('edit'))); })
         .on('click', '[data-move]', function () { openMove(EC.num($(this).data('move'))); })
+        .on('click', '[data-xfer]', function () { openTransfer(EC.num($(this).data('xfer'))); })
         .on('click', '[data-hist]', function () { openHistory(EC.num($(this).data('hist'))); })
         .on('click', '[data-del]',  function () { del(EC.num($(this).data('del'))); })
         .on('click', '[data-page]', function () { page = EC.num($(this).data('page')); render(); });
 
     $('#ivSearch').on('input', function () { page = 1; render(); });
     $('#fCategory,#fType,#fStock,#perPage').on('change', function () { page = 1; render(); });
+    // A location changes the figures themselves, so it reloads from the server.
+    $('#fLocation').on('change', load);
 
     $('#clearBtn').on('click', function () {
-        $('#ivSearch,#fCategory,#fType,#fStock').val('');
-        page = 1; render();
+        var hadLocation = !!$('#fLocation').val();
+        $('#ivSearch,#fCategory,#fType,#fStock,#fLocation').val('');
+        page = 1;
+        if (hadLocation) load(); else render();
     });
 
     $('.iv-sortable').on('click', function () {
@@ -787,6 +967,7 @@
         ecToast('info', 'Export is not built yet.');
     });
 
+    loadLocations();
     load();
 })();
 </script>

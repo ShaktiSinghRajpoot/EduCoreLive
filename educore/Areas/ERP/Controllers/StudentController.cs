@@ -320,8 +320,8 @@ namespace educore.Areas.ERP.Controllers
                 ? new TimetableGrid()
                 : await _timetableService.GetGridAsync(mySection.SectionId, TenantId(), SchoolId(), UserId());
 
-            // Published exams only, and absences are excluded from the totals — see
-            // core.sp_exam_result_student. examId null = their latest published exam.
+            // Exams whose RESULTS are published only, and absences are excluded from the
+            // totals — see core.sp_exam_result_student. examId null = their latest one.
             var exam = await _examService.GetStudentResultAsync(
                 studentId, TenantId(), SchoolId(), UserId(), examId);
 
@@ -431,14 +431,21 @@ namespace educore.Areas.ERP.Controllers
                         pass     = x.PassMarks,
                         absent   = x.IsAbsent,
                         passed   = x.Passed,       // null = cannot say, not "failed"
-                        percent  = x.Percent
+                        percent  = x.Percent,
+                        grade    = x.Grade         // from the school's grade scale
                     }),
                     subjectCount = exam.SubjectCount,
                     obtained     = exam.Obtained,
                     total        = exam.Total,
                     percent      = exam.Percent,
                     absentCount  = exam.AbsentCount,
-                    failedCount  = exam.FailedCount
+                    failedCount  = exam.FailedCount,
+                    // Null when absent from every paper (no percentage, so no grade or rank).
+                    grade        = exam.Grade,
+                    classRank    = exam.ClassRank,
+                    classSize    = exam.ClassSize,
+                    sectionRank  = exam.SectionRank,
+                    sectionSize  = exam.SectionSize
                 },
                 receipts = history.Select(h => new
                 {

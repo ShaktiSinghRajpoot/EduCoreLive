@@ -4617,3 +4617,183 @@ uses `Helpers/LoginThrottle.cs`: only unknown-account / wrong-password / inactiv
 attempts count, 10 per 5 minutes per IP, then that IP waits out the window. The forgot-
 password and OTP pages keep a request limiter of their own ("otp", 5 / 5 min per IP), no
 longer shared with login. In-memory, per app instance (like AppCache).
+
+### [2026-10-10] Exam results: grade scale, a results publish step, grades and class rank
+
+BD-02 and BD-03 were "future feature"; they are built now (catalog section I of
+`educore/docs/test-cases/academics_attendance_exams.md`, new suite
+`tests/exam_results_publish_tests.sql`: **81 / 0**). All other suites stay green.
+
+- **Two statuses per exam.** `academic.exams.status` stays the DATESHEET. New
+  `results_status` (Unpublished | Published) + `results_published_by/_at`, and an
+  append-only `academic.exam_result_log` (Publish / Unpublish, reason, who, when).
+  - Publish needs `exams.manage`, a published datesheet, and every expected mark sheet
+    finalised (`fn_exam_pending_sheets`: each paper x each section with students, the
+    same rule as Marks Entry's section list). The refusal names the first pending sheet.
+  - Once published, `SaveMarks`, `ReopenSheet`, `SaveExam` (edit) and `SetStatus Draft`
+    refuse. Unpublish needs a reason; it is logged. Mark edit history is untouched.
+  - `core.sp_exam_result_student` (the Student Dashboard) shows an exam only when its
+    results are published. Before this, draft marks were visible (EXM-51).
+- **Grade scale per school** (`academic.grade_scale`, `sp_school_admin_grade_scale_manage`).
+  No rows = the CBSE 8-point default (`fn_default_grade_scale`, not seeded per school).
+  Save is replace-all and checks: labels unique (any case), 0-100 covered, no overlap,
+  no gap wider than 1. A band runs from its min % to the next band's min %. Grades are
+  never stored: `fn_grade_for_percent` works them out on every read.
+- **Rank**: `fn_exam_class_result` (one exam, one class): totals, 2-dp %, grade, class rank
+  and section rank with `RANK()` (ties 1, 1, 3). Today's rules kept: absent papers out of
+  the total, marks of a paper no longer on the datesheet ignored, absent-from-everything
+  = no %/grade/rank.
+- **App**: new `IExamResultService` / `ExamResultService` (grade scale cached with
+  `AppCache.Key("gradescale", t, s)`, removed on save/reset; `PostgresException` logged at
+  Warning). Exam controller: Grade Scale page, Result Sheet page (exam/class/section,
+  publish/unpublish panel with pending sheets and log, sort by roll/rank, print, CSV with a
+  formula-injection guard). Marks Entry locks the grid when results are published.
+  Student Dashboard shows grade per subject, overall grade and class rank.
+- **Tests changed**: `academics_attendance_exams_tests.sql` (F section) and
+  `attendance_exam_tests.sql` (E section) flag the results published directly before
+  checking the arithmetic, since results now need that step.
+- **Purge** (`school_purge.sql`) also deletes `grade_scale` and `exam_result_log` (H12).
+- **Deploy order (all re-runnable):**
+  1. `exam_results_publish.sql` (new: tables, columns, functions, two procs)
+  2. `exam_marks.sql`
+  3. `exam_result_student.sql`
+  4. `exam_schedule.sql`
+  5. `school_purge.sql`
+
+  `deploy_2026_10_10b.sql` includes 2-4 but not 1; run step 1 before re-running it.
+
+### [2026-10-10] Inventory: store locations, transfers, returns to supplier, supplier screen
+
+Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). New suite
+`tests/inventory_locations_tests.sql` (111 / 0); `inventory_tests.sql` 49 / 0 and
+`inventory_store_tests.sql` 142 / 0 unchanged.
+
+- **Locations.** `core.inventory_locations` (one default per school, "Main Store",
+  renamable, never deactivated) and `core.inventory_location_stock` (item x location,
+  `CHECK quantity >= 0`). `current_stock` stays as the school-wide total, so the rule is now
+  `current_stock = SUM(location stock) = SUM(ledger)` and, per location, stock = SUM(ledger rows
+  at it). Every ledger row names its `location_id` (NOT NULL) and `location_balance_after`;
+  `balance_after` stays the item total so the old running-sum checks still hold. One helper,
+  `core.fn_inventory_post_movement`, writes location stock + item total + ledger row together;
+  every writer locks the item row first. A location that holds stock cannot be deactivated.
+- **Migration** (in `inventory.sql`, re-runnable): every school with inventory gets "Main
+  Store"; every ledger row and bill without a location goes into it; location stock is built
+  from the ledger. Only rows with no location are touched, so a re-run changes nothing (MIG-07).
+- **Transfers.** `core.inventory_transfers` + a paired `TransferOut` / `TransferIn` ledger row
+  (reference_type `Transfer`). Refused: more than the source holds, same location, inactive item
+  or location, other school's location, >2 decimals, blank reason.
+- **Return to supplier.** `core.inventory_purchase_returns`, one row per line returned (rate,
+  tax, amount rounded like a bill line, reason, who/when) and a `SupplierReturn` ledger row linked
+  to the bill and the bill line (`purchase_item_id`, also now set on `Purchase` rows). Limits: per
+  line bought - already returned; per item what the bill's location holds now. Named
+  `SupplierReturn` because `Return` already means "came back into the store".
+- **Cancelling a bill with returns reverses only the remainder** (bought - returned per line).
+  Chosen over refusing: it never takes the returned goods out twice, and the bill still nets to
+  zero per line. No returns after a cancel. A fully returned bill can be cancelled (no movement).
+- **Suppliers.** `SetSupplierActive`; inactive suppliers keep their bills but are refused on a new
+  bill (and left out of the purchase picker). List search (name/contact/mobile/GSTIN), status
+  filter, bill count / total / last bill (live bills). Email and 15-character GSTIN checked.
+- **Bug fixed: purchase calls failed in the app.** `sp_inventory_purchase_manage` opened only
+  `p_result` on List/Save/Cancel, and PgExec FETCHes every refcursor parameter, so the second
+  FETCH failed with "cursor does not exist". Every branch now opens both cursors (CUR-01). A
+  third INOUT cursor would break every existing PL/pgSQL CALL, so a bill's returns are their own
+  `Returns` operation.
+- **App.** `InventoryService` / `IInventoryService` / models / `InventoryController`: locations,
+  item stock by location, transfers, supplier active, return to supplier, purchase detail (lines
+  with returned qty, returns, cancel status, who/when). New pages `StoreLocations` and
+  `SupplierMaster` (menu entries added). `InventoryItem`: location filter, location on
+  movements and opening stock, transfer dialog, per-location stock and location column in the
+  history. `PurchaseEntry`: "goods go to" location, View on each bill (detail + return to
+  supplier + cancel). Friendly messages for `ux_inventory_location_name` / `chk_inv_loc_stock`.
+- **Purge.** `school_purge.sql` deletes the four new tables.
+- **Deploy order (re-runnable):** `inventory.sql`, then `school_purge.sql`.
+
+### [2026-10-10] Payroll permission, defaulters by session, remove logo, landline phone
+
+- **Payroll has its own keys.** `payroll.view` / `payroll.manage` (People group, one
+  "Payroll & Salary" row on the Roles page). `payroll_permissions.sql` grants BOTH only to roles
+  that hold `staff.manage` today, so nobody who ran payroll loses it and a `staff.view`-only role
+  no longer sees salaries. Re-runnable; a payroll grant a school has removed (soft-deleted row) is
+  not revived by a re-run. `PayrollController`: class `payroll.view`, every write
+  (RunPayroll, MarkPaid, AddAdjustment, VoidAdjustment) `payroll.manage`. Sidebar shows Payroll on
+  `payroll.view` (the Staff group now opens for either key; directory/leave stay on
+  `staff.view`). **Salary gated on `payroll.view`:** Staff Profile's Monthly Salary field and its
+  "Payroll / Payslips" link. Not gated: Add/Edit Staff salary inputs (they need `staff.manage`,
+  and hiding a posted field would blank the salary on save) and the dashboard Quick Access tile
+  (a link only; the page itself is gated).
+- **Defaulters report: Session filter** (default current session, "All sessions" option).
+  `sp_fee_defaulters_get` grew `p_academic_year` as its LAST parameter (after the cursor) so the
+  old positional calls still bind; old signature dropped. A ledger row's session is the first of:
+  `student_ledger.academic_year` (stamped by `fn_student_bill_plan` since today) -> the school
+  session whose dates contain the due date -> the student's own session -> the current session.
+  Rows billed before the column existed (all 481 local rows have it blank) are placed by the
+  fallbacks, and anything unplaceable counts in the current session (the report's default), so
+  no old due drops out. Registration rows follow `core.enquiries.session`, else current. Today's
+  rules unchanged (fallen-due only, exited students listed while they owe).
+- **Remove school logo.** `sp_school_admin_basic_profile_manage` new operation `RemoveLogo`
+  (clears `logo_url`, returns the old URL; the save's COALESCE keeps a logo when none is posted,
+  so it needed its own operation). `SchoolSettings/RemoveLogo` (POST, `settings.manage`,
+  antiforgery) deletes the file only when the URL is inside this school's upload folder, reduced
+  to a bare file name (same rule as the student photo replace). Button on Basic Profile behind
+  `EC.confirm`, shown only with `settings.manage` and a logo.
+- **Official / alternate phone may be a landline.** Rule (same in `core.fn_school_phone_clean`,
+  `PhoneRules` C#, `EC.rule.phone` site.js): after removing spaces/hyphens, a 10-digit mobile
+  `[6-9]` or a number starting with 0 of 10-12 digits (0141-2345678, 011 23456789). **Stored as
+  digits only** (0141-2345678 -> 01412345678). The proc normalises and refuses junk; the
+  controller drops the model's mobile-only regex verdict for these two fields (the SuperAdmin
+  wizard still uses that model and stays mobile-only).
+- **Tests:** `tests/small_features_tests.sql` (runs `payroll_permissions.sql` twice inside the
+  transaction).
+- **Deploy order (re-runnable):** `payroll_permissions.sql`, `fee_reports.sql`,
+  `sp_school_admin_basic_profile_manage.sql`. App restart needed (permission catalog is cached).
+
+### [2026-10-10] Bell schedule per weekday; timetable follows the day; calendar date ranges
+
+- **Per-weekday bell schedules.** `academic.period_structure` gained `day_of_week smallint NULL`
+  (CHECK 0..6, index `(tenant, school, day_of_week, seq)`). NULL = the **default** schedule, used
+  on every day that has no rows of its own; 0..6 = that weekday's **custom** schedule (e.g. a
+  short Saturday). **Migration:** none needed beyond the column: every existing row is NULL, so
+  each school's schedule simply becomes its default; re-running the script changes nothing.
+- **`academic.fn_day_periods(tenant, school, day)`** returns the schedule a weekday runs on (its
+  own rows, else the default). Everything that resolves a timetable slot now goes through it.
+- **`sp_school_admin_period_structure_manage`** grew `p_day_of_week` as its LAST parameter (after
+  the cursor) so every old positional call still binds; the 6-argument signature is dropped.
+  Operations: `GetPeriodStructure` (no day = default; a day = that day's effective schedule, rows
+  carry `day_of_week`), `GetAllSchedules` (page seed), `SavePeriodStructure` (replace-all of ONE
+  schedule; a weekly-off day is refused), `UseDefault` (drop a day's own rows). All of today's
+  rules stay, per schedule. The booked-period protection is now per day: the save snapshots the
+  old effective schedule of every affected day (one custom day, or every day without its own when
+  the default is saved), writes, then refuses (RAISE = whole save undone) if a lesson's period
+  label is no longer a teaching period of that day, and otherwise moves each lesson to its label's
+  new seq on that day. So Saturday lessons follow the Saturday schedule, and switching a day to
+  or from the default moves its lessons by label too.
+- **Timetable (`timetable.sql`).** GetSetup cursor 1 now lists each working day's periods
+  (`day_of_week` column); SaveCell checks the slot is a teaching period of THAT day ("not a
+  teaching period on Saturday"); Copy Day maps each lesson to the same label on the target day
+  and skips + names labels the target day lacks ("Sat P5, Sat P7"; `skipped` includes them, new
+  `no_period` column). All earlier checks (subject/teacher/day/room, teaching staff only, weekly
+  offs from the calendar) are unchanged. Page: rows = every label any day has; a day without the
+  period shows "—"; stats count each day's own teaching periods.
+- **Smart Bell** rings `GetPeriodStructure(today's weekday)`; half-day calendar entries still cut
+  it short. Attendance is daily and unaffected.
+- **Period Structure page:** day selector (Default + every weekday that is not a weekly off, with a
+  Custom badge), "Use default" (confirm, immediate) / "Custom schedule" (starts as a copy of the
+  default), "Copy from default", Save posts `day`. New action `UseDefaultPeriodSchedule`
+  (`academics.manage`, antiforgery); `SavePeriodStructure` takes `day`. Service:
+  `GetAllPeriodSchedulesAsync`, `UseDefaultScheduleAsync`, optional `dayOfWeek` on Get/Save;
+  write failures now logged at Warning with SqlState (they were not logged before).
+- **School Calendar date ranges (`school_calendar.sql`).** `SaveRange` (p_date..p_to_date, one
+  entry per day; a date that already has an entry is skipped and reported; holiday / half-day
+  ranges skip weekly offs, a working-day range does not; max one year; returns created /
+  skipped counts and a message) and `DeleteRange` (every entry in the range; "no calendar
+  entries" when empty). SaveEntry and SaveRange share one code path. A half day's closing time is
+  now checked against **that date's own** schedule (a short Saturday has its own hours).
+  `fn_school_day_type` is unchanged, so attendance, exam papers and leave/payroll day counts work
+  across a range (tested). Actions `SaveCalendarRange` / `DeleteCalendarRange`
+  (`academics.manage`, antiforgery); "Date range" dialog on the page.
+- **Note:** `hotfix_2026_10_10.sql` still holds an older copy of the calendar proc; do not re-run
+  it after `school_calendar.sql`.
+- **Tests:** `tests/weekday_schedules_tests.sql` (97 checks). Every suite in `Database/tests`
+  re-run green; no existing check needed changing.
+- **Deploy order (re-runnable, each ends with a semicolon):** `period_structure.sql`,
+  `timetable.sql`, `school_calendar.sql`. App restart needed (new binaries).

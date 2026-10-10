@@ -1,0 +1,364 @@
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Suppliers";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Inventory/InventoryItem.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell inventory-item-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap d-flex align-items-center gap-3">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-store fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Suppliers</h4>
+            <div class="ec-page-subtitle">Who the school buys from. An inactive supplier keeps its bills but cannot be picked for a new one.</div>
+          </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="PurchaseEntry">
+            <i class="bx bx-cart"></i><span>Purchase Entry</span>
+          </a>
+          <button class="btn btn-primary d-flex align-items-center gap-1" id="addSupplierBtn">
+            <i class="bx bx-plus"></i><span>Add Supplier</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ec-card mb-0">
+      <div class="ec-card-header">
+        <div class="ec-section-title-wrap mb-3">
+          <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
+          <div>
+            <div class="ec-section-title">Supplier List</div>
+            <div class="ec-section-subtitle" id="resultText">Loading…</div>
+          </div>
+        </div>
+        <div class="iv-fbar">
+          <div class="iv-srch-wrap">
+            <i class="bx bx-search iv-srch-ic"></i>
+            <input type="search" class="iv-srch-inp" id="spSearch" placeholder="Search name, contact, mobile, GSTIN…">
+          </div>
+          <div class="iv-fbar-div"></div>
+          <select class="iv-chip" id="spStatus">
+            <option value="">All</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+      <div class="ec-card-body pt-2">
+        <div class="iv-tbl-wrap">
+          <table class="table iv-tbl align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Supplier</th><th>Contact</th><th>GSTIN</th>
+                <th class="text-end">Bills</th><th class="text-end">Billed</th><th>Last bill</th>
+                <th>Status</th><th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody id="spBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal fade" id="supplierModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="spModalTitle">Add Supplier</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="spId">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Supplier Name</label>
+            <input type="text" class="form-control" id="spName" maxlength="150" placeholder="ABC Uniform House">
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">Contact Person</label>
+            <input type="text" class="form-control" id="spContact" maxlength="100">
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">Mobile</label>
+            <input type="text" class="form-control" id="spMobile" maxlength="20">
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" id="spEmail" maxlength="120">
+          </div>
+          <div class="col-12 col-sm-6">
+            <label class="form-label">GSTIN</label>
+            <input type="text" class="form-control text-uppercase" id="spGstin" maxlength="15" placeholder="15 letters and digits">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Address</label>
+            <textarea class="form-control" id="spAddress" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer flex-column flex-sm-row">
+        <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary w-100 w-sm-auto" id="saveSupplierBtn">
+          <i class="bx bx-save me-1"></i> Save Supplier
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="billsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold">Bills</h5>
+          <small class="text-muted" id="billsLabel">—</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr><th>Date</th><th>Invoice</th><th>Location</th><th class="text-end">Total</th>
+                  <th class="text-end">Returned</th><th>Status</th></tr>
+            </thead>
+            <tbody id="billsBody"></tbody>
+          </table>
+        </div>
+        <div class="small text-muted mt-2">Open a bill's lines, returns and cancel details from Purchase Entry → Purchase History.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+(function () {
+    'use strict';
+
+    var LIST_URL      = '@Url.Action("Suppliers", "Inventory", new { area = "ERP" })';
+    var SAVE_URL      = '@Url.Action("SaveSupplier", "Inventory", new { area = "ERP" })';
+    var ACTIVE_URL    = '@Url.Action("SetSupplierActive", "Inventory", new { area = "ERP" })';
+    var DELETE_URL    = '@Url.Action("DeleteSupplier", "Inventory", new { area = "ERP" })';
+    var PURCHASES_URL = '@Url.Action("Purchases", "Inventory", new { area = "ERP" })';
+
+    var rows = [];
+    var timer = null;
+    var pending = null;
+
+    function token() {
+        return $('input[name="__RequestVerificationToken"]').first().val();
+    }
+
+    function postJson(url, body) {
+        return $.ajax({
+            url: url, type: 'POST', contentType: 'application/json',
+            headers: { 'RequestVerificationToken': token(), 'X-Requested-With': 'XMLHttpRequest' },
+            data: JSON.stringify(body)
+        });
+    }
+
+    // Search and status filter run on the server; a newer request aborts the
+    // one still in flight so an old answer never overwrites a newer one.
+    function load() {
+        if (pending) pending.abort();
+        EC.listLoading('#spBody', 'Loading suppliers…');
+        pending = $.get(LIST_URL, { search: $.trim($('#spSearch').val()), status: $('#spStatus').val() })
+            .done(function (d) {
+                rows = d || [];
+                $('#resultText').text(rows.length ? rows.length + (rows.length === 1 ? ' supplier' : ' suppliers') : 'No suppliers');
+                if (!rows.length) {
+                    EC.listEmpty('#spBody', 'No suppliers found.', 'bx-store');
+                    return;
+                }
+                $('#spBody').html(rows.map(function (s) {
+                    return '<tr' + (s.active ? '' : ' class="text-muted"') + '>' +
+                        '<td class="fw-semibold">' + EC.esc(s.name) +
+                            (s.email ? '<div class="small text-muted">' + EC.esc(s.email) + '</div>' : '') + '</td>' +
+                        '<td>' + EC.esc(s.contact || '—') +
+                            (s.mobile ? '<div class="small text-muted">' + EC.esc(s.mobile) + '</div>' : '') + '</td>' +
+                        '<td>' + EC.esc(s.gstin || '—') + '</td>' +
+                        '<td class="text-end">' + EC.num(s.bills) + '</td>' +
+                        '<td class="text-end">' + EC.money(s.billed) + '</td>' +
+                        '<td>' + EC.esc(s.lastBill || '—') + '</td>' +
+                        '<td>' + (s.active ? '<span class="badge bg-label-success">Active</span>'
+                                           : '<span class="badge bg-label-secondary">Inactive</span>') + '</td>' +
+                        '<td class="text-end text-nowrap">' +
+                            '<button class="btn btn-sm btn-icon btn-text-secondary" data-bills="' + s.id + '" title="Bills"><i class="bx bx-receipt"></i></button>' +
+                            '<button class="btn btn-sm btn-icon btn-text-secondary" data-edit="' + s.id + '" title="Edit"><i class="bx bx-edit"></i></button>' +
+                            (s.active
+                                ? '<button class="btn btn-sm btn-icon btn-text-warning" data-off="' + s.id + '" title="Deactivate"><i class="bx bx-pause-circle"></i></button>'
+                                : '<button class="btn btn-sm btn-icon btn-text-success" data-on="' + s.id + '" title="Activate"><i class="bx bx-play-circle"></i></button>') +
+                            '<button class="btn btn-sm btn-icon btn-text-danger" data-del="' + s.id + '" title="Remove"><i class="bx bx-trash"></i></button>' +
+                        '</td></tr>';
+                }).join(''));
+            })
+            .fail(function (x) {
+                if (x.statusText === 'abort') return;
+                EC.listEmpty('#spBody', 'Could not load suppliers. Please retry.', 'bx-error-circle');
+                $('#resultText').text('Could not load.');
+            });
+    }
+
+    function find(id) {
+        return rows.find(function (x) { return x.id === id; });
+    }
+
+    // ── Add / edit ──────────────────────────────────────────────────────────
+    function openForm(s) {
+        $('#spId').val(s ? s.id : '');
+        $('#spName').val(s ? s.name : '');
+        $('#spContact').val(s ? s.contact : '');
+        $('#spMobile').val(s ? s.mobile : '');
+        $('#spEmail').val(s ? s.email : '');
+        $('#spGstin').val(s ? s.gstin : '');
+        $('#spAddress').val(s ? s.address : '');
+        $('#spModalTitle').text(s ? 'Edit Supplier' : 'Add Supplier');
+        new bootstrap.Modal(document.getElementById('supplierModal')).show();
+    }
+
+    $('#addSupplierBtn').on('click', function () { openForm(null); });
+
+    $('#saveSupplierBtn').on('click', function () {
+        var $btn = $(this);
+        var name  = $.trim($('#spName').val());
+        var email = $.trim($('#spEmail').val());
+        var gstin = $.trim($('#spGstin').val()).toUpperCase();
+        if (!name) { ecToast('warning', 'Enter the supplier name.'); $('#spName').focus(); return; }
+        // Each at-sign is doubled: that is Razor's escape for one in the page.
+        if (email && !/^[^@@\s]+@@[^@@\s]+\.[^@@\s]+$/.test(email)) {
+            ecToast('warning', 'Enter a valid email address.'); $('#spEmail').focus(); return;
+        }
+        if (gstin && !/^[0-9A-Z]{15}$/.test(gstin)) {
+            ecToast('warning', 'A GSTIN is 15 letters and digits.'); $('#spGstin').focus(); return;
+        }
+
+        EC.buttonBusy($btn, 'Saving…');
+        postJson(SAVE_URL, {
+            supplierId:    EC.num($('#spId').val()) || 0,
+            supplierName:  name,
+            contactPerson: $.trim($('#spContact').val()),
+            mobile:        $.trim($('#spMobile').val()),
+            email:         email,
+            gstin:         gstin,
+            address:       $.trim($('#spAddress').val())
+        })
+        .done(function (res) {
+            if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not save.'); return; }
+            ecToast('success', res.message);
+            bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();
+            load();
+        })
+        .fail(function () { ecToast('error', 'Could not save the supplier.'); })
+        .always(function () { EC.buttonReset($btn); });
+    });
+
+    // ── Activate / deactivate / remove ──────────────────────────────────────
+    function setActive(id, active) {
+        var s = find(id);
+        EC.confirm({
+            title:   active ? 'Activate this supplier?' : 'Deactivate this supplier?',
+            name:    s ? s.name : '',
+            message: active ? 'It can be picked for new bills again.'
+                            : 'Its bills stay as they are; it just cannot be picked for a new bill.',
+            okText:  active ? 'Activate' : 'Deactivate',
+            danger:  false
+        }).then(function (ok) {
+            if (!ok) return;
+            EC.showLoader();
+            postJson(ACTIVE_URL, { id: id, active: active })
+                .done(function (res) {
+                    if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not change it.'); return; }
+                    ecToast('success', res.message);
+                    load();
+                })
+                .fail(function () { ecToast('error', 'Could not change the supplier.'); })
+                .always(EC.hideLoader);
+        });
+    }
+
+    function remove(id) {
+        var s = find(id);
+        EC.confirm({
+            title:   'Remove this supplier?',
+            name:    s ? s.name : '',
+            message: 'It disappears from this list and from the purchase form. Bills already entered keep its name.',
+            okText:  'Remove supplier'
+        }).then(function (ok) {
+            if (!ok) return;
+            EC.showLoader();
+            postJson(DELETE_URL, { id: id })
+                .done(function (res) {
+                    if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not remove.'); return; }
+                    ecToast('success', res.message);
+                    load();
+                })
+                .fail(function () { ecToast('error', 'Could not remove the supplier.'); })
+                .always(EC.hideLoader);
+        });
+    }
+
+    // ── Bills of one supplier ───────────────────────────────────────────────
+    function openBills(id) {
+        var s = find(id);
+        $('#billsLabel').text(s ? s.name : '');
+        EC.listLoading('#billsBody', 'Loading bills…');
+        new bootstrap.Modal(document.getElementById('billsModal')).show();
+        $.get(PURCHASES_URL, { supplierId: id })
+            .done(function (d) {
+                if (!d || !d.length) {
+                    EC.listEmpty('#billsBody', 'No bills from this supplier.', 'bx-receipt');
+                    return;
+                }
+                $('#billsBody').html(d.map(function (p) {
+                    return '<tr' + (p.cancelled ? ' class="text-muted"' : '') + '>' +
+                        '<td>' + EC.esc(p.date) + '</td>' +
+                        '<td>' + EC.esc(p.invoice || '—') + '</td>' +
+                        '<td>' + EC.esc(p.place || '—') + '</td>' +
+                        '<td class="text-end">' + EC.money(p.total) + '</td>' +
+                        '<td class="text-end">' + (EC.num(p.returnedAmount) > 0 ? EC.money(p.returnedAmount) : '—') + '</td>' +
+                        '<td>' + (p.cancelled ? '<span class="badge bg-label-danger">Cancelled</span>'
+                                              : '<span class="badge bg-label-success">Saved</span>') + '</td>' +
+                    '</tr>';
+                }).join(''));
+            })
+            .fail(function () {
+                EC.listEmpty('#billsBody', 'Could not load bills.', 'bx-error-circle');
+            });
+    }
+
+    // ── Wiring ──────────────────────────────────────────────────────────────
+    $(document)
+        .on('click', '[data-edit]',  function () { openForm(find(EC.num($(this).data('edit')))); })
+        .on('click', '[data-off]',   function () { setActive(EC.num($(this).data('off')), false); })
+        .on('click', '[data-on]',    function () { setActive(EC.num($(this).data('on')), true); })
+        .on('click', '[data-del]',   function () { remove(EC.num($(this).data('del'))); })
+        .on('click', '[data-bills]', function () { openBills(EC.num($(this).data('bills'))); });
+
+    $('#spSearch').on('input', function () {
+        clearTimeout(timer);
+        timer = setTimeout(load, 300);
+    });
+    $('#spStatus').on('change', load);
+
+    load();
+})();
+</script>
+}

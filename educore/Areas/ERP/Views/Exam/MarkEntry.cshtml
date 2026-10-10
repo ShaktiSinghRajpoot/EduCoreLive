@@ -105,6 +105,10 @@
                 <span class="me-lock-chip" id="lockChip" style="display:none;">
                     <i class="bx bx-lock-alt"></i> Finalized
                 </span>
+                <span class="me-lock-chip" id="pubChip" style="display:none;"
+                      title="Unpublish the results on the Result Sheet page to change marks">
+                    <i class="bx bx-check-shield"></i> Results published
+                </span>
                 @if (isAdmin)
                 {
                     <button type="button" class="me-bulk-btn" id="btnReopen" style="display:none;">
@@ -218,7 +222,8 @@ var state = {
     maxMarks: 100, passMarks: 35,
     examDate: '', startTime: '', endTime: '',
     rows: [],          // { studentId, roll, name, marks, absent, hadMark }
-    finalized: false
+    finalized: false,
+    resultsPublished: false   // published results lock every sheet of the exam
 };
 
 var selExam    = document.getElementById('selExam');
@@ -242,6 +247,8 @@ function fmtMarks(v) {
 function closeSheet() {
     state.rows = [];
     state.finalized = false;
+    state.resultsPublished = false;
+    $('#pubChip').hide();
     document.getElementById('markTableBody').innerHTML = '';
     document.getElementById('mobList').innerHTML       = '';
     document.getElementById('meEmpty').style.display   = 'flex';
@@ -371,6 +378,7 @@ $(loadBtn).on('click', function () {
             state.startTime   = d.startTime || '';
             state.endTime     = d.endTime || '';
             state.finalized   = !!d.isFinalized;
+            state.resultsPublished = !!d.resultsPublished;
 
             state.rows = $.map(d.students || [], function (s) {
                 return {
@@ -417,7 +425,9 @@ function renderContext() {
     $('#thMax').text('/ ' + fmtMarks(state.maxMarks));
 
     $('#lockChip').toggle(state.finalized);
-    $('#btnReopen').toggle(state.finalized);
+    $('#pubChip').toggle(state.resultsPublished);
+    // Reopening is refused server-side while the results are published.
+    $('#btnReopen').toggle(state.finalized && !state.resultsPublished);
 
     $('#modalDesc').text(state.examName + (state.session ? ' (' + state.session + ')' : '') +
                         ' · ' + where + ' · ' + state.subjectName);
@@ -429,9 +439,9 @@ function entered() {
     return state.rows.filter(function (r) { return r.absent || r.marks !== null; }).length;
 }
 
-// Marks and the absent toggle are locked once finalized, and for anyone
-// without exams.manage.
-function locked() { return state.finalized || !CAN_MANAGE; }
+// Marks and the absent toggle are locked once finalized, once the exam's
+// results are published, and for anyone without exams.manage.
+function locked() { return state.finalized || state.resultsPublished || !CAN_MANAGE; }
 
 // Pass/fail shows as a row tint, so it needs no column of its own.
 function rowClass(row) {

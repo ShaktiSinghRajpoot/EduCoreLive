@@ -23,6 +23,9 @@
                     </div>
                 </div>
                 <div class="header-actions d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="SupplierMaster">
+                        <i class="bx bx-store"></i><span>Suppliers</span>
+                    </a>
                     <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-1" id="historyBtn">
                         <i class="bx bx-history"></i><span>Purchase History</span>
                     </button>
@@ -101,7 +104,16 @@
                             <option>Cash</option><option>Bank Transfer</option><option>UPI</option><option>Cheque</option>
                         </select>
                     </div>
-                    <div class="col-12">
+                    <div class="col-12 col-md-6 col-lg-3">
+                        <label class="form-label">Goods go to</label>
+                        <select class="form-select" id="locationId">
+@foreach (var l in (List<EduCoreDataAccessLayer.Models.ERP.InventoryLocation>)(ViewBag.Locations ?? new List<EduCoreDataAccessLayer.Models.ERP.InventoryLocation>()))
+{
+                            <option value="@l.LocationId">@l.LocationName@(l.IsDefault ? " (default)" : "")</option>
+}
+                        </select>
+                    </div>
+                    <div class="col-12 col-lg-9">
                         <label class="form-label">Remarks</label>
                         <textarea class="form-control" id="purchaseRemarks" rows="2" placeholder="Purchase remarks"></textarea>
                     </div>
@@ -160,7 +172,8 @@
                                 <li>Stock is automatically updated after save.</li>
                                 <li>A bill number can be entered only once per supplier (and once among bills with no supplier).</li>
                                 <li>Quantities and prices take at most 2 decimal places; a bill cannot be dated in the future.</li>
-                                <li>Purchase can later be linked with accounts module.</li>
+                                <li>Part of a bill can be returned to the supplier from Purchase History; it leaves the location the bill went into.</li>
+                                <li>Cancelling a bill that has returns takes out only what was not returned.</li>
                             </ul>
                         </div>
                     </div>
@@ -193,7 +206,7 @@
       <div class="modal-header">
         <div>
           <h5 class="modal-title fw-bold">Purchase History</h5>
-          <small class="text-muted">A saved purchase is never edited — it can only be cancelled, which reverses its stock.</small>
+          <small class="text-muted">A saved purchase is never edited — part of it can be returned to the supplier, or the whole bill cancelled.</small>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
@@ -202,7 +215,7 @@
           <table class="table align-middle mb-0">
             <thead>
               <tr>
-                <th>Date</th><th>Supplier</th><th>Invoice</th><th>Mode</th>
+                <th>Date</th><th>Supplier</th><th>Invoice</th><th>Location</th>
                 <th class="text-end">Items</th><th class="text-end">Total</th>
                 <th>Status</th><th class="text-end">Action</th>
               </tr>
@@ -210,6 +223,60 @@
             <tbody id="historyBody"></tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold" id="dtTitle">Purchase</h5>
+          <small class="text-muted" id="dtSub">—</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 small mb-3" id="dtFacts"></div>
+        <div class="table-responsive mb-3">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Item</th><th class="text-end">Qty</th><th class="text-end">Rate</th>
+                <th class="text-end">Tax %</th><th class="text-end">Total</th>
+                <th class="text-end">Returned</th><th class="text-end dt-ret" width="140">Return now</th>
+              </tr>
+            </thead>
+            <tbody id="dtLines"></tbody>
+          </table>
+        </div>
+        <div class="dt-ret mb-3">
+          <label class="form-label">Reason for the return</label>
+          <textarea class="form-control" id="dtReason" rows="2" placeholder="Damaged / wrong size / excess (required)"></textarea>
+        </div>
+        <div id="dtReturnsWrap" class="d-none">
+          <div class="fw-semibold mb-2">Returns to supplier</div>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr><th>Date</th><th>Item</th><th class="text-end">Qty</th><th class="text-end">Amount</th>
+                    <th>Location</th><th>Reason</th><th>By</th></tr>
+              </thead>
+              <tbody id="dtReturns"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer flex-column flex-sm-row">
+        <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-danger w-100 w-sm-auto dt-live" id="dtCancelBtn">
+          <i class="bx bx-x-circle me-1"></i> Cancel purchase
+        </button>
+        <button type="button" class="btn btn-primary w-100 w-sm-auto dt-ret" id="dtReturnBtn">
+          <i class="bx bx-undo me-1"></i> Return to supplier
+        </button>
       </div>
     </div>
   </div>
@@ -272,6 +339,8 @@
     var CANCEL_URL    = '@Url.Action("CancelPurchase", "Inventory", new { area = "ERP" })';
     var SUPPLIER_URL  = '@Url.Action("SaveSupplier", "Inventory", new { area = "ERP" })';
     var SUPPLIERS_URL = '@Url.Action("Suppliers", "Inventory", new { area = "ERP" })';
+    var DETAIL_URL    = '@Url.Action("Purchase", "Inventory", new { area = "ERP" })';
+    var RETURN_URL    = '@Url.Action("ReturnToSupplier", "Inventory", new { area = "ERP" })';
 
     // The item catalog is rendered by the server from the same list the item
     // master shows — the page used to carry its own hardcoded copy.
@@ -433,6 +502,7 @@
             invoiceNo:    $.trim($('#invoiceNumber').val()),
             paymentMode:  $('#paymentMode').val(),
             remarks:      $.trim($('#purchaseRemarks').val()),
+            locationId:   EC.num($('#locationId').val()) || null,
             items: lines.map(function (r) {
                 return {
                     itemId:     r.itemId,
@@ -456,6 +526,7 @@
         rows = [];
         $('#invoiceNumber,#purchaseRemarks').val('');
         $('#supplierId').val('');
+        $('#locationId').prop('selectedIndex', 0);
         $('#purchaseDate').val(TODAY);
         renderGrid();
     }
@@ -507,13 +578,14 @@
                         '<td>' + EC.esc(p.date) + '</td>' +
                         '<td>' + EC.esc(p.supplier || '—') + '</td>' +
                         '<td>' + EC.esc(p.invoice || '—') + '</td>' +
-                        '<td>' + EC.esc(p.mode || '—') + '</td>' +
+                        '<td>' + EC.esc(p.place || '—') + '</td>' +
                         '<td class="text-end">' + p.lines + '</td>' +
-                        '<td class="text-end fw-semibold">' + EC.money(p.total) + '</td>' +
-                        '<td>' + (p.cancelled
-                            ? '<span class="badge bg-label-danger">Cancelled</span>'
-                            : '<span class="badge bg-label-success">Saved</span>') + '</td>' +
-                        '<td class="text-end">' + (p.cancelled ? '' :
+                        '<td class="text-end fw-semibold">' + EC.money(p.total) +
+                            (EC.num(p.returnedAmount) > 0 ? '<div class="small text-muted">returned ' + EC.money(p.returnedAmount) + '</div>' : '') + '</td>' +
+                        '<td>' + statusBadge(p) + '</td>' +
+                        '<td class="text-end text-nowrap">' +
+                            '<button class="btn btn-sm btn-text-secondary" data-view="' + p.id + '">View</button>' +
+                            (p.cancelled ? '' :
                             '<button class="btn btn-sm btn-text-danger" data-cancel="' + p.id + '">Cancel</button>') +
                         '</td></tr>';
                 }).join(''));
@@ -523,14 +595,28 @@
             });
     });
 
+    function statusBadge(p) {
+        if (p.cancelled) return '<span class="badge bg-label-danger">Cancelled</span>';
+        if (EC.num(p.returnedQty) > 0) return '<span class="badge bg-label-warning">Part returned</span>';
+        return '<span class="badge bg-label-success">Saved</span>';
+    }
+
     $(document).on('click', '[data-cancel]', function () {
         var id = EC.num($(this).data('cancel'));
-        var p  = lastList.find(function (x) { return x.id === id; });
+        cancelPurchase(id, lastList.find(function (x) { return x.id === id; }));
+    });
+
+    // p: the bill as the history list or the detail modal has it (invoice,
+    // supplier, total, returnedAmount), only used for the dialog's wording.
+    function cancelPurchase(id, p) {
+        var returned = p && EC.num(p.returnedAmount) > 0;
         EC.prompt({
             title:    'Cancel this purchase?',
             name:     p ? ((p.invoice ? 'Bill ' + p.invoice : 'Bill without number') +
                            ' — ' + (p.supplier || 'no supplier') + ' — ' + EC.money(p.total)) : '',
-            message:  'The stock it brought in will be taken back out. The bill stays on record, marked cancelled.',
+            message:  returned
+                ? 'Part of this bill was already returned to the supplier. Only the rest will be taken out of stock. The bill stays on record, marked cancelled.'
+                : 'The stock it brought in will be taken back out. The bill stays on record, marked cancelled.',
             label:    'Why is it being cancelled?',
             required: true,
             okText:   'Cancel purchase',
@@ -545,11 +631,133 @@
                     if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not cancel.'); return; }
                     ecToast('success', res.message);
                     loadSummary();
+                    var dm = bootstrap.Modal.getInstance(document.getElementById('detailModal'));
+                    if (dm) dm.hide();
                     $('#historyBtn').trigger('click');
                 })
                 .fail(function () { ecToast('error', 'Could not cancel the purchase.'); })
                 .always(EC.hideLoader);
         });
+    }
+
+    // ── Purchase detail and return to supplier ──────────────────────────────
+    var detail = null;   // the bill shown in the detail modal
+
+    $(document).on('click', '[data-view]', function () {
+        openDetail(EC.num($(this).data('view')));
+    });
+
+    function openDetail(id) {
+        EC.showLoader();
+        $.get(DETAIL_URL, { id: id })
+            .done(function (d) {
+                if (!d || !d.success) { ecToast('error', (d && d.message) || 'Could not load the purchase.'); return; }
+                detail = d;
+                renderDetail();
+                var el = document.getElementById('detailModal');
+                (bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el)).show();
+            })
+            .fail(function () { ecToast('error', 'Could not load the purchase.'); })
+            .always(EC.hideLoader);
+    }
+
+    function fact(label, value) {
+        return '<div class="col-6 col-md-3"><div class="text-muted">' + EC.esc(label) + '</div>' +
+               '<div class="fw-semibold">' + EC.esc(value || '—') + '</div></div>';
+    }
+
+    function renderDetail() {
+        var d = detail;
+        $('#dtTitle').text(d.invoice ? 'Bill ' + d.invoice : 'Bill without number');
+        $('#dtSub').text((d.supplier || 'No supplier') + ' · ' + d.date);
+
+        var facts = fact('Goods went to', d.place) + fact('Payment mode', d.mode) +
+                    fact('Entered by', d.createdBy) + fact('Entered at', d.createdAt) +
+                    fact('Sub total', EC.money(d.subTotal)) + fact('Tax', EC.money(d.tax)) +
+                    fact('Grand total', EC.money(d.total)) + fact('Returned', EC.money(d.returnedAmount));
+        if (d.cancelled) {
+            facts += fact('Cancelled by', d.cancelledBy) + fact('Cancelled at', d.cancelledAt) +
+                     '<div class="col-12 col-md-6"><div class="text-muted">Cancel reason</div>' +
+                     '<div class="fw-semibold text-danger">' + EC.esc(d.reason || '—') + '</div></div>';
+        }
+        if (d.remarks) {
+            facts += '<div class="col-12"><div class="text-muted">Remarks</div><div>' + EC.esc(d.remarks) + '</div></div>';
+        }
+        $('#dtFacts').html(facts);
+
+        // Returning is only possible on a live bill.
+        $('.dt-ret').toggleClass('d-none', d.cancelled);
+        $('.dt-live').toggleClass('d-none', d.cancelled);
+        $('#dtReason').val('');
+
+        $('#dtLines').html(d.lines.map(function (l) {
+            var left = EC.num(l.qty) - EC.num(l.returnedQty);
+            return '<tr>' +
+                '<td>' + EC.esc(l.name) + '<div class="small text-muted">' + EC.esc(l.unit) + '</div></td>' +
+                '<td class="text-end">' + EC.num(l.qty) + '</td>' +
+                '<td class="text-end">' + EC.money(l.price) + '</td>' +
+                '<td class="text-end">' + EC.num(l.tax) + '</td>' +
+                '<td class="text-end">' + EC.money(l.total) + '</td>' +
+                '<td class="text-end">' + (EC.num(l.returnedQty) > 0
+                    ? EC.num(l.returnedQty) + '<div class="small text-muted">' + EC.money(l.returnedAmount) + '</div>'
+                    : '—') + '</td>' +
+                '<td class="text-end dt-ret' + (d.cancelled ? ' d-none' : '') + '">' + (left > 0
+                    ? '<input type="number" class="form-control form-control-sm text-end" min="0" step="0.01" ' +
+                      'max="' + left + '" placeholder="0" data-retline="' + l.lineId + '" data-left="' + left + '">'
+                    : '<span class="small text-muted">all returned</span>') + '</td>' +
+            '</tr>';
+        }).join(''));
+
+        $('#dtReturnsWrap').toggleClass('d-none', !d.returns.length);
+        $('#dtReturns').html(d.returns.map(function (r) {
+            return '<tr>' +
+                '<td>' + EC.esc(r.date) + '</td>' +
+                '<td>' + EC.esc(r.name) + '</td>' +
+                '<td class="text-end">' + EC.num(r.qty) + '</td>' +
+                '<td class="text-end">' + EC.money(r.amount) + '</td>' +
+                '<td>' + EC.esc(r.place) + '</td>' +
+                '<td class="small">' + EC.esc(r.reason) + '</td>' +
+                '<td class="small">' + EC.esc(r.by) + '<div class="text-muted">' + EC.esc(r.at) + '</div></td>' +
+            '</tr>';
+        }).join(''));
+    }
+
+    $('#dtReturnBtn').on('click', function () {
+        var $btn = $(this);
+        var lines = [], bad = '';
+        $('#dtLines [data-retline]').each(function () {
+            var raw = $.trim($(this).val());
+            if (raw === '') return;
+            var q = EC.numPos(raw);
+            // .attr, not .data: jQuery would turn "1e5" or "0.10" into a number.
+            var left = EC.num($(this).attr('data-left'));
+            if (!twoDp(raw)) bad = 'Use at most 2 decimal places.';
+            else if (q > left) bad = 'Only ' + left + ' can still be returned on one of the lines.';
+            if (q > 0) lines.push({ purchaseItemId: EC.num($(this).attr('data-retline')), quantity: q });
+        });
+        if (bad) { ecToast('warning', bad); return; }
+        if (!lines.length) { ecToast('warning', 'Enter a quantity to return on at least one line.'); return; }
+        var reason = $.trim($('#dtReason').val());
+        if (!reason) { ecToast('warning', 'Give a reason for the return.'); $('#dtReason').focus(); return; }
+
+        EC.buttonBusy($btn, 'Returning…');
+        postJson(RETURN_URL, { purchaseId: detail.id, reason: reason, lines: lines })
+            .done(function (res) {
+                // Refused by name and amount when the location no longer holds
+                // the goods, or the line has less left to return.
+                if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not return.'); return; }
+                ecToast('success', res.message);
+                loadSummary();
+                openDetail(detail.id);
+                if ($('#historyModal').hasClass('show')) $('#historyBtn').trigger('click');
+            })
+            .fail(function () { ecToast('error', 'Could not record the return.'); })
+            .always(function () { EC.buttonReset($btn); });
+    });
+
+    $('#dtCancelBtn').on('click', function () {
+        if (!detail) return;
+        cancelPurchase(detail.id, detail);
     });
 
     // ── Supplier ────────────────────────────────────────────────────────────
@@ -578,10 +786,11 @@
             ecToast('success', res.message);
             bootstrap.Modal.getInstance(document.getElementById('supplierModal')).hide();
 
-            // Refresh the picker and select what was just added.
+            // Refresh the picker and select what was just added. Inactive
+            // suppliers cannot take a new bill, so they are not offered.
             $.get(SUPPLIERS_URL).done(function (list) {
                 var html = '<option value="">Select Supplier</option>';
-                (list || []).forEach(function (s) {
+                (list || []).filter(function (s) { return s.active; }).forEach(function (s) {
                     html += '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
                 });
                 $('#supplierId').html(html).val(res.id);

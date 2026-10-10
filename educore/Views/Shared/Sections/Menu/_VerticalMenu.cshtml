@@ -61,7 +61,9 @@
     bool gFees        = Can("fees.view");
     bool secFinance   = gFees;
 
-    bool gStaff       = Can("staff.view");
+    bool gStaffDir    = Can("staff.view");
+    bool gPayroll     = showPayroll && Can("payroll.view");   // salary has its own key
+    bool gStaff       = gStaffDir || gPayroll;
     bool gTransport   = showTransport && Can("transport.view");
     bool gInventory   = showInventory && Can("inventory.view");
     bool secPeople    = gStaff || gTransport || gInventory;
@@ -192,7 +194,7 @@
         @* ---- Examinations ---- *@
         @if (gExams)
         {
-        <li class='menu-item @Open("CreateExam","Datesheet","MarkEntry")'>
+        <li class='menu-item @Open("CreateExam","Datesheet","MarkEntry","ResultSheet","GradeScale")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-file ic-exam"></i>
                 <div class="text-truncate">Examinations</div>
@@ -201,6 +203,8 @@
                 <li class='menu-item @On("CreateExam")'><a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-red"></i><div class="text-truncate">Exam Schedule</div></a></li>
                 <li class='menu-item @On("Datesheet")'><a asp-area="ERP" asp-controller="Exam" asp-action="Datesheet" class="menu-link"><i class="bx bx-calendar submenu-icon c-teal"></i><div class="text-truncate">Datesheet</div></a></li>
                 <li class='menu-item @On("MarkEntry")'><a asp-area="ERP" asp-controller="Exam" asp-action="MarkEntry" class="menu-link"><i class="bx bx-edit submenu-icon c-purple"></i><div class="text-truncate">Marks Entry</div></a></li>
+                <li class='menu-item @On("ResultSheet")'><a asp-area="ERP" asp-controller="Exam" asp-action="ResultSheet" class="menu-link"><i class="bx bx-table submenu-icon c-green"></i><div class="text-truncate">Result Sheet</div></a></li>
+                <li class='menu-item @On("GradeScale")'><a asp-area="ERP" asp-controller="Exam" asp-action="GradeScale" class="menu-link"><i class="bx bx-award submenu-icon c-orange"></i><div class="text-truncate">Grade Scale</div></a></li>
             </ul>
         </li>
         }
@@ -253,11 +257,17 @@
                 <div class="text-truncate">Staff</div>
             </a>
             <ul class="menu-sub">
+                @if (gStaffDir)
+                {
                 <li class='menu-item @On("StaffList")'><a asp-area="ERP" asp-controller="Staff" asp-action="StaffList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Staff Directory</div></a></li>
                 <li class='menu-item @On("Staff/Inactive")'><a asp-area="ERP" asp-controller="Staff" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive Staff</div></a></li>
-                @if (showPayroll)
+                }
+                @if (showPayroll && gStaffDir)
                 {
                 <li class='menu-item @On("LeaveManagement")'><a asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement" class="menu-link"><i class="bx bx-calendar-minus submenu-icon c-pink"></i><div class="text-truncate">Leave Management</div></a></li>
+                }
+                @if (gPayroll)
+                {
                 <li class='menu-item @On("PayrollManagement")'><a asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Payroll &amp; Salary</div></a></li>
                 }
             </ul>
@@ -282,7 +292,7 @@
 
         @if (gInventory)
         {
-        <li class='menu-item @Open("InventoryItem","PurchaseEntry")'>
+        <li class='menu-item @Open("InventoryItem","PurchaseEntry","StoreLocations","SupplierMaster")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-package ic-inv"></i>
                 <div class="text-truncate">Inventory</div>
@@ -290,6 +300,8 @@
             <ul class="menu-sub">
                 <li class='menu-item @On("InventoryItem")'><a asp-area="ERP" asp-controller="Inventory" asp-action="InventoryItem" class="menu-link"><i class="bx bx-box submenu-icon c-orange"></i><div class="text-truncate">Items &amp; Stock</div></a></li>
                 <li class='menu-item @On("PurchaseEntry")'><a asp-area="ERP" asp-controller="Inventory" asp-action="PurchaseEntry" class="menu-link"><i class="bx bx-cart submenu-icon c-green"></i><div class="text-truncate">Purchase Entry</div></a></li>
+                <li class='menu-item @On("StoreLocations")'><a asp-area="ERP" asp-controller="Inventory" asp-action="StoreLocations" class="menu-link"><i class="bx bx-map-pin submenu-icon c-blue"></i><div class="text-truncate">Store Locations</div></a></li>
+                <li class='menu-item @On("SupplierMaster")'><a asp-area="ERP" asp-controller="Inventory" asp-action="SupplierMaster" class="menu-link"><i class="bx bx-store submenu-icon c-purple"></i><div class="text-truncate">Suppliers</div></a></li>
             </ul>
         </li>
         }

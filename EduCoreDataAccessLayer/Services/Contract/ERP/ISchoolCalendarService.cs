@@ -20,6 +20,14 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<SchoolCalendarSaveResult> SaveEntryAsync(
             SchoolCalendarEntry entry, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>One entry per day from..to (yyyy-MM-dd); days that already have an entry are skipped and reported.</summary>
+        Task<SchoolCalendarSaveResult> SaveRangeAsync(
+            string fromDate, string toDate, SchoolCalendarEntry entry, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Remove every dated entry between the two dates (inclusive).</summary>
+        Task<SchoolCalendarSaveResult> DeleteRangeAsync(
+            string fromDate, string toDate, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>Drop the override on a date, putting it back on the weekly pattern.</summary>
         Task<SchoolCalendarSaveResult> DeleteEntryAsync(
             int calendarId, int tenantId, int schoolId, int actionUserId);

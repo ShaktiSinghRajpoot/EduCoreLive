@@ -65,10 +65,9 @@
 
                 <div class="sd-pane" id="tab-academic">
                     @* This tab used to chart Term 1 / Term 2 / Annual marks against a
-                       "class average", with letter grades. None of that exists: the exam
-                       module records marks per EXAM, not per term, and there is no grading
-                       scale in the school's settings to derive a letter from. It was all
-                       generated. Exam Results shows the real marks, exam by exam. *@
+                       "class average", with letter grades, all generated. The exam module
+                       records marks per EXAM, not per term. Exam Results shows the real marks,
+                       grade (from the school's Grade Scale) and class rank, exam by exam. *@
                     <div class="ec-detail-box mb-4">
                         <div class="ec-detail-title">Exam performance</div>
                         <div id="ac-exams" class="mt-2"></div>
@@ -134,7 +133,7 @@
                         <div class="ec-detail-title">Subject-wise Results</div>
                         <div class="table-responsive">
                             <table class="table sd-tbl align-middle mb-0">
-                                <thead><tr><th>Subject</th><th>Max Marks</th><th>Obtained</th><th>%</th><th>Result</th></tr></thead>
+                                <thead><tr><th>Subject</th><th>Max Marks</th><th>Obtained</th><th>%</th><th>Grade</th><th>Result</th></tr></thead>
                                 <tbody id="examBody"></tbody>
                             </table>
                         </div>
@@ -397,8 +396,8 @@ function loadDashboard(){
 function renderOverview(s,d){
     var att=d.attendance, ex=d.exams;
 
-    // Class Rank is gone: ranking needs every classmate's marks, which this page
-    // does not fetch. It used to show rand(1,40).
+    // Class rank lives on the Exam Results tab: it comes from the published
+    // result (core.sp_exam_result_student). It used to show rand(1,40) here.
     document.getElementById('ov-metrics').innerHTML=
         mc('Attendance', (att&&att.schoolDays) ? att.percent+'%' : '—',
            (att&&att.schoolDays&&att.percent>=75?'bg-label-success text-success':'bg-label-warning text-warning'),'bx-user-check')
@@ -617,7 +616,7 @@ function renderExams(s,d){
         sel.innerHTML='<option>No published results</option>';
         document.getElementById('exam-summary').innerHTML=
             '<div class="text-muted small p-3">No published exam results for this student yet. '
-           +'Results appear here once the exam is published.</div>';
+           +'Results appear here once the school publishes the results of an exam.</div>';
         document.getElementById('examBody').innerHTML='';
         return;
     }
@@ -632,8 +631,10 @@ function renderExams(s,d){
     // Absences are out of the totals, so say how many there were — otherwise
     // "2 subjects" on a 3-subject exam looks like missing data.
     document.getElementById('exam-summary').innerHTML=
-        mc('Percentage', ex.percent+'%',(ex.percent>=33?'bg-label-success text-success':'bg-label-danger text-danger'),'bx-bar-chart-alt-2')
+        mc('Percentage', ex.percent+'%'+(ex.grade?' · '+EC.esc(ex.grade):''),(ex.percent>=33?'bg-label-success text-success':'bg-label-danger text-danger'),'bx-bar-chart-alt-2')
        +mc('Marks', ex.obtained+' / '+ex.total,'bg-label-primary text-primary','bx-calculator')
+       // Rank by overall % within the class; ties share a rank. None when absent from every paper.
+       +mc('Class Rank', ex.classRank!=null ? ex.classRank+' / '+ex.classSize : '—','bg-label-warning text-warning','bx-trophy')
        +mc('Subjects', ex.subjectCount+(ex.absentCount?' (+'+ex.absentCount+' absent)':''),'bg-label-info text-info','bx-book')
        +mc('Failed', ex.failedCount+(ex.failedCount===1?' subject':' subjects'),
            (ex.failedCount?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-error-circle');
@@ -644,6 +645,7 @@ function renderExams(s,d){
             return '<tr>'
                 +'<td class="fw-bold">'+EC.esc(r.subject)+'</td>'
                 +'<td>'+(r.max!=null?r.max:'—')+'</td>'
+                +'<td class="text-muted">—</td>'
                 +'<td class="text-muted">—</td>'
                 +'<td class="text-muted">—</td>'
                 +'<td><span class="sd-bdg b-inactive">Absent</span></td>'
@@ -657,6 +659,7 @@ function renderExams(s,d){
             +'<td>'+(r.max!=null?r.max:'—')+'</td>'
             +'<td class="fw-bold">'+(r.obtained!=null?r.obtained:'—')+'</td>'
             +'<td>'+(r.percent!=null?r.percent+'%':'—')+'</td>'
+            +'<td class="fw-bold">'+(r.grade?EC.esc(r.grade):'—')+'</td>'
             +'<td>'+res+'</td>'
             +'</tr>';
     }).join('');

@@ -1094,7 +1094,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         public async Task<List<DefaulterRow>> GetDefaultersAsync(
-            string? className, string? section, int tenantId, int schoolId, int actionUserId)
+            string? className, string? section, int tenantId, int schoolId, int actionUserId,
+            string? academicYear = null)
         {
             var list = new List<DefaulterRow>();
             if (tenantId <= 1 || schoolId <= 0)
@@ -1107,7 +1108,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
                 new("p_class",          NpgsqlDbType.Text)    { Value = (object?)className ?? DBNull.Value },
                 new("p_section",        NpgsqlDbType.Text)    { Value = (object?)section   ?? DBNull.Value },
-                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" },
+                // After the cursor on purpose: it is the proc's last parameter (null = all sessions).
+                new("p_academic_year",  NpgsqlDbType.Text)    { Value = (object?)academicYear ?? DBNull.Value }
             };
 
             await _db.ExecuteCursorsAsync(SpDefaulters, parameters, async reader =>

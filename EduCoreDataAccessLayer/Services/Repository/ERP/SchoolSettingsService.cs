@@ -226,6 +226,43 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return row["school_id"] == DBNull.Value ? 0 : Convert.ToInt32(row["school_id"]);
         }
 
+        // The save keeps the old logo when none is posted, so removing one is its own
+        // proc operation. The old URL comes back so the caller can delete the file.
+        public async Task<(bool Success, string Message, string? RemovedUrl)> RemoveLogoAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid request.", null);
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation", "RemoveLogo"),
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "basic_profile_cursor" }
+            };
+
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpBasicProfileManage, parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "Logo could not be removed.", null);
+
+                var row = ds.Tables[0].Rows[0];
+                var removed = row["removed_logo_url"] == DBNull.Value ? null : row["removed_logo_url"].ToString();
+                return (true, row["message"]?.ToString() ?? "Logo removed.", removed);
+            }
+            catch (PostgresException ex)
+            {
+                _logger.LogWarning(ex, "RemoveLogo refused ({SqlState}) for tenant {TenantId}, school {SchoolId}",
+                    ex.SqlState, tenantId, schoolId);
+                return (false, ex.MessageText, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "RemoveLogo failed for tenant {TenantId}, school {SchoolId}", tenantId, schoolId);
+                return (false, "Logo could not be removed.", null);
+            }
+        }
+
         public async Task<SchoolDropdownModel> GetBasicProfileDropdownsAsync(int tenantId, int schoolId)
         {
             if (tenantId <= 1 || schoolId <= 0) return new SchoolDropdownModel();
@@ -500,20 +537,26 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         #region Period Structure
 
-        public async Task<List<PeriodStructureItem>> GetPeriodStructureAsync(int tenantId, int schoolId, int actionUserId)
+        // dayOfWeek null = the default schedule; 0..6 = the schedule that weekday
+        // runs on (its own custom one, or the default when it has none).
+        public async Task<List<PeriodStructureItem>> GetPeriodStructureAsync(int tenantId, int schoolId, int actionUserId, int? dayOfWeek = null)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return new List<PeriodStructureItem>();
+            return await ReadPeriodsAsync("GetPeriodStructure", tenantId, schoolId, actionUserId, dayOfWeek);
+        }
+
+        // Every schedule the school has: default rows (DayOfWeek null) plus each custom day's rows.
+        public async Task<List<PeriodStructureItem>> GetAllPeriodSchedulesAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return new List<PeriodStructureItem>();
+            return await ReadPeriodsAsync("GetAllSchedules", tenantId, schoolId, actionUserId, null);
+        }
+
+        private async Task<List<PeriodStructureItem>> ReadPeriodsAsync(
+            string operation, int tenantId, int schoolId, int actionUserId, int? dayOfWeek)
         {
             var items = new List<PeriodStructureItem>();
-            if (tenantId <= 1 || schoolId <= 0) return items;
-
-            var parameters = new NpgsqlParameter[]
-            {
-                new NpgsqlParameter("p_operation", "GetPeriodStructure"),
-                new NpgsqlParameter("p_tenant_id", tenantId),
-                new NpgsqlParameter("p_school_id", schoolId),
-                new NpgsqlParameter("p_action_user_id", actionUserId),
-                new NpgsqlParameter("p_items", DBNull.Value),
-                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "period_structure_cursor" }
-            };
+            var parameters = PeriodParams(operation, tenantId, schoolId, actionUserId, null, dayOfWeek, "period_structure_cursor");
 
             var ds = await _db.ExecuteProcedureWithCursorsAsync(SpPeriodStructureManage, parameters);
             if (ds.Tables.Count == 0) return items;
@@ -527,14 +570,17 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     PeriodType = AsStr(row, "period_type") ?? "class",
                     Label      = AsStr(row, "label") ?? string.Empty,
                     StartTime  = AsStr(row, "start_time") ?? string.Empty,
-                    EndTime    = AsStr(row, "end_time") ?? string.Empty
+                    EndTime    = AsStr(row, "end_time") ?? string.Empty,
+                    DayOfWeek  = Col(row, "day_of_week") && row["day_of_week"] != DBNull.Value
+                                    ? Convert.ToInt32(row["day_of_week"]) : (int?)null
                 });
             }
             return items;
         }
 
+        // Replace-all save of one schedule: the default (dayOfWeek null) or one weekday's own.
         public async Task<PeriodStructureSaveResult> SavePeriodStructureAsync(
-            List<PeriodStructureItem> items, int tenantId, int schoolId, int actionUserId)
+            List<PeriodStructureItem> items, int tenantId, int schoolId, int actionUserId, int? dayOfWeek = null)
         {
             if (tenantId <= 1 || schoolId <= 0)
                 return new PeriodStructureSaveResult { Message = "Invalid school context." };
@@ -548,16 +594,27 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 type  = string.IsNullOrWhiteSpace(p.PeriodType) ? "class" : p.PeriodType.Trim().ToLowerInvariant()
             }));
 
-            var parameters = new NpgsqlParameter[]
-            {
-                new NpgsqlParameter("p_operation", "SavePeriodStructure"),
-                new NpgsqlParameter("p_tenant_id", tenantId),
-                new NpgsqlParameter("p_school_id", schoolId),
-                new NpgsqlParameter("p_action_user_id", actionUserId),
-                new NpgsqlParameter("p_items", NpgsqlDbType.Text) { Value = itemsJson },
-                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "period_structure_save_cursor" }
-            };
+            return await RunPeriodWriteAsync("SavePeriodStructure",
+                PeriodParams("SavePeriodStructure", tenantId, schoolId, actionUserId, itemsJson, dayOfWeek, "period_structure_save_cursor"),
+                schoolId, "Schedule saved.");
+        }
 
+        // Drops a weekday's own schedule so it runs on the default again.
+        public async Task<PeriodStructureSaveResult> UseDefaultScheduleAsync(int dayOfWeek, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new PeriodStructureSaveResult { Message = "Invalid school context." };
+            if (dayOfWeek < 0 || dayOfWeek > 6)
+                return new PeriodStructureSaveResult { Message = "Pick a day of the week." };
+
+            return await RunPeriodWriteAsync("UseDefault",
+                PeriodParams("UseDefault", tenantId, schoolId, actionUserId, null, dayOfWeek, "period_structure_save_cursor"),
+                schoolId, "Schedule saved.");
+        }
+
+        private async Task<PeriodStructureSaveResult> RunPeriodWriteAsync(
+            string operation, NpgsqlParameter[] parameters, int schoolId, string fallbackMessage)
+        {
             try
             {
                 var ds = await _db.ExecuteProcedureWithCursorsAsync(SpPeriodStructureManage, parameters);
@@ -568,14 +625,32 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 return new PeriodStructureSaveResult
                 {
                     Success = row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]),
-                    Message = AsStr(row, "message") ?? "Schedule saved."
+                    Message = AsStr(row, "message") ?? fallbackMessage
                 };
             }
             catch (PostgresException ex)
             {
-                // Proc RAISE (e.g. overlapping periods) — surface the friendly text.
+                // Proc RAISE (e.g. overlapping periods, a booked period removed) — surface the friendly text.
+                _logger.LogWarning(ex, "Period structure {Operation} refused ({SqlState}) for school {SchoolId}",
+                    operation, ex.SqlState, schoolId);
                 return new PeriodStructureSaveResult { Message = ex.MessageText };
             }
+        }
+
+        // Same order as the proc's parameters; p_day_of_week comes after the cursor.
+        private static NpgsqlParameter[] PeriodParams(string operation, int tenantId, int schoolId, int actionUserId,
+            string? itemsJson, int? dayOfWeek, string cursorName)
+        {
+            return new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation", operation),
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_items", NpgsqlDbType.Text) { Value = (object?)itemsJson ?? DBNull.Value },
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = cursorName },
+                new NpgsqlParameter("p_day_of_week", NpgsqlDbType.Smallint) { Value = dayOfWeek.HasValue ? (object)(short)dayOfWeek.Value : DBNull.Value }
+            };
         }
 
         #endregion

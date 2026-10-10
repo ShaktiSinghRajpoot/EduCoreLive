@@ -159,9 +159,11 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             string? from, string? to, int tenantId, int schoolId, int actionUserId,
             string? className = null, string? section = null);
 
-        /// <summary>Students who still owe, with class-wise aging (optionally filtered by class/section).</summary>
+        /// <summary>Students who still owe, with class-wise aging (optionally filtered by class/section
+        /// and session; a null session means all sessions).</summary>
         Task<List<DefaulterRow>> GetDefaultersAsync(
-            string? className, string? section, int tenantId, int schoolId, int actionUserId);
+            string? className, string? section, int tenantId, int schoolId, int actionUserId,
+            string? academicYear = null);
 
         /// <summary>
         /// Refund register for a date range (money OUT), with mode-wise totals. Paired

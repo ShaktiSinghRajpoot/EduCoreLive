@@ -477,6 +477,14 @@ EC.rule = {
     },
     // Blank passes: use required() as well when the field is mandatory.
     mobile:  function (v) { return !v || /^[6-9][0-9]{9}$/.test(v)      ? '' : 'Enter a valid 10-digit mobile number.'; },
+    // A school's official number: a mobile OR a landline with STD code
+    // (0141-2345678, 011 23456789: starts with 0, 10-12 digits). Spaces and
+    // hyphens are ignored. Same rule as PhoneRules (C#) and fn_school_phone_clean.
+    phone:   function (v) {
+        var d = String(v || '').replace(/[\s-]/g, '');
+        return !d || /^[6-9][0-9]{9}$/.test(d) || /^0[0-9]{9,11}$/.test(d)
+            ? '' : 'Enter a 10-digit mobile or a landline with STD code (e.g. 0141-2345678).';
+    },
     email:   function (v) { return !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? '' : 'Enter a valid email address.'; },
     pincode: function (v) { return !v || /^[1-9][0-9]{5}$/.test(v)      ? '' : 'Enter a valid 6-digit pincode.'; }
 };

@@ -1,8 +1,9 @@
 namespace EduCoreDataAccessLayer.Models.ERP
 {
-    /// <summary>A slot in the daily bell schedule; only 'class' periods are bookable.</summary>
+    /// <summary>A slot in one weekday's bell schedule; only 'class' periods are bookable.</summary>
     public class TimetablePeriod
     {
+        public int    DayOfWeek  { get; set; }                    // each day can run on its own schedule
         public int    PeriodSeq  { get; set; }
         public string Label      { get; set; } = string.Empty;
         public string PeriodType { get; set; } = "class";

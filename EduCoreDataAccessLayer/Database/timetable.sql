@@ -7,16 +7,18 @@
 --                                                  | ClearCell | CopyDay | GetTeacherGrid
 --
 -- Sources everything from what the school already configured:
---   * period slots  -> academic.period_structure (only 'class' periods are bookable)
+--   * period slots  -> academic.fn_day_periods: each weekday's own bell schedule
+--                      (a custom one, else the default); only 'class' periods are bookable
 --   * day columns   -> academic.school_calendar_settings (weekly offs are dropped)
 --   * sections      -> academic.academic_class_sections
 --   * subjects      -> academic.class_subjects for that section's class
 --   * teachers      -> core.staff
 --
--- A slot is keyed by the period's SEQ, not its period_id: saving the Period
--- Structure is replace-all (it deletes and re-inserts rows), so ids churn on
--- every save while seq stays put. Inserting a period mid-day still shifts the
--- slots below it — that is the known trade-off of the replace-all save.
+-- A slot is keyed by (day, the period's SEQ in that day's schedule), not its
+-- period_id: saving the Period Structure is replace-all (it deletes and
+-- re-inserts rows), so ids churn on every save. When a save renumbers a day's
+-- periods, the Period Structure proc moves that day's lessons with their
+-- period by label, and refuses to drop a period that still has lessons.
 --
 -- Teacher double-booking is rejected HERE, not just in the page's JS.
 --
@@ -97,6 +99,8 @@ DECLARE
     v_day       smallint;
     v_row       record;
     v_room      text;
+    v_nomatch   integer := 0;
+    v_missing   text := '';
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -113,17 +117,27 @@ BEGIN
     -- ---------------------------------------------------------------- read --
     IF p_operation = 'GetSetup' THEN
 
-        -- 1: the bookable day, straight from the bell schedule.
+        SELECT COALESCE(weekly_off_days, '{0}') INTO v_offs
+        FROM academic.school_calendar_settings
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id;
+        IF v_offs IS NULL THEN
+            v_offs := '{0}';
+        END IF;
+
+        -- 1: each working day's periods, from the schedule that day runs on (its
+        --    own, or the default). A short Saturday lists only its own periods.
         OPEN p_result FOR
         SELECT
-            seq::int AS period_seq,
-            label,
-            period_type,
-            to_char(start_time, 'HH24:MI') AS start_time,
-            to_char(end_time,   'HH24:MI') AS end_time
-        FROM academic.period_structure
-        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
-        ORDER BY seq, start_time;
+            d::smallint AS day_of_week,
+            p.seq::int  AS period_seq,
+            p.label,
+            p.period_type,
+            to_char(p.start_time, 'HH24:MI') AS start_time,
+            to_char(p.end_time,   'HH24:MI') AS end_time
+        FROM generate_series(0, 6) d
+        CROSS JOIN LATERAL academic.fn_day_periods(p_tenant_id, p_school_id, d::smallint) p
+        WHERE NOT (d = ANY (v_offs))
+        ORDER BY CASE WHEN d = 0 THEN 7 ELSE d END, p.seq, p.start_time;
 
         -- 2: class sections to switch between.
         OPEN p_result2 FOR
@@ -152,13 +166,6 @@ BEGIN
         ORDER BY full_name;
 
         -- 4: day columns = the week minus the school's weekly offs.
-        SELECT COALESCE(weekly_off_days, '{0}') INTO v_offs
-        FROM academic.school_calendar_settings
-        WHERE tenant_id = p_tenant_id AND school_id = p_school_id;
-        IF v_offs IS NULL THEN
-            v_offs := '{0}';
-        END IF;
-
         OPEN p_result4 FOR
         SELECT d::smallint AS day_of_week,
                to_char(DATE '2024-01-07' + d, 'Dy') AS day_label   -- 2024-01-07 was a Sunday
@@ -330,11 +337,12 @@ BEGIN
             v_clash := NULL;
         END IF;
 
-        -- Only teaching periods are bookable — never a break or lunch.
-        IF NOT EXISTS (SELECT 1 FROM academic.period_structure
-                       WHERE tenant_id = p_tenant_id AND school_id = p_school_id
-                         AND seq = p_period_seq AND period_type = 'class') THEN
-            RAISE EXCEPTION 'That slot is not a teaching period.';
+        -- Only teaching periods of THAT day's schedule are bookable — never a
+        -- break or lunch, and never a period a short day does not have.
+        IF NOT EXISTS (SELECT 1 FROM academic.fn_day_periods(p_tenant_id, p_school_id, p_day)
+                       WHERE seq = p_period_seq AND period_type = 'class') THEN
+            RAISE EXCEPTION 'That slot is not a teaching period on %.',
+                to_char(DATE '2024-01-07' + p_day, 'FMDay');
         END IF;
 
         -- A teacher cannot be in two rooms at once. This is the gate; the page's
@@ -395,7 +403,10 @@ BEGIN
     ELSIF p_operation = 'CopyDay' THEN
 
         -- Copy one day across the rest of the working week. A slot that would
-        -- double-book a teacher elsewhere is skipped, not forced.
+        -- double-book a teacher or room elsewhere is skipped, not forced. Days can
+        -- run on different schedules, so a lesson goes to the period with the
+        -- SAME LABEL on the target day; a day without that teaching period
+        -- (e.g. a short Saturday has no P7) skips it and says so.
         SELECT COALESCE(weekly_off_days, '{0}') INTO v_offs
         FROM academic.school_calendar_settings
         WHERE tenant_id = p_tenant_id AND school_id = p_school_id;
@@ -414,13 +425,24 @@ BEGIN
               AND day_of_week = v_day;
 
             FOR v_row IN
-                SELECT period_seq, subject_id, staff_id, room_no
-                FROM academic.timetable
-                WHERE tenant_id = p_tenant_id AND school_id = p_school_id
-                  AND academic_year_id = v_year
-                  AND academic_class_section_id = p_section_id
-                  AND day_of_week = p_day
+                SELECT tp.seq AS period_seq, src.label, t.subject_id, t.staff_id, t.room_no
+                FROM academic.timetable t
+                JOIN academic.fn_day_periods(p_tenant_id, p_school_id, p_day) src ON src.seq = t.period_seq
+                LEFT JOIN academic.fn_day_periods(p_tenant_id, p_school_id, v_day) tp
+                       ON lower(tp.label) = lower(src.label) AND tp.period_type = 'class'
+                WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id
+                  AND t.academic_year_id = v_year
+                  AND t.academic_class_section_id = p_section_id
+                  AND t.day_of_week = p_day
+                ORDER BY src.seq
             LOOP
+                IF v_row.period_seq IS NULL THEN
+                    v_nomatch := v_nomatch + 1;
+                    v_missing := v_missing || CASE WHEN v_missing = '' THEN '' ELSE ', ' END
+                                 || to_char(DATE '2024-01-07' + v_day, 'Dy') || ' ' || v_row.label;
+                    CONTINUE;
+                END IF;
+
                 IF v_row.staff_id IS NOT NULL AND EXISTS (
                     SELECT 1 FROM academic.timetable t
                     WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id
@@ -470,11 +492,16 @@ BEGIN
         OPEN p_result FOR
         SELECT TRUE AS success,
                v_copied  AS copied,
-               v_skipped AS skipped,
+               v_skipped + v_nomatch AS skipped,
+               v_nomatch AS no_period,
                CASE WHEN v_skipped > 0
                     THEN v_copied || ' periods copied · ' || v_skipped || ' skipped (teacher or room already booked).'
                     ELSE v_copied || ' periods copied across the week.'
-               END AS message;
+               END
+               || CASE WHEN v_nomatch > 0
+                       THEN ' ' || v_nomatch || ' skipped because that day has no such teaching period: ' || v_missing || '.'
+                       ELSE ''
+                  END AS message;
 
         OPEN p_result2 FOR SELECT 1 WHERE FALSE;
         OPEN p_result3 FOR SELECT 1 WHERE FALSE;

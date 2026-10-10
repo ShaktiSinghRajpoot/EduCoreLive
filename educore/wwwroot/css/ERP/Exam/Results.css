@@ -1,0 +1,67 @@
+/* Grade Scale + Result Sheet pages */
+    :root {
+        --rs-orange: #ff8a00;
+        --rs-orange-soft: #fff4e6;
+        --rs-border: #ececf5;
+        --rs-heading: #2b1b12;
+        --rs-text: #2b2c40;
+        --rs-muted: #8b8175;
+    }
+
+    .rs-page { padding-bottom: 1rem; }
+    .rs-page *, .rs-page *::before, .rs-page *::after { box-sizing: border-box; }
+
+    .rs-page .form-select, .rs-page .form-control {
+        min-height: 42px; border-radius: 10px; border-color: var(--rs-border);
+        font-weight: 700; font-size: .88rem; color: var(--rs-text);
+    }
+    .rs-label { font-size: .7rem; font-weight: 800; color: var(--rs-muted); margin-bottom: .35rem; letter-spacing: .02em; }
+
+    .btn-rs-primary {
+        background: var(--rs-orange); border: 0; color: #fff; border-radius: 10px; font-weight: 900;
+        min-height: 42px; padding: 0 1.1rem;
+    }
+    .btn-rs-primary:hover { background: #e07a00; color: #fff; }
+    .btn-rs-ghost {
+        border: 1.5px solid var(--rs-border); background: #fff; color: var(--rs-text);
+        border-radius: 10px; font-weight: 800; min-height: 42px; padding: 0 .9rem;
+    }
+    .btn-rs-ghost:hover { border-color: var(--rs-orange); color: var(--rs-orange); }
+
+    .rs-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; flex-wrap: wrap; margin-bottom: .9rem; }
+    .rs-title { font-size: 1.05rem; font-weight: 900; color: var(--rs-heading); }
+    .rs-sub { font-size: .8rem; font-weight: 700; color: var(--rs-muted); margin-top: .1rem; }
+
+    .rs-chip { display: inline-flex; align-items: center; gap: .25rem; font-size: .72rem; font-weight: 900; border-radius: 8px; padding: .2rem .55rem; }
+    .rs-chip.is-pub   { background: #ecfdf3; color: #16a34a; }
+    .rs-chip.is-unpub { background: #fff3cd; color: #856404; }
+
+    .rs-note { font-size: .8rem; font-weight: 700; color: var(--rs-muted); }
+    .rs-warn { background: #fff3cd; color: #856404; border-radius: 10px; padding: .6rem .85rem; font-size: .82rem; font-weight: 800; margin-bottom: .8rem; }
+    .rs-pending { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .8rem; font-weight: 700; color: var(--rs-text); }
+    .rs-log { margin: 0; padding: 0; list-style: none; font-size: .78rem; font-weight: 700; color: var(--rs-muted); }
+    .rs-log li { padding: .2rem 0; border-top: 1px dashed var(--rs-border); }
+
+    /* ── Tables ── */
+    .rs-tbl-wrap { overflow-x: auto; }
+    .rs-tbl { width: 100%; border-collapse: collapse; font-size: .84rem; }
+    .rs-tbl th {
+        font-size: .7rem; font-weight: 900; color: var(--rs-muted); text-transform: uppercase; letter-spacing: .03em;
+        border-bottom: 1.5px solid var(--rs-border); padding: .5rem .45rem; white-space: nowrap; text-align: left;
+    }
+    .rs-tbl td { border-bottom: 1px solid var(--rs-border); padding: .45rem; vertical-align: middle; color: var(--rs-text); }
+    .rs-tbl .num { text-align: center; white-space: nowrap; }
+    .rs-tbl .rs-name { font-weight: 800; color: var(--rs-heading); }
+    .rs-tbl .rs-grade { font-size: .68rem; font-weight: 900; color: var(--rs-muted); margin-left: .2rem; }
+    .rs-tbl .rs-fail { color: #c0392b; font-weight: 900; }
+    .rs-tbl .rs-abs { color: var(--rs-muted); font-weight: 900; }
+    .rs-tbl .rs-total { font-weight: 900; }
+    .rs-tbl input.form-control { min-height: 36px; padding: .25rem .5rem; }
+
+    /* ── Print: the result sheet goes on paper ── */
+    @media print {
+        .rs-no-print { display: none !important; }
+        .rs-page .ec-card { border: 0 !important; box-shadow: none !important; }
+        .rs-tbl { font-size: 11px; }
+        .rs-tbl tr { break-inside: avoid; }
+    }

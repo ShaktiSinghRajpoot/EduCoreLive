@@ -56,11 +56,22 @@
     <!-- Main -->
     <div class="ec-card mb-0">
       <div class="ec-card-header">
+        <!-- Which schedule: the default (every day without its own) or one weekday's -->
+        <div class="d-flex flex-wrap gap-2 mb-3" id="dayTabs"></div>
+        <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-2 mb-3 d-none" id="modeBar">
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-primary" id="modeDefault">Use default</button>
+            <button type="button" class="btn btn-outline-primary" id="modeCustom">Custom schedule</button>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-secondary d-none" id="btnCopyDefault"><i class="bx bx-copy me-1"></i>Copy from default</button>
+          <span class="ps-note mb-0" id="modeHint"></span>
+        </div>
+
         <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
           <div class="ec-section-title-wrap">
             <span class="ec-section-icon"><i class="bx bx-time"></i></span>
             <div>
-              <div class="ec-section-title">Daily Schedule</div>
+              <div class="ec-section-title" id="schedTitle">Default Schedule</div>
               <div class="ec-section-subtitle" id="resultText">Loading…</div>
             </div>
           </div>
@@ -87,7 +98,7 @@
         <div class="ps-tl" id="tlList"></div>
 
         <p class="ps-note mt-3 mb-0">
-          <i class="bx bx-info-circle"></i> This schedule feeds the <strong>Timetable</strong> grid. Breaks &amp; lunch show as non-teaching bars there.
+          <i class="bx bx-info-circle"></i> These schedules feed the <strong>Timetable</strong> grid and the <strong>Smart Bell</strong>. Every day runs on the default unless it has a custom schedule. Breaks &amp; lunch show as non-teaching bars.
         </p>
       </div>
     </div>
@@ -155,15 +166,32 @@
 'use strict';
 
 var SAVE_URL='@Url.Action("SavePeriodStructure","SchoolSettings",new{area="ERP"})';
+var DEFAULT_URL='@Url.Action("UseDefaultPeriodSchedule","SchoolSettings",new{area="ERP"})';
 var seed=@Html.Raw(ViewBag.PeriodJson ?? "[]");
+var weeklyOffs=@Html.Raw(ViewBag.WeeklyOffJson ?? "[0]");
 
+var DAY_NAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 var nextId=100, editId=null;
 
-/* The school's single bell schedule, seeded from the server. type: class|break|lunch */
-var PERIODS=(seed||[]).map(function(p){
-  return {id:(p.id||++nextId), name:p.name, start:p.start, end:p.end, type:p.type||'class'};
+/* SAVED holds every schedule as the server has it: SAVED.d = the default,
+   SAVED[1] = Monday's own schedule, and so on. A weekday with no key runs on
+   the default. PERIODS is the working copy of the schedule on screen. */
+var SAVED={ d: [] };
+(seed||[]).forEach(function(p){
+  var k=(p.day===null || p.day===undefined) ? 'd' : String(p.day);
+  if(!SAVED[k]) SAVED[k]=[];
+  SAVED[k].push({id:(p.id||++nextId), name:p.name, start:p.start, end:p.end, type:p.type||'class'});
 });
+
+var curKey='d';        /* 'd' = default, '0'..'6' = a weekday */
+var custom=false;      /* is the weekday on screen using its own schedule? */
+var dirty=false;
+var PERIODS=[];
+
+function copyList(list){ return (list||[]).map(function(r){ return {id:++nextId, name:r.name, start:r.start, end:r.end, type:r.type}; }); }
 function rows(){ return PERIODS; }
+function editable(){ return curKey==='d' || custom; }
+function keyName(k){ return k==='d' ? 'Default' : DAY_NAMES[parseInt(k,10)]; }
 
 function toMin(t){ if(!t) return 0; var p=t.split(':'); return parseInt(p[0],10)*60+parseInt(p[1],10); }
 function dur(r){ return toMin(r.end)-toMin(r.start); }
@@ -172,6 +200,99 @@ function typeLabel(t){ return {class:'Class',assembly:'Assembly',break:'Break',l
 function typeIcon(t){ return {class:'bx-book',assembly:'bx-group',break:'bx-coffee',lunch:'bx-restaurant',diary:'bx-notepad'}[t]||'bx-book'; }
 // The glance bar has a colour per type; anything unknown is drawn as a class.
 function typeKey(t){ return {class:1,assembly:1,break:1,lunch:1,diary:1}[t]?t:'class'; }
+
+/* ---- day selector: Default + every weekday that is not a weekly off (Mon first) ---- */
+function renderTabs(){
+  var order=[1,2,3,4,5,6,0], html='';
+  html+='<button type="button" class="btn btn-sm '+(curKey==='d'?'btn-primary':'btn-outline-primary')+' js-day" data-k="d">Default</button>';
+  order.forEach(function(d){
+    if(weeklyOffs.indexOf(d)>=0) return;
+    var k=String(d), on=(curKey===k);
+    html+='<button type="button" class="btn btn-sm '+(on?'btn-primary':'btn-outline-primary')+' js-day" data-k="'+k+'">'
+        + DAY_NAMES[d].slice(0,3)
+        + (SAVED[k] ? ' <span class="badge bg-label-warning ms-1">Custom</span>' : '')
+        + '</button>';
+  });
+  document.getElementById('dayTabs').innerHTML=html;
+  document.querySelectorAll('.js-day').forEach(function(b){
+    b.addEventListener('click',function(){ switchDay(this.dataset.k); });
+  });
+}
+
+function switchDay(k){
+  if(k===curKey) return;
+  if(!dirty){ openDay(k); return; }
+  EC.confirm({ title:'Discard unsaved changes?', name:keyName(curKey)+' schedule',
+               message:'Your edits to this schedule have not been saved.', okText:'Discard', danger:false })
+    .then(function(ok){ if(ok) openDay(k); });
+}
+
+function openDay(k){
+  curKey=k; dirty=false;
+  custom = (k!=='d' && !!SAVED[k]);
+  PERIODS = copyList(k==='d' ? SAVED.d : (SAVED[k] || SAVED.d));
+  renderTabs(); render();
+}
+
+/* ---- Use default / Custom schedule for a weekday ---- */
+function renderMode(){
+  var bar=document.getElementById('modeBar');
+  bar.classList.toggle('d-none', curKey==='d');
+  document.getElementById('schedTitle').textContent = curKey==='d' ? 'Default Schedule' : keyName(curKey)+' Schedule';
+  if(curKey==='d'){
+    document.getElementById('modeHint').textContent='';
+  } else {
+    document.getElementById('modeDefault').className='btn '+(custom?'btn-outline-primary':'btn-primary');
+    document.getElementById('modeCustom').className ='btn '+(custom?'btn-primary':'btn-outline-primary');
+    document.getElementById('btnCopyDefault').classList.toggle('d-none', !custom);
+    document.getElementById('modeHint').textContent = custom
+      ? keyName(curKey)+' rings on its own schedule.'
+      : keyName(curKey)+' runs on the default schedule. Choose "Custom schedule" to give it different periods.';
+  }
+  document.getElementById('btnAdd').disabled = !editable();
+  document.getElementById('btnSave').disabled = !editable();
+}
+
+document.getElementById('modeCustom').addEventListener('click',function(){
+  if(custom) return;
+  /* start from a copy of the default; it is stored when the user saves */
+  custom=true; dirty=true;
+  PERIODS=copyList(SAVED.d);
+  render();
+  ecToast('info','Copied the default schedule. Edit it, then click Save Schedule.');
+});
+
+document.getElementById('modeDefault').addEventListener('click',function(){
+  if(!custom) return;
+  var k=curKey;
+  if(!SAVED[k]){ custom=false; dirty=false; PERIODS=copyList(SAVED.d); render(); return; }   /* never saved */
+  EC.confirm({ title:'Use the default schedule on '+keyName(k)+'?',
+               message:keyName(k)+'’s own schedule is removed. Its timetable lessons move to the default period with the same name.',
+               okText:'Use default', danger:false }).then(function(ok){
+    if(!ok) return;
+    var $btn=$('#modeDefault');
+    EC.buttonBusy($btn,'Saving…');
+    post(DEFAULT_URL,{ day: parseInt(k,10) })
+      .done(function(res){
+        if(res && res.success){
+          delete SAVED[k];
+          ecToast('success', res.message || 'Done.');
+          openDay(k);
+        } else ecToast('error',(res && res.message) || 'Could not change the schedule.');
+      })
+      .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
+      .always(function(){ EC.buttonReset($btn); renderMode(); });
+  });
+});
+
+document.getElementById('btnCopyDefault').addEventListener('click',function(){
+  EC.confirm({ title:'Copy the default schedule?', name:keyName(curKey),
+               message:'This replaces the periods on screen with the default ones. Nothing is stored until you save.',
+               okText:'Copy', danger:false }).then(function(ok){
+    if(!ok) return;
+    PERIODS=copyList(SAVED.d); dirty=true; render();
+  });
+});
 
 /* validate ordering: detect overlaps / negative durations */
 function findIssue(){
@@ -204,7 +325,7 @@ function renderGlance(){
 }
 
 function render(){
-  var list=rows(), box=document.getElementById('tlList');
+  var list=rows(), box=document.getElementById('tlList'), canEdit=editable();
   box.innerHTML=list.map(function(r,i){
     var d=dur(r);
     return '<div class="ps-item ps-t-'+typeKey(r.type)+'">'
@@ -216,10 +337,12 @@ function render(){
       +     '<div class="ps-blk-meta">'+fmt12(r.start)+' – '+fmt12(r.end)+'</div></div>'
       +  '<span class="ps-dur">'+(d>0?d+' min':'—')+'</span>'
       +  '<span class="ps-type '+typeKey(r.type)+'">'+typeLabel(r.type)+'</span>'
-      +  '<div class="ps-acts">'
-      +     '<button class="ps-icon-btn js-edit" data-id="'+r.id+'"><i class="bx bx-edit-alt"></i></button>'
-      +     '<button class="ps-icon-btn danger js-del" data-id="'+r.id+'"><i class="bx bx-trash"></i></button>'
-      +  '</div>'
+      +  (canEdit
+          ? '<div class="ps-acts">'
+            +  '<button class="ps-icon-btn js-edit" data-id="'+r.id+'"><i class="bx bx-edit-alt"></i></button>'
+            +  '<button class="ps-icon-btn danger js-del" data-id="'+r.id+'"><i class="bx bx-trash"></i></button>'
+            +'</div>'
+          : '')
       +'</div>'
       +'</div>';
   }).join('');
@@ -228,9 +351,10 @@ function render(){
   if(issue){ document.getElementById('warnTxt').textContent=issue; wb.classList.remove('d-none'); }
   else wb.classList.add('d-none');
 
-  document.getElementById('resultText').textContent=list.length+' periods · '+list.filter(function(r){return r.type==='class';}).length+' teaching';
+  document.getElementById('resultText').textContent=list.length+' periods · '+list.filter(function(r){return r.type==='class';}).length+' teaching'
+    +(curKey!=='d' && !custom ? ' · from the default' : '');
 
-  updateCards(); renderGlance(); bindRows();
+  updateCards(); renderGlance(); renderMode(); bindRows();
 }
 
 function bindRows(){
@@ -253,6 +377,7 @@ function del(id){
 
 /* ---- modal ---- */
 function openModal(id){
+  if(!editable()) return;
   editId=id;
   var r=id?rows().find(function(x){return x.id===id;}):null;
   document.getElementById('pmTitle').textContent=r?'Edit Period':'Add Period';
@@ -292,34 +417,47 @@ document.getElementById('pmSave').addEventListener('click',function(){
   render();
 });
 
-/* ---- save the whole schedule (replace-all) ---- */
-document.getElementById('btnSave').addEventListener('click',function(){
-  if(findIssue()){ ecToast('error','Fix the highlighted timing issue before saving.'); return; }
-  if(!rows().length){ ecToast('error','Add at least one period. An empty schedule stops the bell.'); return; }
+function post(url,payload){
   var token=document.querySelector('input[name="__RequestVerificationToken"]');
-  var payload={ periods: rows().map(function(r){ return {name:r.name,start:r.start,end:r.end,type:r.type}; }) };
-  $.ajax({
-    url:         SAVE_URL,
+  return $.ajax({
+    url:         url,
     type:        'POST',
     contentType: 'application/json',
     headers:     { 'RequestVerificationToken': token ? token.value : '', 'X-Requested-With': 'XMLHttpRequest' },
     data:        JSON.stringify(payload)
-  })
+  });
+}
+
+/* ---- save the schedule on screen (replace-all for that one schedule) ---- */
+document.getElementById('btnSave').addEventListener('click',function(){
+  if(!editable()) return;
+  if(findIssue()){ ecToast('error','Fix the highlighted timing issue before saving.'); return; }
+  if(!rows().length){ ecToast('error','Add at least one period. An empty schedule stops the bell.'); return; }
+  var key=curKey, $btn=$(this);
+  var payload={ day: key==='d' ? null : parseInt(key,10),
+                periods: rows().map(function(r){ return {name:r.name,start:r.start,end:r.end,type:r.type}; }) };
+  EC.buttonBusy($btn,'Saving…');
+  post(SAVE_URL,payload)
   .done(function(res){
-    if(res && res.success){ dirty=false; ecToast('success', res.message || 'Schedule saved.'); }
+    if(res && res.success){
+      SAVED[key]=copyList(PERIODS);
+      dirty=false;
+      renderTabs();
+      ecToast('success', res.message || 'Schedule saved.');
+    }
     else ecToast('error', (res && res.message) || 'Save failed.');
   })
-  .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); });
+  .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
+  .always(function(){ EC.buttonReset($btn); renderMode(); });
 });
 
 /* Warn before leaving with edits that were never saved. */
-var dirty=false;
 window.addEventListener('beforeunload',function(e){
   if(dirty){ e.preventDefault(); e.returnValue=''; }
 });
 
 /* init */
-render();
+openDay('d');
 
 })();
 </script>

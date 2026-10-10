@@ -16,6 +16,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int    SubjectCount { get; set; }                   // across every class
         public string ClassNames   { get; set; } = string.Empty;   // "1st, 2nd, 3rd"
         public string Status       { get; set; } = "Draft";        // Draft | Published
+        /// <summary>The RESULT status, separate from the datesheet: Unpublished | Published.</summary>
+        public string ResultsStatus { get; set; } = "Unpublished";
     }
 
     /// <summary>
@@ -36,6 +38,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string EndDate          { get; set; } = string.Empty;   // yyyy-MM-dd
         public string Status           { get; set; } = "Draft";
         public int    SubjectCount     { get; set; }
+        public string ResultsStatus    { get; set; } = "Unpublished";
     }
 
     /// <summary>One subject on a class's datesheet.</summary>
@@ -224,6 +227,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string  SubjectName { get; set; } = string.Empty;
         public bool    IsFinalized { get; set; }
         public string? FinalizedAt { get; set; }                   // yyyy-MM-dd
+        /// <summary>The exam's results are published: every sheet is locked.</summary>
+        public bool    ResultsPublished { get; set; }
         public List<ExamMarkRow> Students { get; set; } = new();
     }
 

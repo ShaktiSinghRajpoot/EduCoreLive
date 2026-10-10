@@ -3,6 +3,7 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace educore.Areas.ERP.Controllers
 {
@@ -32,7 +33,16 @@ namespace educore.Areas.ERP.Controllers
         // ── Pages ────────────────────────────────────────────────
         public IActionResult ManageFee() => View();
         public IActionResult DayClose() => View();
-        public IActionResult Reports() => View();
+        // The Defaulters tab opens on the current session (sp_dropdown_common marks it).
+        public async Task<IActionResult> Reports()
+        {
+            try
+            {
+                ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
+            }
+            catch { ViewBag.Sessions = new List<SelectListItem>(); }
+            return View();
+        }
 
         // ── GET: /ERP/Fee/GetSessions ────────────────────────────
         [HttpGet]
@@ -608,10 +618,11 @@ namespace educore.Areas.ERP.Controllers
 
         // ── GET: /ERP/Fee/GetDefaulters ──────────────────────────
         [HttpGet]
-        public async Task<IActionResult> GetDefaulters(string? className = null, string? section = null)
+        // session blank = all sessions.
+        public async Task<IActionResult> GetDefaulters(string? className = null, string? section = null, string? session = null)
         {
             var rows = await _feePaymentService.GetDefaultersAsync(
-                NullIfEmpty(className), NullIfEmpty(section), TenantId(), SchoolId(), UserId());
+                NullIfEmpty(className), NullIfEmpty(section), TenantId(), SchoolId(), UserId(), NullIfEmpty(session));
             return Json(rows.Select(d => new
             {
                 entry       = d.Entry,          // Student | Registration (not admitted yet)

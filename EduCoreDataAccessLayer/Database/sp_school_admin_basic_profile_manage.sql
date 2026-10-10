@@ -13,7 +13,39 @@
 --      wizard instead of using free-text boxes.
 --   3. SAVE accepts and stores those same ids (new p_country_id / p_state_id /
 --      p_district_id parameters, added at the END, just before p_result).
+--   4. (2026-10-10) Official / alternate phone may be a landline: see
+--      core.fn_school_phone_clean below. Stored as digits only.
+--   5. (2026-10-10) 'RemoveLogo' operation: clears logo_url and returns the old
+--      URL so the controller can delete the file (only when it sits in this
+--      school's upload folder).
 -- ============================================================================
+
+-- ── fn_school_phone_clean ───────────────────────────────────────────────────
+-- A school's official number is often a landline. Accepted, after removing
+-- spaces and hyphens:
+--   * a 10-digit Indian mobile        9876543210
+--   * a landline with its STD code    0141-2345678, 011 23456789, 01412345678
+--     (starts with 0, 10 to 12 digits in all)
+-- Returns the number as DIGITS ONLY (0141-2345678 -> 01412345678), NULL for a
+-- blank value, and raises for anything else. The same rule is in
+-- EC.rule.phone (site.js) and PhoneRules (C#).
+CREATE OR REPLACE FUNCTION core.fn_school_phone_clean(p_value varchar, p_label varchar)
+RETURNS varchar
+LANGUAGE plpgsql IMMUTABLE
+AS $$
+DECLARE
+    v varchar := regexp_replace(COALESCE(p_value, ''), '[\s-]', '', 'g');
+BEGIN
+    IF v = '' THEN
+        RETURN NULL;
+    END IF;
+    IF v ~ '^[6-9][0-9]{9}$' OR v ~ '^0[0-9]{9,11}$' THEN
+        RETURN v;
+    END IF;
+    RAISE EXCEPTION '% must be a 10-digit mobile number or a landline with STD code (e.g. 0141-2345678).', p_label
+        USING ERRCODE = 'check_violation';
+END;
+$$;
 
 CREATE OR REPLACE PROCEDURE core.sp_school_admin_basic_profile_manage(IN p_operation character varying, IN p_tenant_id integer, IN p_school_id integer, IN p_action_user_id integer, IN p_display_name character varying DEFAULT NULL::character varying, IN p_registration_number character varying DEFAULT NULL::character varying, IN p_affiliation_number character varying DEFAULT NULL::character varying, IN p_board_id integer DEFAULT NULL::integer, IN p_school_type_id integer DEFAULT NULL::integer, IN p_ownership_type_id integer DEFAULT NULL::integer, IN p_medium_id integer DEFAULT NULL::integer, IN p_established_year integer DEFAULT NULL::integer, IN p_website character varying DEFAULT NULL::character varying, IN p_logo_url character varying DEFAULT NULL::character varying, IN p_header_image_url character varying DEFAULT NULL::character varying, IN p_address_type_id integer DEFAULT NULL::integer, IN p_address_line1 character varying DEFAULT NULL::character varying, IN p_address_line2 character varying DEFAULT NULL::character varying, IN p_city character varying DEFAULT NULL::character varying, IN p_district character varying DEFAULT NULL::character varying, IN p_state character varying DEFAULT NULL::character varying, IN p_pincode character varying DEFAULT NULL::character varying, IN p_contact_type_id integer DEFAULT NULL::integer, IN p_contact_name character varying DEFAULT NULL::character varying, IN p_designation character varying DEFAULT NULL::character varying, IN p_contact_email character varying DEFAULT NULL::character varying, IN p_phone character varying DEFAULT NULL::character varying, IN p_alternate_phone character varying DEFAULT NULL::character varying, IN p_academic_year_id integer DEFAULT NULL::integer, IN p_date_format_id integer DEFAULT NULL::integer, IN p_time_format_id integer DEFAULT NULL::integer, IN p_enable_sms boolean DEFAULT false, IN p_enable_email boolean DEFAULT true, IN p_enable_whatsapp boolean DEFAULT false, IN p_country_id integer DEFAULT NULL::integer, IN p_state_id integer DEFAULT NULL::integer, IN p_district_id integer DEFAULT NULL::integer, INOUT p_result refcursor DEFAULT 'basic_profile_cursor'::refcursor)
  LANGUAGE plpgsql
@@ -23,6 +55,7 @@ DECLARE
     -- to these values on save (see the UpdateBasicProfile branch).
     v_locked_state_id   integer;
     v_locked_state_name character varying;
+    v_old_logo          character varying;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -136,6 +169,10 @@ BEGIN
           AND COALESCE(s.is_deleted, FALSE) = FALSE;
 
     ELSIF p_operation = 'UpdateBasicProfile' THEN
+
+        -- Mobile or landline, stored as digits (fn_school_phone_clean).
+        p_phone           := core.fn_school_phone_clean(p_phone, 'Official phone');
+        p_alternate_phone := core.fn_school_phone_clean(p_alternate_phone, 'Alternate phone');
 
         -- A State Board is granted by one state's education department, so a UP Board
         -- school cannot be located in Bihar. For boards flagged requires_state the
@@ -324,8 +361,32 @@ BEGIN
             p_school_id AS school_id,
             'Basic profile updated successfully.' AS message;
 
+    ELSIF p_operation = 'RemoveLogo' THEN
+
+        -- The save above keeps the old logo when none is sent (COALESCE), so
+        -- taking a logo off needs its own operation. Only this school's row.
+        SELECT sp.logo_url INTO v_old_logo
+        FROM core.school_profiles sp
+        WHERE sp.tenant_id = p_tenant_id AND sp.school_id = p_school_id;
+
+        UPDATE core.school_profiles
+        SET logo_url = NULL,
+            updated_by = p_action_user_id,
+            updated_at = NOW()
+        WHERE tenant_id = p_tenant_id
+          AND school_id = p_school_id
+          AND logo_url IS NOT NULL;
+
+        OPEN p_result FOR
+        SELECT
+            TRUE AS success,
+            p_school_id AS school_id,
+            v_old_logo AS removed_logo_url,
+            CASE WHEN NULLIF(trim(v_old_logo), '') IS NULL THEN 'There was no logo to remove.'
+                 ELSE 'Logo removed.' END AS message;
+
     ELSE
-        RAISE EXCEPTION 'Invalid operation %. Allowed operations are GetBasicProfile, UpdateBasicProfile', p_operation;
+        RAISE EXCEPTION 'Invalid operation %. Allowed operations are GetBasicProfile, UpdateBasicProfile, RemoveLogo', p_operation;
     END IF;
 END;
 $procedure$

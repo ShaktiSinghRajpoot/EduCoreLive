@@ -98,6 +98,49 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return await RunWriteAsync(p, "Calendar updated.");
         }
 
+        // One entry per day from..to. Days that already have an entry are left
+        // alone (and a holiday / half day range skips the weekly offs); the proc's
+        // message says what was skipped.
+        public async Task<SchoolCalendarSaveResult> SaveRangeAsync(
+            string fromDate, string toDate, SchoolCalendarEntry entry, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new SchoolCalendarSaveResult { Message = "Invalid school context." };
+
+            if (!TryReadDate(fromDate, out var from) || !TryReadDate(toDate, out var to))
+                return new SchoolCalendarSaveResult { Message = "Pick a valid first and last date." };
+
+            var p = Params("SaveRange", tenantId, schoolId, actionUserId);
+            p[5].Value = from.ToString(Dates.Iso);                                   // p_date
+            p[6].Value = to.ToString(Dates.Iso);                                     // p_to_date
+            p[7].Value = string.IsNullOrWhiteSpace(entry?.DayType)                      // p_day_type
+                            ? "holiday" : entry!.DayType.Trim().ToLowerInvariant();
+            p[8].Value = (entry?.Title ?? string.Empty).Trim();                         // p_title
+            p[9].Value = ParseTime(entry?.HalfDayEnd);                                  // p_half_day_end
+
+            return await RunWriteAsync(p, "Calendar updated.");
+        }
+
+        // Removes every entry between the two dates (inclusive).
+        public async Task<SchoolCalendarSaveResult> DeleteRangeAsync(
+            string fromDate, string toDate, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new SchoolCalendarSaveResult { Message = "Invalid school context." };
+
+            if (!TryReadDate(fromDate, out var from) || !TryReadDate(toDate, out var to))
+                return new SchoolCalendarSaveResult { Message = "Pick a valid first and last date." };
+
+            var p = Params("DeleteRange", tenantId, schoolId, actionUserId);
+            p[5].Value = from.ToString(Dates.Iso);      // p_date
+            p[6].Value = to.ToString(Dates.Iso);        // p_to_date
+
+            return await RunWriteAsync(p, "Entries removed.");
+        }
+
+        private static bool TryReadDate(string? value, out DateTime date) =>
+            DateTime.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+
         public async Task<SchoolCalendarSaveResult> DeleteEntryAsync(
             int calendarId, int tenantId, int schoolId, int actionUserId)
         {

@@ -1149,6 +1149,11 @@ BEGIN
     RAISE NOTICE '';
     RAISE NOTICE '-- F. Results ------------------------------------------------------';
 
+    -- Results reach the student only once the exam's RESULTS are published
+    -- (exam_results_publish.sql; that rule has its own suite). These checks are
+    -- about the arithmetic, so the fixture flags the results published directly.
+    UPDATE academic.exams SET results_status = 'Published' WHERE exam_id = ex_x;
+
     -- F1..F3: Aarav, class 7: Maths 90/100 + Science 50/100 = 140/200 = 70%.
     -- Maths is also on class 6's and class 8's datesheet in the same exam.
     SELECT * INTO r FROM pg_temp.res(c_tenant, c_school, s1, ex_x);
@@ -1171,6 +1176,7 @@ BEGIN
            (c_tenant, c_school, ex_y, v_cls7, sub_sc, wd_y2::text, '09:00', '10:00', 100, 33, 2);
     v_n := pg_temp.marks_save(c_tenant, c_school, c_user, ex_y, v_cls7, sub_m,  'A', jsonb_build_array(pg_temp.mk(s2, '30')));
     v_n := pg_temp.marks_save(c_tenant, c_school, c_user, ex_y, v_cls7, sub_sc, 'A', jsonb_build_array(pg_temp.mk(s2, '40')));
+    UPDATE academic.exams SET results_status = 'Published' WHERE exam_id = ex_y;
     SELECT * INTO r FROM pg_temp.res(c_tenant, c_school, s2, ex_y);
     PERFORM pg_temp.chk('EXM-F5 before: 70/200 = 35%', r.total = 200 AND r.pct = 35.0,
         format('obtained=%s total=%s pct=%s', r.obtained, r.total, r.pct));
@@ -1184,7 +1190,12 @@ BEGIN
         format('obtained=%s total=%s pct=%s', r.obtained, r.total, r.pct));
 
     -- F7: an exam moved back to Draft disappears from the student's results.
+    -- Published results must be pulled back before the datesheet can go to draft
+    -- (exam_results_publish_tests C6); the flag is then set again so this checks
+    -- that a draft datesheet hides the exam on its own.
+    UPDATE academic.exams SET results_status = 'Unpublished' WHERE exam_id = ex_y;
     PERFORM pg_temp.exam_op(c_tenant, c_school, 'SetStatus', ex_y, 'Draft');
+    UPDATE academic.exams SET results_status = 'Published' WHERE exam_id = ex_y;
     SELECT * INTO r FROM pg_temp.res(c_tenant, c_school, s2, ex_y);
     PERFORM pg_temp.chk_eq('EXM-F7 an exam moved back to Draft is hidden from results', r.exam_rows, 1);
 

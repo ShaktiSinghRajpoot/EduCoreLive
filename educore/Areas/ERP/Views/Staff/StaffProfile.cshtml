@@ -119,7 +119,10 @@
           </div>
           <div class="sp-card-body">
             <div class="row">
+              @if (ViewBag.CanSeeSalary == true)
+              {
               <div class="col-6 col-md-4 sp-field"><label>Monthly Salary</label><span>@(Model.MonthlySalary.HasValue ? "₹" + Model.MonthlySalary.Value.ToString("N0") : "—")</span></div>
+              }
               <div class="col-6 col-md-4 sp-field"><label>Alt Mobile</label><span>@Dash(Model.AltMobile)</span></div>
               <div class="col-6 col-md-4 sp-field"><label>PAN</label><span>@Dash(Model.Pan)</span></div>
               <div class="col-6 col-md-4 sp-field"><label>Bank A/C No</label><span>@Dash(Model.BankAccountNo)</span></div>
@@ -198,11 +201,14 @@
                 <span class="sp-link-txt"><span class="sp-link-t">Leave History</span><span class="sp-link-s">Requests &amp; balance</span></span>
                 <i class="bx bx-chevron-right sp-link-go"></i>
               </a>
+              @if (ViewBag.CanSeeSalary == true)
+              {
               <a class="sp-link" asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement">
                 <span class="sp-link-ic" style="background:#dcfce7;color:#16a34a;"><i class="bx bx-money"></i></span>
                 <span class="sp-link-txt"><span class="sp-link-t">Payroll / Payslips</span><span class="sp-link-s">Salary &amp; deductions</span></span>
                 <i class="bx bx-chevron-right sp-link-go"></i>
               </a>
+              }
             </div>
           </div>
         </div>

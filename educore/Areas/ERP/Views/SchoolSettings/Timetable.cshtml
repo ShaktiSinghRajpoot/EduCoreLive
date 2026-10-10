@@ -155,7 +155,10 @@ var SAVE_URL   ='@Url.Action("SaveTimetableCell","SchoolSettings",new{area="ERP"
 var CLEAR_URL  ='@Url.Action("ClearTimetableCell","SchoolSettings",new{area="ERP"})';
 var COPY_URL   ='@Url.Action("CopyTimetableDay","SchoolSettings",new{area="ERP"})';
 
-var PERIOD_LIST=[];     /* {id:period_seq, name, time, type} */
+/* Each weekday can run on its own bell schedule (a short Saturday), so periods
+   are kept per day: DAY_PERIODS[dayIdx] = [{id:period_seq, name, time, type}].
+   ROWS is the grid's row list: every period label any day has, in clock order. */
+var DAY_PERIODS=[], ROWS=[];
 var DAYS=[], DAY_VALUES=[];   /* labels for the UI, real 0-6 day numbers for the server */
 var SECTIONS=[], TEACHERS=[], SUBJECTS=[];
 
@@ -164,7 +167,27 @@ var SECTIONS=[], TEACHERS=[], SUBJECTS=[];
 var TT={}, BUSY={}, TEACH={}, ROOMBUSY={};
 
 var view='class', curSection=0, curTeacher=0, curDay=0, ctx=null;
-function PERIODS(){ return PERIOD_LIST; }
+function dayPeriods(dayIdx){ return DAY_PERIODS[dayIdx] || []; }
+function classPeriods(dayIdx){ return dayPeriods(dayIdx).filter(function(p){ return p.type==='class'; }); }
+/* The period with this row's label on that day, or null when the day has none. */
+function periodOf(dayIdx,rowKey){
+  return dayPeriods(dayIdx).find(function(p){ return p.name.toLowerCase()===rowKey; }) || null;
+}
+function anyPeriods(){ return DAY_PERIODS.some(function(l){ return l && l.length; }); }
+
+/* One grid row per label, ordered by the earliest time any day has it. */
+function buildRows(){
+  var byKey={};
+  ROWS=[];
+  DAYS.forEach(function(d,di){
+    dayPeriods(di).forEach(function(p){
+      var k=p.name.toLowerCase();
+      if(!byKey[k]){ byKey[k]={key:k, name:p.name, time:p.time, start:p.time.split('–')[0]}; ROWS.push(byKey[k]); }
+      else if(p.time.split('–')[0] < byKey[k].start) byKey[k].start=p.time.split('–')[0];
+    });
+  });
+  ROWS.sort(function(a,b){ return a.start<b.start ? -1 : (a.start>b.start ? 1 : 0); });
+}
 
 function teacherName(id){ var t=TEACHERS.find(function(x){return x.id===id;}); return t?t.name:''; }
 function sectionLabel(id){ var s=SECTIONS.find(function(x){return x.id===id;}); return s?s.label:''; }
@@ -196,17 +219,21 @@ function clashSection(dayIdx,periodId,teacherId,room){
 function loadSetup(){
   $.getJSON(SETUP_URL, { academicYearId: SESSION_ID })
     .done(function(s){
-      PERIOD_LIST=(s.periods||[]).map(function(p){
-        return {id:p.periodSeq, name:p.label, time:p.startTime+'–'+p.endTime, type:p.periodType};
-      });
       SECTIONS=(s.sections||[]).map(function(x){ return {id:x.sectionId, label:x.label, room:x.roomNo}; });
       TEACHERS=(s.teachers||[]).map(function(x){ return {id:x.staffId, name:x.fullName}; });
       DAYS      =(s.days||[]).map(function(d){ return d.dayLabel; });
       DAY_VALUES=(s.days||[]).map(function(d){ return d.dayOfWeek; });
+      DAY_PERIODS=DAYS.map(function(){ return []; });
+      (s.periods||[]).forEach(function(p){
+        var di=DAY_VALUES.indexOf(p.dayOfWeek);
+        if(di<0) return;
+        DAY_PERIODS[di].push({id:p.periodSeq, name:p.label, time:p.startTime+'–'+p.endTime, type:p.periodType});
+      });
+      buildRows();
 
       fillSelectors();
 
-      if(!PERIOD_LIST.length){ ecToast('info','Set the daily periods in Period Structure first.'); render(); return; }
+      if(!anyPeriods()){ ecToast('info','Set the daily periods in Period Structure first.'); render(); return; }
       if(!SECTIONS.length){ ecToast('info','Add classes & sections first.'); render(); return; }
 
       curSection=SECTIONS[0].id;
@@ -259,13 +286,19 @@ function loadTeacherGrid(){
 
 /* selectors */
 function fillSelectors(){
-  /* one bell schedule per school — the selector stays, it just has one entry */
+  /* the bell schedule summary: the first working day's hours, and a note when
+     some days run on a schedule of their own */
   var sh=document.getElementById('shiftSel');
   sh.innerHTML='';
   var o=document.createElement('option');
   o.value='school';
-  o.textContent=PERIOD_LIST.length
-    ? 'Bell Schedule · '+PERIOD_LIST[0].time.split('–')[0]+'–'+PERIOD_LIST[PERIOD_LIST.length-1].time.split('–')[1]
+  var first=dayPeriods(0);
+  var differs=DAYS.some(function(d,di){
+    return dayPeriods(di).map(function(p){ return p.name+p.time+p.type; }).join('|')
+        !== first.map(function(p){ return p.name+p.time+p.type; }).join('|');
+  });
+  o.textContent=first.length
+    ? 'Bell Schedule · '+first[0].time.split('–')[0]+'–'+first[first.length-1].time.split('–')[1]+(differs?' · some days differ':'')
     : 'No bell schedule';
   sh.appendChild(o);
 
@@ -293,23 +326,25 @@ function fillSubjectSelect(){
 
 /* stats */
 function renderStats(){
-  var classPeriods=PERIODS().filter(function(p){return p.type==='class';}).length * DAYS.length;
+  /* each day counts its own teaching periods (a short Saturday has fewer) */
+  var totalSlots=0;
+  DAYS.forEach(function(d,di){ totalSlots+=classPeriods(di).length; });
   var bar=document.getElementById('statBar');
   if(view==='class'){
     var filled=0, clashes=0;
-    PERIODS().filter(function(p){return p.type==='class';}).forEach(function(p){
-      DAYS.forEach(function(d,di){ var e=TT[di+'_'+p.id]; if(e){ filled++; if(clashSection(di,p.id,e.teacherId,e.room)) clashes++; } });
+    DAYS.forEach(function(d,di){
+      classPeriods(di).forEach(function(p){ var e=TT[di+'_'+p.id]; if(e){ filled++; if(clashSection(di,p.id,e.teacherId,e.room)) clashes++; } });
     });
-    bar.innerHTML='<span class="tt-stat"><b>'+filled+'</b><i>/ '+classPeriods+' set</i></span>'
-      +'<span class="tt-stat"><b>'+(classPeriods-filled)+'</b><i>free</i></span>'
+    bar.innerHTML='<span class="tt-stat"><b>'+filled+'</b><i>/ '+totalSlots+' set</i></span>'
+      +'<span class="tt-stat"><b>'+(totalSlots-filled)+'</b><i>free</i></span>'
       +'<span class="tt-stat clash'+(clashes?'':' zero')+'"><i class="bx bx-error-circle"></i><b>'+clashes+'</b><i>clash'+(clashes===1?'':'es')+'</i></span>';
   } else {
     var taught=0, secSet={};
-    PERIODS().filter(function(p){return p.type==='class';}).forEach(function(p){
-      DAYS.forEach(function(d,di){ var e=TEACH[di+'_'+p.id]; if(e){ taught++; secSet[e.sectionLabel]=1; } });
+    DAYS.forEach(function(d,di){
+      classPeriods(di).forEach(function(p){ var e=TEACH[di+'_'+p.id]; if(e){ taught++; secSet[e.sectionLabel]=1; } });
     });
     bar.innerHTML='<span class="tt-stat"><b>'+taught+'</b><i>periods/wk</i></span>'
-      +'<span class="tt-stat"><b>'+(classPeriods-taught)+'</b><i>free</i></span>'
+      +'<span class="tt-stat"><b>'+(totalSlots-taught)+'</b><i>free</i></span>'
       +'<span class="tt-stat"><b>'+Object.keys(secSet).length+'</b><i>classes</i></span>';
   }
 }
@@ -319,13 +354,25 @@ function renderGrid(){
   var g=document.getElementById('ttGrid');
   var head='<thead><tr><th class="tt-pcol">Period</th>'+DAYS.map(function(d){return '<th>'+d+'</th>';}).join('')+'</tr></thead>';
   var body='<tbody>';
-  PERIODS().forEach(function(p){
-    if(p.type!=='class'){          /* break and lunch are not bookable */
-      body+='<tr class="tt-break"><td class="tt-pcell"><div class="tt-pname">'+EC.esc(p.name)+'</div><div class="tt-ptime">'+p.time+'</div></td><td colspan="'+DAYS.length+'">'+EC.esc(p.name)+' · '+p.time+'</td></tr>';
+  ROWS.forEach(function(r){
+    /* a break every day at the same time stays one bar across the week */
+    var sameBreak=DAYS.every(function(d,di){ var p=periodOf(di,r.key); return p && p.type!=='class' && p.time===r.time; });
+    if(sameBreak){
+      body+='<tr class="tt-break"><td class="tt-pcell"><div class="tt-pname">'+EC.esc(r.name)+'</div><div class="tt-ptime">'+r.time+'</div></td><td colspan="'+DAYS.length+'">'+EC.esc(r.name)+' · '+r.time+'</td></tr>';
       return;
     }
-    body+='<tr><td><div class="tt-pcell"><div class="tt-pname">'+EC.esc(p.name)+'</div><div class="tt-ptime">'+p.time+'</div></div></td>';
-    DAYS.forEach(function(d,di){ body+='<td>'+cellHtml(di,p.id,false)+'</td>'; });
+    body+='<tr><td><div class="tt-pcell"><div class="tt-pname">'+EC.esc(r.name)+'</div><div class="tt-ptime">'+r.time+'</div></div></td>';
+    DAYS.forEach(function(d,di){
+      var p=periodOf(di,r.key);
+      if(!p){                                   /* this day's schedule has no such period */
+        body+='<td><div class="tt-cell ro empty"><span style="font-size:.7rem;font-weight:700;">—</span></div></td>';
+      } else if(p.type!=='class'){              /* break and lunch are not bookable */
+        body+='<td><div class="tt-cell ro empty"><span style="font-size:.7rem;font-weight:700;">'+EC.esc(p.name)+'</span></div>'
+            +(p.time!==r.time?'<div class="tt-ptime">'+p.time+'</div>':'')+'</td>';
+      } else {
+        body+='<td>'+cellHtml(di,p.id,false)+(p.time!==r.time?'<div class="tt-ptime">'+p.time+'</div>':'')+'</td>';
+      }
+    });
     body+='</tr>';
   });
   g.innerHTML=head+body+'</tbody>';
@@ -335,7 +382,7 @@ function renderGrid(){
 function renderMob(){
   var box=document.getElementById('mobList');
   document.querySelectorAll('.tt-day').forEach(function(b){ b.classList.toggle('on', parseInt(b.dataset.d,10)===curDay); });
-  box.innerHTML=PERIODS().map(function(p){
+  box.innerHTML=dayPeriods(curDay).map(function(p){
     if(p.type!=='class') return '<div class="tt-mbreak">'+EC.esc(p.name)+' · '+p.time+'</div>';
     return '<div class="tt-mrow"><div class="tt-mp"><div class="tt-mp-name">'+EC.esc(p.name)+'</div><div class="tt-mp-time">'+p.time+'</div></div>'+cellHtml(curDay,p.id,true)+'</div>';
   }).join('');
@@ -370,7 +417,7 @@ function render(){
 function bindCells(){
   if(view!=='class') return;
   document.querySelectorAll('.js-cell').forEach(function(b){
-    b.addEventListener('click',function(){ openCell(parseInt(this.dataset.d,10), this.dataset.p); });
+    b.addEventListener('click',function(){ openCell(parseInt(this.dataset.d,10), parseInt(this.dataset.p,10)); });
   });
 }
 
@@ -379,7 +426,7 @@ function openCell(dayIdx,periodId){
   if(!SUBJECTS.length){ ecToast('error','This class has no subjects yet — set them in Subject Management.'); return; }
   ctx={dayIdx:dayIdx,periodId:periodId};
   var e=TT[dayIdx+'_'+periodId]||{subjectId:0,teacherId:0,room:''};
-  var p=PERIODS().find(function(x){return x.id===periodId;});
+  var p=dayPeriods(dayIdx).find(function(x){return x.id===periodId;});
   document.getElementById('cellSlot').textContent=sectionLabel(curSection)+' · '+DAYS[dayIdx]+' · '+(p?p.name:'');
   document.getElementById('mSubject').value=e.subjectId||0;
   document.getElementById('mTeacher').value=e.teacherId||0;
@@ -437,12 +484,11 @@ document.getElementById('cellClear').addEventListener('click',function(){
 /* copy the first working day → whole week */
 document.getElementById('btnCopy').addEventListener('click',function(){
   if(!DAYS.length) return;
-  var classP=PERIODS().filter(function(p){return p.type==='class';});
-  var srcCount=classP.filter(function(p){return TT['0_'+p.id];}).length;
+  var srcCount=classPeriods(0).filter(function(p){return TT['0_'+p.id];}).length;
   if(!srcCount){ ecToast('error',DAYS[0]+' is empty — fill it first, then copy.'); return; }
   EC.confirm({ title:'Copy '+DAYS[0]+' across the week?',
                name:sectionLabel(curSection),
-               message:'This overwrites the other days with '+DAYS[0]+'’s '+srcCount+' period(s).',
+               message:'This overwrites the other days with '+DAYS[0]+'’s '+srcCount+' period(s). Each lesson goes to the period with the same name; a day without that period skips it.',
                icon:'bx-copy', okText:'Copy & overwrite' }).then(function(ok){
     if(!ok) return;
     post(COPY_URL,{ sectionId:curSection, day:DAY_VALUES[0] })

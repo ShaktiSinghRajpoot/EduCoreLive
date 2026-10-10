@@ -25,14 +25,16 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         // ── Items ───────────────────────────────────────────────────────────
         public async Task<List<InventoryItem>> GetItemsAsync(
-            int tenantId, int schoolId, int actionUserId, string? search = null, string? status = null)
+            int tenantId, int schoolId, int actionUserId, string? search = null, string? status = null,
+            int? locationId = null)
         {
             var items = new List<InventoryItem>();
             if (tenantId <= 1 || schoolId <= 0) return items;
 
             var ds = await _db.ExecuteProcedureWithCursorsAsync(
                 Sp, Params("ListItems", tenantId, schoolId, actionUserId,
-                           search: search, filterStatus: status));
+                           search: search, filterStatus: status,
+                           locationId: locationId > 0 ? locationId : null));
 
             if (ds.Tables.Count == 0) return items;
             foreach (DataRow row in ds.Tables[0].Rows) items.Add(ReadItem(row));
@@ -64,7 +66,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 openingStock: input.OpeningStock, minStock: input.MinStock,
                 costPrice: input.CostPrice, sellingPrice: input.SellingPrice,
                 brand: input.Brand, model: input.Model,
-                description: input.Description, isActive: input.IsActive));
+                description: input.Description, isActive: input.IsActive,
+                locationId: input.LocationId > 0 ? input.LocationId : null));
         }
 
         public async Task<InventoryResult> DeleteItemAsync(
@@ -86,7 +89,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
             return await RunAsync(Sp, Params("MoveStock", tenantId, schoolId, actionUserId,
                 itemId: input.ItemId, movementType: input.MovementType,
-                quantity: input.Quantity, issuedTo: input.IssuedTo, remarks: input.Remarks));
+                quantity: input.Quantity, issuedTo: input.IssuedTo, remarks: input.Remarks,
+                locationId: input.LocationId > 0 ? input.LocationId : null));
         }
 
         public async Task<List<StockMovement>> GetItemLedgerAsync(
@@ -114,21 +118,137 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     InvoiceNo    = Str(r, "invoice_no"),
                     IssuedTo     = Str(r, "issued_to"),
                     Remarks      = Str(r, "remarks"),
-                    ReferenceId  = IntVal(r, "reference_id")
+                    ReferenceId  = IntVal(r, "reference_id"),
+                    LocationName    = Str(r, "location_name"),
+                    LocationBalance = DecVal(r, "location_balance"),
+                    TransferWith    = Str(r, "transfer_with")
                 });
             return rows;
+        }
+
+        public async Task<List<ItemLocationStock>> GetItemStockByLocationAsync(
+            int itemId, int tenantId, int schoolId, int actionUserId)
+        {
+            var rows = new List<ItemLocationStock>();
+            if (tenantId <= 1 || schoolId <= 0 || itemId <= 0) return rows;
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(
+                Sp, Params("ItemStock", tenantId, schoolId, actionUserId, itemId: itemId));
+
+            if (ds.Tables.Count == 0) return rows;
+            foreach (DataRow r in ds.Tables[0].Rows)
+                rows.Add(new ItemLocationStock
+                {
+                    LocationId   = IntVal(r, "location_id"),
+                    LocationName = Str(r, "location_name"),
+                    IsDefault    = BoolVal(r, "is_default"),
+                    IsActive     = BoolVal(r, "is_active"),
+                    Quantity     = DecVal(r, "quantity")
+                });
+            return rows;
+        }
+
+        // ── Locations and transfers ─────────────────────────────────────────
+        public async Task<List<InventoryLocation>> GetLocationsAsync(
+            int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<InventoryLocation>();
+            if (tenantId <= 1 || schoolId <= 0) return list;
+
+            // The proc creates the default "Main Store" if the school has none yet.
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(
+                Sp, Params("ListLocations", tenantId, schoolId, actionUserId));
+
+            if (ds.Tables.Count == 0) return list;
+            foreach (DataRow r in ds.Tables[0].Rows)
+                list.Add(new InventoryLocation
+                {
+                    LocationId   = IntVal(r, "location_id"),
+                    LocationName = Str(r, "location_name"),
+                    IsDefault    = BoolVal(r, "is_default"),
+                    IsActive     = BoolVal(r, "is_active"),
+                    ItemCount    = IntVal(r, "item_count"),
+                    TotalQty     = DecVal(r, "total_qty"),
+                    StockValue   = DecVal(r, "stock_value")
+                });
+            return list;
+        }
+
+        public async Task<InventoryResult> SaveLocationAsync(
+            int locationId, string? name, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new InventoryResult { Message = "Invalid school scope." };
+
+            return await RunAsync(Sp, Params("SaveLocation", tenantId, schoolId, actionUserId,
+                locationId: locationId > 0 ? locationId : null, locationName: name));
+        }
+
+        public async Task<InventoryResult> SetLocationActiveAsync(
+            int locationId, bool isActive, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new InventoryResult { Message = "Invalid school scope." };
+
+            return await RunAsync(Sp, Params("SetLocationActive", tenantId, schoolId, actionUserId,
+                locationId: locationId, isActive: isActive));
+        }
+
+        public async Task<InventoryResult> TransferStockAsync(
+            StockTransferInput input, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new InventoryResult { Message = "Invalid school scope." };
+            if (input.ToLocationId <= 0)
+                return new InventoryResult { Message = "Choose where the stock is going." };
+
+            return await RunAsync(Sp, Params("Transfer", tenantId, schoolId, actionUserId,
+                itemId: input.ItemId, quantity: input.Quantity, remarks: input.Reason,
+                locationId: input.FromLocationId > 0 ? input.FromLocationId : null,
+                toLocationId: input.ToLocationId));
+        }
+
+        public async Task<List<StockTransfer>> GetTransfersAsync(
+            int tenantId, int schoolId, int actionUserId, int? itemId = null, int? locationId = null)
+        {
+            var list = new List<StockTransfer>();
+            if (tenantId <= 1 || schoolId <= 0) return list;
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(
+                Sp, Params("ListTransfers", tenantId, schoolId, actionUserId,
+                           itemId: itemId > 0 ? itemId : null,
+                           locationId: locationId > 0 ? locationId : null));
+
+            if (ds.Tables.Count == 0) return list;
+            foreach (DataRow r in ds.Tables[0].Rows)
+                list.Add(new StockTransfer
+                {
+                    TransferId   = IntVal(r, "transfer_id"),
+                    TransferDate = Str(r, "transfer_date"),
+                    ItemId       = IntVal(r, "item_id"),
+                    ItemName     = Str(r, "item_name"),
+                    UnitType     = Str(r, "unit_type"),
+                    FromLocation = Str(r, "from_location"),
+                    ToLocation   = Str(r, "to_location"),
+                    Quantity     = DecVal(r, "quantity"),
+                    Reason       = Str(r, "reason"),
+                    CreatedBy    = Str(r, "created_by_name"),
+                    CreatedAt    = Str(r, "created_at")
+                });
+            return list;
         }
 
 
         // ── Suppliers ───────────────────────────────────────────────────────
         public async Task<List<InventorySupplier>> GetSuppliersAsync(
-            int tenantId, int schoolId, int actionUserId)
+            int tenantId, int schoolId, int actionUserId, string? search = null, string? status = null)
         {
             var list = new List<InventorySupplier>();
             if (tenantId <= 1 || schoolId <= 0) return list;
 
             var ds = await _db.ExecuteProcedureWithCursorsAsync(
-                Sp, Params("ListSuppliers", tenantId, schoolId, actionUserId));
+                Sp, Params("ListSuppliers", tenantId, schoolId, actionUserId,
+                           search: search, filterStatus: status));
 
             if (ds.Tables.Count == 0) return list;
             foreach (DataRow r in ds.Tables[0].Rows)
@@ -141,7 +261,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     Email         = Str(r, "email"),
                     Address       = Str(r, "address"),
                     Gstin         = Str(r, "gstin"),
-                    IsActive      = BoolVal(r, "is_active")
+                    IsActive      = BoolVal(r, "is_active"),
+                    BillCount     = IntVal(r, "bill_count"),
+                    TotalBilled   = DecVal(r, "total_billed"),
+                    LastBillDate  = Str(r, "last_bill_date")
                 });
             return list;
         }
@@ -168,10 +291,20 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 supplierId: supplierId));
         }
 
+        public async Task<InventoryResult> SetSupplierActiveAsync(
+            int supplierId, bool isActive, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new InventoryResult { Message = "Invalid school scope." };
+
+            return await RunAsync(Sp, Params("SetSupplierActive", tenantId, schoolId, actionUserId,
+                supplierId: supplierId, isActive: isActive));
+        }
+
         // ── Purchases ───────────────────────────────────────────────────────
         public async Task<List<PurchaseListItem>> GetPurchasesAsync(
             int tenantId, int schoolId, int actionUserId,
-            string? fromDate = null, string? toDate = null)
+            string? fromDate = null, string? toDate = null, int? supplierId = null)
         {
             var list = new List<PurchaseListItem>();
             if (tenantId <= 1 || schoolId <= 0) return list;
@@ -180,7 +313,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             // null) rather than reaching the proc and failing the whole list.
             var ds = await _db.ExecuteProcedureWithCursorsAsync(
                 SpPurchase, PurchaseParams("List", tenantId, schoolId, actionUserId,
-                                           fromDate: Dates.Norm(fromDate), toDate: Dates.Norm(toDate)));
+                                           fromDate: Dates.Norm(fromDate), toDate: Dates.Norm(toDate),
+                                           supplierId: supplierId > 0 ? supplierId : null));
 
             if (ds.Tables.Count == 0) return list;
             foreach (DataRow r in ds.Tables[0].Rows)
@@ -196,7 +330,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     GrandTotal   = DecVal(r, "grand_total"),
                     IsCancelled  = BoolVal(r, "is_cancelled"),
                     LineCount    = IntVal(r, "line_count"),
-                    ItemQty      = DecVal(r, "item_qty")
+                    ItemQty      = DecVal(r, "item_qty"),
+                    LocationName   = Str(r, "location_name"),
+                    ReturnedQty    = DecVal(r, "returned_qty"),
+                    ReturnedAmount = DecVal(r, "returned_amount")
                 });
             return list;
         }
@@ -226,19 +363,52 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 TaxTotal     = DecVal(h, "tax_total"),
                 GrandTotal   = DecVal(h, "grand_total"),
                 IsCancelled  = BoolVal(h, "is_cancelled"),
-                CancelReason = Str(h, "cancel_reason")
+                CancelReason = Str(h, "cancel_reason"),
+                LocationName   = Str(h, "location_name"),
+                CreatedBy      = Str(h, "created_by_name"),
+                CreatedAt      = Str(h, "created_at"),
+                CancelledBy    = Str(h, "cancelled_by_name"),
+                CancelledAt    = Str(h, "cancelled_at"),
+                ReturnedAmount = DecVal(h, "returned_amount")
             };
 
             if (ds.Tables.Count > 1)
                 foreach (DataRow r in ds.Tables[1].Rows)
                     detail.Lines.Add(new PurchaseLine
                     {
+                        PurchaseItemId = IntVal(r, "purchase_item_id"),
                         ItemId     = IntVal(r, "item_id"),
                         ItemName   = Str(r, "item_name"),
                         Quantity   = DecVal(r, "quantity"),
                         UnitPrice  = DecVal(r, "unit_price"),
                         TaxPercent = DecVal(r, "tax_percent"),
-                        LineTotal  = DecVal(r, "line_total")
+                        LineTotal  = DecVal(r, "line_total"),
+                        UnitType       = Str(r, "unit_type"),
+                        ReturnedQty    = DecVal(r, "returned_qty"),
+                        ReturnedAmount = DecVal(r, "returned_amount")
+                    });
+
+            // The returns made against the bill: a second, small call (the proc
+            // keeps them in their own operation, see inventory.sql).
+            var rs = await _db.ExecuteProcedureWithCursorsAsync(
+                SpPurchase, PurchaseParams("Returns", tenantId, schoolId, actionUserId,
+                                           purchaseId: purchaseId));
+            if (rs.Tables.Count > 0)
+                foreach (DataRow r in rs.Tables[0].Rows)
+                    detail.Returns.Add(new PurchaseReturn
+                    {
+                        ReturnId       = IntVal(r, "return_id"),
+                        ReturnDate     = Str(r, "return_date"),
+                        PurchaseItemId = IntVal(r, "purchase_item_id"),
+                        ItemName       = Str(r, "item_name"),
+                        Quantity       = DecVal(r, "quantity"),
+                        UnitPrice      = DecVal(r, "unit_price"),
+                        TaxPercent     = DecVal(r, "tax_percent"),
+                        Amount         = DecVal(r, "amount"),
+                        Reason         = Str(r, "reason"),
+                        LocationName   = Str(r, "location_name"),
+                        CreatedBy      = Str(r, "created_by_name"),
+                        CreatedAt      = Str(r, "created_at")
                     });
 
             return detail;
@@ -274,7 +444,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 PurchaseParams("Save", tenantId, schoolId, actionUserId,
                     supplierId: input.SupplierId, purchaseDate: purchaseDate,
                     invoiceNo: input.InvoiceNo, paymentMode: input.PaymentMode,
-                    remarks: input.Remarks, itemsJson: itemsJson));
+                    remarks: input.Remarks, itemsJson: itemsJson,
+                    locationId: input.LocationId > 0 ? input.LocationId : null));
         }
 
         public async Task<InventoryResult> CancelPurchaseAsync(
@@ -286,6 +457,27 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return await RunAsync(SpPurchase,
                 PurchaseParams("Cancel", tenantId, schoolId, actionUserId,
                     purchaseId: purchaseId, remarks: reason));
+        }
+
+        public async Task<InventoryResult> ReturnToSupplierAsync(
+            PurchaseReturnInput input, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0)
+                return new InventoryResult { Message = "Invalid school scope." };
+
+            // Lines with nothing to return are simply not part of the return;
+            // the proc checks every quantity that is sent.
+            var lines = (input.Lines ?? new List<PurchaseReturnLineInput>())
+                        .Where(l => l.PurchaseItemId > 0 && l.Quantity != 0).ToList();
+            if (lines.Count == 0)
+                return new InventoryResult { Message = "Enter a quantity to return on at least one line." };
+
+            var itemsJson = JsonSerializer.Serialize(
+                lines.Select(l => new { purchaseItemId = l.PurchaseItemId, quantity = l.Quantity }));
+
+            return await RunAsync(SpPurchase,
+                PurchaseParams("Return", tenantId, schoolId, actionUserId,
+                    purchaseId: input.PurchaseId, remarks: input.Reason, itemsJson: itemsJson));
         }
 
         // ── Shared plumbing ─────────────────────────────────────────────────
@@ -302,7 +494,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 {
                     Success      = BoolVal(r, "success"),
                     Message      = Str(r, "message"),
-                    Id           = IntVal(r, "item_id") + IntVal(r, "supplier_id") + IntVal(r, "purchase_id"),
+                    Id           = IntVal(r, "item_id") + IntVal(r, "supplier_id") + IntVal(r, "purchase_id")
+                                 + IntVal(r, "location_id"),
                     CurrentStock = DecVal(r, "current_stock"),
                     GrandTotal   = DecVal(r, "grand_total")
                 };
@@ -337,10 +530,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         "ux_inventory_item_sku"         => "Another item already uses this code.",
                         "ux_inventory_supplier_name"    => "A supplier with this name already exists.",
                         "ux_inventory_purchase_invoice" => "This bill number is already entered for this supplier.",
+                        "ux_inventory_location_name"    => "A location with this name already exists.",
                         _                               => "This record already exists."
                     };
                 case PostgresErrorCodes.CheckViolation:
-                    return "One of the values is not allowed. Check quantities, prices and tax.";
+                    return ex.ConstraintName == "chk_inv_loc_stock"
+                        ? "There is not enough stock at that location."
+                        : "One of the values is not allowed. Check quantities, prices and tax.";
                 case PostgresErrorCodes.NumericValueOutOfRange:
                     return "One of the numbers is too large.";
                 case PostgresErrorCodes.StringDataRightTruncation:
@@ -372,7 +568,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             Description  = Str(r, "description"),
             StockValue   = DecVal(r, "stock_value"),
             StockStatus  = Str(r, "stock_status"),
-            IsActive     = BoolVal(r, "is_active")
+            IsActive     = BoolVal(r, "is_active"),
+            LocationsHeld = IntVal(r, "locations_held")
         };
 
         // Positional: the proc's parameter order.
@@ -387,7 +584,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             string? mobile = null, string? email = null, string? address = null,
             string? gstin = null, string? movementType = null, decimal? quantity = null,
             string? issuedTo = null, string? remarks = null,
-            string? search = null, string? filterStatus = null) => new NpgsqlParameter[]
+            string? search = null, string? filterStatus = null,
+            int? locationId = null, int? toLocationId = null, string? locationName = null) => new NpgsqlParameter[]
         {
             new("p_operation",      NpgsqlDbType.Text)    { Value = operation },
             new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
@@ -421,6 +619,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             new("p_remarks",        NpgsqlDbType.Text)    { Value = (object?)remarks ?? DBNull.Value },
             new("p_search",         NpgsqlDbType.Text)    { Value = (object?)search ?? DBNull.Value },
             new("p_filter_status",  NpgsqlDbType.Text)    { Value = (object?)filterStatus ?? DBNull.Value },
+            new("p_location_id",    NpgsqlDbType.Integer) { Value = (object?)locationId ?? DBNull.Value },
+            new("p_to_location_id", NpgsqlDbType.Integer) { Value = (object?)toLocationId ?? DBNull.Value },
+            new("p_location_name",  NpgsqlDbType.Text)    { Value = (object?)locationName ?? DBNull.Value },
             new("p_result", NpgsqlDbType.Refcursor)
                 { Direction = ParameterDirection.InputOutput, Value = "inventory_cursor" }
         };
@@ -429,7 +630,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             string operation, int tenantId, int schoolId, int actionUserId,
             int? purchaseId = null, int? supplierId = null, string? purchaseDate = null,
             string? invoiceNo = null, string? paymentMode = null, string? remarks = null,
-            string? itemsJson = null, string? fromDate = null, string? toDate = null)
+            string? itemsJson = null, string? fromDate = null, string? toDate = null,
+            int? locationId = null)
             => new NpgsqlParameter[]
         {
             new("p_operation",      NpgsqlDbType.Text)    { Value = operation },
@@ -445,6 +647,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             new("p_items",          NpgsqlDbType.Jsonb)   { Value = (object?)itemsJson ?? "[]" },
             new("p_from_date",      NpgsqlDbType.Unknown)    { Value = (object?)fromDate ?? DBNull.Value },
             new("p_to_date",        NpgsqlDbType.Unknown)    { Value = (object?)toDate ?? DBNull.Value },
+            new("p_location_id",    NpgsqlDbType.Integer) { Value = (object?)locationId ?? DBNull.Value },
             new("p_result",  NpgsqlDbType.Refcursor)
                 { Direction = ParameterDirection.InputOutput, Value = "purchase_cursor" },
             new("p_result2", NpgsqlDbType.Refcursor)

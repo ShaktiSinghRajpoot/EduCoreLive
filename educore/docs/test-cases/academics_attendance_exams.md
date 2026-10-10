@@ -54,7 +54,7 @@ Sunrise Public School, FY 26-27:
 | CAL-10 | Half-day closing time vs bell schedule | half day ending 07:00 (before P1) or 23:00 | Warn or refuse when it is outside school hours | Proc | static: P-CAL:112-114 only checks that it is not NULL | FIXED (closing time must fall inside the period structure; SQL CAL-G0, G0b) |
 | CAL-11 | Delete another school's entry by id | DeleteEntry id from tenant 23 scope | Not deleted | Proc | SQL ISO-H5 | PASS |
 | CAL-12 | Delete reports what it did | DeleteEntry with an id that matches nothing | "not found" | Proc | static: P-CAL:134-140 always returns "Entry removed." | FIXED ("That calendar entry was not found."; SQL ISO-H5) |
-| CAL-13 | Holiday ranges (Diwali week) | 5 consecutive days | One action | UI/Proc | static: P-CAL `p_to_date` is ignored by SaveEntry and V-CAL posts a single date, so it takes five saves | FUTURE FEATURE (date-range entry) |
+| CAL-13 | Holiday ranges (Diwali week) | 5 consecutive days | One action | UI/Proc | P-CAL `SaveRange` / `DeleteRange`; V-CAL "Date range" dialog | BUILT (section J; SQL WDS-F*) |
 | BELL-01 | Day status defaults to today on the school's clock | GetDayStatus(NULL) | today (Asia/Kolkata) | Proc | SQL BELL-A11 | PASS |
 | BELL-02 | Half day clamps the periods | half_day_end 11:30 | Periods starting ≥ 11:30 dropped; a spanning period ends at 11:30 | UI-JS | static: V-BELL:155-168 `buildPeriods` | PASS |
 | BELL-03 | Holiday / weekly off is silent | holiday | "School holiday" card, no ring | UI-JS | static: V-BELL tick() 305-312 | PASS |
@@ -158,7 +158,7 @@ Sunrise Public School, FY 26-27:
 | EXM-37 | **What the mark was before (audit)** | 100 → 90 | Old value retained | Proc/DB | SQL EXM-E14: no history. `finalized_by`/`reopened_by` also keep only the latest | FIXED (academic.exam_marks_history; SQL EXM-E14, E14c) |
 | EXM-38 | **Marks for a section the exam does not cover** | exam = 7-A only; POST 7-B sheet | Refused | Proc | SQL EXM-E15 (saved 1). P-MK checks that the class is on the exam (P-MK:45-49) but not `exam_class_sections` | FIXED (SQL EXM-E15) |
 | EXM-39 | **Marks against a Draft exam** | POST SaveMarks for a Draft exam | Refused | Proc | SQL EXM-E17 (saved 1). Only the page hides drafts (CTL-EX:282); P-MK never reads `exams.status` | FIXED (SQL EXM-E17) |
-| EXM-40 | Re-entry after the exam is Published | edit marks of a Published exam, sheet not finalised | Business rule | Proc | static: allowed, because "Published" means the datesheet is published. Only finalising a sheet locks it | BY DESIGN (BD-02: no result-publish step yet) |
+| EXM-40 | Re-entry after the exam is Published | edit marks of a Published exam, sheet not finalised | Business rule | Proc | static: allowed, because "Published" means the datesheet is published. Only finalising a sheet locks it | BY DESIGN: marks stay editable until the RESULTS are published, then locked (RES-15) |
 | EXM-41 | Teacher without exams.manage | sheet read-only | Inputs locked | UI+CTL | static: V-ME:432-434; CTL-EX:373 | PASS |
 | EXM-42 | Any teacher with exams.manage can enter any class's marks | subject teacher of 6 edits 8 | Restrict to the teacher's classes/subjects | CTL | static: no subject-teacher check anywhere in CTL-EX/P-MK | BY DESIGN (BD-08: stays exams.manage) |
 
@@ -171,10 +171,10 @@ Sunrise Public School, FY 26-27:
 | EXM-45 | Baseline before a paper is removed | Bhavna 30 + 40 of 200 | 35% | Proc | SQL EXM-F5 | PASS |
 | EXM-46 | **Marks of a removed paper** | Science dropped from datesheet | 30/100 = 30% | Proc | SQL EXM-F6: 70/100 = 70%. P-RES LEFT JOINs the missing paper: obtained still counts and max is NULL. Results can exceed 100% | FIXED (SQL EXM-F6) |
 | EXM-47 | Exam back to Draft | SetStatus Draft | Hidden from results | Proc | SQL EXM-F7 | PASS |
-| EXM-48 | Grade per subject / overall | | Grade from a grading scale | — | static: no grading table, column or proc anywhere. The only "Grade/Class Rank" is mock JS in `Views/Admission/Dashboard.cshtml:152, 272, 323` (`rank:rand(1,40)`) | FUTURE FEATURE (BD-03) |
-| EXM-49 | Class rank | | Rank within section/class | — | static: not implemented | FUTURE FEATURE (BD-03) |
-| EXM-50 | Class-wise result sheet / report card | | Printable result | — | static: only the per-student dashboard (CTL-ST DashboardData → P-RES) exists | FUTURE FEATURE |
-| EXM-51 | Partial results visible | Published exam, sheets still draft | Results visible only when final | Proc | static: P-RES:25 filters `status='Published'` (datesheet) only, so draft marks show on the dashboard | FUTURE FEATURE (BD-02) |
+| EXM-48 | Grade per subject / overall | | Grade from a grading scale | — | static: no grading table, column or proc anywhere. The only "Grade/Class Rank" is mock JS in `Views/Admission/Dashboard.cshtml:152, 272, 323` (`rank:rand(1,40)`) | BUILT (RES-01..06, RES-16, RES-20) |
+| EXM-49 | Class rank | | Rank within section/class | — | static: not implemented | BUILT (RES-17..19) |
+| EXM-50 | Class-wise result sheet / report card | | Printable result | — | static: only the per-student dashboard (CTL-ST DashboardData → P-RES) exists | BUILT: Exam/ResultSheet, printable + CSV (RES-21, RES-29, RES-30) |
+| EXM-51 | Partial results visible | Published exam, sheets still draft | Results visible only when final | Proc | static: P-RES:25 filters `status='Published'` (datesheet) only, so draft marks show on the dashboard | FIXED: results show only once published, which needs every sheet finalised (RES-09, RES-11) |
 
 ## G. Timetable (TT)
 
@@ -224,13 +224,75 @@ Sunrise Public School, FY 26-27:
 | ISO-19 | Permissions | attendance.view/manage, exams.view/manage, academics.view/manage, RequiresModule(Exams), ValidateAntiForgeryToken on every POST | static: CTL-ATT:12, 87-88; CTL-EX:12-13, 157-158, 166-167, 206-207, 373-374, 389-390; CTL-SS:1121-1148, 1257-1260, 1358-1389 | PASS |
 | ISO-20 | Error logging convention | Services that catch log first | static: SVC-ATT, SVC-EX, SVC-CAL, SVC-TT catch `PostgresException` without an `ILogger` (CLAUDE.md "Error logging convention") | FIXED (ILogger + Warning in all four services) |
 
+## I. Results: grade scale, publish step, grades, rank, result sheet (RES)
+
+Added 2026-10-10 with the results feature (BD-02, BD-03). **SQL suite:** `EduCoreDataAccessLayer/Database/tests/exam_results_publish_tests.sql` (own fixture: class 8, sections A/B, six ZZ RS students, one exam with Maths /100 and Science /50). **Last run:** `RESULT: 81 passed, 0 failed`. Procs: `exam_results_publish.sql` (**P-GS** = `academic.sp_school_admin_grade_scale_manage`, **P-RP** = `academic.sp_school_admin_exam_results_manage`, `fn_exam_class_result`, `fn_exam_pending_sheets`, `fn_grade_for_percent`). Pages: `Exam/GradeScale`, `Exam/ResultSheet` (Examinations menu).
+
+| ID | Scenario | Steps / input | Expected | Layer | How verified | Result |
+|---|---|---|---|---|---|---|
+| RES-01 | No scale saved | GetScale | CBSE 8-point default: A1 91-100 ... E 0-32, flagged default | Proc | SQL A1 | PASS |
+| RES-02 | Grade mapping | 91, 90.5, 33, 32.99, 100, 0, NULL | A1, A2, D, E, A1, E, none (between two whole-number bands = lower band) | Proc | SQL A2..A8 | PASS |
+| RES-03 | Invalid scales | empty, blank label, duplicate label (any case), overlap, gap, not from 0, not to 100, min > max, > 100, non-numeric | Refused with a message naming the band | Proc | SQL A9..A18 | PASS |
+| RES-04 | Custom scale | 5 bands A/B/C/D/F | Saved; GetScale returns 5, not default; grades follow it | Proc | SQL A19..A21b | PASS |
+| RES-05 | Refused save | invalid scale after a valid one | Previous scale kept | Proc | SQL A23 | PASS |
+| RES-06 | Reset | ResetDefault | CBSE default again | Proc | SQL A25 | PASS |
+| RES-07 | Publish with a draft datesheet | PublishResults on a Draft exam | Refused | Proc | SQL B1 | PASS |
+| RES-08 | Result status of a new exam | GetStatus | Unpublished; expected sheets = papers x sections with students (4), all pending | Proc | SQL B2 | PASS |
+| RES-09 | **Publish while sheets are not finalised** | none / 3 of 4 finalised | Refused, with the count and the first pending sheet | Proc | SQL B3, B6, B7 | PASS |
+| RES-10 | Marks while results unpublished | SaveMarks drafts | Accepted | Proc | SQL B4 | PASS |
+| RES-11 | **Draft marks hidden from parents** | Published datesheet, results unpublished | Student dashboard shows nothing (also not as "latest exam") | Proc | SQL B5, B5b | PASS (closes EXM-51) |
+| RES-12 | Finalise turns blank into Absent | r4 never marked | Absent | Proc | SQL B8 | PASS |
+| RES-13 | Publish | all finalised | Published, by/at stamped, log row Publish | Proc | SQL B10..B12 | PASS |
+| RES-14 | Publish twice | | Refused | Proc | SQL B13 | PASS |
+| RES-15 | **Marks locked once published** | SaveMarks, ReopenSheet, SaveExam edit, SetStatus Draft | All refused ("Unpublish the results first"); mark unchanged; GetSheet reports results_published so Marks Entry locks the grid | Proc+UI | SQL C1..C6; V-ME `pubChip` / `locked()` | PASS (closes EXM-40) |
+| RES-16 | Overall percentage and grade | 130/150 | 86.7% (dashboard, 1 dp), grade A2 (from the 2-dp %) | Proc | SQL D1..D3 | PASS |
+| RES-17 | **Rank with ties** | two students 86.67%, next 83.33% | 1, 1, 3 by class; section rank separately (2 of 3 in A) | Proc | SQL D4..D7, D15 | PASS |
+| RES-18 | Absent paper | Science absent | Out of the total (45/100 = 45%, C2), still ranked | Proc | SQL D8 | PASS |
+| RES-19 | Absent from every paper | | No %, no grade, no rank (not counted in class size) | Proc | SQL D10 | PASS |
+| RES-20 | Subject grade | 90/100, 40/50, absent | A2, B1 (out of its own max), none | Proc | SQL D11..D13 | PASS |
+| RES-21 | Class result sheet | whole class / section "b" | 6 students x 2 papers; section filter keeps the class rank | Proc | SQL D14..D16 | PASS |
+| RES-22 | Grades are not stored | change the scale after publishing | The next read shows the new grade | Proc | SQL D17 | PASS |
+| RES-23 | Unpublish | blank reason / other school / with reason / twice | Refused / not found / done and logged (reason, who, when) / refused | Proc | SQL E1..E5, E7 | PASS |
+| RES-24 | Hidden again after unpublish | | Dashboard shows nothing | Proc | SQL E6 | PASS |
+| RES-25 | Correction cycle | unpublish, reopen, edit, finalise, republish | Mark edit history kept (40 -> 45); ranks recomputed (sole rank 1, then 2) | Proc | SQL E8..E11 | PASS |
+| RES-26 | Marks of a removed paper | paper deleted behind the procs' back | Do not count | Proc | SQL E12 | PASS |
+| RES-27 | Tenant isolation | other school: class sheet, status, student result, result function, grade scale; platform scope | Not found / nothing / own scale only / refused | Proc | SQL A22, A24, B9, E2, F1..F6 | PASS |
+| RES-28 | Permissions | publish, unpublish, grade scale save/reset need exams.manage; pages need exams.view | `[HasPermission("exams.manage")]` + `ValidateAntiForgeryToken` on every POST | CTL | static: CTL-EX SaveGradeScale, ResetGradeScale, PublishResults, UnpublishResults | PASS |
+| RES-29 | CSV export | a name starting with = + - @ tab | Prefixed with `'` and quoted, so a spreadsheet keeps it as text | CTL | static: CTL-EX `Csv()` | PASS |
+| RES-30 | Print | Result Sheet print button | Selectors and status panel hidden; table only | UI | static: Results.css `@media print` | PASS (not browser-tested) |
+| RES-31 | School purge | | grade_scale and exam_result_log deleted | Proc | SQL platform_access_security_tests H12 | PASS |
+
+**Rules recorded with the feature:** a grade band runs from its min % up to the next band's min %; the grade is worked from the percentage rounded to 2 dp; rank uses the same 2-dp percentage over the whole class (the section column is the rank inside the section); absent papers are out of the total (today's rule), so a student absent from a paper is ranked on the papers they sat.
+
+## J. Calendar date ranges + per-day bell schedules (WDS)
+
+Added 2026-10-10 with the weekday-schedules feature. **SQL suite:** `EduCoreDataAccessLayer/Database/tests/weekday_schedules_tests.sql` (fixture 24 / 34 / 39, other school 23 / 33). **Last run:** `RESULT: 97 passed, 0 failed`. The period-structure half is catalogued in `settings_subjects_teachers_periods.md` section E. Procs: P-CAL (`school_calendar.sql`: new `SaveRange`, `DeleteRange`; SaveEntry and SaveRange share one code path), P-TT (`timetable.sql`), `academic.fn_day_periods` (`period_structure.sql`). Page: School Calendar "Date range" button (Dated Entries header).
+
+| ID | Scenario | Steps / input | Expected | Layer | How verified | Result |
+|---|---|---|---|---|---|---|
+| RNG-01 | Holiday over a week | Mon 14 - Sun 20 Sep, a half day already on Wed 16 | 5 entries created; Wed kept as the half day; Sunday (weekly off) skipped; the message names both | Proc | SQL WDS-F1..F6 | PASS |
+| RNG-02 | Day type over the range | fn_school_day_type 14..21 | holiday x4, half_day, holiday, weekly_off, working | Proc | SQL WDS-F7 | PASS |
+| RNG-03 | Attendance inside the range | register on Tue 15 | Refused (school holiday) | Proc | SQL WDS-F8 | PASS |
+| RNG-04 | Leave / payroll days | fn_school_working_days 14..20 | 0.5 (the half day) | Proc | SQL WDS-F9 | PASS |
+| RNG-05 | Exam paper inside the range | paper on Thu 17 | Refused (school is closed) | Proc | SQL WDS-F10 | PASS |
+| RNG-06 | Bad ranges | same range again, to < from, > 1 year, no first date, unknown type | Refused with a message ("Nothing was added ...") | Proc | SQL WDS-F11..F15 | PASS |
+| RNG-07 | Half-day range vs each day's hours | Fri-Sat half day 12:30, Saturday's own schedule ends 10:55 | Refused naming Saturday; nothing written (atomic); Friday alone accepted | Proc | SQL WDS-F16..F18 | PASS |
+| RNG-08 | Working-day range over a weekly off | Sunday 27 | Created; the day reads working | Proc | SQL WDS-F19 | PASS |
+| RNG-09 | Delete a range | 14..20 | 6 entries removed, days back on the weekly pattern, entries outside kept; empty range / backwards refused | Proc | SQL WDS-F20..F24 | PASS |
+| RNG-10 | Isolation / scope | other school deletes or adds in our dates; tenant 1 | Our entries untouched, theirs separate; platform refused | Proc | SQL WDS-G6..G9, G12 | PASS |
+| RNG-11 | Page | Date range dialog: from/to, type, name, closing time; Add range / Remove entries in range (EC.confirm) | Toast shows the proc's message (what was skipped) | UI-JS | static: V-CAL; inline JS checked with `new Function` | PASS (not browser-tested) |
+| TT-19 | Timetable follows each day's schedule | short Saturday | Grid shows Saturday's own periods; booking checks that day's schedule; Copy Day maps by label and reports skipped labels | Proc+UI | SQL WDS-D*, WDS-E*; static V-TT | PASS |
+| BELL-07 | Smart Bell on a short Saturday | Saturday has its own schedule | Rings Saturday's periods; a half day still cuts it short | CTL | static: CTL-SS BuildBellStateAsync passes today's weekday | PASS |
+
+**Rules recorded with the feature:** SaveRange never overwrites a date that already has an entry (SaveEntry still replaces one date); holiday and half-day ranges skip weekly offs, a working-day range does not (that is how a weekly off is opened); a half day's closing time is checked against that date's own bell schedule; ranges are capped at one year.
+
 ## Business decisions (BD), with the user-approved defaults
 
 | ID | Question | Decision |
 |---|---|---|
 | BD-01 | Should the register follow the School Calendar (holidays, weekly offs, working Sundays)? This report assumes **yes** (ATT-01..03). | APPROVED: yes. Declared holidays and weekly offs are refused, declared working days allowed, no hard-coded Sunday. |
-| BD-02 | When are results visible? The exam's "Published" currently means the datesheet is published, so draft (un-finalised) marks show on the student dashboard, and marks stay editable after publishing. Should there be a separate "Publish results" step that also locks sheets? | APPROVED: no result-publish step for now (future feature). |
-| BD-03 | Grades and rank: which grading scale (CBSE 9-point, %, per school)? Rank per section or class, with ties? | APPROVED: future feature. The only grade/rank values are mock JS in `Views/Admission/Dashboard.cshtml` (Admission area); flagged to that page's owner. |
+| BD-02 | When are results visible? The exam's "Published" currently means the datesheet is published, so draft (un-finalised) marks show on the student dashboard, and marks stay editable after publishing. Should there be a separate "Publish results" step that also locks sheets? | APPROVED: no result-publish step for now (future feature). **Built 2026-10-10:** a separate results status; publish needs every sheet finalised and locks marks; unpublish needs a reason and is logged (section I). |
+| BD-03 | Grades and rank: which grading scale (CBSE 9-point, %, per school)? Rank per section or class, with ties? | APPROVED: future feature. The only grade/rank values are mock JS in `Views/Admission/Dashboard.cshtml` (Admission area); flagged to that page's owner. **Built 2026-10-10:** per-school grade scale (CBSE 8-point default), rank by overall % in class and section, ties share a rank (section I). The Admission dashboard mock is still not wired up. |
 | BD-04 | Is "Leave" an absence for attendance %? | APPROVED: Leave is not present, and is reported separately. Late is present but stays Late. |
 | BD-05 | Should a month register show everyone enrolled during that month (leavers, section movers) for the days they were there? This report assumes **yes** (ATT-28/30). | APPROVED: yes, leavers and movers stay, with marks only on the days they belonged. |
 | BD-06 | Audit depth for attendance and marks: full history (old → new, who, when) or last-change only? This report assumes **history is required** (ATT-33, EXM-37). | APPROVED: full history (old, new, who, when), written only on a real change. |
@@ -242,5 +304,7 @@ Sunrise Public School, FY 26-27:
 
 ## Totals
 
+- Calendar ranges + per-day schedules (section J): **97** SQL checks in `weekday_schedules_tests.sql`, all PASS; 13 catalog rows.
+- Results feature (section I): **81** SQL checks in `exam_results_publish_tests.sql`, all PASS; 31 catalog rows.
 - SQL checks: **138** after the fixes (137 PASS, 1 BUG: ATT-B8). Before the fixes: 120 checks (85 PASS, 35 BUG).
 - Catalog rows: 146 test rows plus 11 business decisions. Real bugs: the dates-as-text root cause (R1), which breaks the calendar page and exam create/edit (3 checks), and the result-join bug (Critical). The full list with severity is in the final report.

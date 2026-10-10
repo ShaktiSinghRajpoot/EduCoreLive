@@ -5,6 +5,8 @@ using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using System.Globalization;
+using System.Text;
 
 namespace educore.Areas.ERP.Controllers
 {
@@ -14,6 +16,7 @@ namespace educore.Areas.ERP.Controllers
     public class ExamController : Controller
     {
         private readonly IExamService _exam;
+        private readonly IExamResultService _results;
         private readonly ISubjectService _subject;
         private readonly IReferenceDataService _referenceData;
         private readonly EduCoreDataAccessLayer.Services.IPermissionService _permission;
@@ -21,12 +24,14 @@ namespace educore.Areas.ERP.Controllers
 
         public ExamController(
             IExamService exam,
+            IExamResultService results,
             ISubjectService subject,
             IReferenceDataService referenceData,
             EduCoreDataAccessLayer.Services.IPermissionService permission,
             IBaseService baseService)
         {
             _exam = exam;
+            _results = results;
             _subject = subject;
             _referenceData = referenceData;
             _permission = permission;
@@ -261,13 +266,12 @@ namespace educore.Areas.ERP.Controllers
         // ── Marks Entry ──
         // A SHEET is one (exam, class, section, subject): Exam -> Class -> Section -> Subject.
 
-        [HttpGet]
-        public async Task<IActionResult> MarkEntry(int examId = 0)
+        // Every session's PUBLISHED exams, grouped by session — the exam dropdown of
+        // Marks Entry and the Result Sheet. Marks can be entered for ANY session's
+        // exam (results are often finalised after the year rolls over), and the
+        // exam already determines the session, so there is no session picker.
+        private async Task<List<ExamSessionGroup>> PublishedExamGroupsAsync()
         {
-            // Marks can be entered for ANY session's exam — results are often
-            // finalised after the year rolls over. The dropdown groups exams by
-            // session rather than adding a picker, because the exam already
-            // determines the session (the marks proc reads it off the exam).
             var sessions = await SessionsAsync();
             var current  = CurrentSessionId(sessions);
             var groups   = new List<ExamSessionGroup>();
@@ -292,10 +296,17 @@ namespace educore.Areas.ERP.Controllers
                 });
             }
 
-            ViewBag.ExamGroups       = groups
+            return groups
                 .OrderByDescending(g => g.IsCurrent)
                 .ThenByDescending(g => g.AcademicYearId)
                 .ToList();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> MarkEntry(int examId = 0)
+        {
+            var groups = await PublishedExamGroupsAsync();
+            ViewBag.ExamGroups       = groups;
             ViewBag.AcademicYearName = groups.FirstOrDefault(g => g.IsCurrent)?.SessionName ?? string.Empty;
             ViewBag.SelectedExamId   = examId;
 
@@ -356,6 +367,8 @@ namespace educore.Areas.ERP.Controllers
                 subjectName = sheet.SubjectName,
                 isFinalized = sheet.IsFinalized,
                 finalizedAt = sheet.FinalizedAt,
+                // Published results lock every sheet of the exam.
+                resultsPublished = sheet.ResultsPublished,
                 students    = sheet.Students.Select(s => new
                 {
                     id      = s.StudentId,
@@ -397,6 +410,202 @@ namespace educore.Areas.ERP.Controllers
 
             var result = await _exam.ReopenSheetAsync(
                 examId, classId, subjectId, section, TenantId(), SchoolId(), UserId());
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        // ── Grade Scale ──
+        // The school's grade bands. No saved bands = the CBSE 8-point default.
+
+        [HttpGet]
+        public async Task<IActionResult> GradeScale()
+        {
+            ViewBag.CanManage = await _permission.HasPermissionAsync(
+                TenantId(), SchoolId(), UserId(), "exams.manage");
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GradeScaleData()
+        {
+            var scale = await _results.GetGradeScaleAsync(TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                isDefault = scale.IsDefault,
+                bands = scale.Bands.Select(b => new
+                {
+                    label  = b.Label,
+                    min    = b.MinPercent,
+                    max    = b.MaxPercent,
+                    point  = b.GradePoint,
+                    remark = b.Remark ?? ""
+                })
+            });
+        }
+
+        [HttpPost]
+        [HasPermission("exams.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SaveGradeScale([FromBody] GradeScaleSaveRequest request)
+        {
+            var result = await _results.SaveGradeScaleAsync(request, TenantId(), SchoolId(), UserId());
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        [HttpPost]
+        [HasPermission("exams.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ResetGradeScale()
+        {
+            var result = await _results.ResetGradeScaleAsync(TenantId(), SchoolId(), UserId());
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        // ── Result Sheet ──
+        // One exam, one class: students x subjects with total, %, grade and rank.
+        // Also where an exam's results are published and unpublished.
+
+        [HttpGet]
+        public async Task<IActionResult> ResultSheet(int examId = 0)
+        {
+            var groups = await PublishedExamGroupsAsync();
+            ViewBag.ExamGroups     = groups;
+            ViewBag.SelectedExamId = examId;
+            ViewBag.CanManage      = await _permission.HasPermissionAsync(
+                TenantId(), SchoolId(), UserId(), "exams.manage");
+            return View();
+        }
+
+        // Published or not, the sheets still to finalise, and the publish log.
+        [HttpGet]
+        public async Task<IActionResult> ResultStatus(int examId)
+        {
+            var s = await _results.GetResultStatusAsync(examId, TenantId(), SchoolId(), UserId());
+            if (s == null) return Json(new { success = false, message = "That exam was not found." });
+
+            return Json(new
+            {
+                success       = true,
+                examName      = s.ExamName,
+                status        = s.Status,
+                resultsStatus = s.ResultsStatus,
+                publishedAt   = s.PublishedAt,
+                publishedBy   = s.PublishedBy,
+                sheetCount    = s.SheetCount,
+                pendingCount  = s.PendingCount,
+                pending = s.Pending.Select(x => new { className = x.ClassName, section = x.Section, subject = x.SubjectName }),
+                log     = s.Log.Select(x => new { action = x.Action, reason = x.Reason, by = x.DoneBy, at = x.DoneAt })
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> ClassResult(int examId, int classId, string? section)
+        {
+            var sheet = await _results.GetClassResultAsync(examId, classId, section, TenantId(), SchoolId(), UserId());
+            if (sheet == null) return Json(new { success = false, message = "Could not load the result for that class." });
+
+            return Json(new
+            {
+                success       = true,
+                examName      = sheet.ExamName,
+                className     = sheet.ClassName,
+                section       = sheet.Section,
+                academicYear  = sheet.AcademicYearName,
+                resultsStatus = sheet.ResultsStatus,
+                publishedAt   = sheet.PublishedAt,
+                pendingCount  = sheet.PendingCount,
+                subjects = sheet.Subjects.Select(x => new { id = x.SubjectId, name = x.SubjectName, max = x.MaxMarks, pass = x.PassMarks }),
+                students = sheet.Students.Select(x => new
+                {
+                    id          = x.StudentId,
+                    roll        = x.RollNo,
+                    admNo       = x.AdmissionNo,
+                    name        = x.StudentName,
+                    section     = x.Section,
+                    obtained    = x.Obtained,
+                    total       = x.Total,
+                    percent     = x.Percent,       // null = absent from every paper
+                    grade       = x.Grade,
+                    absent      = x.AbsentCount,
+                    failed      = x.FailedCount,
+                    classRank   = x.ClassRank,
+                    sectionRank = x.SectionRank,
+                    classSize   = x.ClassSize,
+                    sectionSize = x.SectionSize,
+                    cells = x.Cells.Select(c => new
+                    {
+                        subjectId = c.SubjectId,
+                        marks     = c.Marks,
+                        absent    = c.IsAbsent,
+                        grade     = c.Grade,
+                        passed    = c.Passed
+                    })
+                })
+            });
+        }
+
+        // The same sheet as a CSV file.
+        [HttpGet]
+        public async Task<IActionResult> ClassResultCsv(int examId, int classId, string? section)
+        {
+            var sheet = await _results.GetClassResultAsync(examId, classId, section, TenantId(), SchoolId(), UserId());
+            if (sheet == null) return NotFound();
+
+            var sb = new StringBuilder();
+            var head = new List<string> { "Roll No", "Admission No", "Student", "Section" };
+            head.AddRange(sheet.Subjects.Select(s => s.SubjectName + " (/" + Num(s.MaxMarks) + ")"));
+            head.AddRange(new[] { "Total", "Out of", "Percent", "Grade", "Class Rank", "Section Rank", "Result Status" });
+            sb.AppendLine(string.Join(',', head.Select(Csv)));
+
+            foreach (var st in sheet.Students)
+            {
+                var row = new List<string> { st.RollNo, st.AdmissionNo, st.StudentName, st.Section };
+                foreach (var sub in sheet.Subjects)
+                {
+                    var cell = st.Cells.FirstOrDefault(c => c.SubjectId == sub.SubjectId);
+                    row.Add(cell == null ? "" : cell.IsAbsent ? "AB" : cell.Marks.HasValue ? Num(cell.Marks.Value) : "");
+                }
+                row.Add(Num(st.Obtained));
+                row.Add(Num(st.Total));
+                row.Add(st.Percent.HasValue ? st.Percent.Value.ToString("0.00", CultureInfo.InvariantCulture) : "");
+                row.Add(st.Grade ?? "");
+                row.Add(st.ClassRank?.ToString() ?? "");
+                row.Add(st.SectionRank?.ToString() ?? "");
+                row.Add(sheet.ResultsStatus);
+                sb.AppendLine(string.Join(',', row.Select(Csv)));
+            }
+
+            var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
+            return File(bytes, "text/csv", $"result_sheet_{examId}_{classId}_{Dates.Today}.csv");
+        }
+
+        // 90.00 -> "90", 33.50 -> "33.5"
+        private static string Num(decimal v) => v.ToString("0.##", CultureInfo.InvariantCulture);
+
+        // Quote every field, and defuse anything a spreadsheet would run as a
+        // formula (=, +, -, @, tab, CR at the start): a student or subject name
+        // like "=HYPERLINK(...)" must stay text when the file is opened.
+        private static string Csv(string? v)
+        {
+            var s = v ?? string.Empty;
+            if (s.Length > 0 && "=+-@\t\r".IndexOf(s[0]) >= 0) s = "'" + s;
+            return "\"" + s.Replace("\"", "\"\"") + "\"";
+        }
+
+        [HttpPost]
+        [HasPermission("exams.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> PublishResults(int examId)
+        {
+            var result = await _results.PublishResultsAsync(examId, TenantId(), SchoolId(), UserId());
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        [HttpPost]
+        [HasPermission("exams.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UnpublishResults(int examId, string? reason)
+        {
+            var result = await _results.UnpublishResultsAsync(examId, reason, TenantId(), SchoolId(), UserId());
             return Json(new { success = result.Success, message = result.Message });
         }
     }

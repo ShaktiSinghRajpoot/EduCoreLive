@@ -1,4 +1,4 @@
-> **Fix status (2026-10-10):** every row marked BUG/FAIL below has been fixed and its SQL check now passes (see `EduCoreDataAccessLayer/Database/tests/settings_subjects_teachers_periods_tests.sql` and the change log in `docs/SCALING-AND-FIXES.md`). Not supported by design: a different (shorter) Saturday bell schedule — there is one schedule per school.
+> **Fix status (2026-10-10):** every row marked BUG/FAIL below has been fixed and its SQL check now passes (see `EduCoreDataAccessLayer/Database/tests/settings_subjects_teachers_periods_tests.sql` and the change log in `docs/SCALING-AND-FIXES.md`). **Update (2026-10-10, weekday schedules):** a different (shorter) Saturday is now supported: a default schedule plus an optional custom schedule per weekday (PER-34, section E below).
 
 # Test catalog: Subject Management, Assign Class Teacher, Period Structure
 
@@ -166,7 +166,7 @@ Sunrise Public School is setting up FY 26-27, in this order:
 | PER-31 | Leave with unsaved changes | edit, navigate away | Warn | UI-JS | static: no beforeunload in V-PER | FAIL (low) |
 | PER-32 | Save button double-click | 2 clicks | One save / busy state | UI-JS | static: V-PER:302-319 has no EC.buttonBusy (harmless, because replace-all is idempotent) | PASS (minor) |
 | PER-33 | XSS in label | `<b>` label | Escaped | UI-JS | static: V-PER:198, 213 EC.esc; the seed goes through System.Text.Json, which escapes `<` | PASS |
-| PER-34 | **Shorter Saturday** | Saturday ends 12:30 | Per-day schedule | Proc / UI | static: one schedule per school (P-PER line 224-226). The only workaround is a School Calendar half_day (CTL:1121 halfDayEnd), which trims the Smart Bell but not the timetable grid | GAP (not supported) |
+| PER-34 | **Shorter Saturday** | Saturday ends 12:30 | Per-day schedule | Proc / UI | Default schedule + optional custom schedule per weekday (`period_structure.day_of_week`, NULL = default). Page: day selector with Use default / Custom schedule / Copy from default | BUILT (section E; SQL WDS-B*) |
 | PER-35 | Permission | academics.view only | Page OK, Save 403 | Controller | static: CTL:1064, 1163 | PASS |
 | PER-36 | Antiforgery | no token | 400 | Controller | static: CTL:1162, V-PER:305-311 | PASS |
 | PER-37 | Platform scope | tenant 1 / school 0 | Refused | Service+Proc | SVC-SS:479, 512; SQL SC-E3, E4 | PASS |
@@ -184,6 +184,28 @@ Sunrise Public School is setting up FY 26-27, in this order:
 | DS-01 | **Re-save Classes & Sections unchanged** | Save on the ClassSection page | Subjects, timetable and class teacher survive | Proc (P-SETUP) | SQL DS-D9 (new ids), DS-D10 PASS (class teacher restored). **DS-D11 FAIL**: Class 6's 9 subjects vanish, because class_subjects is keyed on the old academic_class_id. **DS-D12 FAIL**: 7-A's timetable is left on the soft-deleted section id | **BUG** (high) |
 | DS-02 | Exam setup after DS-01 | create exam for Class 6 | Subjects available | Proc | Follows from DS-D11: exam proc line 361-367 refuses "not a subject of 6" | **BUG** (via DS-01) |
 | DS-03 | Attendance by class teacher after DS-01 | Vinod marks 7-A | Allowed | Proc | Follows from DS-D10: the gate matches on class and section names | PASS |
+
+## E. Weekday schedules (WDS), built 2026-10-10
+
+**SQL suite:** `EduCoreDataAccessLayer/Database/tests/weekday_schedules_tests.sql` (same fixture: tenant 24 / school 34 / user 39; other school 23 / 33). **Last run:** `RESULT: 97 passed, 0 failed`. Scripts: `period_structure.sql` (column `day_of_week`, `academic.fn_day_periods`, 7-argument P-PER with `GetAllSchedules` and `UseDefault`), `timetable.sql`, `school_calendar.sql`. Calendar-range checks (WDS-F*) are listed in `academics_attendance_exams.md` section J.
+
+| ID | Scenario | Expected | How verified | Result |
+|---|---|---|---|---|
+| WDS-01 | Migration | The existing schedule is the default (day_of_week NULL); every weekday runs on it; re-running the script changes nothing; the old 6-argument positional call still saves the default | SQL WDS-A1..A6 | PASS |
+| WDS-02 | Save a short Saturday | Stored as Saturday's own rows; GetPeriodStructure(6) returns them, (1) and (no day) return the default; GetAllSchedules returns default first, then each custom day | SQL WDS-B1..B7 | PASS |
+| WDS-03 | Rules per schedule | Overlap, duplicate label (case/padding), unknown type, backwards, empty: refused, nothing changed | SQL WDS-B8..B13 | PASS |
+| WDS-04 | Weekly off / bad day | A schedule for a weekly off (Sunday) or day 7 refused | SQL WDS-B14, B15 | PASS |
+| WDS-05 | Edit the default | Saturday's own schedule untouched | SQL WDS-B16, B17 | PASS |
+| WDS-06 | Use default | Needs a day; drops the day's rows; harmless on a day without its own | SQL WDS-B18..B22 | PASS |
+| WDS-07 | **Lessons follow per day** | Saturday renumbered: Saturday lessons follow by label, Monday does not move; default renumbered: Monday follows, Saturday does not | SQL WDS-C1..C7 | PASS |
+| WDS-08 | Booked period protection per day | Removing / un-teaching a booked Saturday period refused (message names the day); the default may drop a period only a custom day teaches; Saturday cannot go back to a default lacking its booked period | SQL WDS-C8..C13 | PASS |
+| WDS-09 | Back to the default | Lessons move to the default's period of the same name; no lesson left on a missing period | SQL WDS-C14..C17 | PASS |
+| WDS-10 | Book against the day's schedule | A slot only the default has, or Saturday's break, refused on Saturday; GetSetup lists each day's own periods; teacher clash per day | SQL WDS-D1..D8 | PASS |
+| WDS-11 | Copy Day across schedules | Lessons go to the same label; a day without it skips and the message names it ("Sat P5, Sat P7"); short day copied to long days | SQL WDS-E1..E8 | PASS |
+| WDS-12 | Isolation / scope | Other school's schedules, Use default, booking; platform scope refused | SQL WDS-G1..G5, G10, G11 | PASS |
+| WDS-13 | Period Structure page | Day selector (Default + weekdays that are not weekly offs), Custom badge, Use default (confirm, immediate), Custom schedule (starts as a copy of the default), Copy from default, Save posts `day` | static: V-PER; inline JS checked with `new Function` | PASS (not browser-tested) |
+| WDS-14 | Timetable page | Rows = every label any day has; a day without the period shows "—"; a day whose time differs shows it in the cell; stats count each day's own teaching periods | static: V-TT; inline JS checked | PASS (not browser-tested) |
+| WDS-15 | Smart Bell | Rings by today's schedule (`GetPeriodStructure(today's weekday)`); half day still clamps it | static: CTL BuildBellStateAsync | PASS |
 
 ## Totals
 

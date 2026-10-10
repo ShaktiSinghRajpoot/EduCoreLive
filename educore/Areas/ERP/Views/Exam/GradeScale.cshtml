@@ -1,0 +1,224 @@
+@{
+    ViewData["Title"] = "Grade Scale";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Exam/Results.css" asp-append-version="true" />
+}
+
+@Html.AntiForgeryToken()
+
+<div class="ec-page-shell rs-page">
+    <div class="ec-page-content">
+
+        <div class="ec-page-header">
+            <div class="ec-page-header-inner">
+                <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                    <div class="ec-page-icon"><i class="bx bx-award"></i></div>
+                    <div>
+                        <h4 class="ec-page-title mb-1">Grade Scale</h4>
+                        <div class="ec-page-subtitle">The grade a percentage earns, for every subject and overall result</div>
+                    </div>
+                </div>
+                <a asp-area="ERP" asp-controller="Exam" asp-action="ResultSheet"
+                   class="btn btn-outline-secondary d-flex align-items-center gap-1">
+                    <i class="bx bx-table"></i><span class="d-none d-sm-inline">Result Sheet</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="ec-card">
+            <div class="ec-card-body">
+                <div class="rs-head">
+                    <div>
+                        <div class="rs-title">Grade bands</div>
+                        <div class="rs-sub" id="gsSub">Loading…</div>
+                    </div>
+                    @if (canManage)
+                    {
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn-rs-ghost" id="gsAdd"><i class="bx bx-plus me-1"></i>Add band</button>
+                            <button type="button" class="btn-rs-ghost" id="gsReset"><i class="bx bx-reset me-1"></i>Use CBSE default</button>
+                            <button type="button" class="btn-rs-primary" id="gsSave"><i class="bx bx-save me-1"></i>Save</button>
+                        </div>
+                    }
+                </div>
+
+                <p class="rs-note mb-3">
+                    Bands must cover 0 to 100 with no overlap and no gap (81-90 followed by 91-100 is fine).
+                    A percentage between two whole-number bands, such as 90.5, takes the lower band.
+                    Grades are worked out when a result is read, so a change here shows on every result straight away.
+                </p>
+
+                <div class="rs-tbl-wrap">
+                    <table class="rs-tbl">
+                        <thead>
+                            <tr>
+                                <th style="width:110px;">Grade</th>
+                                <th style="width:110px;">Min %</th>
+                                <th style="width:110px;">Max %</th>
+                                <th style="width:120px;">Grade point</th>
+                                <th>Remark</th>
+                                @if (canManage) { <th style="width:50px;"></th> }
+                            </tr>
+                        </thead>
+                        <tbody id="gsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section PageScripts {
+<script>
+$(document).ready(function () {
+
+    var urls = {
+        data:  '@Url.Action("GradeScaleData", "Exam", new { area = "ERP" })',
+        save:  '@Url.Action("SaveGradeScale", "Exam", new { area = "ERP" })',
+        reset: '@Url.Action("ResetGradeScale", "Exam", new { area = "ERP" })'
+    };
+    var CAN_MANAGE = @(canManage ? "true" : "false");
+
+    function token() {
+        return $('input[name="__RequestVerificationToken"]').first().val();
+    }
+
+    // 91.00 -> "91", null -> ""
+    function fmt(v) {
+        if (v === null || v === undefined || v === '') return '';
+        var n = Number(v);
+        return isFinite(n) ? String(n) : '';
+    }
+
+    function rowHtml(b) {
+        if (!CAN_MANAGE) {
+            return '<tr>' +
+                '<td class="rs-name">' + EC.esc(b.label) + '</td>' +
+                '<td>' + fmt(b.min) + '</td>' +
+                '<td>' + fmt(b.max) + '</td>' +
+                '<td>' + (fmt(b.point) || '—') + '</td>' +
+                '<td>' + EC.esc(b.remark || '') + '</td>' +
+                '</tr>';
+        }
+        return '<tr>' +
+            '<td><input type="text" class="form-control gs-label" maxlength="10" value="' + EC.esc(b.label) + '"></td>' +
+            '<td><input type="number" class="form-control gs-min" min="0" max="100" step="0.01" value="' + fmt(b.min) + '"></td>' +
+            '<td><input type="number" class="form-control gs-max" min="0" max="100" step="0.01" value="' + fmt(b.max) + '"></td>' +
+            '<td><input type="number" class="form-control gs-point" min="0" step="0.1" value="' + fmt(b.point) + '"></td>' +
+            '<td><input type="text" class="form-control gs-remark" maxlength="100" value="' + EC.esc(b.remark || '') + '"></td>' +
+            '<td><button type="button" class="btn btn-sm btn-outline-danger gs-del" title="Remove band"><i class="bx bx-trash"></i></button></td>' +
+            '</tr>';
+    }
+
+    function load() {
+        EC.showLoader();
+        EC.listLoading('#gsBody', 'Loading grade scale…');
+        $.get(urls.data)
+            .done(function (d) {
+                var bands = (d && d.bands) || [];
+                $('#gsSub').text(d && d.isDefault
+                    ? 'CBSE 8-point default (this school has not saved its own scale)'
+                    : 'This school\'s own scale');
+                if (!bands.length) {
+                    EC.listEmpty('#gsBody', 'No grade bands.', 'bx-award');
+                    return;
+                }
+                $('#gsBody').html(bands.map(rowHtml).join(''));
+            })
+            .fail(function () {
+                EC.listEmpty('#gsBody', 'Could not load the grade scale. Please retry.', 'bx-error-circle');
+            })
+            .always(EC.hideLoader);
+    }
+
+    // The bands as typed. Blank numbers go as null so the server names the band.
+    function collect() {
+        var out = [];
+        $('#gsBody tr').each(function () {
+            var $r = $(this);
+            if (!$r.find('.gs-label').length) return;
+            var min = $r.find('.gs-min').val(), max = $r.find('.gs-max').val(), pt = $r.find('.gs-point').val();
+            out.push({
+                label:      $r.find('.gs-label').val().trim(),
+                minPercent: min === '' ? null : Number(min),
+                maxPercent: max === '' ? null : Number(max),
+                gradePoint: pt === '' ? null : Number(pt),
+                remark:     $r.find('.gs-remark').val().trim()
+            });
+        });
+        return out;
+    }
+
+    $('#gsAdd').on('click', function () {
+        if (!$('#gsBody .gs-label').length) $('#gsBody').html('');
+        $('#gsBody').append(rowHtml({ label: '', min: '', max: '', point: '', remark: '' }));
+    });
+
+    $('#gsBody').on('click', '.gs-del', function () {
+        $(this).closest('tr').remove();
+    });
+
+    $('#gsSave').on('click', function () {
+        var bands = collect();
+        if (!bands.length) { ecToast('error', 'Add at least one grade band.'); return; }
+        for (var i = 0; i < bands.length; i++) {
+            if (bands[i].minPercent === null || bands[i].maxPercent === null) {
+                ecToast('error', 'Enter both the min % and the max % for every band.');
+                return;
+            }
+        }
+
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Saving…');
+        $.ajax({
+            url: urls.save,
+            type: 'POST',
+            contentType: 'application/json',
+            headers: { 'RequestVerificationToken': token() },
+            data: JSON.stringify({ bands: bands })
+        })
+        .done(function (d) {
+            if (!d || !d.success) {
+                ecToast('error', (d && d.message) || 'Could not save the grade scale.');
+                return;
+            }
+            ecToast('success', d.message || 'Grade scale saved.');
+            load();
+        })
+        .fail(function () { ecToast('error', 'Could not save the grade scale. Please retry.'); })
+        .always(function () { EC.buttonReset($btn); });
+    });
+
+    $('#gsReset').on('click', function () {
+        var $btn = $(this);
+        EC.confirm({
+            title:   'Go back to the CBSE default?',
+            message: 'This school\'s own grade bands are removed. Every result will show CBSE grades.',
+            okText:  'Use default',
+            danger:  false
+        }).then(function (ok) {
+            if (!ok) return;
+            EC.buttonBusy($btn);
+            $.ajax({ url: urls.reset, type: 'POST', headers: { 'RequestVerificationToken': token() } })
+                .done(function (d) {
+                    if (!d || !d.success) {
+                        ecToast('error', (d && d.message) || 'Could not reset the grade scale.');
+                        return;
+                    }
+                    ecToast('success', d.message || 'Grade scale reset.');
+                    load();
+                })
+                .fail(function () { ecToast('error', 'Could not reset the grade scale. Please retry.'); })
+                .always(function () { EC.buttonReset($btn); });
+        });
+    });
+
+    load();
+});
+</script>
+}

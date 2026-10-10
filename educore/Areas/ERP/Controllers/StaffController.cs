@@ -172,6 +172,9 @@ namespace educore.Areas.ERP.Controllers
             ViewBag.LeaveTaken = leaves.Where(l => l.Status == "Approved" && (l.FromDate ?? "").StartsWith(year))
                                        .Sum(l => l.Days).ToString("0.#");
             ViewBag.LeavePending = leaves.Count(l => l.Status == "Pending").ToString();
+
+            // Salary is payroll data: staff.view alone does not show it (payroll.view does).
+            ViewBag.CanSeeSalary = await HasPermissionAttribute.UserHasAsync(this, "payroll.view");
             return View(model);
         }
 

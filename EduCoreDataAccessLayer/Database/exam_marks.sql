@@ -17,8 +17,12 @@
 -- show only the students who happen not to have been promoted since.
 -- (See the 2026-08-12 entry in docs/SCALING-AND-FIXES.md.)
 --
--- Grades are NOT stored. A grade is derived from marks + the school's grade scale,
--- and no scale is configurable yet, so the page computes it for display only.
+-- Grades are NOT stored. A grade is derived from the percentage + the school's
+-- grade scale (exam_results_publish.sql) whenever a result is read.
+--
+-- RESULTS PUBLISHED = LOCKED. Once an exam's results are published
+-- (academic.exams.results_status), SaveMarks and ReopenSheet refuse until the
+-- results are unpublished. GetSheet says so, so the page can lock the grid.
 --
 -- Target DB: PostgreSQL (educore). Safe to re-run.
 -- ============================================================================
@@ -164,6 +168,7 @@ DECLARE
     v_added   integer := 0;
     v_blank   integer := 0;
     v_status  text;
+    v_results text;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -173,7 +178,7 @@ BEGIN
 
     -- Every operation works on one exam; resolve its academic year once.
     IF COALESCE(p_exam_id, 0) > 0 THEN
-        SELECT academic_year_id, status INTO v_year_id, v_status
+        SELECT academic_year_id, status, results_status INTO v_year_id, v_status, v_results
         FROM academic.exams
         WHERE exam_id   = p_exam_id
           AND tenant_id = p_tenant_id
@@ -295,7 +300,8 @@ BEGIN
             (SELECT s.subject_name FROM academic.school_subjects s
              WHERE s.subject_id = p_subject_id) AS subject_name,
             COALESCE(sh.is_finalized, FALSE) AS is_finalized,
-            sh.finalized_at
+            sh.finalized_at,
+            (v_results = 'Published') AS results_published
         FROM (SELECT 1) x
         LEFT JOIN academic.exam_mark_sheets sh
                ON sh.exam_id           = p_exam_id
@@ -321,6 +327,12 @@ BEGIN
           AND academic_class_id = p_academic_class_id
           AND subject_id        = p_subject_id
           AND section           = v_section;
+
+        -- Published results are a record parents have seen; they change only
+        -- after someone unpublishes them (with a reason, logged).
+        IF v_results = 'Published' THEN
+            RAISE EXCEPTION 'The results of this exam are published, so its marks are locked. Unpublish the results first.';
+        END IF;
 
         IF COALESCE(v_final, FALSE) THEN
             RAISE EXCEPTION 'These marks are finalized. Ask a school admin to reopen the sheet.';
@@ -454,6 +466,9 @@ BEGIN
         -- Admin-only; the caller enforces that (the proc cannot see roles).
         IF COALESCE(p_subject_id, 0) <= 0 THEN
             RAISE EXCEPTION 'Pick a subject first.';
+        END IF;
+        IF v_results = 'Published' THEN
+            RAISE EXCEPTION 'The results of this exam are published. Unpublish the results before reopening a sheet.';
         END IF;
 
         UPDATE academic.exam_mark_sheets

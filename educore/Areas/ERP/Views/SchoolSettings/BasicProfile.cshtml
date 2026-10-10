@@ -36,6 +36,14 @@
                         <span class="ec-school-logo-edit"><i class="bx bx-camera"></i></span>
                         <input type="file" id="LogoImageFile" name="LogoImageFile" class="d-none" accept="image/*" />
                     </label>
+                    @if (!string.IsNullOrWhiteSpace(Model.LogoUrl) && ViewBag.CanManage == true)
+                    {
+                        <div class="mb-2">
+                            <button type="button" id="btnRemoveLogo" class="btn btn-sm btn-outline-danger">
+                                <i class="bx bx-trash me-1"></i>Remove logo
+                            </button>
+                        </div>
+                    }
 
                     <h5 class="ec-profile-name">@(string.IsNullOrWhiteSpace(Model.SchoolName) ? "School Name" : Model.SchoolName)</h5>
                     <p class="ec-profile-subtitle">@(string.IsNullOrWhiteSpace(Model.TenantName) ? "Tenant not available" : Model.TenantName)</p>
@@ -282,12 +290,12 @@
                             <input asp-for="Designation" type="hidden" />
                             <div class="col-md-6">
                                 <label class="form-label">Official Phone <span class="text-danger">*</span></label>
-                                <input asp-for="Phone" class="form-control" placeholder="Official phone" />
+                                <input asp-for="Phone" class="form-control" placeholder="Mobile or landline, e.g. 0141-2345678" />
                                 <span asp-validation-for="Phone" class="text-danger small"></span>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Alternate Phone</label>
-                                <input asp-for="AlternatePhone" class="form-control" placeholder="Alternate phone" />
+                                <input asp-for="AlternatePhone" class="form-control" placeholder="Mobile or landline" />
                                 <span asp-validation-for="AlternatePhone" class="text-danger small"></span>
                             </div>
                             <div class="col-md-6">
@@ -389,6 +397,36 @@
                 });
             });
 
+            // Remove the saved logo (its own POST; the main Save keeps a logo
+            // when none is uploaded). Reload so every preview shows the default.
+            $("#btnRemoveLogo").on("click", function () {
+                var $btn = $(this);
+                EC.confirm({
+                    title:   "Remove the school logo?",
+                    message: "Receipts, TCs and ID cards will print without a logo until a new one is uploaded.",
+                    okText:  "Remove logo"
+                }).then(function (ok) {
+                    if (!ok) return;
+                    EC.buttonBusy($btn, "Removing…");
+                    $.ajax({
+                        url:     '@Url.Action("RemoveLogo", "SchoolSettings", new { area = "ERP" })',
+                        type:    "POST",
+                        headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() }
+                    }).done(function (d) {
+                        if (d && d.success) {
+                            ecToast('success', d.message || "Logo removed.");
+                            window.location.reload();
+                            return;   // keep the button busy while the page reloads
+                        }
+                        ecToast('error', (d && d.message) || "Logo could not be removed.");
+                        EC.buttonReset($btn);
+                    }).fail(function () {
+                        ecToast('error', "Logo could not be removed.");
+                        EC.buttonReset($btn);
+                    });
+                });
+            });
+
             // ── Validation ──────────────────────────────────────────────────
             // Rules live here; the behaviour (blur check, live clearing, submit
             // block) comes from EC.liveValidate in site.js so every form matches.
@@ -398,8 +436,8 @@
                 City:            EC.rule.required("City"),
                 Pincode:         function (v) { return !v ? "Pincode is required." : EC.rule.pincode(v); },
                 ContactName:     EC.rule.required("Contact Name"),
-                Phone:           function (v) { return !v ? "Official Phone is required." : EC.rule.mobile(v); },
-                AlternatePhone:  EC.rule.mobile,
+                Phone:           function (v) { return !v ? "Official Phone is required." : EC.rule.phone(v); },
+                AlternatePhone:  EC.rule.phone,
                 ContactEmail:    EC.rule.email,
                 Website:         function (v) {
                     return !v || /^(https?:\/\/)?([A-Za-z0-9-]+[.])+[A-Za-z]{2,}(\/.*)?$/.test(v)

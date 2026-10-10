@@ -1,0 +1,422 @@
+@using EduCoreDataAccessLayer.Models.ERP
+@{
+    ViewData["Title"] = "Result Sheet";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var examGroups = ViewBag.ExamGroups as List<ExamSessionGroup> ?? new List<ExamSessionGroup>();
+    var examCount  = examGroups.Sum(g => g.Exams.Count);
+    var canManage  = (bool?)ViewBag.CanManage ?? false;
+    var selected   = (int?)ViewBag.SelectedExamId ?? 0;
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Exam/Results.css" asp-append-version="true" />
+}
+
+@Html.AntiForgeryToken()
+
+<div class="ec-page-shell rs-page">
+    <div class="ec-page-content">
+
+        <div class="ec-page-header rs-no-print">
+            <div class="ec-page-header-inner">
+                <div class="ec-page-title-wrap d-flex align-items-start gap-3">
+                    <div class="ec-page-icon"><i class="bx bx-table"></i></div>
+                    <div>
+                        <h4 class="ec-page-title mb-1">Result Sheet</h4>
+                        <div class="ec-page-subtitle">Marks, total, percentage, grade and rank for a class, and publishing the results</div>
+                    </div>
+                </div>
+                <a asp-area="ERP" asp-controller="Exam" asp-action="GradeScale"
+                   class="btn btn-outline-secondary d-flex align-items-center gap-1">
+                    <i class="bx bx-award"></i><span class="d-none d-sm-inline">Grade Scale</span>
+                </a>
+            </div>
+        </div>
+
+        @if (examCount == 0)
+        {
+            <div class="alert alert-warning rs-no-print" style="border-radius:12px;font-weight:700;">
+                No published exams yet. Publish an exam on the
+                <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam">Exam Schedule</a> page and enter its marks first.
+            </div>
+        }
+
+        <!-- ── Selectors ── -->
+        <div class="ec-card mb-3 rs-no-print">
+            <div class="ec-card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <div class="rs-label">EXAM</div>
+                        <select class="form-select" id="selExam">
+                            <option value="">Select exam</option>
+                            @foreach (var g in examGroups)
+                            {
+                                <optgroup label="@(g.SessionName + (g.IsCurrent ? "  (current)" : ""))">
+                                    @foreach (var e in g.Exams)
+                                    {
+                                        <option value="@e.ExamId" selected="@(e.ExamId == selected)">@e.ExamName</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-6 col-sm-3 col-lg-2">
+                        <div class="rs-label">CLASS</div>
+                        <select class="form-select" id="selClass" disabled><option value="">Class</option></select>
+                    </div>
+                    <div class="col-6 col-sm-3 col-lg-2">
+                        <div class="rs-label">SECTION</div>
+                        <select class="form-select" id="selSection" disabled><option value="">All sections</option></select>
+                    </div>
+                    <div class="col-12 col-lg-4 d-flex gap-2">
+                        <button type="button" class="btn-rs-primary flex-grow-1" id="btnLoad" disabled>
+                            <i class="bx bx-search me-1"></i>Show result
+                        </button>
+                        <button type="button" class="btn-rs-ghost" id="btnCsv" title="Download CSV" disabled><i class="bx bx-download"></i></button>
+                        <button type="button" class="btn-rs-ghost" id="btnPrint" title="Print" disabled><i class="bx bx-printer"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Result status: published or not, what blocks it ── -->
+        <div class="ec-card mb-3 rs-no-print" id="statusCard" style="display:none;">
+            <div class="ec-card-body">
+                <div class="rs-head mb-0">
+                    <div>
+                        <div class="rs-title">Results <span id="stChip"></span></div>
+                        <div class="rs-sub" id="stSub"></div>
+                    </div>
+                    @if (canManage)
+                    {
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn-rs-primary" id="btnPublish" style="display:none;">
+                                <i class="bx bx-check-shield me-1"></i>Publish results
+                            </button>
+                            <button type="button" class="btn-rs-ghost" id="btnUnpublish" style="display:none;">
+                                <i class="bx bx-undo me-1"></i>Unpublish results
+                            </button>
+                        </div>
+                    }
+                </div>
+                <div id="stPending"></div>
+                <ul class="rs-log mt-2" id="stLog"></ul>
+            </div>
+        </div>
+
+        <!-- ── The sheet ── -->
+        <div class="ec-card">
+            <div class="ec-card-body">
+                <div class="rs-head">
+                    <div>
+                        <div class="rs-title" id="shTitle">Result sheet</div>
+                        <div class="rs-sub" id="shSub">Pick an exam and a class.</div>
+                    </div>
+                    <div class="rs-no-print d-flex align-items-center gap-2">
+                        <span class="rs-label mb-0">SORT</span>
+                        <select class="form-select form-select-sm" id="selSort" style="width:auto;min-height:34px;">
+                            <option value="roll">Roll no</option>
+                            <option value="rank">Rank</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="rs-warn" id="shWarn" style="display:none;"></div>
+                <div class="rs-tbl-wrap">
+                    <table class="rs-tbl">
+                        <thead id="shHead"><tr><th>Student</th></tr></thead>
+                        <tbody id="shBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@section PageScripts {
+<script>
+$(document).ready(function () {
+
+    var urls = {
+        classes:   '@Url.Action("ExamClasses", "Exam", new { area = "ERP" })',
+        setup:     '@Url.Action("ClassSetup", "Exam", new { area = "ERP" })',
+        status:    '@Url.Action("ResultStatus", "Exam", new { area = "ERP" })',
+        result:    '@Url.Action("ClassResult", "Exam", new { area = "ERP" })',
+        csv:       '@Url.Action("ClassResultCsv", "Exam", new { area = "ERP" })',
+        publish:   '@Url.Action("PublishResults", "Exam", new { area = "ERP" })',
+        unpublish: '@Url.Action("UnpublishResults", "Exam", new { area = "ERP" })'
+    };
+
+    var selExam    = document.getElementById('selExam');
+    var selClass   = document.getElementById('selClass');
+    var selSection = document.getElementById('selSection');
+    var current    = null;     // the last loaded sheet
+
+    function token() {
+        return $('input[name="__RequestVerificationToken"]').first().val();
+    }
+
+    // 90.00 -> "90", 33.50 -> "33.5", null -> ""
+    function fmt(v) {
+        if (v === null || v === undefined || v === '') return '';
+        var n = Number(v);
+        return isFinite(n) ? String(n) : '';
+    }
+
+    function updateButtons() {
+        var ready = !!(selExam.value && selClass.value);
+        document.getElementById('btnLoad').disabled = !ready;
+        document.getElementById('btnCsv').disabled = !ready;
+        document.getElementById('btnPrint').disabled = !current;
+    }
+
+    function clearSheet(text) {
+        current = null;
+        $('#shHead').html('<tr><th>Student</th></tr>');
+        $('#shBody').html('');
+        $('#shWarn').hide();
+        $('#shTitle').text('Result sheet');
+        $('#shSub').text(text || 'Pick an exam and a class.');
+        updateButtons();
+    }
+
+    // ── Selector cascade ──
+    $(selExam).on('change', function () {
+        selClass.innerHTML = '<option value="">Class</option>';
+        selSection.innerHTML = '<option value="">All sections</option>';
+        selClass.disabled = selSection.disabled = true;
+        clearSheet();
+        if (!this.value) { $('#statusCard').hide(); return; }
+
+        loadStatus();
+        EC.showLoader();
+        $.get(urls.classes, { examId: EC.num(this.value) })
+            .done(function (rows) {
+                var list = rows || [];
+                $.each(list, function (i, c) {
+                    selClass.innerHTML += '<option value="' + c.id + '">' + EC.esc(c.name) + '</option>';
+                });
+                selClass.disabled = list.length === 0;
+                if (list.length === 1) { selClass.value = String(list[0].id); $(selClass).trigger('change'); }
+                updateButtons();
+            })
+            .fail(function () { ecToast('error', 'Could not load the classes for this exam.'); })
+            .always(EC.hideLoader);
+    });
+
+    $(selClass).on('change', function () {
+        selSection.innerHTML = '<option value="">All sections</option>';
+        selSection.disabled = true;
+        clearSheet();
+        updateButtons();
+        if (!this.value) return;
+
+        $.get(urls.setup, { examId: EC.num(selExam.value), classId: EC.num(this.value) })
+            .done(function (d) {
+                var sections = ((d && d.sections) || []).filter(function (s) { return s.name; });
+                $.each(sections, function (i, s) {
+                    selSection.innerHTML += '<option value="' + EC.esc(s.name) + '">' + EC.esc(s.name) + '</option>';
+                });
+                selSection.disabled = sections.length === 0;
+            });
+        loadResult();
+    });
+
+    $(selSection).on('change', function () { if (selClass.value) loadResult(); });
+    $('#btnLoad').on('click', loadResult);
+    $('#selSort').on('change', function () { if (current) render(current); });
+    $('#btnPrint').on('click', function () { window.print(); });
+
+    $('#btnCsv').on('click', function () {
+        window.location.href = urls.csv + '?examId=' + EC.num(selExam.value) +
+            '&classId=' + EC.num(selClass.value) + '&section=' + encodeURIComponent(selSection.value);
+    });
+
+    // ── Result status ──
+    function loadStatus() {
+        $.get(urls.status, { examId: EC.num(selExam.value) })
+            .done(function (d) {
+                if (!d || !d.success) { $('#statusCard').hide(); return; }
+                var pub = d.resultsStatus === 'Published';
+
+                $('#stChip').html(pub
+                    ? '<span class="rs-chip is-pub"><i class="bx bx-check-circle"></i>Published</span>'
+                    : '<span class="rs-chip is-unpub"><i class="bx bx-time-five"></i>Not published</span>');
+
+                $('#stSub').text(pub
+                    ? 'Published ' + (d.publishedAt || '') + (d.publishedBy ? ' by ' + d.publishedBy : '') +
+                      '. Parents can see these results and the marks are locked.'
+                    : (d.pendingCount
+                        ? d.pendingCount + ' of ' + d.sheetCount + ' mark sheet(s) still to finalise before the results can be published.'
+                        : (d.sheetCount
+                            ? 'Every mark sheet is finalised. Parents see nothing until the results are published.'
+                            : 'No students sit this exam yet.')));
+
+                var pend = d.pending || [];
+                $('#stPending').html(!pub && pend.length
+                    ? '<ul class="rs-pending">' + pend.slice(0, 10).map(function (p) {
+                          return '<li>' + EC.esc(p.className + (p.section ? '-' + p.section : '') + ' · ' + p.subject) + '</li>';
+                      }).join('') + (pend.length > 10 ? '<li>and ' + (pend.length - 10) + ' more</li>' : '') + '</ul>'
+                    : '');
+
+                $('#stLog').html((d.log || []).slice(0, 5).map(function (l) {
+                    return '<li>' + EC.esc(l.action === 'Publish' ? 'Published' : 'Unpublished') + ' · ' +
+                        EC.esc(l.at) + ' · ' + EC.esc(l.by) + (l.reason ? ' · "' + EC.esc(l.reason) + '"' : '') + '</li>';
+                }).join(''));
+
+                $('#btnPublish').toggle(!pub);
+                $('#btnPublish').prop('disabled', d.pendingCount > 0 || d.sheetCount === 0);
+                $('#btnUnpublish').toggle(pub);
+                $('#statusCard').show();
+            })
+            .fail(function () { $('#statusCard').hide(); });
+    }
+
+    $('#btnPublish').on('click', function () {
+        var $btn = $(this);
+        EC.confirm({
+            title:   'Publish these results?',
+            name:    $(selExam).find('option:selected').text().trim(),
+            message: 'Parents will see marks, grades and ranks. Every mark sheet of this exam is locked until the results are unpublished.',
+            okText:  'Publish results',
+            danger:  false
+        }).then(function (ok) {
+            if (!ok) return;
+            EC.buttonBusy($btn, 'Publishing…');
+            $.ajax({ url: urls.publish, type: 'POST', headers: { 'RequestVerificationToken': token() },
+                     data: { examId: EC.num(selExam.value) } })
+                .done(function (d) {
+                    if (!d || !d.success) { ecToast('error', (d && d.message) || 'Could not publish the results.'); return; }
+                    ecToast('success', d.message || 'Results published.');
+                    loadStatus();
+                    if (selClass.value) loadResult();
+                })
+                .fail(function () { ecToast('error', 'Could not publish the results. Please retry.'); })
+                .always(function () { EC.buttonReset($btn); });
+        });
+    });
+
+    $('#btnUnpublish').on('click', function () {
+        var $btn = $(this);
+        EC.prompt({
+            title:    'Unpublish these results?',
+            name:     $(selExam).find('option:selected').text().trim(),
+            message:  'Parents stop seeing them, and marks can be corrected again (reopen the sheets that need it). The reason is recorded.',
+            label:    'Reason',
+            required: true,
+            maxLength: 500,
+            okText:   'Unpublish',
+            danger:   false
+        }).then(function (reason) {
+            if (reason === null) return;
+            EC.buttonBusy($btn, 'Unpublishing…');
+            $.ajax({ url: urls.unpublish, type: 'POST', headers: { 'RequestVerificationToken': token() },
+                     data: { examId: EC.num(selExam.value), reason: reason } })
+                .done(function (d) {
+                    if (!d || !d.success) { ecToast('error', (d && d.message) || 'Could not unpublish the results.'); return; }
+                    ecToast('success', d.message || 'Results unpublished.');
+                    loadStatus();
+                    if (selClass.value) loadResult();
+                })
+                .fail(function () { ecToast('error', 'Could not unpublish the results. Please retry.'); })
+                .always(function () { EC.buttonReset($btn); });
+        });
+    });
+
+    // ── The sheet ──
+    function loadResult() {
+        if (!selExam.value || !selClass.value) return;
+        EC.showLoader();
+        EC.listLoading('#shBody', 'Loading result…');
+        $.get(urls.result, { examId: EC.num(selExam.value), classId: EC.num(selClass.value), section: selSection.value })
+            .done(function (d) {
+                if (!d || !d.success) {
+                    current = null;
+                    EC.listEmpty('#shBody', (d && d.message) || 'Could not load the result.', 'bx-error-circle');
+                    updateButtons();
+                    return;
+                }
+                current = d;
+                render(d);
+                updateButtons();
+            })
+            .fail(function () {
+                current = null;
+                EC.listEmpty('#shBody', 'Could not load the result. Please retry.', 'bx-error-circle');
+                updateButtons();
+            })
+            .always(EC.hideLoader);
+    }
+
+    function render(d) {
+        var where = d.className + (d.section ? '-' + d.section : ' (all sections)');
+        $('#shTitle').text(d.examName + ' · ' + where);
+        $('#shSub').text((d.academicYear ? d.academicYear + ' · ' : '') +
+            (d.resultsStatus === 'Published' ? 'Published ' + (d.publishedAt || '') : 'PROVISIONAL: results not published'));
+
+        if (d.resultsStatus !== 'Published') {
+            $('#shWarn').show().text(d.pendingCount
+                ? 'Provisional: ' + d.pendingCount + ' mark sheet(s) of this class are not finalised, so marks, grades and ranks can still change.'
+                : 'Provisional: the results of this exam are not published yet.');
+        } else {
+            $('#shWarn').hide();
+        }
+
+        var head = '<tr><th class="num">Roll</th><th>Student</th>';
+        if (!d.section) head += '<th class="num">Sec</th>';
+        $.each(d.subjects, function (i, s) {
+            head += '<th class="num">' + EC.esc(s.name) + '<br><span style="font-weight:700;">/ ' + fmt(s.max) + '</span></th>';
+        });
+        head += '<th class="num">Total</th><th class="num">%</th><th class="num">Grade</th>' +
+                '<th class="num">Class rank</th><th class="num">Sec rank</th></tr>';
+        $('#shHead').html(head);
+
+        var rows = d.students.slice();
+        if (!rows.length) {
+            EC.listEmpty('#shBody', 'No marks have been entered for this class yet.', 'bx-spreadsheet');
+            return;
+        }
+        if ($('#selSort').val() === 'rank') {
+            // Unranked (absent from every paper) go last.
+            rows.sort(function (a, b) {
+                var ra = a.classRank === null ? 99999 : a.classRank;
+                var rb = b.classRank === null ? 99999 : b.classRank;
+                return ra - rb || String(a.name).localeCompare(String(b.name));
+            });
+        }
+
+        var html = rows.map(function (st) {
+            var byId = {};
+            $.each(st.cells, function (i, c) { byId[c.subjectId] = c; });
+
+            var tr = '<tr><td class="num">' + EC.esc(st.roll) + '</td>' +
+                     '<td class="rs-name">' + EC.esc(st.name) + '</td>';
+            if (!d.section) tr += '<td class="num">' + EC.esc(st.section) + '</td>';
+
+            $.each(d.subjects, function (i, s) {
+                var c = byId[s.id];
+                if (!c) { tr += '<td class="num">—</td>'; return; }
+                if (c.absent) { tr += '<td class="num rs-abs">AB</td>'; return; }
+                if (c.marks === null) { tr += '<td class="num">—</td>'; return; }
+                tr += '<td class="num' + (c.passed === false ? ' rs-fail' : '') + '">' + fmt(c.marks) +
+                      (c.grade ? '<span class="rs-grade">' + EC.esc(c.grade) + '</span>' : '') + '</td>';
+            });
+
+            tr += '<td class="num rs-total">' + fmt(st.obtained) + ' / ' + fmt(st.total) + '</td>' +
+                  '<td class="num">' + (st.percent === null ? '—' : Number(st.percent).toFixed(2)) + '</td>' +
+                  '<td class="num rs-total">' + EC.esc(st.grade || '—') + '</td>' +
+                  '<td class="num">' + (st.classRank === null ? '—' : st.classRank + ' / ' + st.classSize) + '</td>' +
+                  '<td class="num">' + (st.sectionRank === null ? '—' : st.sectionRank + ' / ' + st.sectionSize) + '</td>' +
+                  '</tr>';
+            return tr;
+        }).join('');
+
+        $('#shBody').html(html);
+    }
+
+    if (selExam.value) $(selExam).trigger('change');
+    updateButtons();
+});
+</script>
+}

@@ -29,6 +29,9 @@
 --     inventory, staff leave/payroll, enrolment, promotion history, day-close log.
 --     A school that had run exams could not be purged at all (FK on exam_subjects).
 --     Also the attendance / exam-mark edit history (academics_edit_history.sql).
+--   * 2026-10-10: the result publish log and the grade scale (exam_results_publish.sql).
+--   * 2026-10-10: inventory locations, location stock, transfers and supplier
+--     returns (inventory.sql, store locations revision).
 --   * the archive no longer carries secrets: password_reset_tokens is skipped and
 --     password_hash / token_hash are stripped from every row. The file sits on disk.
 --   * purging a tenant's ONLY school keeps the tenant and its roles (decision D-7):
@@ -152,6 +155,8 @@ BEGIN
     -- ── Deletes, ordered so no foreign key is violated ─────────────────────
     -- academic: timetable and class_subjects reference sections/classes/subjects
     -- exams reference classes and subjects; marks reference students
+    DELETE FROM academic.exam_result_log           WHERE school_id = p_school_id;
+    DELETE FROM academic.grade_scale               WHERE school_id = p_school_id;
     DELETE FROM academic.exam_marks_history        WHERE school_id = p_school_id;
     DELETE FROM academic.exam_marks                WHERE school_id = p_school_id;
     DELETE FROM academic.exam_mark_sheets          WHERE school_id = p_school_id;
@@ -208,11 +213,16 @@ BEGIN
     DELETE FROM core.transport_vehicles            WHERE school_id = p_school_id;
     DELETE FROM core.transport_routes              WHERE school_id = p_school_id;
 
-    -- inventory: purchase lines and the stock ledger reference items/purchases
+    -- inventory: returns, transfers, location stock, purchase lines and the
+    -- stock ledger reference items/purchases/locations, so they go first
+    DELETE FROM core.inventory_purchase_returns    WHERE school_id = p_school_id;
+    DELETE FROM core.inventory_transfers           WHERE school_id = p_school_id;
+    DELETE FROM core.inventory_location_stock      WHERE school_id = p_school_id;
     DELETE FROM core.inventory_purchase_items      WHERE school_id = p_school_id;
     DELETE FROM core.inventory_stock_ledger        WHERE school_id = p_school_id;
     DELETE FROM core.inventory_purchases           WHERE school_id = p_school_id;
     DELETE FROM core.inventory_items               WHERE school_id = p_school_id;
+    DELETE FROM core.inventory_locations           WHERE school_id = p_school_id;
     DELETE FROM core.inventory_suppliers           WHERE school_id = p_school_id;
 
     -- school configuration

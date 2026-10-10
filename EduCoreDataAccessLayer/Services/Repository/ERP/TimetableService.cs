@@ -36,6 +36,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             {
                 setup.Periods.Add(new TimetablePeriod
                 {
+                    DayOfWeek  = IntVal(row, "day_of_week"),
                     PeriodSeq  = IntVal(row, "period_seq"),
                     Label      = Str(row, "label"),
                     PeriodType = Str(row, "period_type"),

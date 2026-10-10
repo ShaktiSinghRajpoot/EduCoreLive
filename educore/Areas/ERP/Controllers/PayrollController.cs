@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace educore.Areas.ERP.Controllers
 {
     [Area("ERP")]
-    [HasPermission("staff.view")]
+    // Salary has its own keys (payroll_permissions.sql): payroll.view to look,
+    // payroll.manage for every write. staff.view alone no longer opens payroll.
+    [HasPermission("payroll.view")]
     [RequiresModule(SchoolModule.Payroll)]
     public class PayrollController : Controller
     {
@@ -105,7 +107,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
-        [HasPermission("staff.manage")]
+        [HasPermission("payroll.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RunPayroll(int month, int year)
         {
@@ -122,7 +124,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
-        [HasPermission("staff.manage")]
+        [HasPermission("payroll.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> MarkPaid(int id, string? paymentMode, string? paymentReference)
         {
@@ -132,7 +134,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
-        [HasPermission("staff.manage")]
+        [HasPermission("payroll.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddAdjustment(int staffId, int month, int year, string? kind, decimal amount,
                                                        string? reason, string? paymentMode, string? paymentReference)
@@ -144,7 +146,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
-        [HasPermission("staff.manage")]
+        [HasPermission("payroll.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> VoidAdjustment(int id, string? reason)
         {

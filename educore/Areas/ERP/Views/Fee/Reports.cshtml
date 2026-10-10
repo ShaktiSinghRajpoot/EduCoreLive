@@ -108,9 +108,20 @@
     <div id="v-defaulters" class="d-none">
       <div class="filter-bar p-3 mb-3 no-print">
         <div class="row g-2 align-items-end">
-          <div class="col-6 col-md-3"><label class="form-label">Class</label><select id="dClass" class="form-select"><option value="">All classes</option></select></div>
-          <div class="col-6 col-md-3"><label class="form-label">Section</label><input id="dSection" class="form-control" placeholder="All"></div>
-          <div class="col-12 col-md-6 d-flex gap-2">
+          @* Session: a due counts in the session it was billed for (old rows without one
+             fall back to their due date's session, then the student's) — see fee_reports.sql. *@
+          <div class="col-12 col-md-3"><label class="form-label">Session</label>
+            <select id="dSession" class="form-select">
+              @foreach (var y in (ViewBag.Sessions as List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>) ?? new())
+              {
+                <option value="@y.Text" selected="@y.Selected">@y.Text</option>
+              }
+              <option value="">All sessions</option>
+            </select>
+          </div>
+          <div class="col-6 col-md-2"><label class="form-label">Class</label><select id="dClass" class="form-select"><option value="">All classes</option></select></div>
+          <div class="col-6 col-md-2"><label class="form-label">Section</label><input id="dSection" class="form-control" placeholder="All"></div>
+          <div class="col-12 col-md-5 d-flex gap-2">
             <button id="dLoad" class="btn btn-primary"><i class="bx bx-search me-1"></i>Load</button>
             <button id="dCsv" class="btn btn-outline-secondary"><i class="bx bx-download me-1"></i>CSV</button>
             <button id="dPrint" class="btn btn-outline-secondary"><i class="bx bx-printer me-1"></i>Print</button>
@@ -261,7 +272,7 @@ $(function () {
     var defData=[];
     $.getJSON(URL.classes).done(function(c){ var h='<option value="">All classes</option>'; (c||[]).forEach(function(x){ h+='<option>'+EC.esc(x)+'</option>'; }); $('#dClass').html(h); $('#rClass').html(h); });
     function loadDef(){
-        $.getJSON(URL.def,{className:$('#dClass').val(),section:$('#dSection').val()}).done(function(rows){
+        $.getJSON(URL.def,{session:$('#dSession').val(),className:$('#dClass').val(),section:$('#dSection').val()}).done(function(rows){
             defData=rows||[];
             var tot=defData.reduce(function(t,r){ return t+Number(r.outstanding||0); },0);
             $('#dTotal').text(EC.money(tot)); $('#dCount').text(defData.length);

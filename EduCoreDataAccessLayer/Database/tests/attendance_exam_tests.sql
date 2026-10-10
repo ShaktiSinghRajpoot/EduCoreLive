@@ -332,6 +332,11 @@ BEGIN
                                     academic_class_id, marks_obtained, is_absent, created_by)
     VALUES (c_tenant, c_school, v_draft, v_sub1, v_sid, v_clsid, 95, FALSE, c_user);
 
+    -- Results reach the student only once the exam's RESULTS are published
+    -- (exam_results_publish.sql, own suite). These checks are about the totals, so
+    -- the results are flagged published directly. The draft exam stays a draft.
+    UPDATE academic.exams SET results_status = 'Published' WHERE exam_id IN (v_exam, v_draft);
+
     DECLARE ce refcursor := 'e1'; cm refcursor := 'e2'; cs refcursor := 'e3';
             eid int; enm text; ety text; edt date;
             subj text; obt numeric; mx numeric; pm numeric; ab bool; ps bool; pct numeric;

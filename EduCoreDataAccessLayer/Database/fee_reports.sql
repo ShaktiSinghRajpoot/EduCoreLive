@@ -155,23 +155,51 @@ $procedure$;
 --
 -- A registration fee part-paid before admission has no ledger yet; its balance
 -- is listed as its own row (entry = 'Registration', student_id NULL).
+--
+-- Session filter (p_academic_year; NULL or blank = all sessions). The session
+-- a ledger row belongs to is the first of:
+--   1. student_ledger.academic_year (written by fn_student_bill_plan since
+--      2026-10-10, see student_money_lifecycle.sql);
+--   2. the school's session whose start..end dates contain the row's due date;
+--   3. the student's own session (core.students.academic_year);
+--   4. the current session.
+-- Rows billed before the column existed are blank in (1), so (2)/(3) place
+-- them; anything still unplaced counts in the current session, which is the
+-- report's default, so an old due is never dropped from the report.
+-- A registration row belongs to its enquiry's session (core.enquiries.session),
+-- else the current session.
+-- Grew p_academic_year: drop the old signature so one overload exists.
+DROP PROCEDURE IF EXISTS core.sp_fee_defaulters_get(integer, integer, integer, varchar, varchar, refcursor);
+DROP PROCEDURE IF EXISTS core.sp_fee_defaulters_get(integer, integer, integer, varchar, varchar, varchar, refcursor);
+
 CREATE OR REPLACE PROCEDURE core.sp_fee_defaulters_get(
     IN    p_tenant_id      integer,
     IN    p_school_id      integer,
     IN    p_action_user_id integer,
     IN    p_class          varchar,
     IN    p_section        varchar,
-    INOUT p_result         refcursor DEFAULT 'result_cursor'::refcursor
+    INOUT p_result         refcursor DEFAULT 'result_cursor'::refcursor,
+    -- Last, so the older positional calls (..., p_section, cursor) still bind.
+    IN    p_academic_year  varchar DEFAULT NULL
 )
 LANGUAGE plpgsql
 AS $procedure$
 DECLARE
     v_class   varchar := NULLIF(trim(p_class), '');
     v_section varchar := NULLIF(trim(p_section), '');
+    v_year    varchar := lower(NULLIF(trim(p_academic_year), ''));
+    v_current varchar;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid request.';
     END IF;
+
+    SELECT y.academic_year_name INTO v_current
+    FROM academic.academic_years y
+    WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id
+      AND y.is_current AND COALESCE(y.is_deleted, FALSE) = FALSE
+    ORDER BY y.start_date DESC
+    LIMIT 1;
 
     OPEN p_result FOR
     WITH dues AS (
@@ -180,8 +208,23 @@ BEGIN
                sl.due_date::date AS due_on,
                (sl.due_date IS NULL OR sl.due_date::date <= CURRENT_DATE)    AS is_due
         FROM core.student_ledger sl
+        JOIN core.students s0 ON s0.student_id = sl.student_id
+        LEFT JOIN LATERAL (
+            SELECT y.academic_year_name
+            FROM academic.academic_years y
+            WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id
+              AND COALESCE(y.is_deleted, FALSE) = FALSE
+              AND left(sl.due_date, 10) BETWEEN y.start_date AND y.end_date
+            ORDER BY y.start_date
+            LIMIT 1
+        ) ys ON v_year IS NOT NULL
         WHERE sl.tenant_id = p_tenant_id AND sl.school_id = p_school_id
           AND sl.amount_due > sl.amount_paid + COALESCE(sl.concession, 0)
+          AND (v_year IS NULL
+               OR lower(COALESCE(NULLIF(trim(sl.academic_year), ''),
+                                 ys.academic_year_name,
+                                 NULLIF(trim(s0.academic_year), ''),
+                                 v_current)) = v_year)
     ),
     students AS (
         SELECT 'Student'::varchar AS entry,
@@ -237,6 +280,8 @@ BEGIN
           AND b.balance > 0.005
           AND v_section IS NULL
           AND (v_class IS NULL OR e.class_name = v_class)
+          AND (v_year IS NULL
+               OR lower(COALESCE(NULLIF(trim(e.session), ''), v_current)) = v_year)
     )
     SELECT * FROM students
     UNION ALL

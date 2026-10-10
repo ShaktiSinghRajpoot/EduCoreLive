@@ -18,7 +18,9 @@
 --
 -- status is Draft | Published. Draft is visible only on the Exam Schedule page;
 -- GetDatesheet returns Published exams only, and the Marks Entry dropdown
--- filters to Published too.
+-- filters to Published too. That is the DATESHEET status; the RESULT has its own
+-- (results_status, see exam_results_publish.sql). While results are published
+-- the exam cannot be edited or moved back to draft.
 --
 -- Subjects come from Subject Management (academic.class_subjects), so SaveExam
 -- rejects any subject a class does not study, then replaces each class's
@@ -240,7 +242,8 @@ BEGIN
             e.status,
             d.class_count,
             d.subject_count,
-            COALESCE(d.class_names, '') AS class_names
+            COALESCE(d.class_names, '') AS class_names,
+            e.results_status
         FROM academic.exams e
         LEFT JOIN (
             SELECT es.exam_id,
@@ -279,7 +282,8 @@ BEGIN
             e.start_date,
             e.end_date,
             e.status,
-            d.subject_count
+            d.subject_count,
+            e.results_status
         FROM academic.exams e
         JOIN (SELECT es.exam_id, es.academic_class_id, COUNT(*)::int AS subject_count
               FROM academic.exam_subjects es
@@ -426,6 +430,14 @@ BEGIN
             RAISE EXCEPTION 'Status must be Draft or Published.';
         END IF;
 
+        -- Published results sit on a published datesheet; pull them back first.
+        IF p_status = 'Draft'
+           AND EXISTS (SELECT 1 FROM academic.exams
+                       WHERE exam_id = p_exam_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+                         AND results_status = 'Published') THEN
+            RAISE EXCEPTION 'The results of this exam are published. Unpublish the results before moving it back to draft.';
+        END IF;
+
         -- An exam with no datesheet has nothing to publish.
         IF p_status = 'Published'
            AND NOT EXISTS (SELECT 1 FROM academic.exam_subjects
@@ -499,6 +511,11 @@ BEGIN
                              AND tenant_id = p_tenant_id AND school_id = p_school_id
                              AND NOT is_deleted) THEN
                 RAISE EXCEPTION 'That exam was not found.';
+            END IF;
+            -- Changing papers or max marks would change results parents have seen.
+            IF EXISTS (SELECT 1 FROM academic.exams
+                       WHERE exam_id = v_exam_id AND results_status = 'Published') THEN
+                RAISE EXCEPTION 'The results of this exam are published, so it cannot be edited. Unpublish the results first.';
             END IF;
             BEGIN
                 UPDATE academic.exams

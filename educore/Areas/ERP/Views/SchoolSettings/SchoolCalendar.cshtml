@@ -116,12 +116,15 @@
       <div class="col-12 col-lg-4">
         <div class="ec-card mb-0 h-100">
           <div class="ec-card-header">
-            <div class="ec-section-title-wrap">
-              <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
-              <div>
-                <div class="ec-section-title">Dated Entries</div>
-                <div class="ec-section-subtitle" id="listSub">—</div>
+            <div class="d-flex justify-content-between align-items-center gap-2">
+              <div class="ec-section-title-wrap">
+                <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
+                <div>
+                  <div class="ec-section-title">Dated Entries</div>
+                  <div class="ec-section-subtitle" id="listSub">—</div>
+                </div>
               </div>
+              <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" id="btnRange"><i class="bx bx-calendar-plus me-1"></i>Date range</button>
             </div>
           </div>
           <div class="ec-card-body pt-2">
@@ -181,6 +184,62 @@
   </div>
 </div>
 
+<!-- Date range modal: one entry per day from..to, or remove every entry in the range -->
+<div class="modal fade" id="rangeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:0;border-radius:20px;overflow:hidden;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-calendar-plus"></i></span>
+          <div>
+            <div class="ec-section-title">Date Range</div>
+            <div class="ec-section-subtitle">Mark several days at once, e.g. a vacation week</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4">
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label sc-modal-lbl">From</label>
+            <input type="date" class="form-control" id="rmFrom">
+          </div>
+          <div class="col-6">
+            <label class="form-label sc-modal-lbl">To</label>
+            <input type="date" class="form-control" id="rmTo">
+          </div>
+          <div class="col-12">
+            <label class="form-label sc-modal-lbl">These days are</label>
+            <select class="form-select" id="rmType">
+              <option value="holiday">Holiday — school closed, no bells</option>
+              <option value="half_day">Half day — bells stop at a set time</option>
+              <option value="working">Working day — overrides the weekly off</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label sc-modal-lbl">Name</label>
+            <input type="text" class="form-control" id="rmName" maxlength="100" placeholder="e.g. Diwali Vacation">
+          </div>
+          <div class="col-12 d-none" id="rmEndWrap">
+            <label class="form-label sc-modal-lbl">School closes at</label>
+            <input type="time" class="form-control" id="rmEnd" value="12:30">
+          </div>
+          <div class="col-12">
+            <div class="sc-hint">One entry is added per day. Days that already have an entry are left as they are, and a holiday or half-day range skips the weekly offs.</div>
+          </div>
+        </div>
+      </div>
+      <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-between gap-2">
+        <button type="button" class="btn btn-outline-danger px-3" id="rmDelete"><i class="bx bx-trash me-1"></i>Remove entries in range</button>
+        <div class="d-flex flex-column flex-sm-row gap-2 ms-sm-auto">
+          <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary px-4" id="rmSave"><i class="bx bx-check me-1"></i>Add range</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 @section PageScripts {
 <script>
 (function(){
@@ -190,6 +249,8 @@ var DATA_URL   ='@Url.Action("SchoolCalendarData","SchoolSettings",new{area="ERP
 var SAVE_URL   ='@Url.Action("SaveCalendarEntry","SchoolSettings",new{area="ERP"})';
 var DELETE_URL ='@Url.Action("DeleteCalendarEntry","SchoolSettings",new{area="ERP"})';
 var WEEKLY_URL ='@Url.Action("SaveWeeklyOff","SchoolSettings",new{area="ERP"})';
+var RANGE_URL  ='@Url.Action("SaveCalendarRange","SchoolSettings",new{area="ERP"})';
+var RANGE_DELETE_URL='@Url.Action("DeleteCalendarRange","SchoolSettings",new{area="ERP"})';
 
 var DOW=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 var DOW_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -387,6 +448,64 @@ el('dmClear').addEventListener('click',function(){
   var id=parseInt(this.dataset.id,10);
   bootstrap.Modal.getInstance(el('dayModal')).hide();
   del(id);
+});
+
+/* ---------------- date range ---------------- */
+el('rmType').addEventListener('change',function(){ el('rmEndWrap').classList.toggle('d-none', this.value!=='half_day'); });
+
+el('btnRange').addEventListener('click',function(){
+  /* start on the month on screen */
+  var first=key(year,month,1);
+  el('rmFrom').value=first; el('rmTo').value=first;
+  el('rmType').value='holiday'; el('rmName').value='';
+  el('rmEndWrap').classList.add('d-none');
+  new bootstrap.Modal(el('rangeModal')).show();
+});
+
+function readRange(){
+  var from=el('rmFrom').value, to=el('rmTo').value;
+  if(!from || !to){ ecToast('error','Pick the first and last date.'); return null; }
+  if(to<from){ ecToast('error','The range ends before it starts.'); return null; }
+  return {from:from, to:to};
+}
+
+el('rmSave').addEventListener('click',function(){
+  var r=readRange(); if(!r) return;
+  var type=el('rmType').value, end=el('rmEnd').value;
+  if(type==='half_day' && !end){ ecToast('error','Set the closing time for a half day.'); return; }
+  var $btn=$(this);
+  EC.buttonBusy($btn,'Saving…');
+  post(RANGE_URL,{ from:r.from, to:r.to, dayType:type, title:el('rmName').value.trim(),
+                   halfDayEnd:(type==='half_day'?end:null) })
+    .done(function(res){
+      if(res && res.success){
+        bootstrap.Modal.getInstance(el('rangeModal')).hide();
+        ecToast('success',res.message||'Calendar updated.');
+        load();
+      } else ecToast('error',(res&&res.message)||'Save failed.');
+    })
+    .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
+    .always(function(){ EC.buttonReset($btn); });
+});
+
+el('rmDelete').addEventListener('click',function(){
+  var r=readRange(); if(!r) return;
+  /* close the range dialog first: two Bootstrap modals on top of each other strand the backdrop */
+  bootstrap.Modal.getInstance(el('rangeModal')).hide();
+  EC.confirm({ title:'Remove every entry in this range?',
+               name:longDate(r.from)+(r.to!==r.from ? ' – '+longDate(r.to) : ''),
+               message:'Holidays, half days and working-day overrides in the range are removed. Those days go back to the weekly pattern.',
+               okText:'Remove entries' }).then(function(ok){
+    if(!ok) return;
+    post(RANGE_DELETE_URL,{ from:r.from, to:r.to })
+      .done(function(res){
+        if(res && res.success){
+          ecToast('info',res.message||'Entries removed.');
+          load();
+        } else ecToast('error',(res&&res.message)||'Could not remove the entries.');
+      })
+      .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Remove failed')); });
+  });
 });
 
 /* init */
