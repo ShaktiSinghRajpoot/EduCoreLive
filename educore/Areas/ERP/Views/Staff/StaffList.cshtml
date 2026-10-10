@@ -136,7 +136,8 @@
                 </td>
                 <td>@(string.IsNullOrWhiteSpace(s.Designation) ? "—" : s.Designation)</td>
                 <td>@(string.IsNullOrWhiteSpace(s.Department) ? "—" : s.Department)</td>
-                <td>@(string.IsNullOrWhiteSpace(s.StaffType) ? "—" : Html.Raw($"<span class='st-type'>{s.StaffType}</span>"))</td>
+                @* Encoded, not Html.Raw: staff_type is a stored string. *@
+                <td>@if (string.IsNullOrWhiteSpace(s.StaffType)) { <text>—</text> } else { <span class="st-type">@s.StaffType</span> }</td>
                 <td>@(string.IsNullOrWhiteSpace(s.Mobile) ? "—" : s.Mobile)</td>
                 <td><span class="st-bdg b-@(status.Replace(" ", ""))">@status</span></td>
                 <td class="text-end">

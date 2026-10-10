@@ -52,6 +52,14 @@ namespace EduCoreDataAccessLayer.Models
         public int? ExperienceYears { get; set; }
         public string Status { get; set; } = "Active";
 
+        /// <summary>Last day a leaver worked (yyyy-MM-dd). Set when the status goes
+        /// Inactive (default today); payroll pays the final month up to it.</summary>
+        [DataType(DataType.Date)]
+        public string? LastWorkingDate { get; set; }
+
+        /// <summary>When the active/inactive state last flipped (read-only).</summary>
+        public DateTime? StatusChangedAt { get; set; }
+
         // ── Payroll / bank ─────────────────────────────────────────
         public decimal? MonthlySalary { get; set; }
         public string? BankAccountNo { get; set; }
@@ -115,6 +123,7 @@ namespace EduCoreDataAccessLayer.Models
         public string? Department { get; set; }
         public string? Designation { get; set; }
         public string? JoiningDate { get; set; }
+        public string? LastWorkingDate { get; set; }
         public string Status { get; set; } = "Active";
         public bool HasLogin { get; set; }
 

@@ -17,10 +17,13 @@ namespace educore.Areas.ERP.Controllers
         private readonly IPermissionService _perms;
         private readonly IPublicIdService _publicIds;
         private readonly AppCache _cache;
+        private readonly IStaffLeaveService _leaveService;
 
-        public StaffController(IStaffService staffService, IPermissionService perms, IPublicIdService publicIds, AppCache cache)
+        public StaffController(IStaffService staffService, IPermissionService perms, IPublicIdService publicIds, AppCache cache,
+                               IStaffLeaveService leaveService)
         {
             _staffService = staffService;
+            _leaveService = leaveService;
             _perms = perms;
             _publicIds = publicIds;
             _cache = cache;
@@ -83,15 +86,29 @@ namespace educore.Areas.ERP.Controllers
         [HttpPost]
         [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Deactivate(Guid id)
+        public async Task<IActionResult> Deactivate(Guid id, string? lastWorkingDate)
         {
             var staffId = await _publicIds.ResolveAsync(IPublicIdService.Staff, id, TenantId(), SchoolId());
             if (staffId == 0) return RedirectToAction("StaffList");
 
-            var (ok, message) = await _staffService.DeactivateAsync(staffId, TenantId(), SchoolId(), UserId());
-            if (ok > 0) await ForgetAccessAsync(staffId);
-            TempData[ok > 0 ? "SuccessMessage" : "ErrorMessage"] =
-                ok > 0 ? "Staff member deactivated." : message;
+            // The last working day decides how much of the final month payroll pays.
+            if (!string.IsNullOrWhiteSpace(lastWorkingDate)
+                && !DateTime.TryParseExact(lastWorkingDate, "yyyy-MM-dd", null,
+                                           System.Globalization.DateTimeStyles.None, out _))
+            {
+                TempData["ErrorMessage"] = "Enter the last working day as a date.";
+                return RedirectToAction("StaffProfile", new { id });
+            }
+
+            var (ok, message) = await _staffService.DeactivateAsync(staffId, lastWorkingDate, TenantId(), SchoolId(), UserId());
+            if (ok == 0)
+            {
+                // Stay on the profile so the reason (e.g. a date before joining) is seen there.
+                TempData["ErrorMessage"] = message;
+                return RedirectToAction("StaffProfile", new { id });
+            }
+            await ForgetAccessAsync(staffId);
+            TempData["SuccessMessage"] = "Staff member deactivated.";
             return RedirectToAction("StaffList");
         }
 
@@ -148,6 +165,13 @@ namespace educore.Areas.ERP.Controllers
                 ViewBag.RoleNames = roles.Where(r => model.RoleIds.Contains(r.RoleId))
                                          .Select(r => r.RoleName).ToList();
             }
+
+            // HR snapshot: approved leave days this year and requests still pending.
+            var leaves = await _leaveService.GetLeavesAsync(TenantId(), SchoolId(), UserId(), staffId: staffId);
+            var year = Dates.Now.Year.ToString();
+            ViewBag.LeaveTaken = leaves.Where(l => l.Status == "Approved" && (l.FromDate ?? "").StartsWith(year))
+                                       .Sum(l => l.Days).ToString("0.#");
+            ViewBag.LeavePending = leaves.Count(l => l.Status == "Pending").ToString();
             return View(model);
         }
 

@@ -57,6 +57,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     Department   = NullStr(row, "department"),
                     Designation  = NullStr(row, "designation"),
                     JoiningDate  = DbRead.NStr(row, "joining_date"),
+                    LastWorkingDate = DbRead.NStr(row, "last_working_date"),
                     Status       = Str(row, "status"),
                     HasLogin     = row.Table.Columns.Contains("user_id") && row["user_id"] != DBNull.Value
                 });
@@ -109,6 +110,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     Department   = NullStr(row, "department"),
                     Designation  = NullStr(row, "designation"),
                     JoiningDate  = DbRead.NStr(row, "joining_date"),
+                    LastWorkingDate = DbRead.NStr(row, "last_working_date"),
                     Status       = Str(row, "status"),
                     HasLogin     = row.Table.Columns.Contains("user_id") && row["user_id"] != DBNull.Value
                 });
@@ -143,6 +145,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 Department      = NullStr(row, "department"),
                 Designation     = NullStr(row, "designation"),
                 JoiningDate     = DbRead.NStr(row, "joining_date"),
+                LastWorkingDate = DbRead.NStr(row, "last_working_date"),
+                StatusChangedAt = DbRead.DateTimeN(row, "status_changed_at"),
                 Qualification   = NullStr(row, "qualification"),
                 ExperienceYears = NullIntVal(row, "experience_years"),
                 Status          = Str(row, "status"),
@@ -202,25 +206,31 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
         }
 
-        public Task<(int StaffId, string Message)> DeactivateAsync(int staffId, int tenantId, int schoolId, int actionUserId)
-            => RunActionAsync("DELETE", staffId, tenantId, schoolId, actionUserId);
+        public Task<(int StaffId, string Message)> DeactivateAsync(int staffId, string? lastWorkingDate, int tenantId, int schoolId, int actionUserId)
+            => RunActionAsync("DELETE", staffId, lastWorkingDate, tenantId, schoolId, actionUserId);
 
         public Task<(int StaffId, string Message)> ReactivateAsync(int staffId, int tenantId, int schoolId, int actionUserId)
-            => RunActionAsync("REACTIVATE", staffId, tenantId, schoolId, actionUserId);
+            => RunActionAsync("REACTIVATE", staffId, null, tenantId, schoolId, actionUserId);
 
-        private async Task<(int StaffId, string Message)> RunActionAsync(string operation, int staffId, int tenantId, int schoolId, int actionUserId)
-
+        private async Task<(int StaffId, string Message)> RunActionAsync(string operation, int staffId, string? lastWorkingDate,
+                                                                         int tenantId, int schoolId, int actionUserId)
         {
             if (tenantId <= 1 || schoolId <= 0 || staffId <= 0) return (0, "Invalid request.");
             try
             {
-                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpManage, BuildParameters(operation, tenantId, schoolId, actionUserId, staffId: staffId));
+                await _db.ExecuteProcedureWithCursorsAsync(SpManage, BuildParameters(operation, tenantId, schoolId, actionUserId,
+                    staffId: staffId, lastWorkingDate: lastWorkingDate));
                 return (staffId, "Done.");
             }
             catch (PostgresException ex)
             {
                 _logger.LogWarning(ex, "Staff {Op} business-rule error (SqlState {State})", operation, ex.SqlState);
                 return (0, ex.MessageText);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Staff {Op} unexpected error", operation);
+                return (0, "Could not update the staff member. Please try again.");
             }
         }
 
@@ -360,7 +370,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static NpgsqlParameter[] BuildParameters(
             string operation, int tenantId, int schoolId, int actionUserId,
             int staffId = 0, StaffModel? model = null, string? passwordHash = null,
-            string? search = null, string? statusFilter = null)
+            string? search = null, string? statusFilter = null, string? lastWorkingDate = null)
         {
             return new NpgsqlParameter[]
             {
@@ -396,7 +406,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     { Value = (object?)model?.RoleIds?.ToArray() ?? Array.Empty<int>() },
                 Txt("p_search", search),
                 Txt("p_status_filter", statusFilter),
-                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "staff_cursor" }
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "staff_cursor" },
+                // After p_result in the proc: the last working day (DELETE, or an
+                // Edit-form change to Inactive). Null = today.
+                NDate("p_last_working_date", lastWorkingDate ?? model?.LastWorkingDate)
             };
         }
 

@@ -40,7 +40,9 @@
 
     <form asp-area="ERP" asp-controller="Staff" asp-action="EditStaff" method="post" novalidate>
       @Html.AntiForgeryToken()
-      <input type="hidden" name="id" value="@staffId" />
+      @* No hidden "id" here: the action's id is the public uuid from the URL. A
+         hidden int id used to win model binding (form fields bind before route
+         values), fail to parse as a Guid, and bounce every save to the list. *@
       <input asp-for="UserId" type="hidden" />
 
       <!-- Personal -->
@@ -139,9 +141,15 @@
             </div>
             <div class="col-12 col-md-4">
               <label class="es-label">Employment Status</label>
-              <select asp-for="Status" class="form-select">
+              <select asp-for="Status" id="ddStatus" class="form-select">
                 <option>Active</option><option>On Leave</option><option>Inactive</option>
               </select>
+              <div class="text-muted small mt-1">Inactive = left the school: the login is switched off.</div>
+            </div>
+            <div class="col-12 col-md-4" id="lwdWrap" style="display:none;">
+              <label class="es-label">Last Working Day</label>
+              <input asp-for="LastWorkingDate" type="date" class="form-control" max="@Dates.Now.ToString("yyyy-MM-dd")">
+              <div class="text-muted small mt-1">Payroll pays the final month up to this day. Blank = today.</div>
             </div>
           </div>
         </div>
@@ -280,14 +288,26 @@
         function BindDesignations(dept, keep) {
             var url = '@Url.Action("GetDesignations", "Staff", new { area = "ERP" })';
             $.post(url, { department: dept }, function (data) {
+                var found = false;
                 $.each(data, function (i, item) {
-                    var opt = $("<option></option>").val(item.value).html(item.text).attr('data-type', item.type);
-                    if (item.value === keep) opt.prop('selected', true);
+                    // .text, not .html: designation names are typed in by the school.
+                    var opt = $("<option></option>").val(item.value).text(item.text).attr('data-type', item.type);
+                    if (item.value === keep) { opt.prop('selected', true); found = true; }
                     $('#ddDesignation').append(opt);
                 });
+                // A designation that was deactivated in the masters is not offered
+                // any more; keep the person's current one so a save does not wipe it.
+                if (keep && !found) {
+                    $('#ddDesignation').append($("<option></option>").val(keep).text(keep).prop('selected', true));
+                }
                 SyncStaffType();
             });
         }
+
+        // The last working day only matters for someone leaving.
+        function SyncLeaving() { $('#lwdWrap').css('display', $('#ddStatus').val() === 'Inactive' ? 'block' : 'none'); }
+        $('#ddStatus').change(SyncLeaving);
+        SyncLeaving();
 
         function SyncStaffType() { $('#ddStaffType').val($('#ddDesignation :selected').data('type') || ''); }
         $('#ddDesignation').change(SyncStaffType);

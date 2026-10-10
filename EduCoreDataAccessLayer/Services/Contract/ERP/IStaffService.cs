@@ -21,7 +21,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             StaffModel model, string operation, string? passwordHash,
             int tenantId, int schoolId, int actionUserId);
 
-        Task<(int StaffId, string Message)> DeactivateAsync(int staffId, int tenantId, int schoolId, int actionUserId);
+        /// <summary>Deactivates and switches the login off. <paramref name="lastWorkingDate"/>
+        /// (yyyy-MM-dd, null = today) is the day payroll pays the final month up to.</summary>
+        Task<(int StaffId, string Message)> DeactivateAsync(int staffId, string? lastWorkingDate, int tenantId, int schoolId, int actionUserId);
         Task<(int StaffId, string Message)> ReactivateAsync(int staffId, int tenantId, int schoolId, int actionUserId);
 
         Task<StaffDropdowns> GetDropdownsAsync(int tenantId, int schoolId);

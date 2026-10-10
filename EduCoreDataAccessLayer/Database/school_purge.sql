@@ -232,6 +232,8 @@ BEGIN
     DELETE FROM core.user_roles                    WHERE school_id = p_school_id;
     DELETE FROM core.user_profiles                 WHERE school_id = p_school_id;
     DELETE FROM core.staff_leave                   WHERE school_id = p_school_id;
+    DELETE FROM core.staff_payroll_history         WHERE school_id = p_school_id;
+    DELETE FROM core.staff_payroll_adjustment      WHERE school_id = p_school_id;
     DELETE FROM core.staff_payroll                 WHERE school_id = p_school_id;
     DELETE FROM core.staff                         WHERE school_id = p_school_id;
     DELETE FROM core.users                         WHERE school_id = p_school_id;

@@ -1,4 +1,4 @@
-﻿-- ============================================================================
+-- ============================================================================
 -- sp_staff_manage.sql  —  CRUD for core.staff (HR/Staff module)
 --
 -- Operations (p_operation):
@@ -25,9 +25,102 @@
 --   * Phone uniqueness uses core.fn_user_phone_taken (last 10 digits, like the index).
 --   * Activation, role changes and admin password resets write admin_activity_logs.
 --
+-- Oct 2026 (hr_leave_payroll_tests.sql, docs/test-cases/hr_leave_payroll.md):
+--   * core.staff.last_working_date: the day a leaver last worked. Payroll pays
+--     the final month up to that day, so a leaver is no longer dropped from the
+--     month they worked in. DELETE records it (p_last_working_date, default today).
+--   * Choosing "Inactive" on the Edit form is the same as Deactivate: is_active
+--     goes FALSE, status_changed_at and the last working day are stamped and the
+--     login is switched off (same guards). Inactive -> Active/On Leave on the
+--     form is the same as Reactivate. Before this only the status word changed,
+--     so the person stayed in the teacher pools and kept signing in.
+--   * UPDATE / DELETE / REACTIVATE check the staff row is in THIS school first.
+--     An out-of-scope UPDATE with "create login" ticked used to create the login
+--     before finding nothing to update, leaving an orphan account.
+--   * Refused: employee code differing only by case, negative salary, a status
+--     other than Active / On Leave / Inactive, a staff type outside the four
+--     buckets, a new staff member created Inactive, a last working day in the
+--     future or before the joining date, deactivating someone already inactive.
+--   * p_last_working_date is the LAST parameter (after p_result) so existing
+--     positional callers keep working.
+--
 -- NOTE: parameters are POSITIONAL (Npgsql CommandType.StoredProcedure). The C#
 -- StaffService MUST build NpgsqlParameter[] in exactly this order.
 -- ============================================================================
+
+-- When a leaver last worked. Text 'YYYY-MM-DD' like every other date column on
+-- core.staff (see dates_as_text.sql). NULL for anyone still working, and for
+-- staff deactivated before this column existed (no honest value to fill in).
+ALTER TABLE core.staff ADD COLUMN IF NOT EXISTS last_working_date varchar(10);
+
+-- "zzhr-001" and "ZZHR-001" are the same badge. The proc checks this too; the
+-- index makes it hold under concurrent saves.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_staff_employee_code_ci
+    ON core.staff (tenant_id, school_id, UPPER(TRIM(employee_code)))
+    WHERE employee_code IS NOT NULL AND is_deleted = FALSE;
+
+
+-- ----------------------------------------------------------------------------
+-- Switch a staff member's login off or on, with the guards that go with it.
+-- One place for DELETE, REACTIVATE and an Edit-form status change.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE PROCEDURE core.sp_staff_login_switch(
+    p_tenant_id      integer,
+    p_school_id      integer,
+    p_action_user_id integer,
+    p_staff_id       integer,
+    p_user_id        integer,
+    p_on             boolean)
+LANGUAGE plpgsql
+AS $procedure$
+BEGIN
+    IF p_user_id IS NULL THEN
+        RETURN;
+    END IF;
+
+    IF NOT p_on THEN
+        IF p_user_id = p_action_user_id THEN
+            RAISE EXCEPTION 'You cannot deactivate your own login.';
+        END IF;
+        IF core.fn_is_last_school_admin(p_school_id, p_user_id) THEN
+            RAISE EXCEPTION 'This is the last active School Admin of the school. Make someone else a School Admin first.';
+        END IF;
+
+        -- Someone who has left must not keep signing in.
+        UPDATE core.users
+        SET    is_active = FALSE, updated_by = p_action_user_id, updated_at = now()
+        WHERE  user_id = p_user_id AND tenant_id = p_tenant_id AND is_active = TRUE;
+
+        IF FOUND THEN
+            PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'USER_DEACTIVATE',
+                'Staff', 'core.users', p_user_id,
+                format('Login deactivated with staff %s', p_staff_id));
+        END IF;
+        RETURN;
+    END IF;
+
+    -- Bring the login back, unless its email or phone now belongs to someone else.
+    IF EXISTS (SELECT 1 FROM core.users WHERE user_id = p_user_id
+               AND tenant_id = p_tenant_id AND is_active = FALSE AND is_deleted = FALSE) THEN
+        IF core.fn_user_email_taken((SELECT email FROM core.users WHERE user_id = p_user_id), p_user_id) THEN
+            RAISE EXCEPTION 'This person''s login email is now used by another user. Change it before re-activating.';
+        END IF;
+        IF EXISTS (SELECT 1 FROM core.user_profiles up WHERE up.user_id = p_user_id AND up.phone IS NOT NULL
+                   AND core.fn_user_phone_taken(up.phone, p_user_id)) THEN
+            RAISE EXCEPTION 'This person''s login phone is now used by another user. Change it before re-activating.';
+        END IF;
+
+        UPDATE core.users
+        SET    is_active = TRUE, updated_by = p_action_user_id, updated_at = now()
+        WHERE  user_id = p_user_id;
+
+        PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'USER_ACTIVATE',
+            'Staff', 'core.users', p_user_id,
+            format('Login re-activated with staff %s', p_staff_id));
+    END IF;
+END;
+$procedure$;
+
 
 DROP PROCEDURE IF EXISTS core.sp_staff_manage(
     text, integer, integer, integer, integer,
@@ -75,7 +168,9 @@ CREATE OR REPLACE PROCEDURE core.sp_staff_manage(
     p_search           text,
     p_status_filter    text,
     -- out
-    INOUT p_result     refcursor DEFAULT 'staff_cursor'
+    INOUT p_result     refcursor DEFAULT 'staff_cursor',
+    -- leaving (DELETE, or UPDATE to Inactive). Last so positional callers still work.
+    p_last_working_date date DEFAULT NULL
 )
 LANGUAGE plpgsql
 AS $procedure$
@@ -88,6 +183,12 @@ DECLARE
     v_admin_role  integer;
     v_had_admin   boolean;
     v_gets_admin  boolean;
+    v_old_status  text;
+    v_new_status  text;
+    v_join        date;
+    v_lwd         date;
+    v_going_off   boolean := FALSE;
+    v_coming_back boolean := FALSE;
 BEGIN
     -- Multi-tenancy guard (tenant 1 = platform; real schools are tenant > 1).
     IF p_tenant_id IS NULL OR p_tenant_id <= 1 OR p_school_id IS NULL OR p_school_id <= 0 THEN
@@ -102,7 +203,7 @@ BEGIN
                s.staff_type, s.department, s.designation, s.joining_date,
                s.qualification, s.experience_years, s.status,
                s.monthly_salary, s.bank_account_no, s.ifsc_code, s.pan, s.aadhaar,
-               s.user_id
+               s.user_id, s.status_changed_at, s.last_working_date
         FROM   core.staff s
         WHERE  s.tenant_id = p_tenant_id
           AND  s.school_id = p_school_id
@@ -124,7 +225,7 @@ BEGIN
                s.staff_type, s.department, s.designation, s.joining_date,
                s.qualification, s.experience_years, s.status,
                s.monthly_salary, s.bank_account_no, s.ifsc_code, s.pan, s.aadhaar,
-               s.user_id
+               s.user_id, s.status_changed_at, s.last_working_date
         FROM   core.staff s
         WHERE  s.tenant_id = p_tenant_id
           AND  s.school_id = p_school_id
@@ -133,74 +234,65 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Every write below works on one staff row of THIS school. Find it first, so
+    -- nothing (a login, a role) is created for a row that is not ours.
+    IF p_operation IN ('UPDATE', 'DELETE', 'REACTIVATE') THEN
+        SELECT user_id, status, NULLIF(joining_date, '')::date
+          INTO v_user_id, v_old_status, v_join
+        FROM core.staff
+        WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+          AND staff_id = p_staff_id AND is_deleted = FALSE;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Staff member not found.';
+        END IF;
+    END IF;
+
     -- -------------------------------------------------------------- DELETE
     IF p_operation = 'DELETE' THEN
-        SELECT user_id INTO v_user_id FROM core.staff
-        WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
+        IF v_old_status = 'Inactive' THEN
+            RAISE EXCEPTION 'This staff member is already inactive.';
+        END IF;
 
-        IF v_user_id IS NOT NULL THEN
-            IF v_user_id = p_action_user_id THEN
-                RAISE EXCEPTION 'You cannot deactivate your own login.';
-            END IF;
-            IF core.fn_is_last_school_admin(p_school_id, v_user_id) THEN
-                RAISE EXCEPTION 'This is the last active School Admin of the school. Make someone else a School Admin first.';
-            END IF;
+        v_lwd := COALESCE(p_last_working_date, CURRENT_DATE);
+        IF v_lwd > CURRENT_DATE THEN
+            RAISE EXCEPTION 'The last working day cannot be in the future. Deactivate on or after that day.';
+        END IF;
+        -- Someone hired for a future date who never joined: no working days at
+        -- all, so no last working day (payroll then never pays them).
+        IF p_last_working_date IS NULL AND v_join IS NOT NULL AND v_join > CURRENT_DATE THEN
+            v_lwd := NULL;
+        END IF;
+        IF v_join IS NOT NULL AND v_lwd < v_join THEN
+            RAISE EXCEPTION 'The last working day cannot be before the joining date (%).', to_char(v_join, 'DD Mon YYYY');
         END IF;
 
         UPDATE core.staff
         SET    status = 'Inactive', is_active = FALSE,
                status_changed_at = now(),
+               last_working_date = to_char(v_lwd, 'YYYY-MM-DD'),
                updated_by = p_action_user_id, updated_at = now()
         WHERE  tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
 
-        -- Someone who has left must not keep signing in.
-        IF v_user_id IS NOT NULL THEN
-            UPDATE core.users
-            SET    is_active = FALSE, updated_by = p_action_user_id, updated_at = now()
-            WHERE  user_id = v_user_id AND tenant_id = p_tenant_id AND is_active = TRUE;
-
-            IF FOUND THEN
-                PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'USER_DEACTIVATE',
-                    'Staff', 'core.users', v_user_id,
-                    format('Login deactivated with staff %s', p_staff_id));
-            END IF;
-        END IF;
+        CALL core.sp_staff_login_switch(p_tenant_id, p_school_id, p_action_user_id, p_staff_id, v_user_id, FALSE);
 
         OPEN p_result FOR SELECT p_staff_id AS staff_id;
         RETURN;
     END IF;
 
     -- ---------------------------------------------------------- REACTIVATE
+    -- Meant for a mistaken deactivation. A re-hire after a real gap should also
+    -- get a new joining date on the Edit form, or payroll would see the gap as
+    -- employed time.
     IF p_operation = 'REACTIVATE' THEN
-        SELECT user_id INTO v_user_id FROM core.staff
-        WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
-
         UPDATE core.staff
         SET    status = 'Active', is_active = TRUE,
                status_changed_at = now(),
+               last_working_date = NULL,
                updated_by = p_action_user_id, updated_at = now()
         WHERE  tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
 
-        -- Bring the login back, unless its email or phone now belongs to someone else.
-        IF v_user_id IS NOT NULL
-           AND EXISTS (SELECT 1 FROM core.users WHERE user_id = v_user_id
-                       AND tenant_id = p_tenant_id AND is_active = FALSE AND is_deleted = FALSE) THEN
-            IF core.fn_user_email_taken((SELECT email FROM core.users WHERE user_id = v_user_id), v_user_id) THEN
-                RAISE EXCEPTION 'This person''s login email is now used by another user. Change it before re-activating.';
-            END IF;
-            IF EXISTS (SELECT 1 FROM core.user_profiles up WHERE up.user_id = v_user_id AND up.phone IS NOT NULL
-                       AND core.fn_user_phone_taken(up.phone, v_user_id)) THEN
-                RAISE EXCEPTION 'This person''s login phone is now used by another user. Change it before re-activating.';
-            END IF;
-
-            UPDATE core.users
-            SET    is_active = TRUE, updated_by = p_action_user_id, updated_at = now()
-            WHERE  user_id = v_user_id;
-
-            PERFORM core.fn_admin_audit(p_tenant_id, p_school_id, p_action_user_id, 'USER_ACTIVATE',
-                'Staff', 'core.users', v_user_id,
-                format('Login re-activated with staff %s', p_staff_id));
-        END IF;
+        CALL core.sp_staff_login_switch(p_tenant_id, p_school_id, p_action_user_id, p_staff_id, v_user_id, TRUE);
 
         OPEN p_result FOR SELECT p_staff_id AS staff_id;
         RETURN;
@@ -213,13 +305,27 @@ BEGIN
             RAISE EXCEPTION 'Staff full name is required.';
         END IF;
 
-        -- Employee code unique per school (when supplied).
+        -- Payroll pays a salary only for the statuses it knows; any other word
+        -- would silently drop the person from payroll.
+        v_new_status := COALESCE(NULLIF(TRIM(p_status), ''), v_old_status, 'Active');
+        IF v_new_status NOT IN ('Active', 'On Leave', 'Inactive') THEN
+            RAISE EXCEPTION 'Status must be Active, On Leave or Inactive.';
+        END IF;
+        IF p_operation = 'INSERT' AND v_new_status = 'Inactive' THEN
+            RAISE EXCEPTION 'A new staff member starts Active or On Leave.';
+        END IF;
+
+        IF p_monthly_salary IS NOT NULL AND p_monthly_salary < 0 THEN
+            RAISE EXCEPTION 'Monthly salary cannot be negative.';
+        END IF;
+
+        -- Employee code unique per school (when supplied), ignoring case and spaces.
         IF p_employee_code IS NOT NULL AND TRIM(p_employee_code) <> ''
            AND EXISTS (
                 SELECT 1 FROM core.staff
                 WHERE tenant_id = p_tenant_id AND school_id = p_school_id
                   AND is_deleted = FALSE
-                  AND TRIM(employee_code) = TRIM(p_employee_code)
+                  AND UPPER(TRIM(employee_code)) = UPPER(TRIM(p_employee_code))
                   AND (p_operation = 'INSERT' OR staff_id <> p_staff_id)
            ) THEN
             RAISE EXCEPTION 'Employee code already exists.';
@@ -237,12 +343,30 @@ BEGIN
             LIMIT 1;
         END IF;
         v_staff_type := COALESCE(v_staff_type, NULLIF(TRIM(p_staff_type), ''));
+        IF v_staff_type IS NOT NULL AND v_staff_type NOT IN ('Teaching', 'Non-Teaching', 'Transport', 'Support') THEN
+            RAISE EXCEPTION 'Invalid staff type.';
+        END IF;
 
-        -- Resolve which staff row we are creating the login for.
+        -- Status flips through the Edit form behave exactly like Deactivate /
+        -- Reactivate (see the header).
         IF p_operation = 'UPDATE' THEN
-            SELECT user_id INTO v_user_id
-            FROM core.staff
-            WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
+            v_going_off   := v_new_status = 'Inactive' AND v_old_status <> 'Inactive';
+            v_coming_back := v_old_status = 'Inactive' AND v_new_status <> 'Inactive';
+        END IF;
+
+        -- The last working day is set when someone goes Inactive, and can be
+        -- corrected later while they stay Inactive.
+        IF v_new_status = 'Inactive' AND (v_going_off OR p_last_working_date IS NOT NULL) THEN
+            v_lwd := COALESCE(p_last_working_date, CURRENT_DATE);
+            IF v_lwd > CURRENT_DATE THEN
+                RAISE EXCEPTION 'The last working day cannot be in the future. Deactivate on or after that day.';
+            END IF;
+            IF p_last_working_date IS NULL AND COALESCE(p_joining_date, v_join) > CURRENT_DATE THEN
+                v_lwd := NULL;   -- never joined (see DELETE)
+            END IF;
+            IF COALESCE(p_joining_date, v_join) IS NOT NULL AND v_lwd < COALESCE(p_joining_date, v_join) THEN
+                RAISE EXCEPTION 'The last working day cannot be before the joining date.';
+            END IF;
         END IF;
 
         -- Optionally create a login user (only when none is linked yet).
@@ -384,7 +508,7 @@ BEGIN
                 (p_tenant_id, p_school_id, NULLIF(TRIM(p_employee_code), ''), TRIM(p_full_name), p_gender, p_dob,
                  NULLIF(TRIM(p_mobile), ''), NULLIF(TRIM(p_alt_mobile), ''), NULLIF(TRIM(p_email), ''), p_blood_group, p_address,
                  v_staff_type, p_department, p_designation, p_joining_date, p_qualification,
-                 p_experience_years, COALESCE(NULLIF(TRIM(p_status), ''), 'Active'), p_monthly_salary, p_bank_account_no, p_ifsc_code,
+                 p_experience_years, v_new_status, p_monthly_salary, p_bank_account_no, p_ifsc_code,
                  p_pan, p_aadhaar, v_user_id, p_action_user_id, p_action_user_id)
             RETURNING staff_id INTO v_staff_id;
         ELSE
@@ -404,7 +528,14 @@ BEGIN
                 joining_date    = p_joining_date,
                 qualification   = p_qualification,
                 experience_years = p_experience_years,
-                status          = COALESCE(NULLIF(TRIM(p_status), ''), status),
+                status          = v_new_status,
+                -- is_active always follows the status, whichever screen set it.
+                is_active       = (v_new_status <> 'Inactive'),
+                status_changed_at = CASE WHEN v_going_off OR v_coming_back THEN now()
+                                         ELSE status_changed_at END,
+                last_working_date = CASE WHEN v_lwd IS NOT NULL THEN to_char(v_lwd, 'YYYY-MM-DD')
+                                         WHEN v_coming_back THEN NULL
+                                         ELSE last_working_date END,
                 monthly_salary  = p_monthly_salary,
                 bank_account_no = p_bank_account_no,
                 ifsc_code       = p_ifsc_code,
@@ -415,6 +546,12 @@ BEGIN
                 updated_at      = now()
             WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id
             RETURNING staff_id INTO v_staff_id;
+
+            IF v_going_off THEN
+                CALL core.sp_staff_login_switch(p_tenant_id, p_school_id, p_action_user_id, p_staff_id, v_user_id, FALSE);
+            ELSIF v_coming_back THEN
+                CALL core.sp_staff_login_switch(p_tenant_id, p_school_id, p_action_user_id, p_staff_id, v_user_id, TRUE);
+            END IF;
         END IF;
 
         OPEN p_result FOR SELECT v_staff_id AS staff_id;
@@ -424,6 +561,7 @@ BEGIN
     RAISE EXCEPTION 'Unknown operation: %', p_operation;
 END;
 $procedure$;
+
 
 -- ============================================================================
 -- sp_staff_dropdowns — form source lists for the Add/Edit Staff screens:

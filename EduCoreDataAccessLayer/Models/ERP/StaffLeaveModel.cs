@@ -1,7 +1,7 @@
 namespace EduCoreDataAccessLayer.Models.ERP
 {
-    /// <summary>One leave request. Days are working days — Sundays are not counted,
-    /// matching the attendance register's definition of a school day.</summary>
+    /// <summary>One leave request. Days are school working days on the School
+    /// Calendar (weekly offs and holidays not counted); a half day is 0.5.</summary>
     public class StaffLeaveItem
     {
         public int       LeaveId      { get; set; }
@@ -13,13 +13,17 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string    LeaveType    { get; set; } = string.Empty;
         public string? FromDate     { get; set; }
         public string? ToDate       { get; set; }
-        public int       Days         { get; set; }
+        public decimal   Days         { get; set; }
+        public bool      HalfDay      { get; set; }
         public string?   Reason       { get; set; }
 
+        /// <summary>Pending / Approved / Rejected / Cancelled.</summary>
         public string    Status       { get; set; } = "Pending";
         public string?   DecisionRemark { get; set; }
         public DateTime? AppliedAt    { get; set; }
         public DateTime? DecidedAt    { get; set; }
+        public string?   CancelReason { get; set; }
+        public DateTime? CancelledAt  { get; set; }
 
         /// <summary>Approved and today falls inside the range — the page's "on leave
         /// today" count. Decided in SQL so every caller agrees on what today is.</summary>
@@ -33,9 +37,21 @@ namespace EduCoreDataAccessLayer.Models.ERP
 
     public class StaffLeaveResult
     {
-        public bool   Success { get; set; }
-        public string Message { get; set; } = string.Empty;
-        public int    LeaveId { get; set; }
-        public int    Days    { get; set; }
+        public bool    Success { get; set; }
+        public string  Message { get; set; } = string.Empty;
+        public int     LeaveId { get; set; }
+        public decimal Days    { get; set; }
+    }
+
+    /// <summary>One leave type's yearly balance for one staff member.
+    /// Entitled / Remaining are null for uncapped types (Comp-off, Unpaid).</summary>
+    public class StaffLeaveBalance
+    {
+        public string   LeaveType { get; set; } = string.Empty;
+        public decimal? Entitled  { get; set; }
+        public decimal  Taken     { get; set; }
+        public decimal  Pending   { get; set; }
+        public decimal? Remaining { get; set; }
+        public int      Year      { get; set; }
     }
 }

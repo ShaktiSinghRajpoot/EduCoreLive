@@ -371,7 +371,7 @@
                             <span class="dash-icon soft-amber" style="width:2.4rem;height:2.4rem;font-size:1.1rem"><i class="bx bx-calendar-minus"></i></span>
                             <div class="flex-grow-1 min-w-0">
                                 <h6 class="mb-0 text-truncate">@a.FullName</h6>
-                                <small class="text-muted text-truncate d-block">@a.LeaveType Leave · @a.Days day@(a.Days == 1 ? "" : "s")</small>
+                                <small class="text-muted text-truncate d-block">@a.LeaveType Leave · @a.Days.ToString("0.#") day@(a.Days == 1 ? "" : "s")</small>
                             </div>
                             @* Approve and Reject both just opened the leave page — two buttons
                                that looked like decisions and were navigation. One link now. *@

@@ -4561,3 +4561,50 @@ Catalog: `educore/docs/test-cases/students_transport_documents.md`. Suite: `Data
   7. `student_exit.sql`
 
   Apply `transport_module.sql` **after** `hotfix_2026_10_10.sql`. Never re-run that hotfix afterwards: it carries an older `sp_transport_assign_manage`.
+
+### [2026-10-10] HR, leave and payroll: every salary leaves a trail, a paid payslip never changes
+
+Suite `tests/hr_leave_payroll_tests.sql` went from 73 passed / 32 failed to **149 / 0**
+(catalog: `educore/docs/test-cases/hr_leave_payroll.md`). All other suites stay green.
+
+- **Staff (`sp_staff_manage.sql`):**
+  - New `core.staff.last_working_date`. Deactivate takes it (default today; never future, never before joining).
+  - Choosing Inactive on the Edit form now behaves like Deactivate (is_active, stamp, login off, out of the teacher pools). Back to Active behaves like Reactivate.
+  - The login on/off logic moved into `core.sp_staff_login_switch`, which keeps the self / last-admin guards.
+  - Writes check the staff row is in this school first. An out-of-scope edit used to create an orphan login.
+  - Refused: an employee code that differs only by case (new index `uq_staff_employee_code_ci`), a negative salary, an unknown status or staff type, a new staff member created Inactive.
+  - `p_last_working_date` is added AFTER `p_result`, so positional callers still work.
+- **Masters (`staff_masters_manage.sql`):**
+  - An edit keeps the sort order and default role the page does not send.
+  - A rename follows through to the staff rows (and to designation defaults); a staff type change does too.
+  - A deleted row gives up its name, so the name can be added again.
+  - A foreign or deleted id gets "not found".
+- **Leave (`staff_leave.sql`):**
+  - Days are counted on the School Calendar by the new `core.fn_school_working_days`, which payroll uses too.
+  - Leave types are a fixed list, with yearly caps in `core.fn_leave_entitlement` (pending days count).
+  - New: half days (`days` is numeric), CANCEL (with reason, who, when), BALANCE, and a DAYS preview.
+  - Refused: leave for an inactive person, leave before joining or after the last working day.
+- **Payroll (`staff_payroll.sql`):**
+  - Pro-rata from the joining date to the last working day.
+  - LOP is worked from the salary, so an all-LOP month nets 0. "On Leave" staff are paid.
+  - A future month is refused.
+  - Mark Paid needs a mode and a reference.
+  - New `core.staff_payroll_adjustment` (Addition / Deduction / Advance; void only, with a reason, while the month is unpaid).
+  - New append-only `core.staff_payroll_history`.
+  - A trigger refuses any UPDATE of a paid payslip. RUN reports paid slips whose figures now differ.
+- **Purge (`school_purge.sql`):** the purge also deletes the two new payroll tables.
+- **App:**
+  - Leave, Payroll and StaffMasters pages: cancel, balance, half day, server-side day count, adjustments, mode/reference, money trail, EC.money / EC.esc / EC.listEmpty.
+  - Edit Staff saves again: a hidden int `id` had beaten the route uuid in model binding.
+  - Last working day appears on the Edit, Profile and Inactive pages.
+  - Leave and payroll services log a `PostgresException` at Warning.
+  - Dashboard leave days are decimal.
+- **Deploy order (all re-runnable):**
+  1. `sp_staff_manage.sql`
+  2. `staff_list.sql`
+  3. `staff_masters_manage.sql`
+  4. `staff_leave.sql`
+  5. `staff_payroll.sql`
+  6. `school_purge.sql`
+
+  Regenerate `deploy_2026_10_10b_parts/part2.sql` first, or leave it out: it still holds the old `sp_staff_manage`.

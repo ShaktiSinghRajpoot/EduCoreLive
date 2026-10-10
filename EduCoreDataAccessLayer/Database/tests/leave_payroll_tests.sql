@@ -70,7 +70,7 @@ BEGIN
     v_m1  := DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date;
     v_mon := EXTRACT(MONTH FROM v_m1)::int;
     v_yr  := EXTRACT(YEAR  FROM v_m1)::int;
-    v_wd  := core.fn_working_days(v_m1, (v_m1 + INTERVAL '1 month - 1 day')::date);
+    v_wd  := core.fn_school_working_days(c_tenant, c_school, v_m1, (v_m1 + INTERVAL '1 month - 1 day')::date);
     v_perday := ROUND(v_gross / NULLIF(v_wd, 0), 2);
 
     RAISE NOTICE 'fixture: payroll month %-%  (% working days, gross %, ~%/day)',
@@ -152,7 +152,7 @@ BEGIN
         v_from := v_m1 + 1;
         WHILE EXTRACT(DOW FROM v_from) = 0 LOOP v_from := v_from + 1; END LOOP;
         v_to := v_from + 2;
-        WHILE core.fn_working_days(v_from, v_to) < 3 LOOP v_to := v_to + 1; END LOOP;
+        WHILE core.fn_school_working_days(c_tenant, c_school, v_from, v_to) < 3 LOOP v_to := v_to + 1; END LOOP;
 
         c := 'c1';
         CALL core.sp_staff_leave_manage('APPLY', c_tenant, c_school, c_user, NULL,
@@ -322,7 +322,7 @@ BEGIN
 
         c := 'f1';
         CALL core.sp_staff_payroll_manage('MARK_PAID', c_tenant, c_school, c_user,
-             NULL, NULL, v_pid, NULL, c);
+             NULL, NULL, v_pid, NULL, c, 'Bank Transfer', 'UTR-LP-1');
 
         SELECT status, paid_by INTO v_txt, v_n FROM core.staff_payroll WHERE payroll_id = v_pid;
         PERFORM pg_temp.chk('F1 payslip marked paid', v_txt = 'Paid', format('status %s', v_txt));
@@ -331,7 +331,7 @@ BEGIN
         BEGIN
             c := 'f3';
             CALL core.sp_staff_payroll_manage('MARK_PAID', c_tenant, c_school, c_user,
-                 NULL, NULL, v_pid, NULL, c);
+                 NULL, NULL, v_pid, NULL, c, 'Bank Transfer', 'UTR-LP-2');
             PERFORM pg_temp.chk('F3 paying twice refused', FALSE, 'it was accepted');
         EXCEPTION WHEN OTHERS THEN
             PERFORM pg_temp.chk('F3 paying twice refused', TRUE, SQLERRM);

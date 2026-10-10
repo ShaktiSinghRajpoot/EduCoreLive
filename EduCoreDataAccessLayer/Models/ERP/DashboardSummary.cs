@@ -68,7 +68,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string    LeaveType { get; set; } = "";
         public string? FromDate  { get; set; }
         public string? ToDate    { get; set; }
-        public int       Days      { get; set; }
+        public decimal   Days      { get; set; }
     }
 
     public class DashboardEvent

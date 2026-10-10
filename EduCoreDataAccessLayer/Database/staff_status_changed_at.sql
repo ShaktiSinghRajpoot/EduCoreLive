@@ -6,8 +6,9 @@
 -- years ago. core.staff only had updated_at, which moves on ANY edit (a phone
 -- number change after the fact would overwrite it), so it cannot answer this.
 --
--- status_changed_at is written only by the DEACTIVATE and REACTIVATE branches of
--- core.sp_staff_manage, so it always means "when the active/inactive state last
+-- status_changed_at is written only when core.sp_staff_manage flips the state (DEACTIVATE,
+-- REACTIVATE, or an Edit-form change to/from Inactive -- Oct 2026),
+-- so it always means "when the active/inactive state last
 -- flipped" — nothing else touches it.
 --
 -- DELIBERATELY NULL FOR EXISTING ROWS. Rows deactivated before this column

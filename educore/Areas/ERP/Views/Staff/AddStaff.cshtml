@@ -135,7 +135,8 @@
                 <div class="col-12 col-md-4">
                   <label class="es-label">Employment Status</label>
                   <select asp-for="Status" class="form-select">
-                    <option>Active</option><option>On Leave</option><option>Inactive</option>
+                    @* A new staff member starts Active or On Leave; Inactive is for leavers. *@
+                    <option>Active</option><option>On Leave</option>
                   </select>
                 </div>
               </div>
@@ -240,7 +241,8 @@
             var url = '@Url.Action("GetDesignations", "Staff", new { area = "ERP" })';
             $.post(url, { department: dept }, function (data) {
                 $.each(data, function (i, item) {
-                    var opt = $("<option></option>").val(item.value).html(item.text).attr('data-type', item.type);
+                    // .text, not .html: designation names are typed in by the school.
+                    var opt = $("<option></option>").val(item.value).text(item.text).attr('data-type', item.type);
                     if (item.value === keep) opt.prop('selected', true);
                     $('#ddDesignation').append(opt);
                 });

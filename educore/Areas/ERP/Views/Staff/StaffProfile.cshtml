@@ -9,7 +9,11 @@
     string initials = string.Concat(Model.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
         .Take(2).Select(w => w[0])).ToUpper();
     if (string.IsNullOrEmpty(initials)) { initials = "—"; }
-    string statusClass = Model.Status == "Active" ? "b-active" : "b-active";
+    // Both branches used to be "b-active", so an Inactive person showed a green badge.
+    string statusClass = Model.Status == "Active" ? "b-active"
+                       : Model.Status == "On Leave" ? "bg-label-warning text-warning"
+                       : "bg-label-danger text-danger";
+    string lastDay = string.IsNullOrWhiteSpace(Model.LastWorkingDate) ? "—" : Dates.Show(Model.LastWorkingDate, "dd MMM yyyy");
     string dob = string.IsNullOrWhiteSpace(Model.DateOfBirth) ? "—" : Dates.Show(Model.DateOfBirth, "dd MMM yyyy");
     string joinDate = string.IsNullOrWhiteSpace(Model.JoiningDate) ? "—" : Dates.Show(Model.JoiningDate, "dd MMM yyyy");
     string exp = Model.ExperienceYears.HasValue ? $"{Model.ExperienceYears} yrs" : "—";
@@ -49,12 +53,16 @@
         @if (Model.Status != "Inactive")
         {
           <form asp-area="ERP" asp-controller="Staff" asp-action="Deactivate" method="post"
+                class="d-flex align-items-center gap-2"
                 data-ec-confirm="Deactivate this staff member?"
                 data-ec-confirm-name="@Model.FullName"
-                data-ec-confirm-message="They will move to the inactive list. You can reactivate them later."
+                data-ec-confirm-message="They move to the inactive list and their login is switched off. Payroll pays the final month up to the last working day."
                 data-ec-confirm-ok="Deactivate">
             @Html.AntiForgeryToken()
             <input type="hidden" name="id" value="@Model.PublicId" />
+            <input type="date" name="lastWorkingDate" class="form-control form-control-sm" style="max-width:155px"
+                   title="Last working day (payroll pays up to this day)"
+                   value="@Dates.Now.ToString("yyyy-MM-dd")" max="@Dates.Now.ToString("yyyy-MM-dd")" />
             <button type="submit" class="btn btn-outline-danger d-flex align-items-center gap-1">
               <i class="bx bx-user-x"></i><span>Deactivate</span>
             </button>
@@ -96,6 +104,10 @@
               <div class="col-6 col-md-4 sp-field"><label>Joining Date</label><span>@joinDate</span></div>
               <div class="col-6 col-md-4 sp-field"><label>Qualification</label><span>@Dash(Model.Qualification)</span></div>
               <div class="col-6 col-md-4 sp-field mb-0"><label>Experience</label><span>@exp</span></div>
+              @if (Model.Status == "Inactive")
+              {
+                <div class="col-6 col-md-4 sp-field mb-0 mt-3"><label>Last Working Day</label><span>@lastDay</span></div>
+              }
             </div>
           </div>
         </div>
@@ -161,8 +173,10 @@
           </div>
           <div class="sp-card-body">
             <div class="row g-2">
-              <div class="col-6"><div class="sp-stat"><div class="sp-stat-val" id="spAttend">—</div><div class="sp-stat-lbl">Attendance</div></div></div>
-              <div class="col-6"><div class="sp-stat"><div class="sp-stat-val" id="spLeaves">—</div><div class="sp-stat-lbl">Leaves Taken</div></div></div>
+              @* Both figures used to be a permanent "—" (nothing filled them). There is
+                 no staff attendance register, so the snapshot shows leave instead. *@
+              <div class="col-6"><div class="sp-stat"><div class="sp-stat-val">@(ViewBag.LeaveTaken ?? "—")</div><div class="sp-stat-lbl">Leave Days Taken (@Dates.Now.Year)</div></div></div>
+              <div class="col-6"><div class="sp-stat"><div class="sp-stat-val">@(ViewBag.LeavePending ?? "—")</div><div class="sp-stat-lbl">Requests Pending</div></div></div>
             </div>
           </div>
         </div>
@@ -179,12 +193,12 @@
                  404'd. There is no staff attendance register yet; that is also why
                  payroll works out Loss of Pay from unpaid leave rather than from
                  absences. The link comes back when the register does. *@
-              <a class="sp-link" asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement" asp-route-id="@staffId">
+              <a class="sp-link" asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement">
                 <span class="sp-link-ic" style="background:#fce7f3;color:#be185d;"><i class="bx bx-calendar-minus"></i></span>
                 <span class="sp-link-txt"><span class="sp-link-t">Leave History</span><span class="sp-link-s">Requests &amp; balance</span></span>
                 <i class="bx bx-chevron-right sp-link-go"></i>
               </a>
-              <a class="sp-link" asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement" asp-route-id="@staffId">
+              <a class="sp-link" asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement">
                 <span class="sp-link-ic" style="background:#dcfce7;color:#16a34a;"><i class="bx bx-money"></i></span>
                 <span class="sp-link-txt"><span class="sp-link-t">Payroll / Payslips</span><span class="sp-link-s">Salary &amp; deductions</span></span>
                 <i class="bx bx-chevron-right sp-link-go"></i>

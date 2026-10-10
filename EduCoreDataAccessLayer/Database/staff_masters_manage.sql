@@ -72,10 +72,26 @@ CREATE OR REPLACE PROCEDURE config.sp_staff_masters_manage(
 )
 LANGUAGE plpgsql
 AS $procedure$
+-- Oct 2026 (hr_leave_payroll_tests.sql):
+--   * Editing a row keeps what the page did not send: the page has no sort-order
+--     or default-role field, so p_sort_order NULL/0 and p_default_role_id NULL
+--     keep the stored values (they used to be reset on every edit).
+--   * A rename follows through: core.staff stores the department / designation
+--     NAME, so the staff rows (and designations defaulting to a renamed
+--     department) are renamed too. Before, staff kept a name that no longer
+--     existed, and the in-use delete guard -- which looks for the new name --
+--     then let an in-use designation be deleted. A designation's staff type
+--     change follows through to its staff the same way.
+--   * A deleted row no longer holds its name: uq_*_name (tenant_id, name) covers
+--     deleted rows, so re-adding a deleted name died on a raw constraint error.
+--     Saving that name now renames the deleted row out of the way first.
+--   * Editing / deleting / toggling a row of another tenant (or a deleted one)
+--     says "not found" instead of reporting success.
 DECLARE
     v_name        text := NULLIF(TRIM(p_name), '');
     v_staff_type  text;
     v_target_name text;
+    v_old_type    text;
     v_id          integer;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
@@ -96,11 +112,33 @@ BEGIN
         END IF;
 
         IF COALESCE(p_id, 0) > 0 THEN
+            SELECT name INTO v_target_name FROM config.departments
+            WHERE department_id = p_id AND tenant_id = p_tenant_id AND COALESCE(is_deleted, FALSE) = FALSE;
+            IF NOT FOUND THEN
+                RAISE EXCEPTION 'Department not found.';
+            END IF;
+        END IF;
+
+        -- A deleted row gives its name up (see the header).
+        UPDATE config.departments
+        SET    name = LEFT(name, 80) || ' (deleted ' || department_id || ')'
+        WHERE  tenant_id = p_tenant_id AND is_deleted = TRUE AND name = v_name;
+
+        IF COALESCE(p_id, 0) > 0 THEN
             UPDATE config.departments
-            SET name = v_name, sort_order = COALESCE(p_sort_order, sort_order),
+            SET name = v_name, sort_order = COALESCE(NULLIF(p_sort_order, 0), sort_order),
                 updated_by = p_action_user_id, updated_at = NOW()
             WHERE department_id = p_id AND tenant_id = p_tenant_id
             RETURNING department_id INTO v_id;
+
+            IF v_target_name IS DISTINCT FROM v_name THEN
+                UPDATE core.staff
+                SET    department = v_name, updated_by = p_action_user_id, updated_at = now()
+                WHERE  tenant_id = p_tenant_id AND LOWER(TRIM(department)) = LOWER(TRIM(v_target_name));
+                UPDATE config.designations
+                SET    default_department = v_name, updated_by = p_action_user_id, updated_at = NOW()
+                WHERE  tenant_id = p_tenant_id AND LOWER(TRIM(default_department)) = LOWER(TRIM(v_target_name));
+            END IF;
         ELSE
             INSERT INTO config.departments (tenant_id, name, sort_order, created_by)
             VALUES (p_tenant_id, v_name, COALESCE(p_sort_order, 0), p_action_user_id)
@@ -111,7 +149,10 @@ BEGIN
 
     ELSIF p_operation = 'DeleteDepartment' THEN
         SELECT name INTO v_target_name FROM config.departments
-        WHERE department_id = p_id AND tenant_id = p_tenant_id;
+        WHERE department_id = p_id AND tenant_id = p_tenant_id AND COALESCE(is_deleted, FALSE) = FALSE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Department not found.';
+        END IF;
 
         IF EXISTS (SELECT 1 FROM core.staff
                    WHERE tenant_id = p_tenant_id AND COALESCE(is_deleted, FALSE) = FALSE
@@ -120,7 +161,8 @@ BEGIN
         END IF;
 
         UPDATE config.departments
-        SET is_deleted = TRUE, is_active = FALSE, updated_by = p_action_user_id, updated_at = NOW()
+        SET is_deleted = TRUE, is_active = FALSE, deleted_by = p_action_user_id, deleted_at = NOW(),
+            updated_by = p_action_user_id, updated_at = NOW()
         WHERE department_id = p_id AND tenant_id = p_tenant_id;
         OPEN p_result FOR SELECT TRUE AS success, 'Department deleted.' AS message;
         RETURN;
@@ -128,7 +170,10 @@ BEGIN
     ELSIF p_operation = 'ToggleDepartment' THEN
         UPDATE config.departments
         SET is_active = NOT is_active, updated_by = p_action_user_id, updated_at = NOW()
-        WHERE department_id = p_id AND tenant_id = p_tenant_id;
+        WHERE department_id = p_id AND tenant_id = p_tenant_id AND COALESCE(is_deleted, FALSE) = FALSE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Department not found.';
+        END IF;
         OPEN p_result FOR SELECT TRUE AS success, 'Department status updated.' AS message;
         RETURN;
 
@@ -149,14 +194,34 @@ BEGIN
         END IF;
 
         IF COALESCE(p_id, 0) > 0 THEN
+            SELECT name, staff_type INTO v_target_name, v_old_type FROM config.designations
+            WHERE designation_id = p_id AND tenant_id = p_tenant_id AND COALESCE(is_deleted, FALSE) = FALSE;
+            IF NOT FOUND THEN
+                RAISE EXCEPTION 'Designation not found.';
+            END IF;
+        END IF;
+
+        UPDATE config.designations
+        SET    name = LEFT(name, 80) || ' (deleted ' || designation_id || ')'
+        WHERE  tenant_id = p_tenant_id AND is_deleted = TRUE AND name = v_name;
+
+        IF COALESCE(p_id, 0) > 0 THEN
             UPDATE config.designations
             SET name = v_name, staff_type = v_staff_type,
                 default_department = NULLIF(TRIM(p_default_department), ''),
-                default_role_id = NULLIF(COALESCE(p_default_role_id, 0), 0),
-                sort_order = COALESCE(p_sort_order, sort_order),
+                default_role_id = COALESCE(NULLIF(p_default_role_id, 0), default_role_id),
+                sort_order = COALESCE(NULLIF(p_sort_order, 0), sort_order),
                 updated_by = p_action_user_id, updated_at = NOW()
             WHERE designation_id = p_id AND tenant_id = p_tenant_id
             RETURNING designation_id INTO v_id;
+
+            -- Staff carry the designation name and the staff type derived from it.
+            IF v_target_name IS DISTINCT FROM v_name OR v_old_type IS DISTINCT FROM v_staff_type THEN
+                UPDATE core.staff
+                SET    designation = v_name, staff_type = v_staff_type,
+                       updated_by = p_action_user_id, updated_at = now()
+                WHERE  tenant_id = p_tenant_id AND LOWER(TRIM(designation)) = LOWER(TRIM(v_target_name));
+            END IF;
         ELSE
             INSERT INTO config.designations
                 (tenant_id, name, staff_type, default_department, default_role_id, sort_order, created_by)
@@ -170,7 +235,10 @@ BEGIN
 
     ELSIF p_operation = 'DeleteDesignation' THEN
         SELECT name INTO v_target_name FROM config.designations
-        WHERE designation_id = p_id AND tenant_id = p_tenant_id;
+        WHERE designation_id = p_id AND tenant_id = p_tenant_id AND COALESCE(is_deleted, FALSE) = FALSE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Designation not found.';
+        END IF;
 
         IF EXISTS (SELECT 1 FROM core.staff
                    WHERE tenant_id = p_tenant_id AND COALESCE(is_deleted, FALSE) = FALSE
@@ -179,7 +247,8 @@ BEGIN
         END IF;
 
         UPDATE config.designations
-        SET is_deleted = TRUE, is_active = FALSE, updated_by = p_action_user_id, updated_at = NOW()
+        SET is_deleted = TRUE, is_active = FALSE, deleted_by = p_action_user_id, deleted_at = NOW(),
+            updated_by = p_action_user_id, updated_at = NOW()
         WHERE designation_id = p_id AND tenant_id = p_tenant_id;
         OPEN p_result FOR SELECT TRUE AS success, 'Designation deleted.' AS message;
         RETURN;
@@ -187,7 +256,10 @@ BEGIN
     ELSIF p_operation = 'ToggleDesignation' THEN
         UPDATE config.designations
         SET is_active = NOT is_active, updated_by = p_action_user_id, updated_at = NOW()
-        WHERE designation_id = p_id AND tenant_id = p_tenant_id;
+        WHERE designation_id = p_id AND tenant_id = p_tenant_id AND COALESCE(is_deleted, FALSE) = FALSE;
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Designation not found.';
+        END IF;
         OPEN p_result FOR SELECT TRUE AS success, 'Designation status updated.' AS message;
         RETURN;
 

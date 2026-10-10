@@ -101,7 +101,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     LeaveType = Str(row, "leave_type"),
                     FromDate  = DbRead.NStr(row, "from_date"),
                     ToDate    = DbRead.NStr(row, "to_date"),
-                    Days      = IntVal(row, "days")
+                    Days      = DecVal(row, "days")   // numeric: a half day is 0.5
                 });
 
             foreach (var row in Rows(ds, 7))

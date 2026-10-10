@@ -61,8 +61,11 @@
             <div class="lm-bal-chip"><span class="lm-bal-dot" style="background:#16a34a;"></span><span class="lm-bal-name">Earned</span><span class="lm-bal-val">15/yr</span></div>
             <div class="lm-bal-chip"><span class="lm-bal-dot" style="background:#be185d;"></span><span class="lm-bal-name">Maternity</span><span class="lm-bal-val">90 days</span></div>
             <div class="lm-bal-chip"><span class="lm-bal-dot" style="background:#7c3aed;"></span><span class="lm-bal-name">Comp-off</span><span class="lm-bal-val">As earned</span></div>
+            <div class="lm-bal-chip"><span class="lm-bal-dot" style="background:#64748b;"></span><span class="lm-bal-name">Unpaid</span><span class="lm-bal-val">LOP</span></div>
           </div>
-          <span class="text-muted" style="font-size:.74rem;font-weight:700;"><i class="bx bx-info-circle me-1"></i>Annual entitlement per staff</span>
+          @* Same figures the proc enforces (core.fn_leave_entitlement), per calendar year.
+             Beyond them the rest is applied as Unpaid (Loss of Pay). *@
+          <span class="text-muted" style="font-size:.74rem;font-weight:700;"><i class="bx bx-info-circle me-1"></i>Annual entitlement per staff · beyond it, apply as Unpaid</span>
         </div>
       </div>
     </div>
@@ -74,6 +77,7 @@
         <button class="lm-tab" data-f="pending">Pending <span class="lm-tab-count" id="cPending">0</span></button>
         <button class="lm-tab" data-f="approved">Approved <span class="lm-tab-count" id="cApproved">0</span></button>
         <button class="lm-tab" data-f="rejected">Rejected <span class="lm-tab-count" id="cRejected">0</span></button>
+        <button class="lm-tab" data-f="cancelled">Cancelled <span class="lm-tab-count" id="cCancelled">0</span></button>
       </div>
       <div class="position-relative" style="max-width:240px;width:100%;">
         <i class="bx bx-search" style="position:absolute;left:.7rem;top:50%;transform:translateY(-50%);color:var(--lm-muted);"></i>
@@ -142,10 +146,18 @@
               <input type="date" name="ToDate" id="lvTo" class="form-control" required>
             </div>
             <div class="col-12">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="lvHalf">
+                <label class="form-check-label" for="lvHalf">Half day (one date, counts 0.5)</label>
+              </div>
+            </div>
+            <div class="col-12">
               <div class="d-flex align-items-center gap-2">
                 <span class="text-muted" style="font-size:.78rem;font-weight:700;">Duration:</span>
                 <span class="lm-daypill" id="lvDays">— days</span>
               </div>
+              <div class="text-muted small mt-1">Counted on the School Calendar: weekly offs and holidays are not leave days.</div>
+              <div class="small mt-1" id="lvBalance"></div>
             </div>
             <div class="col-12">
               <label class="form-label">Reason</label>
@@ -166,72 +178,78 @@
 <script>
 $(document).ready(function () {
 
-    const LIST_URL    = '@Url.Action("List","Leave",new{area="ERP"})';
-    const APPLY_URL   = '@Url.Action("ApplyLeave","Leave",new{area="ERP"})';
-    const APPROVE_URL = '@Url.Action("Approve","Leave",new{area="ERP"})';
-    const REJECT_URL  = '@Url.Action("Reject","Leave",new{area="ERP"})';
+    var LIST_URL    = '@Url.Action("List","Leave",new{area="ERP"})';
+    var APPLY_URL   = '@Url.Action("ApplyLeave","Leave",new{area="ERP"})';
+    var APPROVE_URL = '@Url.Action("Approve","Leave",new{area="ERP"})';
+    var REJECT_URL  = '@Url.Action("Reject","Leave",new{area="ERP"})';
+    var CANCEL_URL  = '@Url.Action("Cancel","Leave",new{area="ERP"})';
+    var DAYS_URL    = '@Url.Action("CountDays","Leave",new{area="ERP"})';
+    var BAL_URL     = '@Url.Action("Balance","Leave",new{area="ERP"})';
+    var TODAY       = '@Dates.Now.ToString("yyyy-MM-dd")';   // the school's today, not the browser's UTC one
 
-
-    const TYPE = { Casual:'t-casual', Sick:'t-sick', Earned:'t-earned', Maternity:'t-maternity',
-                   'Comp-off':'t-comp', Unpaid:'t-comp' };
+    var TYPE = { Casual:'t-casual', Sick:'t-sick', Earned:'t-earned', Maternity:'t-maternity',
+                 'Comp-off':'t-comp', Unpaid:'t-comp' };
 
     // Loaded from the server; the page filters and counts in the browser because a
     // school's leave register is small.
-    let requests = [];
+    var requests = [];
+    var curFilter = 'all', curSearch = '';
 
-    let curFilter = 'all', curSearch = '';
-    const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    // Working days, Sundays excluded — the same rule core.fn_working_days applies
-    // on save. A plain date subtraction would preview 7 for Mon–Sun and then save 6.
-    function workingDays(a,b){
-        let n=0; const d=new Date(a), end=new Date(b);
-        while(d<=end){ if(d.getDay()!==0) n++; d.setDate(d.getDate()+1); }
-        return n;
-    }
-    function todayIso(){ return new Date().toISOString().slice(0,10); }
-    function isOnLeaveToday(r){ const t=todayIso(); return r.status==='approved' && r.from<=t && r.to>=t; }
-
-    // The DB stores Pending/Approved/Rejected; the page's tabs and CSS use lowercase.
+    function token() { return $('input[name="__RequestVerificationToken"]').first().val(); }
+    // The DB stores Pending/Approved/Rejected/Cancelled; the page's tabs and CSS use lowercase.
     function st(r){ return (r.status||'').toLowerCase(); }
     function ini(n){ return (n||'').split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase(); }
+    function dayText(d){ return d + ' working day' + (Number(d) === 1 ? '' : 's'); }
 
     function statusBadge(s){
-        const m={ pending:['st-pending','Pending'], approved:['st-approved','Approved'], rejected:['st-rejected','Rejected'] };
-        const x=m[s]||m.pending; return '<span class="lm-status '+x[0]+'">'+x[1]+'</span>';
+        var m={ pending:['st-pending','Pending'], approved:['st-approved','Approved'],
+                rejected:['st-rejected','Rejected'], cancelled:['st-rejected','Cancelled'] };
+        var x=m[s]||m.pending; return '<span class="lm-status '+x[0]+'">'+x[1]+'</span>';
     }
+
+    // A pending request can always be withdrawn; an approved one only before it starts
+    // (the server also refuses it when that month's salary is already paid).
+    function canCancel(r){ return st(r)==='pending' || (st(r)==='approved' && r.fromIso > TODAY); }
+
+    function count(s){ return requests.filter(function(r){ return st(r)===s; }).length; }
 
     function updateKpis(){
         // onLeaveToday is decided server-side so every caller agrees on "today".
-        $('#kpiPending').text(requests.filter(r=>st(r)==='pending').length);
-        $('#kpiToday').text(requests.filter(r=>r.onLeaveToday).length);
-        $('#kpiApproved').text(requests.filter(r=>st(r)==='approved').length);
+        var month = TODAY.slice(0,7);
+        $('#kpiPending').text(count('pending'));
+        $('#kpiToday').text(requests.filter(function(r){ return r.onLeaveToday; }).length);
+        $('#kpiApproved').text(requests.filter(function(r){ return st(r)==='approved' && (r.fromIso||'').slice(0,7)===month; }).length);
         $('#kpiRequests').text(requests.length);
         $('#cAll').text(requests.length);
-        $('#cPending').text(requests.filter(r=>st(r)==='pending').length);
-        $('#cApproved').text(requests.filter(r=>st(r)==='approved').length);
-        $('#cRejected').text(requests.filter(r=>st(r)==='rejected').length);
+        $('#cPending').text(count('pending'));
+        $('#cApproved').text(count('approved'));
+        $('#cRejected').text(count('rejected'));
+        $('#cCancelled').text(count('cancelled'));
     }
 
     function render(){
-        let list = requests.slice();
-        if(curFilter!=='all') list = list.filter(r=>st(r)===curFilter);
-        if(curSearch) list = list.filter(r=>r.name.toLowerCase().includes(curSearch)
-                                         || (r.code||'').toLowerCase().includes(curSearch));
+        var list = requests.slice();
+        if(curFilter!=='all') list = list.filter(function(r){ return st(r)===curFilter; });
+        if(curSearch) list = list.filter(function(r){ return r.name.toLowerCase().indexOf(curSearch) >= 0
+                                         || (r.code||'').toLowerCase().indexOf(curSearch) >= 0; });
 
         if(!list.length){ $('#lmList').html(''); $('#lmEmpty').removeClass('d-none'); updateKpis(); return; }
         $('#lmEmpty').addClass('d-none');
 
         $('#lmList').html(list.map(function(r){
-            // days comes from the server — it excludes Sundays, which a
-            // date subtraction in the browser would not.
-            const d = r.days;
-            const range = r.from===r.to ? r.from : r.from+' → '+r.to;
-            const actions = st(r)==='pending'
+            // days comes from the server -- counted on the School Calendar.
+            var range = r.from===r.to ? r.from : r.from+' → '+r.to;
+            var cancelBtn = canCancel(r)
+              ? '<button class="lm-btn lm-btn-reject" data-act="cancel" data-id="'+r.id+'" title="Withdraw this request"><i class="bx bx-undo"></i>Cancel</button>'
+              : '';
+            var actions = st(r)==='pending'
               ? '<div class="lm-actions">'
                 + '<button class="lm-btn lm-btn-approve" data-act="approve" data-id="'+r.id+'"><i class="bx bx-check"></i>Approve</button>'
                 + '<button class="lm-btn lm-btn-reject" data-act="reject" data-id="'+r.id+'"><i class="bx bx-x"></i>Reject</button>'
-                + '</div>'
-              : '<div class="lm-actions">'+statusBadge(st(r))+'</div>';
+                + cancelBtn + '</div>'
+              : '<div class="lm-actions">'+statusBadge(st(r))+cancelBtn+'</div>';
+            var note = st(r)==='cancelled' && r.cancelReason ? ' · cancelled: '+EC.esc(r.cancelReason)
+                     : (r.remark ? ' · '+EC.esc(r.remark) : '');
             return ''
               + '<div class="lm-card is-'+st(r)+'">'
               +   '<div class="lm-av bg-label-primary text-primary">'+EC.esc(ini(r.name))+'</div>'
@@ -240,7 +258,8 @@ $(document).ready(function () {
               +   '<div><span class="lm-type '+(TYPE[r.type]||'t-casual')+'"><i class="bx bx-bookmark"></i>'+EC.esc(r.type)
               +     (r.unpaid?' <span title="Payroll charges these days as Loss of Pay">(LOP)</span>':'')+'</span></div>'
               +   '<div class="lm-dates"><div class="lm-range"><i class="bx bx-calendar"></i>'+EC.esc(range)+'</div>'
-              +     '<div class="lm-days">'+d+' working day'+(d>1?'s':'')+' · <span class="lm-reason">'+EC.esc(r.reason||'—')+'</span></div></div>'
+              +     '<div class="lm-days">'+EC.esc(dayText(r.days))+(r.halfDay?' (half day)':'')
+              +     ' · <span class="lm-reason">'+EC.esc(r.reason||'—')+note+'</span></div></div>'
               +   actions
               + '</div>';
         }).join(''));
@@ -255,48 +274,52 @@ $(document).ready(function () {
     // Search
     $('#lmSearch').on('input',function(){ curSearch = this.value.toLowerCase().trim(); render(); });
 
-    // Approve / Reject — the server decides, and refuses a second decision on a
-    // request that was already approved or rejected.
-    $('#lmList').on('click','.lm-btn',function(){
-        const id = Number($(this).data('id')), act = $(this).data('act');
-        const $btn = $(this);
-        EC.buttonBusy($btn, act === 'approve' ? 'Approving…' : 'Rejecting…');
-
-        $.ajax({
-            url: act === 'approve' ? APPROVE_URL : REJECT_URL,
-            type: 'POST',
-            headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
-            data: { id: id }
-        })
+    function post(url, data, $btn, busyText, okType){
+        EC.buttonBusy($btn, busyText);
+        $.ajax({ url: url, type: 'POST', headers: { 'RequestVerificationToken': token() }, data: data })
         .done(function (res) {
             if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not update.'); return; }
-            ecToast(act === 'approve' ? 'success' : 'warning', res.message);
+            ecToast(okType, res.message);
             load();
         })
         .fail(function (xhr) {
             ecToast('error', xhr && xhr.status === 403
-                ? 'You do not have permission to decide leave.'
+                ? 'You do not have permission to change leave.'
                 : 'Could not reach the server. Nothing was changed.');
         })
         .always(function () { EC.buttonReset($btn); });
+    }
+
+    // Approve / Reject / Cancel -- the server decides, and refuses a second decision
+    // on a request that was already approved or rejected.
+    $('#lmList').on('click','.lm-btn',function(){
+        var id = Number($(this).data('id')), act = $(this).data('act'), $btn = $(this);
+        if (act === 'approve') { post(APPROVE_URL, { id: id }, $btn, 'Approving…', 'success'); return; }
+        if (act === 'reject')  { post(REJECT_URL,  { id: id }, $btn, 'Rejecting…', 'warning'); return; }
+        EC.prompt({ title: 'Cancel this leave request?', message: 'The request is kept, marked Cancelled, with your reason.', label: 'Reason',
+                    okText: 'Cancel request', required: true, danger: true }).then(function (reason) {
+            if (reason === null) return;
+            post(CANCEL_URL, { id: id, reason: reason }, $btn, 'Cancelling…', 'success');
+        });
     });
 
     // Apply
     $('#applyLeaveForm').on('submit', function (e) {
         e.preventDefault();
-        const $btn = $(this).find('button[type=submit]');
+        var $btn = $(this).find('button[type=submit]');
         EC.buttonBusy($btn, 'Submitting…');
 
         $.ajax({
             url: APPLY_URL,
             type: 'POST',
-            headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+            headers: { 'RequestVerificationToken': token() },
             data: {
                 staffId:   $('#lvStaff').val(),
                 leaveType: $('[name=LeaveType]').val(),
                 fromDate:  $('#lvFrom').val(),
                 toDate:    $('#lvTo').val(),
-                reason:    $('[name=Reason]').val()
+                reason:    $('[name=Reason]').val(),
+                halfDay:   $('#lvHalf').is(':checked')
             }
         })
         .done(function (res) {
@@ -304,6 +327,7 @@ $(document).ready(function () {
             bootstrap.Modal.getOrCreateInstance(document.getElementById('applyLeaveModal')).hide();
             document.getElementById('applyLeaveForm').reset();
             $('#lvDays').text('— days');
+            $('#lvBalance').html('');
             ecToast('success', res.message);
             load();
         })
@@ -316,28 +340,43 @@ $(document).ready(function () {
     });
 
     function load(){
-        EC.listLoading && EC.listLoading('#lmList');
+        EC.showLoader();
+        EC.listLoading('#lmList');
         $.getJSON(LIST_URL).done(function (rows) {
             requests = rows || [];
             render();
         }).fail(function () {
-            $('#lmList').html('');
-            $('#lmEmpty').removeClass('d-none');
-            ecToast('error', 'Could not load leave requests.');
-        });
+            requests = [];
+            EC.listEmpty('#lmList', 'Could not load leave requests. Please retry.', 'bx-error-circle');
+        }).always(EC.hideLoader);
     }
 
-    // Modal duration
+    // Modal duration: asked from the server, so holidays and weekly offs on the
+    // School Calendar are counted exactly as Apply will count them.
     function calcDays(){
-        const f=$('#lvFrom').val(), t=$('#lvTo').val();
-        if(f&&t&&new Date(t)>=new Date(f)){
-            const d=workingDays(f,t);
-            $('#lvDays').text(d ? d+' working day'+(d>1?'s':'') : 'no working days');
-        }
-        else $('#lvDays').text('— days');
+        var f=$('#lvFrom').val(), t=$('#lvTo').val(), half=$('#lvHalf').is(':checked');
+        if (half && f) { $('#lvTo').val(f); t = f; }
+        if (!f || !t || t < f) { $('#lvDays').text('— days'); return; }
+        $.getJSON(DAYS_URL, { fromDate: f, toDate: t, halfDay: half }).done(function (res) {
+            var d = res && res.success ? res.days : 0;
+            $('#lvDays').text(d ? dayText(d) : 'no working days');
+        });
     }
-    $('#lvFrom,#lvTo').on('change', calcDays);
-    $('#lvFrom').attr('min', todayIso());
+    $('#lvFrom,#lvTo,#lvHalf').on('change', calcDays);
+
+    // Balance of the chosen staff member, for the year of the chosen from date.
+    function loadBalance(){
+        var sid = $('#lvStaff').val();
+        if (!sid) { $('#lvBalance').html(''); return; }
+        $.getJSON(BAL_URL, { staffId: sid, date: $('#lvFrom').val() || TODAY }).done(function (rows) {
+            if (!rows || !rows.length) { $('#lvBalance').html(''); return; }
+            $('#lvBalance').html('<span class="text-muted">Left in ' + EC.esc(rows[0].year) + ':</span> ' + rows
+                .filter(function (b) { return b.entitled !== null; })
+                .map(function (b) { return '<span class="me-2"><b>' + EC.esc(b.type) + '</b> ' + EC.esc(b.remaining) + '/' + EC.esc(b.entitled) + '</span>'; })
+                .join(''));
+        });
+    }
+    $('#lvStaff,#lvFrom').on('change', loadBalance);
 
     load();
 });

@@ -57,7 +57,7 @@
                 <td><span class="sm-type">@d.StaffType</span></td>
                 <td class="text-end">
                   <button class="btn btn-sm btn-outline-secondary rounded-circle editDesig"
-                          data-id="@d.DesignationId" data-name="@d.Name" data-dept="@d.DefaultDepartment"><i class="bx bx-edit"></i></button>
+                          data-id="@d.DesignationId" data-name="@d.Name" data-dept="@d.DefaultDepartment" data-type="@d.StaffType"><i class="bx bx-edit"></i></button>
                   <button class="btn btn-sm btn-outline-secondary rounded-circle toggleM" data-kind="Designation" data-id="@d.DesignationId"><i class="bx bx-power-off"></i></button>
                   <button class="btn btn-sm btn-outline-danger rounded-circle delM" data-kind="Designation" data-id="@d.DesignationId" data-name="@d.Name"><i class="bx bx-trash"></i></button>
                 </td>
@@ -111,10 +111,15 @@
             <select id="dgDept" class="form-select"><option value="">— Any department —</option>
               @foreach (var n in deptNames) { <option value="@n">@n</option> }
             </select>
-            <div class="text-muted small mt-1">Staff type is set automatically from the department.</div>
           </div>
           <div class="col-12"><label class="form-label fw-bold">2. Designation Name</label>
             <input id="dgName" class="form-control" placeholder="e.g. Hostel Warden">
+          </div>
+          <div class="col-12"><label class="form-label fw-bold">3. Staff Type</label>
+            <select id="dgType" class="form-select">
+              <option>Teaching</option><option>Non-Teaching</option><option>Transport</option><option>Support</option>
+            </select>
+            <div class="text-muted small mt-1">Suggested from the department; change it if it is wrong. Only Teaching staff can be class teachers or take periods. Staff holding this designation follow a change.</div>
           </div>
         </div>
       </div>
@@ -151,7 +156,23 @@ $(function(){
   function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
   function reload(){ setTimeout(function(){ location.reload(); }, 600); }
 
-  // Staff Type is derived silently from the department (no manual field).
+  // One handler for every write: busy button, the server's message, a failure toast.
+  // The button stays busy on success because the page reloads.
+  function send(req, $btn){
+    EC.buttonBusy($btn, 'Saving…');
+    req.done(function(res){
+         ecToast(res.success?'success':'error', res.message);
+         if(res.success) reload(); else EC.buttonReset($btn);
+       })
+       .fail(function(xhr){
+         EC.buttonReset($btn);
+         ecToast('error', xhr && xhr.status===403 ? 'You do not have permission to change staff masters.'
+                                                   : 'Could not reach the server. Nothing was saved.');
+       });
+  }
+
+  // Staff Type SUGGESTED from the department; the select lets the user correct it
+  // (a "Music Teacher" in a "Music" department is still Teaching).
   function deptToType(dept){
     var d = (dept||'').toLowerCase();
     if (/academic|teaching|sport/.test(d)) return 'Teaching';
@@ -163,50 +184,50 @@ $(function(){
   // ── Designation add / edit / save ──
   $('#addDesigBtn').on('click', function(){
     $('#desigTitle').text('Add Designation');
-    $('#dgId').val(0); $('#dgName').val(''); $('#dgDept').val('');
-    new bootstrap.Modal('#desigModal').show();
+    $('#dgId').val(0); $('#dgName').val(''); $('#dgDept').val(''); $('#dgType').val(deptToType(''));
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('desigModal')).show();
   });
   $('.editDesig').on('click', function(){
     var d = $(this);
     $('#desigTitle').text('Edit Designation');
     $('#dgId').val(d.data('id')); $('#dgName').val(d.data('name')); $('#dgDept').val(d.data('dept')||'');
-    new bootstrap.Modal('#desigModal').show();
+    $('#dgType').val(d.data('type') || deptToType(d.data('dept')));
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('desigModal')).show();
   });
+  $('#dgDept').on('change', function(){ $('#dgType').val(deptToType($(this).val())); });
   $('#saveDesigBtn').on('click', function(){
     var name = $('#dgName').val().trim(); if(!name){ ecToast('warning','Enter a designation name.'); return; }
     var dept = $('#dgDept').val();
-    postJson(URL.saveDesig, { designationId:Number($('#dgId').val())||0, name:name, staffType:deptToType(dept),
-        defaultDepartment:dept||null })
-      .done(function(res){ ecToast(res.success?'success':'error', res.message); if(res.success) reload(); });
+    // No sortOrder / defaultRoleId: the proc keeps the stored values on an edit.
+    send(postJson(URL.saveDesig, { designationId:Number($('#dgId').val())||0, name:name, staffType:$('#dgType').val(),
+        defaultDepartment:dept||null }), $(this));
   });
 
   // ── Department add / edit / save ──
   $('#addDeptBtn').on('click', function(){
     $('#deptTitle').text('Add Department'); $('#dpId').val(0); $('#dpName').val('');
-    new bootstrap.Modal('#deptModal').show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('deptModal')).show();
   });
   $('.editDept').on('click', function(){
     var d = $(this);
     $('#deptTitle').text('Edit Department'); $('#dpId').val(d.data('id')); $('#dpName').val(d.data('name'));
-    new bootstrap.Modal('#deptModal').show();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('deptModal')).show();
   });
   $('#saveDeptBtn').on('click', function(){
     var name = $('#dpName').val().trim(); if(!name){ ecToast('warning','Enter a department name.'); return; }
-    postJson(URL.saveDept, { departmentId:Number($('#dpId').val())||0, name:name })
-      .done(function(res){ ecToast(res.success?'success':'error', res.message); if(res.success) reload(); });
+    // A rename follows through to the staff in this department (done by the proc).
+    send(postJson(URL.saveDept, { departmentId:Number($('#dpId').val())||0, name:name }), $(this));
   });
 
   // ── Toggle active / delete (shared) ──
   $('.toggleM').on('click', function(){
-    postForm(URL.toggle, { kind:$(this).data('kind'), id:$(this).data('id') })
-      .done(function(res){ ecToast(res.success?'success':'error', res.message); if(res.success) reload(); });
+    send(postForm(URL.toggle, { kind:$(this).data('kind'), id:$(this).data('id') }), $(this));
   });
   $('.delM').on('click', function(){
     var d = $(this);
     EC.confirm({ title:'Delete this ' + (d.data('kind')||'entry') + '?', name:d.data('name') }).then(function(ok){
       if(!ok) return;
-      postForm(URL.del, { kind:d.data('kind'), id:d.data('id') })
-        .done(function(res){ ecToast(res.success?'success':'error', res.message); if(res.success) reload(); });
+      send(postForm(URL.del, { kind:d.data('kind'), id:d.data('id') }), d);
     });
   });
 
