@@ -46,7 +46,8 @@
 
 -- One transaction: PostgreSQL DDL is transactional, so the drop and both
 -- CREATEs land atomically and no request can arrive between them.
-BEGIN;
+-- (no BEGIN/COMMIT here: the deploy bundles run each bundle as one transaction,
+--  and a COMMIT inside would end that transaction early)
 
 -- CREATE OR REPLACE cannot remove a parameter default, so the session-aware
 -- proc is dropped and recreated without the default on p_academic_year_id.
@@ -255,4 +256,4 @@ END
 
 $shim$;
 
-COMMIT;
+-- end of the two procedures
