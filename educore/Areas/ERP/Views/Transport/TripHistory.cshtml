@@ -1,0 +1,166 @@
+@{
+    ViewData["Title"] = "Trip History";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var vehicles = ViewBag.Vehicles as List<EduCoreDataAccessLayer.Models.ERP.TransportVehicle>
+                   ?? new List<EduCoreDataAccessLayer.Models.ERP.TransportVehicle>();
+}
+
+@section VendorStyles {
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+}
+
+@section PageStyles {
+<style>
+  .th-map  { height: 480px; border-radius: 16px; border: 1px solid var(--bs-border-color); }
+  .th-card { background:#fff; border:1px solid var(--bs-border-color); border-radius:16px; }
+  .th-table tr.sel td { background: var(--soft); }
+  .th-table { font-size: .85rem; }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+      <div class="d-flex align-items-center gap-2">
+        <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center" style="background:var(--soft);color:var(--p);width:46px;height:46px"><i class="bx bx-history fs-4"></i></div>
+        <div>
+          <h4 class="mb-0" style="color:var(--heading);font-weight:900">Trip History</h4>
+          <div class="text-muted" style="font-size:.8rem">Past trips and their route on the map · kept for 30 days</div>
+        </div>
+      </div>
+      <a class="btn btn-outline-secondary" asp-action="LiveTracking"><i class="bx bx-current-location me-1"></i>Live tracking</a>
+    </div>
+
+    <div class="th-card p-3 mb-3">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Vehicle</label>
+          <select id="fVehicle" class="form-select">
+            <option value="">All vehicles</option>
+            @foreach (var v in vehicles) { <option value="@v.VehicleId">@v.VehicleNo</option> }
+          </select>
+        </div>
+        <div class="col-6 col-md-3"><label class="form-label fw-bold">From</label><input id="fFrom" type="date" class="form-control" value="@ViewBag.WeekAgo"></div>
+        <div class="col-6 col-md-3"><label class="form-label fw-bold">To</label><input id="fTo" type="date" class="form-control" value="@ViewBag.Today"></div>
+        <div class="col-md-2"><button class="btn btn-primary w-100" id="loadBtn"><i class="bx bx-search me-1"></i>Show</button></div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-6">
+        <div class="th-card p-2" style="max-height:520px;overflow-y:auto">
+          <table class="table table-sm align-middle mb-0 th-table">
+            <thead><tr><th>Start</th><th>Vehicle</th><th>Route / driver</th><th>Time</th><th></th></tr></thead>
+            <tbody id="tripBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div id="map" class="th-map"></div>
+        <div class="d-flex align-items-center gap-2 mt-2">
+          <button class="btn btn-sm btn-outline-primary" id="replayBtn" disabled><i class="bx bx-play me-1"></i>Replay</button>
+          <span class="text-muted small" id="pathInfo">Pick a trip to see its path.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section VendorScripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+}
+
+@section PageScripts {
+<script>
+$(function () {
+  'use strict';
+  var URL = { trips: '@Url.Action("GetTrips")', points: '@Url.Action("GetTripPoints")' };
+
+  var map = L.map('map').setView([22.5, 79.0], 5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  var pathLayer = L.layerGroup().addTo(map);
+  var path = [];          // [[lat, lng], ...] of the trip on the map
+  var replayTimer = null;
+
+  function stopReplay() {
+    if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+  }
+
+  function loadTrips() {
+    EC.showLoader();
+    EC.listLoading('#tripBody');
+    $.get(URL.trips, { vehicleId: $('#fVehicle').val(), from: $('#fFrom').val(), to: $('#fTo').val() })
+      .done(function (d) {
+        if (!d || !d.success) { EC.listEmpty('#tripBody', (d && d.message) || 'Could not load.', 'bx-error-circle'); return; }
+        if (!d.rows.length) { EC.listEmpty('#tripBody', 'No trips in these dates.'); return; }
+        $('#tripBody').html(d.rows.map(function (t) {
+          var time = t.running ? '<span class="badge bg-label-success">running</span>'
+                               : t.minutes + ' min' + (t.endReason === 'Stale' ? ' <span class="text-muted" title="No position for 30 minutes, ended automatically">(auto-ended)</span>' : '');
+          return '<tr data-id="' + t.tripId + '">' +
+            '<td>' + EC.esc((t.startedAt || '').substring(0, 16)) + '</td>' +
+            '<td class="fw-bold">' + EC.esc(t.vehicleNo || '') + '</td>' +
+            '<td>' + EC.esc(t.routeName || 'No route') + '<div class="text-muted small">' + EC.esc(t.driverName || '—') + '</div></td>' +
+            '<td>' + time + '</td>' +
+            '<td class="text-end"><button class="btn btn-sm btn-outline-primary showTrip" data-id="' + t.tripId + '" ' +
+              (t.points ? '' : 'disabled title="No positions recorded"') + '><i class="bx bx-map-alt"></i></button></td>' +
+            '</tr>';
+        }).join(''));
+      })
+      .fail(function () { EC.listEmpty('#tripBody', 'Could not load. Please retry.', 'bx-error-circle'); })
+      .always(EC.hideLoader);
+  }
+
+  function drawTrip(id) {
+    stopReplay();
+    pathLayer.clearLayers();
+    path = [];
+    $('#replayBtn').prop('disabled', true);
+    $('#pathInfo').text('Loading path…');
+    EC.showLoader();
+    $.get(URL.points, { tripId: id })
+      .done(function (d) {
+        if (!d || !d.success || !d.points.length) { $('#pathInfo').text('No positions recorded for this trip.'); return; }
+        path = d.points.map(function (p) { return [p.lat, p.lng]; });
+        L.polyline(path, { color: '#ff8a00', weight: 5, opacity: .85 }).addTo(pathLayer);
+        L.circleMarker(path[0], { radius: 8, color: '#fff', weight: 2, fillColor: '#198754', fillOpacity: 1 })
+          .bindTooltip('Start ' + EC.esc((d.points[0].at || '').substring(11, 16))).addTo(pathLayer);
+        var last = d.points[d.points.length - 1];
+        L.circleMarker(path[path.length - 1], { radius: 8, color: '#fff', weight: 2, fillColor: '#dc3545', fillOpacity: 1 })
+          .bindTooltip('End ' + EC.esc((last.at || '').substring(11, 16))).addTo(pathLayer);
+        map.fitBounds(path, { padding: [30, 30], maxZoom: 16 });
+        $('#pathInfo').text(path.length + ' point(s)');
+        $('#replayBtn').prop('disabled', path.length < 2);
+      })
+      .fail(function () { $('#pathInfo').text('Could not load the path.'); })
+      .always(EC.hideLoader);
+  }
+
+  // Moves a dot along the path, a few points a second.
+  $('#replayBtn').on('click', function () {
+    if (path.length < 2) return;
+    stopReplay();
+    var i = 0;
+    var dot = L.circleMarker(path[0], { radius: 9, color: '#fff', weight: 3, fillColor: '#0d6efd', fillOpacity: 1 }).addTo(pathLayer);
+    replayTimer = setInterval(function () {
+      i++;
+      if (i >= path.length) { stopReplay(); pathLayer.removeLayer(dot); return; }
+      dot.setLatLng(path[i]);
+    }, 150);
+  });
+
+  $('#tripBody').on('click', '.showTrip', function () {
+    $('#tripBody tr').removeClass('sel');
+    $(this).closest('tr').addClass('sel');
+    drawTrip($(this).data('id'));
+  });
+  $('#loadBtn').on('click', loadTrips);
+  $('#fVehicle').on('change', loadTrips);
+
+  loadTrips();
+});
+</script>
+}

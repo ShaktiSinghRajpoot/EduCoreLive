@@ -1,0 +1,272 @@
+@{
+    ViewData["Title"] = "My Bus";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var buses = ViewBag.Buses as List<EduCoreDataAccessLayer.Models.ERP.MyBusVehicle>
+                ?? new List<EduCoreDataAccessLayer.Models.ERP.MyBusVehicle>();
+    bool moduleOff = ViewBag.ModuleOff == true;
+}
+
+@section PageStyles {
+<style>
+  .mb-wrap { max-width: 560px; margin: 0 auto; }
+  .mb-card { background:#fff; border:1px solid var(--bs-border-color); border-radius:18px; padding:1.1rem; }
+  .mb-bus  { font-size:1.5rem; font-weight:900; color:var(--heading); }
+  .mb-route{ font-size:.9rem; font-weight:700; color:var(--bs-secondary-color); }
+  .mb-btn  { width:100%; padding:1.1rem; font-size:1.25rem; font-weight:900; border-radius:16px; }
+  .mb-stat { display:flex; justify-content:space-between; padding:.45rem 0; border-bottom:1px dashed var(--bs-border-color); font-size:.92rem; }
+  .mb-stat:last-child { border-bottom:0; }
+  .mb-stat span:first-child { color:var(--bs-secondary-color); font-weight:700; }
+  .mb-stat span:last-child  { font-weight:800; text-align:right; }
+  .gps-ok   { color:#198754; }
+  .gps-wait { color:#b7791f; }
+  .gps-bad  { color:#dc3545; }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content mb-wrap">
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center" style="background:var(--soft);color:var(--p);width:46px;height:46px"><i class="bx bx-bus fs-4"></i></div>
+      <div>
+        <h4 class="mb-0" style="color:var(--heading);font-weight:900">My Bus</h4>
+        <div class="text-muted" style="font-size:.8rem">Share the bus's live location while you drive</div>
+      </div>
+    </div>
+
+    @if (moduleOff)
+    {
+      <div class="mb-card text-center text-muted">Transport is turned off for this school.</div>
+    }
+    else if (!buses.Any())
+    {
+      <div class="mb-card text-center">
+        <i class="bx bx-info-circle fs-1 text-muted"></i>
+        <div class="fw-bold mt-2">You are not the driver of any bus.</div>
+        <div class="text-muted small mt-1">Ask the school office to pick you as the driver on the Vehicles page.</div>
+      </div>
+    }
+    else
+    {
+      @* Usually one bus. With several, the driver picks which one this trip is for. *@
+      <div class="mb-card mb-3">
+        @if (buses.Count > 1)
+        {
+          <label class="form-label fw-bold">Bus</label>
+          <select id="busPick" class="form-select form-select-lg mb-2">
+            @foreach (var b in buses)
+            {
+              <option value="@b.VehicleId" data-trip="@(b.TripId ?? 0)" data-route="@b.RouteName">@b.VehicleNo</option>
+            }
+          </select>
+        }
+        else
+        {
+          <input type="hidden" id="busPick" value="@buses[0].VehicleId" data-trip="@(buses[0].TripId ?? 0)">
+        }
+        <div class="mb-bus" id="busNo">@buses[0].VehicleNo</div>
+        <div class="mb-route" id="busRoute">@(string.IsNullOrWhiteSpace(buses[0].RouteName) ? "No route set" : buses[0].RouteName)</div>
+      </div>
+
+      <div class="mb-3">
+        <button type="button" class="btn btn-success mb-btn" id="startBtn"><i class="bx bx-play-circle me-1"></i>Start Trip</button>
+        <button type="button" class="btn btn-danger mb-btn d-none" id="endBtn"><i class="bx bx-stop-circle me-1"></i>End Trip</button>
+      </div>
+
+      <div class="alert alert-warning d-none" id="keepOpen" style="border-radius:14px">
+        <i class="bx bx-error me-1"></i><strong>Keep this page open and the screen on.</strong>
+        Phones pause pages in the background, and the location stops being shared until you come back.
+      </div>
+
+      <div class="mb-card">
+        <div class="mb-stat"><span>Trip</span><span id="stTrip">Not started</span></div>
+        <div class="mb-stat"><span>GPS</span><span id="stGps" class="text-muted">Off</span></div>
+        <div class="mb-stat"><span>Last sent</span><span id="stSent">—</span></div>
+        <div class="mb-stat"><span>Points sent</span><span id="stCount">0</span></div>
+      </div>
+    }
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+@if (!moduleOff && buses.Any())
+{
+<script>
+$(function () {
+  'use strict';
+  var CSRF = $('input[name="__RequestVerificationToken"]').val();
+  var URL = { start: '@Url.Action("StartTrip")', end: '@Url.Action("EndTrip")', point: '@Url.Action("SendPoint")' };
+  var SEND_EVERY_MS = 15000;     // the server drops anything closer than 5 s anyway
+
+  var tripId = 0;
+  var watchId = null;
+  var timerId = null;
+  var latest = null;             // the newest position from the phone
+  var lastSentAt = 0;
+  var sending = false;
+  var sentCount = 0;
+  var wakeLock = null;
+
+  function post(url, data) {
+    return $.ajax({ url: url, type: 'POST', contentType: 'application/json',
+                    headers: { 'RequestVerificationToken': CSRF }, data: JSON.stringify(data) });
+  }
+
+  function vehicleId() { return Number($('#busPick').val()) || 0; }
+
+  function setGps(cls, text) {
+    $('#stGps').attr('class', cls).text(text);
+  }
+
+  function showRunning(running) {
+    $('#startBtn').toggleClass('d-none', running);
+    $('#endBtn').toggleClass('d-none', !running);
+    $('#keepOpen').toggleClass('d-none', !running);
+    $('#busPick').prop('disabled', running);
+    $('#stTrip').text(running ? 'Running' : 'Not started');
+  }
+
+  // Ask the phone to keep the screen on while a trip runs (not every browser can).
+  function keepScreenOn() {
+    if (!('wakeLock' in navigator)) return;
+    navigator.wakeLock.request('screen').then(function (lock) { wakeLock = lock; }).catch(function () {});
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible' && tripId) keepScreenOn();
+  });
+
+  function startGps() {
+    if (!navigator.geolocation) {
+      setGps('gps-bad', 'This browser has no GPS access');
+      return;
+    }
+    if (!window.isSecureContext) {
+      setGps('gps-bad', 'Location needs an https:// page');
+      return;
+    }
+    setGps('gps-wait', 'Waiting for GPS…');
+    watchId = navigator.geolocation.watchPosition(onPosition, onGpsError,
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+    // watchPosition only fires when the phone moves; this keeps sending while
+    // the bus waits at a stop, so the trip is not taken as abandoned.
+    timerId = setInterval(sendIfDue, 5000);
+    keepScreenOn();
+  }
+
+  function stopGps() {
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    if (timerId !== null) clearInterval(timerId);
+    watchId = null; timerId = null; latest = null;
+    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    setGps('text-muted', 'Off');
+  }
+
+  function onPosition(pos) {
+    latest = pos;
+    setGps('gps-ok', 'OK · ±' + Math.round(pos.coords.accuracy) + ' m');
+    sendIfDue();
+  }
+
+  function onGpsError(err) {
+    if (err.code === 1) setGps('gps-bad', 'Location permission denied — allow it in the browser settings');
+    else if (err.code === 3) setGps('gps-wait', 'Still waiting for GPS…');
+    else setGps('gps-bad', 'GPS not available — go outside or turn on Location');
+  }
+
+  function sendIfDue() {
+    if (!tripId || !latest || sending) return;
+    if (Date.now() - lastSentAt < SEND_EVERY_MS) return;
+    // The phone's last fix, re-sent while the bus stands still -- but never one
+    // older than 5 minutes; then we wait for a fresh fix instead.
+    var age = Date.now() - latest.timestamp;
+    if (age > 5 * 60 * 1000) { setGps('gps-wait', 'Waiting for a fresh GPS fix…'); return; }
+
+    var c = latest.coords;
+    sending = true;
+    lastSentAt = Date.now();
+    post(URL.point, {
+      tripId: tripId, lat: c.latitude, lng: c.longitude, accuracy: c.accuracy,
+      speed: c.speed, heading: c.heading,
+      // a re-sent fix is stamped now: it is still where the bus is
+      recordedAt: age > SEND_EVERY_MS ? Date.now() : latest.timestamp
+    }).done(function (res) {
+      if (res.success) {
+        if (res.accepted) {
+          sentCount++;
+          $('#stCount').text(sentCount);
+          $('#stSent').text(new Date().toLocaleTimeString());
+        }
+        return;
+      }
+      if (res.ended) {
+        ecToast('warning', res.message || 'The trip has ended.');
+        tripId = 0; stopGps(); showRunning(false);
+        return;
+      }
+      $('#stSent').text('Not saved: ' + (res.message || 'error'));
+    }).fail(function () {
+      $('#stSent').text('No network — will retry');
+      lastSentAt = 0;   // retry on the next tick
+    }).always(function () { sending = false; });
+  }
+
+  $('#busPick').on('change', function () {
+    var $o = $(this).find(':selected');
+    $('#busNo').text($o.text());
+    $('#busRoute').text($o.data('route') || 'No route set');
+  });
+
+  $('#startBtn').on('click', function () {
+    var $btn = $(this);
+    EC.buttonBusy($btn, 'Starting…');
+    post(URL.start, { vehicleId: vehicleId() })
+      .done(function (res) {
+        if (!res.success) { ecToast('error', res.message); return; }
+        tripId = res.tripId; sentCount = 0; lastSentAt = 0;
+        $('#stCount').text('0'); $('#stSent').text('—');
+        showRunning(true);
+        startGps();
+        ecToast('success', res.message);
+      })
+      .fail(function () { ecToast('error', 'Could not start the trip. Check the network.'); })
+      .always(function () { EC.buttonReset($btn); });
+  });
+
+  $('#endBtn').on('click', function () {
+    var $btn = $(this);
+    EC.confirm({ title: 'End this trip?', message: 'The bus stops sharing its location.',
+                 okText: 'End trip', danger: false }).then(function (ok) {
+      if (!ok) return;
+      EC.buttonBusy($btn, 'Ending…');
+      post(URL.end, { tripId: tripId })
+        .done(function (res) {
+          ecToast(res.success ? 'success' : 'error', res.message);
+          if (res.success) { tripId = 0; stopGps(); showRunning(false); }
+        })
+        .fail(function () { ecToast('error', 'Could not end the trip. Check the network.'); })
+        .always(function () { EC.buttonReset($btn); });
+    });
+  });
+
+  // A trip already running (the page was reloaded): carry on sending.
+  var running = 0;
+  if ($('#busPick').is('select')) {
+    $('#busPick option').each(function () {
+      if (!running && Number($(this).data('trip')) > 0) {
+        running = Number($(this).data('trip'));
+        $('#busPick').val($(this).val()).trigger('change');
+      }
+    });
+  } else {
+    running = Number($('#busPick').data('trip')) || 0;
+  }
+  if (running) {
+    tripId = running;
+    showRunning(true);
+    startGps();
+  }
+});
+</script>
+}
+}

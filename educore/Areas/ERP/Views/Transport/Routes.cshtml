@@ -3,6 +3,9 @@
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var routes = ViewBag.Routes as List<EduCoreDataAccessLayer.Models.ERP.TransportRoute>
                  ?? new List<EduCoreDataAccessLayer.Models.ERP.TransportRoute>();
+    // route id -> when its parent tracking link was made
+    var shares = ViewBag.Shares as Dictionary<int, string> ?? new Dictionary<int, string>();
+    bool canManage = ViewBag.CanManage == true;
 }
 
 @section PageStyles {
@@ -49,6 +52,23 @@
               <div class="tr-fare mt-1">
                 @if (r.StopCount > 0) { @($"₹{r.MinFare:0} – ₹{r.MaxFare:0} / month") } else { <span class="tr-meta">No stops</span> }
               </div>
+              @* Parent tracking link (live bus tracking). Only its hash is stored, so the
+                 link itself is shown once, when it is made; "New link" makes another. *@
+              <div class="tr-meta mt-1">
+                @if (shares.TryGetValue(r.RouteId, out var sharedAt))
+                {
+                    <span class="text-success fw-bold"><i class="bx bx-link"></i> Parent link on</span><span> · since @EduCoreDataAccessLayer.Helpers.Dates.Show(sharedAt)</span>
+                    @if (canManage)
+                    {
+                        <button class="btn btn-link btn-sm p-0 ms-2 shareRoute" data-id="@r.RouteId" data-name="@r.RouteName" data-regen="1">New link</button>
+                        <button class="btn btn-link btn-sm p-0 ms-2 text-danger revokeShare" data-id="@r.RouteId" data-name="@r.RouteName">Turn off</button>
+                    }
+                }
+                else if (canManage && r.IsActive)
+                {
+                    <button class="btn btn-link btn-sm p-0 shareRoute" data-id="@r.RouteId" data-name="@r.RouteName"><i class="bx bx-share-alt"></i> Create parent tracking link</button>
+                }
+              </div>
             </div>
             <div class="d-flex gap-1">
               <button class="btn btn-sm btn-outline-secondary rounded-circle editRoute" data-id="@r.RouteId" data-name="@r.RouteName" data-desc="@r.Description" title="Edit"><i class="bx bx-edit"></i></button>
@@ -89,6 +109,32 @@
   </div>
 </div>
 
+<!-- Parent link modal: shows a freshly made link once -->
+<div class="modal fade" id="shareModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:18px">
+      <div class="modal-header"><h5 class="modal-title">Parent tracking link</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="alert alert-warning small py-2"><i class="bx bx-info-circle me-1"></i>Copy it now: for safety the link is shown only once. You can always make a new one (the old one then stops working).</div>
+        <label class="form-label fw-bold">Link</label>
+        <div class="input-group mb-3">
+          <input id="shareLink" class="form-control" readonly>
+          <button class="btn btn-outline-primary" id="copyLinkBtn" type="button"><i class="bx bx-copy"></i> Copy link</button>
+        </div>
+        <label class="form-label fw-bold">Message for parents</label>
+        <textarea id="shareText" class="form-control mb-2" rows="4" readonly></textarea>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-outline-secondary btn-sm" id="copyTextBtn" type="button"><i class="bx bx-copy"></i> Copy message</button>
+          <a class="btn btn-success btn-sm" id="waBtn" target="_blank" rel="noopener"><i class="bx bxl-whatsapp"></i> WhatsApp</a>
+          <a class="btn btn-outline-secondary btn-sm" id="smsBtn"><i class="bx bx-message"></i> SMS</a>
+        </div>
+        <div class="text-muted small mt-2">Parents see only this route's bus number and position, and only while a trip is running.</div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-primary" data-bs-dismiss="modal" id="shareDoneBtn">Done</button></div>
+    </div>
+  </div>
+</div>
+
 @Html.AntiForgeryToken()
 
 @section PageScripts {
@@ -96,7 +142,8 @@
 $(function(){
   'use strict';
   var CSRF=$('input[name="__RequestVerificationToken"]').val();
-  var URL={ stops:'@Url.Action("GetStops")', save:'@Url.Action("SaveRoute")', del:'@Url.Action("DeleteRoute")', toggle:'@Url.Action("ToggleRouteStatus")' };
+  var URL={ stops:'@Url.Action("GetStops")', save:'@Url.Action("SaveRoute")', del:'@Url.Action("DeleteRoute")', toggle:'@Url.Action("ToggleRouteStatus")',
+             share:'@Url.Action("CreateShareLink")', revoke:'@Url.Action("RevokeShareLink")' };
   function post(url,data){ return $.ajax({url:url,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},data:JSON.stringify(data)}); }
   function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
 
@@ -148,6 +195,46 @@ $(function(){
       postForm(URL.del,{id:id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); })
         .fail(function(){ ecToast('error','Could not delete the route.'); });
     });
+  });
+
+// ── Parent tracking link ──
+  function copyText(text){
+    if(navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(text).then(function(){ ecToast('success','Copied.'); },function(){ ecToast('warning','Select the text and copy it.'); });
+    } else { ecToast('warning','Select the text and copy it.'); }
+  }
+  function showShare(name,link){
+    var msg='Track the school bus ('+name+') live: '+link+'\nThe position shows while the bus is on a trip.';
+    $('#shareLink').val(link); $('#shareText').val(msg);
+    $('#waBtn').attr('href','https://wa.me/?text='+encodeURIComponent(msg));
+    $('#smsBtn').attr('href','sms:?body='+encodeURIComponent(msg));
+    new bootstrap.Modal('#shareModal').show();
+  }
+  $('.shareRoute').on('click',function(){
+    var $btn=$(this), id=$btn.data('id'), name=String($btn.data('name'));
+    var make=function(){
+      EC.buttonBusy($btn,'Creating…');
+      postForm(URL.share,{routeId:id}).done(function(res){
+        if(!res.success){ ecToast('error',res.message); EC.buttonReset($btn); return; }
+        showShare(name,res.link);
+      }).fail(function(){ ecToast('error','Could not create the link.'); EC.buttonReset($btn); });
+    };
+    if(!$btn.data('regen')){ make(); return; }
+    EC.confirm({ title:'Make a new parent link?', name:name, message:'The link parents have now stops working at once.', okText:'Make new link', danger:false })
+      .then(function(ok){ if(ok) make(); });
+  });
+  $('#copyLinkBtn').on('click',function(){ copyText($('#shareLink').val()); });
+  $('#copyTextBtn').on('click',function(){ copyText($('#shareText').val()); });
+  // The page shows "Parent link on" after a reload; the raw link is never shown again.
+  $('#shareModal').on('hidden.bs.modal',function(){ location.reload(); });
+  $('.revokeShare').on('click',function(){
+    var id=$(this).data('id');
+    EC.confirm({ title:'Turn off the parent link?', name:$(this).data('name'), message:'Parents who have the link can no longer see the bus.', okText:'Turn off' })
+      .then(function(ok){
+        if(!ok) return;
+        postForm(URL.revoke,{routeId:id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success) setTimeout(function(){location.reload();},500); })
+          .fail(function(){ ecToast('error','Could not turn off the link.'); });
+      });
   });
 
 });

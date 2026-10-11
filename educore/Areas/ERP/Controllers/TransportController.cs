@@ -16,14 +16,17 @@ namespace educore.Areas.ERP.Controllers
         private readonly IBaseService _baseService;
         private readonly IAdmissionService _admissionService;
         private readonly ISchoolSettingsService _schoolSettingsService;
+        private readonly ITransportTrackingService _tracking;
 
         public TransportController(
             ITransportService transportService,
             IBaseService baseService,
             IAdmissionService admissionService,
-            ISchoolSettingsService schoolSettingsService)
+            ISchoolSettingsService schoolSettingsService,
+            ITransportTrackingService tracking)
         {
             _transportService = transportService;
+            _tracking = tracking;
             _baseService = baseService;
             _admissionService = admissionService;
             _schoolSettingsService = schoolSettingsService;
@@ -34,6 +37,9 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> Routes()
         {
             ViewBag.Routes = await _transportService.GetRoutesAsync(TenantId(), SchoolId(), UserId());
+            // route id -> when its parent link was made (routes without a link are absent)
+            ViewBag.Shares = await _tracking.GetShareLinksAsync(TenantId(), SchoolId(), UserId());
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "transport.manage");
             return View();
         }
 
@@ -189,6 +195,85 @@ namespace educore.Areas.ERP.Controllers
             public int     StopId    { get; set; }
             public string? Session   { get; set; }
             public string? StartDate { get; set; }
+        }
+
+        // ── Live tracking (transport_live_tracking.sql) ──────────
+        [HttpGet]
+        public IActionResult LiveTracking() => View();
+
+        [HttpGet]
+        public async Task<IActionResult> GetLiveTrips()
+        {
+            var rows = await _tracking.GetLiveTripsAsync(TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                success = true,
+                rows = rows.Select(t => new
+                {
+                    tripId = t.TripId, vehicleId = t.VehicleId, vehicleNo = t.VehicleNo,
+                    routeName = t.RouteName, driverName = t.DriverName,
+                    startedAt = t.StartedAt, lastPointAt = t.LastPointAt, ageSeconds = t.AgeSeconds,
+                    lat = t.Lat, lng = t.Lng, accuracy = t.AccuracyM, speed = t.SpeedMps, points = t.PointCount
+                })
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> TripHistory()
+        {
+            ViewBag.Vehicles = await _transportService.GetVehiclesAsync(TenantId(), SchoolId(), UserId());
+            ViewBag.Today = Dates.Today;
+            ViewBag.WeekAgo = Dates.Now.AddDays(-6).ToString(Dates.Iso);
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetTrips(int? vehicleId, string? from, string? to)
+        {
+            var rows = await _tracking.GetTripHistoryAsync(vehicleId, Dates.Norm(from), Dates.Norm(to), TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                success = true,
+                rows = rows.Select(t => new
+                {
+                    tripId = t.TripId, vehicleNo = t.VehicleNo, routeName = t.RouteName, driverName = t.DriverName,
+                    startedAt = t.StartedAt, endedAt = t.EndedAt, endReason = t.EndReason,
+                    points = t.PointCount, running = t.IsRunning, minutes = t.DurationMin
+                })
+            });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetTripPoints(int tripId)
+        {
+            var pts = await _tracking.GetTripPointsAsync(tripId, TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                success = true,
+                points = pts.Select(p => new { lat = p.Lat, lng = p.Lng, speed = p.SpeedMps, at = p.RecordedAt })
+            });
+        }
+
+        // Parent share link: create or regenerate. The raw link is returned ONCE.
+        [HttpPost]
+        [HasPermission("transport.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CreateShareLink(int routeId)
+        {
+            var (ok, msg, token) = await _tracking.CreateShareLinkAsync(routeId, TenantId(), SchoolId(), UserId());
+            string? link = ok && token != null
+                ? Url.Action("Index", "BusTrack", new { area = "", token }, Request.Scheme)
+                : null;
+            return Json(new { success = ok, message = msg, link });
+        }
+
+        [HttpPost]
+        [HasPermission("transport.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RevokeShareLink(int routeId)
+        {
+            var (ok, msg) = await _tracking.RevokeShareLinkAsync(routeId, TenantId(), SchoolId(), UserId());
+            return Json(new { success = ok, message = msg });
         }
 
         // ── Student cascade (same source as Fee Collection) ──────

@@ -135,6 +135,19 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0                          // excess attempts are rejected, not queued
             }));
 
+    // WHY: the public parent bus-tracking page (/BusTrack/{token}) needs no login, so it is
+    // throttled per IP. The page polls every 15 s (4 a minute); 60 a minute leaves room for
+    // several families behind one mobile-carrier IP while still blunting token guessing.
+    options.AddPolicy("bustrack", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+
     // WHY: return a clean 429; the status-code-pages middleware re-executes to /Account/Error.
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
@@ -223,6 +236,7 @@ builder.Services.AddScoped<IAdmissionWorkflowService, AdmissionWorkflowService>(
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<IFeePaymentService, FeePaymentService>();
 builder.Services.AddScoped<ITransportService, TransportService>();
+builder.Services.AddScoped<ITransportTrackingService, TransportTrackingService>();
 builder.Services.AddScoped<IStaffService, StaffService>();
 
 // Resolves the uuid a URL carries back into the internal id (see

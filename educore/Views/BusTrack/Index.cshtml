@@ -1,0 +1,148 @@
+@{
+    Layout = "_BlankLayout";
+    ViewData["Title"] = "Bus tracking";
+    bool valid = ViewBag.Valid == true;
+    string routeName = ViewBag.RouteName as string ?? "";
+}
+
+@section VendorStyles {
+    <meta name="robots" content="noindex, nofollow" />
+    @if (valid)
+    {
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    }
+}
+
+@section PageStyles {
+<style>
+  body { background: #f6f4f0; }
+  .bt-wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+  .bt-card { background: #fff; border: 1px solid #e7e2da; border-radius: 18px; padding: 1rem; }
+  .bt-title { font-weight: 900; font-size: 1.2rem; }
+  .bt-sub { font-size: .85rem; font-weight: 650; color: #6c757d; }
+  .bt-map { height: 60vh; min-height: 320px; border-radius: 16px; border: 1px solid #e7e2da; }
+  .bt-status { font-weight: 800; }
+</style>
+}
+
+<div class="bt-wrap">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <i class="bx bx-bus" style="font-size:2rem;color:#ff8a00"></i>
+    <div>
+      <div class="bt-title">School bus tracking</div>
+      @if (valid) { <div class="bt-sub">Route: @routeName</div> }
+    </div>
+  </div>
+
+  @if (!valid)
+  {
+    <div class="bt-card text-center">
+      <i class="bx bx-link-alt" style="font-size:2.5rem;opacity:.4"></i>
+      <div class="fw-bold mt-2">This tracking link is not valid or has been turned off.</div>
+      <div class="bt-sub mt-1">Please ask the school for the current link.</div>
+    </div>
+  }
+  else
+  {
+    <div class="bt-card mb-3">
+      <div class="bt-status" id="btStatus">Loading…</div>
+      <div class="bt-sub" id="btWhen"></div>
+    </div>
+    <div id="map" class="bt-map"></div>
+    <div class="bt-sub mt-2">Refreshes every 15 seconds. The position is shared only while the bus is on a trip.</div>
+  }
+</div>
+
+@section VendorScripts {
+    @if (valid)
+    {
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    }
+}
+
+@section PageScripts {
+@if (valid)
+{
+<script>
+(function () {
+  'use strict';
+  var DATA_URL = '@Url.Action("Data", "BusTrack", new { token = (string)ViewBag.Token })';
+
+  var map = L.map('map').setView([22.5, 79.0], 5);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  var markers = {};       // vehicle no -> marker
+  var firstFit = true;
+  var stopped = false;
+
+  function ago(sec) {
+    if (sec === null || sec === undefined) return 'waiting for the first position';
+    if (sec < 60) return 'updated just now';
+    if (sec < 3600) return 'updated ' + Math.floor(sec / 60) + ' min ago';
+    return 'updated ' + Math.floor(sec / 3600) + ' h ago';
+  }
+
+  function render(d) {
+    var buses = (d.buses || []).filter(function (b) { return b.lat !== null && b.lng !== null; });
+    var seen = {};
+    var bounds = [];
+
+    buses.forEach(function (b) {
+      seen[b.vehicleNo] = true;
+      var stale = b.ageSeconds === null || b.ageSeconds > 180;
+      var m = markers[b.vehicleNo];
+      if (!m) {
+        m = L.circleMarker([b.lat, b.lng], { radius: 11, weight: 3, color: '#fff', fillOpacity: 1 }).addTo(map);
+        m.bindTooltip(EC.esc(b.vehicleNo), { permanent: true, direction: 'top', offset: [0, -10] });
+        markers[b.vehicleNo] = m;
+      }
+      m.setLatLng([b.lat, b.lng]);
+      m.setStyle({ fillColor: stale ? '#9aa0a6' : '#ff8a00' });
+      bounds.push([b.lat, b.lng]);
+    });
+    Object.keys(markers).forEach(function (k) {
+      if (!seen[k]) { map.removeLayer(markers[k]); delete markers[k]; }
+    });
+
+    if (!d.buses || !d.buses.length) {
+      $('#btStatus').text('The bus is not on a trip right now.');
+      $('#btWhen').text('');
+      return;
+    }
+    var first = d.buses[0];
+    $('#btStatus').text('Bus ' + first.vehicleNo + (d.buses.length > 1 ? ' and ' + (d.buses.length - 1) + ' more' : '') + ' is on a trip');
+    $('#btWhen').text(ago(first.ageSeconds) + (first.lastPointAt ? ' (' + first.lastPointAt + ')' : ''));
+
+    if (bounds.length && firstFit) { map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 }); firstFit = false; }
+    else if (bounds.length === 1) { map.panTo(bounds[0]); }
+  }
+
+  function load() {
+    if (stopped) return;
+    $.get(DATA_URL)
+      .done(function (d) {
+        if (!d || !d.valid) {
+          // The link was turned off while the page was open.
+          stopped = true;
+          $('#btStatus').text('This tracking link has been turned off.');
+          $('#btWhen').text('');
+          Object.keys(markers).forEach(function (k) { map.removeLayer(markers[k]); });
+          markers = {};
+          return;
+        }
+        render(d);
+      })
+      .fail(function (x) {
+        $('#btWhen').text(x.status === 429 ? 'Too many requests — slowing down.' : 'Could not refresh. Retrying…');
+      });
+  }
+
+  load();
+  setInterval(load, 15000);
+})();
+</script>
+}
+}

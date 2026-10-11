@@ -4797,3 +4797,52 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   re-run green; no existing check needed changing.
 - **Deploy order (re-runnable, each ends with a semicolon):** `period_structure.sql`,
   `timetable.sql`, `school_calendar.sql`. App restart needed (new binaries).
+
+### [2026-10-11] Transport: live bus tracking (driver's phone, staff map, parent link, 30-day history)
+
+- **Location source = the driver's phone browser.** A driver is a staff row with a login
+  (`staff.user_id`) set as `transport_vehicles.driver_staff_id`. New page **`/ERP/MyBus`**
+  (`MyBusController`, `[Authorize(SchoolUserOnly)]`, no permission key — being the assigned driver
+  of an active bus is the permission, checked again by the proc on every write; the Transport
+  switch is checked in the controller because `[RequiresModule]` would redirect a driver to a
+  settings page they cannot open). Start/End Trip; `navigator.geolocation.watchPosition`; posts
+  at most every 15 s (antiforgery); re-sends the last fix while standing still (at most 5 min old)
+  so a bus waiting at a stop is not taken as abandoned; asks for a screen wake lock; warns to keep
+  the page open. "My Bus" menu item only for drivers (`IsDriverAsync`, AppCache 5 min per user).
+- **Tables** (`transport_live_tracking.sql`): `core.transport_trips` (snapshots of bus / route /
+  driver; the latest point is copied onto the trip row so the live map reads one row per bus — no
+  "latest point per trip" scan), `core.transport_trip_points`, `core.transport_route_shares`
+  (sha256 hex of the token only). Indexes: unique running trip per vehicle (partial), running
+  trips per school (partial), history `(tenant, school, started_at desc)`,
+  `points(trip_id, recorded_at)`, and `points(recorded_at)` / `trips(started_at)` for the purge.
+- **Procs:** `fn_transport_close_stale_trips` (no point *received* for 30 min → ended `Stale`;
+  server receive time, so a wrong phone clock cannot keep a trip alive), `sp_transport_trip_manage`
+  (MyBus / IsDriver / StartTrip / EndTrip / AddPoint: lat/lng in range and not 0,0; accuracy
+  0..2000 m; not > 2 min in the future nor before the trip; < 5 s after the last point = dropped,
+  not an error; junk speed/heading stored NULL), `sp_transport_tracking_manage` (LiveList /
+  TripHistory / TripPoints / ShareList / ShareCreate / ShareRevoke), `sp_transport_track_public`
+  (token hash → its own school and route; nothing when revoked, unknown, route deleted or the
+  module is off; returns only route name, vehicle no., position and age).
+- **30-day retention without a scheduler:** `StartTrip` runs `DELETE ... points WHERE recorded_at <
+  now() - 30 days` and deletes ended trips started more than 30 days ago, for every school.
+  Indexed, so it is cheap at the start of each trip.
+- **Staff:** `/ERP/Transport/LiveTracking` (Leaflet 1.9.4 from cdnjs + OpenStreetMap tiles with
+  attribution; polling every 10 s, no SignalR; grey after 3 min) and `/ERP/Transport/TripHistory`
+  (vehicle/date filter, polyline with start/end markers, replay), both under the existing
+  `transport.view` + `[RequiresModule(Transport)]`.
+- **Parent link:** per route on the Routes page (`transport.manage`): create / new link /
+  turn off. 32 random bytes, base64url, shown once (copy link, WhatsApp, SMS text); only the hash
+  is stored, so to re-share the office makes a new link and the old one stops at once.
+  Public `/BusTrack/{token}` and `/BusTrack/{token}/data` (`BusTrackController`, AllowAnonymous,
+  attribute routes): malformed tokens never reach the DB, unknown and revoked look identical,
+  `Cache-Control: no-store`, `noindex`; new rate-limit policy **`bustrack`** (60/min per IP —
+  room for families behind one carrier IP; the page polls 4 times a minute).
+- **Purge:** `school_purge.sql` deletes the three tables (before vehicles / routes / staff); H12
+  stays green.
+- **Roadmap:** "Live bus tracking" moved from Planned to a new "Now available" block.
+- **Tests:** `tests/transport_live_tracking_tests.sql` (75 checks). Every suite in
+  `Database/tests` re-run green (34 suites). Smoke-tested against a local run: start, points,
+  future/NaN refusal, CSRF 400, live list, public JSON (no driver name), end, history, path,
+  create/regenerate/revoke, 429.
+- **Deploy order (re-runnable, each ends with a semicolon):** `transport_live_tracking.sql`, then
+  `school_purge.sql`. App restart needed (new binaries).

@@ -16,11 +16,17 @@
         ("Front office",      "bx-buildings",      new[] { "Document verification", "Entrance test", "Interview", "Visitor book", "Phone call log", "Complaints" }),
         ("Attendance",        "bx-user-check",     new[] { "Staff attendance" }),
         ("Inventory",         "bx-package",        new[] { "Suppliers", "Issue items" }),
-        ("Transport",         "bx-bus",            new[] { "Live bus tracking" }),
         ("Reports",           "bx-bar-chart-alt-2",new[] { "Reports & analytics" }),
         ("Administration",    "bx-cog",            new[] { "SMS / payment gateway", "Backup & restore", "Billing & subscription" })
     };
     var total = planned.Sum(p => p.Items.Length);
+
+    // Shipped from this list. Kept here a while so people who looked for an item
+    // can see it is now available, with a link to it.
+    var shipped = new (string Group, string Icon, string Item, string Controller, string Action)[]
+    {
+        ("Transport", "bx-bus", "Live bus tracking", "Transport", "LiveTracking")
+    };
 }
 
 @section PageStyles {
@@ -66,6 +72,21 @@
             </div>
         </div>
 
+        <h6 class="fw-bold mb-2">Now available</h6>
+        <div class="rm-grid mb-4">
+            @foreach (var x in shipped)
+            {
+                <div class="rm-card">
+                    <div class="rm-head">
+                        <i class="bx @x.Icon"></i><span>@x.Group</span>
+                        <span class="badge bg-label-success ms-auto">Available</span>
+                    </div>
+                    <a asp-area="ERP" asp-controller="@x.Controller" asp-action="@x.Action" class="fw-bold">@x.Item <i class="bx bx-right-arrow-alt"></i></a>
+                </div>
+            }
+        </div>
+
+        <h6 class="fw-bold mb-2">Planned</h6>
         <div class="rm-grid">
             @foreach (var p in planned)
             {

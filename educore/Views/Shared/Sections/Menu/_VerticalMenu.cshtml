@@ -2,6 +2,7 @@
 @using EduCoreDataAccessLayer.Services.Contract.ERP
 @using System.Security.Claims
 @inject IAdmissionWorkflowService AdmissionWorkflowService
+@inject ITransportTrackingService TransportTrackingService
 @inject EduCoreDataAccessLayer.Services.IPermissionService PermissionService
 
 @{
@@ -65,6 +66,14 @@
     bool gPayroll     = showPayroll && Can("payroll.view");   // salary has its own key
     bool gStaff       = gStaffDir || gPayroll;
     bool gTransport   = showTransport && Can("transport.view");
+    // "My Bus" is for the bus's assigned driver, who usually has no transport
+    // permission at all; being the driver is the permission (cached 5 min).
+    bool gMyBus = false;
+    if (showTransport && _tId > 1 && _sId > 0)
+    {
+        try { gMyBus = await TransportTrackingService.IsDriverAsync(_tId, _sId, _uId); }
+        catch { /* the menu must never fail to render */ }
+    }
     bool gInventory   = showInventory && Can("inventory.view");
     bool secPeople    = gStaff || gTransport || gInventory;
 
@@ -126,6 +135,16 @@
                 <div class="text-truncate">Dashboard</div>
             </a>
         </li>
+
+        @if (gMyBus)
+        {
+        <li class='menu-item @On("MyBus")'>
+            <a asp-area="ERP" asp-controller="MyBus" asp-action="Index" class="menu-link">
+                <i class="menu-icon icon-base bx bx-bus ic-bus"></i>
+                <div class="text-truncate">My Bus</div>
+            </a>
+        </li>
+        }
 
         @* ===================== ACADEMIC ===================== *@
         @if (secAcademic)
@@ -277,7 +296,7 @@
         @* ---- Transport (hidden when the school turns the module off) ---- *@
         @if (gTransport)
         {
-        <li class='menu-item @Open("Routes","Vehicles","Assign")'>
+        <li class='menu-item @Open("Routes","Vehicles","Assign","LiveTracking","TripHistory")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-bus ic-bus"></i>
                 <div class="text-truncate">Transport</div>
@@ -286,6 +305,8 @@
                 <li class='menu-item @On("Routes")'><a asp-area="ERP" asp-controller="Transport" asp-action="Routes" class="menu-link"><i class="bx bx-map submenu-icon c-blue"></i><div class="text-truncate">Routes</div></a></li>
                 <li class='menu-item @On("Vehicles")'><a asp-area="ERP" asp-controller="Transport" asp-action="Vehicles" class="menu-link"><i class="bx bx-car submenu-icon c-purple"></i><div class="text-truncate">Vehicles &amp; Drivers</div></a></li>
                 <li class='menu-item @On("Assign")'><a asp-area="ERP" asp-controller="Transport" asp-action="Assign" class="menu-link"><i class="bx bx-link submenu-icon c-green"></i><div class="text-truncate">Assign Transport</div></a></li>
+                <li class='menu-item @On("LiveTracking")'><a asp-area="ERP" asp-controller="Transport" asp-action="LiveTracking" class="menu-link"><i class="bx bx-current-location submenu-icon c-orange"></i><div class="text-truncate">Live Tracking</div></a></li>
+                <li class='menu-item @On("TripHistory")'><a asp-area="ERP" asp-controller="Transport" asp-action="TripHistory" class="menu-link"><i class="bx bx-history submenu-icon c-blue"></i><div class="text-truncate">Trip History</div></a></li>
             </ul>
         </li>
         }

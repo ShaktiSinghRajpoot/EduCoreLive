@@ -32,6 +32,9 @@
 --   * 2026-10-10: the result publish log and the grade scale (exam_results_publish.sql).
 --   * 2026-10-10: inventory locations, location stock, transfers and supplier
 --     returns (inventory.sql, store locations revision).
+--   * 2026-10-11: live bus tracking -- trip points, trips and parent share links
+--     (transport_live_tracking.sql). The share link's token_hash is stripped from
+--     the archive like every other token_hash.
 --   * the archive no longer carries secrets: password_reset_tokens is skipped and
 --     password_hash / token_hash are stripped from every row. The file sits on disk.
 --   * purging a tenant's ONLY school keeps the tenant and its roles (decision D-7):
@@ -208,7 +211,12 @@ BEGIN
     DELETE FROM core.registration_counters         WHERE school_id = p_school_id;
     DELETE FROM core.receipt_counters              WHERE school_id = p_school_id;
 
-    -- transport: vehicles reference routes and staff (SET NULL), stops cascade
+    -- transport: live tracking first (points -> trips -> vehicles/routes/staff,
+    -- share links -> routes); vehicles reference routes and staff (SET NULL),
+    -- stops cascade
+    DELETE FROM core.transport_trip_points         WHERE school_id = p_school_id;
+    DELETE FROM core.transport_trips               WHERE school_id = p_school_id;
+    DELETE FROM core.transport_route_shares        WHERE school_id = p_school_id;
     DELETE FROM core.transport_stops               WHERE school_id = p_school_id;
     DELETE FROM core.transport_vehicles            WHERE school_id = p_school_id;
     DELETE FROM core.transport_routes              WHERE school_id = p_school_id;

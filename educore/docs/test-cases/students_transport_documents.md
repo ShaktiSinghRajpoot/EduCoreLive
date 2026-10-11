@@ -300,3 +300,56 @@ Layer: **DB** = stored procedure, **C#** = controller/service, **JS** = view scr
 | D7 | **Viewing a student who has left.** Should the Dashboard (fees, receipts, history) stay reachable after an exit? | Redirects to the list (STU-LEFT-VIEW). |
 | D8 | **Edit-form status.** Should status changes stay on the Exit / Reactivate flow (recommended), with the status block removed from Edit Student? | The block is shown and silently ignored. |
 | D9 | **Deleting a route.** If it has had riders this session, refuse outright or require an end date / migration? | Deleted. |
+
+---
+
+## 5. Live bus tracking (added 2026-10-11)
+
+**Feature:** the driver's phone browser shares the bus's position during a trip; staff watch the
+buses on a map and replay past trips; parents follow their route's bus through a share link with
+no login. Script `EduCoreDataAccessLayer/Database/transport_live_tracking.sql` (apply it, then
+`school_purge.sql`). Suite `tests/transport_live_tracking_tests.sql`, fixture 24/34 (driver = staff
+21 / user 43, other staff = staff 23 / user 45), cross-school 23/33/38.
+**Run (2026-10-11): `RESULT: 75 passed, 0 failed`.**
+
+**Pages:** `/ERP/MyBus` (driver, no permission key: being the bus's assigned driver is the
+permission; menu item "My Bus" shows only for drivers), `/ERP/Transport/LiveTracking` and
+`/ERP/Transport/TripHistory` (`transport.view`, hidden and refused when Transport is switched off),
+share links on `/ERP/Transport/Routes` (`transport.manage`), public `/BusTrack/{token}`.
+
+| ID | Scenario | Expected | Layer | How verified | Result |
+|---|---|---|---|---|---|
+| GPS-01 | Who sees "My Bus" | Only the bus(es) whose `driver_staff_id` is the user's staff row; a non-staff user, or the driver under another school's scope, sees none | DB | SQL A1–A4 | PASS |
+| GPS-02 | Start trip by anyone but the driver | Refused (other staff, school admin, another school, platform scope, inactive staff, switched-off bus) | DB | SQL B1–B7 | PASS |
+| GPS-03 | Start trip | Trip keeps bus, route and driver (snapshots for history) | DB | SQL B8 | PASS |
+| GPS-04 | One running trip per vehicle | A second start resumes the same trip; the unique index refuses a second running row | DB | SQL B9, B10 | PASS |
+| GPS-05 | Good point | Saved; becomes the trip's latest position | DB | SQL C1 | PASS |
+| GPS-06 | Point from anyone but the bus's current driver | Refused (other staff, another school, a driver taken off the bus mid-trip) | DB | SQL C2, C3, C16 | PASS |
+| GPS-07 | Bad position | lat > 90, lng < -180, (0,0), missing lat: refused | DB+C# | SQL C4–C7; NaN / 1e308 become NULL in the service and are refused (smoke test) | PASS |
+| GPS-08 | Accuracy | Negative or worse than 2 km: refused | DB | SQL C8, C9 | PASS |
+| GPS-09 | Timestamp | More than 2 min in the future, or older than the trip: refused | DB | SQL C10, C11 | PASS |
+| GPS-10 | Min interval | A point < 5 s after the last one, or out of order, is dropped (accepted = false), not an error | DB | SQL C12, C13 | PASS |
+| GPS-11 | Junk speed / heading | Stored empty, point kept | DB | SQL C14 | PASS |
+| GPS-12 | Live list | Running trips of this school only, with position, age, driver; not another school's; not idle buses; platform scope refused | DB | SQL D1–D4 | PASS |
+| GPS-13 | Stale trip | Nothing received for 30 min: closed (`Stale`, ended at the last point) on the next read or write; takes no more points; a new start closes a stale trip on the same bus; 29 min is still running | DB | SQL E1–E5 | PASS |
+| GPS-14 | End trip | Only the driver; twice is harmless; no points after; leaves the live list | DB | SQL F1–F6 | PASS |
+| GPS-15 | Share link create | Only the sha256 hash is stored | DB | SQL G1, G2 | PASS |
+| GPS-16 | Public read, no trip | Route name, "not on a trip" | DB | SQL G3 | PASS |
+| GPS-17 | Public read during a trip | That route's bus only (not another route's running bus); row has only route name, trip id, vehicle no., position, age | DB | SQL G4, G5; smoke test: driver name absent from page and JSON | PASS |
+| GPS-18 | Regenerate / revoke | Old link stops at once; one live link per route; revoking twice says so | DB | SQL G6, G7, G13, G14 | PASS |
+| GPS-19 | Cross-school link changes | Another school can neither create nor revoke a link to our route | DB | SQL G8, G9 | PASS |
+| GPS-20 | Unknown / garbage / malformed token | Nothing returned; malformed never reaches the DB (C# format check) | DB+C# | SQL G10, G11; smoke test `{"valid":false}` | PASS |
+| GPS-21 | Module off / route deleted | The public link shows nothing | DB | SQL G12, G15 | PASS |
+| GPS-22 | History | Lists trips with start, end, reason, driver, bus, route, point count; vehicle and date filters; path in time order; another school sees neither list nor path | DB | SQL H1–H7 | PASS |
+| GPS-23 | 30-day retention | A trip start deletes points older than 30 days and ended trips started > 30 days ago (all schools); recent points kept | DB | SQL I1–I4 | PASS |
+| GPS-24 | School purge | Deletes points, trips and share links, before what they reference (H12 in `platform_access_security_tests` also covers it) | DB | SQL J1, J2 | PASS |
+| GPS-25 | Tenant isolation | Trips and points carry their own school only | DB | SQL J3 | PASS |
+| GPS-26 | Public page rate limit | `bustrack` policy, 60 requests / minute / IP, then 429 | C# | smoke test: 70 rapid calls -> 17 x 429 | PASS |
+| GPS-27 | Antiforgery on driver posts | Missing token -> 400 | C# | smoke test | PASS |
+| GPS-28 | Public page caching | `Cache-Control: no-store`, `X-Robots-Tag: noindex` | C# | smoke test | PASS |
+| GPS-29 | Escaping | Vehicle no., route, driver go through `EC.esc` on the map, list, history and parent page | JS | static | PASS |
+
+**Limitations (by design, documented):** a browser page cannot share location from the background,
+so the driver must keep My Bus open with the screen on (the page asks for a screen wake lock where
+the browser supports it, and says so). Location needs HTTPS (or localhost). The share link is shown
+once; to give it out again the office makes a new one, which stops the old one.
