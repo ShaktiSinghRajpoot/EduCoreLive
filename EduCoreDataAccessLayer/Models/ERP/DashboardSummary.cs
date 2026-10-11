@@ -24,6 +24,16 @@ namespace EduCoreDataAccessLayer.Models.ERP
         /// </summary>
         public bool ShowFinance { get; set; } = true;
 
+        // Same idea for the rest of the page: the controller turns each block off (and
+        // empties its data) when the viewer's role cannot open that module.
+        public bool ShowStudents   { get; set; } = true;   // students.view
+        public bool ShowStaff      { get; set; } = true;   // staff.view
+        public bool ShowAttendance { get; set; } = true;   // attendance.view
+        public bool CanAdmit       { get; set; } = true;   // students.manage
+        public bool IsDriver       { get; set; }           // drives a bus -> My Bus shortcut
+        public string? SessionName { get; set; }           // the school's current session
+        public List<DashboardLink> QuickLinks { get; set; } = new();
+
         public List<DashboardTrendPoint>  Trend      { get; set; } = new();
         public List<DashboardClassCount>  Classes    { get; set; } = new();
         public List<DashboardModeTotal>   Modes      { get; set; } = new();
@@ -69,6 +79,14 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? FromDate  { get; set; }
         public string? ToDate    { get; set; }
         public decimal   Days      { get; set; }
+    }
+
+    public class DashboardLink
+    {
+        public string Label { get; set; } = "";
+        public string Icon  { get; set; } = "";
+        public string Url   { get; set; } = "";
+        public string Color { get; set; } = "";
     }
 
     public class DashboardEvent

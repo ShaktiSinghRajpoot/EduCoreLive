@@ -1,4 +1,4 @@
-﻿@model EduCoreDataAccessLayer.Models.ERP.DashboardSummary
+@model EduCoreDataAccessLayer.Models.ERP.DashboardSummary
 @{
     ViewData["Title"] = "Dashboard";
     var greeting = Dates.Now.Hour < 12 ? "Good morning" : Dates.Now.Hour < 17 ? "Good afternoon" : "Good evening";
@@ -41,7 +41,7 @@
     <div class="row g-4">
 
         @* ============ HERO + LIVE ATTENDANCE ============ *@
-        <div class="col-12 col-xxl-8 dash-animate">
+        <div class="col-12 @(Model.ShowAttendance ? "col-xxl-8" : "") dash-animate">
             <div class="dash-hero h-100">
                 <div class="dash-hero-body d-flex flex-column h-100">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
@@ -49,7 +49,11 @@
                             <span class="dash-chip mb-3"><i class="bx bx-calendar"></i> @Dates.Now.ToString("dddd, dd MMMM yyyy")</span>
                             <h3 class="text-white fw-bold mb-1">@greeting, @(User.FindFirst(EduCoreDataAccessLayer.Helpers.Common.SK_UserName)?.Value ?? "Admin") 👋</h3>
                             <p class="mb-0" style="color:rgba(255,255,255,.9);max-width:36rem">
-                                @if (!Model.ShowFinance)
+                                @if (!Model.ShowFinance && !Model.ShowStudents && !Model.ShowStaff && !Model.ShowAttendance)
+                                {
+                                    <text>@(Model.IsDriver ? "Open My Bus to start today's trip." : "Use the menu to open the pages your role can use.")</text>
+                                }
+                                else if (!Model.ShowFinance)
                                 {
                                     <text>Here is your school today.</text>
                                 }
@@ -74,15 +78,28 @@
                                 }
                             </p>
                         </div>
-                        <span class="dash-chip"><i class="bx bx-book-open"></i> Session 2025–26</span>
+                        @if (!string.IsNullOrWhiteSpace(Model.SessionName))
+                        {
+                            <span class="dash-chip"><i class="bx bx-book-open"></i> Session @Model.SessionName</span>
+                        }
                     </div>
                     <div class="d-flex flex-wrap gap-2 mt-auto pt-4">
-                        <a href="/ERP/Admission/Create" class="btn btn-sm btn-light text-dark fw-semibold"><i class="bx bx-user-plus me-1"></i>New Admission</a>
+                        @if (Model.IsDriver)
+                        {
+                            <a href="/ERP/MyBus" class="btn btn-sm btn-light text-dark fw-semibold"><i class="bx bx-bus me-1"></i>My Bus</a>
+                        }
+                        @if (Model.CanAdmit)
+                        {
+                            <a href="/ERP/Admission/Create" class="btn btn-sm btn-light text-dark fw-semibold"><i class="bx bx-user-plus me-1"></i>New Admission</a>
+                        }
                         @if (Model.ShowFinance)
                         {
                             <a href="/ERP/Fee/ManageFee" class="btn btn-sm btn-outline-light"><i class="bx bx-wallet me-1"></i>Collect Fee</a>
                         }
-                        <a href="/ERP/Attendance/StudentAttendance" class="btn btn-sm btn-outline-light"><i class="bx bx-user-check me-1"></i>Mark Attendance</a>
+                        @if (Model.ShowAttendance)
+                        {
+                            <a href="/ERP/Attendance/StudentAttendance" class="btn btn-sm btn-outline-light"><i class="bx bx-user-check me-1"></i>Mark Attendance</a>
+                        }
                         @if (Model.ShowFinance)
                         {
                             <a href="/ERP/FeeDueReminders" class="btn btn-sm btn-outline-light"><i class="bx bx-bell me-1"></i>Send Reminders</a>
@@ -92,6 +109,8 @@
             </div>
         </div>
 
+        @if (Model.ShowAttendance)
+        {
         <div class="col-12 col-xxl-4 dash-animate" style="animation-delay:.05s">
             <div class="dash-card h-100">
                 <div class="dash-card-head d-flex justify-content-between align-items-center">
@@ -129,6 +148,7 @@
                 </div>
             </div>
         </div>
+        }
 
         @* ============ PRIMARY KPI CARDS ============ *@
         @{
@@ -154,9 +174,10 @@
                       Soft="soft-red", Icon="bx-error-circle", Spark="sparkDue", Up=false },
             };
 
-            // Today's Collection and Outstanding Due are finance figures (fees.view).
-            if (!Model.ShowFinance)
-                kpis = kpis.Take(2).ToArray();
+            // Each figure needs its module: students, staff, then the two finance ones.
+            kpis = kpis.Where((k, idx) => idx == 0 ? Model.ShowStudents
+                                        : idx == 1 ? Model.ShowStaff
+                                        : Model.ShowFinance).ToArray();
         }
         @for (var i = 0; i < kpis.Length; i++)
         {
@@ -251,12 +272,15 @@
             </div>
         </div>
         }
+        @if (Model.ShowStudents)
+        {
         <div class="col-12 col-lg-6 col-xl-4 dash-animate" style="animation-delay:.05s">
             <div class="dash-card h-100">
                 <div class="dash-card-head"><h5 class="dash-card-title">Class-wise Strength</h5><small class="dash-sub">Students per class</small></div>
                 <div class="dash-card-body"><div id="classStrengthChart"></div></div>
             </div>
         </div>
+        }
         @if (Model.ShowFinance)
         {
         <div class="col-12 col-xl-4 dash-animate" style="animation-delay:.1s">
@@ -352,6 +376,8 @@
         </div>
 
         }
+        @if (Model.ShowStaff)
+        {
         <div class="col-12 col-xl-4 dash-animate" style="animation-delay:.1s">
             <div class="dash-card h-100">
                 <div class="dash-card-head d-flex justify-content-between align-items-center">
@@ -381,22 +407,34 @@
                 </div>
             </div>
         </div>
+        }
 
         @* ============ EVENTS · NOTICES · BIRTHDAYS ============ *@
         <div class="col-12 col-lg-6 col-xl-4 dash-animate">
             <div class="dash-card h-100">
                 <div class="dash-card-head"><h5 class="dash-card-title">Upcoming Events</h5><small class="dash-sub">Academic calendar</small></div>
                 <div class="dash-card-body">
-                    <ul class="dash-timeline">
-                        <li><div class="d-flex justify-content-between"><h6 class="mb-0">Half-Yearly Exams</h6><small class="text-muted">15 Jun</small></div><small class="text-muted">All classes · Term 1</small></li>
-                        <li><div class="d-flex justify-content-between"><h6 class="mb-0">Parent-Teacher Meeting</h6><small class="text-muted">20 Jun</small></div><small class="text-muted">10:00 AM · Main Hall</small></li>
-                        <li><div class="d-flex justify-content-between"><h6 class="mb-0">Annual Sports Day</h6><small class="text-muted">28 Jun</small></div><small class="text-muted">Playground · Full day</small></li>
-                        <li><div class="d-flex justify-content-between"><h6 class="mb-0">Summer Break Begins</h6><small class="text-muted">01 Jul</small></div><small class="text-muted">School closed</small></li>
-                    </ul>
+                    @* These used to be four hard-coded entries (the same "Half-Yearly Exams
+                       15 Jun" for every school); now they are the School Calendar's own. *@
+                    @if (!Model.Events.Any())
+                    {
+                        <div class="text-muted small p-2">Nothing on the school calendar yet.</div>
+                    }
+                    else
+                    {
+                        <ul class="dash-timeline">
+                            @foreach (var e in Model.Events)
+                            {
+                                <li><div class="d-flex justify-content-between"><h6 class="mb-0">@e.Title</h6><small class="text-muted">@Dates.Show(e.Date, "dd MMM")</small></div><small class="text-muted">@e.DayType</small></li>
+                            }
+                        </ul>
+                    }
                 </div>
             </div>
         </div>
 
+        @if (Model.ShowStudents)
+        {
         <div class="col-12 col-lg-6 col-xl-4 dash-animate" style="animation-delay:.05s">
             <div class="dash-card h-100">
                 @* There is no notices table, and the Post button linked to /ERP/NoticeBoard
@@ -425,7 +463,10 @@
                 </div>
             </div>
         </div>
+        }
 
+        @if (Model.ShowStudents || Model.ShowStaff)
+        {
         <div class="col-12 col-xl-4 dash-animate" style="animation-delay:.1s">
             <div class="dash-card h-100">
                 <div class="dash-card-head"><h5 class="dash-card-title">🎂 Birthdays Today</h5><small class="dash-sub">Wish them well</small></div>
@@ -455,35 +496,25 @@
                 </div>
             </div>
         </div>
+        }
 
         @* ============ QUICK ACCESS ============ *@
         <div class="col-12 dash-animate">
             <div class="dash-card">
-                <div class="dash-card-head"><h5 class="dash-card-title">Quick Access</h5><small class="dash-sub">Jump to any module</small></div>
+                <div class="dash-card-head"><h5 class="dash-card-title">Quick Access</h5><small class="dash-sub">Modules your role can open</small></div>
                 <div class="dash-card-body">
                     <div class="row g-3">
-                        @{
-                            var links = new[] {
-                                new { L="Students", I="bx-group", U="/ERP/Student/StudentList", C="#ff8a00" },
-                                new { L="Admission", I="bx-user-plus", U="/ERP/Admission/Create", C="#16a34a" },
-                                new { L="Fees", I="bx-wallet", U="/ERP/Fee/ManageFee", C="#0284c7" },
-                                new { L="Attendance", I="bx-user-check", U="/ERP/Attendance/StudentAttendance", C="#d97706" },
-                                new { L="Exams", I="bx-file", U="/ERP/Exam/CreateExam", C="#dc2626" },
-                                new { L="Staff", I="bx-id-card", U="/ERP/Staff/StaffList", C="#9333ea" },
-                                new { L="Payroll", I="bx-money", U="/ERP/Payroll/PayrollManagement", C="#16a34a" },
-                                new { L="Leave", I="bx-calendar-minus", U="/ERP/Leave/LeaveManagement", C="#e83e8c" },
-                                new { L="Inventory", I="bx-package", U="/ERP/Inventory/InventoryItem", C="#ff5722" },
-                                new { L="Reminders", I="bx-bell", U="/ERP/FeeDueReminders", C="#ff8a00" },
-                                new { L="Reports", I="bx-bar-chart-alt-2", U="/ERP/Reports", C="#009688" },
-                                new { L="Settings", I="bx-cog", U="/ERP/SchoolSettings/BasicProfile", C="#6b7280" },
-                            };
+                        @* Built by DashboardsController: only tiles this role can open. *@
+                        @if (!Model.QuickLinks.Any())
+                        {
+                            <div class="col-12 text-muted small">No modules are enabled for your role yet. Ask your school admin for access.</div>
                         }
-                        @foreach (var l in links)
+                        @foreach (var l in Model.QuickLinks)
                         {
                             <div class="col-6 col-sm-4 col-md-3 col-xl-2">
-                                <a href="@l.U" class="dash-quick">
-                                    <i class="bx @l.I" style="color:@l.C"></i>
-                                    <span>@l.L</span>
+                                <a href="@l.Url" class="dash-quick">
+                                    <i class="bx @l.Icon" style="color:@l.Color"></i>
+                                    <span>@l.Label</span>
                                 </a>
                             </div>
                         }
