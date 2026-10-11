@@ -90,6 +90,8 @@ WHERE sp.board_state_id IS NULL
 -- state's board?" picker. Only the boards cursor changes; every other list is
 -- byte-identical to the original proc.
 -- ============================================================================
+-- SUPERSEDED (2026-10-11): config.sp_school_dropdowns is now defined in
+-- institution_categories.sql. Running this copy would drop the categories cursor.
 CREATE OR REPLACE PROCEDURE config.sp_school_dropdowns(
     INOUT p_tenants refcursor, INOUT p_statuses refcursor, INOUT p_boards refcursor,
     INOUT p_school_types refcursor, INOUT p_ownership_types refcursor, INOUT p_mediums refcursor,
@@ -98,10 +100,15 @@ CREATE OR REPLACE PROCEDURE config.sp_school_dropdowns(
  LANGUAGE plpgsql
 AS $procedure$
 BEGIN
+    -- Tenant 1 is the platform itself and cannot own a school (school tables check
+    -- tenant_id > 1), so it is never offered as an "existing tenant".
     OPEN p_tenants FOR
     SELECT tenant_id AS id, tenant_name AS name
     FROM core.tenants
-    WHERE is_active = TRUE;
+    WHERE is_active = TRUE
+      AND is_deleted = FALSE
+      AND tenant_id > 1
+    ORDER BY tenant_name;
 
     OPEN p_statuses FOR
         SELECT school_status_id AS id, name

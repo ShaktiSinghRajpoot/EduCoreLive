@@ -19,5 +19,18 @@
         public List<DropdownItem> DateFormats { get; set; } = new();
         public List<DropdownItem> TimeFormats { get; set; } = new();
         public List<DropdownItem> Tenants { get; set; } = new();
+
+        /// <summary>School / Computer-IT institute / Coaching centre (config.institution_categories).</summary>
+        public List<InstitutionCategoryItem> Categories { get; set; } = new();
+    }
+
+    public class InstitutionCategoryItem
+    {
+        public int Id { get; set; }
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string TypeLabel { get; set; } = "";    // "School Type" / "Institute Type"
+        public string BoardLabel { get; set; } = "";   // "Board" / "Affiliation / Certification"
+        public bool BoardRequired { get; set; }        // only a school must name its board
     }
 }

@@ -20,6 +20,11 @@ LANGUAGE plpgsql
 AS $procedure$
 DECLARE
     v_offset integer;
+    -- Typed text is matched literally: % and _ are LIKE wildcards, so a search for
+    -- "%" used to return every school. Backslash is ILIKE's default escape.
+    v_search text := replace(replace(replace(TRIM(COALESCE(p_search, '')), '\', '\\'), '%', '\%'), '_', '\_');
+    v_city   text := replace(replace(replace(TRIM(COALESCE(p_city,   '')), '\', '\\'), '%', '\%'), '_', '\_');
+    v_state  text := replace(replace(replace(TRIM(COALESCE(p_state,  '')), '\', '\\'), '%', '\%'), '_', '\_');
 BEGIN
     IF p_page_no IS NULL OR p_page_no < 1 THEN p_page_no := 1; END IF;
     IF p_page_size IS NULL OR p_page_size < 1 THEN p_page_size := 10; END IF;
@@ -32,19 +37,23 @@ BEGIN
         s.school_name,
         s.display_name,
         t.tenant_name,
+        t.tenant_code,
         st.name AS status_name,
         -- "State Board" alone is not useful on a list of schools across states, so
         -- boards that carry a state show it: "State Board (Maharashtra)".
         CASE WHEN bs.name IS NOT NULL THEN b.name || ' (' || bs.name || ')' ELSE b.name END
             AS board_name,
         sty.name AS school_type_name,
+        -- School / Computer-IT institute / Coaching centre (institution_categories.sql).
+        COALESCE(ic.name, 'School') AS category_name,
         a.city,
         a.state,
         c.contact_name,
         c.phone,
         s.created_at,
         COUNT(*) OVER()                                          AS total_count,
-        COUNT(*) FILTER (WHERE st.name = 'Active') OVER()        AS active_count
+        -- "Active" = can sign in, so Under Review (allows_login) counts too.
+        COUNT(*) FILTER (WHERE st.allows_login) OVER()           AS active_count
     FROM core.schools s
     INNER JOIN core.tenants t
         ON t.tenant_id = s.tenant_id
@@ -65,6 +74,8 @@ BEGIN
     LEFT JOIN config.school_types sty
         ON sty.school_type_id = sp.school_type_id
        AND sty.is_deleted = FALSE
+    LEFT JOIN config.institution_categories ic
+        ON ic.category_id = sp.institution_category_id
     LEFT JOIN core.school_addresses a
         ON a.tenant_id = s.tenant_id
        AND a.school_id = s.school_id
@@ -80,14 +91,15 @@ BEGIN
     WHERE s.is_active = TRUE
       AND s.is_deleted = FALSE
       AND (p_tenant_id = 1 OR s.tenant_id = p_tenant_id)
-      AND (p_search IS NULL OR TRIM(p_search) = '' OR
-              s.school_name  ILIKE '%' || p_search || '%' OR
-              s.school_code  ILIKE '%' || p_search || '%' OR
-              t.tenant_name  ILIKE '%' || p_search || '%' OR
-              a.city         ILIKE '%' || p_search || '%' OR
-              c.contact_name ILIKE '%' || p_search || '%')
-      AND (p_city IS NULL OR TRIM(p_city) = '' OR a.city ILIKE '%' || p_city || '%')
-      AND (p_state IS NULL OR TRIM(p_state) = '' OR a.state ILIKE '%' || p_state || '%')
+      AND (v_search = '' OR
+              s.school_name  ILIKE '%' || v_search || '%' OR
+              s.school_code  ILIKE '%' || v_search || '%' OR
+              t.tenant_name  ILIKE '%' || v_search || '%' OR
+              t.tenant_code  ILIKE '%' || v_search || '%' OR
+              a.city         ILIKE '%' || v_search || '%' OR
+              c.contact_name ILIKE '%' || v_search || '%')
+      AND (v_city = '' OR a.city ILIKE '%' || v_city || '%')
+      AND (v_state = '' OR a.state ILIKE '%' || v_state || '%')
       AND (p_status_id IS NULL OR s.status_id = p_status_id)
       AND (p_board_id IS NULL OR sp.board_id = p_board_id)
       AND (p_school_type_id IS NULL OR sp.school_type_id = p_school_type_id)

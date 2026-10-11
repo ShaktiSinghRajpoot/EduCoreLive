@@ -24,7 +24,12 @@ namespace educore.ViewComponents
             int userId = ToInt(UserClaimsPrincipal.FindFirst(Common.SK_UserId)?.Value);
 
             SchoolManageModel? model = null;
-            if (schoolId > 0)
+            // The platform super admin has no school; "Your School" read as if one was missing.
+            if (tenantId == 1)
+            {
+                model = new SchoolManageModel { SchoolName = "Platform Admin" };
+            }
+            else if (schoolId > 0)
             {
                 model = await _schoolSettingsService.GetBasicProfileAsync(tenantId, schoolId, userId);
             }

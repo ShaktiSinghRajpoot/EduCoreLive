@@ -1,4 +1,4 @@
-@using Microsoft.AspNetCore.Mvc.Rendering
+﻿@using Microsoft.AspNetCore.Mvc.Rendering
 @using educore.Models
 @model IEnumerable<SchoolListModel>
 
@@ -179,7 +179,15 @@
                           </div>
                         </td>
                         <td><span class="badge bg-label-secondary text-uppercase">@item.SchoolCode</span></td>
-                        <td><div class="fw-semibold small">@item.BoardName</div><div class="scl-sub">@item.SchoolTypeName</div></td>
+                        <td>
+                            <div class="fw-semibold small">@(string.IsNullOrWhiteSpace(item.BoardName) ? "-" : item.BoardName)</div>
+                            <div class="scl-sub">@item.SchoolTypeName</div>
+                            @* Only institutes are labelled; a plain school needs no badge. *@
+                            @if (!string.IsNullOrWhiteSpace(item.CategoryName) && item.CategoryName != "School")
+                            {
+                                <span class="badge bg-label-info mt-1">@item.CategoryName</span>
+                            }
+                        </td>
                         <td><div class="small">@item.City</div><div class="scl-sub">@item.State</div></td>
                         <td><div class="small fw-semibold">@item.ContactName</div><div class="scl-sub"><i class="bx bx-phone-call"></i> @item.Phone</div></td>
                         <td>

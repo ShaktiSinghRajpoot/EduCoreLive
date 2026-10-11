@@ -15,6 +15,7 @@
         // Board / Type
         public string? BoardName { get; set; }
         public string? SchoolTypeName { get; set; }
+        public string? CategoryName { get; set; }   // School / Computer-IT institute / Coaching centre
 
         // Location
         public string? City { get; set; }

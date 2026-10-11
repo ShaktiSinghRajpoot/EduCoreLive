@@ -7,6 +7,22 @@
 --   * School create, status change, admin creation and admin password reset write
 --     admin_activity_logs on the PLATFORM tenant (1, no school) so the record
 --     outlives a purge of the school.
+-- Oct 2026 (superadmin_schools_tests.sql):
+--   * The tenant's built-in roles are seeded on EVERY save, not only when an admin is
+--     created at INSERT -- a school created without an admin got a login with no role
+--     later (Edit -> add admin) and that admin could never sign in. Assigning the
+--     SCHOOL_ADMIN role now fails loudly instead of silently inserting nothing.
+--   * Tenant code: lower-case slug, and unique even against deleted tenants (the index
+--     is, so the check was letting a raw 23505 through).
+--   * Pincode, contact phone, admin phone, status and the board's state are checked
+--     here as strictly as the form checks them.
+--   * Editing a missing school says "School not found."; the soft-delete branch is gone
+--     (the controller action was removed because it stranded schools).
+-- Oct 2026 (institution_categories.sql): p_institution_category_id -- School /
+--   Computer-IT institute / Coaching centre. It sits AFTER p_result on purpose: an app
+--   that does not know it yet still calls the proc correctly (it defaults), so the DB
+--   can be deployed before the app. Board / type / ownership must be offered for the
+--   chosen category, and only a SCHOOL must name a board.
 -- Adding p_country_id / p_state_id / p_district_id changes the signature, and in
 -- Postgres CREATE OR REPLACE would then create a SECOND overload instead of
 -- replacing — every CALL afterwards fails as ambiguous. Drop all overloads first.
@@ -24,7 +40,7 @@ BEGIN
 END
 $drop$;
 
-CREATE OR REPLACE PROCEDURE core.sp_school_manage(IN p_operation character varying, IN p_tenant_id integer, IN p_action_user_id integer, IN p_tenant_mode character varying DEFAULT NULL::character varying, IN p_selected_tenant_id integer DEFAULT NULL::integer, IN p_tenant_name character varying DEFAULT NULL::character varying, IN p_tenant_code character varying DEFAULT NULL::character varying, IN p_tenant_email character varying DEFAULT NULL::character varying, IN p_tenant_phone character varying DEFAULT NULL::character varying, IN p_school_id integer DEFAULT NULL::integer, IN p_school_name character varying DEFAULT NULL::character varying, IN p_display_name character varying DEFAULT NULL::character varying, IN p_status_id integer DEFAULT NULL::integer, IN p_registration_number character varying DEFAULT NULL::character varying, IN p_affiliation_number character varying DEFAULT NULL::character varying, IN p_board_id integer DEFAULT NULL::integer, IN p_school_type_id integer DEFAULT NULL::integer, IN p_ownership_type_id integer DEFAULT NULL::integer, IN p_medium_id integer DEFAULT NULL::integer, IN p_established_year integer DEFAULT NULL::integer, IN p_website character varying DEFAULT NULL::character varying, IN p_address_type_id integer DEFAULT NULL::integer, IN p_address_line1 character varying DEFAULT NULL::character varying, IN p_address_line2 character varying DEFAULT NULL::character varying, IN p_city character varying DEFAULT NULL::character varying, IN p_district character varying DEFAULT NULL::character varying, IN p_state character varying DEFAULT NULL::character varying, IN p_pincode character varying DEFAULT NULL::character varying, IN p_contact_type_id integer DEFAULT NULL::integer, IN p_contact_name character varying DEFAULT NULL::character varying, IN p_designation character varying DEFAULT NULL::character varying, IN p_contact_email character varying DEFAULT NULL::character varying, IN p_phone character varying DEFAULT NULL::character varying, IN p_alternate_phone character varying DEFAULT NULL::character varying, IN p_academic_year_id integer DEFAULT NULL::integer, IN p_date_format_id integer DEFAULT NULL::integer, IN p_time_format_id integer DEFAULT NULL::integer, IN p_enable_sms boolean DEFAULT false, IN p_enable_email boolean DEFAULT false, IN p_enable_whatsapp boolean DEFAULT false, IN p_create_school_admin boolean DEFAULT false, IN p_admin_full_name character varying DEFAULT NULL::character varying, IN p_admin_email character varying DEFAULT NULL::character varying, IN p_admin_phone character varying DEFAULT NULL::character varying, IN p_password_hash character varying DEFAULT NULL::character varying, IN p_country_id integer DEFAULT NULL::integer, IN p_state_id integer DEFAULT NULL::integer, IN p_district_id integer DEFAULT NULL::integer, IN p_board_state_id integer DEFAULT NULL::integer, INOUT p_result refcursor DEFAULT 'school_cursor'::refcursor)
+CREATE OR REPLACE PROCEDURE core.sp_school_manage(IN p_operation character varying, IN p_tenant_id integer, IN p_action_user_id integer, IN p_tenant_mode character varying DEFAULT NULL::character varying, IN p_selected_tenant_id integer DEFAULT NULL::integer, IN p_tenant_name character varying DEFAULT NULL::character varying, IN p_tenant_code character varying DEFAULT NULL::character varying, IN p_tenant_email character varying DEFAULT NULL::character varying, IN p_tenant_phone character varying DEFAULT NULL::character varying, IN p_school_id integer DEFAULT NULL::integer, IN p_school_name character varying DEFAULT NULL::character varying, IN p_display_name character varying DEFAULT NULL::character varying, IN p_status_id integer DEFAULT NULL::integer, IN p_registration_number character varying DEFAULT NULL::character varying, IN p_affiliation_number character varying DEFAULT NULL::character varying, IN p_board_id integer DEFAULT NULL::integer, IN p_school_type_id integer DEFAULT NULL::integer, IN p_ownership_type_id integer DEFAULT NULL::integer, IN p_medium_id integer DEFAULT NULL::integer, IN p_established_year integer DEFAULT NULL::integer, IN p_website character varying DEFAULT NULL::character varying, IN p_address_type_id integer DEFAULT NULL::integer, IN p_address_line1 character varying DEFAULT NULL::character varying, IN p_address_line2 character varying DEFAULT NULL::character varying, IN p_city character varying DEFAULT NULL::character varying, IN p_district character varying DEFAULT NULL::character varying, IN p_state character varying DEFAULT NULL::character varying, IN p_pincode character varying DEFAULT NULL::character varying, IN p_contact_type_id integer DEFAULT NULL::integer, IN p_contact_name character varying DEFAULT NULL::character varying, IN p_designation character varying DEFAULT NULL::character varying, IN p_contact_email character varying DEFAULT NULL::character varying, IN p_phone character varying DEFAULT NULL::character varying, IN p_alternate_phone character varying DEFAULT NULL::character varying, IN p_academic_year_id integer DEFAULT NULL::integer, IN p_date_format_id integer DEFAULT NULL::integer, IN p_time_format_id integer DEFAULT NULL::integer, IN p_enable_sms boolean DEFAULT false, IN p_enable_email boolean DEFAULT false, IN p_enable_whatsapp boolean DEFAULT false, IN p_create_school_admin boolean DEFAULT false, IN p_admin_full_name character varying DEFAULT NULL::character varying, IN p_admin_email character varying DEFAULT NULL::character varying, IN p_admin_phone character varying DEFAULT NULL::character varying, IN p_password_hash character varying DEFAULT NULL::character varying, IN p_country_id integer DEFAULT NULL::integer, IN p_state_id integer DEFAULT NULL::integer, IN p_district_id integer DEFAULT NULL::integer, IN p_board_state_id integer DEFAULT NULL::integer, INOUT p_result refcursor DEFAULT 'school_cursor'::refcursor, IN p_institution_category_id integer DEFAULT NULL::integer)
  LANGUAGE plpgsql
 AS $procedure$
 DECLARE
@@ -35,6 +51,10 @@ DECLARE
     v_seq integer;
     v_old_status character varying;
     v_new_status character varying;
+    v_category_id integer;
+    v_category_code character varying;
+    v_category_name character varying;
+    v_board_required boolean;
 BEGIN
     IF p_operation IS NULL OR TRIM(p_operation) = '' THEN
         RAISE EXCEPTION 'Operation is required.';
@@ -131,6 +151,7 @@ BEGIN
             sp.affiliation_number,
             sp.board_id,
             sp.board_state_id,
+            sp.institution_category_id,
             sp.school_type_id,
             sp.ownership_type_id,
             sp.medium_id,
@@ -224,31 +245,8 @@ BEGIN
         RETURN;
     END IF;
 
-    /*
-        DELETE / SOFT DELETE
-    */
-    IF p_operation = 'DELETE' THEN
-        IF p_school_id IS NULL OR p_school_id <= 0 THEN
-            RAISE EXCEPTION 'School id is required.';
-        END IF;
-
-        UPDATE core.schools
-        SET
-            is_active = FALSE,
-            is_deleted = TRUE,
-            deleted_by = p_action_user_id,
-            deleted_at = NOW(),
-            updated_by = p_action_user_id,
-            updated_at = NOW()
-        WHERE school_id = p_school_id
-          AND (p_tenant_id = 1 OR tenant_id = p_tenant_id)
-          AND is_deleted = FALSE;
-
-        OPEN p_result FOR
-        SELECT p_school_id AS school_id;
-
-        RETURN;
-    END IF;
+    -- DELETE (soft delete) was removed: it hid the school from the list AND from Edit,
+    -- so it could never be reopened or purged. Close it (status) or purge it instead.
 
     /*
         INSERT / UPDATE VALIDATION
@@ -263,6 +261,13 @@ BEGIN
 
     IF p_status_id IS NULL OR p_status_id <= 0 THEN
         RAISE EXCEPTION 'Status is required.';
+    END IF;
+
+    -- core.schools.status_id has no foreign key; an unknown id would block every login
+    -- with an empty message.
+    IF NOT EXISTS (SELECT 1 FROM config.school_statuses
+                   WHERE school_status_id = p_status_id AND is_deleted = FALSE) THEN
+        RAISE EXCEPTION 'Please select a valid status.';
     END IF;
 
     IF p_address_line1 IS NULL OR TRIM(p_address_line1) = '' THEN
@@ -281,8 +286,8 @@ BEGIN
         RAISE EXCEPTION 'Pincode is required.';
     END IF;
 
-    IF TRIM(p_pincode) !~ '^[0-9]{6}$' THEN
-        RAISE EXCEPTION 'Pincode must be 6 digits.';
+    IF TRIM(p_pincode) !~ '^[1-9][0-9]{5}$' THEN
+        RAISE EXCEPTION 'Pincode must be 6 digits and cannot start with 0.';
     END IF;
 
     IF p_contact_name IS NULL OR TRIM(p_contact_name) = '' THEN
@@ -297,6 +302,15 @@ BEGIN
                    WHERE board_id = p_board_id AND requires_state = TRUE AND is_deleted = FALSE)
        AND (p_board_state_id IS NULL OR p_board_state_id <= 0) THEN
         RAISE EXCEPTION 'Please select which state''s board this school follows.';
+    END IF;
+
+    -- Without the address state id the mismatch check below cannot run, and a UP Board
+    -- school could be saved in Bihar.
+    IF p_board_id IS NOT NULL
+       AND EXISTS (SELECT 1 FROM config.boards
+                   WHERE board_id = p_board_id AND requires_state = TRUE AND is_deleted = FALSE)
+       AND (p_state_id IS NULL OR p_state_id <= 0) THEN
+        RAISE EXCEPTION 'Please select the state from the list.';
     END IF;
 
     -- A State Board is granted by one state's education department, so a UP Board school
@@ -315,8 +329,62 @@ BEGIN
             (SELECT name FROM config.states WHERE state_id = p_board_state_id);
     END IF;
 
-    IF p_phone IS NULL OR TRIM(p_phone) = '' THEN
+    -- Mobile or landline with STD code, stored as digits -- the same rule as the
+    -- school's own Basic Profile (core.fn_school_phone_clean).
+    p_phone := core.fn_school_phone_clean(p_phone, 'Phone');
+    IF p_phone IS NULL THEN
         RAISE EXCEPTION 'Phone is required.';
+    END IF;
+
+    -- A login phone is a mobile number: 10 digits starting 6-9, like the form asks.
+    IF p_admin_phone IS NOT NULL AND TRIM(p_admin_phone) <> ''
+       AND TRIM(p_admin_phone) !~ '^[6-9][0-9]{9}$' THEN
+        RAISE EXCEPTION 'Admin phone must be a 10-digit mobile number.';
+    END IF;
+
+    -- Institution category. Not sent (an app older than this parameter, or a direct
+    -- call): an existing school keeps its own, a new one is a SCHOOL.
+    v_category_id := p_institution_category_id;
+    IF v_category_id IS NULL AND p_operation = 'UPDATE' THEN
+        SELECT institution_category_id INTO v_category_id
+        FROM core.school_profiles
+        WHERE school_id = p_school_id AND is_deleted = FALSE;
+    END IF;
+    v_category_id := COALESCE(v_category_id, 1);
+
+    SELECT category_code, name, board_required
+      INTO v_category_code, v_category_name, v_board_required
+    FROM config.institution_categories
+    WHERE category_id = v_category_id AND is_deleted = FALSE;
+    IF v_category_code IS NULL THEN
+        RAISE EXCEPTION 'Please select a valid institution category.';
+    END IF;
+
+    IF v_board_required AND p_board_id IS NULL THEN
+        RAISE EXCEPTION 'Board is required.';
+    END IF;
+
+    -- Each list row says which categories it is offered for (category_codes, NULL = all),
+    -- so a coaching centre cannot be saved with a CBSE board or a "K-12 School" type.
+    IF p_board_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM config.boards
+        WHERE board_id = p_board_id AND is_deleted = FALSE
+          AND (category_codes IS NULL OR v_category_code = ANY (category_codes))) THEN
+        RAISE EXCEPTION 'The selected board is not available for a %.', v_category_name;
+    END IF;
+
+    IF p_school_type_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM config.school_types
+        WHERE school_type_id = p_school_type_id AND is_deleted = FALSE
+          AND (category_codes IS NULL OR v_category_code = ANY (category_codes))) THEN
+        RAISE EXCEPTION 'The selected type is not available for a %.', v_category_name;
+    END IF;
+
+    IF p_ownership_type_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM config.ownership_types
+        WHERE ownership_type_id = p_ownership_type_id AND is_deleted = FALSE
+          AND (category_codes IS NULL OR v_category_code = ANY (category_codes))) THEN
+        RAISE EXCEPTION 'The selected ownership is not available for a %.', v_category_name;
     END IF;
 
     /*
@@ -326,6 +394,12 @@ BEGIN
         IF p_tenant_mode = 'existing' THEN
             IF p_selected_tenant_id IS NULL OR p_selected_tenant_id <= 0 THEN
                 RAISE EXCEPTION 'Please select tenant.';
+            END IF;
+
+            -- Tenant 1 is the platform; a school there fails chk_school_profiles_scope
+            -- with a raw constraint error, so say it plainly instead.
+            IF p_selected_tenant_id = 1 THEN
+                RAISE EXCEPTION 'The platform tenant cannot own a school. Choose another tenant or create a new one.';
             END IF;
 
             IF NOT EXISTS (
@@ -349,11 +423,17 @@ BEGIN
                 RAISE EXCEPTION 'Tenant code is required.';
             END IF;
 
+            -- A short slug: lower-case letters, digits and hyphens (e.g. "dps-group").
+            IF LOWER(TRIM(p_tenant_code)) !~ '^[a-z0-9][a-z0-9-]{1,49}$' THEN
+                RAISE EXCEPTION 'Tenant code may use only letters, digits and hyphens (2-50 characters).';
+            END IF;
+
+            -- No is_deleted filter: the unique index covers deleted tenants too, so a
+            -- deleted tenant's code is still taken.
             IF EXISTS (
                 SELECT 1
                 FROM core.tenants
                 WHERE LOWER(TRIM(tenant_code)) = LOWER(TRIM(p_tenant_code))
-                  AND is_deleted = FALSE
             ) THEN
                 RAISE EXCEPTION 'Tenant code already exists.';
             END IF;
@@ -408,6 +488,9 @@ BEGIN
     END IF;
 
     IF v_tenant_id IS NULL OR v_tenant_id <= 0 THEN
+        IF p_operation = 'UPDATE' THEN
+            RAISE EXCEPTION 'School not found.';
+        END IF;
         RAISE EXCEPTION 'Tenant id is required.';
     END IF;
 
@@ -586,6 +669,7 @@ BEGIN
         affiliation_number,
         board_id,
         board_state_id,
+        institution_category_id,
         school_type_id,
         ownership_type_id,
         medium_id,
@@ -607,6 +691,7 @@ BEGIN
         CASE WHEN EXISTS (SELECT 1 FROM config.boards
                           WHERE board_id = p_board_id AND requires_state = TRUE AND is_deleted = FALSE)
              THEN p_board_state_id ELSE NULL END,
+        v_category_id,
         p_school_type_id,
         p_ownership_type_id,
         p_medium_id,
@@ -622,6 +707,7 @@ BEGIN
         affiliation_number = EXCLUDED.affiliation_number,
         board_id = EXCLUDED.board_id,
         board_state_id = EXCLUDED.board_state_id,
+        institution_category_id = EXCLUDED.institution_category_id,
         school_type_id = EXCLUDED.school_type_id,
         ownership_type_id = EXCLUDED.ownership_type_id,
         medium_id = EXCLUDED.medium_id,
@@ -780,6 +866,30 @@ BEGIN
         updated_by = p_action_user_id,
         updated_at = NOW();
 
+    -- Roles are tenant-scoped (config.roles has a row per tenant). Seed the standard
+    -- staff roles for this tenant if they are missing -- on every save, not only when
+    -- an admin is created at INSERT. Otherwise a school created without an admin has
+    -- no SCHOOL_ADMIN role, so the admin added later from Edit gets a login with no
+    -- role and can never sign in, and the built-in role defaults below find nothing.
+    -- role_id is an identity column, so it is left to auto-generate.
+    INSERT INTO config.roles
+    (
+        tenant_id, role_code, role_name, is_active, is_deleted, created_by, created_at
+    )
+    SELECT
+        v_tenant_id, x.code, x.name, TRUE, FALSE, p_action_user_id, NOW()
+    FROM (VALUES
+        ('SCHOOL_ADMIN', 'School Admin'),
+        ('TEACHER',      'Teacher'),
+        ('ACCOUNTANT',   'Accountant'),
+        ('RECEPTIONIST', 'Receptionist')
+    ) AS x(code, name)
+    WHERE NOT EXISTS (
+        SELECT 1 FROM config.roles r
+        WHERE r.tenant_id = v_tenant_id
+          AND r.role_code = x.code
+    );
+
     /*
         CREATE SCHOOL ADMIN
     */
@@ -835,28 +945,6 @@ BEGIN
             NOW()
         );
 
-        -- Roles are tenant-scoped (config.roles has a row per tenant). Seed the standard
-        -- staff roles for this tenant if they are missing, otherwise a freshly-created
-        -- tenant has no SCHOOL_ADMIN row and the admin can never log in. role_id is an
-        -- identity column, so it is left to auto-generate.
-        INSERT INTO config.roles
-        (
-            tenant_id, role_code, role_name, is_active, is_deleted, created_by, created_at
-        )
-        SELECT
-            v_tenant_id, x.code, x.name, TRUE, FALSE, p_action_user_id, NOW()
-        FROM (VALUES
-            ('SCHOOL_ADMIN', 'School Admin'),
-            ('TEACHER',      'Teacher'),
-            ('ACCOUNTANT',   'Accountant'),
-            ('RECEPTIONIST', 'Receptionist')
-        ) AS x(code, name)
-        WHERE NOT EXISTS (
-            SELECT 1 FROM config.roles r
-            WHERE r.tenant_id = v_tenant_id
-              AND r.role_code = x.code
-        );
-
         -- Assign the SCHOOL_ADMIN role for THIS tenant by code (not a hardcoded id).
         INSERT INTO core.user_roles
         (
@@ -884,6 +972,13 @@ BEGIN
           AND r.is_active = TRUE
           AND r.is_deleted = FALSE
         ON CONFLICT (tenant_id, user_id, role_id) DO NOTHING;
+
+        -- A brand-new user cannot conflict, so nothing inserted means the tenant's
+        -- SCHOOL_ADMIN role is missing or switched off: stop rather than leave a login
+        -- that can never sign in.
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'This tenant has no active School Admin role, so the admin could not be created.';
+        END IF;
 
         PERFORM core.fn_admin_audit(1, NULL, p_action_user_id, 'SCHOOL_ADMIN_CREATE', 'SuperAdmin/Schools',
             'core.users', v_user_id,
@@ -997,6 +1092,10 @@ BEGIN
               AND r.is_active = TRUE
               AND r.is_deleted = FALSE
             ON CONFLICT (tenant_id, user_id, role_id) DO NOTHING;
+
+            IF NOT FOUND THEN
+                RAISE EXCEPTION 'This tenant has no active School Admin role, so the admin could not be created.';
+            END IF;
         END IF;
     END IF;
 

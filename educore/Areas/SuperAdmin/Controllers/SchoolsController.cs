@@ -8,6 +8,7 @@ using EduCoreDataAccessLayer.Services.Contract.SuperAdmin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
+using Npgsql;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -21,12 +22,32 @@ namespace educore.Areas.SuperAdmin.Controllers
         private readonly INotificationService _notificationService;
         private readonly IGeoService _geoService;
         private readonly IWebHostEnvironment _env;
-        public SchoolsController(ISchoolService schoolService, INotificationService notificationService, IGeoService geoService, IWebHostEnvironment env)
+        private readonly ILogger<SchoolsController> _logger;
+        public SchoolsController(ISchoolService schoolService, INotificationService notificationService, IGeoService geoService, IWebHostEnvironment env, ILogger<SchoolsController> logger)
         {
             _schoolService = schoolService;
             _notificationService = notificationService;
             _geoService = geoService;
             _env = env;
+            _logger = logger;
+        }
+
+        // A proc RAISE (business rule) is shown as its own text -- ex.Message would add
+        // "P0001: " in front. Anything else is logged and gets a plain message, so a raw
+        // constraint name never reaches the screen. (CLAUDE.md: error logging convention.)
+        private string FriendlyError(Exception ex, string action)
+        {
+            if (ex is PostgresException pg)
+            {
+                _logger.LogWarning(pg, "School {Action} refused: {SqlState} {Message}", action, pg.SqlState, pg.MessageText);
+                // P0001 = a RAISE from the proc; 23514 = fn_school_phone_clean's check.
+                if (pg.SqlState == "P0001" || pg.SqlState == "23514")
+                    return pg.MessageText;
+                return "The school could not be saved because some details clash with an existing record. Please check the codes, email and phone.";
+            }
+
+            _logger.LogError(ex, "School {Action} failed", action);
+            return "Something went wrong while saving the school. Please try again.";
         }
 
         [HttpGet]
@@ -176,7 +197,7 @@ namespace educore.Areas.SuperAdmin.Controllers
             }
             catch (Exception ex)
             {
-                ModelState.AddModelError("", ex.Message);
+                ModelState.AddModelError("", FriendlyError(ex, "create"));
                 await FillDropdownsAsync(model);
                 return View(model);
             }
@@ -326,7 +347,7 @@ namespace educore.Areas.SuperAdmin.Controllers
             }
             catch (Exception ex)
             {
-                ModelState.AddModelError("", ex.Message);
+                ModelState.AddModelError("", FriendlyError(ex, "update"));
                 await FillDropdownsAsync(model);
                 return View("Create", model);
             }
@@ -342,15 +363,27 @@ namespace educore.Areas.SuperAdmin.Controllers
         // Removed rather than left unused, because an unreferenced [HttpPost] endpoint
         // still accepts a request.
 
-        // Boards flagged requires_state (State Board, Madrasah Board) must say WHICH state's
-        // board. The proc enforces this too; doing it here turns a raw PostgresException into
-        // a field-level error on the right control.
+        // A school must name its board; a computer institute or coaching centre need not
+        // (config.institution_categories.board_required). Boards flagged requires_state
+        // (State Board, Madrasah Board) must say WHICH state's board. The proc enforces
+        // both; doing it here turns a raw PostgresException into a field-level error.
         private async Task ValidateBoardStateAsync(SchoolManageModel model)
         {
-            if (!model.BoardId.HasValue)
-                return;
-
             var d = await _schoolService.GetSchoolDropdownsAsync();
+
+            var category = d.Categories.FirstOrDefault(c => c.Id == model.InstitutionCategoryId);
+            if (category == null)
+            {
+                ModelState.AddModelError(nameof(model.InstitutionCategoryId), "Please select the institution category.");
+                return;
+            }
+
+            if (!model.BoardId.HasValue)
+            {
+                if (category.BoardRequired)
+                    ModelState.AddModelError(nameof(model.BoardId), $"{category.BoardLabel} is required.");
+                return;
+            }
 
             if (d.BoardsRequiringState.Contains(model.BoardId.Value) &&
                 !(model.BoardStateId > 0))
@@ -486,29 +519,18 @@ namespace educore.Areas.SuperAdmin.Controllers
                 Text = x.Name
             }).ToList();
 
-            model.BoardList = d.Boards.Select(x => new SelectListItem
-            {
-                Value = x.Id.ToString(),
-                Text = x.Name
-            }).ToList();
+            // Boards, types and ownerships go to the page as raw items: each <option>
+            // carries the categories it belongs to, and the page filters by category.
+            model.CategoryList = d.Categories;
+            model.BoardItems = d.Boards;
+            model.SchoolTypeItems = d.SchoolTypes;
+            model.OwnershipTypeItems = d.OwnershipTypes;
 
             // "State Board" alone doesn't say which state's board, and MSBSHSE / UP Board /
             // RBSE share nothing but the label. Which boards need a state comes from
             // config.boards.requires_state, so the wizard never hardcodes a board id.
             model.BoardsRequiringState = d.BoardsRequiringState;
             model.BoardStateList = await _geoService.GetStatesAsync();
-
-            model.SchoolTypeList = d.SchoolTypes.Select(x => new SelectListItem
-            {
-                Value = x.Id.ToString(),
-                Text = x.Name
-            }).ToList();
-
-            model.OwnershipTypeList = d.OwnershipTypes.Select(x => new SelectListItem
-            {
-                Value = x.Id.ToString(),
-                Text = x.Name
-            }).ToList();
 
             model.MediumList = d.Mediums.Select(x => new SelectListItem
             {

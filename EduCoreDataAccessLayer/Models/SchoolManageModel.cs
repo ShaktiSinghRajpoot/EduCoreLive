@@ -18,7 +18,13 @@ namespace educore.Models
         [Required(ErrorMessage = "Status is required.")]
         public int StatusId { get; set; }
 
-        [Required(ErrorMessage = "Board is required.")]
+        /// <summary>
+        /// config.institution_categories: 1 School, 2 Computer / IT institute, 3 Coaching
+        /// centre. Decides which boards / types / ownerships are offered and whether a
+        /// board is required (only for a school -- checked in the controller and the proc).
+        /// </summary>
+        public int InstitutionCategoryId { get; set; } = 1;
+
         public int? BoardId { get; set; }
 
         /// <summary>
@@ -36,7 +42,7 @@ namespace educore.Models
         /// </summary>
         public bool BoardRequiresState { get; set; }
 
-        [Required(ErrorMessage = "School type is required.")]
+        [Required(ErrorMessage = "Type is required.")]
         public int? SchoolTypeId { get; set; }
 
         public int? OwnershipTypeId { get; set; }
@@ -151,7 +157,9 @@ namespace educore.Models
         [StringLength(200)]
         public string? TenantName { get; set; }
 
-        [StringLength(50, ErrorMessage = "Tenant code cannot exceed 50 characters.")]
+        // Same rule as sp_school_manage: a short slug such as "dps-group".
+        [RegularExpression(@"^[A-Za-z0-9][A-Za-z0-9-]{1,49}$",
+            ErrorMessage = "Tenant code may use only letters, digits and hyphens (2-50 characters).")]
         public string? TenantCode { get; set; }
 
         [EmailAddress(ErrorMessage = "Enter valid tenant email.")]
@@ -192,5 +200,17 @@ namespace educore.Models
         public List<SelectListItem> AcademicYearList { get; set; } = new();
         public List<SelectListItem> DateFormatList { get; set; } = new();
         public List<SelectListItem> TimeFormatList { get; set; } = new();
+
+        // Create School wizard: the raw lists, so each <option> can carry the categories
+        // it belongs to (DropdownItem.Categories) and the page can filter by category.
+        public List<InstitutionCategoryItem> CategoryList { get; set; } = new();
+        public List<DropdownItem> BoardItems { get; set; } = new();
+        public List<DropdownItem> SchoolTypeItems { get; set; } = new();
+        public List<DropdownItem> OwnershipTypeItems { get; set; } = new();
+
+        // Admin Basic Profile: what this school's category calls the board and type fields.
+        public string? CategoryName { get; set; }
+        public string BoardLabel { get; set; } = "Board";
+        public string TypeLabel { get; set; } = "School Type";
     }
 }

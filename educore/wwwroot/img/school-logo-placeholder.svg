@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <!-- Shown on Basic Profile until the school uploads its own logo. -->
+  <rect width="160" height="160" rx="24" fill="#fff4e8"/>
+  <g fill="none" stroke="#ff8a00" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M40 72 L80 46 L120 72"/>
+    <rect x="50" y="72" width="60" height="44"/>
+    <rect x="72" y="92" width="16" height="24"/>
+    <line x1="34" y1="116" x2="126" y2="116"/>
+  </g>
+</svg>

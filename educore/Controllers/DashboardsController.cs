@@ -1,4 +1,4 @@
-using EduCoreDataAccessLayer.Helpers;
+﻿using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using educore.Services;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -41,6 +41,12 @@ namespace educore.Controllers
         public async Task<IActionResult> Index()
         {
             int t = TenantId(), s = SchoolId(), u = UserId();
+
+            // The platform super admin has no school, so a school dashboard would be
+            // empty. Their home is the Schools list.
+            if (t == 1)
+                return RedirectToAction("SchoolList", "Schools", new { area = "SuperAdmin" });
+
             var model = await _dashboardService.GetSummaryAsync(t, s, u);
 
             // Fee collections, outstanding dues and the defaulters list are finance data.

@@ -4922,3 +4922,37 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   re-run green (36 suites).
 - **Deploy:** `staff_self_service.sql` (after `staff_leave.sql` / `staff_payroll.sql`); app restart
   (new binaries).
+
+### [2026-10-11] Institution categories (school / computer institute / coaching) + Super Admin fixes
+
+- **Why:** after the data wipe the "existing tenant" list offered only tenant 1 (the platform), and a
+  school created there failed on `chk_school_profiles_scope`. Separately, the board and school-type
+  lists only knew schools, so a computer institute went live as "ICSE, Special Education School",
+  and the type / ownership lists held the same entries twice.
+- **`deploy_2026_10_11h.sql`:** the tenant dropdown skips tenant 1 and deleted tenants;
+  `sp_school_manage` refuses tenant 1 with a readable message.
+- **`institution_categories.sql`** (new, re-runnable; now owns `config.sp_school_dropdowns`):
+  `config.institution_categories` (SCHOOL / COMPUTER_IT / COACHING, with the labels and whether a
+  board is required), `core.school_profiles.institution_category_id` (default 1),
+  `category_codes text[]` on boards / school_types / ownership_types (NULL = every category).
+  Retires duplicate types (profiles moved to the surviving row first), adds institute boards
+  (NIELIT, NSDC, MKCL, Tally, open-university study centre, Franchise, Not affiliated), types and
+  legal forms. The dropdown proc gains a 12th cursor *with a default*, and `sp_school_manage`
+  gains `p_institution_category_id` *after* `p_result` -- both so the running app keeps working
+  between the DB deploy and the app deploy.
+- **`sp_school_manage`:** board / type / ownership must fit the category; only a school must name a
+  board; plus the 12 fixes from `tests/superadmin_schools_tests.sql` (roles seeded on every save so
+  an admin added later from Edit can sign in, tenant-code slug and uniqueness, pincode / phone /
+  status / board-state checks, "School not found.", DELETE branch removed). `sp_school_list`:
+  category name, tenant code, literal search, active = `allows_login`. Basic Profile GET returns the
+  category and its labels.
+- **App:** wizard step 1 has Institution Category; board / type / ownership options are filtered
+  client-side from `data-categories`; Ownership and Medium are now visible (optional). Super admin
+  (tenant 1) menu shows Platform -> Schools / Add School instead of the school modules, and the
+  dashboard redirects to the school list. `SchoolsController` logs DB errors and shows the proc's
+  message (not `ex.Message`).
+- **Tests:** `tests/institution_categories_tests.sql` (36), `tests/superadmin_schools_tests.sql`
+  (92), catalog `educore/docs/test-cases/superadmin_schools.md`.
+- **Deploy:** `deploy_2026_10_11h.sql`, then `institution_categories.sql`, `sp_school_manage.sql`,
+  `sp_school_list.sql`, `sp_school_admin_basic_profile_manage.sql`; then push (app restart).
+

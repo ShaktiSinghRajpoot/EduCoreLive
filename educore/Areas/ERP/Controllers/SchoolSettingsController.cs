@@ -260,6 +260,9 @@ namespace educore.Areas.ERP.Controllers
             model.BoardStateId       = saved.BoardStateId;
             model.BoardRequiresState = saved.BoardRequiresState;
             model.SchoolTypeName     = saved.SchoolTypeName;
+            model.CategoryName       = saved.CategoryName;
+            model.BoardLabel         = saved.BoardLabel;
+            model.TypeLabel          = saved.TypeLabel;
             model.LogoUrl            = saved.LogoUrl;
             model.HeaderImageUrl     = saved.HeaderImageUrl;
         }

@@ -63,13 +63,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 {
                     SchoolId = ToInt(row["school_id"], 0),
                     TenantName = row["tenant_name"]?.ToString(),
-                    TenantCode = row["tenant_name"]?.ToString(),
+                    TenantCode = HasColumn(row, "tenant_code") ? row["tenant_code"]?.ToString() : null,
                     SchoolCode = row["school_code"]?.ToString(),
                     SchoolName = row["school_name"]?.ToString(),
                     DisplayName = row["display_name"]?.ToString(),
                     StatusName = row["status_name"]?.ToString(),
                     BoardName = row["board_name"]?.ToString(),
                     SchoolTypeName = row["school_type_name"]?.ToString(),
+                    CategoryName = HasColumn(row, "category_name") ? row["category_name"]?.ToString() : null,
                     City = row["city"]?.ToString(),
                     State = row["state"]?.ToString(),
                     ContactName = row["contact_name"]?.ToString(),
@@ -148,6 +149,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 AffiliationNumber = row["affiliation_number"]?.ToString(),
                 BoardId = ToNullableInt(row["board_id"]),
                 BoardStateId = HasColumn(row, "board_state_id") ? ToNullableInt(row["board_state_id"]) : null,
+                InstitutionCategoryId = HasColumn(row, "institution_category_id") ? ToInt(row["institution_category_id"], 1) : 1,
                 SchoolTypeId = ToNullableInt(row["school_type_id"]),
                 OwnershipTypeId = ToNullableInt(row["ownership_type_id"]),
                 MediumId = ToNullableInt(row["medium_id"]),
@@ -275,7 +277,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 new NpgsqlParameter("p_contact_types", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cur_contact_types" },
                 new NpgsqlParameter("p_academic_years", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cur_academic_years" },
                 new NpgsqlParameter("p_date_formats", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cur_date_formats" },
-                new NpgsqlParameter("p_time_formats", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cur_time_formats" }
+                new NpgsqlParameter("p_time_formats", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cur_time_formats" },
+                new NpgsqlParameter("p_categories", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "cur_categories" }
             };
 
             var dal = _db;
@@ -296,7 +299,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 ContactTypes = ToDropdownList(ds, 7),
                 AcademicYears = ToDropdownList(ds, 8),
                 DateFormats = ToDropdownList(ds, 9),
-                TimeFormats = ToDropdownList(ds, 10)
+                TimeFormats = ToDropdownList(ds, 10),
+                Categories = ToCategoryList(ds, 11)
             };
         }
 
@@ -372,7 +376,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 // it when the chosen board doesn't need one.
                 new NpgsqlParameter("p_board_state_id", (object?)model?.BoardStateId ?? DBNull.Value),
 
-                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "school_cursor" }
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "school_cursor" },
+
+                // Declared AFTER p_result in the proc, so an app without it still works
+                // against the new proc. NULL on GET; the proc keeps / defaults it.
+                new NpgsqlParameter("p_institution_category_id", (object?)model?.InstitutionCategoryId ?? DBNull.Value)
             };
         }
 
@@ -388,7 +396,31 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 list.Add(new DropdownItem
                 {
                     Id = ToInt(row["id"], 0),
-                    Name = row["name"]?.ToString() ?? string.Empty
+                    Name = row["name"]?.ToString() ?? string.Empty,
+                    Categories = HasColumn(row, "categories") ? row["categories"]?.ToString() ?? string.Empty : string.Empty
+                });
+            }
+
+            return list;
+        }
+
+        private static List<InstitutionCategoryItem> ToCategoryList(DataSet ds, int tableIndex)
+        {
+            var list = new List<InstitutionCategoryItem>();
+
+            if (ds.Tables.Count <= tableIndex)
+                return list;
+
+            foreach (DataRow row in ds.Tables[tableIndex].Rows)
+            {
+                list.Add(new InstitutionCategoryItem
+                {
+                    Id = ToInt(row["id"], 0),
+                    Code = row["category_code"]?.ToString() ?? string.Empty,
+                    Name = row["name"]?.ToString() ?? string.Empty,
+                    TypeLabel = row["type_label"]?.ToString() ?? string.Empty,
+                    BoardLabel = row["board_label"]?.ToString() ?? string.Empty,
+                    BoardRequired = ToBool(row["board_required"])
                 });
             }
 

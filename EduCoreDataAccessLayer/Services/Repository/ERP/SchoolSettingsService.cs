@@ -100,6 +100,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             model.SchoolName = row["school_name"] == DBNull.Value ? string.Empty : row["school_name"].ToString() ?? string.Empty;
             model.DisplayName = row["display_name"] == DBNull.Value ? null : row["display_name"].ToString();
             model.StatusId = row["status_id"] == DBNull.Value ? 0 : Convert.ToInt32(row["status_id"]);
+            if (row.Table.Columns.Contains("status_name"))
+                model.StatusName = row["status_name"] == DBNull.Value ? null : row["status_name"].ToString();
             model.RegistrationNumber = row["registration_number"] == DBNull.Value ? null : row["registration_number"].ToString();
             model.AffiliationNumber = row["affiliation_number"] == DBNull.Value ? null : row["affiliation_number"].ToString();
             model.BoardId = row["board_id"] == DBNull.Value ? null : Convert.ToInt32(row["board_id"]);
@@ -110,6 +112,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                                        && Convert.ToBoolean(row["board_requires_state"]);
             model.SchoolTypeId = row["school_type_id"] == DBNull.Value ? null : Convert.ToInt32(row["school_type_id"]);
             model.SchoolTypeName = row["school_type_name"] == DBNull.Value ? null : row["school_type_name"].ToString();
+            // What this school's category calls the board and type (institution_categories.sql).
+            if (row.Table.Columns.Contains("category_name"))
+            {
+                model.CategoryName = row["category_name"] == DBNull.Value ? null : row["category_name"].ToString();
+                model.BoardLabel = row["board_label"] == DBNull.Value ? "Board" : row["board_label"].ToString() ?? "Board";
+                model.TypeLabel = row["type_label"] == DBNull.Value ? "School Type" : row["type_label"].ToString() ?? "School Type";
+            }
             model.OwnershipTypeId = row["ownership_type_id"] == DBNull.Value ? null : Convert.ToInt32(row["ownership_type_id"]);
             model.MediumId = row["medium_id"] == DBNull.Value ? null : Convert.ToInt32(row["medium_id"]);
             model.EstablishedYear = row["established_year"] == DBNull.Value ? null : Convert.ToInt32(row["established_year"]);

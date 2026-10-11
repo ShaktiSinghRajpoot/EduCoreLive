@@ -1,4 +1,4 @@
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model educore.Models.SchoolManageModel
 
 @{
@@ -6,7 +6,7 @@
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 
     var logoImage = string.IsNullOrWhiteSpace(Model.LogoUrl)
-        ? Url.Content("~/assets/img/school-logo.png")
+        ? Url.Content("~/img/school-logo-placeholder.svg")   // school-logo.png never existed: a broken image
         : Url.Content(Model.LogoUrl);
 }
 
@@ -49,7 +49,11 @@
                     <p class="ec-profile-subtitle">@(string.IsNullOrWhiteSpace(Model.TenantName) ? "Tenant not available" : Model.TenantName)</p>
 
                     <div class="ec-pill-wrap">
-                        <span class="ec-pill">@(string.IsNullOrWhiteSpace(Model.BoardName)   ? "Board -"  : Model.BoardName)</span>
+                        <span class="ec-pill">@(string.IsNullOrWhiteSpace(Model.BoardName)   ? Model.BoardLabel + " -" : Model.BoardName)</span>
+                        @if (!string.IsNullOrWhiteSpace(Model.CategoryName) && Model.CategoryName != "School")
+                        {
+                            <span class="ec-pill">@Model.CategoryName</span>
+                        }
                         <span class="ec-pill">@(string.IsNullOrWhiteSpace(Model.StatusName) ? "Status -" : Model.StatusName)</span>
                     </div>
                 </div>
@@ -68,7 +72,7 @@
                     <div class="ec-detail-item">
                         <div class="ec-detail-icon"><i class="bx bx-category"></i></div>
                         <div>
-                            <div class="ec-detail-label">School Type</div>
+                            <div class="ec-detail-label">@Model.TypeLabel</div>
                             <div class="ec-detail-value">@(string.IsNullOrWhiteSpace(Model.SchoolTypeName) ? "-" : Model.SchoolTypeName)</div>
                         </div>
                     </div>
@@ -76,7 +80,7 @@
                     <div class="ec-detail-item">
                         <div class="ec-detail-icon"><i class="bx bx-certification"></i></div>
                         <div>
-                            <div class="ec-detail-label">Board</div>
+                            <div class="ec-detail-label">@Model.BoardLabel</div>
                             <div class="ec-detail-value">@(string.IsNullOrWhiteSpace(Model.BoardName) ? "-" : Model.BoardName)</div>
                         </div>
                     </div>
@@ -154,11 +158,11 @@
                                 <span asp-validation-for="SchoolName" class="text-danger small"></span>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Board</label>
+                                <label class="form-label">@Model.BoardLabel</label>
                                 <input asp-for="BoardName" class="form-control ec-readonly" readonly />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">School Type</label>
+                                <label class="form-label">@Model.TypeLabel</label>
                                 <input asp-for="SchoolTypeName" class="form-control ec-readonly" readonly />
                             </div>
                         </div>

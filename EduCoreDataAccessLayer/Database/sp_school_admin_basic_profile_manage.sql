@@ -73,7 +73,9 @@ BEGIN
             s.school_name,
             s.display_name,
             s.status_id,
-           -- sm.name AS status_name,
+            -- The page's status pill read "Status -" for every school: this join was
+            -- left commented out (with a wrong table and column name).
+            sm.name AS status_name,
 
             sp.registration_number,
             sp.affiliation_number,
@@ -93,6 +95,12 @@ BEGIN
 
             sp.school_type_id,
             st.name AS school_type_name,
+
+            -- School / Computer-IT institute / Coaching centre, and what this page calls
+            -- the board and type fields for it (institution_categories.sql).
+            COALESCE(ic.name, 'School')         AS category_name,
+            COALESCE(ic.board_label, 'Board')   AS board_label,
+            COALESCE(ic.type_label, 'School Type') AS type_label,
 
             sp.ownership_type_id,
             sp.medium_id,
@@ -138,14 +146,17 @@ BEGIN
             ON sp.tenant_id = s.tenant_id
            AND sp.school_id = s.school_id
 
-         -- LEFT JOIN config.config.school_statuses sm
-         --     ON sm.status_id = s.status_id
+        LEFT JOIN config.school_statuses sm
+            ON sm.school_status_id = s.status_id
 
         LEFT JOIN config.boards b
             ON b.board_id = sp.board_id
 
         LEFT JOIN config.states bs
             ON bs.state_id = sp.board_state_id
+
+        LEFT JOIN config.institution_categories ic
+            ON ic.category_id = sp.institution_category_id
 
         LEFT JOIN config.school_types st
             ON st.school_type_id = sp.school_type_id

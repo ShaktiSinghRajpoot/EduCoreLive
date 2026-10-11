@@ -88,6 +88,12 @@ namespace educore.Controllers
         [HttpGet]
         public IActionResult Login()
         {
+            // "/" is this page, so the logo, a bookmark or the 404 page's "Back to home"
+            // used to show a signed-in user the login form again. Send them home instead
+            // (the dashboard sends a super admin on to the Schools list).
+            if (User.Identity?.IsAuthenticated == true)
+                return RedirectToAction("Index", "Dashboards", new { area = "" });
+
             return View();
         }
 

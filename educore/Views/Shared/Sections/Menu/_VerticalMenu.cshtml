@@ -1,4 +1,4 @@
-@using EduCoreDataAccessLayer.Helpers
+﻿@using EduCoreDataAccessLayer.Helpers
 @using EduCoreDataAccessLayer.Services.Contract.ERP
 @using System.Security.Claims
 @inject IAdmissionWorkflowService AdmissionWorkflowService
@@ -45,7 +45,10 @@
     var _access = await PermissionService.GetUserAccessAsync(_tId, _sId, _uId, _activeRoleId);
     bool isAdmin = _access.IsAdmin;
     var _perms = _access.Keys;
-    bool Can(string key) => isAdmin || _perms.Contains(key);
+    // The platform super admin (tenant 1) has no school, so none of the school
+    // modules apply -- they would open empty or failing pages. They get Schools instead.
+    bool isPlatform = _tId == 1;
+    bool Can(string key) => !isPlatform && (isAdmin || _perms.Contains(key));
 
     // Group visibility (a group shows if the role can reach at least one item).
     // Only modules that actually EXIST appear here. Placeholder groups
@@ -147,6 +150,23 @@
                 <div class="text-truncate">Dashboard</div>
             </a>
         </li>
+
+        @if (isPlatform)
+        {
+        <li class="menu-header"><span class="menu-header-text">Platform</span></li>
+        <li class='menu-item @On("Schools/SchoolList")'>
+            <a asp-area="SuperAdmin" asp-controller="Schools" asp-action="SchoolList" class="menu-link">
+                <i class="menu-icon icon-base bx bx-buildings ic-dash"></i>
+                <div class="text-truncate">Schools</div>
+            </a>
+        </li>
+        <li class='menu-item @On("Schools/Create")'>
+            <a asp-area="SuperAdmin" asp-controller="Schools" asp-action="Create" class="menu-link">
+                <i class="menu-icon icon-base bx bx-plus-circle ic-dash"></i>
+                <div class="text-truncate">Add School</div>
+            </a>
+        </li>
+        }
 
         @if (gMyBus)
         {

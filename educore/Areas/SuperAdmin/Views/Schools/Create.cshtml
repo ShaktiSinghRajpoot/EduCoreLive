@@ -1,4 +1,4 @@
-@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model educore.Models.SchoolManageModel;
 
 @{
@@ -84,8 +84,6 @@
                 <input asp-for="Website" type="hidden" />
                 <input asp-for="RegistrationNumber" type="hidden" />
                 <input asp-for="AffiliationNumber" type="hidden" />
-                <input asp-for="OwnershipTypeId" type="hidden" />
-                <input asp-for="MediumId" type="hidden" />
                 <input asp-for="EstablishedYear" type="hidden" />
                 <input asp-for="AddressLine2" type="hidden" />
                 <input asp-for="District" type="hidden" />
@@ -174,8 +172,24 @@
 
                         <div class="col-12"><hr class="my-1" /></div>
 
+                        @* School / Computer-IT institute / Coaching centre. Decides which
+                           boards, types and ownerships are offered below, what those fields
+                           are called, and whether a board is required (only for a school).
+                           All of it comes from config.institution_categories. *@
                         <div class="col-12">
-                            <label class="form-label" asp-for="SchoolName">School Name <span class="text-danger">*</span></label>
+                            <label class="form-label" asp-for="InstitutionCategoryId">Institution Category <span class="text-danger">*</span></label>
+                            <select asp-for="InstitutionCategoryId" class="form-select">
+                                @foreach (var c in Model.CategoryList)
+                                {
+                                    <option value="@c.Id" data-code="@c.Code" data-type-label="@c.TypeLabel"
+                                            data-board-label="@c.BoardLabel" data-board-required="@(c.BoardRequired ? "1" : "0")">@c.Name</option>
+                                }
+                            </select>
+                            <span asp-validation-for="InstitutionCategoryId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label" asp-for="SchoolName"><span id="nameLabelText">School Name</span> <span class="text-danger">*</span></label>
                             <input asp-for="SchoolName" class="form-control" placeholder="International Public School"
                                    maxlength="200" autocomplete="off" />
                             <span asp-validation-for="SchoolName" class="text-danger small"></span>
@@ -200,11 +214,15 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label" asp-for="BoardId">Board <span class="text-danger">*</span></label>
-                            <select asp-for="BoardId"
-                                    class="form-select"
-                                    asp-items="@(new SelectList(Model.BoardList, "Value", "Text"))">
-                                <option value="">Select Board</option>
+                            <label class="form-label" asp-for="BoardId"><span id="boardLabelText">Board</span> <span class="text-danger" id="boardRequiredStar">*</span></label>
+                            @* Options carry data-categories (empty = every category); the
+                               script below shows only the ones for the chosen category. *@
+                            <select asp-for="BoardId" class="form-select">
+                                <option value="">Select</option>
+                                @foreach (var b in Model.BoardItems)
+                                {
+                                    <option value="@b.Id" data-categories="@b.Categories">@b.Name</option>
+                                }
                             </select>
                             <span asp-validation-for="BoardId" class="text-danger small"></span>
                         </div>
@@ -225,13 +243,34 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label class="form-label" asp-for="SchoolTypeId">School Type <span class="text-danger">*</span></label>
-                            <select asp-for="SchoolTypeId"
-                                    class="form-select"
-                                    asp-items="@(new SelectList(Model.SchoolTypeList, "Value", "Text"))">
-                                <option value="">Select School Type</option>
+                            <label class="form-label" asp-for="SchoolTypeId"><span id="typeLabelText">School Type</span> <span class="text-danger">*</span></label>
+                            <select asp-for="SchoolTypeId" class="form-select">
+                                <option value="">Select</option>
+                                @foreach (var t in Model.SchoolTypeItems)
+                                {
+                                    <option value="@t.Id" data-categories="@t.Categories">@t.Name</option>
+                                }
                             </select>
                             <span asp-validation-for="SchoolTypeId" class="text-danger small"></span>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" asp-for="OwnershipTypeId">Ownership</label>
+                            <select asp-for="OwnershipTypeId" class="form-select">
+                                <option value="">Select (optional)</option>
+                                @foreach (var o in Model.OwnershipTypeItems)
+                                {
+                                    <option value="@o.Id" data-categories="@o.Categories">@o.Name</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" asp-for="MediumId">Medium of Instruction</label>
+                            <select asp-for="MediumId" class="form-select"
+                                    asp-items="@(new SelectList(Model.MediumList, "Value", "Text"))">
+                                <option value="">Select (optional)</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -417,7 +456,7 @@
                             new { Label = "Organization",  Id = "reviewTenant",     Target = 1, Focus = isEdit ? "" : "TenantId",  Sub = (string?)null },
                             new { Label = "School Name",   Id = "reviewSchoolName", Target = 1, Focus = "SchoolName",              Sub = (string?)null },
                             new { Label = "Status",        Id = "reviewStatus",     Target = 1, Focus = "StatusId",                Sub = (string?)null },
-                            new { Label = "Board / Type",  Id = "reviewBoard",      Target = 1, Focus = "BoardId",                 Sub = (string?)null },
+                            new { Label = "Category / Board / Type", Id = "reviewBoard",      Target = 1, Focus = "BoardId",                 Sub = (string?)null },
                             new { Label = "Address",       Id = "reviewAddress",    Target = 2, Focus = "AddressLine1",            Sub = (string?)null },
                             new { Label = "Location",      Id = "reviewLocation",   Target = 2, Focus = "StateId",                 Sub = (string?)null },
                             new { Label = "Contact",       Id = "reviewContact",    Target = 2, Focus = "ContactName",             Sub = (string?)null },
@@ -554,6 +593,62 @@
             }
         }
 
+        // ── Institution category ────────────────────────────────────────────
+        // The board, type and ownership lists hold every option, each tagged with
+        // data-categories ("SCHOOL", "COMPUTER_IT,COACHING", or empty = all). A copy of
+        // the full list is kept, and the list is rebuilt from it whenever the category
+        // changes. Rebuilt rather than hiding <option>s, because Safari ignores
+        // display:none on an <option>.
+        var allOptions = {};
+
+        function rememberOptions(name) {
+            allOptions[name] = $form.find('[name="' + name + '"] option').clone();
+        }
+
+        function filterByCategory(name, code) {
+            var $select = $form.find('[name="' + name + '"]');
+            var current = $select.val();
+            $select.empty();
+            allOptions[name].each(function () {
+                var cats = $(this).attr("data-categories");
+                // The placeholder has no data-categories at all and always stays.
+                if (cats === undefined || cats === "" || cats.split(",").indexOf(code) > -1) {
+                    $select.append($(this).clone());
+                }
+            });
+            // Keep the choice if it is still offered; otherwise back to the placeholder.
+            $select.val($select.find('option[value="' + current + '"]').length ? current : "");
+        }
+
+        function selectedCategory() {
+            var $o = $("#InstitutionCategoryId option:selected");
+            return {
+                name: $.trim($o.text()),
+                code: $o.attr("data-code") || "SCHOOL",
+                typeLabel: $o.attr("data-type-label") || "School Type",
+                boardLabel: $o.attr("data-board-label") || "Board",
+                boardRequired: $o.attr("data-board-required") !== "0"
+            };
+        }
+
+        function applyCategory() {
+            var c = selectedCategory();
+            filterByCategory("BoardId", c.code);
+            filterByCategory("SchoolTypeId", c.code);
+            filterByCategory("OwnershipTypeId", c.code);
+
+            $("#boardLabelText").text(c.boardLabel);
+            $("#boardRequiredStar").toggleClass("d-none", !c.boardRequired);
+            $("#typeLabelText").text(c.typeLabel);
+            // "School Type" -> "School Name", "Institute Type" -> "Institute Name".
+            $("#nameLabelText").text(c.typeLabel.replace(" Type", " Name"));
+            // An example name that fits the category.
+            var examples = { SCHOOL: "International Public School", COMPUTER_IT: "Global Computer Academy", COACHING: "Bright Future Coaching Centre" };
+            $('[name="SchoolName"]').attr("placeholder", examples[c.code] || examples.SCHOOL);
+
+            toggleBoardState();
+        }
+
         // True when the admin section must be filled in: an existing admin is always
         // edited, otherwise only when the "Create School Admin now" switch is on.
         function adminRequired() {
@@ -621,15 +716,16 @@
             }
 
             if (name === "SchoolName" && value === "") {
-                fail("School name is required.");
+                fail(selectedCategory().typeLabel.replace(" Type", " name") + " is required.");
             }
 
             if (name === "StatusId" && (value === "" || value === "0")) {
                 fail("Status is required.");
             }
 
-            if (name === "BoardId" && (value === "" || value === "0")) {
-                fail("Board is required.");
+            // Only a school must name its board; an institute may be unaffiliated.
+            if (name === "BoardId" && (value === "" || value === "0") && selectedCategory().boardRequired) {
+                fail(selectedCategory().boardLabel + " is required.");
             }
 
             if (name === "BoardStateId" && boardNeedsState() && (value === "" || value === "0")) {
@@ -637,7 +733,7 @@
             }
 
             if (name === "SchoolTypeId" && (value === "" || value === "0")) {
-                fail("School Type is required.");
+                fail(selectedCategory().typeLabel + " is required.");
             }
 
             if (name === "AddressLine1" && value === "") {
@@ -814,7 +910,7 @@
                 var bs = pick('[name="BoardStateId"]');
                 board = bs ? board + " (" + bs + ")" : board;
             }
-            $("#reviewBoard").text(join([board, pick('[name="SchoolTypeId"]')], " / "));
+            $("#reviewBoard").text(join([selectedCategory().name, board, pick('[name="SchoolTypeId"]')], " / "));
 
             $("#reviewAddress").text(join([
                 $('[name="AddressLine1"]').val(),
@@ -912,6 +1008,16 @@
         $("#TenantMode").on("change", toggleTenantMode);
 
         $form.on("change", '[name="BoardId"]', toggleBoardState);
+        $form.on("change", '[name="InstitutionCategoryId"]', function () {
+            applyCategory();
+            // Re-check the fields already showing an error, so the message follows the
+            // category ("Board is required" goes away for an institute, "School name"
+            // becomes "Institute name").
+            ["SchoolName", "BoardId", "SchoolTypeId", "OwnershipTypeId"].forEach(function (name) {
+                var $f = $form.find('[name="' + name + '"]');
+                if ($f.hasClass("is-invalid")) validateField($f);
+            });
+        });
 
         // Review -> jump back to the step that owns the field, and put the cursor on it.
         // No validation gate: this only ever moves BACKWARDS from step 4, and blocking
@@ -945,7 +1051,10 @@
         $(document).ready(function () {
             showStep(1);
             toggleTenantMode();
-            toggleBoardState();
+            rememberOptions("BoardId");
+            rememberOptions("SchoolTypeId");
+            rememberOptions("OwnershipTypeId");
+            applyCategory();   // also runs toggleBoardState()
             // Admin fields show whenever the section applies (existing admin, or the switch on).
             // The password box is an optional reset for an existing admin, mandatory otherwise,
             // and hidden only while auto-generate is on.
