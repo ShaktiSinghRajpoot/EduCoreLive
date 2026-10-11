@@ -19,5 +19,14 @@ namespace educore.Services
 
         public string FromAddress { get; set; } = string.Empty;
         public string FromName { get; set; } = "SmartSchoolWala.com";
+
+        /// <summary>
+        /// "Smtp" (default) or "Brevo". Railway blocks outbound SMTP below its Pro plan,
+        /// so production sends through Brevo's HTTPS API instead; local dev keeps SMTP.
+        /// </summary>
+        public string Provider { get; set; } = "Smtp";
+
+        /// <summary>API key for the HTTPS provider (Brevo). Set as Email__ApiKey; never commit it.</summary>
+        public string ApiKey { get; set; } = string.Empty;
     }
 }
