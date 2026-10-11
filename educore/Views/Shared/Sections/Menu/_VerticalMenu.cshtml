@@ -52,7 +52,9 @@
     // "soon" stub were removed: half the old menu led nowhere, which is what made
     // it feel complicated. Planned modules are listed on the "What's coming" page
     // instead. To add a module later, gate it here and add its group below.
-    bool gAdmissions  = Can("enquiry.view") || Can("registration.view") || Can("students.view");
+    // Matches the group's three links: a view-only students role (e.g. Teacher) has
+    // none of them, and used to get an empty "Admissions" heading.
+    bool gAdmissions  = Can("enquiry.view") || (showRegistration && Can("registration.view")) || Can("students.manage");
     bool gStudents    = Can("students.view");
     bool gAttendance  = Can("attendance.view");
     bool gExams       = showExams && Can("exams.view");

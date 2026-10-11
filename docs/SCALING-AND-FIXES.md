@@ -4846,3 +4846,21 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   create/regenerate/revoke, 429.
 - **Deploy order (re-runnable, each ends with a semicolon):** `transport_live_tracking.sql`, then
   `school_purge.sql`. App restart needed (new binaries).
+
+### [2026-10-11] Dashboard and menu follow the role; built-in roles get default permissions
+
+- **Dashboard** (`DashboardsController`, `Views/Dashboards/Index.cshtml`): every block now needs
+  its module permission and is removed on the server when the role lacks it (students,
+  staff, attendance, admission, finance as before). Quick Access lists only modules the role
+  can open, with the module switches; drivers get a My Bus shortcut. Also fixed: Upcoming
+  Events was four hard-coded events (now the school calendar), the session chip was a
+  hard-coded 2025-26, and the Reports tile linked to a missing page.
+- **Menu**: New Admission and Promote Students need `students.manage` (a view-only role saw
+  forms it could not save); the Admissions group no longer shows empty.
+- **`builtin_role_defaults.sql`**: TEACHER / ACCOUNTANT / RECEPTIONIST had no permissions in any
+  school, so they saw only the Dashboard. `config.fn_apply_builtin_role_defaults` grants a
+  sensible set per school where the role has no grant at all (a school's own setup is never
+  overwritten); applied to every existing school and called by `sp_school_manage` for new
+  schools. Bundle: `deploy_2026_10_11f.sql`.
+- Tested in the browser with one login per role (admin, teacher, accountant, receptionist,
+  driver, transport in-charge, cashier, front office, HR manager).

@@ -88,6 +88,7 @@ DECLARE
     v_year   varchar;
     c        refcursor;
     r        record;
+    v_owf    text;   -- the other school's workflow row before section F
     v_n      integer;
     v_txt    text;
     v_b      boolean;
@@ -619,6 +620,8 @@ BEGIN
     -- ══════════════════════════════════════════════════════════════════════
     RAISE NOTICE '';
     RAISE NOTICE '-- F. Admission workflow settings ----------------------';
+    SELECT row_to_json(w)::text INTO v_owf FROM core.school_admission_workflow_settings w
+     WHERE tenant_id = o_tenant AND school_id = o_school;
 
     DELETE FROM core.school_admission_workflow_settings WHERE tenant_id = c_tenant AND school_id = c_school;
     c := 'f1';
@@ -747,11 +750,12 @@ BEGIN
     END;
 
     -- The other school's workflow is untouched by everything above.
-    SELECT * INTO r FROM core.school_admission_workflow_settings WHERE tenant_id = o_tenant AND school_id = o_school;
+    -- Compared with its own row from before section F, not with fixed values: the
+    -- other school is real test data that people change by hand.
     PERFORM pg_temp.chk('F18 the other school''s workflow is untouched',
-                        r.enable_registration AND r.registration_number_prefix = 'REG-' AND NOT r.enable_transport,
-                        format('reg=%s prefix=%s transport=%s', r.enable_registration,
-                               r.registration_number_prefix, r.enable_transport));
+                        (SELECT row_to_json(w)::text FROM core.school_admission_workflow_settings w
+                          WHERE tenant_id = o_tenant AND school_id = o_school) IS NOT DISTINCT FROM v_owf,
+                        'row unchanged since the start of section F');
 
     -- ══════════════════════════════════════════════════════════════════════
     RAISE NOTICE '';

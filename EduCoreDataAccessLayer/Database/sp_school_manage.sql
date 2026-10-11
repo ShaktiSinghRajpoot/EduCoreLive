@@ -890,6 +890,12 @@ BEGIN
             format('School admin %s created for school %s (tenant %s)', LOWER(TRIM(p_admin_email)), v_school_id, v_tenant_id));
     END IF;
 
+    -- A new school's built-in roles (Teacher, Accountant, Receptionist) start with
+    -- sensible permissions instead of none (builtin_role_defaults.sql).
+    IF p_operation = 'INSERT' THEN
+        PERFORM config.fn_apply_builtin_role_defaults(v_tenant_id, v_school_id, p_action_user_id);
+    END IF;
+
     /*
         UPDATE SCHOOL ADMIN (edit existing; create one if none exists yet)
     */
