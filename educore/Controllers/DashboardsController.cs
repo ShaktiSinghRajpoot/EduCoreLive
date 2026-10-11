@@ -84,16 +84,19 @@ namespace educore.Controllers
         // Quick Access tiles the viewer can actually open: permission plus module switch.
         private async Task<List<DashboardLink>> BuildQuickLinksAsync(int t, int s, int u, bool isDriver)
         {
-            bool exams = true, inventory = true, payroll = true;
+            bool exams = true, inventory = true, payroll = true, transport = true, registration = true;
             try
             {
                 var mods = await _workflow.GetAdmissionWorkflowAsync(t, s, u);
                 exams = mods.EnableExams; inventory = mods.EnableInventory; payroll = mods.EnablePayroll;
+                transport = mods.EnableTransport; registration = mods.EnableRegistration;
             }
             catch { /* show the tiles; the pages themselves still refuse a switched-off module */ }
 
             var all = new (string Label, string Icon, string Url, string Color, string Key, bool On)[]
             {
+                ("Enquiries",  "bx-message-square-detail", "/ERP/Enquiry/EnquiryCRM",      "#e83e8c", "enquiry.view",    true),
+                ("Registrations", "bx-clipboard",    "/ERP/Registration",                  "#d97706", "registration.view", registration),
                 ("Students",   "bx-group",           "/ERP/Student/StudentList",           "#ff8a00", "students.view",   true),
                 ("Admission",  "bx-user-plus",       "/ERP/Admission/Create",              "#16a34a", "students.manage", true),
                 ("Fees",       "bx-wallet",          "/ERP/Fee/ManageFee",                 "#0284c7", "fees.view",       true),
@@ -103,6 +106,7 @@ namespace educore.Controllers
                 ("Payroll",    "bx-money",           "/ERP/Payroll/PayrollManagement",     "#16a34a", "payroll.view",    payroll),
                 ("Leave",      "bx-calendar-minus",  "/ERP/Leave/LeaveManagement",         "#e83e8c", "staff.view",      true),
                 ("Inventory",  "bx-package",         "/ERP/Inventory/InventoryItem",       "#ff5722", "inventory.view",  inventory),
+                ("Transport",  "bx-bus",             "/ERP/Transport/LiveTracking",        "#0ea5e9", "transport.view",  transport),
                 ("Reminders",  "bx-bell",            "/ERP/FeeDueReminders",               "#ff8a00", "fees.view",       true),
                 // Was /ERP/Reports, which does not exist.
                 ("Reports",    "bx-bar-chart-alt-2", "/ERP/Fee/Reports",                   "#009688", "fees.view",       true),

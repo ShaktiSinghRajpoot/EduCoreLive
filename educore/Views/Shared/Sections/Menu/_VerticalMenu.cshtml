@@ -1,4 +1,4 @@
-﻿@using EduCoreDataAccessLayer.Helpers
+@using EduCoreDataAccessLayer.Helpers
 @using EduCoreDataAccessLayer.Services.Contract.ERP
 @using System.Security.Claims
 @inject IAdmissionWorkflowService AdmissionWorkflowService
@@ -169,7 +169,9 @@
                 {
                 <li class='menu-item @On("Registration")'><a asp-area="ERP" asp-controller="Registration" asp-action="Index" class="menu-link"><i class="bx bx-clipboard submenu-icon c-orange"></i><div class="text-truncate">Registrations</div></a></li>
                 }
-                @if (Can("students.view"))
+                @* Admitting writes a student (students.manage); a view-only role used to see
+                   this link and then could not save the form. *@
+                @if (Can("students.manage"))
                 {
                 <li class='menu-item @On("Admission/Create")'><a asp-area="ERP" asp-controller="Admission" asp-action="Create" class="menu-link"><i class="bx bx-user-plus submenu-icon c-green"></i><div class="text-truncate">New Admission</div></a></li>
                 }
@@ -187,7 +189,10 @@
             </a>
             <ul class="menu-sub">
                 <li class='menu-item @On("StudentList")'><a asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Student Directory</div></a></li>
+                @if (Can("students.manage"))
+                {
                 <li class='menu-item @On("Promotion")'><a asp-area="ERP" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
+                }
                 <li class='menu-item @On("Student/Inactive")'><a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
                 <li class='menu-item @On("Tc/Register")'><a asp-area="ERP" asp-controller="Tc" asp-action="Register" class="menu-link"><i class="bx bx-award submenu-icon c-teal"></i><div class="text-truncate">TC Register</div></a></li>
                 <li class='menu-item @On("IdCard")'><a asp-area="ERP" asp-controller="IdCard" asp-action="Index" class="menu-link"><i class="bx bx-id-card submenu-icon c-purple"></i><div class="text-truncate">ID Cards</div></a></li>
