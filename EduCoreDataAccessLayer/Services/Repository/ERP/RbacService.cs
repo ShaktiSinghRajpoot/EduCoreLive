@@ -123,23 +123,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             if (role == null) return null;
 
             // 1) the global catalog
-            var catalog = new List<PermissionItem>();
-            var catDs = await _db.ExecuteProcedureWithCursorsAsync(
-                SpCatalog,
-                new NpgsqlParameter[]
-                {
-                    new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "perm_cursor" }
-                });
-            if (catDs.Tables.Count > 0)
-                foreach (DataRow r in catDs.Tables[0].Rows)
-                    catalog.Add(new PermissionItem
-                    {
-                        PermissionId  = IntVal(r, "permission_id"),
-                        PermissionKey = Str(r, "permission_key"),
-                        ModuleGroup   = Str(r, "module_group"),
-                        DisplayName   = Str(r, "display_name"),
-                        SortOrder     = IntVal(r, "sort_order")
-                    });
+            var catalog = await GetCatalogAsync();
 
             // 2) currently granted permission ids for this role
             var granted = new HashSet<int>();
@@ -185,6 +169,29 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 matrix.Groups.Add(mg);
             }
             return matrix;
+        }
+
+        // The global permission catalog (the same for every school).
+        public async Task<List<PermissionItem>> GetCatalogAsync()
+        {
+            var catalog = new List<PermissionItem>();
+            var catDs = await _db.ExecuteProcedureWithCursorsAsync(
+                SpCatalog,
+                new NpgsqlParameter[]
+                {
+                    new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "perm_cursor" }
+                });
+            if (catDs.Tables.Count > 0)
+                foreach (DataRow r in catDs.Tables[0].Rows)
+                    catalog.Add(new PermissionItem
+                    {
+                        PermissionId  = IntVal(r, "permission_id"),
+                        PermissionKey = Str(r, "permission_key"),
+                        ModuleGroup   = Str(r, "module_group"),
+                        DisplayName   = Str(r, "display_name"),
+                        SortOrder     = IntVal(r, "sort_order")
+                    });
+            return catalog;
         }
 
         public async Task<(bool Ok, string Message)> SavePermissionsAsync(

@@ -24,13 +24,15 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> Index()
         {
             var roles = await _rbac.GetRolesAsync(TenantId(), SchoolId(), UserId());
+            ViewBag.Templates = RoleTemplates.All;
             return View(roles);
         }
 
         // ── POST: create / rename a role ────────────────────────
+        // templateName (new roles only) = "Start from template" on the create form.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Save(RoleModel model)
+        public async Task<IActionResult> Save(RoleModel model, string? templateName)
         {
             if (string.IsNullOrWhiteSpace(model.RoleName))
             {
@@ -43,6 +45,13 @@ namespace educore.Areas.ERP.Controllers
 
             if (id <= 0) TempData["ErrorMessage"] = message;
             else TempData["SuccessMessage"] = op == "INSERT" ? "Role created." : "Role updated.";
+
+            if (id > 0 && op == "INSERT")
+            {
+                var template = RoleTemplates.Find(templateName);
+                if (template != null && template.Keys.Length > 0)
+                    await ApplyTemplateAsync(id, template);
+            }
 
             // New role → go straight to its (empty) permission matrix.
             if (id > 0 && op == "INSERT")
@@ -87,6 +96,28 @@ namespace educore.Areas.ERP.Controllers
                 TempData["ErrorMessage"] = message;
             }
             return RedirectToAction("Permissions", new { id = roleId });
+        }
+
+        // Ticks the template's keys on a just-created role. Only keys that exist in the
+        // catalog are used; the save proc writes the audit row as for a manual save.
+        private async Task ApplyTemplateAsync(int roleId, RoleTemplates.RoleTemplate template)
+        {
+            var catalog = await _rbac.GetCatalogAsync();
+            var ids = catalog.Where(p => RoleTemplates.Grants(template, p.PermissionKey))
+                             .Select(p => p.PermissionId)
+                             .ToList();
+            if (ids.Count == 0) return;
+
+            var (ok, message) = await _rbac.SavePermissionsAsync(roleId, ids, TenantId(), SchoolId(), UserId());
+            if (ok)
+            {
+                _perms.InvalidateRole(TenantId(), SchoolId(), roleId);
+                TempData["SuccessMessage"] = $"Role created with the {template.Name} permissions. Review the ticks below.";
+            }
+            else
+            {
+                TempData["ErrorMessage"] = "Role created, but the template could not be applied: " + message;
+            }
         }
 
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");

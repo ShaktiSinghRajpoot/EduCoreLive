@@ -1,6 +1,7 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model List<EduCoreDataAccessLayer.Models.RoleModel>
 @{
+    var templates = ViewBag.Templates as List<educore.Helpers.RoleTemplates.RoleTemplate> ?? new List<educore.Helpers.RoleTemplates.RoleTemplate>();
     ViewData["Title"] = "Roles & Permissions";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 }
@@ -114,9 +115,21 @@
           <label class="form-label fw-bold">Role Name <span class="text-danger">*</span></label>
           <input type="text" name="RoleName" id="rmRoleName" class="form-control" maxlength="50" required placeholder="e.g. Librarian" />
         </div>
-        <div class="mb-1">
+        <div class="mb-3">
           <label class="form-label fw-bold">Description</label>
           <textarea name="Description" id="rmDescription" class="form-control" rows="2" maxlength="250" placeholder="What this role is for (optional)"></textarea>
+        </div>
+        <!-- New roles only: tick a starting set of permissions (can be changed afterwards). -->
+        <div class="mb-1" id="rmTemplateWrap">
+          <label class="form-label fw-bold">Start from template</label>
+          <select name="templateName" id="rmTemplate" class="form-select" onchange="showTemplateHint()">
+            <option value="">No template (empty role)</option>
+            @foreach (var t in templates)
+            {
+              <option value="@t.Name" data-hint="@(t.Hint ?? "")">@t.Name</option>
+            }
+          </select>
+          <div class="form-text" id="rmTemplateHint">Optional. The permissions are ticked for you on the next screen, where you can change them.</div>
         </div>
       </div>
       <div class="modal-footer">
@@ -129,19 +142,34 @@
 
 @section PageScripts {
 <script>
+  var TEMPLATE_HINT = 'Optional. The permissions are ticked for you on the next screen, where you can change them.';
+
   function newRole(){
     document.getElementById('rmTitle').textContent = 'New Role';
     document.getElementById('rmRoleId').value = 0;
     document.getElementById('rmRoleName').value = '';
     document.getElementById('rmDescription').value = '';
+    document.getElementById('rmTemplate').value = '';
+    document.getElementById('rmTemplateWrap').style.display = '';
+    showTemplateHint();
   }
   function editRole(id, name, desc){
     document.getElementById('rmTitle').textContent = 'Edit Role';
     document.getElementById('rmRoleId').value = id;
     document.getElementById('rmRoleName').value = name;
     document.getElementById('rmDescription').value = desc;
+    // Templates apply only when a role is created.
+    document.getElementById('rmTemplate').value = '';
+    document.getElementById('rmTemplateWrap').style.display = 'none';
     var m = new bootstrap.Modal(document.getElementById('roleModal'));
     m.show();
+  }
+  // The chosen template's own hint (e.g. Driver), else the general one.
+  function showTemplateHint(){
+    var sel = document.getElementById('rmTemplate');
+    var opt = sel.options[sel.selectedIndex];
+    var hint = opt ? opt.getAttribute('data-hint') : '';
+    document.getElementById('rmTemplateHint').textContent = hint || TEMPLATE_HINT;
   }
 </script>
 }

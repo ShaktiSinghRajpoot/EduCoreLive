@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Day Close";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canReopen = (bool?)ViewBag.CanReopen ?? false;
 }
 
 @*
@@ -119,6 +120,7 @@ $(function () {
     var CSRF=$('input[name="__RequestVerificationToken"]').val();
     var URL={ get:'@Url.Action("GetDayCollection","Fee",new{area="ERP"})', close:'@Url.Action("CloseDay","Fee",new{area="ERP"})', reopen:'@Url.Action("ReopenDay","Fee",new{area="ERP"})' };
     var expected=0;
+    var CAN_REOPEN = @(canReopen ? "true" : "false");   // fees.reopen
 
     function todayStr(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
     $('#dDate').val(todayStr());
@@ -156,8 +158,8 @@ $(function () {
                 $('#remarks').val(d.closeRemarks||'').prop('disabled', true);
                 $('#closedBadge').removeClass('d-none');
                 $('#closedNote').removeClass('d-none');
-                $('#closedText').text('This day was closed'+(d.closedAt?' on '+d.closedAt:'')+'. Counted '+EC.money(d.countedCash)+', difference '+EC.money(d.difference)+'. Re-open it (with a reason) to record a new count.');
-                $('#btnClose').addClass('d-none'); $('#btnReopen').removeClass('d-none');
+                $('#closedText').text('This day was closed'+(d.closedAt?' on '+d.closedAt:'')+'. Counted '+EC.money(d.countedCash)+', difference '+EC.money(d.difference)+'. '+(CAN_REOPEN ? 'Re-open it (with a reason) to record a new count.' : 'Ask someone who can re-open closed days to record a new count.'));
+                $('#btnClose').addClass('d-none'); $('#btnReopen').toggleClass('d-none', !CAN_REOPEN);
             } else {
                 $('#counted').val('').prop('disabled', false); $('#remarks').val('').prop('disabled', false);
                 $('#closedBadge').addClass('d-none');

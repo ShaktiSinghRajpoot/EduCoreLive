@@ -60,6 +60,13 @@ namespace educore.Areas.ERP.Controllers
             return isAdmin;
         }
 
+        // Entering marks needs exams.marks; exams.manage includes it.
+        private async Task<bool> CanEnterMarksAsync()
+        {
+            return await HasPermissionAttribute.UserHasAsync(this, "exams.marks")
+                || await HasPermissionAttribute.UserHasAsync(this, "exams.manage");
+        }
+
         // ── Exam Schedule ──
         // An exam is school-wide; each class it covers gets its own datesheet.
 
@@ -72,6 +79,9 @@ namespace educore.Areas.ERP.Controllers
 
             ViewBag.Classes = await _subject.GetClassesAsync(
                 TenantId(), SchoolId(), UserId(), (int)ViewBag.SessionId);
+
+            // Create / edit / publish / delete buttons are shown only with exams.manage.
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "exams.manage");
 
             try { ViewBag.ExamTypes = await _referenceData.GetOptionsAsync("ExamType", TenantId(), SchoolId()); }
             catch { ViewBag.ExamTypes = new List<SelectListItem>(); }
@@ -312,8 +322,7 @@ namespace educore.Areas.ERP.Controllers
 
             // Only a school admin may reopen a finalized sheet.
             ViewBag.IsAdmin   = await IsAdminAsync();
-            ViewBag.CanManage = await _permission.HasPermissionAsync(
-                TenantId(), SchoolId(), UserId(), "exams.manage");
+            ViewBag.CanEnterMarks = await CanEnterMarksAsync();
 
             return View();
         }
@@ -382,11 +391,15 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
+        // Saving and finalising marks: exams.marks or exams.manage (checked in the action
+        // because the attribute can only require one key).
         [HttpPost]
-        [HasPermission("exams.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveMarks([FromBody] ExamMarksSaveRequest request)
         {
+            if (!await CanEnterMarksAsync())
+                return StatusCode(StatusCodes.Status403Forbidden);
+
             var result = await _exam.SaveMarksAsync(request, TenantId(), SchoolId(), UserId());
             return Json(new
             {

@@ -275,3 +275,57 @@ with `;`): `sp_staff_manage.sql` → `staff_list.sql` → `staff_masters_manage.
 - The untracked bundle `Database/deploy_2026_10_10b_parts/part2.sql` holds the OLD
   `sp_staff_manage`. Running it after these scripts would create a second overload. Regenerate
   the bundle from the scripts before deploying.
+
+---
+
+## G. Staff self-service: My Leave / My Payslip (SS) — added 2026-10-11
+
+Every signed-in user with a staff record in the school (`core.staff.user_id` = the user, same
+tenant/school, not deleted) gets **My Leave** (`/ERP/MyLeave`) and **My Payslip**
+(`/ERP/MyPayslip`, one slip at `/ERP/MyPayslip/Slip/{id}`). No permission key: the staff record
+is the permission. Script `Database/staff_self_service.sql`: `core.fn_my_staff_id`,
+`core.sp_staff_my_leave` (ME / LIST / BALANCE / DAYS / APPLY / CANCEL), `core.sp_staff_my_payslip`
+(LIST / GET). Neither proc has a staff id parameter; BALANCE / DAYS / APPLY / CANCEL call
+`core.sp_staff_leave_manage` with the resolved staff id, so every leave rule above (D5–D7) is
+the HR one, unchanged.
+
+SQL suite: `Database/tests/staff_self_service_tests.sql` (own users + staff, Jan–Mar 2027 on a
+Mon–Sat week; rolls back). **RESULT: 58 passed, 0 failed.**
+
+| ID | Scenario | Expected | Layer | Result |
+|---|---|---|---|---|
+| SS-A1 | ME for a staff user | own staff row | Proc | PASS |
+| SS-A2..A6 | User with no staff record (school admin 39) | ME / LIST / payslips empty; APPLY and BALANCE refused "no staff record" | Proc | PASS |
+| SS-A7 | Posted staff id | the self-service procs have no `p_staff_id` at all; controllers take none | Proc + Controller | PASS |
+| SS-B1/B2 | Preview and apply 4–16 Jan 2027 | 12 working days | Proc | PASS |
+| SS-B3 | Stored as | Pending, own staff id, `applied_by` = own user, canonical type | Proc | PASS |
+| SS-B4/B5 | HR side | visible on Leave Management (LIST Pending) and in the dashboard Pending Approvals cursor | Proc | PASS |
+| SS-B6/B7 | 13th Casual day | refused ("apply the rest as Unpaid"); same day as Unpaid accepted | Proc | PASS |
+| SS-B8 | Overlap with own request | refused | Proc | PASS |
+| SS-B9/B10 | Half day; Sunday alone | 0.5; refused (no working days) | Proc | PASS |
+| SS-B11/B12 | Unknown type; before joining | refused | Proc | PASS |
+| SS-B13/B14 | Colleague applies | lands on the colleague; never in my list | Proc | PASS |
+| SS-B15/B16 | My list | my 3 requests, with who applied | Proc | PASS |
+| SS-C1..C4 | Balance | identical to HR's BALANCE for me (all 6 types, every figure); Casual 0 left; Sick pending 0.5; default = current year | Proc | PASS |
+| SS-D1/D1b | Cancel a colleague's request | "not found"; still Pending | Proc | PASS |
+| SS-D2..D4 | Cancel own pending | reason required; Cancelled with who/when/why; not twice | Proc | PASS |
+| SS-D5/D5b | `can_cancel` in LIST | true only for pending and approved-future-unpaid-month; decided-by shown | Proc | PASS |
+| SS-D6..D8 | Approved: started / month already paid / future | refused / refused / cancelled with the approval kept | Proc | PASS |
+| SS-D9 | My request from another school's scope | refused | Proc | PASS |
+| SS-E1/E2 | Inactive staff applies | refused, nothing written | Proc | PASS |
+| SS-F1..F5 | My payslips | only my 3 (Draft + Paid, newest first); no colleague / other-school slip; no `payment_reference` / `paid_by` column; mode shown | Proc | PASS |
+| SS-F6 | GET own slip | figures + staff + school name | Proc | PASS |
+| SS-F7..F10 | GET a colleague's id, another school's id, my user under another scope, another school's user under ours | nothing | Proc | PASS |
+| SS-F11..F14 | Other users | each sees only their own slip; admin without staff record nothing; deleted staff row nothing | Proc | PASS |
+| SS-G1..G4 | Platform scope; leakage | refused; nothing written in 23/33 | Proc | PASS |
+| SS-UI-01 | Menu | "My Leave" / "My Payslip" under My Bus only with a current (not Inactive) staff record and the Payroll module on (cached 5 min, like My Bus) | UI | static `_VerticalMenu.cshtml` |
+| SS-UI-02 | Dashboard Quick Access | My Leave / My Payslip tiles under the same rule | Controller | static `DashboardsController.BuildQuickLinksAsync` |
+| SS-UI-03 | Payroll module off | pages show "turned off", Apply refused; Cancel still allowed | Controller | static `MyLeaveController`, `MyPayslipController` |
+| SS-UI-04 | Slip of someone else by URL | 404 | Controller | static `MyPayslipController.Slip` |
+| SS-UI-05 | Page JS | EC helpers, EC.esc on every value, EC.prompt with required reason for cancel | UI-JS | `node --check` on the extracted script |
+
+Decisions: draft payslips are shown, marked **Draft** ("figures can still change"); the payment
+reference and the payer are never returned to the staff member (mode + date only); an Inactive
+staff member keeps read access to their own history (their login is switched off on
+deactivation anyway) but cannot apply. Leave belongs to the Payroll module, as Leave Management
+already does, so both self-service pages follow that switch.

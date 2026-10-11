@@ -3,6 +3,7 @@
 @using System.Security.Claims
 @inject IAdmissionWorkflowService AdmissionWorkflowService
 @inject ITransportTrackingService TransportTrackingService
+@inject IStaffSelfService StaffSelfService
 @inject EduCoreDataAccessLayer.Services.IPermissionService PermissionService
 
 @{
@@ -76,7 +77,16 @@
         try { gMyBus = await TransportTrackingService.IsDriverAsync(_tId, _sId, _uId); }
         catch { /* the menu must never fail to render */ }
     }
-    bool gInventory   = showInventory && Can("inventory.view");
+    // "My Leave" / "My Payslip" are for anyone with a current staff record here,
+    // whatever their role; having the staff record is the permission (cached 5 min).
+    // Leave and salary both belong to the Payroll module.
+    bool gMyStaff = false;
+    if (showPayroll && _tId > 1 && _sId > 0)
+    {
+        try { gMyStaff = await StaffSelfService.HasStaffRecordAsync(_tId, _sId, _uId); }
+        catch { /* the menu must never fail to render */ }
+    }
+    bool gInventory  = showInventory && Can("inventory.view");
     bool secPeople    = gStaff || gTransport || gInventory;
 
     // Setup screens used to sit in ONE 14-item "School Settings" group, which was
@@ -144,6 +154,22 @@
             <a asp-area="ERP" asp-controller="MyBus" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-bus ic-bus"></i>
                 <div class="text-truncate">My Bus</div>
+            </a>
+        </li>
+        }
+
+        @if (gMyStaff)
+        {
+        <li class='menu-item @On("MyLeave")'>
+            <a asp-area="ERP" asp-controller="MyLeave" asp-action="Index" class="menu-link">
+                <i class="menu-icon icon-base bx bx-calendar-minus ic-hr"></i>
+                <div class="text-truncate">My Leave</div>
+            </a>
+        </li>
+        <li class='menu-item @On("MyPayslip")'>
+            <a asp-area="ERP" asp-controller="MyPayslip" asp-action="Index" class="menu-link">
+                <i class="menu-icon icon-base bx bx-receipt ic-hr"></i>
+                <div class="text-truncate">My Payslip</div>
             </a>
         </li>
         }

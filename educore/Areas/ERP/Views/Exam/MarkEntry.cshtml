@@ -6,7 +6,7 @@
     var examGroups = ViewBag.ExamGroups as List<ExamSessionGroup> ?? new List<ExamSessionGroup>();
     var examCount  = examGroups.Sum(g => g.Exams.Count);
     var yearName  = ViewBag.AcademicYearName as string ?? string.Empty;
-    var canManage = (bool?)ViewBag.CanManage ?? false;
+    var canEnterMarks = (bool?)ViewBag.CanEnterMarks ?? false;
     var isAdmin   = (bool?)ViewBag.IsAdmin   ?? false;
     var selected  = (int?)ViewBag.SelectedExamId ?? 0;
 }
@@ -214,7 +214,7 @@ var urls = {
     reopen:  '@Url.Action("ReopenSheet", "Exam", new { area = "ERP" })'
 };
 
-var CAN_MANAGE = @(canManage ? "true" : "false");
+var CAN_ENTER_MARKS = @(canEnterMarks ? "true" : "false");
 
 var state = {
     examId: 0, classId: 0, subjectId: 0, section: '',
@@ -440,8 +440,8 @@ function entered() {
 }
 
 // Marks and the absent toggle are locked once finalized, once the exam's
-// results are published, and for anyone without exams.manage.
-function locked() { return state.finalized || state.resultsPublished || !CAN_MANAGE; }
+// results are published, and for anyone without exams.marks / exams.manage.
+function locked() { return state.finalized || state.resultsPublished || !CAN_ENTER_MARKS; }
 
 // Pass/fail shows as a row tint, so it needs no column of its own.
 function rowClass(row) {

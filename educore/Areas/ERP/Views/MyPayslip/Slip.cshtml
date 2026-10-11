@@ -1,0 +1,141 @@
+@model EduCoreDataAccessLayer.Models.ERP.MyPayslip
+@{
+    // A stand-alone page (like the TC print) so it prints clean on A4 and reads well on a phone.
+    Layout = null;
+    var p = Model;
+    var inr = new System.Globalization.CultureInfo("en-IN");
+    bool paid = string.Equals(p.Status, "Paid", StringComparison.OrdinalIgnoreCase);
+    string period = new DateTime(p.PayYear, Math.Clamp(p.PayMonth, 1, 12), 1)
+        .ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture);
+    string M(decimal v) => "₹" + v.ToString("N2", inr);
+    string D(decimal v) => v.ToString("0.#");
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Payslip — @period</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f5f5f9; font-family: "Public Sans", -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #2b2c40; }
+        .bar { max-width: 760px; margin: 16px auto 0; padding: 0 16px; display: flex; justify-content: space-between; gap: 8px; }
+        .bar a, .bar button { font: inherit; font-weight: 700; font-size: .9rem; padding: .55rem 1rem; border-radius: 10px; border: 1px solid #d9dee3; background: #fff; color: #2b2c40; text-decoration: none; cursor: pointer; }
+        .bar button { background: #ff8a00; border-color: #ff8a00; color: #fff; }
+        .sheet { max-width: 760px; margin: 12px auto 24px; background: #fff; border: 1px solid #ececf5; border-radius: 18px; overflow: hidden; }
+        .head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1.1rem 1.4rem; background: linear-gradient(135deg, #fff4e6, #fff 72%); border-bottom: 1px solid #ececf5; flex-wrap: wrap; }
+        .school { font-size: 1.05rem; font-weight: 900; color: #2b1b12; }
+        .label { font-size: .7rem; font-weight: 800; color: #8b8175; text-transform: uppercase; letter-spacing: .04em; }
+        .period { font-weight: 900; color: #2b1b12; }
+        .who { padding: .9rem 1.4rem; border-bottom: 1px solid #ececf5; }
+        .who .nm { font-weight: 900; color: #2b1b12; }
+        .who .sub { font-size: .8rem; color: #8b8175; font-weight: 700; }
+        .att { display: flex; gap: .5rem; flex-wrap: wrap; padding: .8rem 1.4rem; background: #faf9f7; border-bottom: 1px solid #ececf5; }
+        .chip { background: #fff; border: 1px solid #ececf5; border-radius: 10px; padding: .4rem .65rem; text-align: center; min-width: 80px; }
+        .chip .v { font-weight: 900; color: #2b1b12; }
+        .chip .l { font-size: .64rem; font-weight: 800; text-transform: uppercase; color: #8b8175; }
+        .cols { display: grid; grid-template-columns: 1fr 1fr; }
+        .col { padding: 1rem 1.3rem; }
+        .col.earn { border-right: 1px solid #ececf5; }
+        .col-title { font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .6rem; }
+        .earn .col-title { color: #16a34a; }
+        .ded .col-title { color: #dc2626; }
+        .line { display: flex; justify-content: space-between; gap: 1rem; font-size: .86rem; padding: .4rem 0; border-bottom: 1px dashed #efece8; }
+        .line span:first-child { color: #8b8175; font-weight: 700; }
+        .line span:last-child { font-weight: 800; font-variant-numeric: tabular-nums; }
+        .line.total { border-bottom: 0; margin-top: .3rem; padding-top: .6rem; border-top: 2px solid #ececf5; }
+        .line.total span { font-weight: 900; color: #2b1b12; }
+        .net { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.4rem; background: #16a34a; color: #fff; }
+        .net .l { font-size: .8rem; font-weight: 800; text-transform: uppercase; }
+        .net .v { font-size: 1.6rem; font-weight: 900; }
+        .status { padding: .8rem 1.4rem; font-size: .85rem; font-weight: 700; }
+        .status.paid { color: #15803d; }
+        .status.draft { color: #b7791f; }
+        .note { font-size: .72rem; color: #8b8175; font-weight: 700; padding: 0 1.4rem 1rem; }
+        @@media (max-width: 575.98px) {
+            .cols { grid-template-columns: 1fr; }
+            .col.earn { border-right: 0; border-bottom: 1px solid #ececf5; }
+        }
+        @@media print {
+            body { background: #fff; }
+            .bar { display: none; }
+            .sheet { margin: 0; border: 0; border-radius: 0; max-width: none; }
+            .net { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @@page { size: A4; margin: 12mm; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bar">
+        <a asp-action="Index">&larr; My Payslips</a>
+        <button type="button" onclick="window.print()">Print</button>
+    </div>
+
+    <div class="sheet">
+        <div class="head">
+            <div>
+                <div class="school">@(string.IsNullOrWhiteSpace(p.SchoolName) ? "Payslip" : p.SchoolName)</div>
+                <div class="label">Salary slip</div>
+            </div>
+            <div style="text-align:right">
+                <div class="label">Pay period</div>
+                <div class="period">@period</div>
+            </div>
+        </div>
+
+        <div class="who">
+            <div class="nm">@p.FullName</div>
+            <div class="sub">@(string.IsNullOrWhiteSpace(p.EmployeeCode) ? "—" : p.EmployeeCode) · @(string.IsNullOrWhiteSpace(p.Designation) ? "—" : p.Designation)@(string.IsNullOrWhiteSpace(p.Department) ? "" : " · " + p.Department)</div>
+        </div>
+
+        <div class="att">
+            <div class="chip"><div class="v">@D(p.WorkingDays)</div><div class="l">Working days</div></div>
+            <div class="chip"><div class="v">@D(p.PaidDays)</div><div class="l">Days employed</div></div>
+            <div class="chip"><div class="v">@D(p.LopDays)</div><div class="l">LOP days</div></div>
+        </div>
+
+        <div class="cols">
+            <div class="col earn">
+                <div class="col-title">Earnings</div>
+                <div class="line"><span>Monthly salary (rate)</span><span>@M(p.MonthlySalary)</span></div>
+                @if (p.PaidDays < p.WorkingDays)
+                {
+                    <div class="line"><span>Earned for @D(p.PaidDays) of @D(p.WorkingDays) days</span><span>@M(p.Gross)</span></div>
+                }
+                @if (p.OtherAdd > 0)
+                {
+                    <div class="line"><span>Additions</span><span>@M(p.OtherAdd)</span></div>
+                }
+                <div class="line total"><span>Gross earnings</span><span>@M(p.Gross + p.OtherAdd)</span></div>
+            </div>
+            <div class="col ded">
+                <div class="col-title">Deductions</div>
+                @if (p.LopDays > 0)
+                {
+                    <div class="line"><span>Loss of pay (@D(p.LopDays) d)</span><span>@M(p.LopAmount)</span></div>
+                }
+                @if (p.OtherDeduct > 0)
+                {
+                    <div class="line"><span>Advances / deductions</span><span>@M(p.OtherDeduct)</span></div>
+                }
+                <div class="line total"><span>Total deductions</span><span>@M(p.TotalDeduct)</span></div>
+            </div>
+        </div>
+
+        <div class="net">
+            <span class="l">Net salary</span>
+            <span class="v">@M(p.NetPay)</span>
+        </div>
+
+        @if (paid)
+        {
+            <div class="status paid">Paid on @(p.PaidAt?.ToString("dd MMM yyyy") ?? "—")@(string.IsNullOrWhiteSpace(p.PaymentMode) ? "" : " · " + p.PaymentMode)</div>
+        }
+        else
+        {
+            <div class="status draft">Draft — not paid yet. The figures can still change until the school office pays this slip.</div>
+        }
+        <div class="note">Days are school working days (School Calendar). Gross = salary × days employed ÷ working days; loss of pay = approved unpaid leave days at the same rate.</div>
+    </div>
+</body>
+</html>

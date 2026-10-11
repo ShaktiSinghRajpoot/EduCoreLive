@@ -247,6 +247,7 @@ builder.Services.AddScoped<IPublicIdService, PublicIdService>();
 // Apply/Approve/Run/Mark Paid only set a TempData message.
 builder.Services.AddScoped<IStaffLeaveService, StaffLeaveService>();
 builder.Services.AddScoped<IStaffPayrollService, StaffPayrollService>();
+builder.Services.AddScoped<IStaffSelfService, StaffSelfService>();   // My Leave / My Payslip
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 
 // The landing dashboard. Every number on it used to be hardcoded in the view.

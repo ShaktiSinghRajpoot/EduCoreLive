@@ -9,6 +9,7 @@
     var yearName  = ViewBag.AcademicYearName as string ?? string.Empty;
     var sessions  = ViewBag.Sessions as List<SelectListItem> ?? new List<SelectListItem>();
     var sessionId = (int?)ViewBag.SessionId ?? 0;
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // exams.manage
     var currentSessionId = 0;
     var cur = sessions.FirstOrDefault(x => x.Selected);
     if (cur != null) { int.TryParse(cur.Value, out currentSessionId); }
@@ -195,12 +196,19 @@
                 <div class="exam-bar-summary">
                     <span id="barSummary">Fill in the exam details to begin.</span>
                 </div>
+                @if (canManage)
+                {
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-ex-ghost" id="cancelBtn">Clear</button>
                     <button type="button" class="btn btn-ex-primary" id="saveExamBtn" disabled>
                         <i class="bx bx-save me-1"></i>Save Exam
                     </button>
                 </div>
+                }
+                else
+                {
+                <span class="text-muted small">View only &mdash; creating or changing exams needs the Examinations &mdash; Manage permission.</span>
+                }
             </div>
         </div>
 
@@ -246,6 +254,7 @@ $(document).ready(function () {
     };
 
     var SESSION_ID = @sessionId;
+    var CAN_MANAGE = @(canManage ? "true" : "false");   // edit / publish / delete buttons
 
     // Changing the session reloads the page: the class list, subjects and exam
     // list all belong to one session, so a partial refresh would mix them.
@@ -803,7 +812,7 @@ $(document).ready(function () {
                         : '<span class="exam-badge is-draft">DRAFT</span>';
 
                     var actions = '';
-                    if (first) {
+                    if (first && CAN_MANAGE) {
                         actions =
                             '<button type="button" class="btn btn-ex-ghost exam-edit" title="Edit"><i class="bx bx-edit"></i></button>' +
                             (r.status === 'Published'

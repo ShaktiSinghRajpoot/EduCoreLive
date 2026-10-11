@@ -7,8 +7,9 @@
 -- defaults are applied per school, and ONLY where that role has no grant at all
 -- for that school: a school that already configured a role is never touched.
 --
---   TEACHER       students.view, attendance.view/manage, exams.view/manage,
---                 academics.view
+--   TEACHER       students.view, attendance.view/manage, exams.view, exams.marks,
+--                 academics.view   (exams.marks replaced exams.manage on
+--                 2026-10-11 -- see permissions_exams_reopen.sql)
 --   ACCOUNTANT    fees.view/manage/collect/cancel/refund/concession,
 --                 reports.view, inventory.view
 --   RECEPTIONIST  enquiry.view/manage, registration.view/manage,
@@ -51,7 +52,7 @@ BEGIN
         FROM config.permissions p
         WHERE p.permission_key = ANY (CASE r.role_code
             WHEN 'TEACHER'      THEN ARRAY['students.view', 'attendance.view', 'attendance.manage',
-                                           'exams.view', 'exams.manage', 'academics.view']
+                                           'exams.view', 'exams.marks', 'academics.view']
             WHEN 'ACCOUNTANT'   THEN ARRAY['fees.view', 'fees.manage', 'fees.collect', 'fees.cancel',
                                            'fees.refund', 'fees.concession', 'reports.view', 'inventory.view']
             WHEN 'RECEPTIONIST' THEN ARRAY['enquiry.view', 'enquiry.manage', 'registration.view',

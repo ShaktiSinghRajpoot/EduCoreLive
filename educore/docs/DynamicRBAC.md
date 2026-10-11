@@ -185,6 +185,14 @@ Single-feature controllers carry a controller-level `.view` gate and a `.manage`
 
 **Mixed-feature controllers are tagged per action** (no controller-level gate):
 
+- **`ERP/Exam`** — `SaveMarks` needs `exams.marks` **or** `exams.manage` (checked inside the
+  action); exam setup, grade scale and publishing stay `exams.manage`.
+- **`ERP/Fee`** — `ReopenDay` needs `fees.reopen` (granted to no role by default).
+
+**Role templates:** the New Role form offers "Start from template"; the sets live in
+`educore/Helpers/RoleTemplates.cs` and are ticked by `RolesController` right after the role is
+created (only keys present in `config.permissions`).
+
 - **`Admin/SchoolSettings`** — `BasicProfile`/`AcademicYears` → `settings`; `FeeHead`/`FeeStructure`
   → `fees`; `ClassSection`/`Subjects`/`Timetable`/`PeriodStructure`/`AssignClassTeacher` →
   `academics`; `EnquiryCRM` → `enquiry`. GETs use `.view`, mutations use `.manage`.

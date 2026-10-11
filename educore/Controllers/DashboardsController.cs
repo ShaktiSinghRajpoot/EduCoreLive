@@ -15,10 +15,13 @@ namespace educore.Controllers
         private readonly IAdmissionWorkflowService _workflow;
         private readonly ITransportTrackingService _tracking;
         private readonly IBaseService _baseService;
+        private readonly IStaffSelfService _self;
 
         public DashboardsController(IDashboardService dashboardService, IAdmissionWorkflowService workflow,
-                                    ITransportTrackingService tracking, IBaseService baseService)
+                                    ITransportTrackingService tracking, IBaseService baseService,
+                                    IStaffSelfService self)
         {
+            _self = self;
             _dashboardService = dashboardService;
             _workflow = workflow;
             _tracking = tracking;
@@ -116,6 +119,17 @@ namespace educore.Controllers
             var links = new List<DashboardLink>();
             if (isDriver)
                 links.Add(new DashboardLink { Label = "My Bus", Icon = "bx-bus", Url = "/ERP/MyBus", Color = "#ff8a00" });
+            // My Leave / My Payslip: for anyone with a current staff record (no permission key).
+            bool isStaff = false;
+            if (payroll)
+            {
+                try { isStaff = await _self.HasStaffRecordAsync(t, s, u); } catch { isStaff = false; }
+            }
+            if (isStaff)
+            {
+                links.Add(new DashboardLink { Label = "My Leave",   Icon = "bx-calendar-minus", Url = "/ERP/MyLeave",   Color = "#e83e8c" });
+                links.Add(new DashboardLink { Label = "My Payslip", Icon = "bx-receipt",        Url = "/ERP/MyPayslip", Color = "#16a34a" });
+            }
             foreach (var l in all)
                 if (l.On && await Can(l.Key))
                     links.Add(new DashboardLink { Label = l.Label, Icon = l.Icon, Url = l.Url, Color = l.Color });

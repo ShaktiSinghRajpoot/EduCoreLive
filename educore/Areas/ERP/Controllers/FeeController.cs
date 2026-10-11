@@ -32,7 +32,12 @@ namespace educore.Areas.ERP.Controllers
 
         // ── Pages ────────────────────────────────────────────────
         public IActionResult ManageFee() => View();
-        public IActionResult DayClose() => View();
+        public async Task<IActionResult> DayClose()
+        {
+            // The Re-open button shows only with fees.reopen (ReopenDay enforces it too).
+            ViewBag.CanReopen = await HasPermissionAttribute.UserHasAsync(this, "fees.reopen");
+            return View();
+        }
         // The Defaulters tab opens on the current session (sp_dropdown_common marks it).
         public async Task<IActionResult> Reports()
         {
@@ -455,9 +460,10 @@ namespace educore.Areas.ERP.Controllers
         // ── POST: /ERP/Fee/ReopenDay ─────────────────────────────
         // Re-opens the cashier's own closed day so a correction can be made and the
         // day closed again. A reason is required; the earlier count stays in the
-        // close history and is never overwritten.
+        // close history and is never overwritten. Needs its own fees.reopen key so a
+        // school can let a cashier close a day without letting them re-open it.
         [HttpPost]
-        [HasPermission("fees.manage")]
+        [HasPermission("fees.reopen")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ReopenDay([FromBody] ReopenDayRequest req)
         {

@@ -4864,3 +4864,61 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   schools. Bundle: `deploy_2026_10_11f.sql`.
 - Tested in the browser with one login per role (admin, teacher, accountant, receptionist,
   driver, transport in-charge, cashier, front office, HR manager).
+
+### [2026-10-11] Exam marks and day re-open get their own permissions; role templates
+
+- **`exams.marks`** ("Examinations — Enter marks"): `ExamController.SaveMarks` (save + finalise)
+  now needs `exams.marks` **or** `exams.manage` (a small `CanEnterMarksAsync` check in the
+  action, since the attribute takes one key). Creating/editing/deleting exams, the grade scale
+  and publish/unpublish stay `exams.manage`. Marks Entry locks the grid without either key;
+  Exam Schedule hides Save/Clear and the row edit/publish/delete buttons without
+  `exams.manage` (Grade Scale and Result Sheet already did).
+- **`fees.reopen`** ("Fees & Collection — Re-open a closed day"): `FeeController.ReopenDay`
+  needs it instead of `fees.manage`; the Day Close page hides Re-open without it. Not copied
+  to any role on purpose — school admins bypass as always, anyone else is ticked deliberately.
+- **`permissions_exams_reopen.sql`** (re-runnable): adds both keys; copies every live
+  `exams.manage` grant to `exams.marks` (nobody loses mark entry); removes the default
+  `exams.manage` from built-in TEACHER roles (rows with `created_by = 0` never edited since —
+  a school that re-ticks it keeps it on a re-run). `builtin_role_defaults.sql`: TEACHER now
+  gets `exams.marks` instead of `exams.manage`.
+- **Role templates** (Roles → New Role → "Start from template"): Principal, Transport
+  In-charge, Driver, Store Keeper, HR / Office, Cashier, Teacher-like, Accountant-like,
+  Receptionist-like. Defined once in `educore/Helpers/RoleTemplates.cs`; after the role is
+  created the server ticks the template's keys that exist in the catalog through
+  `config.sp_role_permissions_save` (so the audit row is written as for a manual save) and
+  invalidates the role's cache. The school can change the ticks afterwards.
+  `IRbacService.GetCatalogAsync` was extracted from `GetMatrixAsync` for this.
+- **Tests:** `tests/permissions_split_templates_tests.sql` (23 checks). Every suite in
+  `Database/tests` re-run green (35 suites); no existing check asserted the old teacher set.
+- **Deploy order (re-runnable, each ends with a semicolon):** `permissions_exams_reopen.sql`,
+  then `builtin_role_defaults.sql`. App restart needed (new binaries; it also clears the
+  cached role permissions).
+
+### [2026-10-11] Staff self-service: My Leave and My Payslip
+
+- **What:** every signed-in user with a staff record in the school (`core.staff.user_id` = the
+  user, same tenant/school, not deleted) gets **My Leave** (`/ERP/MyLeave`: balance per type for
+  the year, own requests with who/when/why, apply for themselves, cancel own request) and **My
+  Payslip** (`/ERP/MyPayslip`: own generated payslips marked Draft / Paid; `/ERP/MyPayslip/Slip/{id}`
+  is a stand-alone printable slip). No permission key, same pattern as My Bus: the staff record
+  is the permission and the procedure re-checks it on every call.
+- **`staff_self_service.sql`** (new, re-runnable): `core.fn_my_staff_id(tenant, school, user)`,
+  `core.sp_staff_my_leave` (ME / LIST / BALANCE / DAYS / APPLY / CANCEL) and
+  `core.sp_staff_my_payslip` (LIST / GET). Neither proc takes a staff id: it is resolved from the
+  user id, and someone else's leave or payslip id reads as "not found". BALANCE / DAYS / APPLY /
+  CANCEL `CALL core.sp_staff_leave_manage` with the resolved id, so caps, School Calendar day
+  count, half days, overlap, joining / last working day, inactive staff and the cancel rule are
+  the HR ones, unchanged (the HR procs were not widened). A self-applied request is an ordinary
+  Pending row (`applied_by` = the staff member) and shows on Leave Management and the dashboard
+  Pending Approvals. Payslips never return `payment_reference` or `paid_by` (mode + date only).
+- **App:** `IStaffSelfService` / `StaffSelfService` (PgExec; Warning log with SqlState on a
+  `PostgresException`), models in `Models/ERP/StaffSelfModel.cs`, `MyLeaveController`,
+  `MyPayslipController`, views `Areas/ERP/Views/MyLeave/Index`, `MyPayslip/{Index,Slip}`. Menu
+  entries under My Bus and two Quick Access tiles, shown only with a current (not Inactive) staff
+  record and the Payroll module on (`HasStaffRecordAsync`, cached 5 min like `IsDriverAsync`).
+  Leave follows the Payroll module switch, as Leave Management already did.
+- **Tests:** `tests/staff_self_service_tests.sql` (58 checks); cases appended to
+  `educore/docs/test-cases/hr_leave_payroll.md` (section G). Every suite in `Database/tests`
+  re-run green (36 suites).
+- **Deploy:** `staff_self_service.sql` (after `staff_leave.sql` / `staff_payroll.sql`); app restart
+  (new binaries).

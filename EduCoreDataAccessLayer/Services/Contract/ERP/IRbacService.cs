@@ -12,6 +12,7 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<(int RoleId, string Message)> DeleteRoleAsync(int roleId, int tenantId, int schoolId, int actionUserId);
 
         // Permission matrix
+        Task<List<PermissionItem>> GetCatalogAsync();
         Task<RolePermissionMatrix?> GetMatrixAsync(int roleId, int tenantId, int schoolId, int actionUserId);
         Task<(bool Ok, string Message)> SavePermissionsAsync(int roleId, IEnumerable<int> permissionIds, int tenantId, int schoolId, int actionUserId);
 
