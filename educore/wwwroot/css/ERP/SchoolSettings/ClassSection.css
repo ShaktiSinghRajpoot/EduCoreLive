@@ -85,9 +85,9 @@
 .cs-sec{ border:1px solid var(--ec-border); border-radius:14px; background:#fcfbf9; padding:.85rem .9rem; transition:var(--ec-transition); }
 .cs-sec:hover{ background:#fff; border-color:rgba(255,138,0,.35); }
 .cs-sec-top{ display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.55rem; }
-.cs-sec-name{ display:flex; align-items:center; gap:.5rem; }
-.cs-sec-badge{ width:30px; height:30px; border-radius:9px; background:var(--ec-primary-light); color:var(--ec-primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.85rem; }
-.cs-sec-title{ font-weight:800; color:var(--ec-text-dark); font-size:.88rem; }
+.cs-sec-name{ display:flex; align-items:center; gap:.5rem; min-width:0; }
+.cs-sec-badge{ flex-shrink:0; width:30px; height:30px; border-radius:9px; background:var(--ec-primary-light); color:var(--ec-primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.85rem; }
+.cs-sec-title{ font-weight:800; color:var(--ec-text-dark); font-size:.88rem; line-height:1.2; overflow-wrap:anywhere; }
 .cs-sec-meta{ font-size:.72rem; color:var(--ec-text-muted); font-weight:650; display:flex; align-items:center; gap:.3rem; margin-bottom:.5rem; }
 .cs-sec-meta i{ font-size:.9rem; }
 
