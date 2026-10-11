@@ -29,3 +29,7 @@ educore/App_Data/keys/
 # OS noise
 Thumbs.db
 .DS_Store
+
+# Files schools upload (logos, student photos): real school data, never commit.
+# UploadPaths.FolderFor creates the folders on first upload.
+educore/wwwroot/uploads/
