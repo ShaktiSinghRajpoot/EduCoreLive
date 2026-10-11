@@ -29,6 +29,7 @@ Everything hangs off a single global `EC`.
 | `EC.money(n)` | `₹1,234.56` — Indian grouping, always two decimals |
 | `EC.num(v)` | Safe `Number()`, keeps negatives (arithmetic results) |
 | `EC.numPos(v)` | Safe `Number()`, clamps negatives to 0 (amounts the user typed) |
+| `EC.sectionBadge(name)` / `EC.sectionTitle(name)` | Section card badge and title: "A" / "Section A", but a long batch name ("Morning 8-9 AM") gets "M" / "Morning 8-9 AM" |
 
 Notifications live separately, in `_Scripts.cshtml`:
 

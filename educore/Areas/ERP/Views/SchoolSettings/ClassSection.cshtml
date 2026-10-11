@@ -392,11 +392,7 @@ function render(){
 
     var secCards=c.sections.map(function(s){
       var p=s.cap?Math.round(s.str/s.cap*100):0;
-      // The badge fits one or two characters. A long name such as an institute's
-      // batch "Morning 8-9 AM" gets its first letter there, and its title is the
-      // name itself ("Section Morning 8-9 AM" read oddly).
-      var badge=s.name.length<=2 ? s.name : s.name.charAt(0).toUpperCase();
-      var title=s.name.length<=3 ? 'Section '+s.name : s.name;
+      var badge=EC.sectionBadge(s.name), title=EC.sectionTitle(s.name);   // site.js
       return '<div class="cs-sec">'
         +'<div class="cs-sec-top">'
         +  '<div class="cs-sec-name"><span class="cs-sec-badge">'+EC.esc(badge)+'</span><span class="cs-sec-title">'+EC.esc(title)+'</span></div>'

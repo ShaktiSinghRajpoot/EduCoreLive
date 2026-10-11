@@ -241,8 +241,8 @@ function render(){
         : '<span class="act-stat empty"><i class="bx bx-error-circle"></i>Unassigned</span>';
 
       return '<div class="act-row'+(s.teacherId?'':' unassigned')+'">'
-        +'<div class="act-sec-name"><span class="act-sec-badge">'+EC.esc(s.name)+'</span>'
-        +  '<div><div class="act-sec-title">Section '+EC.esc(s.name)+'</div><div class="act-sec-sub">Room '+EC.esc(s.room||'—')+'</div></div></div>'
+        +'<div class="act-sec-name"><span class="act-sec-badge">'+EC.esc(EC.sectionBadge(s.name))+'</span>'
+        +  '<div><div class="act-sec-title">'+EC.esc(EC.sectionTitle(s.name))+'</div><div class="act-sec-sub">Room '+EC.esc(s.room||'—')+'</div></div></div>'
         +'<div>'+selectHtml(s)+'</div>'
         +'<div>'+loadHtml+'</div>'
         +'<div class="text-lg-end">'+statHtml+'</div>'

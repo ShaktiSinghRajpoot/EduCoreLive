@@ -668,4 +668,20 @@ EC.isRealRoom = function (room) {
     return r !== '' && r !== 'na' && r !== 'nil' && r !== 'none';
 };
 
+// ── Section badge and title ─────────────────────────────────────────────
+// Section cards show a small square badge and a title. A school's sections are
+// "A", "B": badge "A", title "Section A". An institute's batches are named
+// "Morning 8-9 AM", which overflowed the badge and read "Section Morning 8-9 AM".
+// A long name gets its first letter in the badge and is its own title.
+// Used by Classes & Sections and Assign Class Teacher, so both agree.
+EC.sectionBadge = function (name) {
+    name = name || '';
+    return name.length <= 2 ? name : name.charAt(0).toUpperCase();
+};
+
+EC.sectionTitle = function (name) {
+    name = name || '';
+    return name.length <= 3 ? 'Section ' + name : name;
+};
+
 window.EC = EC;
