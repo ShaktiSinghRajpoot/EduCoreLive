@@ -16,6 +16,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private readonly PgExec _db;
         private readonly AppCache _cache;
         private readonly ILogger<SchoolSettingsService> _logger;
+        // Largest amount a single fee head / structure line may carry (one crore).
+        // The columns are numeric(12,2); this keeps every total built from them in range.
+        public const decimal MaxFeeAmount = 10000000m;
+
         private const string SpBasicProfileManage = "core.sp_school_admin_basic_profile_manage";
         private const string SpReceiptFormatManage = "core.sp_school_receipt_format_manage";
         private const string SpTcFormatManage = "core.sp_school_tc_format_manage";
@@ -975,6 +979,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         {
             if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
 
+            // default_amount is numeric(12,2), and the structure totals multiply it by
+            // up to 12, so a huge typo used to fail in the database with a raw
+            // "numeric field overflow". One crore per head is far above any real fee.
+            if (model.DefaultAmount > MaxFeeAmount)
+                return (false, $"Default amount cannot be more than {MaxFeeAmount:N0}.");
+
             model.TenantId = tenantId;
             model.SchoolId = schoolId;
 
@@ -1007,7 +1017,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             {
                 _logger.LogWarning(ex, "SaveFeeHead refused ({SqlState}) for tenant {TenantId}, school {SchoolId}",
                     ex.SqlState, tenantId, schoolId);
-                return (false, ex.MessageText);
+                // P0001 = a RAISE from the proc, written for the user. Anything else
+                // (overflow, constraint) is not, so it gets a plain sentence instead.
+                return (false, ex.SqlState == PostgresErrorCodes.RaiseException
+                    ? ex.MessageText
+                    : "Could not save the fee head. Please check the values and try again.");
             }
 
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
@@ -1401,6 +1415,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var selectedFeeHeads = model.FeeHeads.Where(x => x.IsSelected).ToList();
             if (selectedFeeHeads.Count == 0)
                 return (false, "Select at least one fee head.");
+
+            // Same cap as a fee head's default amount (the columns are numeric(12,2)).
+            if (selectedFeeHeads.Any(h => h.Amount > MaxFeeAmount))
+                return (false, $"An amount cannot be more than {MaxFeeAmount:N0}.");
 
             // One payload per class, sent whole. This used to be a header call plus
             // one call per fee head, each in its own transaction -- and the header

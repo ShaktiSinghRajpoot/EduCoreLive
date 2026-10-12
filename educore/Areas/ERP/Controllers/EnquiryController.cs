@@ -432,6 +432,43 @@ namespace educore.Areas.ERP.Controllers
             if (registrationFeePaid && discountValue > 0 && string.IsNullOrWhiteSpace(discountReason))
                 return (false, "Please provide a reason for the registration discount.", null, null);
 
+            // Work the fee out BEFORE registering, so an over-sized discount or an
+            // amount above what is payable is refused while nothing has been written.
+            // These used to be capped silently: a 600 collection on a 450 payable
+            // quietly became 450, and a discount above the fee became a full waiver.
+            // The amount is master data -- the sum of Registration-point Fee Heads for
+            // the enquiry's class -- never trusted from the client.
+            bool takesFee = registrationFeePaid && workflow.EnableRegistration && workflow.EnableRegistrationFee;
+            EnquiryModel? enquiry = null;
+            decimal regFee = 0m, discountAmount = 0m;
+            string? discType = null;
+            if (takesFee)
+            {
+                enquiry = await _enquiryService.GetEnquiryByIdAsync(enquiryId, tenantId, schoolId, actionUserId);
+                if (enquiry != null)
+                {
+                    regFee = await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
+                        enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
+                        "Registration", tenantId, schoolId, actionUserId);
+
+                    // Discount amount is computed HERE from the chosen type + value --
+                    // the client only picks type/value/reason, never the amount.
+                    if (regFee > 0 && discountValue > 0 && !string.IsNullOrWhiteSpace(discountType))
+                    {
+                        discType = string.Equals(discountType, "Percentage", StringComparison.OrdinalIgnoreCase)
+                            ? "Percentage" : "Fixed";
+                        discountAmount = discType == "Percentage"
+                            ? Math.Round(regFee * discountValue / 100m, 2)
+                            : discountValue;
+                        if (discountAmount > regFee)
+                            return (false, $"Discount cannot exceed the registration fee of {regFee:N2}.", null, null);
+                    }
+
+                    if (regFee > 0 && collectAmount is > 0 && collectAmount.Value > regFee - discountAmount)
+                        return (false, $"Collecting {collectAmount.Value:N2} is more than the {regFee - discountAmount:N2} payable.", null, null);
+                }
+            }
+
             var regDate = Dates.Norm(registrationDate);
 
             var (success, message, regNo) = await _enquiryService.RegisterEnquiryAsync(
@@ -446,70 +483,44 @@ namespace educore.Areas.ERP.Controllers
                 tenantId, schoolId, actionUserId);
 
             // When the registration fee was collected, record a real payment + receipt.
-            // The amount is master data — the sum of Registration-point Fee Heads for the
-            // enquiry's class — never trusted from the client.
             string? receiptNo = null;
-            if (success > 0 && registrationFeePaid && workflow.EnableRegistration && workflow.EnableRegistrationFee)
+            if (success > 0 && takesFee && enquiry != null)
             {
-                var enquiry = await _enquiryService.GetEnquiryByIdAsync(enquiryId, tenantId, schoolId, actionUserId);
-                if (enquiry != null)
+                if (regFee > 0)
                 {
-                    decimal regFee = await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
-                        enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
-                        "Registration", tenantId, schoolId, actionUserId);
+                    // What the parent actually hands over. The full net is the default,
+                    // so a caller that does not send an amount behaves as before; a
+                    // smaller figure is a part payment and leaves a balance behind.
+                    decimal net  = regFee - discountAmount;
+                    decimal cash = collectAmount is > 0 ? collectAmount.Value : net;
 
-                    if (regFee > 0)
+                    var (paid, payMsg, rcp, balance) = await _feePaymentService.RecordRegistrationPaymentAsync(
+                        enquiryId, cash,
+                        NullIfEmpty(paymentMode) ?? "Cash",
+                        NullIfEmpty(paymentReference),
+                        "Registration fee",
+                        enquiry.Session,
+                        tenantId, schoolId, actionUserId,
+                        discountAmount, discType, NullIfEmpty(discountReason),
+                        feeAmount: regFee);
+
+                    if (paid)
                     {
-                        // Discount amount is computed HERE from the chosen type + value —
-                        // the client only picks type/value/reason, never the amount. Capped
-                        // at the fee (a 100% / over-value discount = full waiver, net 0).
-                        decimal discountAmount = 0m;
-                        string? discType = null;
-                        if (discountValue > 0 && !string.IsNullOrWhiteSpace(discountType))
-                        {
-                            discType = string.Equals(discountType, "Percentage", StringComparison.OrdinalIgnoreCase)
-                                ? "Percentage" : "Fixed";
-                            discountAmount = discType == "Percentage"
-                                ? Math.Round(regFee * discountValue / 100m, 2)
-                                : discountValue;
-                            if (discountAmount > regFee) discountAmount = regFee;
-                            if (discountAmount < 0) discountAmount = 0m;
-                        }
-
-                        // What the parent actually hands over. The full net is the default,
-                        // so a caller that does not send an amount behaves as before; a
-                        // smaller figure is a part payment and leaves a balance behind.
-                        decimal net  = regFee - discountAmount;
-                        decimal cash = collectAmount is > 0 ? Math.Min(collectAmount.Value, net) : net;
-
-                        var (paid, payMsg, rcp, balance) = await _feePaymentService.RecordRegistrationPaymentAsync(
-                            enquiryId, cash,
-                            NullIfEmpty(paymentMode) ?? "Cash",
-                            NullIfEmpty(paymentReference),
-                            "Registration fee",
-                            enquiry.Session,
-                            tenantId, schoolId, actionUserId,
-                            discountAmount, discType, NullIfEmpty(discountReason),
-                            feeAmount: regFee);
-
-                        if (paid)
-                        {
-                            receiptNo = rcp;
-                            // Say what is still owed. Silence here is how a balance gets
-                            // forgotten at the counter.
-                            if (balance > 0)
-                                message = $"{message} {payMsg}";
-                        }
-                        else
-                        {
-                            message = $"{message} Fee not recorded: {payMsg}";
-                        }
+                        receiptNo = rcp;
+                        // Say what is still owed. Silence here is how a balance gets
+                        // forgotten at the counter.
+                        if (balance > 0)
+                            message = $"{message} {payMsg}";
                     }
                     else
                     {
-                        // Say so rather than quietly registering without the fee.
-                        message = $"{message} Fee not recorded: no registration fee is set up for this class.";
+                        message = $"{message} Fee not recorded: {payMsg}";
                     }
+                }
+                else
+                {
+                    // Say so rather than quietly registering without the fee.
+                    message = $"{message} Fee not recorded: no registration fee is set up for this class.";
                 }
             }
 

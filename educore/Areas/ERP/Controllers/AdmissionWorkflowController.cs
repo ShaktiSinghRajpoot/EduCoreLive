@@ -77,7 +77,7 @@ namespace educore.Areas.ERP.Controllers
         // Collection Point / refundable flag preset — the school only types a name +
         // amount, never touches the Fee Head master.
         [HttpPost]
-        [HasPermission("fees.manage")]
+        [HasPermission("settings.manage")]   // fee master: admin-level, not the cashier's fees.manage
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveSetupFee([FromBody] SetupFeeRequest req)
         {
@@ -130,7 +130,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpPost]
-        [HasPermission("fees.manage")]
+        [HasPermission("settings.manage")]   // fee master: admin-level, not the cashier's fees.manage
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteSetupFee([FromBody] IdRequest req)
         {
@@ -139,7 +139,7 @@ namespace educore.Areas.ERP.Controllers
 
             // This endpoint exists to clear the two cards on THIS page, and it took
             // whatever id it was handed -- so a crafted post deleted any fee head in
-            // the school through a screen that shows two. The caller has fees.manage
+            // the school through a screen that shows two. The caller has settings.manage
             // and could do it from the Fee Head master anyway, but a button that
             // deletes something other than the thing beside it is a trap for the
             // next person editing this page, not a security boundary.

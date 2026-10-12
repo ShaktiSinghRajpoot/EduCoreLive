@@ -258,6 +258,8 @@
         public string?   PaymentType   { get; set; }
         public bool      IsCancelled   { get; set; }
         public string?   GivenBy       { get; set; }
+        /// <summary>Approver picked from a list by the cashier (not verified); GivenBy is the real user.</summary>
+        public string?   ApprovedBy    { get; set; }
         public string?   DiscountType  { get; set; }
         public decimal   DiscountValue { get; set; }
         public string?   Reason        { get; set; }

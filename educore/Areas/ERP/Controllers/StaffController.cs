@@ -203,6 +203,16 @@ namespace educore.Areas.ERP.Controllers
 
             var model = await _staffService.GetStaffByIdAsync(staffId, TenantId(), SchoolId(), UserId());
             if (model == null) return RedirectToAction("StaffList");
+
+            // staff.view alone can open this form but cannot save it, so it gets the
+            // same masked Aadhaar as the profile. Only staff.manage sees the full number.
+            if (!string.IsNullOrWhiteSpace(model.Aadhaar)
+                && !await HasPermissionAttribute.UserHasAsync(this, "staff.manage"))
+            {
+                var digits = new string(model.Aadhaar.Where(char.IsDigit).ToArray());
+                model.Aadhaar = digits.Length < 4 ? "XXXX XXXX XXXX" : "XXXX XXXX " + digits[^4..];
+            }
+
             await FillDropdownsAsync(model);
             return View(model);
         }

@@ -94,7 +94,7 @@
           </div>
           <div class="col-12 col-sm-6">
             <label class="form-label">Mobile</label>
-            <input type="text" class="form-control" id="spMobile" maxlength="20">
+            <input type="tel" class="form-control" id="spMobile" maxlength="10" inputmode="numeric">
           </div>
           <div class="col-12 col-sm-6">
             <label class="form-label">Email</label>
@@ -246,6 +246,10 @@
         if (email && !/^[^@@\s]+@@[^@@\s]+\.[^@@\s]+$/.test(email)) {
             ecToast('warning', 'Enter a valid email address.'); $('#spEmail').focus(); return;
         }
+        var mobile = $.trim($('#spMobile').val());
+        if (mobile && !/^[6-9][0-9]{9}$/.test(mobile)) {
+            ecToast('warning', 'Enter a valid 10-digit mobile number.'); $('#spMobile').focus(); return;
+        }
         if (gstin && !/^[0-9A-Z]{15}$/.test(gstin)) {
             ecToast('warning', 'A GSTIN is 15 letters and digits.'); $('#spGstin').focus(); return;
         }
@@ -255,7 +259,7 @@
             supplierId:    EC.num($('#spId').val()) || 0,
             supplierName:  name,
             contactPerson: $.trim($('#spContact').val()),
-            mobile:        $.trim($('#spMobile').val()),
+            mobile:        mobile,
             email:         email,
             gstin:         gstin,
             address:       $.trim($('#spAddress').val())

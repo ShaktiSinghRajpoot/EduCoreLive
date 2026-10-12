@@ -99,6 +99,9 @@ $(function(){
     var no=$('#vNo').val().trim(); if(!no){ ecToast('warning','Enter a vehicle number.'); return; }
     var capRaw=$('#vCap').val().trim();
     if(capRaw!=='' && !(Number(capRaw)>=1)){ ecToast('warning','Capacity must be at least 1 seat, or left blank.'); return; }
+    // Without a linked driver the phone is saved as typed: optional, but a 10-digit mobile.
+    var dp=$('#vDp').val().trim();
+    if(!$('#vDsid').val() && dp!=='' && !/^[6-9][0-9]{9}$/.test(dp)){ ecToast('warning','Enter a valid 10-digit driver phone number.'); return; }
     // Busy while saving: a double click used to register the bus twice.
     var $btn=$(this); EC.buttonBusy($btn,'Saving…');
     post(URL.save,{ vehicleId:Number($('#vId').val())||0, vehicleNo:no, capacity:capRaw===''?null:Number(capRaw),

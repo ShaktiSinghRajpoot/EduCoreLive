@@ -65,73 +65,28 @@
     @* Right items — flex-shrink-0 so bell + avatar are never compressed *@
     <ul class="navbar-nav flex-row align-items-center gap-2 flex-shrink-0">
 
-        @* ── Notifications ──────────────────────────────────────────── *@
+        @* ── Notifications ────────────────────────────────────────────
+           There is no notification feed yet, so the bell shows an honest
+           empty state and no unread badge (it used to show hard-coded
+           demo items with a fixed "3"). *@
         <li class="nav-item dropdown">
             <a class="nav-link p-2 position-relative"
                href="javascript:void(0);"
                data-bs-toggle="dropdown"
                aria-expanded="false"
-               aria-label="Notifications, 3 unread">
+               aria-label="Notifications">
                 <i class="icon-base bx bx-bell bx-sm" aria-hidden="true"></i>
-                <span class="badge rounded-pill bg-danger position-absolute top-0 start-100 translate-middle"
-                      style="font-size:.65rem;padding:.2em .4em;">
-                    3<span class="visually-hidden"> unread notifications</span>
-                </span>
             </a>
 
             @* max-width: min(320px, 90vw) stops dropdown overflowing on narrow screens *@
             <div class="dropdown-menu dropdown-menu-end shadow-sm p-0"
                  style="width:320px;max-width:min(320px,90vw);">
-                <div class="d-flex align-items-center justify-content-between px-4 py-3 border-bottom">
+                <div class="px-4 py-3 border-bottom">
                     <h6 class="mb-0 fw-semibold">Notifications</h6>
-                    <span class="badge bg-label-danger rounded-pill">3 new</span>
                 </div>
-                <ul class="list-unstyled mb-0" style="max-height:260px;overflow-y:auto;">
-                    <li class="border-bottom">
-                        <a href="javascript:void(0);"
-                           class="dropdown-item px-4 py-3 d-flex gap-3 align-items-start">
-                            <div class="avatar flex-shrink-0" style="width:34px;height:34px;">
-                                <span class="avatar-initial rounded-circle bg-label-warning">
-                                    <i class="bx bx-wallet" style="font-size:14px;"></i>
-                                </span>
-                            </div>
-                            <div class="overflow-hidden">
-                                <p class="mb-0 fw-medium small text-truncate">3 fee payments due today</p>
-                                <small class="text-muted">2 hours ago</small>
-                            </div>
-                        </a>
-                    </li>
-                    <li class="border-bottom">
-                        <a href="javascript:void(0);"
-                           class="dropdown-item px-4 py-3 d-flex gap-3 align-items-start">
-                            <div class="avatar flex-shrink-0" style="width:34px;height:34px;">
-                                <span class="avatar-initial rounded-circle bg-label-info">
-                                    <i class="bx bx-user-plus" style="font-size:14px;"></i>
-                                </span>
-                            </div>
-                            <div class="overflow-hidden">
-                                <p class="mb-0 fw-medium small text-truncate">New admission enquiry received</p>
-                                <small class="text-muted">5 hours ago</small>
-                            </div>
-                        </a>
-                    </li>
-                    <li>
-                        <a href="javascript:void(0);"
-                           class="dropdown-item px-4 py-3 d-flex gap-3 align-items-start">
-                            <div class="avatar flex-shrink-0" style="width:34px;height:34px;">
-                                <span class="avatar-initial rounded-circle bg-label-success">
-                                    <i class="bx bx-file" style="font-size:14px;"></i>
-                                </span>
-                            </div>
-                            <div class="overflow-hidden">
-                                <p class="mb-0 fw-medium small text-truncate">Exam results upload pending</p>
-                                <small class="text-muted">Yesterday</small>
-                            </div>
-                        </a>
-                    </li>
-                </ul>
-                <div class="text-center border-top py-2">
-                    <a href="javascript:void(0);" class="small fw-medium">View all</a>
+                <div class="text-center text-muted small px-4 py-4">
+                    <i class="bx bx-bell-off d-block mx-auto mb-2" style="font-size:1.75rem;opacity:.35"></i>
+                    No notifications
                 </div>
             </div>
         </li>

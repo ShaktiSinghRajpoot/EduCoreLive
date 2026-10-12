@@ -55,6 +55,13 @@ if (builder.Environment.IsDevelopment())
 }
 
 builder.Services.AddRazorPages();
+
+// WHY: the antiforgery cookie follows the same Security:RequireHttps switch as the auth and
+// session cookies -- Secure-only with HTTPS, SameAsRequest on plain-HTTP hosting.
+builder.Services.AddAntiforgery(options =>
+{
+    options.Cookie.SecurePolicy = cookieSecurePolicy;
+});
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSession(options =>
@@ -296,11 +303,19 @@ else
 
 app.UseStatusCodePagesWithReExecute("/Account/Error");
 
+// Security headers on every response.
+// - frame-ancestors 'self' (and the matching X-Frame-Options for older browsers): only
+//   this site may frame its pages, which blocks clickjacking.
+// - Deliberately NO script-src: inline <script> blocks are used on most pages.
+// - geolocation=(self): My Bus (driver live tracking) reads the phone's GPS from our own
+//   origin. Photo capture uses <input capture>, which camera=() does not block.
 app.Use(async (context, next) =>
 {
-    context.Response.Headers["X-Frame-Options"] = "DENY";
+    context.Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+    context.Response.Headers["Content-Security-Policy"] = "frame-ancestors 'self'";
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)";
 
     await next();
 });

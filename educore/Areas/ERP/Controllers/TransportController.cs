@@ -102,6 +102,14 @@ namespace educore.Areas.ERP.Controllers
             if (vehicle == null || string.IsNullOrWhiteSpace(vehicle.VehicleNo))
                 return Json(new { success = false, message = "Vehicle number is required." });
 
+            // With a driver linked the proc copies the phone from the staff record, so
+            // only a free-text phone (no driver) is checked: optional, but when given a
+            // 10-digit Indian mobile (same rule as StaffModel.Mobile). "123" used to be saved.
+            vehicle.DriverPhone = string.IsNullOrWhiteSpace(vehicle.DriverPhone) ? null : vehicle.DriverPhone.Trim();
+            if (vehicle.DriverStaffId is not > 0 && vehicle.DriverPhone != null
+                && !System.Text.RegularExpressions.Regex.IsMatch(vehicle.DriverPhone, "^[6-9][0-9]{9}$"))
+                return Json(new { success = false, message = "Enter a valid 10-digit driver phone number." });
+
             var (ok, msg) = await _transportService.SaveVehicleAsync(vehicle, TenantId(), SchoolId(), UserId());
             return Json(new { success = ok, message = msg });
         }

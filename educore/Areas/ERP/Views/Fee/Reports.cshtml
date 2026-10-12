@@ -298,6 +298,12 @@ $(function () {
     // ── concessions & cancellations ──
     var auditData={concessions:[],cancels:[]};
     $('#aFrom').val(monthStart()); $('#aTo').val(todayStr());
+    // The approver is picked from a list at the counter, so it is always shown
+    // with the user who actually entered the discount.
+    function givenByText(r){
+        if(!r.approvedBy) return EC.esc(r.givenBy||'—');
+        return 'Authorised by '+EC.esc(r.approvedBy)+(r.givenBy?' <span class="text-muted">(entered by '+EC.esc(r.givenBy)+')</span>':'');
+    }
     function loadAudit(){
         $.getJSON(URL.audit,{from:$('#aFrom').val(),to:$('#aTo').val()}).done(function(d){
             auditData=d;
@@ -308,7 +314,7 @@ $(function () {
             $('#aCancCount').text(canc.length);
             $('#aConcRows').html(conc.length? conc.map(function(r){
                 var kind=(r.type==='Registration'?'Registration · ':'')+(r.kind||'—');
-                return '<tr'+(r.cancelled?' class="text-decoration-line-through text-muted" title="Receipt cancelled later"':'')+'><td class="text-muted">'+EC.esc(r.date||'—')+'</td><td class="fw-semibold">'+EC.esc(r.receiptNo)+'</td><td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td><td>'+EC.esc(kind)+'</td><td>'+EC.esc(r.reason||'—')+'</td><td>'+EC.esc(r.givenBy||'—')+'</td><td class="num fw-bold" style="color:var(--info)">'+EC.money(r.amount)+'</td></tr>';
+                return '<tr'+(r.cancelled?' class="text-decoration-line-through text-muted" title="Receipt cancelled later"':'')+'><td class="text-muted">'+EC.esc(r.date||'—')+'</td><td class="fw-semibold">'+EC.esc(r.receiptNo)+'</td><td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td><td>'+EC.esc(kind)+'</td><td>'+EC.esc(r.reason||'—')+'</td><td>'+givenByText(r)+'</td><td class="num fw-bold" style="color:var(--info)">'+EC.money(r.amount)+'</td></tr>';
             }).join('') : '<tr><td colspan="7" class="text-muted text-center py-4">No concessions in this range.</td></tr>');
             $('#aCancRows').html(canc.length? canc.map(function(r){
                 return '<tr><td class="text-muted">'+EC.esc(r.cancelledAt||r.date||'—')+'</td><td class="fw-semibold">'+EC.esc(r.receiptNo)+'</td><td>'+EC.esc(r.student)+'<div class="text-muted" style="font-size:.72rem">'+EC.esc(r.admNo)+'</div></td><td>'+EC.esc(r.reason||'—')+'</td><td>'+EC.esc(r.authorisedBy||'—')+'</td><td>'+EC.esc(r.cancelledBy||'—')+'</td><td>'+EC.esc(r.collectedBy||'—')+'</td><td class="num fw-bold" style="color:var(--dng)">'+EC.money(r.amount)+'</td></tr>';
@@ -318,7 +324,7 @@ $(function () {
     $('#aLoad').on('click', loadAudit);
     $('#aCsv').on('click', function(){
         var rows=[['Register','Date','Receipt','Student','Adm/Reg No','Type','Reason','Authorised','By','Collected by','Cancelled later','Amount']];
-        (auditData.concessions||[]).forEach(function(r){ rows.push(['Concession',r.date,r.receiptNo,r.student,r.admNo,(r.type==='Registration'?'Registration ':'')+(r.kind||''),r.reason,'',r.givenBy,'',r.cancelled?'Yes':'',r.amount]); });
+        (auditData.concessions||[]).forEach(function(r){ rows.push(['Concession',r.date,r.receiptNo,r.student,r.admNo,(r.type==='Registration'?'Registration ':'')+(r.kind||''),r.reason,r.approvedBy||'',r.givenBy,'',r.cancelled?'Yes':'',r.amount]); });
         (auditData.cancels||[]).forEach(function(r){ rows.push(['Cancellation',r.cancelledAt||r.date,r.receiptNo,r.student,r.admNo,'',r.reason,r.authorisedBy,r.cancelledBy,r.collectedBy,'',r.amount]); });
         csv(rows,'concessions-cancellations.csv');
     });

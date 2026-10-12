@@ -41,6 +41,17 @@ namespace EduCoreDataAccessLayer.Helpers
         /// <summary>Now, on the school's clock. Use instead of DateTime.Now.</summary>
         public static DateTime Now => DateTimeOffset.UtcNow.ToOffset(SchoolOffset).DateTime;
 
+        /// <summary>
+        /// A UTC moment (what Npgsql returns for a timestamptz column, Kind=Utc) on
+        /// the school's clock. Printing the UTC value straight showed a receipt
+        /// cancelled at 3:27 PM as 09:57 AM. Anything not tagged UTC is returned
+        /// as it is, so a plain `timestamp` column is never shifted twice.
+        /// </summary>
+        public static DateTime ToSchool(DateTime value)
+            => value.Kind == DateTimeKind.Utc
+                   ? new DateTimeOffset(value).ToOffset(SchoolOffset).DateTime
+                   : value;
+
         /// <summary>Today as ISO text, on the school's clock.</summary>
         public static string Today => Now.ToString(Iso, CultureInfo.InvariantCulture);
 

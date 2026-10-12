@@ -220,6 +220,14 @@ namespace educore.Areas.ERP.Controllers
             if (items.Count == 0 && extras.Count == 0)
                 return Json(new { success = false, message = "Enter an amount/concession on a due, or add an extra charge." });
 
+            // The page spreads the discount over the picked dues, and used to cap it
+            // there: a 2,000 discount on a 1,500 due quietly became a full waiver.
+            // A flat discount must land in full, and a percentage cannot pass 100.
+            bool percent = string.Equals(req.DiscountType, "Percent", StringComparison.OrdinalIgnoreCase);
+            if ((percent && req.DiscountValue > 100m)
+                || (!percent && req.DiscountValue > 0 && req.DiscountValue > items.Sum(i => i.Concession) + 0.01m))
+                return Json(new { success = false, message = "Discount cannot exceed the payable amount." });
+
             var tenders = (req.Tenders ?? new List<TenderLine>())
                 .Where(t => t.Amount > 0)
                 .Select(t => new EduCoreDataAccessLayer.Models.ERP.FeeTenderItem
@@ -573,7 +581,7 @@ namespace educore.Areas.ERP.Controllers
                 refunds = refunds.Rows.Select(r => new
                 {
                     refundNo   = r.RefundNo,
-                    date       = r.RefundedAt,
+                    date       = r.RefundedAt?.ToString("dd MMM yyyy, hh:mm tt"),
                     student    = r.StudentName,
                     admNo      = r.AdmissionNo,
                     cls        = string.IsNullOrWhiteSpace(r.ClassName) ? "" : $"{r.ClassName}{(string.IsNullOrWhiteSpace(r.Section) ? "" : " - " + r.Section)}",
@@ -631,6 +639,7 @@ namespace educore.Areas.ERP.Controllers
                     type      = c.PaymentType,
                     cancelled = c.IsCancelled,
                     givenBy   = c.GivenBy,
+                    approvedBy = c.ApprovedBy,
                     kind      = c.DiscountType == "Percent" ? $"{c.DiscountValue}%" : (c.DiscountType ?? ""),
                     reason    = c.Reason
                 }),

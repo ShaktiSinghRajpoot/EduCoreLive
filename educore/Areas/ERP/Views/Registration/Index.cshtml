@@ -412,6 +412,7 @@ $(function () {
     'use strict';
 
     var FEE_ENABLED = @(Model.RegistrationFeeEnabled ? "true" : "false");
+    var CAN_ADMIT = @(ViewBag.CanAdmit == true ? "true" : "false");
     var csrf = $('input[name="__RequestVerificationToken"]').first().val() || $('[name="__RequestVerificationToken"]').val() || '';
     var ADMISSION_URL = '@Url.Action("Create", "Admission", new { area = "ERP" })';
     var ENQUIRY_EDIT_URL = '@Url.Action("EnquiryCRM", "Enquiry", new { area = "ERP" })';
@@ -449,8 +450,8 @@ $(function () {
         // Mark fee paid
         if (FEE_ENABLED && !r.registrationFeePaid && active)
             actions += '<button class="btn btn-sm btn-icon btn-outline-success reg-act-btn btn-fee" title="Mark fee collected" data-id="'+r.enquiryId+'"><i class="bx bx-rupee"></i></button>';
-        // Convert to admission
-        if (active)
+        // Convert to admission (only for users who can admit students)
+        if (active && CAN_ADMIT)
             actions += '<a href="'+ADMISSION_URL+'?enquiryId='+r.enquiryId+'" class="btn btn-sm btn-icon btn-success reg-act-btn" title="Convert to Admission"><i class="bx bx-user-check"></i></a>';
         // Cancel (mark withdrawn / Not Interested — fee retained)
         if (active)

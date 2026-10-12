@@ -97,6 +97,17 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> Create(int? enquiryId)
         {
+            // Saving needs students.manage. Without it the whole form used to open and
+            // only the Save 403'd, so say so up front instead.
+            if (!await HasPermissionAttribute.UserHasAsync(this, "students.manage"))
+            {
+                TempData["Result"] = "0";
+                TempData["Message"] = "You do not have permission to admit students.";
+                return enquiryId is > 0
+                    ? RedirectToAction("Index", "Registration", new { area = "ERP" })
+                    : RedirectToAction("StudentList", "Student", new { area = "ERP" });
+            }
+
             // Direct / walk-in admission (no enquiry) is blocked when registration
             // is mandatory — every student must be registered first. Send them to
             // the Enquiry CRM where an enquiry is created and registered.

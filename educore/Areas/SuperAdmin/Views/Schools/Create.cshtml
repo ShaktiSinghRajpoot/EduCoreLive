@@ -519,6 +519,9 @@
         const totalSteps = 4;
         const isEdit = @(isEdit ? "true" : "false");
         const hasAdmin = @(hasAdmin ? "true" : "false");
+        // Same rule as the server (SchoolManageModel.PasswordPattern): 8+ chars, a letter and a digit.
+        const passwordPattern = new RegExp(@Html.Raw(Json.Serialize(educore.Models.SchoolManageModel.PasswordPattern)));
+        const passwordRuleMessage = @Html.Raw(Json.Serialize(educore.Models.SchoolManageModel.PasswordRuleMessage));
 
         // Scope every selector to this form. The old code bound to a bare
         // $("input, select, textarea"), which also grabbed the layout's navbar search.
@@ -796,27 +799,27 @@
                     fail("Enter valid admin phone number.");
                 }
 
-                // 8, not 6 — the forced first-login reset (ChangePasswordViewModel)
-                // demands 8, so a 6-char password set here could not be re-entered.
+                // passwordPattern: 8+ characters (the forced first-login reset demands 8)
+                // with at least one letter and one digit.
                 if (name === "Password") {
                     if (hasAdmin) {
                         // Existing admin: blank keeps the current password.
-                        if (value !== "" && value.length < 8) {
-                            fail("Password must be at least 8 characters.");
+                        if (value !== "" && !passwordPattern.test(value)) {
+                            fail(passwordRuleMessage);
                         }
                     } else if (isEdit) {
                         // Editing a school with no admin yet — the proc only creates one
                         // when a password is supplied, so it is mandatory here.
                         if (value === "") {
                             fail("This school has no administrator yet — set a password to create one.");
-                        } else if (value.length < 8) {
-                            fail("Password must be at least 8 characters.");
+                        } else if (!passwordPattern.test(value)) {
+                            fail(passwordRuleMessage);
                         }
                     } else if (!$("#AutoGeneratePassword").is(":checked")) {
                         if (value === "") {
                             fail("Password is required.");
-                        } else if (value.length < 8) {
-                            fail("Password must be at least 8 characters.");
+                        } else if (!passwordPattern.test(value)) {
+                            fail(passwordRuleMessage);
                         }
                     }
                 }

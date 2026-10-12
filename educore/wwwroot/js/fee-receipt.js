@@ -82,7 +82,9 @@
             var lbl = 'Concession' +
                 (r.discountType === 'Percent' ? ' (' + r.discountValue + '%)' : '') +
                 (r.discountReason ? ' <span class="rc-muted">' + EC.esc(r.discountReason) + '</span>' : '') +
-                (r.discountApprovedBy ? ' <span class="rc-muted">· approved by ' + EC.esc(r.discountApprovedBy) + '</span>' : '');
+                // The approver is picked from a list by the cashier, so say who entered it too.
+                (r.discountApprovedBy ? ' <span class="rc-muted">· approved by ' + EC.esc(r.discountApprovedBy) +
+                    (r.collectedBy ? ' (entered by ' + EC.esc(r.collectedBy) + ')' : '') + '</span>' : '');
             out += '<tr><td colspan="' + cols + '">' + lbl + '</td><td class="rc-amt">−' + EC.money(r.concession) + '</td></tr>';
         }
         // A registration fee's discount sits on the receipt header, not on lines.
@@ -147,8 +149,10 @@
         if (!r.isCancelled) return '';
         var bits = [];
         if (r.cancelledAt) bits.push('on ' + EC.esc(r.cancelledAt));
-        if (r.cancelledBy) bits.push('by ' + EC.esc(r.cancelledBy));
-        if (r.cancelAuthorisedBy) bits.push('authorised: ' + EC.esc(r.cancelAuthorisedBy));
+        // The approver is picked from a list, so the user who cancelled is shown with it.
+        if (r.cancelAuthorisedBy)
+            bits.push('authorised by ' + EC.esc(r.cancelAuthorisedBy) + (r.cancelledBy ? ' (entered by ' + EC.esc(r.cancelledBy) + ')' : ''));
+        else if (r.cancelledBy) bits.push('by ' + EC.esc(r.cancelledBy));
         return '<div class="rc-void"><b>CANCELLED</b>' + (bits.length ? ' ' + bits.join(' · ') : '') +
                (r.cancelReason ? '<br/>Reason: ' + EC.esc(r.cancelReason) : '') +
                '<br/>This receipt is void and is not proof of payment.</div>';

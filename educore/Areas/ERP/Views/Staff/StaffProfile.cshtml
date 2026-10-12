@@ -6,6 +6,14 @@
     int staffId = Model.StaffId;
 
     string Dash(string? v) => string.IsNullOrWhiteSpace(v) ? "—" : v;
+    // Aadhaar is shown masked to the last 4 digits (XXXX XXXX 1234); the Edit
+    // form still has the full number for users who can edit staff.
+    string MaskAadhaar(string? v)
+    {
+        if (string.IsNullOrWhiteSpace(v)) return "—";
+        string digits = new string(v.Where(char.IsDigit).ToArray());
+        return digits.Length < 4 ? "XXXX XXXX XXXX" : "XXXX XXXX " + digits.Substring(digits.Length - 4);
+    }
     string initials = string.Concat(Model.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
         .Take(2).Select(w => w[0])).ToUpper();
     if (string.IsNullOrEmpty(initials)) { initials = "—"; }
@@ -127,7 +135,7 @@
               <div class="col-6 col-md-4 sp-field"><label>PAN</label><span>@Dash(Model.Pan)</span></div>
               <div class="col-6 col-md-4 sp-field"><label>Bank A/C No</label><span>@Dash(Model.BankAccountNo)</span></div>
               <div class="col-6 col-md-4 sp-field"><label>IFSC</label><span>@Dash(Model.IfscCode)</span></div>
-              <div class="col-6 col-md-4 sp-field mb-0"><label>Aadhaar</label><span>@Dash(Model.Aadhaar)</span></div>
+              <div class="col-6 col-md-4 sp-field mb-0"><label>Aadhaar</label><span>@MaskAadhaar(Model.Aadhaar)</span></div>
             </div>
           </div>
         </div>

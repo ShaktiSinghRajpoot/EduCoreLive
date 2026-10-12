@@ -144,9 +144,15 @@ namespace educore.Models
 
         public bool AutoGeneratePassword { get; set; } = true;
 
-        // 8 to match ChangePasswordViewModel — a 6-char password set here could not be
-        // re-entered on the forced first-login reset, which demands 8.
+        // The school admin password rule, kept in ONE place: the attribute below uses it
+        // server-side and Create.cshtml reads the same constant for its client-side check.
+        // At least 8 characters (ChangePasswordViewModel demands 8 on the forced first-login
+        // reset) with at least one letter and one digit, so "12345678" is refused.
+        public const string PasswordPattern = @"^(?=.*[A-Za-z])(?=.*[0-9]).{8,100}$";
+        public const string PasswordRuleMessage = "Password must be at least 8 characters and include a letter and a digit.";
+
         [StringLength(100, MinimumLength = 8, ErrorMessage = "Password must be at least 8 characters.")]
+        [RegularExpression(PasswordPattern, ErrorMessage = PasswordRuleMessage)]
         public string? Password { get; set; }
 
         public int? TenantId { get; set; }

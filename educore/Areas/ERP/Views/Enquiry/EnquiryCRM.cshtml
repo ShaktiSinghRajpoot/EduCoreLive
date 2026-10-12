@@ -1493,6 +1493,34 @@ $(document).ready(function () {
             return;
         }
 
+        // Same rules the server applies; checked here so the user is told before
+        // anything is sent. The server refuses these too.
+        if (REG_FEE_ENABLED && $('#regFeePaid').is(':checked')) {
+            var fee      = REG_FEE_AMOUNT || 0;
+            var discType = $('#regDiscountType').val();
+            var discVal  = EC.numPos($('#regDiscountValue').val());
+            var disc     = 0;
+            if (discType && discVal > 0) {
+                if (!$.trim($('#regDiscountReason').val())) {
+                    ecToast('error', 'Please provide a reason for the registration discount.');
+                    $('#regDiscountReason').focus();
+                    return;
+                }
+                disc = (discType === 'Percentage') ? Math.round(fee * discVal) / 100 : discVal;
+                if (disc > fee) {
+                    ecToast('error', 'Discount cannot exceed the registration fee of ' + EC.money(fee) + '.');
+                    return;
+                }
+            }
+            var payable = fee - disc;
+            if (EC.numPos($('#regCollectAmount').val()) > payable + 0.005) {
+                ecToast('error', 'Collecting ' + EC.money(EC.numPos($('#regCollectAmount').val())) +
+                                 ' is more than the ' + EC.money(payable) + ' payable.');
+                $('#regCollectAmount').focus();
+                return;
+            }
+        }
+
         var $btn = $(this);
         EC.buttonBusy($btn, 'Saving…');
 

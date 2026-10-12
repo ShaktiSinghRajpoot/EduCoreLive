@@ -46,8 +46,12 @@ namespace EduCoreDataAccessLayer.Helpers
             => cols.Contains(c) && r[c] != DBNull.Value ? r[c].ToString() : null;
 
 
+        /// <summary>
+        /// A timestamp column, on the school's clock: a timestamptz arrives as UTC
+        /// and callers only display it (see Dates.ToSchool).
+        /// </summary>
         public static DateTime? DateTimeN(NpgsqlDataReader r, HashSet<string> cols, string c)
-            => cols.Contains(c) && r[c] != DBNull.Value ? Convert.ToDateTime(r[c]) : null;
+            => cols.Contains(c) && r[c] != DBNull.Value ? Dates.ToSchool(Convert.ToDateTime(r[c])) : null;
 
         // ── DataRow overloads ────────────────────────────────────────────────
         // Dates are stored as ISO text (YYYY-MM-DD), so they are read as text —
@@ -71,7 +75,7 @@ namespace EduCoreDataAccessLayer.Helpers
         {
             if (!r.Table.Columns.Contains(c) || r[c] == DBNull.Value) return null;
             var v = r[c];
-            if (v is DateTime dt) return dt;
+            if (v is DateTime dt) return Dates.ToSchool(dt);
             return DateTime.TryParse(v.ToString(), out var p) ? p : null;
         }
     }

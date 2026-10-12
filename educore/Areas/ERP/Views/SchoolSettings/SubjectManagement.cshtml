@@ -270,10 +270,15 @@ $(document).ready(function () {
 
     // Adding or removing only changed the pills, so there was no sign that a
     // Save was still pending.
+    function isDirty() {
+        if (!activeId) return false;
+        const cur = getSubjects(activeId);
+        return cur.length !== originalSnap.length ||
+               cur.some((s, i) => s !== originalSnap[i]);
+    }
+
     function updateDirty() {
-        const cur   = getSubjects(activeId);
-        const dirty = cur.length !== originalSnap.length ||
-                      cur.some((s, i) => s !== originalSnap[i]);
+        const dirty = isDirty();
         $('#smDirtyBadge').toggleClass('d-none', !dirty);
         $('#smSaveHintText').toggleClass('d-none', dirty);
     }
@@ -355,11 +360,40 @@ $(document).ready(function () {
     }
 
     // ── Class item click — fetch the class's saved subjects once, then cache ──
+    // Switching away from a class with unsaved edits used to drop them silently
+    // (the badge even showed the unsaved count). Ask first; on OK the edits are
+    // thrown away and the class goes back to what is saved.
     $(document).on('click', '.sm-class-item', function() {
         const $item = $(this);
         const id  = parseInt($item.data('id'), 10);
-        const cls = $item.attr('data-class');
         if (!id || id === activeId) return;
+        if (!isDirty()) { openClass($item); return; }
+
+        EC.confirm({
+            title:   'Discard unsaved changes?',
+            name:    activeClass,
+            message: 'The subjects for this class have not been saved.',
+            okText:  'Discard and switch',
+            danger:  false
+        }).then(function (ok) {
+            if (!ok) return;
+            setSubjects(activeId, [...originalSnap]);
+            updateDirty();
+            openClass($item);
+        });
+    });
+
+    // Warn on reload / leaving the page (this also covers the session dropdown,
+    // which reloads the page) while edits are unsaved.
+    window.addEventListener('beforeunload', function (e) {
+        if (!isDirty()) return;
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
+    function openClass($item) {
+        const id  = parseInt($item.data('id'), 10);
+        const cls = $item.attr('data-class');
 
         if (subjectData[id]) { loadClass(id, cls); return; }
 
@@ -392,7 +426,7 @@ $(document).ready(function () {
                 $('#smEmptyState').show();
             })
             .always(function() { EC.hideLoader(); $item.removeClass('is-loading'); });
-    });
+    }
 
     // ── Add via suggestion chip ───────────────────────────────────────────────
     $(document).on('click', '.sm-suggest-chip:not(.chip-added)', function() {

@@ -134,6 +134,9 @@
        sidebar cannot scroll and the menu search matches nothing. *@
     <ul class="menu-inner py-1">
 
+        @* Shown by the menu filter below when the search matches nothing. *@
+        <li class="menu-search-empty text-muted small px-4 py-3" style="display:none">No menu items match.</li>
+
         @*
            ============================================================
            Every link here points at a real controller action. There are no
@@ -615,21 +618,30 @@
         const rootItems = document.querySelectorAll("#layout-menu > ul.menu-inner > li.menu-item");
         const headers   = document.querySelectorAll("#layout-menu > ul.menu-inner > li.menu-header");
 
+        const emptyRow  = document.querySelector("#layout-menu .menu-search-empty");
+
         searchInput.addEventListener("input", function () {
             const value = this.value.toLowerCase().trim();
+            let shown = 0;
             headers.forEach(h => h.style.display = value ? "none" : "");
 
             rootItems.forEach(item => {
-                const text = item.innerText.toLowerCase();
+                // textContent, not innerText: innerText skips text that is not
+                // currently rendered (a closed submenu, a collapsed sidebar),
+                // which made every item look like a non-match.
+                const text = item.textContent.toLowerCase();
                 const sub  = item.querySelector(".menu-sub");
                 if (!value) { item.style.display = ""; item.classList.remove("open"); return; }
                 if (text.includes(value)) {
                     item.style.display = "";
+                    shown++;
                     if (sub) item.classList.add("open");   // CSS reveals the sub
                 } else {
                     item.style.display = "none";
                 }
             });
+
+            if (emptyRow) emptyRow.style.display = (value && shown === 0) ? "" : "none";
         });
     });
 </script>

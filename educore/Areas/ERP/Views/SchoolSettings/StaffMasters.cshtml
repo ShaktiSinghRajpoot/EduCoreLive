@@ -175,8 +175,10 @@ $(function(){
   // (a "Music Teacher" in a "Music" department is still Teaching).
   function deptToType(dept){
     var d = (dept||'').toLowerCase();
-    if (/academic|teaching|sport/.test(d)) return 'Teaching';
+    // Transport is tested first: "transport" contains "sport", so the Teaching
+    // rule used to win and a Transport department suggested Teaching.
     if (/transport/.test(d)) return 'Transport';
+    if (/academic|teaching|sport/.test(d)) return 'Teaching';
     if (/housekeep|security|maintenance|cleaning|support/.test(d)) return 'Support';
     return 'Non-Teaching';
   }

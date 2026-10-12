@@ -475,8 +475,9 @@ $(function () {
         $('#discValLbl').text(t==='pct'?'Percentage (%)':'Amount (₹)'); discPreview();
     }
     function discPreview(){
-        var v=EC.numPos($('#discVal').val()), dues=calc().dues, amt=discType==='pct'?Math.round(dues*v/100):v;
-        $('#discPreview').text(v>0 ? (discType==='pct'? v+'% of '+EC.money(dues)+' = ':'Flat ')+'discount '+EC.money(Math.min(amt,dues)) : '');
+        var v=EC.numPos($('#discVal').val()), base=discBase(), amt=discType==='pct'?Math.round(base*v/100):v;
+        if(v>0 && amt>base){ $('#discPreview').html('<span class="text-danger">Discount cannot exceed the payable amount ('+EC.money(base)+').</span>'); return; }
+        $('#discPreview').text(v>0 ? (discType==='pct'? v+'% of '+EC.money(base)+' = ':'Flat ')+'discount '+EC.money(amt) : '');
     }
     $('#discModal .fc-seg').on('click', function(){ setSeg($(this).data('t')); });
     $('#discVal').on('input', discPreview);
@@ -491,6 +492,8 @@ $(function () {
         if(v<=0){ ecToast('warning','Enter a discount value.'); return; }
         if(!reason){ ecToast('warning','A reason is required for a discount.'); return; }
         if(!approvedBy){ ecToast('warning','Choose who approved the discount.'); return; }
+        var base=discBase(), amt=discType==='pct'?Math.round(base*v/100):v;
+        if(amt>base){ ecToast('warning','Discount cannot exceed the payable amount ('+EC.money(base)+').'); return; }
         discount={type:discType,value:v,reason:reason,approvedBy:approvedBy}; discModal.hide(); settle();
     });
     function renderDiscount(){
@@ -538,13 +541,15 @@ $(function () {
 
     /* ── settlement maths ── */
     function selectedArr(){ return Object.keys(sel).map(function(k){ return sel[k]; }); }
+    // A discount is worked out on the dues that can take one -- never a refundable deposit.
+    function discBase(){ return selectedArr().reduce(function(t,x){return t+(x.refundable?0:x.outstanding);},0); }
+    // The discount as entered, before any cap; more than discBase() is refused.
+    function discRaw(){ return discount ? (discount.type==='pct'?Math.round(discBase()*discount.value/100):discount.value) : 0; }
     function calc(){
         var dues=selectedArr().reduce(function(t,x){return t+x.outstanding;},0), n=selectedArr().length;
         var ext=extras.filter(function(e){return e.amount>0&&(e.label||'').trim();}).reduce(function(t,e){return t+e.amount;},0);
-        // A discount is worked out on, and capped at, the dues that can take one --
-        // never a refundable deposit.
-        var discBase=selectedArr().reduce(function(t,x){return t+(x.refundable?0:x.outstanding);},0);
-        var disc=discount ? Math.min(discount.type==='pct'?Math.round(discBase*discount.value/100):discount.value, discBase) : 0;
+        // Capped for display only; Collect refuses a discount above discBase().
+        var disc=Math.min(discRaw(), discBase());
         var payable=Math.max(0, dues-disc+ext);
         return {dues:dues,ext:ext,disc:disc,payable:payable,n:n};
     }
@@ -589,6 +594,8 @@ $(function () {
         var items=buildItems();
         var exs=extras.filter(function(e){return e.amount>0&&(e.label||'').trim();}).map(function(e){return {label:e.label,amount:e.amount,note:e.note||''};});
         if(!items.length && !exs.length){ ecToast('warning','Pick a due or add an extra charge.'); return; }
+        // Dues may have been unticked after the discount was applied.
+        if(discRaw()>discBase()){ ecToast('warning','Discount cannot exceed the payable amount ('+EC.money(discBase())+').'); return; }
         var advUse=advUseVal(calc());
         var paidTenders = tenders.filter(function(t){ return EC.numPos(t.amt)>0; })
                                  .map(function(t){ return { mode:t.mode, amount:EC.numPos(t.amt), reference:(t.ref||'').trim() }; });
@@ -633,7 +640,8 @@ $(function () {
         if(r.advanceCredit>0) meta.push(EC.money(r.advanceCredit)+' to advance');
         if(r.collectedBy) meta.push('by '+EC.esc(r.collectedBy));
         var voided = x ? '<div class="hist-meta text-danger">Cancelled'+(r.cancelledAt?' '+EC.esc(r.cancelledAt):'')+
-                         (r.cancelledBy?' by '+EC.esc(r.cancelledBy):'')+(r.authorisedBy?' · authorised: '+EC.esc(r.authorisedBy):'')+
+                         (r.authorisedBy ? ' · authorised by '+EC.esc(r.authorisedBy)+(r.cancelledBy?' (entered by '+EC.esc(r.cancelledBy)+')':'')
+                                         : (r.cancelledBy?' by '+EC.esc(r.cancelledBy):''))+
                          (r.cancelReason?' · '+EC.esc(r.cancelReason):'')+'</div>' : '';
         return '<div class="hist-row'+(x?' cancelled':'')+'"><div class="hist-info">'+
                '<div class="hist-rcp'+(x?' strike':'')+'">'+EC.esc(r.receiptNo)+(x?' <span class="ec-badge ec-badge-default">Cancelled</span>':'')+'</div>'+

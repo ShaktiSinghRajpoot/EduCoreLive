@@ -183,6 +183,7 @@
                                            class="form-control"
                                            id="DefaultAmount"
                                            min="0"
+                                           max="@EduCoreDataAccessLayer.Services.Repository.ERP.SchoolSettingsService.MaxFeeAmount"
                                            step="0.01"
                                            placeholder="0" />
                                 </div>
@@ -568,6 +569,15 @@
                 if (!feeType) {
                     e.preventDefault();
                     ecToast('error', 'Please select fee type.');
+                    return false;
+                }
+
+                // Same cap the server applies (the column overflows past it).
+                let maxAmount = Number($('#DefaultAmount').attr('max'));
+                if (EC.numPos($('#DefaultAmount').val()) > maxAmount) {
+                    e.preventDefault();
+                    ecToast('error', 'Default amount cannot be more than ' + EC.money(maxAmount) + '.');
+                    $('#DefaultAmount').focus();
                     return false;
                 }
             });

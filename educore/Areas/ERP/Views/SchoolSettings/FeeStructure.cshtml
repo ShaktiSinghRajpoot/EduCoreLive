@@ -320,7 +320,10 @@
                                                                    class="form-control fee-amount fee-amount-input"
                                                                    name="FeeHeads[@i].Amount"
                                                                    value="@feeHeads[i].Amount"
+                                                                   data-default="@feeHeads[i].Amount.ToString(System.Globalization.CultureInfo.InvariantCulture)"
+                                                                   placeholder="@feeHeads[i].Amount.ToString("N0")"
                                                                    min="0"
+                                                                   max="@EduCoreDataAccessLayer.Services.Repository.ERP.SchoolSettingsService.MaxFeeAmount"
                                                                    step="0.01" />
                                                         </div>
                                                     </div>
@@ -634,6 +637,13 @@
                 }
             }
 
+            // A blank amount box means the head's default amount -- the server saves
+            // it that way too, so the summary must count it the same.
+            function rowAmount($input) {
+                let typed = ($input.val() || '').trim();
+                return EC.numPos(typed === '' ? $input.attr('data-default') : typed);
+            }
+
             function updateSummary() {
                 let oneTime = 0;
                 let monthly = 0;
@@ -666,7 +676,7 @@
                     selectedFeeHeads++;
 
                     let cycle = ($(this).data('cycle') || '').toString().toLowerCase();
-                    let amount = parseFloat($(this).find('.fee-amount').val()) || 0;
+                    let amount = rowAmount($(this).find('.fee-amount'));
                     let feeHeadName = $(this).attr('data-fee-head-name') || '';
 
                     selectedFeeHeadHtml += '<span class="summary-chip">' + EC.esc(feeHeadName) + '</span>';
@@ -898,6 +908,17 @@
                 if (selectedFeeHeads === 0) {
                     e.preventDefault();
                     ecToast('error', 'Please select at least one fee head.');
+                    return false;
+                }
+
+                // Same cap the server applies (the columns overflow past it).
+                let tooBig = false;
+                $('.fee-head-checkbox:checked').closest('.fee-head-row').find('.fee-amount').each(function () {
+                    if (rowAmount($(this)) > Number($(this).attr('max'))) tooBig = true;
+                });
+                if (tooBig) {
+                    e.preventDefault();
+                    ecToast('error', 'An amount cannot be more than ' + EC.money(@EduCoreDataAccessLayer.Services.Repository.ERP.SchoolSettingsService.MaxFeeAmount) + '.');
                     return false;
                 }
 

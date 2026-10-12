@@ -1033,8 +1033,10 @@ $(function () {
                 EC.buttonReset($btn);
             }
         })
-        .fail(function () {
-            ecToast('error', 'Something went wrong while saving.');
+        .fail(function (xhr) {
+            ecToast('error', xhr && xhr.status === 403
+                ? 'You do not have permission to admit students.'
+                : 'Something went wrong while saving.');
             EC.buttonReset($btn);
         });
     });

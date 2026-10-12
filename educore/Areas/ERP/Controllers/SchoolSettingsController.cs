@@ -379,7 +379,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [HasPermission("fees.manage")]
+        [HasPermission("settings.manage")]   // fee master: admin-level, not the cashier's fees.manage
         public async Task<IActionResult> SaveFeeHead(FeeHead model, string? returnUrl)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -459,7 +459,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [HasPermission("fees.manage")]
+        [HasPermission("settings.manage")]   // fee master: admin-level, not the cashier's fees.manage
         public async Task<IActionResult> DeleteFeeHead(int id, string? returnUrl)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -478,7 +478,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [HasPermission("fees.manage")]
+        [HasPermission("settings.manage")]   // fee master: admin-level, not the cashier's fees.manage
         public async Task<IActionResult> ToggleFeeHeadStatus(int id, string? returnUrl)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -610,7 +610,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [HasPermission("fees.manage")]
+        [HasPermission("settings.manage")]   // fee master: admin-level, not the cashier's fees.manage
         public async Task<IActionResult> SaveFeeStructure(FeeStructureModel model)
         {
             int tenantId     = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value  ?? "0");
@@ -636,6 +636,17 @@ namespace educore.Areas.ERP.Controllers
                 return RedirectToAction(nameof(FeeStructure));
             }
 
+            // A cleared amount box binds as 0, which saved the head as free while the
+            // page shows its default amount beside it. Blank means "use the default".
+            var heads = await _schoolSettingsService.GetFeeHeadAsync(tenantId, schoolId, actionUserId);
+            for (int i = 0; i < model.FeeHeads!.Count; i++)
+            {
+                if (!model.FeeHeads[i].IsSelected) continue;
+                if (!string.IsNullOrWhiteSpace(Request.Form[$"FeeHeads[{i}].Amount"])) continue;
+                var head = heads.FirstOrDefault(h => h.FeeHeadId == model.FeeHeads[i].FeeHeadId);
+                if (head != null) model.FeeHeads[i].Amount = head.DefaultAmount;
+            }
+
             // The service says which classes were written and where it stopped. The
             // old message counted the classes that were *asked* for, so it read the
             // same whether every class saved or none did.
@@ -652,7 +663,7 @@ namespace educore.Areas.ERP.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        [HasPermission("fees.manage")]
+        [HasPermission("settings.manage")]   // fee master: admin-level, not the cashier's fees.manage
         public async Task<IActionResult> DeleteFeeStructure(int id)
         {
             int tenantId     = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");

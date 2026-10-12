@@ -478,8 +478,14 @@ namespace educore.Areas.SuperAdmin.Controllers
 
         private void ValidateSchoolAdmin(SchoolManageModel model)
         {
+            // The password rule (SchoolManageModel.PasswordPattern) only matters when the typed
+            // password is actually used. Drop its attribute errors otherwise, so a value left in
+            // the hidden password box cannot block the save with a message nobody can see.
             if (!model.CreateSchoolAdmin)
+            {
+                ModelState.Remove(nameof(model.Password));
                 return;
+            }
 
             if (string.IsNullOrWhiteSpace(model.AdminFullName))
                 ModelState.AddModelError(nameof(model.AdminFullName), "Admin full name is required.");
@@ -491,6 +497,9 @@ namespace educore.Areas.SuperAdmin.Controllers
 
             if (!isEdit)
             {
+                if (model.AutoGeneratePassword)
+                    ModelState.Remove(nameof(model.Password));
+
                 // Create with manual entry — a password must be typed.
                 if (!model.AutoGeneratePassword && string.IsNullOrWhiteSpace(model.Password))
                     ModelState.AddModelError(nameof(model.Password), "Password is required.");

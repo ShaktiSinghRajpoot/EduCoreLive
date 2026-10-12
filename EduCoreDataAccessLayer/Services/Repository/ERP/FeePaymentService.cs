@@ -1077,6 +1077,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             PaymentType   = DbRead.NStr(reader, cols, "payment_type"),
                             IsCancelled   = DbRead.Bool(reader, cols, "is_cancelled"),
                             GivenBy       = DbRead.NStr(reader, cols, "given_by_name"),
+                            ApprovedBy    = DbRead.NStr(reader, cols, "discount_approved_by"),
                             DiscountType  = DbRead.NStr(reader, cols, "discount_type"),
                             DiscountValue = DbRead.Dec(reader, cols, "discount_value"),
                             Reason        = DbRead.NStr(reader, cols, "discount_reason"),

@@ -4980,3 +4980,23 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   and the double-submit flag reset with a toast. (Root cause not reproduced -- the tester's Chrome
   window was hidden; same for BUG-009, left for a retest in a visible browser.)
 - **Deploy:** `deploy_2026_10_12.sql`, then push (app restart).
+
+### [2026-10-12] QA report: Medium bugs (platform, fees, staff/settings)
+- **Platform:** sidebar search matches `textContent` + "No menu items match." (006); demo notification
+  bell replaced by an empty state (010); Super Admin admin password needs a letter and a digit, rule in
+  `SchoolManageModel.PasswordPattern` (016); `frame-ancestors 'self'` CSP, Permissions-Policy
+  (geolocation self for driver tracking), X-Frame-Options SAMEORIGIN, antiforgery cookie follows
+  `Security:RequireHttps` (019). 013 was already fixed; 022 needs `Email__*` env vars on Railway.
+- **Fees:** max fee amount 1 crore with friendly messages, only RAISE text reaches the user (030);
+  blank structure amount = head default (033); registration discount/over-collection refused before
+  anything is written (043); honest concession label on the student dashboard (047); discount above
+  payable refused (057); "authorised by X (entered by user)" on receipt, history and concession
+  register -- `fee_concession_cancel_report.sql` (063); `DbRead.DateTimeN` converts UTC timestamptz to
+  the school clock via `Dates.ToSchool` (064); fee heads / structures / setup fees need
+  `settings.manage` instead of `fees.manage` (065).
+- **Staff/settings:** subjects confirm before discarding unsaved changes (025); Transport department
+  no longer matches "sport" -> Teaching (029); Aadhaar masked unless staff.manage (040); duplicate
+  active staff mobile/email refused in `sp_staff_manage.sql` (041); admission without
+  `students.manage` hidden/redirected with a clear message (066); 10-digit mobile on driver phone and
+  supplier mobile (068).
+- **Deploy:** `fee_concession_cancel_report.sql` (concession register proc), `sp_staff_manage.sql`.

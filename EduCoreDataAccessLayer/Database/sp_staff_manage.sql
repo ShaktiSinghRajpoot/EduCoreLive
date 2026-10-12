@@ -331,6 +331,32 @@ BEGIN
             RAISE EXCEPTION 'Employee code already exists.';
         END IF;
 
+        -- Mobile and email unique among this school's current staff (not the row
+        -- being edited, not deleted or Inactive people, so a re-hire still works).
+        -- Mobile compares the last 10 digits, the same rule as the login phone.
+        IF p_mobile IS NOT NULL AND TRIM(p_mobile) <> ''
+           AND EXISTS (
+                SELECT 1 FROM core.staff
+                WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                  AND is_deleted = FALSE AND status <> 'Inactive'
+                  AND RIGHT(regexp_replace(mobile, '\D', '', 'g'), 10)
+                      = RIGHT(regexp_replace(p_mobile, '\D', '', 'g'), 10)
+                  AND (p_operation = 'INSERT' OR staff_id <> p_staff_id)
+           ) THEN
+            RAISE EXCEPTION 'A staff member with this mobile already exists.';
+        END IF;
+
+        IF p_email IS NOT NULL AND TRIM(p_email) <> ''
+           AND EXISTS (
+                SELECT 1 FROM core.staff
+                WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+                  AND is_deleted = FALSE AND status <> 'Inactive'
+                  AND LOWER(TRIM(email)) = LOWER(TRIM(p_email))
+                  AND (p_operation = 'INSERT' OR staff_id <> p_staff_id)
+           ) THEN
+            RAISE EXCEPTION 'A staff member with this email already exists.';
+        END IF;
+
         -- Staff Type is DERIVED from the chosen Designation (single source of
         -- truth) so it can never contradict the title, even if the form is
         -- bypassed. Falls back to whatever the caller sent if the designation

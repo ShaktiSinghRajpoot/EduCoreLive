@@ -56,6 +56,10 @@ namespace educore.Areas.ERP.Controllers
             try { model.AvailableClasses = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
             catch { /* empty is acceptable */ }
 
+            // Admitting writes a student (students.manage, as on SaveAdmission). Without
+            // it the Convert button is hidden instead of leading to a form that 403s.
+            ViewBag.CanAdmit = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
+
             return View(model);
         }
 

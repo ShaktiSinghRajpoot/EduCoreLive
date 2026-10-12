@@ -35,6 +35,7 @@ BEGIN
            COALESCE(p.concession_total, 0) + COALESCE(p.discount_amount, 0) AS concession_amount,
            COALESCE(NULLIF(TRIM(p.payment_type), ''), 'Fee') AS payment_type,
            p.discount_type, p.discount_value, p.discount_reason,
+           p.discount_approved_by,   -- picked by the cashier; given_by_name is who entered it
            COALESCE(p.is_cancelled, FALSE) AS is_cancelled,
            core.fn_user_display_name(p.created_by) AS given_by_name,
            COALESCE(s.student_name, e.student_name, '—') AS student_name,

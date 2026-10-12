@@ -275,6 +275,12 @@ namespace educore.Areas.ERP.Controllers
         {
             if (input == null) return Json(new { success = false, message = "Nothing to save." });
 
+            // Optional, but when given it must be a 10-digit Indian mobile (same rule
+            // as StaffModel.Mobile); "12" used to be saved.
+            input.Mobile = (input.Mobile ?? "").Trim();
+            if (input.Mobile != "" && !System.Text.RegularExpressions.Regex.IsMatch(input.Mobile, "^[6-9][0-9]{9}$"))
+                return Json(new { success = false, message = "Enter a valid 10-digit mobile number." });
+
             var res = await _inventory.SaveSupplierAsync(input, TenantId(), SchoolId(), UserId());
             return Json(new { success = res.Success, message = res.Message, id = res.Id });
         }
