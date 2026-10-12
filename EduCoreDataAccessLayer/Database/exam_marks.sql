@@ -5,7 +5,7 @@
 --   academic.exam_mark_sheets        the finalize/lock state of one sheet
 --   academic.fn_exam_sheet_roster    who sits a sheet (ONE definition, two callers)
 --   academic.sp_school_admin_exam_marks_manage
---         GetExamClasses | GetClassSetup | GetSheet | SaveMarks | ReopenSheet
+--         GetExamClasses | GetClassSetup | GetSheet | SaveMarks | ReopenSheet | GetMarkScope
 --
 -- A SHEET is one (exam, class, section, subject) — what a teacher fills in one
 -- sitting. The exam is school-wide (see exam_schedule.sql), so the selector
@@ -458,6 +458,45 @@ BEGIN
                CASE WHEN p_finalize
                     THEN 'Marks finalized and locked.'
                     ELSE 'Marks saved as draft.' END AS message;
+
+        OPEN p_result2 FOR SELECT 1 WHERE FALSE;
+
+    ELSIF p_operation = 'GetMarkScope' THEN
+
+        -- The sheets of this exam the calling user teaches (2026-10-12):
+        -- every subject of a section they are class teacher of, plus each
+        -- subject the timetable gives them in a section. A teacher with only
+        -- exams.marks is limited to these; the caller skips this for school
+        -- admins and exams.manage (the proc cannot see roles).
+        -- Sections are per session, so joining on the exam's class id keeps
+        -- this to the exam's own academic year.
+        OPEN p_result FOR
+        SELECT DISTINCT es.academic_class_id,
+               sec.section_name AS section,
+               es.subject_id
+        FROM academic.exam_subjects es
+        JOIN academic.academic_class_sections sec
+             ON sec.academic_class_id = es.academic_class_id
+            AND sec.tenant_id = p_tenant_id
+            AND sec.school_id = p_school_id
+            AND COALESCE(sec.is_deleted, FALSE) = FALSE
+        JOIN core.staff st
+             ON st.tenant_id = p_tenant_id
+            AND st.school_id = p_school_id
+            AND st.user_id   = p_action_user_id
+            -- A teacher who has left must not keep entering marks.
+            AND COALESCE(st.is_active, TRUE)   = TRUE
+            AND COALESCE(st.is_deleted, FALSE) = FALSE
+        WHERE es.exam_id   = p_exam_id
+          AND es.tenant_id = p_tenant_id
+          AND es.school_id = p_school_id
+          AND (sec.class_teacher_staff_id = st.staff_id
+               OR EXISTS (SELECT 1 FROM academic.timetable t
+                          WHERE t.academic_class_section_id = sec.academic_class_section_id
+                            AND t.subject_id = es.subject_id
+                            AND t.staff_id   = st.staff_id
+                            AND t.tenant_id  = p_tenant_id
+                            AND t.school_id  = p_school_id));
 
         OPEN p_result2 FOR SELECT 1 WHERE FALSE;
 

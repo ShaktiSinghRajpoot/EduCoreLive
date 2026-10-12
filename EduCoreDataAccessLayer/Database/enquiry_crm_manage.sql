@@ -34,6 +34,7 @@ DECLARE
     v_status_before  VARCHAR(60);
     v_admission_id   INTEGER;
     v_today          DATE := CURRENT_DATE;
+    v_same_mobile    INTEGER := 0;
 BEGIN
 
     -- ── GetEnquiries (filtered + paginated) ──────────────────
@@ -251,6 +252,22 @@ BEGIN
                 v_enquiry_id, p_tenant_id, p_school_id,
                 NULL, COALESCE(p_status, 'New'), 'Enquiry created', p_action_user_id
             );
+
+            -- Siblings share a parent mobile, so a match is never blocked -- it is
+            -- returned so the page can warn "possible duplicate". Counts other open
+            -- enquiries (admitted ones are counted as the student) and active students.
+            IF NULLIF(TRIM(p_mobile), '') IS NOT NULL THEN
+                SELECT (SELECT COUNT(*) FROM core.enquiries e
+                         WHERE e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+                           AND e.is_active = TRUE AND e.admission_id IS NULL
+                           AND e.enquiry_id <> v_enquiry_id
+                           AND TRIM(p_mobile) IN (TRIM(e.mobile), TRIM(e.father_mobile), TRIM(e.mother_mobile)))
+                     + (SELECT COUNT(*) FROM core.students s
+                         WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id
+                           AND s.is_active = TRUE
+                           AND TRIM(p_mobile) IN (TRIM(s.mobile), TRIM(s.alt_mobile)))
+                  INTO v_same_mobile;
+            END IF;
         ELSE
             SELECT status INTO v_status_before
             FROM core.enquiries
@@ -321,7 +338,8 @@ BEGIN
             END IF;
         END IF;
 
-        OPEN p_result FOR SELECT COALESCE(v_enquiry_id, 0) AS enquiry_id;
+        OPEN p_result FOR SELECT COALESCE(v_enquiry_id, 0) AS enquiry_id,
+                                 v_same_mobile AS same_mobile_count;
         RETURN;
 
     -- ── UpdateStatus ──────────────────────────────────────────

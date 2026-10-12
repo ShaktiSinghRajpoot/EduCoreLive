@@ -132,7 +132,7 @@
            student's dues keep being generated through the year, so there is no
            fixed figure to freeze -- only what is owed today. */
         if (r.dues && r.dues.outstanding > 0) {
-            rows += '<div class="rc-kv rc-bal"><span>Outstanding as on ' + EC.esc(r.dues.asOn) +
+            rows += '<div class="rc-kv rc-bal"><span>Outstanding as on ' + EC.esc(fmtDate(r.dues.asOn)) +
                     '</span><b>' + EC.money(r.dues.outstanding) + '</b></div>';
         }
 

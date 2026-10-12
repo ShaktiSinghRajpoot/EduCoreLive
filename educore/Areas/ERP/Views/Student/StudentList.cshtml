@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @using System.Linq
 @using Microsoft.AspNetCore.Http
 @using Microsoft.AspNetCore.Mvc.Rendering
@@ -32,6 +32,10 @@
         var parts = (n ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return parts.Length == 0 ? "?" : string.Concat(parts.Take(2).Select(p => char.ToUpper(p[0])));
     }
+    // Fee status is shown only to users with fees.view (the controller blanks it otherwise).
+    bool canViewFees = ViewBag.CanViewFees == true;
+    // Admit / photo / mark-as-left need students.manage; a Teacher only views (QA BUG-059).
+    bool canManage = ViewBag.CanManage == true;
     string FeeBadgeClass(string f) => f switch { "Paid" => "b-paid", "Partial" => "b-partial", _ => "b-pending" };
     string StatBadgeClass(string s) => s switch { "Active" => "b-active", "Transfer" => "b-transfer", _ => "b-inactive" };
     (string cls, string ic) GenderMeta(string? g) => g switch
@@ -71,7 +75,7 @@
               <i class="bx bx-user-plus"></i><span>New Enquiry</span>
             </a>
         }
-        else
+        else if (canManage)
         {
             <a asp-area="ERP" asp-controller="Admission" asp-action="Create"
                class="btn btn-primary d-flex align-items-center gap-1">
@@ -162,6 +166,8 @@
             <option value="Other" selected="@Sel("Other", Model.FilterGender)">Other</option>
           </select>
 
+          @if (canViewFees)
+          {
           <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterFee) ? "" : "active-filter")"
                   name="FilterFee">
             <option value="">Fee</option>
@@ -169,6 +175,7 @@
             <option value="Partial" selected="@Sel("Partial", Model.FilterFee)">Partial</option>
             <option value="Pending" selected="@Sel("Pending", Model.FilterFee)">Pending</option>
           </select>
+          }
 
           <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterYear) ? "" : "active-filter")"
                   name="FilterYear">
@@ -216,7 +223,7 @@
                   Admission Date <i class="@SortIcon("admdate")"></i></a></th>
                 <th>Parent / Guardian</th>
                 <th>Contact</th>
-                <th>Fee Status</th>
+                @if (canViewFees) { <th>Fee Status</th> }
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -247,11 +254,13 @@
                     <td>@(string.IsNullOrWhiteSpace(s.AdmissionDate) ? "—" : Dates.Show(s.AdmissionDate, "dd MMM yyyy"))</td>
                     <td>@(string.IsNullOrEmpty(s.GuardianName) ? "—" : s.GuardianName)</td>
                     <td>@(string.IsNullOrEmpty(s.Mobile) ? "—" : s.Mobile)</td>
-                    <td><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></td>
+                    @if (canViewFees) { <td><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></td> }
                     <td><span class="sl-bdg @StatBadgeClass(s.Status)">@s.Status</span></td>
                     <td>
                       <div class="d-inline-flex gap-1 align-items-center">
                         <a href="@dashUrl" class="sl-view-btn"><i class="bx bx-layout"></i>Dashboard</a>
+                        @if (canManage)
+                        {
                         <button type="button" class="btn btn-sm btn-icon btn-outline-secondary btn-photo"
                                 title="Upload photo" data-id="@s.PublicId" data-name="@s.StudentName">
                           <i class="bx bx-camera"></i>
@@ -260,6 +269,7 @@
                                 title="Mark as left" data-id="@s.StudentId" data-name="@s.StudentName">
                           <i class="bx bx-user-x"></i>
                         </button>
+                        }
                       </div>
                     </td>
                   </tr>
@@ -307,18 +317,21 @@
                   <div class="sl-mob-field"><label>Contact</label><span>@(string.IsNullOrEmpty(s.Mobile) ? "—" : s.Mobile)</span></div>
                   <div class="sl-mob-field"><label>Admitted</label><span>@(string.IsNullOrWhiteSpace(s.AdmissionDate) ? "—" : Dates.Show(s.AdmissionDate, "dd MMM yyyy"))</span></div>
                   <div class="sl-mob-field"><label>Gender</label><span>@s.Gender</span></div>
-                  <div class="sl-mob-field"><label>Fee Status</label><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></div>
+                  @if (canViewFees) { <div class="sl-mob-field"><label>Fee Status</label><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></div> }
                   <div class="sl-mob-field"><label>Class</label><span>@s.ClassName @s.Section</span></div>
                 </div>
                 @* The photo button used to exist only in the desktop table, so on a
                    phone there was no way to set a student's picture at all. *@
                 <div class="sl-mob-actions">
                   <a href="@dashUrl" class="btn btn-sm btn-primary flex-grow-1"><i class="bx bx-layout me-1"></i>View Dashboard</a>
+                  @if (canManage)
+                  {
                   <button type="button" class="btn btn-sm btn-outline-secondary btn-photo flex-shrink-0"
                           title="Upload photo" aria-label="Upload photo"
                           data-id="@s.PublicId" data-name="@s.StudentName">
                     <i class="bx bx-camera"></i>
                   </button>
+                  }
                 </div>
               </div>
           }
@@ -432,6 +445,7 @@
    export buttons: Excel pulls the CURRENT filtered set from the JSON endpoint,
    PDF uses the browser print dialog. */
 var EXPORT_URL='@Url.Action("GetStudentsData","Admission",new{area="ERP"})';
+var CAN_FEES=@(canViewFees ? "true" : "false");   // fees.view -- else no Fee column in the export
 var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function fmtDate(d){if(!d)return'';var x=new Date(d);if(isNaN(x))return d;return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]+' '+x.getFullYear();}
 function val(n){var el=document.querySelector('[name="'+n+'"]');return el?el.value:'';}
@@ -453,6 +467,7 @@ document.getElementById('btnExcel').addEventListener('click',function(){
       var rows=(res&&res.success&&res.rows)?res.rows:[];
       var hdr=['Adm No','Roll','Name','Class','Sec','Gender','Adm Date','Guardian','Phone','Fee','Status'];
       var body=rows.map(function(s){return[s.admissionNo,s.rollNo||'',s.studentName,s.className,s.section||'',s.gender||'',fmtDate(s.admissionDate),s.guardianName||'',s.mobile||'',s.feeStatus||'',s.status||''];});
+      if(!CAN_FEES){ hdr.splice(9,1); body.forEach(function(r){ r.splice(9,1); }); }
       // A cell that starts with = + - @@ (or a tab / CR) is run as a formula by
       // Excel. Prefix it with ' so a name like "=HYPERLINK(...)" stays text.
       function cell(c){

@@ -1,10 +1,18 @@
 @{
     ViewData["Title"] = "School Calendar";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
 }
 
 @section PageStyles {
     <link rel="stylesheet" href="~/css/ERP/SchoolSettings/SchoolCalendar.css" asp-append-version="true" />
+    @if (!canManage)
+    {
+        @* View-only role (e.g. Teacher): hide the buttons the server would refuse. *@
+        <style>
+            #btnSaveWeekly, #btnRange, #dmSave, #dmClear, #rmSave, #rmDelete, .js-del { display: none !important; }
+        </style>
+    }
 }
 
 <div class="ec-page-shell">
@@ -432,6 +440,12 @@ function openModal(k){
 el('dmSave').addEventListener('click',function(){
   var type=el('dmType').value, name=el('dmName').value.trim(), end=el('dmEnd').value;
   if(type==='half_day' && !end){ ecToast('error','Set the closing time for a half day.'); return; }
+  /* A working-day override only opens a weekly off; on a normal weekday it changes nothing. */
+  var dk=parseKey(editDate);
+  if(type==='working' && WEEKLY.indexOf(new Date(dk.y,dk.m,dk.d).getDay())<0){
+    ecToast('warning', longDate(editDate)+' is already a working day. A working-day override is only for a weekly off.');
+    return;
+  }
 
   post(SAVE_URL,{ date:editDate, dayType:type, title:name, halfDayEnd:(type==='half_day'?end:null) })
     .done(function(res){

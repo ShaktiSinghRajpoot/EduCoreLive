@@ -600,10 +600,10 @@
                         $('#feeHeadFormTitle').text('Edit Fee Head');
                         $('#cancelEditButton').removeClass('d-none');
 
-                        window.scrollTo({
-                            top: 0,
-                            behavior: 'smooth'
-                        });
+                        // Scroll to the form itself (scrolling to the page top missed it
+                        // when the form sits below the list) and put the cursor in it.
+                        document.getElementById('feeHeadFormTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        $('#FeeHeadName').trigger('focus');
                     } else {
                         ecToast('error', response.message);
                     }

@@ -500,6 +500,10 @@ namespace educore.Areas.ERP.Controllers
             string? className = null, string? section = null, string? gender = null,
             string? year = null, string? status = null, string? fee = null)
         {
+            // Fee columns only for users who may see fees (see StudentList).
+            bool canViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
+            if (!canViewFees) fee = null;
+
             var (rows, totalCount) = await _admissionService.GetStudentsAsync(
                 TenantId(), SchoolId(), UserId(), page, pageSize,
                 NullIfEmpty(search), NullIfEmpty(className), NullIfEmpty(section),
@@ -536,11 +540,11 @@ namespace educore.Areas.ERP.Controllers
                     admissionDate = s.AdmissionDate,
                     guardianName = s.GuardianName,
                     mobile       = s.Mobile,
-                    annualTotal  = s.AnnualTotal,
+                    annualTotal  = canViewFees ? s.AnnualTotal : 0,
                     status       = s.Status,
                     approvalStatus = s.ApprovalStatus,
-                    feeStatus    = s.FeeStatus,
-                    feeDue       = s.FeeDue
+                    feeStatus    = canViewFees ? s.FeeStatus : "",
+                    feeDue       = canViewFees ? s.FeeDue : 0
                 })
             });
         }

@@ -660,8 +660,32 @@ $(document).ready(function () {
             .always(EC.hideLoader);
     });
 
-    // The four boxes above only seed NEW subjects. Re-rendering here would rebuild
-    // the grid mid-keystroke and steal the cursor, which is exactly what it used to do.
+    // The four boxes above seed NEW subjects. Re-rendering on every keystroke would
+    // rebuild the grid and steal the cursor, so max/pass are applied on change only:
+    // cells still on the old default follow the new one, cells the user changed
+    // on their own keep their value.
+    $('#maxMarks, #passMarks').on('focus', function () {
+        $(this).data('was', this.id === 'maxMarks' ? defaults().max : defaults().pass);
+    });
+    $('#maxMarks, #passMarks').on('change', function () {
+        var key = this.id === 'maxMarks' ? 'max' : 'pass';
+        var now = defaults()[key], was = $(this).data('was');
+        $(this).data('was', now);
+        if (was === undefined || was === now) return;
+        captureGrid();
+        $.each(sheets, function (cid, rows) {
+            $.each(rows, function (i, r) { if (r[key] === was) r[key] = now; });
+        });
+        renderGrid();
+    });
+
+    // Both dates, end not before start. Returns the message to show, or ''.
+    function datesError() {
+        var start = $('#startDate').val(), end = $('#endDate').val();
+        if (!start || !end) return 'Enter both the start and end dates.';
+        if (end < start) return 'End date cannot be before the start date.';
+        return '';
+    }
 
     $('#startDate').on('change', function () {
         var v = $(this).val();
@@ -676,7 +700,17 @@ $(document).ready(function () {
         renderGrid();
     });
 
-    $('#endDate').on('change', function () { $('#examDatesWrap').removeClass('has-error'); updateBar(); });
+    $('#endDate').on('change', function () {
+        // Say it straight away rather than only when Save is pressed.
+        var start = $('#startDate').val(), end = $(this).val();
+        if (start && end && end < start) {
+            $('#examDatesErr').text('End date cannot be before the start date.');
+            $('#examDatesWrap').addClass('has-error');
+        } else {
+            $('#examDatesWrap').removeClass('has-error');
+        }
+        updateBar();
+    });
     $('#examName').on('input', function () { $('#examNameWrap').removeClass('has-error'); updateBar(); });
     $('#examType').on('change', updateBar);
 
@@ -728,14 +762,15 @@ $(document).ready(function () {
         var valid = true;
 
         if (!$('#examName').val().trim()) { $('#examNameWrap').addClass('has-error'); valid = false; }
-        if (!$('#startDate').val() || !$('#endDate').val()
-            || $('#endDate').val() < $('#startDate').val()) {
+        var dateErr = datesError();
+        if (dateErr) {
+            $('#examDatesErr').text(dateErr);
             $('#examDatesWrap').addClass('has-error'); valid = false;
         }
 
         var picked = pickedClasses();
         if (!picked.length) { ecToast('error', 'Tick at least one class.'); return; }
-        if (!valid) { ecToast('error', 'Please complete the required fields.'); return; }
+        if (!valid) { ecToast('error', dateErr || 'Please complete the required fields.'); return; }
 
         var payloadClasses = [], blank = [];
         $.each(picked, function (i, id) {

@@ -1,10 +1,18 @@
 @{
     ViewData["Title"] = "Period Structure";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
 }
 
 @section PageStyles {
     <link rel="stylesheet" href="~/css/ERP/SchoolSettings/PeriodStructure.css" asp-append-version="true" />
+    @if (!canManage)
+    {
+        @* View-only role (e.g. Teacher): hide the buttons the server would refuse. *@
+        <style>
+            #modeBar .btn-group, #btnCopyDefault, #btnAdd, #btnSave, #pmSave, .js-edit, .js-del { display: none !important; }
+        </style>
+    }
 }
 
 <div class="ec-page-shell">
@@ -320,6 +328,9 @@ function renderGlance(){
     var cls='ps-g-'+typeKey(r.type);
     return '<div class="ps-g-seg '+cls+'" style="flex:'+w+' 1 0;" title="'+EC.esc(r.name)+' · '+r.start+'–'+r.end+'">'+(w>5?EC.esc(r.name):'')+'</div>';
   }).join('');
+  /* "total" is forced to 1 above only to avoid dividing by zero, so with no
+     periods the label read "Total day: 1m". */
+  if(!list.length){ document.getElementById('totalDur').textContent='No periods yet'; return; }
   var hrs=Math.floor(total/60), mins=total%60;
   document.getElementById('totalDur').textContent='Total day: '+(hrs?hrs+'h ':'')+(mins?mins+'m':'');
 }

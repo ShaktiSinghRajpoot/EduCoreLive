@@ -219,12 +219,16 @@ namespace educore.Areas.ERP.Controllers
             }
 
             bool isNewEnquiry = model.EnquiryId <= 0;
-            var result = await _enquiryService.SaveEnquiryAsync(model, tenantId, schoolId, actionUserId);
+            var (result, sameMobile) = await _enquiryService.SaveEnquiryAsync(model, tenantId, schoolId, actionUserId);
 
             TempData["Result"] = result > 0 ? "1" : "0";
             TempData["Message"] = result > 0
                 ? (isNewEnquiry ? "New enquiry added successfully." : "Enquiry updated successfully.")
                 : "Unable to save enquiry. Please try again.";
+
+            // Warn, don't block: siblings legitimately share a parent's mobile.
+            if (result > 0 && sameMobile > 0)
+                TempData["Warning"] = $"Mobile {model.Mobile} is already on {sameMobile} other enquiry/student record(s). Check this is not a duplicate (siblings may share it).";
 
             // Adding an enquiry is lead capture only — registration is a deliberate,
             // separate step (per-card Register action, or the Register Walk-in form on
@@ -384,7 +388,7 @@ namespace educore.Areas.ERP.Controllers
                 LeadSource   = "Walk-in",
                 Status       = "New"
             };
-            var newId = await _enquiryService.SaveEnquiryAsync(enquiry, tenantId, schoolId, actionUserId);
+            var (newId, _) = await _enquiryService.SaveEnquiryAsync(enquiry, tenantId, schoolId, actionUserId);
             if (newId <= 0)
                 return Json(new { success = false, message = "Could not create the registration record." });
 

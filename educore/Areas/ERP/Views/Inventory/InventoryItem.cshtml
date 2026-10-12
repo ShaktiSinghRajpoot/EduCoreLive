@@ -715,6 +715,11 @@
         .done(function (res) {
             if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not save.'); return; }
             ecToast('success', res.message);
+            // Warn only -- selling below cost can be deliberate (clearance, subsidised kit).
+            var cost = EC.numPos($('#costPrice').val()), sell = EC.numPos($('#sellingPrice').val());
+            if (sell > 0 && sell < cost) {
+                ecToast('warning', 'Selling price (' + EC.money(sell) + ') is below cost price (' + EC.money(cost) + ').');
+            }
             bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
             load();
         })

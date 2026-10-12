@@ -46,6 +46,7 @@
                            class="form-control"
                            placeholder="Email address or 10-digit mobile"
                            autocomplete="username"
+                           required
                            autofocus />
                 </div>
             </div>
@@ -58,7 +59,8 @@
                            asp-for="Password"
                            id="Password"
                            class="form-control"
-                           placeholder="••••••••••" />
+                           placeholder="••••••••••"
+                           required />
                     <span class="password-eye" id="togglePassword">
                         <i class="icon-base bx bx-hide"></i>
                     </span>
@@ -81,19 +83,24 @@
                 <span class="login-btn-arrow" aria-hidden="true">→</span>
             </button>
         </form>
-
-        <div class="login-links">
-            <a href="#">Terms</a> • <a href="#">Privacy</a>
-        </div>
     </div>
 </div>
 
 @section PageScripts {
     <script type="text/javascript">
         $(function () {
+            // Empty fields are caught here instead of costing a round trip (and a
+            // rate-limit attempt). Registered BEFORE the handler below, so that
+            // handler can see the prevented submit and leave the button alone.
+            EC.liveValidate('#myform', {
+                Email:    EC.rule.required('Email or mobile number'),
+                Password: EC.rule.required('Password')
+            });
+
             // Prevent double/triple-click duplicate submits. Each extra POST would
             // burn the login rate-limit budget (5 / 5 min per IP) and trigger a 429.
-            $('#myform').on('submit', function () {
+            $('#myform').on('submit', function (e) {
+                if (e.isDefaultPrevented()) { return; }   // failed validation above
                 var $btn = $(this).find('button[type="submit"]');
                 if ($btn.data('submitting')) { return false; }
                 $btn.data('submitting', true);

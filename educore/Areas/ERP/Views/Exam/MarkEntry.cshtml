@@ -297,7 +297,7 @@ function loadClasses(examId) {
             selClass.disabled = list.length === 0;
 
             if (!list.length) {
-                ecToast('error', 'This exam has no classes on its datesheet.');
+                ecToast('error', 'No classes to show: this exam has none on its datesheet, or none you teach.');
             } else if (list.length === 1) {
                 selClass.value = String(list[0].id);
                 $(selClass).trigger('change');
@@ -316,6 +316,25 @@ $(selClass).on('change', function () {
     if (state.classId) loadSetup(state.examId, state.classId);
 });
 
+// A teacher limited to the sheets they teach gets a scope list from ClassSetup
+// ({ section, subjectId } pairs); null = every subject in every section.
+var setupSubjects = [], setupScope = null;
+
+function fillSubjects() {
+    var sec = String(selSection.value || '').trim().toLowerCase();
+    var list = setupSubjects.filter(function (s) {
+        if (!setupScope) return true;
+        return setupScope.some(function (x) {
+            return x.subjectId === s.id && String(x.section || '').toLowerCase() === sec;
+        });
+    });
+    selSubject.innerHTML = '<option value="">Select Subject</option>';
+    $.each(list, function (i, s) {
+        selSubject.innerHTML += '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
+    });
+    selSubject.disabled = list.length === 0;
+}
+
 function loadSetup(examId, classId) {
     EC.showLoader();
     $.get(urls.setup, { examId: examId, classId: classId })
@@ -327,25 +346,30 @@ function loadSetup(examId, classId) {
                 var label = (s.name || '(no section)') + ' (' + s.students + ')';
                 selSection.innerHTML += '<option value="' + EC.esc(s.name) + '">' + EC.esc(label) + '</option>';
             });
-            $.each(subjects, function (i, s) {
-                selSubject.innerHTML += '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
-            });
+            setupSubjects = subjects;
+            setupScope    = (d && d.scope) || null;
 
             selSection.disabled = sections.length === 0;
-            selSubject.disabled = subjects.length === 0;
 
             if (!sections.length) {
-                ecToast('error', 'No students are enrolled in this class for the exam\'s academic year.');
+                ecToast('error', setupScope
+                    ? 'You do not teach any section of this class for this exam.'
+                    : 'No students are enrolled in this class for the exam\'s academic year.');
             } else if (sections.length === 1) {
                 selSection.value = sections[0].name;
             }
+            fillSubjects();
             updateLoadBtn();
         })
         .fail(function () { ecToast('error', 'Could not load this class. Please retry.'); })
         .always(EC.hideLoader);
 }
 
-$(selSection).on('change', function () { closeSheet(); updateLoadBtn(); });
+$(selSection).on('change', function () {
+    closeSheet();
+    if (setupScope) fillSubjects();   // a restricted teacher's subjects depend on the section
+    updateLoadBtn();
+});
 $(selSubject).on('change', function () { closeSheet(); updateLoadBtn(); });
 
 function updateLoadBtn() {
@@ -443,6 +467,12 @@ function entered() {
 // results are published, and for anyone without exams.marks / exams.manage.
 function locked() { return state.finalized || state.resultsPublished || !CAN_ENTER_MARKS; }
 
+// A mark below 0 or above the maximum. It is kept as typed (never silently
+// clamped) and flagged, and Save stays blocked until it is corrected.
+function badMarks(row) {
+    return !row.absent && row.marks !== null && (row.marks < 0 || row.marks > state.maxMarks);
+}
+
 // Pass/fail shows as a row tint, so it needs no column of its own.
 function rowClass(row) {
     if (row.absent) return 'me-row-abs';
@@ -465,7 +495,7 @@ function buildTableRow(row, idx) {
             '</label>' +
         '</td>' +
         '<td style="text-align:center;">' +
-            '<input type="number" class="me-marks-inp marks-inp" data-idx="' + idx + '" ' +
+            '<input type="number" class="me-marks-inp marks-inp' + (badMarks(row) ? ' inp-error' : '') + '" data-idx="' + idx + '" ' +
                    'min="0" max="' + state.maxMarks + '" step="0.5" placeholder="—" ' +
                    'value="' + (row.absent ? '' : fmtMarks(row.marks)) + '" ' + ro + '>' +
         '</td>' +
@@ -493,7 +523,7 @@ function buildMobCard(row, idx) {
             '</div>' +
             '<div>' +
                 '<span class="me-mob-inp-lbl">Marks / ' + fmtMarks(state.maxMarks) + '</span>' +
-                '<input type="number" class="me-marks-inp marks-inp" data-idx="' + idx + '" ' +
+                '<input type="number" class="me-marks-inp marks-inp' + (badMarks(row) ? ' inp-error' : '') + '" data-idx="' + idx + '" ' +
                        'min="0" max="' + state.maxMarks + '" step="0.5" placeholder="—" style="width:90px;" ' +
                        'value="' + (row.absent ? '' : fmtMarks(row.marks)) + '" ' + ro + '>' +
             '</div>' +
@@ -529,11 +559,11 @@ function attachRowEvents() {
         var idx = parseInt(this.dataset.idx, 10);
         var raw = this.value.trim();
         var val = raw === '' ? null : Number(raw);
-
-        if (val !== null && (!isFinite(val) || val < 0)) { val = 0; this.value = 0; }
-        if (val !== null && val > state.maxMarks) { val = state.maxMarks; this.value = state.maxMarks; }
+        if (val !== null && !isFinite(val)) val = null;
 
         state.rows[idx].marks = val;
+        // Out of range: flag both copies of the box (table + mobile card).
+        $('.marks-inp[data-idx="' + idx + '"]').toggleClass('inp-error', badMarks(state.rows[idx]));
         refreshRow(idx);
         renderContext();
     });
@@ -582,6 +612,16 @@ function collectItems() {
     return out;
 }
 
+// Marks outside 0..max block Save and Finalize until they are corrected.
+function checkMarks() {
+    var bad = state.rows.filter(badMarks);
+    if (!bad.length) return true;
+    ecToast('error', 'Marks must be between 0 and ' + fmtMarks(state.maxMarks) + '. Correct the ' +
+        bad.length + ' highlighted ' + (bad.length === 1 ? 'box' : 'boxes') + ' first.');
+    $('.marks-inp.inp-error:visible').first().focus();
+    return false;
+}
+
 function postSheet($btn, finalize) {
     EC.buttonBusy($btn, finalize ? 'Finalizing…' : 'Saving…');
 
@@ -613,9 +653,13 @@ function postSheet($btn, finalize) {
     .always(function () { EC.buttonReset($btn); });
 }
 
-$('#btnDraft').on('click', function () { postSheet($(this), false); });
+$('#btnDraft').on('click', function () {
+    if (!checkMarks()) return;
+    postSheet($(this), false);
+});
 
 $('#btnFinalize').on('click', function () {
+    if (!checkMarks()) return;
     var pending = state.rows.filter(function (r) { return !r.absent && r.marks === null; }).length;
     var warn = document.getElementById('modalPendingWarn');
 

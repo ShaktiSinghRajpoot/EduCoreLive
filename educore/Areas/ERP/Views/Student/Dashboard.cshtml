@@ -158,7 +158,7 @@
                         <div class="ec-detail-title">Payment History</div>
                         <div class="table-responsive">
                             <table class="table sd-tbl align-middle mb-0">
-                                <thead><tr><th>Date</th><th>Fee Head</th><th>Amount</th><th>Mode</th><th>Receipt No</th><th>Paid By</th><th></th></tr></thead>
+                                <thead><tr><th>Date</th><th>Fee Head</th><th>Amount</th><th>Mode</th><th>Receipt No</th><th>Collected By</th><th></th></tr></thead>
                                 <tbody id="feeHistBody"></tbody>
                             </table>
                         </div>
@@ -301,7 +301,7 @@ function buildDetail(api){
     });
 
     return {
-        dob:st.dob, age:'—', blood:st.blood,
+        dob:st.dob, age:(st.age!=null ? st.age+' yrs' : '—'), blood:st.blood,
         religion:st.religion, category:st.category, nationality:st.nation,
         aadhaar:st.idProof, motherTongue:'—', caste:'—',
         fatherName:st.guardian, motherName:st.mother, guardianName:st.guardian,
@@ -313,7 +313,7 @@ function buildDetail(api){
         feeStructure: Object.keys(feeStructure).map(function(k){ return feeStructure[k]; }),
         feeHistory: (api.receipts || []).map(function(r){
             return {date:r.date, head:'Fee payment', amt:r.amount, mode:r.mode,
-                    receipt:r.receiptNo, by:r.cancelled ? 'CANCELLED' : '—'};
+                    receipt:r.receiptNo, by:r.cancelled ? 'CANCELLED' : (r.collectedBy || '—')};
         }),
         totalFee: fee.totalDue, totalPaid: fee.totalPaid,
         hasConcession: fee.concession > 0, concessionAmt: fee.concession,
@@ -343,7 +343,7 @@ function loadDashboard(){
             phone:st.mobile, address:st.address,
             feeDue:api.fee.outstanding,
             feeSt:api.fee.outstanding<=0 ? 'Paid' : (api.fee.totalPaid>0 ? 'Partial' : 'Pending'),
-            attend:null, color:'primary'
+            attend:null, color:'primary', subjects:st.subjects
         };
 
         STUDENT=s; DETAIL=buildDetail(api);
@@ -402,7 +402,8 @@ function renderOverview(s,d){
         mc('Attendance', (att&&att.schoolDays) ? att.percent+'%' : '—',
            (att&&att.schoolDays&&att.percent>=75?'bg-label-success text-success':'bg-label-warning text-warning'),'bx-user-check')
        +mc('Last Exam',  (ex&&ex.options.length) ? ex.percent+'%' : '—','bg-label-info text-info','bx-book-open')
-       +mc('Subjects',   (ex&&ex.options.length) ? String(ex.subjectCount) : '—','bg-label-primary text-primary','bx-list-check')
+       // The class's subjects (Subject Management); else the last exam's count.
+       +mc('Subjects',   s.subjects!=null ? String(s.subjects) : (ex&&ex.options.length) ? String(ex.subjectCount) : '—','bg-label-primary text-primary','bx-list-check')
        +mc('Fee Due',    inr(s.feeDue),(s.feeDue>0?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-wallet');
 
     // Subject bars come from the latest published exam's real marks; absent
@@ -486,7 +487,10 @@ function renderAttendance(s,d){
         return;
     }
 
-    if(a.percent<75) document.getElementById('att-warn').classList.remove('d-none');
+    // The class may have held registers this student was never marked on (e.g.
+    // admitted the same week). Warn only once the student has marked days.
+    var marked=(a.present||0)+(a.absent||0)+(a.leave||0);
+    if(marked>0 && a.percent<75) document.getElementById('att-warn').classList.remove('d-none');
     else             document.getElementById('att-warn').classList.add('d-none');
 
     document.getElementById('att-metrics').innerHTML=

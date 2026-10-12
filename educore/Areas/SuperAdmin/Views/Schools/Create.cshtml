@@ -522,6 +522,10 @@
         // Same rule as the server (SchoolManageModel.PasswordPattern): 8+ chars, a letter and a digit.
         const passwordPattern = new RegExp(@Html.Raw(Json.Serialize(educore.Models.SchoolManageModel.PasswordPattern)));
         const passwordRuleMessage = @Html.Raw(Json.Serialize(educore.Models.SchoolManageModel.PasswordRuleMessage));
+        // Same map as the server (SchoolManageModel.PinZonesByState): state name -> allowed
+        // first digits of its PIN codes.
+        const pinZonesByState = @Html.Raw(Json.Serialize(educore.Models.SchoolManageModel.PinZonesByState));
+        const pinStateMessage = @Html.Raw(Json.Serialize(educore.Models.SchoolManageModel.PinStateMessage));
 
         // Scope every selector to this form. The old code bound to a bare
         // $("input, select, textarea"), which also grabbed the layout's navbar search.
@@ -758,11 +762,17 @@
                     fail("Pincode is required.");
                 } else if (!/^[1-9][0-9]{5}$/.test(value)) {
                     fail("Enter valid 6 digit pincode.");
+                } else if (!pinMatchesState(value, $form.find('[name="State"]').val())) {
+                    fail(pinStateMessage);
                 }
             }
 
-            if (name === "ContactName" && value === "") {
-                fail("Primary contact person is required.");
+            if (name === "ContactName") {
+                if (value === "") {
+                    fail("Primary contact person is required.");
+                } else if (value.length < 2) {
+                    fail("Contact person name must be at least 2 characters.");
+                }
             }
 
             if (name === "Phone") {
@@ -778,8 +788,12 @@
             }
 
             if (adminRequired()) {
-                if (name === "AdminFullName" && value === "") {
-                    fail("Admin full name is required.");
+                if (name === "AdminFullName") {
+                    if (value === "") {
+                        fail("Admin full name is required.");
+                    } else if (value.length < 3) {
+                        fail("Admin name must be at least 3 characters.");
+                    }
                 }
 
                 if (name === "AdminEmail") {
@@ -826,6 +840,16 @@
             }
 
             return ok;
+        }
+
+        // Same rule as SchoolManageModel.PinMatchesState: a state missing from the map
+        // (or a blank state) is never blocked.
+        function pinMatchesState(pin, state) {
+            var key = Object.keys(pinZonesByState).find(function (k) {
+                return k.toLowerCase() === $.trim(state || "").toLowerCase();
+            });
+            if (!key) return true;
+            return pinZonesByState[key].indexOf(pin.charAt(0)) !== -1;
         }
 
         // Validates one step by number. The old version only ever validated the step on
@@ -990,7 +1014,20 @@
         $form.on("submit", function (e) {
             if (!validateThrough(totalSteps)) {
                 e.preventDefault();
+                return;
             }
+            formDirty = false;   // a real save is leaving the page -- don't warn
+        });
+
+        // ── Unsaved-changes warning ─────────────────────────────────────────
+        // Four steps of typing are lost on an accidental Back or tab close. Any
+        // edit marks the form dirty; a successful submit clears it (above).
+        let formDirty = false;
+        $form.on("input change", "input, select, textarea", function () { formDirty = true; });
+        window.addEventListener("beforeunload", function (e) {
+            if (!formDirty) return;
+            e.preventDefault();
+            e.returnValue = "";   // older browsers need this to show the prompt
         });
 
         // ── Live validation ─────────────────────────────────────────────────
@@ -1011,6 +1048,12 @@
         $("#TenantMode").on("change", toggleTenantMode);
 
         $form.on("change", '[name="BoardId"]', toggleBoardState);
+
+        // A PIN that fit the old state may not fit the new one.
+        $form.on("change", '[name="StateId"]', function () {
+            var $pin = $form.find('[name="Pincode"]');
+            if ($.trim($pin.val())) validateField($pin);
+        });
         $form.on("change", '[name="InstitutionCategoryId"]', function () {
             applyCategory();
             // Re-check the fields already showing an error, so the message follows the

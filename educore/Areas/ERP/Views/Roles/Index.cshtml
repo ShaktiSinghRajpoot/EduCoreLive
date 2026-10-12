@@ -67,7 +67,8 @@
                     }
                   </td>
                   <td><span class="rl-count">@r.UserCount</span></td>
-                  <td><span class="rl-count">@r.PermissionCount granted</span></td>
+                  @* School Admin bypasses permission checks, so its 0 granted rows mean "everything". *@
+                  <td><span class="rl-count">@(r.RoleCode == "SCHOOL_ADMIN" ? "All permissions" : $"{r.PermissionCount} granted")</span></td>
                   <td class="text-end">
                     <a class="btn btn-sm btn-outline-primary" asp-area="ERP" asp-controller="Roles" asp-action="Permissions" asp-route-id="@r.RoleId">
                       <i class="bx bx-slider-alt me-1"></i>Permissions

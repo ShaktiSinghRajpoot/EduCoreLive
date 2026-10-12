@@ -16,17 +16,20 @@ namespace educore.Areas.ERP.Controllers
         private readonly IBaseService _baseService;
         private readonly IClassTeacherService _classTeacher;
         private readonly EduCoreDataAccessLayer.Services.IPermissionService _permission;
+        private readonly ISchoolCalendarService _calendar;
 
         public AttendanceController(
             IAttendanceService attendance,
             IBaseService baseService,
             IClassTeacherService classTeacher,
-            EduCoreDataAccessLayer.Services.IPermissionService permission)
+            EduCoreDataAccessLayer.Services.IPermissionService permission,
+            ISchoolCalendarService calendar)
         {
             _attendance = attendance;
             _baseService = baseService;
             _classTeacher = classTeacher;
             _permission = permission;
+            _calendar = calendar;
         }
 
         // Admins/principals may mark any section; a class teacher only their own.
@@ -67,11 +70,25 @@ namespace educore.Areas.ERP.Controllers
         {
             var d = Dates.Norm(date) ?? Dates.Today;
             var roster = await _attendance.GetRosterAsync(@class, section, d, TenantId(), SchoolId(), UserId());
-            var canMark = await CanMarkAsync(@class, section);
+
+            // Why Save is off, shown next to the button instead of a silent disabled state.
+            string? cannotMark = null;
+            if (!await HasPermissionAttribute.UserHasAsync(this, "attendance.manage"))
+                cannotMark = "Your role can view attendance but not mark it.";
+            else if (!await CanMarkAsync(@class, section))
+                cannotMark = "You can mark attendance only for classes where you are the class teacher.";
+
+            // Holiday / weekly off from the School Calendar -- sp_attendance_save refuses these days.
+            var day = await _calendar.GetDayStatusAsync(
+                DateTime.ParseExact(d, Dates.Iso, System.Globalization.CultureInfo.InvariantCulture),
+                TenantId(), SchoolId(), UserId());
 
             return Json(new
             {
-                canMark,
+                canMark = cannotMark == null,
+                cannotMark,
+                dayType  = day.DayType,     // working | weekly_off | holiday | half_day
+                dayTitle = day.Title,
                 students = roster.Select(s => new
                 {
                     id     = s.StudentId,

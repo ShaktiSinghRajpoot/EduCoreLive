@@ -65,6 +65,11 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<ExamMarksSaveResult> SaveMarksAsync(
             ExamMarksSaveRequest request, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>The sheets of an exam this user teaches (class teacher or timetable).
+        /// Callers apply it only to users without exams.manage.</summary>
+        Task<List<ExamMarkScope>> GetMarkScopeAsync(
+            int examId, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>Unlock a finalized sheet. Callers must restrict this to school admins.</summary>
         Task<ExamMarksSaveResult> ReopenSheetAsync(
             int examId, int academicClassId, int subjectId, string? section,

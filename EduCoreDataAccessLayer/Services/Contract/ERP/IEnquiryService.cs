@@ -30,8 +30,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<EnquiryStatsModel>  GetKpiStatsAsync(int tenantId, int schoolId, int actionUserId);
         Task<EnquiryModel?>      GetEnquiryByIdAsync(int enquiryId, int tenantId, int schoolId, int actionUserId);
 
-        // Save / update (full form)
-        Task<int> SaveEnquiryAsync(EnquiryModel model, int tenantId, int schoolId, int actionUserId);
+        // Save / update (full form). SameMobileCount is set for a NEW enquiry only:
+        // other open enquiries / active students on the same mobile (warn, never block).
+        Task<(int EnquiryId, int SameMobileCount)> SaveEnquiryAsync(EnquiryModel model, int tenantId, int schoolId, int actionUserId);
 
         // Status-only AJAX update (auto-logs to status_history)
         Task<(int Success, string Message)> UpdateStatusAsync(

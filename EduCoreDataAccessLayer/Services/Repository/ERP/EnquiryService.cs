@@ -171,9 +171,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         }
 
         // ── Save enquiry ─────────────────────────────────────────
-        public async Task<int> SaveEnquiryAsync(EnquiryModel model, int tenantId, int schoolId, int actionUserId)
+        public async Task<(int EnquiryId, int SameMobileCount)> SaveEnquiryAsync(EnquiryModel model, int tenantId, int schoolId, int actionUserId)
         {
-            if (tenantId <= 1 || schoolId <= 0) return 0;
+            if (tenantId <= 1 || schoolId <= 0) return (0, 0);
 
             var parameters = new NpgsqlParameter[]
             {
@@ -221,9 +221,12 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var dal = _db;
             var ds = await dal.ExecuteProcedureWithCursorsAsync(SpMain, parameters);
 
-            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return 0;
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (0, 0);
             var row = ds.Tables[0].Rows[0];
-            return row["enquiry_id"] == DBNull.Value ? 0 : Convert.ToInt32(row["enquiry_id"]);
+            int id = row["enquiry_id"] == DBNull.Value ? 0 : Convert.ToInt32(row["enquiry_id"]);
+            int sameMobile = row.Table.Columns.Contains("same_mobile_count") && row["same_mobile_count"] != DBNull.Value
+                ? Convert.ToInt32(row["same_mobile_count"]) : 0;
+            return (id, sameMobile);
         }
 
         // ── Status update (AJAX) ─────────────────────────────────

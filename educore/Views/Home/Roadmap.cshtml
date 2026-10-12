@@ -27,6 +27,10 @@
     {
         ("Transport", "bx-bus", "Live bus tracking", "Transport", "LiveTracking")
     };
+
+    // These are school modules. The platform super admin (tenant 1) has no school,
+    // so the links would only 403 -- hide the "Now available" block for them.
+    bool isPlatform = User.FindFirst(Common.SK_TenantId)?.Value == "1";
 }
 
 @section PageStyles {
@@ -72,6 +76,8 @@
             </div>
         </div>
 
+        @if (!isPlatform)
+        {
         <h6 class="fw-bold mb-2">Now available</h6>
         <div class="rm-grid mb-4">
             @foreach (var x in shipped)
@@ -85,6 +91,7 @@
                 </div>
             }
         </div>
+        }
 
         <h6 class="fw-bold mb-2">Planned</h6>
         <div class="rm-grid">

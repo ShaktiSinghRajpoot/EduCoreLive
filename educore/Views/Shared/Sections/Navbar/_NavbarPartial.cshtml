@@ -111,7 +111,12 @@
                         </div>
                         <div class="overflow-hidden">
                             <h6 class="mb-1 text-truncate fw-semibold">@userName</h6>
-                            <span class="badge bg-label-primary rounded-pill" style="font-size:.65rem;">@roleLabel</span>
+                            @* The platform account is literally named "Super Admin";
+                               don't print the role a second time under it. *@
+                            @if (!string.Equals(roleLabel, userName.Trim(), StringComparison.OrdinalIgnoreCase))
+                            {
+                                <span class="badge bg-label-primary rounded-pill" style="font-size:.65rem;">@roleLabel</span>
+                            }
                         </div>
                     </div>
                 </li>

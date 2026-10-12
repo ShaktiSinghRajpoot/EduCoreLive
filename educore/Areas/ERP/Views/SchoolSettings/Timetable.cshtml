@@ -1,10 +1,18 @@
 @{
     ViewData["Title"] = "Timetable";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
 }
 
 @section PageStyles {
     <link rel="stylesheet" href="~/css/ERP/SchoolSettings/Timetable.css" asp-append-version="true" />
+    @if (!canManage)
+    {
+        @* View-only role (e.g. Teacher): hide the buttons the server would refuse. *@
+        <style>
+            #btnCopy, #cellSave, #cellClear { display: none !important; }
+        </style>
+    }
 }
 
 <div class="ec-page-shell">

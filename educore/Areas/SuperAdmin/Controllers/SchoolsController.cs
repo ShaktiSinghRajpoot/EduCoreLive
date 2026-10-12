@@ -165,6 +165,8 @@ namespace educore.Areas.SuperAdmin.Controllers
             ValidateTenant(model);
             ValidateSchoolAdmin(model);
             await ValidateBoardStateAsync(model);
+            if (!SchoolManageModel.PinMatchesState(model.Pincode, model.State))
+                ModelState.AddModelError(nameof(model.Pincode), SchoolManageModel.PinStateMessage);
 
             if (!ModelState.IsValid)
             {
@@ -323,6 +325,8 @@ namespace educore.Areas.SuperAdmin.Controllers
             ValidateTenant(model);
             ValidateSchoolAdmin(model);
             await ValidateBoardStateAsync(model);
+            if (!SchoolManageModel.PinMatchesState(model.Pincode, model.State))
+                ModelState.AddModelError(nameof(model.Pincode), SchoolManageModel.PinStateMessage);
 
             if (!ModelState.IsValid)
             {

@@ -341,7 +341,7 @@
                                     <label class="form-label">Apply To</label>
                                     <select id="discountApplyTo" name="DiscountApplyTo" class="form-select">
                                         <option value="payToday">Pay Today Only</option>
-                                        <option value="annual">Estimated Annual</option>
+                                        <option value="annual">Fees for Rest of Session</option>
                                     </select>
                                 </div>
                                 <div class="col-12">
@@ -764,12 +764,12 @@ $(function () {
         if (halfYearly > 0) summary += '<div class="summary-line"><span>Half-Yearly</span><strong>' + EC.money(halfYearly) + '/half-yr</strong></div>';
         summary += '<div class="summary-line"><span>Yearly</span><strong>' + EC.money(yearly) + '/yr</strong></div>';
         if (applyTo === 'annual' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + EC.money(disc) + '</strong></div>';
-        summary += '<div class="summary-line"><span>Estimated Annual Fee</span><strong>' + EC.money(estAnnual) + '</strong></div>' +
+        summary += '<div class="summary-line"><span title="Admission fees plus the instalments left in this session (pro-rated by joining month)">Fees for Rest of Session</span><strong>' + EC.money(estAnnual) + '</strong></div>' +
             '</div>';
         html += summary;
 
         $annual.text(EC.money(payToday));
-        $annualRef.text('Est. annual fee ' + EC.money(estAnnual) + ' · billed through the year');
+        $annualRef.text('Fees for rest of session ' + EC.money(estAnnual) + ' · one-time + instalments left this session');
         $feeBox.html(html);
 
         // Cap collection at the amount due now (no advance/prepay at admission — that's

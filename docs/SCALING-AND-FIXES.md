@@ -5000,3 +5000,27 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   `students.manage` hidden/redirected with a clear message (066); 10-digit mobile on driver phone and
   supplier mobile (068).
 - **Deploy:** `fee_concession_cancel_report.sql` (concession register proc), `sp_staff_manage.sql`.
+
+### [2026-10-12] QA report: last Medium bugs + Low bugs
+- **Medium (attendance/exams):** a Present tap counts as reviewed and an untouched roster saves after a
+  confirm (052); out-of-range marks stay as typed, are highlighted and block Save (055); teachers
+  with `exams.marks` but not `exams.manage` only get sheets for sections they are class teacher of
+  or subjects they teach in the timetable -- new `GetMarkScope` op in `exam_marks.sql` (060).
+- **Low, public/Super Admin:** dead Terms/Privacy and Support links removed; login fields required
+  without leaving the button busy; no Dashboard menu item for tenant 1; roadmap hides school-only
+  modules from Super Admin; role badge not repeated; contact/admin name min length; PIN first digit
+  must fit the state (`SchoolManageModel.PinZonesByState`, unknown states never blocked);
+  beforeunload on the Add School wizard; error page title. 021 not in our code.
+- **Low, settings:** unique class order except stream classes; plurals; PCM/PCB subject suggestions;
+  Staff Masters keeps its tab; Fee Head edit scrolls to the form; Fee Structure list in class order;
+  "No periods yet"; working-day override refused on a normal weekday (`school_calendar.sql`);
+  School Admin role shows "All permissions"; staff form errors all come back in one round (client
+  validation partial removed).
+- **Low, students/fees/inventory:** same-mobile enquiry warning (`enquiry_crm_manage.sql`); "Fees for
+  rest of session" label; receipt date formatted; student age / subjects / "Collected by";
+  low-attendance warning only after marked days; Collect Fees header = the cashier's Day Close
+  figure; Fee Status hidden without `fees.view`; selling-below-cost warning. 058 not reproduced.
+- **Low, attendance/exams:** "Future date" label; holiday / weekly-off notice and disabled Save;
+  a visible reason when a teacher cannot mark; exam end-date message; default max/pass marks
+  update untouched grid cells; write buttons hidden without `academics.manage` / `students.manage`.
+  062 not reproduced locally (Railway may lack `fn_school_working_days`).

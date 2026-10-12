@@ -1,12 +1,20 @@
 @{
     ViewData["Title"] = "Subject Management";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
     var classes = ViewBag.Classes as List<EduCoreDataAccessLayer.Models.ERP.SubjectClassItem>
                   ?? new List<EduCoreDataAccessLayer.Models.ERP.SubjectClassItem>();
 }
 
 @section PageStyles {
     <link rel="stylesheet" href="~/css/ERP/SchoolSettings/SubjectManagement.css" asp-append-version="true" />
+    @if (!canManage)
+    {
+        @* View-only role (e.g. Teacher): hide the buttons the server would refuse. *@
+        <style>
+            .sm-suggest-section, .sm-add-row, .sm-pill-remove, .sm-save-bar { display: none !important; }
+        </style>
+    }
 }
 
 <div class="ec-page-shell sm-page">
@@ -70,7 +78,7 @@
             <div class="sm-class-panel">
                 <div class="sm-panel-hdr">
                     <span class="sm-panel-title"><i class="bx bx-layer me-1"></i>Classes</span>
-                    <span class="sm-panel-count">@classes.Count classes</span>
+                    <span class="sm-panel-count">@classes.Count @(classes.Count == 1 ? "class" : "classes")</span>
                 </div>
                 <div class="sm-class-list" id="classList">
                     @foreach (var cls in classes)
@@ -79,7 +87,7 @@
                             <div class="sm-class-ic"><i class="bx bx-book-open"></i></div>
                             <div class="flex-grow-1 min-width-0">
                                 <div class="sm-class-name">@cls.ClassName</div>
-                                <div class="sm-class-meta"><span class="cls-subj-count">@cls.SubjectCount</span> subjects</div>
+                                <div class="sm-class-meta"><span class="cls-subj-count">@cls.SubjectCount</span> <span class="cls-subj-word">@(cls.SubjectCount == 1 ? "subject" : "subjects")</span></div>
                             </div>
                             <span class="sm-count-badge sm-badge-zero cls-badge">@cls.SubjectCount</span>
                         </div>
@@ -197,6 +205,12 @@ $(document).ready(function () {
             return ['English','Hindi','Mathematics','Science','Social Science','Sanskrit','Computer'];
         if (/^(class\s*)?(9th?|10th?|9|10)$/i.test(n))
             return ['English','Hindi','Mathematics','Science','Social Science','Sanskrit','IT \/ Computer'];
+        // Stream classes are saved as "Class 11 Science (PCM)" / "(PCB)", so check
+        // the stream before the plain "science" match.
+        if (/\bpcm\b/i.test(n))
+            return ['English','Physics','Chemistry','Mathematics','Computer Science','Physical Education'];
+        if (/\bpcb\b/i.test(n))
+            return ['English','Physics','Chemistry','Biology','Physical Education','Psychology'];
         if (/science/i.test(n))
             return ['English','Physics','Chemistry','Biology','Mathematics','Computer Science','Physical Education'];
         if (/commerce/i.test(n))
@@ -242,6 +256,7 @@ $(document).ready(function () {
         const $meta  = $item.find('.cls-subj-count');
 
         $meta.text(count);
+        $item.find('.cls-subj-word').text(count === 1 ? 'subject' : 'subjects');
         $badge.text(count);
         $badge.removeClass('sm-badge-ok sm-badge-warn sm-badge-zero');
         if (count >= 4)     $badge.addClass('sm-badge-ok');

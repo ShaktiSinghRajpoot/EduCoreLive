@@ -1,10 +1,18 @@
 @{
     ViewData["Title"] = "Assign Class Teacher";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
 }
 
 @section PageStyles {
     <link rel="stylesheet" href="~/css/ERP/SchoolSettings/AssignClassTeacher.css" asp-append-version="true" />
+    @if (!canManage)
+    {
+        @* View-only role (e.g. Teacher): hide the buttons the server would refuse. *@
+        <style>
+            #btnAuto { display: none !important; }
+        </style>
+    }
 }
 
 <div class="ec-page-shell">
@@ -126,6 +134,7 @@ var GRID_URL   = '@Url.Action("ClassTeacherGrid", "SchoolSettings", new { area =
 var SESSION_ID = @(ViewBag.AcademicYearId ?? 0);
 var POOL_URL   = '@Url.Action("ClassTeacherPool", "SchoolSettings", new { area = "ERP" })';
 var ASSIGN_URL = '@Url.Action("AssignClassTeacher", "SchoolSettings", new { area = "ERP" })';
+var CAN_MANAGE = @(canManage ? "true" : "false");   // view-only roles see the picker locked
 var TOKEN      = $('input[name="__RequestVerificationToken"]').first().val();
 
 // Loaded from the server: the staff pool and the class/section grid.
@@ -205,7 +214,7 @@ function selectHtml(sec){
     var extra = (load>0 && t.id!==sec.teacherId) ? ' ('+load+' sec)' : (t.id===sec.teacherId && load>1 ? ' ('+load+' sec)' : '');
     opts+='<option value="'+t.id+'"'+(t.id===sec.teacherId?' selected':'')+'>'+EC.esc(t.name)+extra+'</option>';
   });
-  return '<select class="act-select js-assign'+(sec.teacherId?'':' empty')+'" data-sec="'+sec.id+'">'+opts+'</select>';
+  return '<select class="act-select js-assign'+(sec.teacherId?'':' empty')+'" data-sec="'+sec.id+'"'+(CAN_MANAGE?'':' disabled')+'>'+opts+'</select>';
 }
 
 /* Render */

@@ -3,10 +3,19 @@
 @{
     ViewData["Title"] = "Classes & Sections";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
 }
 
 @section PageStyles {
     <link rel="stylesheet" href="~/css/ERP/SchoolSettings/ClassSection.css" asp-append-version="true" />
+    @if (!canManage)
+    {
+        @* View-only role (e.g. Teacher): hide the buttons the server would refuse. *@
+        <style>
+            #btnAddClass, #btnCopySetup, #classSave, #secSave,
+            .js-add-sec, .js-edit-sec, .js-del-sec, .js-edit-class, .js-del-class { display: none !important; }
+        </style>
+    }
 }
 
 <div class="ec-page-shell">
@@ -537,6 +546,12 @@ document.getElementById('classSave').addEventListener('click',function(){
       : '"'+name+'" already exists.');
     return;
   }
+  /* Rank is the promotion order, so two classes may share one only when both are
+     stream variants of the same class (Class 11 PCM and Class 11 Commerce). */
+  var rankClash=DATA.find(function(x){
+    return x.rank===rank && x.id!==editClassId && (stream==='gen' || !x.stream || x.stream==='gen');
+  });
+  if(rankClash){ ecToast('warning','Order '+rank+' is already used by "'+rankClash.name+'". Only stream classes (e.g. Class 11 PCM and Class 11 Commerce) can share an order.'); return; }
   if(editClassId){
     var c=DATA.find(function(x){return x.id===editClassId;});
     c.name=name; c.rank=rank; c.stream=stream; c.coord=coord; c.coordStaffId=coordStaffId;

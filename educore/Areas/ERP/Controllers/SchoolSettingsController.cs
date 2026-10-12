@@ -539,6 +539,17 @@ namespace educore.Areas.ERP.Controllers
                     .ToList();
             }
 
+            // List in class order (rank from Classes & Sections), not by name --
+            // a name sort put "Class 10" before "Class 2".
+            var classRank = (academicSetup?.ClassDetails ?? new List<AcademicClassDetail>())
+                .GroupBy(c => c.ClassName, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().DisplayOrder, StringComparer.OrdinalIgnoreCase);
+            existingStructures = existingStructures
+                .OrderBy(s => classRank.TryGetValue(s.ClassName ?? "", out var r) ? r : int.MaxValue)
+                .ThenBy(s => s.ClassName)
+                .ThenByDescending(s => s.AcademicYear)
+                .ToList();
+
             // Current academic year string (e.g. "2026-2027")
             string currentAy = chosenAy?.Text
                 ?? (Dates.Now.Month >= 4
@@ -697,6 +708,9 @@ namespace educore.Areas.ERP.Controllers
             // subject count. The page then loads/saves one class at a time.
             ViewBag.Classes = await _subjectService.GetClassesAsync(
                 SmTenant(), SmSchool(), SmUser(), academicYearId);
+            // Add / edit / delete buttons are shown only with academics.manage
+            // (a teacher has academics.view and would be refused on save).
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "academics.manage");
             return View();
         }
 
@@ -808,6 +822,9 @@ namespace educore.Areas.ERP.Controllers
             ViewBag.CanCopySetup = structure.ClassCount == 0 && structure.CanCopy;
             ViewBag.CopyFromYearId = structure.SourceYearId;
             ViewBag.CopyFromYearName = structure.SourceYearName;
+            // Add / edit / delete buttons are shown only with academics.manage
+            // (a teacher has academics.view and would be refused on save).
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "academics.manage");
 
             return View();
         }
@@ -891,6 +908,14 @@ namespace educore.Areas.ERP.Controllers
                 // dropdown offers are allowed through.
                 if (stream != null && !AllowedStreams.Contains(stream))
                     return Json(new { success = false, message = $"\"{name}\" has an unknown stream." });
+
+                // Rank is the promotion order. Only stream variants of one class
+                // (Class 11 PCM, Class 11 Commerce) may share it.
+                bool isStream = stream != null && stream != "gen";
+                var rankClash = model.ClassDetails.FirstOrDefault(x => x.DisplayOrder == c.Rank
+                    && (!isStream || string.IsNullOrEmpty(x.Stream) || x.Stream == "gen"));
+                if (rankClash != null)
+                    return Json(new { success = false, message = $"Order {c.Rank} is used by both \"{rankClash.ClassName}\" and \"{name}\". Only stream classes (e.g. Class 11 PCM and Class 11 Commerce) can share an order." });
 
                 var coordinator = string.IsNullOrWhiteSpace(c.Coordinator) ? null : c.Coordinator!.Trim();
                 if (coordinator != null && coordinator.Length > CoordinatorMaxLength)
@@ -1123,6 +1148,9 @@ namespace educore.Areas.ERP.Controllers
         {
             // Sections are per session, so the grid belongs to one.
             await ResolveSessionAsync(academicYearId);
+            // Add / edit / delete buttons are shown only with academics.manage
+            // (a teacher has academics.view and would be refused on save).
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "academics.manage");
             return View();
         }
 
@@ -1164,6 +1192,9 @@ namespace educore.Areas.ERP.Controllers
         {
             // Sections are per session, so the grid belongs to one.
             await ResolveSessionAsync(academicYearId);
+            // Add / edit / delete buttons are shown only with academics.manage
+            // (a teacher has academics.view and would be refused on save).
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "academics.manage");
             return View();
         }
 
@@ -1268,6 +1299,9 @@ namespace educore.Areas.ERP.Controllers
             var today    = Dates.Now.Date;
             var calendar = await _schoolCalendarService.GetCalendarAsync(today, today, tenantId, schoolId, actionUserId);
             ViewBag.WeeklyOffJson = System.Text.Json.JsonSerializer.Serialize(calendar.WeeklyOffDays);
+            // Add / edit / delete buttons are shown only with academics.manage
+            // (a teacher has academics.view and would be refused on save).
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "academics.manage");
 
             return View();
         }
@@ -1439,8 +1473,11 @@ namespace educore.Areas.ERP.Controllers
         // working-day overrides. Feeds the Smart Bell and anything else that needs
         // to know whether the school is open.
         [HasPermission("academics.view")]
-        public IActionResult SchoolCalendar()
+        public async Task<IActionResult> SchoolCalendar()
         {
+            // Add / edit / delete buttons are shown only with academics.manage
+            // (a teacher has academics.view and would be refused on save).
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "academics.manage");
             return View();
         }
 

@@ -67,6 +67,23 @@ namespace educore.Areas.ERP.Controllers
                 || await HasPermissionAttribute.UserHasAsync(this, "exams.manage");
         }
 
+        // A teacher with exams.marks but not exams.manage enters marks only for the
+        // sheets they teach: sections they are class teacher of, and subjects the
+        // timetable gives them. Null = not restricted (school admin / exams.manage).
+        private async Task<List<ExamMarkScope>?> MarkScopeAsync(int examId)
+        {
+            if (await HasPermissionAttribute.UserHasAsync(this, "exams.manage")) return null;
+            return await _exam.GetMarkScopeAsync(examId, TenantId(), SchoolId(), UserId());
+        }
+
+        private static bool SameSection(string? a, string? b) =>
+            string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
+
+        private static bool InScope(List<ExamMarkScope>? scope, int classId, string? section, int subjectId) =>
+            scope == null || scope.Any(x => x.AcademicClassId == classId
+                                         && x.SubjectId == subjectId
+                                         && SameSection(x.Section, section));
+
         // ── Exam Schedule ──
         // An exam is school-wide; each class it covers gets its own datesheet.
 
@@ -332,6 +349,9 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> ExamClasses(int examId)
         {
             var classes = await _exam.GetExamClassesAsync(examId, TenantId(), SchoolId(), UserId());
+            var scope   = await MarkScopeAsync(examId);
+            if (scope != null)
+                classes = classes.Where(c => scope.Any(x => x.AcademicClassId == c.AcademicClassId)).ToList();
             return Json(classes.Select(c => new
             {
                 id       = c.AcademicClassId,
@@ -345,8 +365,22 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> ClassSetup(int examId, int classId)
         {
             var setup = await _exam.GetClassSetupAsync(examId, classId, TenantId(), SchoolId(), UserId());
+
+            // A restricted teacher sees only their sections and subjects; the page
+            // narrows the subjects per section with the scope list.
+            var scope = await MarkScopeAsync(examId);
+            List<ExamMarkScope>? mine = null;
+            if (scope != null)
+            {
+                var own = scope.Where(x => x.AcademicClassId == classId).ToList();
+                setup.Sections = setup.Sections.Where(s => own.Any(x => SameSection(x.Section, s.Section))).ToList();
+                setup.Subjects = setup.Subjects.Where(s => own.Any(x => x.SubjectId == s.SubjectId)).ToList();
+                mine = own;
+            }
+
             return Json(new
             {
+                scope = mine?.Select(x => new { section = x.Section.Trim(), subjectId = x.SubjectId }),
                 subjects = setup.Subjects.Select(s => new
                 {
                     id        = s.SubjectId,
@@ -363,6 +397,9 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> Sheet(int examId, int classId, int subjectId, string? section)
         {
+            if (!InScope(await MarkScopeAsync(examId), classId, section, subjectId))
+                return Json(new { success = false, message = "You can enter marks only for the classes and subjects you teach." });
+
             var sheet = await _exam.GetSheetAsync(
                 examId, classId, subjectId, section, TenantId(), SchoolId(), UserId());
             if (sheet == null) return Json(new { success = false, message = "That sheet was not found." });
@@ -399,6 +436,11 @@ namespace educore.Areas.ERP.Controllers
         {
             if (!await CanEnterMarksAsync())
                 return StatusCode(StatusCodes.Status403Forbidden);
+
+            // Only the sheets this teacher teaches (unless exams.manage / admin).
+            if (request == null
+                || !InScope(await MarkScopeAsync(request.ExamId), request.AcademicClassId, request.Section, request.SubjectId))
+                return Json(new { success = false, message = "You can enter marks only for the classes and subjects you teach." });
 
             var result = await _exam.SaveMarksAsync(request, TenantId(), SchoolId(), UserId());
             return Json(new

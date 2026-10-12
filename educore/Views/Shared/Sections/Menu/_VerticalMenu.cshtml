@@ -8,7 +8,6 @@
 
 @{
     var currentPage = Context.Request.Path.Value ?? "";
-    var supportUrl = "#";
 
     // Identity / scope (hoisted so the permission gating below can reuse them).
     int _tId = int.TryParse(User.FindFirst(Common.SK_TenantId)?.Value, out var _t) ? _t : 0;
@@ -147,12 +146,17 @@
         *@
 
         @* ===================== MAIN ===================== *@
+        @* The platform super admin has no dashboard of their own (Dashboards just
+           redirects them to the Schools list), so they get no "Dashboard" item. *@
+        @if (!isPlatform)
+        {
         <li class='menu-item @On("Dashboards")'>
             <a asp-area="" asp-controller="Dashboards" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-home-smile ic-dash"></i>
                 <div class="text-truncate">Dashboard</div>
             </a>
         </li>
+        }
 
         @if (isPlatform)
         {
@@ -478,12 +482,6 @@
             </a>
         </li>
 
-        <li class="menu-item">
-            <a href="@supportUrl" target="_blank" class="menu-link">
-                <i class="menu-icon icon-base bx bx-support ic-support"></i>
-                <div class="text-truncate">Support &amp; Help</div>
-            </a>
-        </li>
         @* Hidden until the browser says the app is installable (or we detect iOS,
            which never fires beforeinstallprompt). Wired up in site.js. *@
         <li class="menu-item d-none" id="ec-install-item">

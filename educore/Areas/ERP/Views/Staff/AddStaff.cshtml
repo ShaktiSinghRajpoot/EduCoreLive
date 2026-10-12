@@ -225,7 +225,9 @@
 </div>
 
 @section PageScripts {
-<partial name="_ValidationScriptsPartial" />
+@* No client-side validation here on purpose: it checked only name, mobile and email,
+   blocked the post, and the server then reported PAN, IFSC, dates and login errors
+   in a second round. The server checks every field and lists all errors at once. *@
 <script>
     $(function () {
 

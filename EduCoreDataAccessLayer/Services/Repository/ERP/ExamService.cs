@@ -587,6 +587,29 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
         }
 
+        public async Task<List<ExamMarkScope>> GetMarkScopeAsync(
+            int examId, int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<ExamMarkScope>();
+            if (tenantId <= 1 || schoolId <= 0 || examId <= 0) return list;
+
+            var p = MarkParams("GetMarkScope", tenantId, schoolId, actionUserId);
+            p[4].Value = examId;                       // p_exam_id
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpMarks, p);
+            if (ds.Tables.Count == 0) return list;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+                list.Add(new ExamMarkScope
+                {
+                    AcademicClassId = IntVal(row, "academic_class_id"),
+                    Section         = Str(row, "section"),
+                    SubjectId       = IntVal(row, "subject_id")
+                });
+
+            return list;
+        }
+
         public async Task<ExamMarksSaveResult> ReopenSheetAsync(
             int examId, int academicClassId, int subjectId, string? section,
             int tenantId, int schoolId, int actionUserId)

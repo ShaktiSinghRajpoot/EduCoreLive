@@ -190,6 +190,15 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal PassMarks   { get; set; } = 35;
     }
 
+    /// <summary>One sheet a teacher may enter marks on: they are the section's class
+    /// teacher, or the timetable gives them that subject in that section.</summary>
+    public class ExamMarkScope
+    {
+        public int    AcademicClassId { get; set; }
+        public string Section         { get; set; } = string.Empty;
+        public int    SubjectId       { get; set; }
+    }
+
     /// <summary>A section of the class that actually has students enrolled.</summary>
     public class ExamSheetSection
     {

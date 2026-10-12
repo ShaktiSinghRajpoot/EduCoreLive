@@ -1,4 +1,4 @@
-﻿using educore.Helpers;
+using educore.Helpers;
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
@@ -23,6 +23,7 @@ namespace educore.Areas.ERP.Controllers
         private readonly IAttendanceService _attendanceService;
         private readonly ITimetableService _timetableService;
         private readonly IExamService _examService;
+        private readonly ISubjectService _subjectService;
 
         public StudentController(
             IBaseService baseService,
@@ -34,8 +35,10 @@ namespace educore.Areas.ERP.Controllers
             IAttendanceService attendanceService,
             ITimetableService timetableService,
             IExamService examService,
+            ISubjectService subjectService,
             IWebHostEnvironment env, IConfiguration config)
         {
+            _subjectService = subjectService;
             _publicIds = publicIds;
             _feeService = feeService;
             _attendanceService = attendanceService;
@@ -67,7 +70,16 @@ namespace educore.Areas.ERP.Controllers
             var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
             ViewBag.RegistrationRequired = workflow.EnableRegistration && workflow.RegistrationRequiredBeforeAdmission;
 
+            // Fee status is fee data: a teacher with students.view only must not see it,
+            // filter by it, or receive it in the page.
+            bool canViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
+            ViewBag.CanViewFees = canViewFees;
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
+            if (!canViewFees) query.FilterFee = null;
+
             await _admissionService.GetStudentListPageAsync(query, TenantId(), SchoolId(), UserId());
+            if (!canViewFees)
+                foreach (var s in query.Items) { s.FeeStatus = ""; s.FeeDue = 0; s.AnnualTotal = 0; }
             return View(query);
         }
 
@@ -325,6 +337,24 @@ namespace educore.Areas.ERP.Controllers
             var exam = await _examService.GetStudentResultAsync(
                 studentId, TenantId(), SchoolId(), UserId(), examId);
 
+            // Subjects the class studies (Subject Management, current session). Only
+            // when the class name is unambiguous -- streams can share a class name.
+            var classMatches = (await _subjectService.GetClassesAsync(TenantId(), SchoolId(), UserId()))
+                .Where(c => string.Equals(c.ClassName, student.ClassName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            int? classSubjects = classMatches.Count == 1 ? classMatches[0].SubjectCount : null;
+
+            // Age in completed years on the school's today, from the DOB.
+            int? age = null;
+            var dob = Dates.Parse(student.DateOfBirth);
+            if (dob.HasValue)
+            {
+                var today = Dates.Now.Date;
+                int years = today.Year - dob.Value.Year;
+                if (dob.Value.Date > today.AddYears(-years)) years--;
+                if (years >= 0) age = years;
+            }
+
             return Json(new
             {
                 found = true,
@@ -344,6 +374,8 @@ namespace educore.Areas.ERP.Controllers
                     sec       = student.Section ?? "—",
                     gender    = student.Gender ?? "—",
                     dob       = string.IsNullOrWhiteSpace(student.DateOfBirth) ? "—" : Dates.Show(student.DateOfBirth, "dd MMM yyyy"),
+                    age,
+                    subjects  = classSubjects,
                     admDate   = string.IsNullOrWhiteSpace(student.AdmissionDate) ? "—" : Dates.Show(student.AdmissionDate, "dd MMM yyyy"),
                     year      = student.AcademicYear,
                     guardian  = student.GuardianName ?? "—",
@@ -453,6 +485,7 @@ namespace educore.Areas.ERP.Controllers
                     date      = string.IsNullOrWhiteSpace(h.PaymentDate) ? "—" : Dates.Show(h.PaymentDate, "dd MMM yyyy"),
                     amount    = h.Amount,
                     mode      = h.PaymentMode,
+                    collectedBy = h.CollectedBy,   // the payer is not recorded; the cashier is
                     cancelled = h.IsCancelled      // a cancelled receipt still shows, marked
                 })
             });

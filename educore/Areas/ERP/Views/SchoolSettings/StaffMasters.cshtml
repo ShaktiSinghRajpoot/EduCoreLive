@@ -156,6 +156,15 @@ $(function(){
   function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
   function reload(){ setTimeout(function(){ location.reload(); }, 600); }
 
+  // Keep the open tab in the URL hash, so the reload after a save (and a manual
+  // refresh) comes back to Departments instead of the default Designations tab.
+  $('button[data-bs-toggle="tab"]').on('shown.bs.tab', function(){
+    history.replaceState(null, '', $(this).data('bs-target'));
+  });
+  if (location.hash === '#tabDept') {
+    bootstrap.Tab.getOrCreateInstance(document.querySelector('button[data-bs-target="#tabDept"]')).show();
+  }
+
   // One handler for every write: busy button, the server's message, a failure toast.
   // The button stays busy on success because the page reloads.
   function send(req, $btn){

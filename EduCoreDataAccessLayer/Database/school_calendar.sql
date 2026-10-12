@@ -110,6 +110,7 @@ DECLARE
     v_created    integer := 0;
     v_had_entry  integer := 0;
     v_off_days   integer := 0;
+    v_open_days  integer := 0;
     v_had_list   text := '';
     v_first      time;
     v_last       time;
@@ -254,6 +255,17 @@ BEGIN
                   AND EXTRACT(DOW FROM v_day)::smallint = ANY (v_offs) THEN
                 v_off_days := v_off_days + 1;
 
+            -- A working-day override only means something on a weekly off; on a
+            -- normal weekday it changes nothing, so refuse it (one date) or skip
+            -- that day (a range).
+            ELSIF v_type = 'working'
+                  AND NOT (EXTRACT(DOW FROM v_day)::smallint = ANY (v_offs)) THEN
+                IF p_operation = 'SaveEntry' THEN
+                    RAISE EXCEPTION '% is already a working day. A working-day override is only for a weekly off.',
+                        to_char(v_day, 'FMDay, FMDD Mon');
+                END IF;
+                v_open_days := v_open_days + 1;
+
             ELSE
                 -- The closing time has to fall inside that day's bell schedule, or
                 -- the bell either never rings (before the first period) or the
@@ -289,8 +301,9 @@ BEGIN
             OPEN p_result FOR SELECT TRUE AS success, 'Calendar updated.' AS message;
         ELSE
             IF v_created = 0 THEN
-                RAISE EXCEPTION 'Nothing was added: every day from % to % already has an entry or is a weekly off.',
-                    to_char(p_date, 'FMDD Mon YYYY'), to_char(v_to, 'FMDD Mon YYYY');
+                RAISE EXCEPTION 'Nothing was added: every day from % to % already has an entry or %.',
+                    to_char(p_date, 'FMDD Mon YYYY'), to_char(v_to, 'FMDD Mon YYYY'),
+                    CASE WHEN v_type = 'working' THEN 'is already a working day' ELSE 'is a weekly off' END;
             END IF;
 
             OPEN p_result FOR
@@ -305,6 +318,10 @@ BEGIN
                            ELSE '' END
                    || CASE WHEN v_off_days > 0
                            THEN ' Skipped ' || v_off_days || ' weekly off' || CASE WHEN v_off_days = 1 THEN '' ELSE 's' END || '.'
+                           ELSE '' END
+                   || CASE WHEN v_open_days > 0
+                           THEN ' Skipped ' || v_open_days || ' day' || CASE WHEN v_open_days = 1 THEN '' ELSE 's' END
+                                || ' that ' || CASE WHEN v_open_days = 1 THEN 'is' ELSE 'are' END || ' already a working day.'
                            ELSE '' END AS message;
         END IF;
         OPEN p_result2 FOR SELECT 1 WHERE FALSE;

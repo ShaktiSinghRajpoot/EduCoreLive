@@ -100,10 +100,40 @@ namespace educore.Models
         [RegularExpression(@"^[1-9][0-9]{5}$", ErrorMessage = "Enter valid 6 digit pincode.")]
         public string Pincode { get; set; } = string.Empty;
 
+        // The first digit of an Indian PIN code is its postal zone, and every zone
+        // covers a fixed group of states. A cheap check that catches a Rajasthan
+        // school typed with a Kerala PIN; it cannot catch a wrong district. Value =
+        // the first digits allowed for that state (Puducherry's Yanam uses a 5 PIN).
+        // Keyed by config.states name. Create.cshtml reads this same map.
+        public static readonly Dictionary<string, string> PinZonesByState = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Delhi"] = "1", ["Haryana"] = "1", ["Punjab"] = "1", ["Himachal Pradesh"] = "1",
+            ["Jammu and Kashmir"] = "1", ["Ladakh"] = "1", ["Chandigarh"] = "1",
+            ["Uttar Pradesh"] = "2", ["Uttarakhand"] = "2",
+            ["Rajasthan"] = "3", ["Gujarat"] = "3", ["Dadra and Nagar Haveli and Daman and Diu"] = "3",
+            ["Maharashtra"] = "4", ["Goa"] = "4", ["Madhya Pradesh"] = "4", ["Chhattisgarh"] = "4",
+            ["Andhra Pradesh"] = "5", ["Telangana"] = "5", ["Karnataka"] = "5",
+            ["Tamil Nadu"] = "6", ["Kerala"] = "6", ["Lakshadweep"] = "6", ["Puducherry"] = "56",
+            ["West Bengal"] = "7", ["Odisha"] = "7", ["Sikkim"] = "7", ["Andaman and Nicobar Islands"] = "7",
+            ["Assam"] = "7", ["Arunachal Pradesh"] = "7", ["Manipur"] = "7", ["Meghalaya"] = "7",
+            ["Mizoram"] = "7", ["Nagaland"] = "7", ["Tripura"] = "7",
+            ["Bihar"] = "8", ["Jharkhand"] = "8"
+        };
+        public const string PinStateMessage = "This pincode does not belong to the selected state.";
+
+        // True when the PIN fits the state, or when either is blank / the state is not
+        // in the map (a foreign state) -- the check never guesses.
+        public static bool PinMatchesState(string? pincode, string? state)
+        {
+            if (string.IsNullOrWhiteSpace(pincode) || string.IsNullOrWhiteSpace(state)) return true;
+            if (!PinZonesByState.TryGetValue(state.Trim(), out var zones)) return true;
+            return zones.Contains(pincode.Trim()[0]);
+        }
+
         public int ContactTypeId { get; set; } = 1;
 
         [Required(ErrorMessage = "Primary contact person is required.")]
-        [StringLength(150)]
+        [StringLength(150, MinimumLength = 2, ErrorMessage = "Contact person name must be at least 2 characters.")]
         public string ContactName { get; set; } = string.Empty;
 
         [StringLength(100)]

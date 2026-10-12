@@ -64,12 +64,17 @@
                     </div>
                 </div>
 
+                <!-- Holiday / weekly off / future date: the save proc refuses these days -->
+                <div class="alert alert-warning py-2 small fw-semibold mb-3" id="dayNotice" style="display:none;"></div>
+
                 <div class="att-list" id="list"></div>
             </div>
         </div>
 
         <!-- Sticky action bar (inside content → matches page width, never under the sidebar) -->
         <div class="att-bar">
+            <!-- Why Save is disabled (not the class teacher, holiday, ...) -->
+            <div class="small fw-semibold text-warning mb-2" id="saveNote" style="display:none;"><i class="bx bx-info-circle me-1"></i><span id="saveNoteText"></span></div>
             <div class="att-bar-inner">
                 <div id="barLabel"><i class="bx bx-chalkboard"></i><span id="barLabelText"></span></div>
                 <div class="att-bar-actions">
@@ -144,14 +149,26 @@ $(document).ready(function () {
     let students = [];
     const status = {}, notified = {}, marked = {};
     let touched = false; // true once teacher interacts with any toggle
-    let canMark = true;  // false when this user isn't the section's class teacher
+    let canMark = true;  // false when Save would be refused (see cannotMarkWhy)
+    let cannotMarkWhy = '';
 
-    // Only the class teacher (or an admin) may save; others get a read-only roster.
+    // Only the class teacher (or an admin) may save, and only on a school day that
+    // is not in the future. The reason stays visible next to the Save button.
     function applyCanMark() {
         $('#saveBtn').prop('disabled', !canMark);
-        if (!canMark && students.length) {
-            ecToast('warning', 'You are not the class teacher of this section — view only.');
-        }
+        $('#saveNoteText').text(cannotMarkWhy);
+        $('#saveNote').toggle(!canMark && !!cannotMarkWhy);
+    }
+
+    // The day itself: future dates and School Calendar days off have no register.
+    function dayBlockReason(res) {
+        var v = $('#attendanceDate').val() || iso;
+        if (v > iso) return 'This is a future date. Attendance can be marked only for today or earlier.';
+        if (res && res.dayType === 'holiday')
+            return 'This day is a school holiday' + (res.dayTitle ? ' (' + res.dayTitle + ')' : '') + '. No attendance is taken.';
+        if (res && res.dayType === 'weekly_off')
+            return 'This day is a weekly off' + (res.dayTitle ? ' (' + res.dayTitle + ')' : '') + '. No attendance is taken.';
+        return '';
     }
 
     function initials(name) {
@@ -189,9 +206,11 @@ $(document).ready(function () {
         $('#dbDay').text(d.toLocaleDateString('en-IN', { weekday: 'long' }));
         $('#dbDate').text(d.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' }));
         const isToday = v === iso;
+        // yyyy-MM-dd strings compare correctly as text.
+        const label = isToday ? 'Today' : (v > iso ? 'Future date' : 'Back-dated');
         $('#dbStatus')
             .attr('class', 'db-status ' + (isToday ? 'today' : 'past'))
-            .html('<span class="db-dot"></span>' + (isToday ? 'Today' : 'Back-dated'));
+            .html('<span class="db-dot"></span>' + label);
     }
     updateDateBanner();
     function classStr() { return $('#filterClass').val() + '-' + $('#filterSection').val(); }
@@ -250,6 +269,8 @@ $(document).ready(function () {
     function loadRoster() {
         const cls = $('#filterClass').val(), sec = $('#filterSection').val(), date = $('#attendanceDate').val();
         touched = false; updateSaveBtn();
+        $('#dayNotice').hide();
+        canMark = true; cannotMarkWhy = ''; applyCanMark();
         if (!cls || !sec) { students = []; render(); return; }
 
         EC.showLoader();
@@ -266,14 +287,17 @@ $(document).ready(function () {
                     marked[s.id]   = !!rows[i].marked;
                     notified[s.id] = false;
                 });
-                canMark = !res || res.canMark !== false;
+                var dayWhy = dayBlockReason(res);
+                if (dayWhy) $('#dayNotice').text(dayWhy).show();
+                cannotMarkWhy = dayWhy || (res && res.cannotMark) || '';
+                canMark = !cannotMarkWhy && (!res || res.canMark !== false);
+                applyCanMark();
                 if (!students.length) {
                     renderStats();
                     EC.listEmpty('#list', 'No students on this register for the chosen date.', 'bx-user-x');
                     return;
                 }
                 render();
-                applyCanMark();
             })
             .fail(function (xhr) {
                 students = [];
@@ -285,10 +309,12 @@ $(document).ready(function () {
 
     $(document).on('click', '.att-toggle button', function () {
         const id = Number($(this).data('id')), set = $(this).data('set');
+        // Any tap counts as reviewing the roster, even Present on a student
+        // who already shows Present.
+        if (!touched) { touched = true; updateSaveBtn(); }
         if (status[id] === set) return;
         status[id] = set;
         if (set === 'present') notified[id] = false;
-        if (!touched) { touched = true; updateSaveBtn(); }
         render();
     });
 
@@ -308,20 +334,33 @@ $(document).ready(function () {
 
     $('#saveBtn').on('click', function () {
         if (!students.length) { ecToast('warning', 'Load a class roster first.'); return; }
-        if (!canMark) { ecToast('error', 'You are not the class teacher of this section.'); return; }
+        if (!canMark) { ecToast('error', cannotMarkWhy || 'You cannot mark attendance for this class.'); return; }
+        var $btn = $(this);
+        // Nothing tapped yet: ask once instead of refusing, so a roster where
+        // everyone is present can still be saved as shown.
         if (!touched) {
-            ecToast('warning', 'Please review the roster first. Tap at least one student to confirm attendance before saving.');
-            $('#list').find('.att-row:first').css('box-shadow','0 0 0 3px rgba(255,138,0,.4)');
-            setTimeout(function () { $('#list').find('.att-row:first').css('box-shadow',''); }, 1800);
+            EC.confirm({
+                title:   'Save the roster as shown?',
+                message: 'You have not changed anyone. Present ' + $('#sumPresent').text() + ', Absent ' + $('#sumAbsent').text() + '.',
+                okText:  'Save attendance',
+                danger:  false
+            }).then(function (ok) {
+                if (!ok) return;
+                touched = true; updateSaveBtn();
+                saveRoster($btn);
+            });
             return;
         }
+        saveRoster($btn);
+    });
+
+    function saveRoster($btn) {
         // Send the whole roster with each student's status as it stands (the server
         // only rewrites rows whose status actually changed).
         var STATUS = { present: 'Present', absent: 'Absent', late: 'Late', leave: 'Leave' };
         var items = students.map(function (s) {
             return { studentId: s.id, status: STATUS[status[s.id]] || 'Present', remarks: '' };
         });
-        var $btn = $(this);
         EC.buttonBusy($btn, 'Saving…');
         $.ajax({
             url: SAVE_URL,
@@ -336,7 +375,7 @@ $(document).ready(function () {
         })
         .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not save')); })
         .always(function () { EC.buttonReset($btn); });
-    });
+    }
 
     function template() { return 'Dear {parent}, your ward {student} (Class {class}) was marked absent on {date}. Kindly inform the school if this is unexpected.'; }
     function buildMsg(s) {

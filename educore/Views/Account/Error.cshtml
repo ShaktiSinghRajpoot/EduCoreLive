@@ -15,7 +15,9 @@
         404 => ("Page Not Found ⚠️", "We couldn't find the page you are looking for."),
         _   => ("Something Went Wrong ⚠️", "An unexpected error occurred. Please try again.")
     };
-    ViewData["Title"] = $"{status} - SmartSchoolWala.com";
+    // The layout already appends " | SmartSchoolWala.com", so the title is just
+    // the status and heading ("404 Page Not Found"), without the warning emoji.
+    ViewData["Title"] = status + " " + heading.Replace("⚠️", "").Trim();
 }
 @section PageStyles {
     <link rel="stylesheet" href="~/vendor/css/pages/page-misc.css" />
