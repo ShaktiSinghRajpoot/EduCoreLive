@@ -98,6 +98,16 @@
                 if ($btn.data('submitting')) { return false; }
                 $btn.data('submitting', true);
                 EC.buttonBusy($btn, 'Signing in…');
+
+                // A normal login leaves this page long before this fires. If the
+                // browser never sent the POST or the request stalled, the button
+                // used to stay on "Signing in…" until a reload. Give it back.
+                setTimeout(function () {
+                    $btn.data('submitting', false);
+                    $btn.removeClass('ec-submitting');
+                    EC.buttonReset($btn);
+                    ecToast('warning', 'Login is taking too long. Please check your connection and try again.');
+                }, 20000);
             });
 
             $('#togglePassword').on('click', function () {

@@ -137,6 +137,7 @@ DECLARE
     v_sess_month    DATE;
     v_cycles        INTEGER;
     v_reg_balance   NUMERIC;
+    v_reg_agreed    NUMERIC;
 BEGIN
 
     -- ── SaveAdmission ────────────────────────────────────────
@@ -399,16 +400,67 @@ BEGIN
         -- admission, because a balance that can be lost between two calls is a bug
         -- this codebase has been bitten by before.
         --
-        -- Nothing is written back to the enquiry: its figure is derived from its own
-        -- receipts and keeps saying what happened at registration. Nothing sums an
-        -- enquiry's balance into a student's dues, so this is not double counting.
+        -- The agreed fee is frozen on the enquiry only by the FIRST receipt
+        -- (sp_registration_fee_record). A family registered without paying anything
+        -- therefore had 0 agreed, 0 - 0 = 0 was carried, and the whole fee vanished
+        -- at admission (QA BUG-046). When nothing was agreed, a registered enquiry
+        -- falls back to the fee the registration screen asks for -- the class-wise
+        -- Registration-point amount from the Fee Structure, else the active
+        -- Registration heads' default amounts (SchoolSettingsService.
+        -- GetCollectionPointResolvedTotalAsync) -- but only while the school has
+        -- the registration fee switched on. That amount is frozen on the enquiry so
+        -- its "Fee Pending" badge clears once the carried due is paid.
+        --
+        -- Nothing sums an enquiry's balance into a student's dues, so this is not
+        -- double counting.
         IF p_enquiry_id IS NOT NULL AND p_enquiry_id > 0 THEN
-            SELECT COALESCE(registration_fee_amount, 0)
-                   - core.fn_registration_fee_settled(p_tenant_id, p_school_id, p_enquiry_id)
-              INTO v_reg_balance
-            FROM core.enquiries
-            WHERE enquiry_id = p_enquiry_id
-              AND tenant_id = p_tenant_id AND school_id = p_school_id;
+            SELECT COALESCE(e.registration_fee_amount, 0)
+              INTO v_reg_agreed
+            FROM core.enquiries e
+            WHERE e.enquiry_id = p_enquiry_id
+              AND e.tenant_id = p_tenant_id AND e.school_id = p_school_id;
+
+            IF COALESCE(v_reg_agreed, 0) <= 0 THEN
+                SELECT COALESCE(
+                         (SELECT NULLIF(SUM(d.amount), 0)
+                            FROM core.school_fee_structures s
+                            JOIN core.school_fee_structure_details d ON d.fee_structure_id = s.fee_structure_id
+                            JOIN core.school_fee_heads h             ON h.fee_head_id = d.fee_head_id
+                           WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id
+                             AND s.class_name = e.class_name AND s.academic_year = e.session
+                             AND COALESCE(s.is_deleted, FALSE) = FALSE
+                             AND COALESCE(d.is_deleted, FALSE) = FALSE
+                             AND COALESCE(d.is_selected, FALSE)
+                             AND h.collection_point = 'Registration'),
+                         (SELECT SUM(h.default_amount)
+                            FROM core.school_fee_heads h
+                           WHERE h.tenant_id = p_tenant_id AND h.school_id = p_school_id
+                             AND COALESCE(h.is_active, TRUE)
+                             AND COALESCE(h.is_deleted, FALSE) = FALSE
+                             AND h.collection_point = 'Registration'),
+                         0)
+                  INTO v_reg_agreed
+                FROM core.enquiries e
+                WHERE e.enquiry_id = p_enquiry_id
+                  AND e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+                  AND COALESCE(TRIM(e.registration_number), '') <> ''
+                  AND EXISTS (SELECT 1 FROM core.school_admission_workflow_settings w
+                               WHERE w.tenant_id = p_tenant_id AND w.school_id = p_school_id
+                                 AND COALESCE(w.is_deleted, FALSE) = FALSE
+                                 AND COALESCE(w.enable_registration, FALSE)
+                                 AND COALESCE(w.enable_registration_fee, FALSE));
+
+                IF COALESCE(v_reg_agreed, 0) > 0 THEN
+                    UPDATE core.enquiries
+                       SET registration_fee_amount = ROUND(v_reg_agreed, 2)
+                     WHERE enquiry_id = p_enquiry_id
+                       AND tenant_id = p_tenant_id AND school_id = p_school_id
+                       AND COALESCE(registration_fee_amount, 0) = 0;
+                END IF;
+            END IF;
+
+            v_reg_balance := COALESCE(v_reg_agreed, 0)
+                             - core.fn_registration_fee_settled(p_tenant_id, p_school_id, p_enquiry_id);
 
             IF COALESCE(v_reg_balance, 0) > 0.005 THEN
                 INSERT INTO core.student_ledger (

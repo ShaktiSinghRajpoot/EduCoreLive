@@ -155,6 +155,10 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<(bool Success, string Message)> ReopenDayAsync(
             string? date, int cashierId, string reason, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Every cashier's close row for a date, so an admin can re-open another counter.</summary>
+        Task<List<DayCloseCounterRow>> GetClosedCountersAsync(
+            string? date, int tenantId, int schoolId, int actionUserId);
+
         Task<CollectionRegister> GetCollectionRegisterAsync(
             string? from, string? to, int tenantId, int schoolId, int actionUserId,
             string? className = null, string? section = null);

@@ -124,6 +124,23 @@
         public string?   Note           { get; set; }
     }
 
+    /// <summary>One cashier's close row for a date (core.sp_fee_day_close_list).
+    /// Lets an admin find and re-open another counter's closed day.</summary>
+    public class DayCloseCounterRow
+    {
+        public int       CashierId      { get; set; }
+        public string?   CashierName    { get; set; }
+        public DateTime? ClosedAt       { get; set; }
+        public decimal   TotalCollected { get; set; }
+        public decimal   ExpectedCash   { get; set; }
+        public decimal   CountedCash    { get; set; }
+        public decimal   Difference     { get; set; }
+        public bool      IsClosed       { get; set; }
+        public DateTime? ReopenedAt     { get; set; }
+        public string?   ReopenedBy     { get; set; }
+        public string?   ReopenReason   { get; set; }
+    }
+
     public class DayModeRow
     {
         public string  Mode   { get; set; } = string.Empty;

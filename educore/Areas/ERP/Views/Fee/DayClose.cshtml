@@ -91,6 +91,24 @@
         </div>
       </div>
 
+      @if (canReopen)
+      {
+      <!-- every counter closed on this date: lets an admin re-open a cashier's day -->
+      <div class="col-12 no-print">
+        <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap">
+          <div class="ec-section-icon"><i class="bx bx-group"></i></div>
+          <div><h6 class="ec-section-title">All counters on this date</h6><div class="ec-section-subtitle">Re-open a cashier's closed day so they can collect or correct again</div></div>
+        </div></div>
+          <div class="ec-card-body p-0">
+            <div class="table-responsive"><table class="table ec-table mb-0">
+              <thead><tr><th>Cashier</th><th>Closed at</th><th class="text-end">Collected</th><th class="text-end">Expected</th><th class="text-end">Counted</th><th class="text-end">Difference</th><th>Status</th><th></th></tr></thead>
+              <tbody id="counterRows"></tbody>
+            </table></div>
+          </div>
+        </div>
+      </div>
+      }
+
       <!-- every close and re-open, newest first (never overwritten) -->
       <div class="col-12" id="historyWrap" style="display:none">
         <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap">
@@ -118,7 +136,7 @@ $(function () {
     'use strict';
 
     var CSRF=$('input[name="__RequestVerificationToken"]').val();
-    var URL={ get:'@Url.Action("GetDayCollection","Fee",new{area="ERP"})', close:'@Url.Action("CloseDay","Fee",new{area="ERP"})', reopen:'@Url.Action("ReopenDay","Fee",new{area="ERP"})' };
+    var URL={ get:'@Url.Action("GetDayCollection","Fee",new{area="ERP"})', close:'@Url.Action("CloseDay","Fee",new{area="ERP"})', reopen:'@Url.Action("ReopenDay","Fee",new{area="ERP"})', counters:'@Url.Action("GetClosedCounters","Fee",new{area="ERP"})' };
     var expected=0;
     var CAN_REOPEN = @(canReopen ? "true" : "false");   // fees.reopen
 
@@ -179,6 +197,23 @@ $(function () {
             }).join(''));
             diff();
         }).fail(function(){ ecToast('error','Could not load the day collection.'); });
+        loadCounters();
+    }
+
+    // Every counter closed on the date (admins with fees.reopen only).
+    function loadCounters(){
+        if(!CAN_REOPEN) return;
+        $.getJSON(URL.counters,{date:$('#dDate').val()}).done(function(rows){
+            $('#counterRows').html((rows||[]).length ? rows.map(function(r){
+                var status = r.isClosed ? '<span class="closed-badge">Closed</span>'
+                           : '<span class="text-muted">Re-opened'+(r.reopenedAt?' '+EC.esc(r.reopenedAt):'')+(r.reopenedBy?' by '+EC.esc(r.reopenedBy):'')+'</span>';
+                var btn = r.isClosed ? '<button class="btn btn-sm ec-btn-soft btn-reopen-counter" data-id="'+r.cashierId+'" data-name="'+EC.esc(r.cashier||'')+'"><i class="bx bx-lock-open-alt me-1"></i>Re-open</button>' : '';
+                return '<tr><td class="fw-semibold">'+EC.esc(r.cashier||'')+'</td><td class="text-muted">'+EC.esc(r.closedAt||'')+'</td>'
+                     + '<td class="text-end">'+EC.money(r.collected)+'</td><td class="text-end">'+EC.money(r.expected)+'</td>'
+                     + '<td class="text-end">'+EC.money(r.counted)+'</td><td class="text-end">'+EC.money(r.diff)+'</td>'
+                     + '<td>'+status+'</td><td class="text-end">'+btn+'</td></tr>';
+            }).join('') : '<tr><td colspan="8" class="text-muted text-center py-4">No counter was closed on this date.</td></tr>');
+        }).fail(function(){ ecToast('error','Could not load the closed counters.'); });
     }
     function diff(){
         var counted=EC.num($('#counted').val()), d=counted-expected;
@@ -191,22 +226,27 @@ $(function () {
     $('#dDate').on('change', load);
     $('#btnPrint').on('click', function(){ window.print(); });
 
-    $('#btnReopen').on('click', function(){
-        var $btn=$(this);
-        EC.prompt({ title:'Re-open this day?', name:$('#dDate').val(), label:'Reason', required:true,
+    // cashierId null = your own counter; otherwise the counter picked in the list.
+    function reopen(cashierId, name, $btn){
+        EC.prompt({ title:'Re-open this day?', name:name, label:'Reason', required:true,
                     message:'The current count stays in the history. Close the day again after the correction.',
                     okText:'Re-open day', danger:false })
         .then(function(reason){
             if(reason===null) return;
             EC.buttonBusy($btn);
             $.ajax({url:URL.reopen,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},
-                    data:JSON.stringify({ date:$('#dDate').val(), reason:reason })})
+                    data:JSON.stringify({ date:$('#dDate').val(), reason:reason, cashierId:cashierId })})
             .done(function(res){
                 EC.buttonReset($btn);
                 if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not re-open.'); return; }
                 ecToast('success',res.message||'Day re-opened.'); load();
             }).fail(function(){ EC.buttonReset($btn); ecToast('error','Could not re-open the day.'); });
         });
+    }
+    $('#btnReopen').on('click', function(){ reopen(null, $('#dDate').val(), $(this)); });
+    $('#counterRows').on('click', '.btn-reopen-counter', function(){
+        var $b=$(this);
+        reopen(Number($b.data('id')), $b.data('name')+' — '+$('#dDate').val(), $b);
     });
 
     $('#btnClose').on('click', function(){

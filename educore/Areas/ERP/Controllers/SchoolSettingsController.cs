@@ -404,6 +404,24 @@ namespace educore.Areas.ERP.Controllers
                 return BackToFeeHead(returnUrl);
             }
 
+            // The proc upserts a NEW head on its name, so creating "tuition fee"
+            // while "Tuition Fee" exists silently overwrote that head's amount and
+            // cycle. From this form a new head with a taken name is refused; the
+            // user edits the existing head instead.
+            if (model.FeeHeadId == 0)
+            {
+                var all = await _schoolSettingsService.GetFeeHeadAsync(tenantId, schoolId, actionUserId);
+                var clash = all.FirstOrDefault(h => string.Equals((h.FeeHeadName ?? "").Trim(), model.FeeHeadName.Trim(),
+                                                                  StringComparison.OrdinalIgnoreCase));
+                if (clash != null)
+                {
+                    TempData["ErrorMessage"] = clash.IsActive
+                        ? $"A fee head called \"{clash.FeeHeadName}\" already exists. Edit it instead of creating a new one."
+                        : $"A fee head called \"{clash.FeeHeadName}\" already exists but is switched off. Switch it on and edit it instead.";
+                    return BackToFeeHead(returnUrl);
+                }
+            }
+
             var (ok, message) = await _schoolSettingsService.SaveFeeHeadAsync(model, tenantId, schoolId, actionUserId);
 
             if (ok)

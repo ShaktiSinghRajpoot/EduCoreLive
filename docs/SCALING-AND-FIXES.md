@@ -4956,3 +4956,27 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - **Deploy:** `deploy_2026_10_11h.sql`, then `institution_categories.sql`, `sp_school_manage.sql`,
   `sp_school_list.sql`, `sp_school_admin_basic_profile_manage.sql`; then push (app restart).
 
+
+### [2026-10-12] QA report: the seven High bugs (SmartSchoolWala_Test_Report.xlsx)
+- **BUG-012 Schools "Created date" filter 500:** `SchoolService.GetSchoolsAsync` sent `p_from_date` /
+  `p_to_date` as `NpgsqlDbType.Unknown` with a `DateTime` value, which Npgsql refuses to write.
+  Now `NpgsqlDbType.Date`.
+- **BUG-031 creating a fee head with an existing name overwrote it:** the proc's create path is a
+  name upsert by design (settings tests C4/D8). `SchoolSettingsController.SaveFeeHead` now refuses
+  a new head (id 0) whose name already exists, active or not. The Admission Workflow cards already
+  send the existing id, so they are unaffected; the proc is unchanged.
+- **BUG-038 staff form accepted garbage:** `StaffController.ValidateDetails` (Add + Edit): DOB age
+  14-100, joining date not > 1 year ahead and at least 14 years after DOB, experience 0-60,
+  salary >= 0, PAN / IFSC / Aadhaar format (upper-cased / spaces stripped first).
+- **BUG-046 unpaid registration fee lost at admission:** the agreed fee is only frozen on the
+  enquiry by the first receipt, so an unpaid registration carried 0 - 0 = 0. `sp_admission_manage`
+  now falls back to the resolved Registration-point fee (class-wise structure, else head defaults)
+  for a *registered* enquiry while the school has the registration fee on, freezes it on the
+  enquiry, and the existing carry puts the balance on `student_ledger`.
+- **BUG-067 admin could not re-open a cashier's day:** `FeeController.ReopenDay` always passed the
+  caller as the cashier. It now takes an optional `CashierId`; new `GetClosedCounters` +
+  `core.sp_fee_day_close_list` and an "All counters on this date" card (fees.reopen only) on Day Close.
+- **BUG-004 login stuck on "Signing in…":** if the page is still there 20 s after submit, the button
+  and the double-submit flag reset with a toast. (Root cause not reproduced -- the tester's Chrome
+  window was hidden; same for BUG-009, left for a retest in a visible browser.)
+- **Deploy:** `deploy_2026_10_12.sql`, then push (app restart).

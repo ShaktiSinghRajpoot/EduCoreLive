@@ -126,6 +126,7 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> AddStaff(StaffModel model)
         {
             ValidateLogin(model);
+            ValidateDetails(model);
             if (!ModelState.IsValid)
             {
                 await FillDropdownsAsync(model);
@@ -216,6 +217,7 @@ namespace educore.Areas.ERP.Controllers
 
             model.StaffId = staffId;
             ValidateLogin(model);
+            ValidateDetails(model);
             if (!ModelState.IsValid)
             {
                 await FillDropdownsAsync(model);
@@ -286,6 +288,47 @@ namespace educore.Areas.ERP.Controllers
             if (hasLogin && model.ChangePassword
                 && (string.IsNullOrWhiteSpace(model.LoginPassword) || model.LoginPassword!.Length < 8))
                 ModelState.AddModelError(nameof(model.LoginPassword), "New password must be at least 8 characters.");
+        }
+
+        // Dates, experience and the statutory/bank ids. Payroll, bank transfers and
+        // tax forms read these, so garbage such as a 2030 birth date or a PAN of
+        // "ABC" must be refused here. PAN/IFSC are upper-cased and spaces are
+        // stripped from Aadhaar first, so "abcde 1234f" style input still passes.
+        private void ValidateDetails(StaffModel model)
+        {
+            var today = Dates.Now.Date;
+            var dob = Dates.Parse(model.DateOfBirth);
+            var joined = Dates.Parse(model.JoiningDate);
+
+            if (!string.IsNullOrWhiteSpace(model.DateOfBirth) && dob == null)
+                ModelState.AddModelError(nameof(model.DateOfBirth), "Enter a valid date of birth.");
+            else if (dob != null && (dob > today.AddYears(-14) || dob < today.AddYears(-100)))
+                ModelState.AddModelError(nameof(model.DateOfBirth), "Date of birth must make the staff member between 14 and 100 years old.");
+
+            if (!string.IsNullOrWhiteSpace(model.JoiningDate) && joined == null)
+                ModelState.AddModelError(nameof(model.JoiningDate), "Enter a valid joining date.");
+            else if (joined != null && joined > today.AddYears(1))
+                ModelState.AddModelError(nameof(model.JoiningDate), "Joining date cannot be more than a year ahead.");
+            else if (joined != null && dob != null && joined < dob.Value.AddYears(14))
+                ModelState.AddModelError(nameof(model.JoiningDate), "Joining date must be at least 14 years after the date of birth.");
+
+            if (model.ExperienceYears is < 0 or > 60)
+                ModelState.AddModelError(nameof(model.ExperienceYears), "Experience must be between 0 and 60 years.");
+
+            if (model.MonthlySalary is < 0)
+                ModelState.AddModelError(nameof(model.MonthlySalary), "Monthly salary cannot be negative.");
+
+            model.Pan = string.IsNullOrWhiteSpace(model.Pan) ? null : model.Pan.Replace(" ", "").ToUpperInvariant();
+            if (model.Pan != null && !System.Text.RegularExpressions.Regex.IsMatch(model.Pan, "^[A-Z]{5}[0-9]{4}[A-Z]$"))
+                ModelState.AddModelError(nameof(model.Pan), "Enter a valid PAN (e.g. ABCDE1234F).");
+
+            model.IfscCode = string.IsNullOrWhiteSpace(model.IfscCode) ? null : model.IfscCode.Replace(" ", "").ToUpperInvariant();
+            if (model.IfscCode != null && !System.Text.RegularExpressions.Regex.IsMatch(model.IfscCode, "^[A-Z]{4}0[A-Z0-9]{6}$"))
+                ModelState.AddModelError(nameof(model.IfscCode), "Enter a valid IFSC code (e.g. SBIN0001234).");
+
+            model.Aadhaar = string.IsNullOrWhiteSpace(model.Aadhaar) ? null : model.Aadhaar.Replace(" ", "").Replace("-", "");
+            if (model.Aadhaar != null && !System.Text.RegularExpressions.Regex.IsMatch(model.Aadhaar, "^[2-9][0-9]{11}$"))
+                ModelState.AddModelError(nameof(model.Aadhaar), "Enter a valid 12-digit Aadhaar number.");
         }
 
         // Hash the entered password when creating a new login OR resetting an existing one.

@@ -426,3 +426,40 @@ BEGIN
            'Day ' || to_char(v_date, 'DD Mon YYYY') || ' re-opened. Close it again after the correction.' AS message;
 END;
 $procedure$;
+
+-- ── 8. Every counter closed on a date (for re-opening someone else's day) ────
+-- Day Close is per cashier, so an admin could not see -- let alone re-open --
+-- the drawer an accountant had closed (QA BUG-067). This lists each cashier's
+-- close row for the date; the page shows it only to users with fees.reopen,
+-- and ReopenDay then passes that row's cashier_id to sp_fee_day_reopen.
+CREATE OR REPLACE PROCEDURE core.sp_fee_day_close_list(
+    IN    p_tenant_id      integer,
+    IN    p_school_id      integer,
+    IN    p_action_user_id integer,
+    IN    p_date           date,
+    INOUT p_result         refcursor DEFAULT 'result_cursor'::refcursor
+)
+LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+    v_iso varchar(10);
+BEGIN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
+        RAISE EXCEPTION 'Invalid request.';
+    END IF;
+    v_iso := to_char(COALESCE(p_date, CURRENT_DATE), 'YYYY-MM-DD');
+
+    OPEN p_result FOR
+    SELECT dc.cashier_id,
+           core.fn_user_display_name(dc.cashier_id)  AS cashier_name,
+           dc.closed_at, dc.total_collected, dc.expected_cash, dc.counted_cash, dc.difference,
+           (dc.reopened_at IS NULL)                  AS is_closed,
+           dc.reopened_at,
+           core.fn_user_display_name(dc.reopened_by) AS reopened_by_name,
+           dc.reopen_reason
+    FROM core.fee_day_close dc
+    WHERE dc.tenant_id = p_tenant_id AND dc.school_id = p_school_id
+      AND dc.close_date = v_iso
+    ORDER BY (dc.reopened_at IS NULL) DESC, dc.closed_at DESC;
+END;
+$procedure$;

@@ -458,10 +458,13 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── POST: /ERP/Fee/ReopenDay ─────────────────────────────
-        // Re-opens the cashier's own closed day so a correction can be made and the
-        // day closed again. A reason is required; the earlier count stays in the
-        // close history and is never overwritten. Needs its own fees.reopen key so a
-        // school can let a cashier close a day without letting them re-open it.
+        // Re-opens a closed day so a correction can be made and the day closed
+        // again. A reason is required; the earlier count stays in the close history
+        // and is never overwritten. Needs its own fees.reopen key so a school can
+        // let a cashier close a day without letting them re-open it.
+        // CashierId picks whose counter (from GetClosedCounters); without it the
+        // caller's own counter is re-opened. Only rows of the caller's own
+        // tenant/school can match, so another school's cashier can't be targeted.
         [HttpPost]
         [HasPermission("fees.reopen")]
         [ValidateAntiForgeryToken]
@@ -470,15 +473,40 @@ namespace educore.Areas.ERP.Controllers
             if (req == null || string.IsNullOrWhiteSpace(req.Reason))
                 return Json(new { success = false, message = "A reason is required to re-open a closed day." });
 
+            int cashierId = req.CashierId > 0 ? req.CashierId.Value : UserId();
             var (ok, msg) = await _feePaymentService.ReopenDayAsync(
-                Dates.Norm(req.Date), UserId(), req.Reason!.Trim(), TenantId(), SchoolId(), UserId());
+                Dates.Norm(req.Date), cashierId, req.Reason!.Trim(), TenantId(), SchoolId(), UserId());
             return Json(new { success = ok, message = msg });
         }
 
         public class ReopenDayRequest
         {
-            public string? Date   { get; set; }
-            public string? Reason { get; set; }
+            public string? Date      { get; set; }
+            public string? Reason    { get; set; }
+            public int?    CashierId { get; set; }
+        }
+
+        // ── GET: /ERP/Fee/GetClosedCounters ──────────────────────
+        // Every counter closed on a date, for the admin's re-open list on Day Close.
+        [HttpGet]
+        [HasPermission("fees.reopen")]
+        public async Task<IActionResult> GetClosedCounters(string? date = null)
+        {
+            var rows = await _feePaymentService.GetClosedCountersAsync(Dates.Norm(date), TenantId(), SchoolId(), UserId());
+            return Json(rows.Select(r => new
+            {
+                cashierId  = r.CashierId,
+                cashier    = r.CashierName,
+                closedAt   = r.ClosedAt?.ToString("dd MMM yyyy, hh:mm tt"),
+                collected  = r.TotalCollected,
+                expected   = r.ExpectedCash,
+                counted    = r.CountedCash,
+                diff       = r.Difference,
+                isClosed   = r.IsClosed,
+                reopenedAt = r.ReopenedAt?.ToString("dd MMM yyyy, hh:mm tt"),
+                reopenedBy = r.ReopenedBy,
+                reason     = r.ReopenReason
+            }));
         }
 
         // ── POST: /ERP/Fee/CloseDay ──────────────────────────────

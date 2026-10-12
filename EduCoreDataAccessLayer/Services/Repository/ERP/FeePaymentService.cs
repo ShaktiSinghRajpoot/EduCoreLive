@@ -30,6 +30,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpDayCollection = "core.sp_fee_day_collection_get";
         private const string SpDayClose = "core.sp_fee_day_close";
         private const string SpDayReopen = "core.sp_fee_day_reopen";
+        private const string SpDayCloseList = "core.sp_fee_day_close_list";
         private const string SpCollectionRegister = "core.sp_fee_collection_register";
         private const string SpDefaulters = "core.sp_fee_defaulters_get";
         private const string SpAdvanceGet = "core.sp_student_advance_get";
@@ -861,6 +862,47 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 _logger.LogError(ex, "Unexpected error re-opening day for school {SchoolId}, date {Date}.", schoolId, date);
                 return (false, "Unable to re-open the day.");
             }
+        }
+
+        public async Task<List<DayCloseCounterRow>> GetClosedCountersAsync(
+            string? date, int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<DayCloseCounterRow>();
+            if (tenantId <= 1 || schoolId <= 0)
+                return list;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_date",           NpgsqlDbType.Unknown) { Value = (object?)date ?? DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
+            };
+
+            await _db.ExecuteCursorsAsync(SpDayCloseList, parameters, async reader =>
+            {
+                var cols = reader.Columns();
+                while (await reader.ReadAsync())
+                {
+                    list.Add(new DayCloseCounterRow
+                    {
+                        CashierId      = DbRead.Int(reader, cols, "cashier_id"),
+                        CashierName    = DbRead.NStr(reader, cols, "cashier_name"),
+                        ClosedAt       = DbRead.DateTimeN(reader, cols, "closed_at"),
+                        TotalCollected = DbRead.Dec(reader, cols, "total_collected"),
+                        ExpectedCash   = DbRead.Dec(reader, cols, "expected_cash"),
+                        CountedCash    = DbRead.Dec(reader, cols, "counted_cash"),
+                        Difference     = DbRead.Dec(reader, cols, "difference"),
+                        IsClosed       = DbRead.Bool(reader, cols, "is_closed"),
+                        ReopenedAt     = DbRead.DateTimeN(reader, cols, "reopened_at"),
+                        ReopenedBy     = DbRead.NStr(reader, cols, "reopened_by_name"),
+                        ReopenReason   = DbRead.NStr(reader, cols, "reopen_reason")
+                    });
+                }
+            });
+
+            return list;
         }
 
         public async Task<CollectionRegister> GetCollectionRegisterAsync(
