@@ -312,6 +312,8 @@ function inr(n){return n===0?'₹ 0':'₹ '+n.toLocaleString('en-IN');}
 function feeB(f){var m={Paid:'b-paid',Partial:'b-partial',Pending:'b-pending'};return '<span class="sd-bdg '+(m[f]||'b-pending')+'">'+EC.esc(f)+'</span>';}
 function statB(s){var m={Active:'b-active',Inactive:'b-inactive',Transfer:'b-transfer'};return '<span class="sd-bdg '+(m[s]||'b-inactive')+'">'+EC.esc(s)+'</span>';}
 function pct(a,b){return b===0?0:Math.round(a/b*100);}
+// Exam percentages: 2 decimals, the same as the Result Sheet (82.86%, not 82.9%).
+function examPct(v){ return Number(v).toFixed(2)+'%'; }
 function attHtml(p){
   var c=p>=75?'#28c76f':p>=50?'#ff9f43':'#ea5455';
   var tc=p>=75?'#155724':p>=50?'#856404':'#842029';
@@ -467,7 +469,7 @@ function renderOverview(s,d){
     document.getElementById('ov-metrics').innerHTML=
         mc('Attendance', (att&&att.schoolDays) ? att.percent+'%' : '—',
            (att&&att.schoolDays&&att.percent>=75?'bg-label-success text-success':'bg-label-warning text-warning'),'bx-user-check')
-       +mc('Last Exam',  (ex&&ex.options.length) ? ex.percent+'%' : '—','bg-label-info text-info','bx-book-open')
+       +mc('Last Exam',  (ex&&ex.options.length) ? examPct(ex.percent) : '—','bg-label-info text-info','bx-book-open')
        // The class's subjects (Subject Management); else the last exam's count.
        +mc('Subjects',   s.subjects!=null ? String(s.subjects) : (ex&&ex.options.length) ? String(ex.subjectCount) : '—','bg-label-primary text-primary','bx-list-check')
        +(CAN_FEES
@@ -481,7 +483,7 @@ function renderOverview(s,d){
       ? bars.map(function(m){
             var col=m.percent>=85?'#28c76f':m.percent>=70?'#2196f3':m.percent>=55?'#ff9f43':'#ea5455';
             return '<div class="sd-subj-row">'
-                +'<div class="sd-subj-hd"><span>'+EC.esc(m.subject)+'</span><span>'+m.percent+'%</span></div>'
+                +'<div class="sd-subj-hd"><span>'+EC.esc(m.subject)+'</span><span>'+examPct(m.percent)+'</span></div>'
                 +'<div class="sd-bar-wrap"><div class="sd-bar-fill" style="width:'+m.percent+'%;background:'+col+'"></div></div>'
                 +'</div>';
         }).join('')
@@ -491,7 +493,7 @@ function renderOverview(s,d){
     // and a made-up absence date.
     var acts='';
     if(ex&&ex.options.length) acts+=ai('bx-file','bg-label-info text-info',
-        'Last exam: '+EC.esc(ex.options[0].name), ex.percent+'%'+(ex.options[0].date?' · '+EC.esc(ex.options[0].date):''));
+        'Last exam: '+EC.esc(ex.options[0].name), examPct(ex.percent)+(ex.options[0].date?' · '+EC.esc(ex.options[0].date):''));
     if(d.feeHistory.length)   acts+=ai('bx-wallet','bg-label-success text-success',
         'Last fee payment', inr(d.feeHistory[0].amt)+' · '+EC.esc(d.feeHistory[0].date));
     if(att&&att.schoolDays)   acts+=ai('bx-user-check','bg-label-primary text-primary',
@@ -704,7 +706,7 @@ function renderExams(s,d){
     // Absences are out of the totals, so say how many there were — otherwise
     // "2 subjects" on a 3-subject exam looks like missing data.
     document.getElementById('exam-summary').innerHTML=
-        mc('Percentage', ex.percent+'%'+(ex.grade?' · '+EC.esc(ex.grade):''),(ex.percent>=33?'bg-label-success text-success':'bg-label-danger text-danger'),'bx-bar-chart-alt-2')
+        mc('Percentage', examPct(ex.percent)+(ex.grade?' · '+EC.esc(ex.grade):''),(ex.percent>=33?'bg-label-success text-success':'bg-label-danger text-danger'),'bx-bar-chart-alt-2')
        +mc('Marks', ex.obtained+' / '+ex.total,'bg-label-primary text-primary','bx-calculator')
        // Rank by overall % within the class; ties share a rank. None when absent from every paper.
        +mc('Class Rank', ex.classRank!=null ? ex.classRank+' / '+ex.classSize : '—','bg-label-warning text-warning','bx-trophy')
@@ -731,7 +733,7 @@ function renderExams(s,d){
             +'<td class="fw-bold">'+EC.esc(r.subject)+'</td>'
             +'<td>'+(r.max!=null?r.max:'—')+'</td>'
             +'<td class="fw-bold">'+(r.obtained!=null?r.obtained:'—')+'</td>'
-            +'<td>'+(r.percent!=null?r.percent+'%':'—')+'</td>'
+            +'<td>'+(r.percent!=null?examPct(r.percent):'—')+'</td>'
             +'<td class="fw-bold">'+(r.grade?EC.esc(r.grade):'—')+'</td>'
             +'<td>'+res+'</td>'
             +'</tr>';

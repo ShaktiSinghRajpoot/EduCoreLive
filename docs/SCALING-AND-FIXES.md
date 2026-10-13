@@ -5084,3 +5084,9 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   32.5% -> E), tied students share a rank and the next rank skips. All matched; results published.
   Noted: the Result Sheet shows % to 2 decimals and the student page to 1; a student with no roll
   number shows the admission no in the Roll column (by design in the proc).
+
+### [2026-10-13] Exam percentages: 2 decimals everywhere
+- The Result Sheet showed 82.86% and the Student Dashboard 82.9% for the same student:
+  `core.sp_exam_result_student` rounded the subject and overall % to 1 decimal. Both are now
+  `ROUND(..., 2)` (`exam_result_student.sql`, deployed with `deploy_2026_10_13b.sql`), and the
+  dashboard prints exam percentages with `examPct()` (`toFixed(2)`), like the Result Sheet.

@@ -103,7 +103,7 @@ BEGIN
                 WHEN es.pass_marks IS NULL        THEN NULL
                 ELSE m.marks_obtained >= es.pass_marks END          AS passed,
            CASE WHEN COALESCE(m.is_absent, FALSE) OR COALESCE(es.max_marks, 0) = 0 THEN NULL
-                ELSE ROUND(m.marks_obtained * 100.0 / es.max_marks, 1) END AS percent,
+                ELSE ROUND(m.marks_obtained * 100.0 / es.max_marks, 2) END AS percent,
            academic.fn_grade_for_percent(p_tenant_id, p_school_id,
                CASE WHEN m.marks_obtained IS NULL OR COALESCE(es.max_marks, 0) = 0 THEN NULL
                     ELSE ROUND(m.marks_obtained * 100.0 / es.max_marks, 2) END) AS grade
@@ -138,7 +138,7 @@ BEGIN
            CASE WHEN COALESCE(SUM(es.max_marks) FILTER (WHERE m.marks_obtained IS NOT NULL), 0) = 0
                 THEN 0::numeric
                 ELSE ROUND(SUM(m.marks_obtained) FILTER (WHERE m.marks_obtained IS NOT NULL) * 100.0
-                         / SUM(es.max_marks)     FILTER (WHERE m.marks_obtained IS NOT NULL), 1)
+                         / SUM(es.max_marks)     FILTER (WHERE m.marks_obtained IS NOT NULL), 2)
            END                                                             AS percent,
            COUNT(*) FILTER (WHERE COALESCE(m.is_absent, FALSE))::int       AS absent_count,
            COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL
