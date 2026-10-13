@@ -44,11 +44,16 @@
         </div>
       </div>
       <div class="ec-card-body p-0">
-        <div class="table-responsive">
+        <div class="table-responsive tt-wrap">
           <table class="sv-grid" style="min-width:640px;">
             <thead id="mtHead"></thead>
             <tbody id="mtBody"><tr><td class="text-muted py-4">Loading…</td></tr></tbody>
           </table>
+        </div>
+        <!-- phone: one day at a time -->
+        <div class="tt-mob p-3">
+          <div class="tt-days" id="mtDays"></div>
+          <div id="mtMobList"></div>
         </div>
       </div>
     </div>
@@ -120,6 +125,7 @@ $(function () {
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
     var D = null;          // the page data from URL.data
     var slot = null;       // the period being requested: {day, seq, label}
+    var MOB_DAY = null;    // the day shown on a phone
 
     function post(url, body) {
         return $.ajax({ url: url, type: 'POST', contentType: 'application/json',
@@ -134,17 +140,22 @@ $(function () {
                 return '<option value="' + s.id + '">' + EC.esc(s.label) + '</option>';
             }).join(''));
             drawWeek();
+            drawMobile();
             drawRequests();
         }).fail(function () { ecToast('error', 'Could not load your timetable.'); });
     }
 
     // Rows = period numbers (from the first day that has them); columns = days.
-    function drawWeek() {
+    function periodRows() {
         var rows = [];
         D.periods.forEach(function (p) {
             if (!rows.some(function (r) { return r.seq === p.seq; })) rows.push({ seq: p.seq, label: p.label, time: p.time, type: p.type });
         });
-        rows.sort(function (a, b) { return a.seq - b.seq; });
+        return rows.sort(function (a, b) { return a.seq - b.seq; });
+    }
+
+    function drawWeek() {
+        var rows = periodRows();
 
         $('#mtHead').html('<tr><th>Period</th>' + D.days.map(function (d) { return '<th>' + EC.esc(d.label) + '</th>'; }).join('') + '</tr>');
 
@@ -153,13 +164,32 @@ $(function () {
                 return '<tr class="tt-break"><td colspan="' + (D.days.length + 1) + '">' + EC.esc(r.label) + ' · ' + EC.esc(r.time) + '</td></tr>';
             }
             return '<tr><td><div class="tt-pcell"><div class="tt-pname">' + EC.esc(r.label) + '</div><div class="tt-ptime">' + EC.esc(r.time) + '</div></div></td>'
-                 + D.days.map(function (d) { return cell(d, r); }).join('') + '</tr>';
+                 + D.days.map(function (d) { return '<td>' + cell(d, r) + '</td>'; }).join('') + '</tr>';
         }).join(''));
     }
 
+    // Phone: day pills (today first picked) and that day's periods stacked.
+    function drawMobile() {
+        if (MOB_DAY === null) {
+            var today = new Date().getDay();
+            MOB_DAY = D.days.some(function (d) { return d.day === today; }) ? today : (D.days[0] || { day: 1 }).day;
+        }
+        $('#mtDays').html(D.days.map(function (d) {
+            return '<button type="button" class="tt-day' + (d.day === MOB_DAY ? ' on' : '') + '" data-day="' + d.day + '">' + EC.esc(d.label.slice(0, 3)) + '</button>';
+        }).join(''));
+
+        var day = D.days.filter(function (d) { return d.day === MOB_DAY; })[0];
+        $('#mtMobList').html(periodRows().map(function (r) {
+            if (r.type !== 'class') return '<div class="tt-mbreak">' + EC.esc(r.label) + '</div>';
+            return '<div class="tt-mrow"><div class="tt-mp"><div class="tt-mp-name">' + EC.esc(r.label) + '</div><div class="tt-mp-time">' + EC.esc(r.time) + '</div></div>'
+                 + '<div>' + cell(day, r) + '</div></div>';
+        }).join(''));
+    }
+
+    // One period's content, shared by the week grid and the phone list.
     function cell(d, r) {
         var isPeriod = D.periods.some(function (p) { return p.day === d.day && p.seq === r.seq && p.type === 'class'; });
-        if (!isPeriod) return '<td><div class="sv-empty" style="opacity:.5">—</div></td>';
+        if (!isPeriod) return '<div class="sv-empty" style="opacity:.5">—</div>';
 
         var live = D.live.filter(function (e) { return e.day === d.day && e.seq === r.seq; })[0];
         var req  = D.requests.filter(function (q) { return q.day === d.day && q.seq === r.seq && q.status === 'Pending'; })[0];
@@ -176,7 +206,7 @@ $(function () {
             html += '<div class="sv-empty mt-ask" style="cursor:pointer"' + ask + '>+ Request</div>';
         }
         if (req) html += '<div class="sv-req"><div>Waiting: ' + EC.esc(req.subject) + '<br>' + EC.esc(req.section) + '</div></div>';
-        return '<td>' + html + '</td>';
+        return html;
     }
 
     function drawRequests() {
@@ -194,7 +224,9 @@ $(function () {
     }
 
     // Open the request pop-up for a free (or own) period.
-    $('#mtBody').on('click', '.mt-ask', function () {
+    $('#mtDays').on('click', '.tt-day', function () { MOB_DAY = Number($(this).attr('data-day')); drawMobile(); });
+
+    $('#mtBody, #mtMobList').on('click', '.mt-ask', function () {
         slot = { day: Number($(this).attr('data-day')), seq: Number($(this).attr('data-seq')) };
         $('#mtSlot').text($(this).attr('data-label'));
         $('#mtSection').val('');
