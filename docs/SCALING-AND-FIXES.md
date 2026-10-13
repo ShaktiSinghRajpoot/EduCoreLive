@@ -5131,3 +5131,18 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   without changes; Undo is `core.fn_ledger_reopen`.
 - One proc `core.sp_fee_year_end_manage` (`fee_year_end.sql`, `deploy_2026_10_13f.sql`), 12 rolled-back
   checks in `tests/fee_year_end_tests.sql`.
+
+### [2026-10-14] Announcements / Notice Board
+- New page `Notice/Index` (menu: Notice Board, under Dashboard, every school user). A notice has a
+  title, message, category (General, Circular, Holiday, Event, PTM, Exam, Fee), who it is for
+  (Everyone / Staff / All parents / Parents of selected classes), optional pin and "show until" date.
+- Posting / editing / deleting needs the new permission `notices.manage` (School Admin bypasses; the
+  Principal role template includes it). Everyone else only reads.
+- Opening the board marks notices read, so the poster sees "Seen by N of M" with names and times.
+  The navbar bell shows the five newest notices and an unread count (`Notice/Latest`).
+- Parents have no login and no SMS gateway is set up, so each notice has **Print** (a circular on the
+  school letterhead, `Notice/Print/{id}`) and **WhatsApp** (opens WhatsApp with the text, to share in
+  the class/parents group).
+- DB: `core.announcements`, `core.announcement_reads`, proc `core.sp_announcement_manage`
+  (`announcements.sql`, `deploy_2026_10_14.sql`); 9 rolled-back checks in `tests/announcements_tests.sql`.
+- Also: the Year-End page no longer converts its "decided on" time to school time twice.

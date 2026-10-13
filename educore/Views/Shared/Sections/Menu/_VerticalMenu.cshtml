@@ -156,6 +156,12 @@
                 <div class="text-truncate">Dashboard</div>
             </a>
         </li>
+        <li class='menu-item @On("ERP/Notice")'>
+            <a asp-area="ERP" asp-controller="Notice" asp-action="Index" class="menu-link">
+                <i class="menu-icon icon-base bx bx-broadcast ic-dash"></i>
+                <div class="text-truncate">Notice Board</div>
+            </a>
+        </li>
         }
 
         @if (isPlatform)

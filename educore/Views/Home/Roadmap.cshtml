@@ -6,7 +6,7 @@
     // When a module ships, delete its row here and add it back to _VerticalMenu.
     var planned = new (string Group, string Icon, string[] Items)[]
     {
-        ("Communication",     "bx-broadcast",      new[] { "Notice board", "Send SMS / email", "Events calendar" }),
+        ("Communication",     "bx-broadcast",      new[] { "Send SMS / email", "Events calendar" }),
         ("Certificates",      "bx-certification",  new[] { "Bonafide & character certificates", "Custom certificate designer" }),
         ("Library",           "bx-book-reader",    new[] { "Book catalog", "Issue & return", "Members" }),
         ("Hostel",            "bx-building-house", new[] { "Hostels & rooms", "Room allocation" }),
@@ -25,7 +25,8 @@
     // can see it is now available, with a link to it.
     var shipped = new (string Group, string Icon, string Item, string Controller, string Action)[]
     {
-        ("Transport", "bx-bus", "Live bus tracking", "Transport", "LiveTracking")
+        ("Transport", "bx-bus", "Live bus tracking", "Transport", "LiveTracking"),
+        ("Communication", "bx-broadcast", "Notice board", "Notice", "Index")
     };
 
     // These are school modules. The platform super admin (tenant 1) has no school,

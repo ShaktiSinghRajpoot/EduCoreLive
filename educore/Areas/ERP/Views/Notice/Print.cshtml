@@ -1,0 +1,72 @@
+@model EduCoreDataAccessLayer.Models.ERP.Notice
+@using educore.Models
+@{
+    Layout = null;
+    var sc = ViewBag.School as SchoolManageModel ?? new SchoolManageModel { SchoolName = "Your School" };
+    var logo = ViewBag.Logo as string;
+    var addr = string.Join(", ", new[] { sc.AddressLine1, sc.City, sc.State }.Where(p => !string.IsNullOrWhiteSpace(p)));
+    var contact = string.Join(" · ", new[] { sc.Phone, sc.ContactEmail, sc.Website }.Where(p => !string.IsNullOrWhiteSpace(p)));
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Circular — @Model.Title</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111; background: #eceff3; }
+        .bar { text-align: center; padding: 10px; }
+        .bar button { padding: 8px 18px; font-size: 14px; cursor: pointer; }
+        .page { background: #fff; width: 210mm; max-width: 100%; min-height: 270mm; margin: 0 auto 10mm; padding: 14mm 16mm; }
+        .head { display: flex; align-items: center; gap: 12px; border-bottom: 3px double #26426b; padding-bottom: 8px; }
+        .head img { max-height: 70px; max-width: 90px; object-fit: contain; }
+        .school { flex: 1; text-align: center; }
+        .school .n { font-size: 24px; font-weight: 800; color: #26426b; }
+        .school .a, .school .c { font-size: 12px; color: #555; }
+        .title { text-align: center; margin: 18px 0 10px; }
+        .title span { display: inline-block; background: #26426b; color: #fff; font-weight: 800; letter-spacing: 3px; padding: 4px 18px; border-radius: 3px; }
+        .meta { display: flex; justify-content: space-between; font-size: 14px; margin: 14px 0; }
+        .to { font-size: 14px; margin-bottom: 10px; }
+        .subject { font-size: 15px; font-weight: 700; margin: 12px 0; }
+        .body { font-size: 15px; line-height: 1.7; white-space: pre-line; overflow-wrap: anywhere; }
+        .sign { margin-top: 60px; display: flex; justify-content: flex-end; }
+        .sign div { text-align: center; border-top: 1px solid #333; padding-top: 4px; min-width: 180px; font-weight: 700; }
+        @@media print {
+            body { background: #fff; }
+            .bar { display: none; }
+            .page { margin: 0; width: auto; min-height: 0; padding: 0; }
+            @@page { size: A4; margin: 14mm 16mm; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bar"><button onclick="window.print()">Print</button></div>
+    <div class="page">
+        <div class="head">
+            @if (!string.IsNullOrWhiteSpace(logo))
+            {
+                <img src="@logo" alt="" />
+            }
+            <div class="school">
+                <div class="n">@sc.SchoolName</div>
+                @if (addr.Length > 0) { <div class="a">@addr</div> }
+                @if (contact.Length > 0) { <div class="c">@contact</div> }
+            </div>
+        </div>
+
+        <div class="title"><span>@(Model.Category == "General" ? "NOTICE" : Model.Category == "Circular" ? "CIRCULAR" : Model.Category.ToUpperInvariant() + " NOTICE")</span></div>
+
+        <div class="meta">
+            <div>Ref: N-@Model.Id.ToString("0000")</div>
+            <div>Date: @(Model.CreatedAt?.ToString("dd MMM yyyy"))</div>
+        </div>
+
+        <div class="to"><b>To:</b> @Model.AudienceText</div>
+        <div class="subject">Subject: @Model.Title</div>
+        <div class="body">@Model.Body</div>
+
+        <div class="sign"><div>Principal</div></div>
+    </div>
+</body>
+</html>

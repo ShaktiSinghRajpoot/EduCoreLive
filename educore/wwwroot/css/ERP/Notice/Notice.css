@@ -1,0 +1,41 @@
+/* Notice Board (Areas/ERP/Views/Notice/Index.cshtml) */
+.nb-page .nb-tools{ display:flex;flex-wrap:wrap;gap:.6rem;align-items:center;justify-content:space-between; }
+.nb-page .nb-tools .form-control{ flex:0 1 260px; }
+.nb-page .nb-chips{ display:flex;gap:.3rem;flex-wrap:wrap; }
+.nb-page .nb-chips button{ border:1px solid var(--ec-border);background:#fff;border-radius:999px;padding:.3rem .8rem;font-size:.8rem;font-weight:700;color:var(--ec-text); }
+.nb-page .nb-chips button.on{ background:var(--ec-primary);border-color:var(--ec-primary);color:#fff; }
+
+.nb-page .nb-card{ display:flex;margin-bottom:.8rem;overflow:hidden; }
+.nb-page .nb-card.is-old{ opacity:.65; }
+.nb-page .nb-bar{ width:5px;flex:0 0 5px; }
+.nb-page .nb-in{ flex:1;min-width:0;padding:.85rem 1rem; }
+.nb-page .nb-tags{ display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.35rem; }
+.nb-page .nb-cat,.nb-page .nb-tag{ font-size:.68rem;font-weight:800;padding:2px 9px;border-radius:999px; }
+.nb-page .nb-tag.pin{ background:#fff1e0;color:#cc6a00; }
+.nb-page .nb-tag.new{ background:#e8fadf;color:#1f9254; }
+.nb-page .nb-tag.old{ background:#eef0f2;color:#6b7280; }
+.nb-page .nb-title{ font-weight:800;font-size:1.02rem;color:var(--ec-text-dark); }
+.nb-page .nb-body{ white-space:pre-line;font-size:.9rem;margin:.3rem 0 .5rem;overflow-wrap:anywhere; }
+.nb-page .nb-meta{ font-size:.76rem;color:var(--ec-text-muted); }
+.nb-page .nb-acts{ display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;margin-top:.55rem; }
+.nb-page .btn-xs{ padding:.18rem .6rem;font-size:.76rem;border-radius:8px; }
+.nb-page .nb-wa{ background:#e7f8ee;color:#128c4b;border:1px solid #bfe9cf; }
+.nb-page .nb-wa:hover{ background:#d3f2df;color:#0d6b39; }
+
+/* category colours: chip + left bar */
+.nb-page .nb-cat.c-General { background:#eef0f2;color:#4b5563; } .nb-page .nb-bar.c-General { background:#9ca3af; }
+.nb-page .nb-cat.c-Circular{ background:#e8f0ff;color:#2952cc; } .nb-page .nb-bar.c-Circular{ background:#4f7cff; }
+.nb-page .nb-cat.c-Holiday { background:#e8fadf;color:#1f9254; } .nb-page .nb-bar.c-Holiday { background:#28c76f; }
+.nb-page .nb-cat.c-Event   { background:#f3e8ff;color:#7c3aed; } .nb-page .nb-bar.c-Event   { background:#a26bfa; }
+.nb-page .nb-cat.c-PTM     { background:#fff1e0;color:#cc6a00; } .nb-page .nb-bar.c-PTM     { background:#ff8a00; }
+.nb-page .nb-cat.c-Exam    { background:#dff7fa;color:#0e7f8c; } .nb-page .nb-bar.c-Exam    { background:#00bad1; }
+.nb-page .nb-cat.c-Fee     { background:#fdeceb;color:#c4332f; } .nb-page .nb-bar.c-Fee     { background:#ea5455; }
+
+.nb-classes{ display:flex;flex-wrap:wrap;gap:.4rem;max-height:160px;overflow:auto; }
+.nb-class{ border:1px solid var(--ec-border);border-radius:8px;padding:.25rem .6rem;font-size:.85rem;cursor:pointer; }
+.nb-reader{ display:flex;justify-content:space-between;gap:.5rem;padding:.35rem 0;border-bottom:1px solid #f1f1f1; }
+.nb-reader small{ color:var(--ec-text-muted); }
+
+@media (max-width:767.98px){
+  .nb-page .nb-tools .form-control{ flex:1 1 100%; }
+}

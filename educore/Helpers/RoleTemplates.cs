@@ -24,8 +24,8 @@ namespace educore.Helpers
             new RoleTemplate
             {
                 Name = "Principal",
-                Keys = new[] { "*.view", "staff.manage", "exams.manage", "exams.marks", "fees.reopen", "reports.view" },
-                Hint = "Sees every module, approves leave, manages exams and can re-open a closed fee day. No settings or roles."
+                Keys = new[] { "*.view", "staff.manage", "exams.manage", "exams.marks", "fees.reopen", "reports.view", "notices.manage" },
+                Hint = "Sees every module, approves leave, manages exams, posts notices and can re-open a closed fee day. No settings or roles."
             },
             new RoleTemplate { Name = "Transport In-charge", Keys = new[] { "transport.view", "transport.manage" } },
             new RoleTemplate

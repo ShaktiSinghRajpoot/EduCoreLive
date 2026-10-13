@@ -604,7 +604,7 @@ namespace educore.Areas.ERP.Controllers
                 amount   = r.Amount,
                 state    = r.State,
                 reason   = r.Reason,
-                decided  = r.DecidedAt.HasValue ? Dates.ToSchool(r.DecidedAt.Value).ToString("dd MMM yyyy") : null
+                decided  = r.DecidedAt?.ToString("dd MMM yyyy")
             }));
         }
 

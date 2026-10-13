@@ -66,9 +66,11 @@
     <ul class="navbar-nav flex-row align-items-center gap-2 flex-shrink-0">
 
         @* ── Notifications ────────────────────────────────────────────
-           There is no notification feed yet, so the bell shows an honest
-           empty state and no unread badge (it used to show hard-coded
-           demo items with a fixed "3"). *@
+           The Notice Board's newest notices with an unread count, filled by
+           the small script below from /ERP/Notice/Latest. School users only:
+           the platform super admin has no notice board. *@
+        @if (_navTId > 1 && _navSId > 0)
+        {
         <li class="nav-item dropdown">
             <a class="nav-link p-2 position-relative"
                href="javascript:void(0);"
@@ -76,20 +78,46 @@
                aria-expanded="false"
                aria-label="Notifications">
                 <i class="icon-base bx bx-bell bx-sm" aria-hidden="true"></i>
+                <span id="navBellCount" class="badge rounded-pill bg-danger position-absolute top-0 end-0 d-none" style="font-size:.6rem"></span>
             </a>
 
             @* max-width: min(320px, 90vw) stops dropdown overflowing on narrow screens *@
             <div class="dropdown-menu dropdown-menu-end shadow-sm p-0"
                  style="width:320px;max-width:min(320px,90vw);">
                 <div class="px-4 py-3 border-bottom">
-                    <h6 class="mb-0 fw-semibold">Notifications</h6>
+                    <h6 class="mb-0 fw-semibold">Notices</h6>
                 </div>
-                <div class="text-center text-muted small px-4 py-4">
-                    <i class="bx bx-bell-off d-block mx-auto mb-2" style="font-size:1.75rem;opacity:.35"></i>
-                    No notifications
+                <div id="navBellList">
+                    <div class="text-center text-muted small px-4 py-4">
+                        <i class="bx bx-bell-off d-block mx-auto mb-2" style="font-size:1.75rem;opacity:.35"></i>
+                        No notices
+                    </div>
                 </div>
+                <a class="d-block text-center small fw-semibold py-2 border-top" href="@Url.Action("Index", "Notice", new { area = "ERP" })">Open Notice Board</a>
             </div>
         </li>
+        <script>
+            // Plain JS: jQuery and site.js load after this partial.
+            (function () {
+                function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+                fetch('@Url.Action("Latest", "Notice", new { area = "ERP" })', { credentials: 'same-origin' })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (d) {
+                        if (!d) return;
+                        var badge = document.getElementById('navBellCount');
+                        if (d.unread > 0) { badge.textContent = d.unread > 9 ? '9+' : d.unread; badge.classList.remove('d-none'); }
+                        if (!d.items || !d.items.length) return;
+                        document.getElementById('navBellList').innerHTML = d.items.map(function (n) {
+                            return '<a class="dropdown-item py-2 text-wrap" href="@Url.Action("Index", "Notice", new { area = "ERP" })">'
+                                 + (n.isNew ? '<span class="badge bg-label-success me-1">New</span>' : '')
+                                 + '<span class="fw-semibold">' + esc(n.title) + '</span>'
+                                 + '<div class="small text-muted">' + esc(n.category) + ' · ' + esc(n.posted) + '</div></a>';
+                        }).join('');
+                    })
+                    .catch(function () { /* the bell must never break the page */ });
+            })();
+        </script>
+        }
 
         @* ── User ───────────────────────────────────────────────────── *@
         <li class="nav-item navbar-dropdown dropdown-user dropdown">
