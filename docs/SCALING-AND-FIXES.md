@@ -5045,3 +5045,11 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   blanking them. APAAR 12 digits, email format and income >= 0 are checked when changed; the
   audit row says which group changed. The documents checklist stays admission-only (it is JSON).
 - **Deploy:** `deploy_2026_10_13.sql`, then push.
+
+### [2026-10-13] Collect Fees: find a student by name, father's name or mobile
+- A parent at the counter often does not know the class / section. The "Admission Number" box on
+  `Fee/ManageFee` is now **Find Student**: new `FeeController.SearchStudents` reuses the student
+  list search (`GetStudentsAsync(search:)`, which already matches student name, admission no,
+  guardian name and mobile). One match or an exact admission no opens the student through the
+  existing `doAdmSearch()`; several matches are listed (name, class, father, mobile, adm no) to
+  pick from. No DB change.

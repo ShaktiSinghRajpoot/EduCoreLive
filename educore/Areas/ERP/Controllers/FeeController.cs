@@ -139,6 +139,33 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
+        // ── GET: /ERP/Fee/SearchStudents ─────────────────────────
+        // A parent at the counter often does not know the class or section. The
+        // student list search already matches the student's name, admission no,
+        // father / guardian name and mobile, so the counter uses it as is.
+        [HttpGet]
+        public async Task<IActionResult> SearchStudents(string? session, string? q)
+        {
+            if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2)
+                return Json(Array.Empty<object>());
+
+            var (rows, _) = await _admissionService.GetStudentsAsync(
+                TenantId(), SchoolId(), UserId(),
+                pageNumber: 1, pageSize: 20,
+                search: q.Trim(),
+                filterYear: NullIfEmpty(session));
+
+            return Json(rows.Select(s => new
+            {
+                admNo    = s.AdmissionNo,
+                name     = s.StudentName,
+                cls      = s.ClassName,
+                sec      = s.Section,
+                guardian = s.GuardianName,
+                mobile   = s.Mobile
+            }));
+        }
+
         // ── GET: /ERP/Fee/GetAdvance ─────────────────────────────
         // The student's current advance / credit balance.
         [HttpGet]
