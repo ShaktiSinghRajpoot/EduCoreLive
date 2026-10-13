@@ -1,0 +1,11 @@
+/* Certificates (Areas/ERP/Views/Certificate/Index.cshtml) */
+.ct-page .btn-xs{ padding:.18rem .6rem;font-size:.76rem;border-radius:8px; }
+.ct-page .ct-hits{ position:absolute;left:calc(var(--bs-gutter-x) * .5);right:calc(var(--bs-gutter-x) * .5);z-index:20;background:#fff;border:1px solid var(--ec-border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.08);max-height:300px;overflow:auto; }
+.ct-page .ct-hit{ padding:.5rem .75rem;cursor:pointer;border-bottom:1px solid #f1f1f1; }
+.ct-page .ct-hit:hover{ background:var(--ec-primary-light); }
+.ct-page .ct-picked{ display:flex;justify-content:space-between;align-items:center;gap:.5rem;border:1px solid #ffc98a;background:var(--ec-primary-light);border-radius:10px;padding:.5rem .75rem; }
+.ct-page .ct-types{ display:flex;gap:.6rem;flex-wrap:wrap; }
+.ct-page .ct-type{ flex:1 1 200px;border:1px solid var(--ec-border);border-radius:10px;padding:.55rem .75rem;cursor:pointer; }
+.ct-page .ct-type small{ display:block;color:var(--ec-text-muted);margin-left:1.3rem; }
+.ct-page .ct-type:has(input:checked){ border-color:var(--ec-primary);background:var(--ec-primary-light); }
+.ct-page .ct-void-row td{ opacity:.6; }

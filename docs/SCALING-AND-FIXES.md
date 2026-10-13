@@ -5174,3 +5174,18 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - DB: `academic.homework`, `academic.homework_status`, `academic.sp_homework_manage`
   (`homework.sql`, `deploy_2026_10_14c.sql`); 10 rolled-back checks in `tests/homework_tests.sql`.
   Operation 'Student' (a student's last 30 days) is ready for the Student Dashboard.
+
+### [2026-10-14] Report cards + Bonafide / Character certificates
+- **Report Cards** (`ReportCard/Index`, menu Examinations › Report Cards, `exams.view`): pick an exam whose
+  results are published, a class and an optional section; one A4 page per student with the letterhead,
+  photo, father / mother / DOB, subject marks (max, pass, obtained, grade, result), total, percentage,
+  grade, section and class rank, the session's attendance, the grade scale's remark and three signature
+  lines. Built live from `GetClassResult` + the ID-card student data + `core.sp_report_card_extras`
+  (mother's name, attendance counted like the Student Dashboard). Unpublished results are refused.
+- **Certificates** (`Certificate/Index`, menu Students › Certificates; view `students.view`, issue/void
+  `students.manage`): Bonafide (current students only, "needed for" required) and Character (current or
+  former, conduct). Numbered `BC-/CC-YYYY-0001` per school and year, the student frozen at issue time,
+  never deleted (Void keeps the number with a reason), printed on the letterhead with a VOID stamp when void.
+- DB: `core.certificates`, `core.certificate_counters`, `core.sp_certificate_manage`,
+  `core.sp_report_card_extras` (`report_card_certificates.sql`, `deploy_2026_10_14d.sql`);
+  8 rolled-back checks in `tests/report_card_certificates_tests.sql`.

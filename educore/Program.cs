@@ -258,6 +258,7 @@ builder.Services.AddScoped<IStaffSelfService, StaffSelfService>();   // My Leave
 builder.Services.AddScoped<INoticeService, NoticeService>();         // Announcements / Notice Board
 builder.Services.AddScoped<IStaffAttendanceService, StaffAttendanceService>();   // Staff attendance + substitutes
 builder.Services.AddScoped<IHomeworkService, HomeworkService>();     // Homework
+builder.Services.AddScoped<ICertificateService, CertificateService>(); // Bonafide / Character certificates + report-card extras
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 
 // The landing dashboard. Every number on it used to be hardcoded in the view.

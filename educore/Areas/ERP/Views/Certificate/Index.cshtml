@@ -1,0 +1,196 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Certificates";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canIssue = (bool?)ViewBag.CanIssue ?? false;   // students.manage
+}
+
+@*
+   Certificates — Bonafide (current students) and Character (current or former),
+   numbered BC-/CC-YYYY-0001 and kept in a register (core.sp_certificate_manage).
+   The TC has its own page (Tc/Register).
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Certificate/Certificate.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell ct-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-certification"></i></div>
+          <div><h4 class="ec-page-title mb-1">Certificates</h4>
+            <p class="ec-page-subtitle">Bonafide and character certificates on the school letterhead</p></div>
+        </div>
+        <a href="@Url.Action("Register","Tc",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-file me-1"></i>Transfer Certificates</a>
+      </div>
+    </div>
+
+    @if (canIssue)
+    {
+    <div class="ec-card mb-3"><div class="ec-card-body">
+      <h6 class="fw-bold mb-3">Issue a certificate</h6>
+      <div class="row g-3">
+        <div class="col-12 col-lg-5 position-relative">
+          <label class="form-label">Student <span class="text-danger">*</span></label>
+          <input id="cSearch" class="form-control" autocomplete="off" placeholder="Name, father's name, mobile or adm. no">
+          <div id="cHits" class="ct-hits d-none"></div>
+          <div id="cPicked" class="ct-picked d-none"></div>
+        </div>
+        <div class="col-12 col-lg-7">
+          <label class="form-label">Certificate</label>
+          <div class="ct-types">
+            <label class="ct-type"><input type="radio" name="cType" value="Bonafide" checked> <b>Bonafide</b><small>Is studying here now</small></label>
+            <label class="ct-type"><input type="radio" name="cType" value="Character"> <b>Character</b><small>Conduct, current or former student</small></label>
+          </div>
+        </div>
+        <div class="col-12 col-md-6" id="cPurposeWrap">
+          <label class="form-label">Needed for <span class="text-danger">*</span></label>
+          <input id="cPurpose" class="form-control" maxlength="200" list="cPurposes" placeholder="e.g. Opening a bank account">
+          <datalist id="cPurposes">
+            <option value="Opening a bank account"></option><option value="Scholarship application"></option><option value="Passport application"></option>
+            <option value="Aadhaar enrolment / update"></option><option value="Railway concession"></option><option value="Sports / competition entry"></option>
+          </datalist>
+        </div>
+        <div class="col-12 col-md-6 d-none" id="cConductWrap">
+          <label class="form-label">Conduct</label>
+          <select id="cConduct" class="form-select"><option>Excellent</option><option>Very Good</option><option selected>Good</option><option>Satisfactory</option></select>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">Remarks <small class="text-muted">(optional, printed)</small></label>
+          <input id="cRemarks" class="form-control" maxlength="300">
+        </div>
+        <div class="col-12 text-end">
+          <button id="btnIssue" class="btn btn-primary"><i class="bx bx-printer me-1"></i>Issue &amp; print</button>
+        </div>
+      </div>
+    </div></div>
+    }
+
+    <div class="ec-card"><div class="ec-card-body">
+      <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
+        <h6 class="fw-bold mb-0">Register</h6>
+        <div class="d-flex gap-2 flex-wrap">
+          <select id="rType" class="form-select form-select-sm" style="width:auto"><option value="">All types</option><option>Bonafide</option><option>Character</option></select>
+          <input id="rSearch" class="form-control form-control-sm" style="width:220px" placeholder="Search name, adm. no, cert. no">
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead><tr><th>No.</th><th>Type</th><th>Student</th><th>Class</th><th>For / conduct</th><th>Date</th><th></th></tr></thead>
+          <tbody id="rBody"></tbody>
+        </table>
+      </div>
+    </div></div>
+
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var CSRF = $('input[name="__RequestVerificationToken"]').val();
+    var URL = {
+        search: '@Url.Action("Search","Certificate",new{area="ERP"})',
+        list:   '@Url.Action("List","Certificate",new{area="ERP"})',
+        issue:  '@Url.Action("Issue","Certificate",new{area="ERP"})',
+        voidIt: '@Url.Action("Void","Certificate",new{area="ERP"})',
+        print:  '@Url.Action("Print","Certificate",new{area="ERP"})'
+    };
+    var CAN_ISSUE = @(canIssue ? "true" : "false");
+    var picked = null, timer = null;
+
+    function post(url, body) {
+        return $.ajax({ url: url, type: 'POST', contentType: 'application/json', headers: { 'RequestVerificationToken': CSRF }, data: JSON.stringify(body) });
+    }
+
+    // ── pick the student ───────────────────────────────────────────────
+    $('#cSearch').on('input', function () {
+        clearTimeout(timer);
+        var q = this.value.trim();
+        if (q.length < 2) { $('#cHits').addClass('d-none'); return; }
+        timer = setTimeout(function () {
+            $.getJSON(URL.search, { q: q }).done(function (rows) {
+                $('#cHits').removeClass('d-none').html((rows || []).map(function (s, i) {
+                    return '<div class="ct-hit" data-i="' + i + '"><b>' + EC.esc(s.name) + '</b> <span class="text-muted">' + EC.esc((s.cls || '') + (s.sec ? '-' + s.sec : '')) + ' · ' + EC.esc(s.adm || '') + '</span>'
+                         + (s.current ? '' : ' <span class="badge bg-label-secondary">' + EC.esc(s.status || 'Left') + '</span>')
+                         + '<div class="small text-muted">' + EC.esc(s.father ? 'F: ' + s.father : '') + ' ' + EC.esc(s.mobile || '') + '</div></div>';
+                }).join('') || '<div class="p-2 text-muted">No student found.</div>').data('rows', rows || []);
+            });
+        }, 250);
+    });
+    $('#cHits').on('click', '.ct-hit', function () {
+        picked = $('#cHits').data('rows')[$(this).data('i')];
+        $('#cHits').addClass('d-none'); $('#cSearch').addClass('d-none');
+        $('#cPicked').removeClass('d-none').html('<div><b>' + EC.esc(picked.name) + '</b> · ' + EC.esc((picked.cls || '') + (picked.sec ? '-' + picked.sec : '')) + ' · ' + EC.esc(picked.adm || '')
+            + (picked.current ? '' : ' <span class="badge bg-label-secondary">' + EC.esc(picked.status || 'Left') + '</span>') + '</div>'
+            + '<button class="btn btn-xs btn-outline-secondary" id="cChange">Change</button>');
+        if (!picked.current) { $('input[name=cType][value=Character]').prop('checked', true).trigger('change'); }
+    });
+    $('#cPicked').on('click', '#cChange', function () {
+        picked = null; $('#cPicked').addClass('d-none'); $('#cSearch').removeClass('d-none').val('').focus();
+    });
+
+    $('input[name=cType]').on('change', function () {
+        var bona = $('input[name=cType]:checked').val() === 'Bonafide';
+        $('#cPurposeWrap').toggleClass('d-none', !bona); $('#cConductWrap').toggleClass('d-none', bona);
+    });
+
+    $('#btnIssue').on('click', function () {
+        var type = $('input[name=cType]:checked').val();
+        if (!picked) { ecToast('error', 'Pick a student first.'); return; }
+        if (type === 'Bonafide' && !$('#cPurpose').val().trim()) { ecToast('error', 'Write what the certificate is needed for.'); return; }
+        var $b = $(this); EC.buttonBusy($b);
+        // open the window now (a pop-up opened after the reply is blocked), fill it once issued
+        var w = window.open('', '_blank');
+        post(URL.issue, { studentId: picked.id, type: type, purpose: type === 'Bonafide' ? $('#cPurpose').val().trim() : null,
+                          conduct: type === 'Character' ? $('#cConduct').val() : null, remarks: $('#cRemarks').val().trim() || null })
+            .done(function (r) {
+                ecToast(r.success ? 'success' : 'error', r.message);
+                if (r.success) {
+                    if (w) w.location = URL.print + '/' + r.id;
+                    $('#cChange').click(); $('#cPurpose, #cRemarks').val('');
+                    loadList();
+                } else if (w) w.close();
+            })
+            .fail(function () { ecToast('error', 'Could not issue. Please try again.'); if (w) w.close(); })
+            .always(function () { EC.buttonReset($b); });
+    });
+
+    // ── register ───────────────────────────────────────────────────────
+    function loadList() {
+        $.getJSON(URL.list, { type: $('#rType').val(), q: $('#rSearch').val() }).done(function (rows) {
+            $('#rBody').html((rows || []).map(function (c) {
+                var acts = '<a class="btn btn-xs ec-btn-soft" target="_blank" href="' + URL.print + '/' + c.id + '"><i class="bx bx-printer"></i></a>';
+                if (CAN_ISSUE && !c.isVoid) acts += ' <button class="btn btn-xs btn-outline-danger ct-void" data-id="' + c.id + '" data-no="' + EC.esc(c.no) + '">Void</button>';
+                return '<tr class="' + (c.isVoid ? 'ct-void-row' : '') + '"><td class="fw-semibold">' + EC.esc(c.no) + '</td><td>' + EC.esc(c.type) + '</td>'
+                     + '<td>' + EC.esc(c.name) + '<div class="small text-muted">' + EC.esc(c.adm || '') + '</div></td><td>' + EC.esc(c.cls) + '</td>'
+                     + '<td>' + EC.esc(c.type === 'Bonafide' ? (c.purpose || '') : (c.conduct || '')) + (c.isVoid ? '<div class="small text-danger">Void: ' + EC.esc(c.voidReason || '') + '</div>' : '') + '</td>'
+                     + '<td>' + EC.esc(c.date) + '</td><td class="text-end text-nowrap">' + acts + '</td></tr>';
+            }).join('') || '<tr><td colspan="7" class="text-muted text-center py-4">No certificates yet.</td></tr>');
+        }).fail(function () { ecToast('error', 'Could not load the register.'); });
+    }
+    $('#rType').on('change', loadList);
+    $('#rSearch').on('input', function () { clearTimeout(timer); timer = setTimeout(loadList, 300); });
+
+    $('#rBody').on('click', '.ct-void', function () {
+        var id = $(this).data('id'), no = $(this).data('no');
+        EC.prompt({ title: 'Void this certificate?', name: no, label: 'Reason', required: true, okText: 'Void certificate' }).then(function (reason) {
+            if (reason === null) return;
+            post(URL.voidIt, { id: id, reason: reason })
+                .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) loadList(); })
+                .fail(function () { ecToast('error', 'Could not void. Please try again.'); });
+        });
+    });
+
+    loadList();
+});
+</script>
+}

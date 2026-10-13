@@ -1,0 +1,160 @@
+@model educore.Models.ReportCardPrintModel
+@using educore.Models
+@using EduCoreDataAccessLayer.Helpers
+@{
+    Layout = null;
+    var sc = Model.School;
+    var sh = Model.Sheet;
+    var addr = string.Join(", ", new[] { sc.AddressLine1, sc.City, sc.State }.Where(p => !string.IsNullOrWhiteSpace(p)));
+    string N(decimal? n) => ReportCardPrintModel.Num(n);
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Report Cards — @sh.ExamName — @sh.ClassName</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111; background: #eceff3; font-size: 12.5px; }
+        .bar { text-align: center; padding: 10px; }
+        .bar button { padding: 8px 18px; font-size: 14px; cursor: pointer; }
+        .bar .n { color: #667; font-size: 12px; }
+        .rc { background: #fff; width: 210mm; min-height: 287mm; margin: 0 auto 8mm; padding: 10mm 12mm; border: 1.5px solid #26426b;
+              display: flex; flex-direction: column; page-break-after: always; break-after: page; }
+        .rc:last-child { page-break-after: auto; break-after: auto; }
+        .head { display: flex; align-items: center; gap: 10px; border-bottom: 2px solid #26426b; padding-bottom: 6px; }
+        .head img { max-height: 60px; max-width: 80px; object-fit: contain; }
+        .school { flex: 1; text-align: center; }
+        .school .n { font-size: 22px; font-weight: 800; color: #26426b; }
+        .school .a { font-size: 11px; color: #555; }
+        .title { text-align: center; margin: 8px 0; }
+        .title .t { display: inline-block; background: #26426b; color: #fff; font-weight: 800; letter-spacing: 3px; padding: 3px 16px; border-radius: 3px; }
+        .title .e { font-weight: 700; margin-top: 4px; }
+        .info { display: flex; gap: 10px; margin: 6px 0 10px; }
+        .info table { flex: 1; border-collapse: collapse; }
+        .info td { padding: 3px 6px; border-bottom: 1px dotted #c8d2e0; }
+        .info td.k { color: #555; width: 22%; }
+        .info td.v { font-weight: 700; }
+        .photo { width: 28mm; height: 34mm; border: 1px solid #9bb0cc; display: flex; align-items: center; justify-content: center; color: #9bb0cc; font-size: 10px; }
+        .photo img { width: 100%; height: 100%; object-fit: cover; }
+        table.marks { width: 100%; border-collapse: collapse; }
+        table.marks th, table.marks td { border: 1px solid #9bb0cc; padding: 5px 6px; text-align: center; }
+        table.marks th { background: #e8eef7; color: #26426b; }
+        table.marks td.s { text-align: left; font-weight: 600; }
+        table.marks tr.tot td { font-weight: 800; background: #f6f8fb; }
+        .fail { color: #c4332f; font-weight: 700; }
+        .sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+        .sum div { border: 1px solid #c8d2e0; border-radius: 4px; padding: 6px; text-align: center; }
+        .sum b { display: block; font-size: 15px; color: #26426b; }
+        .remarks { margin-top: 10px; border: 1px solid #c8d2e0; border-radius: 4px; padding: 8px; min-height: 22mm; }
+        .result { font-weight: 800; }
+        .sign { margin-top: auto; padding-top: 18mm; display: flex; justify-content: space-between; }
+        .sign div { text-align: center; border-top: 1px solid #333; padding-top: 3px; min-width: 45mm; font-weight: 700; }
+        @@media print {
+            body { background: #fff; }
+            .bar { display: none; }
+            .rc { margin: 0; border: 1.5px solid #26426b; width: auto; min-height: 277mm; }
+            @@page { size: A4; margin: 10mm; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bar">
+        <button onclick="window.print()">Print</button>
+        <div class="n">@sh.Students.Count report card(s) · one A4 page each</div>
+    </div>
+
+    @foreach (var s in sh.Students)
+    {
+        Model.Records.TryGetValue(s.StudentId, out var rec);
+        Model.Extras.TryGetValue(s.StudentId, out var ex);
+        var remark = s.Grade != null && Model.GradeRemarks.TryGetValue(s.Grade, out var r) ? r : null;
+        var result = s.Percent == null ? "Absent"
+                   : s.FailedCount > 0 ? "Needs improvement in " + s.FailedCount + " subject(s)"
+                   : s.AbsentCount > 0 ? "Passed (absent in " + s.AbsentCount + " subject(s))"
+                   : "Passed";
+
+        <div class="rc">
+            <div class="head">
+                @if (!string.IsNullOrWhiteSpace(Model.LogoUrl))
+                {
+                    <img src="@Model.LogoUrl" alt="" />
+                }
+                <div class="school">
+                    <div class="n">@sc.SchoolName</div>
+                    @if (addr.Length > 0) { <div class="a">@addr</div> }
+                    @if (!string.IsNullOrWhiteSpace(sc.AffiliationNumber)) { <div class="a">Affiliation No. @sc.AffiliationNumber</div> }
+                </div>
+            </div>
+
+            <div class="title">
+                <span class="t">REPORT CARD</span>
+                <div class="e">@sh.ExamName · Session @sh.AcademicYearName</div>
+            </div>
+
+            <div class="info">
+                <table>
+                    <tr><td class="k">Name</td><td class="v">@s.StudentName</td><td class="k">Admission No.</td><td class="v">@(string.IsNullOrWhiteSpace(s.AdmissionNo) ? "—" : s.AdmissionNo)</td></tr>
+                    <tr><td class="k">Class</td><td class="v">@sh.ClassName@(string.IsNullOrWhiteSpace(s.Section) ? "" : " – " + s.Section)</td><td class="k">Roll No.</td><td class="v">@(string.IsNullOrWhiteSpace(s.RollNo) ? "—" : s.RollNo)</td></tr>
+                    <tr><td class="k">Father</td><td class="v">@(rec?.GuardianName ?? "—")</td><td class="k">Mother</td><td class="v">@(ex?.MotherName ?? "—")</td></tr>
+                    <tr><td class="k">Date of Birth</td><td class="v">@(rec?.DobDisplay ?? "—")</td><td class="k">Attendance</td>
+                        <td class="v">@(ex == null || ex.SchoolDays == 0 ? "—" : ex.Present + " / " + ex.SchoolDays + " days (" + N(ex.Percent) + "%)")</td></tr>
+                </table>
+                <div class="photo">
+                    @if (!string.IsNullOrWhiteSpace(rec?.PhotoUrl))
+                    {
+                        <img src="@rec.PhotoUrl" alt="" />
+                    }
+                    else
+                    {
+                        <span>PHOTO</span>
+                    }
+                </div>
+            </div>
+
+            <table class="marks">
+                <thead><tr><th>#</th><th style="text-align:left">Subject</th><th>Max</th><th>Pass</th><th>Obtained</th><th>Grade</th><th>Result</th></tr></thead>
+                <tbody>
+                    @{ var i = 0; }
+                    @foreach (var subj in sh.Subjects)
+                    {
+                        i++;
+                        var cell = s.Cells.FirstOrDefault(c => c.SubjectId == subj.SubjectId);
+                        <tr>
+                            <td>@i</td>
+                            <td class="s">@subj.SubjectName</td>
+                            <td>@N(subj.MaxMarks)</td>
+                            <td>@N(subj.PassMarks)</td>
+                            <td>@(cell == null ? "—" : cell.IsAbsent ? "AB" : N(cell.Marks))</td>
+                            <td>@(cell?.Grade ?? "—")</td>
+                            <td class="@(cell?.Passed == false ? "fail" : "")">@(cell == null ? "—" : cell.IsAbsent ? "Absent" : cell.Passed == false ? "Below pass" : cell.Passed == true ? "Pass" : "—")</td>
+                        </tr>
+                    }
+                    <tr class="tot"><td></td><td class="s">Total</td><td>@N(s.Total)</td><td></td><td>@N(s.Obtained)</td><td>@(s.Grade ?? "—")</td><td></td></tr>
+                </tbody>
+            </table>
+
+            <div class="sum">
+                <div>Percentage<b>@(s.Percent == null ? "—" : N(s.Percent) + "%")</b></div>
+                <div>Grade<b>@(s.Grade ?? "—")</b></div>
+                <div>Rank in section<b>@(s.SectionRank == null ? "—" : s.SectionRank + " / " + s.SectionSize)</b></div>
+                <div>Rank in class<b>@(s.ClassRank == null ? "—" : s.ClassRank + " / " + s.ClassSize)</b></div>
+            </div>
+
+            <div class="remarks">
+                <div class="result">Result: @result</div>
+                @if (remark != null)
+                {
+                    <div>Remarks: @remark</div>
+                }
+            </div>
+
+            <div class="sign">
+                <div>Class Teacher</div>
+                <div>Parent / Guardian</div>
+                <div>Principal</div>
+            </div>
+        </div>
+    }
+</body>
+</html>

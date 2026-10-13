@@ -1,0 +1,115 @@
+@model EduCoreDataAccessLayer.Models.ERP.Certificate
+@using educore.Models
+@using EduCoreDataAccessLayer.Helpers
+@{
+    Layout = null;
+    var sc = ViewBag.School as SchoolManageModel ?? new SchoolManageModel { SchoolName = "Your School" };
+    var logo = ViewBag.Logo as string;
+    var addr = string.Join(", ", new[] { sc.AddressLine1, sc.City, sc.State }.Where(p => !string.IsNullOrWhiteSpace(p)));
+    var contact = string.Join(" · ", new[] { sc.Phone, sc.ContactEmail }.Where(p => !string.IsNullOrWhiteSpace(p)));
+    var c = Model;
+    var bona = c.CertType == "Bonafide";
+    string parents = string.Join(" and ", new[] { c.FatherName, c.MotherName }.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => "<b>" + System.Net.WebUtility.HtmlEncode(p) + "</b>"));
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@c.CertType Certificate — @c.CertNo</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Georgia, "Times New Roman", serif; color: #111; background: #eceff3; }
+        .bar { text-align: center; padding: 10px; font-family: "Segoe UI", Arial, sans-serif; }
+        .bar button { padding: 8px 18px; font-size: 14px; cursor: pointer; }
+        .page { position: relative; background: #fff; width: 210mm; max-width: 100%; min-height: 270mm; margin: 0 auto 10mm; padding: 14mm 16mm; border: 6px double #26426b; }
+        .head { display: flex; align-items: center; gap: 12px; border-bottom: 2px solid #26426b; padding-bottom: 8px; font-family: "Segoe UI", Arial, sans-serif; }
+        .head img { max-height: 70px; max-width: 90px; object-fit: contain; }
+        .school { flex: 1; text-align: center; }
+        .school .n { font-size: 24px; font-weight: 800; color: #26426b; }
+        .school .a, .school .c { font-size: 12px; color: #555; }
+        .meta { display: flex; justify-content: space-between; font-size: 14px; margin: 14px 0 0; font-family: "Segoe UI", Arial, sans-serif; }
+        .title { text-align: center; margin: 26px 0 22px; font-size: 24px; font-weight: 700; letter-spacing: 3px; text-decoration: underline; color: #26426b; }
+        .body { font-size: 17px; line-height: 2; text-align: justify; }
+        .remarks { margin-top: 14px; font-size: 15px; }
+        .sign { margin-top: 80px; display: flex; justify-content: space-between; font-family: "Segoe UI", Arial, sans-serif; font-size: 14px; }
+        .sign div { text-align: center; border-top: 1px solid #333; padding-top: 4px; min-width: 170px; font-weight: 700; }
+        .void { position: absolute; top: 45%; left: 0; right: 0; text-align: center; font-size: 90px; font-weight: 900; color: rgba(220, 38, 38, .18); transform: rotate(-20deg); font-family: Arial, sans-serif; }
+        @@media print {
+            body { background: #fff; }
+            .bar { display: none; }
+            .page { margin: 0; width: auto; min-height: 265mm; }
+            @@page { size: A4; margin: 10mm; }
+        }
+    </style>
+</head>
+<body>
+    <div class="bar"><button onclick="window.print()">Print</button></div>
+    <div class="page">
+        @if (c.IsVoid)
+        {
+            <div class="void">VOID</div>
+        }
+        <div class="head">
+            @if (!string.IsNullOrWhiteSpace(logo))
+            {
+                <img src="@logo" alt="" />
+            }
+            <div class="school">
+                <div class="n">@sc.SchoolName</div>
+                @if (addr.Length > 0) { <div class="a">@addr</div> }
+                @if (contact.Length > 0) { <div class="c">@contact</div> }
+                @if (!string.IsNullOrWhiteSpace(sc.AffiliationNumber)) { <div class="c">Affiliation No. @sc.AffiliationNumber</div> }
+            </div>
+        </div>
+
+        <div class="meta">
+            <div>No. <b>@c.CertNo</b></div>
+            <div>Date: <b>@Dates.Show(c.IssueDate)</b></div>
+        </div>
+
+        <div class="title">@(bona ? "BONAFIDE CERTIFICATE" : "CHARACTER CERTIFICATE")</div>
+
+        <div class="body">
+            @if (bona)
+            {
+                <p>
+                    This is to certify that <b>@c.StudentName</b>, @c.Child of @Html.Raw(parents.Length > 0 ? parents : "—"),
+                    Admission No. <b>@(c.AdmissionNo ?? "—")</b>, is a bonafide student of this school, studying in
+                    <b>@c.ClassDisplay</b> during the academic session <b>@(c.AcademicYear ?? "—")</b>.
+                    @c.HisHerCap date of birth as per the school records is <b>@c.DobDisplay</b>.
+                </p>
+                <p>This certificate is issued on request for the purpose of <b>@c.Purpose</b>.</p>
+            }
+            else
+            {
+                <p>
+                    This is to certify that <b>@c.StudentName</b>, @c.Child of @Html.Raw(parents.Length > 0 ? parents : "—"),
+                    Admission No. <b>@(c.AdmissionNo ?? "—")</b>,
+                    @if (c.IsCurrent)
+                    {
+                        <text>is a student of this school, presently studying in <b>@c.ClassDisplay</b> (session @(c.AcademicYear ?? "—")).</text>
+                    }
+                    else
+                    {
+                        <text>was a student of this school@(string.IsNullOrWhiteSpace(c.AdmissionDate) ? "" : " from " + Dates.Show(c.AdmissionDate))@(string.IsNullOrWhiteSpace(c.DateOfLeaving) ? "" : " to " + Dates.Show(c.DateOfLeaving)), and last studied in <b>@c.ClassDisplay</b>.</text>
+                    }
+                </p>
+                <p>
+                    During @c.HisHer stay in the school, @c.HisHer conduct and character were <b>@(c.Conduct ?? "Good")</b>.
+                    To the best of my knowledge, @c.HeShe.ToLower() bears a good moral character. I wish @(c.IsGirl ? "her" : "him") success in life.
+                </p>
+            }
+            @if (!string.IsNullOrWhiteSpace(c.Remarks))
+            {
+                <div class="remarks"><b>Remarks:</b> @c.Remarks</div>
+            }
+        </div>
+
+        <div class="sign">
+            <div>Class Teacher</div>
+            <div>Principal<br /><small style="font-weight:400">(Seal &amp; Signature)</small></div>
+        </div>
+    </div>
+</body>
+</html>
