@@ -239,6 +239,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     PaidDays      = DecVal(row, "paid_days"),
                     Gross         = DecVal(row, "gross"),
                     LopDays       = DecVal(row, "lop_days"),
+                    AbsentDays    = DecVal(row, "absent_days"),
                     LopAmount     = DecVal(row, "lop_amount"),
                     OtherAdd      = DecVal(row, "other_add"),
                     OtherDeduct   = DecVal(row, "other_deduct"),

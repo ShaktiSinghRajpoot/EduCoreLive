@@ -133,7 +133,7 @@
         <span class="l">Net Salary Payable</span>
         <span class="v" id="psNet">₹0.00</span>
       </div>
-      <div class="ps-note"><i class="bx bx-info-circle me-1"></i>Days are school working days (School Calendar). Gross = salary × days employed ÷ working days; LOP = approved unpaid leave days at the same rate.</div>
+      <div class="ps-note"><i class="bx bx-info-circle me-1"></i>Days are school working days (School Calendar). Gross = salary × days employed ÷ working days; LOP = approved unpaid leave days plus days marked Absent / Half day (0.5) / Leave in Staff Attendance without approved leave, at the same rate. Run payroll again after marking attendance.</div>
 
       <div class="px-4 pb-2" id="psPaidInfo"></div>
       <div class="px-4 pb-2 row g-2 align-items-end" id="psPayForm">
@@ -258,8 +258,9 @@ $(document).ready(function () {
               +     '<div class="pr-sub">'+EC.esc(s.code||'—')+' · '+EC.esc(s.designation||'—')+'</div></div></div></td>'
               +   '<td class="text-end pr-amt">'+EC.money(s.gross + s.additions)+part+'</td>'
               +   '<td class="text-end pr-amt ded">'+(s.deductions>0?'−'+EC.money(s.deductions):EC.money(0))+'</td>'
-              +   '<td class="text-center"><span class="pr-lop '+lopCls+'" title="Approved unpaid leave days in this month">'
-              +     '<i class="bx bx-calendar-x"></i>'+EC.esc(s.lopDays)+'</span></td>'
+              +   '<td class="text-center"><span class="pr-lop '+lopCls+'" title="'+EC.esc(lopTitle(s))+'">'
+              +     '<i class="bx bx-calendar-x"></i>'+EC.esc(s.lopDays)+'</span>'
+              +     (s.absentDays > 0 ? '<div class="pr-sub">'+EC.esc(s.absentDays)+' absent</div>' : '')+'</td>'
               +   '<td class="text-end pr-amt net">'+EC.money(s.net)+'</td>'
               +   '<td class="text-center"><span class="pr-status '+(isPaid?'ps-paid':'ps-pending')+'">'+(isPaid?'Paid':'Draft')+'</span></td>'
               +   '<td class="text-center"><button class="pr-view" data-id="'+s.id+'"><i class="bx bx-receipt"></i>View</button></td>'
@@ -270,6 +271,12 @@ $(document).ready(function () {
         $('#kDed').text(EC.money(totDed));
         $('#kPaid').text(paid);
         $('#kPend').text(pend);
+    }
+
+    // Loss of pay = approved unpaid leave + days absent in Staff Attendance (no approved leave).
+    function lopTitle(s){
+        var leave = s.lopDays - (s.absentDays || 0);
+        return leave + ' day(s) unpaid leave' + (s.absentDays > 0 ? ' + ' + s.absentDays + ' day(s) absent (Staff Attendance)' : '');
     }
 
     /* ── Payslip modal ── */
@@ -296,7 +303,7 @@ $(document).ready(function () {
             + lineTotal('Gross Earnings', s.gross + s.additions)
         );
         $('#psDed').html(
-            (s.lopDays > 0 ? line('Loss of Pay ('+s.lopDays+'d)', s.lopAmount) : '')
+            (s.lopDays > 0 ? line('Loss of Pay ('+s.lopDays+'d: '+lopTitle(s)+')', s.lopAmount) : '')
             + (s.otherDeduct > 0 ? line('Advances / deductions', s.otherDeduct) : '')
             + lineTotal('Total Deductions', s.deductions)
         );
@@ -464,9 +471,9 @@ $(document).ready(function () {
         if(!ROWS.length){ ecToast('warning','Nothing to export — run the payroll first.'); return; }
         // The figures the payslip actually holds (no browser-side tax maths).
         var rows = ROWS.map(function(s){
-            return [s.code,s.name,s.department,s.salary,s.workingDays,s.paidDays,s.gross,s.lopDays,s.lopAmount,
+            return [s.code,s.name,s.department,s.salary,s.workingDays,s.paidDays,s.gross,s.lopDays,s.absentDays,s.lopAmount,
                     s.additions,s.otherDeduct,s.net,s.status,s.payMode,s.payRef,s.paidAt]; });
-        var hdr = ['Emp','Name','Department','Salary','Working Days','Days Employed','Gross','LOP Days','LOP Amount',
+        var hdr = ['Emp','Name','Department','Salary','Working Days','Days Employed','Gross','LOP Days','Of which Absent','LOP Amount',
                    'Additions','Advances/Deductions','NetPay','Status','Paid By','Reference','Paid At'];
         var csv = '﻿'+[hdr].concat(rows).map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\r\n');
         var a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);

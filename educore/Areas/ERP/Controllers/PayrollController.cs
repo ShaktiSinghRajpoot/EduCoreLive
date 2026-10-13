@@ -67,6 +67,7 @@ namespace educore.Areas.ERP.Controllers
                 paidDays    = r.PaidDays,
                 gross       = r.Gross,
                 lopDays     = r.LopDays,
+                absentDays  = r.AbsentDays,
                 lopAmount   = r.LopAmount,
                 additions   = r.OtherAdd,
                 otherDeduct = r.OtherDeduct,

@@ -23,7 +23,11 @@
 --     run. Staff "On Leave" (long leave) get a payslip; their unpaid leave is LOP.
 --
 --   * LOP (Loss of Pay) is APPROVED 'Unpaid' leave inside the employed part of
---     the month. Amounts are worked from the salary, not from a rounded per-day
+--     the month, plus the days Staff Attendance (core.staff_attendance) marks
+--     Absent / HalfDay (0.5) / Leave on a school working day that no approved
+--     leave of any type covers (absent_days). Late costs nothing. A day covered
+--     by approved leave is never counted twice. A school that does not mark staff
+--     attendance gets exactly the old leave-only LOP. Amounts are worked from the salary, not from a rounded per-day
 --     rate, so a month that is all LOP nets exactly 0:
 --         gross      = ROUND(salary x paid_days / working_days, 2)
 --         lop_amount = gross - ROUND(salary x (paid_days - lop_days) / working_days, 2)
@@ -52,8 +56,8 @@
 --   * One row per staff per month, enforced by a unique index rather than by
 --     the proc remembering to check.
 --
--- Target DB: PostgreSQL. Safe to re-run. Needs staff_leave.sql (fn_school_working_days)
--- and sp_staff_manage.sql (core.staff.last_working_date).
+-- Target DB: PostgreSQL. Safe to re-run. Needs staff_leave.sql (fn_school_working_days),
+-- sp_staff_manage.sql (core.staff.last_working_date) and staff_attendance.sql.
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS core.staff_payroll (
@@ -100,6 +104,7 @@ ALTER TABLE core.staff_payroll ADD COLUMN IF NOT EXISTS paid_days         numeri
 ALTER TABLE core.staff_payroll ADD COLUMN IF NOT EXISTS other_add         numeric(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE core.staff_payroll ADD COLUMN IF NOT EXISTS payment_mode      varchar(20);
 ALTER TABLE core.staff_payroll ADD COLUMN IF NOT EXISTS payment_reference varchar(60);
+ALTER TABLE core.staff_payroll ADD COLUMN IF NOT EXISTS absent_days       numeric(5,1) NOT NULL DEFAULT 0;  -- of lop_days, from Staff Attendance
 
 ALTER TABLE core.staff_payroll DROP CONSTRAINT IF EXISTS chk_staff_payroll_mode;
 ALTER TABLE core.staff_payroll ADD CONSTRAINT chk_staff_payroll_mode
@@ -240,6 +245,7 @@ DECLARE
     v_to      date;
     v_paid    numeric := 0;
     v_lop     numeric := 0;
+    v_abs     numeric := 0;
     v_salary  numeric;
     v_gross   numeric;
     v_after   numeric;
@@ -304,7 +310,25 @@ BEGIN
       AND l.status = 'Approved'
       AND LOWER(l.leave_type) = 'unpaid'
       AND l.from_date::date <= v_to AND l.to_date::date >= v_from;
-    v_lop := LEAST(v_lop, v_paid);
+
+    -- Plus Staff Attendance: Absent / HalfDay / Leave on a school working day
+    -- with no approved leave of any type (a covered day is paid leave, or is
+    -- already in the Unpaid sum above). A half school day weighs 0.5.
+    SELECT COALESCE(SUM(core.fn_school_working_days(p_tenant_id, p_school_id, a.att_date, a.att_date)
+                        * CASE a.status WHEN 'HalfDay' THEN 0.5 ELSE 1 END), 0)
+      INTO v_abs
+    FROM core.staff_attendance a
+    WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
+      AND a.staff_id = p_staff_id
+      AND a.att_date BETWEEN v_from AND v_to
+      AND a.status IN ('Absent', 'HalfDay', 'Leave')
+      AND NOT EXISTS (SELECT 1 FROM core.staff_leave l
+                       WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
+                         AND l.staff_id = p_staff_id AND l.status = 'Approved'
+                         AND a.att_date BETWEEN l.from_date::date AND l.to_date::date);
+
+    v_lop := LEAST(v_lop + v_abs, v_paid);
+    v_abs := LEAST(v_abs, v_lop);
 
     v_salary  := COALESCE(s.monthly_salary, 0);
     v_gross   := ROUND(v_salary * v_paid / v_work, 2);
@@ -334,12 +358,12 @@ BEGIN
         INSERT INTO core.staff_payroll (
             tenant_id, school_id, staff_id, pay_month, pay_year,
             monthly_salary, working_days, paid_days,
-            gross, lop_days, lop_amount, other_add, other_deduct, net_pay,
+            gross, lop_days, absent_days, lop_amount, other_add, other_deduct, net_pay,
             status, generated_by, generated_at)
         VALUES (
             p_tenant_id, p_school_id, p_staff_id, p_month, p_year,
             v_salary, v_work, v_paid,
-            v_gross, v_lop, v_lop_amt, v_add, v_ded, v_net,
+            v_gross, v_lop, v_abs, v_lop_amt, v_add, v_ded, v_net,
             'Draft', p_action_user_id, now())
         RETURNING * INTO p;
 
@@ -349,13 +373,13 @@ BEGIN
         VALUES (p_tenant_id, p_school_id, p.payroll_id, p_staff_id, p_month, p_year, 'GENERATED',
                 v_gross, v_lop, v_lop_amt, v_add, v_ded, v_net, p_action_user_id);
 
-    ELSIF (p.monthly_salary, p.working_days, p.paid_days, p.gross, p.lop_days, p.lop_amount,
+    ELSIF (p.monthly_salary, p.working_days, p.paid_days, p.gross, p.lop_days, p.absent_days, p.lop_amount,
            p.other_add, p.other_deduct, p.net_pay)
           IS DISTINCT FROM
-          (v_salary, v_work, v_paid, v_gross, v_lop, v_lop_amt, v_add, v_ded, v_net) THEN
+          (v_salary, v_work, v_paid, v_gross, v_lop, v_abs, v_lop_amt, v_add, v_ded, v_net) THEN
         UPDATE core.staff_payroll
         SET monthly_salary = v_salary, working_days = v_work, paid_days = v_paid,
-            gross = v_gross, lop_days = v_lop, lop_amount = v_lop_amt,
+            gross = v_gross, lop_days = v_lop, absent_days = v_abs, lop_amount = v_lop_amt,
             other_add = v_add, other_deduct = v_ded, net_pay = v_net,
             generated_by = p_action_user_id, generated_at = now()
         WHERE payroll_id = p.payroll_id;
@@ -424,7 +448,7 @@ BEGIN
                s.designation, s.department,
                p.pay_month, p.pay_year,
                p.monthly_salary, p.working_days, p.paid_days,
-               p.gross, p.lop_days, p.lop_amount, p.other_add, p.other_deduct, p.net_pay,
+               p.gross, p.lop_days, p.absent_days, p.lop_amount, p.other_add, p.other_deduct, p.net_pay,
                p.status, p.generated_at, p.paid_at, p.payment_mode, p.payment_reference,
                core.fn_payroll_user_name(p.paid_by) AS paid_by_name
         FROM core.staff_payroll p

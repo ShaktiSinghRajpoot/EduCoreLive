@@ -205,7 +205,7 @@ BEGIN
     OPEN p_result FOR
     SELECT p.payroll_id, p.pay_month, p.pay_year,
            p.monthly_salary, p.working_days, p.paid_days,
-           p.gross, p.lop_days, p.lop_amount, p.other_add, p.other_deduct, p.net_pay,
+           p.gross, p.lop_days, p.absent_days, p.lop_amount, p.other_add, p.other_deduct, p.net_pay,
            p.status, p.generated_at, p.paid_at, p.payment_mode,
            s.full_name, s.employee_code, s.designation, s.department,
            COALESCE(NULLIF(TRIM(sc.display_name), ''), sc.school_name) AS school_name

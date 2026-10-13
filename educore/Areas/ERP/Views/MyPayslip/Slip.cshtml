@@ -112,7 +112,7 @@
                 <div class="col-title">Deductions</div>
                 @if (p.LopDays > 0)
                 {
-                    <div class="line"><span>Loss of pay (@D(p.LopDays) d)</span><span>@M(p.LopAmount)</span></div>
+                    <div class="line"><span>Loss of pay (@D(p.LopDays) d@(p.AbsentDays > 0 ? ", of which " + D(p.AbsentDays) + " absent" : ""))</span><span>@M(p.LopAmount)</span></div>
                 }
                 @if (p.OtherDeduct > 0)
                 {

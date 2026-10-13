@@ -25,8 +25,10 @@ namespace EduCoreDataAccessLayer.Models.ERP
 
         /// <summary>Earned for the employed days (= salary for a full month).</summary>
         public decimal   Gross        { get; set; }
-        /// <summary>Approved 'Unpaid' leave days falling inside this month.</summary>
+        /// <summary>Loss-of-pay days: approved 'Unpaid' leave plus AbsentDays.</summary>
         public decimal   LopDays      { get; set; }
+        /// <summary>Of LopDays, the days Staff Attendance marks absent (half day 0.5) with no approved leave.</summary>
+        public decimal   AbsentDays   { get; set; }
         public decimal   LopAmount    { get; set; }
         public decimal   OtherAdd     { get; set; }
         public decimal   OtherDeduct  { get; set; }

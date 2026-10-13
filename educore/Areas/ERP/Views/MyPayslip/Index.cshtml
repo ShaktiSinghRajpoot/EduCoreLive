@@ -73,7 +73,7 @@
               <div class="mp-figs">
                 <span>Gross <b>₹@((p.Gross + p.OtherAdd).ToString("N2", inr))</b></span>
                 <span>Deductions <b>₹@p.TotalDeduct.ToString("N2", inr)</b></span>
-                @if (p.LopDays > 0) { <span>LOP <b>@p.LopDays.ToString("0.#") d</b></span> }
+                @if (p.LopDays > 0) { <span>LOP <b>@p.LopDays.ToString("0.#") d</b>@(p.AbsentDays > 0 ? " (" + p.AbsentDays.ToString("0.#") + " absent)" : "")</span> }
               </div>
               <div class="mp-net">₹@p.NetPay.ToString("N2", inr)</div>
             </div>

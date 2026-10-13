@@ -5189,3 +5189,15 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - DB: `core.certificates`, `core.certificate_counters`, `core.sp_certificate_manage`,
   `core.sp_report_card_extras` (`report_card_certificates.sql`, `deploy_2026_10_14d.sql`);
   8 rolled-back checks in `tests/report_card_certificates_tests.sql`.
+
+### [2026-10-14] Payroll counts Staff Attendance as loss of pay
+- `core.fn_staff_payslip_build` now adds to LOP every day Staff Attendance marks **Absent** (1),
+  **HalfDay** (0.5) or **Leave** (1) on a school working day (weighted by `fn_school_working_days`, so a
+  half school day counts half) that **no approved leave of any type covers**. Approved paid leave stays
+  paid and approved Unpaid leave is not counted twice. **Late** costs nothing. A school that does not mark
+  staff attendance gets exactly the old leave-only LOP.
+- New column `core.staff_payroll.absent_days` (the attendance part of `lop_days`), shown on the payroll
+  grid ("2 absent"), the payslip modal, the CSV ("Of which Absent") and the staff's own payslip. A change
+  re-generates the draft with a REGENERATED row in the money trail; a paid payslip is never touched.
+- `staff_payroll.sql`, `staff_self_service.sql` (`deploy_2026_10_14e.sql`); 6 rolled-back checks in
+  `tests/payroll_attendance_tests.sql`; `tests/leave_payroll_tests.sql` still 29/29.
