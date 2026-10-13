@@ -102,6 +102,13 @@ namespace educore.Areas.ERP.Controllers
             var school = await _settings.GetBasicProfileAsync(TenantId(), SchoolId(), UserId())
                          ?? new SchoolManageModel { SchoolName = "Your School" };
 
+            // Section by section, then roll order, so a class set is handed out in order.
+            students = students
+                .OrderBy(s => s.Section)
+                .ThenBy(s => int.TryParse(s.RollNo, out var n) ? n : int.MaxValue)
+                .ThenBy(s => s.StudentName)
+                .ToList();
+
             var model = new AdmitCardPrintModel
             {
                 Students    = students,
