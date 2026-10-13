@@ -67,7 +67,7 @@
             <div class="col-6 col-xl-3">
                 <div class="fdr-stat">
                     <span class="fdr-stat-ic soft-red"><i class="bx bx-error-circle"></i></span>
-                    <div><div class="fdr-stat-label mb-1">Outstanding</div><div class="fdr-stat-value">₹@Model.SumOutstanding.ToString("N0")</div></div>
+                    <div><div class="fdr-stat-label mb-1">Outstanding</div><div class="fdr-stat-value">₹@Money.Inr(Model.SumOutstanding)</div></div>
                 </div>
             </div>
             <div class="col-6 col-xl-3">
@@ -85,7 +85,7 @@
             <div class="col-6 col-xl-3">
                 <div class="fdr-stat">
                     <span class="fdr-stat-ic soft-orange"><i class="bx bx-calculator"></i></span>
-                    <div><div class="fdr-stat-label mb-1">Avg / Student</div><div class="fdr-stat-value">₹@Model.AvgPerStudent.ToString("N0")</div></div>
+                    <div><div class="fdr-stat-label mb-1">Avg / Student</div><div class="fdr-stat-value">₹@Money.Inr(Model.AvgPerStudent)</div></div>
                 </div>
             </div>
         </div>
@@ -107,7 +107,7 @@
                             @* All filtering/sorting/paging is server-side: this GET form
                                round-trips the query string. Omitting Page resets to page 1;
                                sort rides along in hidden fields so it survives a filter change. *@
-                            <form id="fdrFilterForm" method="get" asp-area="ERP" asp-controller="FeeDueReminders" asp-action="Index" class="d-flex gap-2">
+                            <form id="fdrFilterForm" method="get" asp-area="ERP" asp-controller="FeeDueReminders" asp-action="Index" class="d-flex flex-wrap gap-2">
                                 <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
                                 <input type="hidden" name="SortDir" value="@Model.SortDirection" />
                                 <input type="search" name="Search" value="@Model.Search" class="form-control form-control-sm"
@@ -153,7 +153,7 @@
                                     <tr>
                                         <td><input class="form-check-input fdr-check" type="checkbox"
                                                    data-name="@d.StudentName" data-id="@d.StudentId" data-mobile="@d.Mobile"
-                                                   data-class="@d.ClassName" data-due="@d.TotalOutstanding.ToString("N0")" data-days="@d.OverdueDays"></td>
+                                                   data-class="@d.ClassName" data-due="@Money.Inr(d.TotalOutstanding)" data-days="@d.OverdueDays"></td>
                                         <td>
                                             <div class="d-flex align-items-center gap-2">
                                                 <span class="fdr-avatar bg-label-@color text-@color">@Initials(d.StudentName)</span>
@@ -169,7 +169,7 @@
                                             </div>
                                         </td>
                                         <td>@d.ClassName @(string.IsNullOrWhiteSpace(d.Section) ? "" : "· " + d.Section)</td>
-                                        <td><span class="fw-bold" style="color:#dc2626">₹@d.TotalOutstanding.ToString("N0")</span></td>
+                                        <td><span class="fw-bold" style="color:#dc2626">₹@Money.Inr(d.TotalOutstanding)</span></td>
                                         <td><span class="@badge.cls">@badge.txt</span></td>
                                         <td class="fdr-last"><small class="text-muted">@(d.LastReminderAt.HasValue ? d.LastReminderAt.Value.ToString("dd MMM") : "Never")</small></td>
                                         <td class="text-end"><button type="button" class="btn btn-icon btn-sm btn-outline-primary fdr-remind-one" title="Remind"><i class="bx bx-bell"></i></button></td>
@@ -302,7 +302,7 @@
                                 <td class="fw-semibold">@h.StudentName</td>
                                 <td><small class="text-muted">@h.ClassName</small></td>
                                 <td><span class="badge bg-label-info">@(string.IsNullOrWhiteSpace(chan) ? "—" : chan)</span></td>
-                                <td>₹@h.Outstanding.ToString("N0")</td>
+                                <td>₹@Money.Inr(h.Outstanding)</td>
                                 <td><small class="text-muted">@(h.SentAt.HasValue ? h.SentAt.Value.ToString("dd MMM, hh:mm tt") : "—")</small></td>
                                 <td><span class="badge bg-label-@stCl">@h.Status</span></td>
                             </tr>

@@ -67,7 +67,7 @@
         <div class="small text-muted mb-2" id="admResultsTitle"></div>
         <div class="table-responsive">
           <table class="table table-sm table-hover align-middle mb-0">
-            <thead><tr><th>Student</th><th>Class</th><th>Father / Guardian</th><th>Mobile</th><th>Adm No</th></tr></thead>
+            <thead><tr><th>Student</th><th class="d-none d-md-table-cell">Class</th><th class="d-none d-md-table-cell">Father / Guardian</th><th class="d-none d-md-table-cell">Mobile</th><th class="d-none d-md-table-cell">Adm No</th></tr></thead>
             <tbody id="admResultsBody"></tbody>
           </table>
         </div>
@@ -410,11 +410,15 @@ $(function () {
             $('#admResultsTitle').text(list.length+' students match "'+q+'". Pick the right one:');
             $('#admResultsBody').html(list.map(function(s){
                 return '<tr class="adm-pick" style="cursor:pointer" data-adm="'+EC.esc(s.admNo)+'">'
-                     + '<td class="fw-semibold">'+EC.esc(s.name)+'</td>'
-                     + '<td>'+EC.esc(s.cls)+(s.sec?' – '+EC.esc(s.sec):'')+'</td>'
-                     + '<td>'+EC.esc(s.guardian||'—')+'</td>'
-                     + '<td>'+EC.esc(s.mobile||'—')+'</td>'
-                     + '<td>'+EC.esc(s.admNo)+'</td></tr>';
+                     // On a phone the other columns are hidden and the same facts sit
+                     // under the name, so two children with one name can be told apart.
+                     + '<td><div class="fw-semibold">'+EC.esc(s.name)+'</div>'
+                     + '<div class="small text-muted d-md-none">'+EC.esc(s.cls)+(s.sec?' – '+EC.esc(s.sec):'')
+                     + ' · '+EC.esc(s.guardian||'—')+' · '+EC.esc(s.mobile||'—')+'</div></td>'
+                     + '<td class="d-none d-md-table-cell">'+EC.esc(s.cls)+(s.sec?' – '+EC.esc(s.sec):'')+'</td>'
+                     + '<td class="d-none d-md-table-cell">'+EC.esc(s.guardian||'—')+'</td>'
+                     + '<td class="d-none d-md-table-cell">'+EC.esc(s.mobile||'—')+'</td>'
+                     + '<td class="d-none d-md-table-cell">'+EC.esc(s.admNo)+'</td></tr>';
             }).join(''));
             $('#admResults').removeClass('d-none');
         }).fail(function(){ ecToast('error','Could not search students.'); });

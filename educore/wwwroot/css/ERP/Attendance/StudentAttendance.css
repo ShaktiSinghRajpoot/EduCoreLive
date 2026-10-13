@@ -167,3 +167,11 @@
         .att-bar-actions { flex: 0 0 auto; }
         .att-bar .btn { flex: 0 0 auto; padding: 0 1.5rem; min-height: 46px; }
     }
+
+    /* Narrow phones: the avatar and the P / A toggle left ~90px for the name, so
+       a surname like "Srivastava" was broken mid-word. A little smaller here. */
+    @media (max-width: 400px) {
+        .att-av { width: 38px; height: 38px; border-radius: 11px; font-size: .74rem; }
+        .att-toggle button { flex-basis: 40px; height: 40px; }
+        .att-name { font-size: .9rem; }
+    }

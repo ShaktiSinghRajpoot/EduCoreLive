@@ -129,7 +129,7 @@
             <div class="row">
               @if (ViewBag.CanSeeSalary == true)
               {
-              <div class="col-6 col-md-4 sp-field"><label>Monthly Salary</label><span>@(Model.MonthlySalary.HasValue ? "₹" + Model.MonthlySalary.Value.ToString("N0") : "—")</span></div>
+              <div class="col-6 col-md-4 sp-field"><label>Monthly Salary</label><span>@(Model.MonthlySalary.HasValue ? "₹" + Money.Inr(Model.MonthlySalary.Value) : "—")</span></div>
               }
               <div class="col-6 col-md-4 sp-field"><label>Alt Mobile</label><span>@Dash(Model.AltMobile)</span></div>
               <div class="col-6 col-md-4 sp-field"><label>PAN</label><span>@Dash(Model.Pan)</span></div>

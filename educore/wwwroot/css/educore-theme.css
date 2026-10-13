@@ -681,6 +681,13 @@ textarea.form-control {
 @media (max-width: 575.98px) {
     .ec-page-header-inner { flex-direction: column; align-items: flex-start; }
 
+    /* The header stacks on a phone, but the rows INSIDE it (title + subtitle,
+     * date + buttons) did not wrap, so Day Close's subtitle ran off the screen
+     * and its Print button was cut in half. Let them wrap and never exceed the
+     * header's width. */
+    .ec-page-header-inner > * { max-width: 100%; min-width: 0; }
+    .ec-page-header-inner .d-flex { flex-wrap: wrap; }
+
     /* Full-width buttons on phones.
      *
      * A lone Save/Submit does read better full width, so that stays the

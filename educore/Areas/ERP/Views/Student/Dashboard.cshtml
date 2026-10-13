@@ -659,9 +659,10 @@ function renderTimetable(d){
         var time=(pd.start&&pd.end) ? pd.start+'–'+pd.end : pd.label;
 
         // A break or lunch is not a subject — span it instead of drawing dashes.
+        // Left-aligned: centred across six days put the label off-screen on a phone.
         if(pd.type && pd.type.toLowerCase()!=='class'){
             return '<tr><td class="fw-bold text-muted" style="font-size:.75rem;white-space:nowrap;">'+EC.esc(time)+'</td>'
-                 + '<td colspan="'+tt.days.length+'" class="text-center text-muted" style="font-size:.75rem;">'
+                 + '<td colspan="'+tt.days.length+'" class="text-start text-muted" style="font-size:.75rem;">'
                  + EC.esc(pd.label)+'</td></tr>';
         }
 

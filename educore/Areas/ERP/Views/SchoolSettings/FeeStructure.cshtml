@@ -321,7 +321,7 @@
                                                                    name="FeeHeads[@i].Amount"
                                                                    value="@feeHeads[i].Amount"
                                                                    data-default="@feeHeads[i].Amount.ToString(System.Globalization.CultureInfo.InvariantCulture)"
-                                                                   placeholder="@feeHeads[i].Amount.ToString("N0")"
+                                                                   placeholder="@Money.Inr(feeHeads[i].Amount)"
                                                                    min="0"
                                                                    max="@EduCoreDataAccessLayer.Services.Repository.ERP.SchoolSettingsService.MaxFeeAmount"
                                                                    step="0.01" />
@@ -330,7 +330,7 @@
 
                                                     <div class="col-12 col-sm-6 col-lg-3 text-sm-end">
                                                         <small class="text-muted d-block">Default amount</small>
-                                                        <strong>₹@feeHeads[i].Amount.ToString("N0")</strong>
+                                                        <strong>₹@Money.Inr(feeHeads[i].Amount)</strong>
                                                     </div>
                                                 </div>
                                             </div>
@@ -519,14 +519,14 @@
                                     @* "Monthly" alone showed 0 for a school billing quarterly,
                                        next to a large annual figure, with nothing to explain it. *@
                                     <td>
-                                        @if (item.MonthlyTotal > 0)    { <div>₹@item.MonthlyTotal.ToString("N0") <small class="text-muted">/mo</small></div> }
-                                        @if (item.QuarterlyTotal > 0)  { <div>₹@item.QuarterlyTotal.ToString("N0") <small class="text-muted">/qtr</small></div> }
-                                        @if (item.HalfYearlyTotal > 0) { <div>₹@item.HalfYearlyTotal.ToString("N0") <small class="text-muted">/half-yr</small></div> }
+                                        @if (item.MonthlyTotal > 0)    { <div>₹@Money.Inr(item.MonthlyTotal) <small class="text-muted">/mo</small></div> }
+                                        @if (item.QuarterlyTotal > 0)  { <div>₹@Money.Inr(item.QuarterlyTotal) <small class="text-muted">/qtr</small></div> }
+                                        @if (item.HalfYearlyTotal > 0) { <div>₹@Money.Inr(item.HalfYearlyTotal) <small class="text-muted">/half-yr</small></div> }
                                         @if (item.MonthlyTotal == 0 && item.QuarterlyTotal == 0 && item.HalfYearlyTotal == 0) { <span class="text-muted">—</span> }
                                     </td>
 
                                     <td class="fw-bold text-primary">
-                                        ₹@item.AnnualTotal.ToString("N0")
+                                        ₹@Money.Inr(item.AnnualTotal)
                                     </td>
 
                                     <td>
