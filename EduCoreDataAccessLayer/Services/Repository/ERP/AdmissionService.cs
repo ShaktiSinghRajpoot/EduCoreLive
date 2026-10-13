@@ -260,6 +260,17 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 PrevClass        = NullStr(row, "prev_class"),
                 PrevTcNo         = NullStr(row, "prev_tc_no"),
 
+                // Parent details were saved at admission but never read back, so the
+                // dashboard showed "—" and Edit could not change them.
+                FatherOccupation     = NullStr(row, "father_occupation"),
+                FatherQualification  = NullStr(row, "father_qualification"),
+                FatherEmail          = NullStr(row, "father_email"),
+                MotherOccupation     = NullStr(row, "mother_occupation"),
+                MotherQualification  = NullStr(row, "mother_qualification"),
+                MotherEmail          = NullStr(row, "mother_email"),
+                AnnualIncome         = Has(row, "annual_income") && row["annual_income"] != DBNull.Value
+                                         ? Convert.ToDecimal(row["annual_income"]) : null,
+
                 PayTodayTotal    = DecVal(row, "pay_today_total"),
                 MonthlyTotal     = DecVal(row, "monthly_total"),
                 YearlyTotal      = DecVal(row, "yearly_total"),
@@ -579,7 +590,24 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 Txt("p_id_proof_no",   model.IdProofNo),
                 Txt("p_prev_school",   model.PrevSchoolName),
                 new("p_result", NpgsqlDbType.Refcursor)
-                    { Direction = ParameterDirection.InputOutput, Value = "student_update_cursor" }
+                    { Direction = ParameterDirection.InputOutput, Value = "student_update_cursor" },
+
+                // The rest of the admission form. p_extended tells the proc these
+                // are being sent; without it the stored values are kept.
+                new("p_extended",      NpgsqlDbType.Boolean) { Value = true },
+                Txt("p_mother_tongue",        model.MotherTongue),
+                Txt("p_apaar_id",             model.ApaarId),
+                Txt("p_udise_student_id",     model.UdiseStudentId),
+                Txt("p_prev_board",           model.PrevBoard),
+                Txt("p_prev_class",           model.PrevClass),
+                Txt("p_prev_tc_no",           model.PrevTcNo),
+                Txt("p_father_occupation",    model.FatherOccupation),
+                Txt("p_father_qualification", model.FatherQualification),
+                Txt("p_father_email",         model.FatherEmail),
+                Txt("p_mother_occupation",    model.MotherOccupation),
+                Txt("p_mother_qualification", model.MotherQualification),
+                Txt("p_mother_email",         model.MotherEmail),
+                new("p_annual_income", NpgsqlDbType.Numeric) { Value = (object?)model.AnnualIncome ?? DBNull.Value }
             };
 
             try
@@ -603,7 +631,6 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         private static NpgsqlParameter Txt(string name, string? value) =>
             new(name, NpgsqlDbType.Text) { Value = (object?)value ?? DBNull.Value };
-
         public async Task<List<ClassLadderItem>> GetClassLadderDetailedAsync(
             int tenantId, int schoolId, int actionUserId, string? academicYearName = null)
         {

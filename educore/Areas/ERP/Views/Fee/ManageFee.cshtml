@@ -325,7 +325,16 @@ $(function () {
     loadToday();
 
     /* ── cascade (unchanged: Session → Adm → Class → Section → Student) ── */
-    api.sessions().done(function(s){ fillSelect($session,s,null); $session.val(s[0]); loadClasses(); });
+    // ?adm=...&session=... (the Student Dashboard's "Collect Fee" button) opens
+    // that student straight away instead of making the cashier search again.
+    var linkAdm = new URLSearchParams(location.search).get('adm');
+    var linkSession = new URLSearchParams(location.search).get('session');
+    api.sessions().done(function(s){
+        fillSelect($session,s,null);
+        $session.val(linkSession && s.indexOf(linkSession)>=0 ? linkSession : s[0]);
+        loadClasses();
+        if(linkAdm){ $adm.val(linkAdm); doAdmSearch(); }
+    });
     function loadClasses(){
         clearStudentView(); students=[];
         $section.prop('disabled',true).html('<option value="">Select class first</option>');

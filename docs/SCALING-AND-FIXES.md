@@ -5024,3 +5024,24 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   a visible reason when a teacher cannot mark; exam end-date message; default max/pass marks
   update untouched grid cells; write buttons hidden without `academics.manage` / `students.manage`.
   062 not reproduced locally (Railway may lack `fn_school_working_days`).
+
+### [2026-10-13] Student Dashboard works end to end; Edit Student covers the whole admission form
+- **Tabs did nothing:** no click handler existed and `activateTab` was called but never defined
+  (the console error QA saw). Tabs now switch, and the open tab is kept in the URL hash
+  (`#fee`, `#profile`) so it can be linked to and survives a reload.
+- **Header actions:** Edit (students.manage) and Collect Fee (fees.collect) — Collect Fee opens
+  `Fee/ManageFee?adm=...&session=...`, which now picks that student straight away.
+- **Fees only for fees.view:** `DashboardData` returns `fee`/`receipts` as null otherwise and the
+  page hides the Fee tab and the Fee Due card (a Teacher opens this page too).
+- **Fee tab:** "Fee Structure" was really only the rows still owing -> now "Pending Dues" per
+  instalment (head, instalment, due date). The print button called `window.print()` on the
+  whole page; it now opens the real receipt (shared `_FeeReceiptModal` + `fee-receipt.js`).
+- **Profile tab:** mother tongue, APAAR, UDISE, parents' occupation / qualification / email,
+  income, previous board / class / TC were always "—" (never read back). The dead Documents,
+  Caste and TC Date rows are gone.
+- **Edit Student:** those fields are now editable (plain inputs, `value="@Model.X"`).
+  `core.sp_student_update` takes them AFTER `p_result` and writes them only when
+  `p_extended = TRUE`, so the old app build (during a deploy) keeps the stored values instead of
+  blanking them. APAAR 12 digits, email format and income >= 0 are checked when changed; the
+  audit row says which group changed. The documents checklist stays admission-only (it is JSON).
+- **Deploy:** `deploy_2026_10_13.sql`, then push.

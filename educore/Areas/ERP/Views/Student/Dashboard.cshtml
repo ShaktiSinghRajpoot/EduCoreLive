@@ -2,6 +2,9 @@
     ViewData["Title"] = "Student Dashboard";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     Guid studentPublicId = ViewBag.StudentPublicId ?? Guid.Empty;
+    bool canManage   = ViewBag.CanManage == true;     // students.manage: Edit
+    bool canViewFees = ViewBag.CanViewFees == true;   // fees.view: Fee tab, fee figures
+    bool canCollect  = ViewBag.CanCollect == true;    // fees.collect: Collect Fee button
 }
 
 @section VendorScripts {
@@ -23,10 +26,25 @@
                     @* Shown for a student who has left: the record is read-only. *@
                     <div class="text-danger small fw-bold mt-1 d-none" id="sdLeft"></div>
                 </div>
-                <a asp-area="ERP" asp-controller="Student" asp-action="StudentList"
-                   class="sd-back-btn ms-auto">
-                    <i class="bx bx-arrow-back"></i><span class="d-none d-sm-inline">Back to List</span>
-                </a>
+                <div class="ms-auto d-flex gap-2 flex-wrap justify-content-end">
+                    @if (canCollect)
+                    {
+                        @* Filled in by the script once the admission no is known. *@
+                        <a id="sdCollectBtn" href="#" class="btn btn-sm btn-primary d-none">
+                            <i class="bx bx-wallet me-1"></i><span class="d-none d-sm-inline">Collect Fee</span>
+                        </a>
+                    }
+                    @if (canManage)
+                    {
+                        <a id="sdEditBtn" asp-area="ERP" asp-controller="Student" asp-action="EditStudent"
+                           asp-route-id="@studentPublicId" class="btn btn-sm btn-outline-primary">
+                            <i class="bx bx-edit me-1"></i><span class="d-none d-sm-inline">Edit</span>
+                        </a>
+                    }
+                    <a asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="sd-back-btn">
+                        <i class="bx bx-arrow-back"></i><span class="d-none d-sm-inline">Back to List</span>
+                    </a>
+                </div>
             </div>
 
             <nav class="sd-tab-nav" id="sdTabNav">
@@ -35,7 +53,10 @@
                 <button class="sd-tab-btn" data-tab="attendance">Attendance</button>
                 <button class="sd-tab-btn" data-tab="timetable">Timetable</button>
                 <button class="sd-tab-btn" data-tab="exams">Exam Results</button>
-                <button class="sd-tab-btn" data-tab="fee">Fee Details</button>
+                @if (canViewFees)
+                {
+                    <button class="sd-tab-btn" data-tab="fee">Fee Details</button>
+                }
                 <button class="sd-tab-btn" data-tab="profile">Profile</button>
             </nav>
 
@@ -145,11 +166,13 @@
 
                 <div class="sd-pane" id="tab-fee">
                     <div class="row g-2 mb-4" id="fee-metrics"></div>
+                    @* Only instalments still owing come back from the ledger, so this is
+                       labelled Pending Dues, not the full fee structure. *@
                     <div class="ec-detail-box mb-4">
-                        <div class="ec-detail-title">Fee Structure</div>
+                        <div class="ec-detail-title">Pending Dues</div>
                         <div class="table-responsive">
                             <table class="table sd-tbl align-middle mb-0">
-                                <thead><tr><th>Fee Head</th><th>Total</th><th>Paid</th><th>Balance</th></tr></thead>
+                                <thead><tr><th>Fee Head</th><th>Instalment</th><th>Due Date</th><th>Amount</th><th>Paid</th><th>Balance</th></tr></thead>
                                 <tbody id="feeStructBody"></tbody>
                             </table>
                         </div>
@@ -177,13 +200,16 @@
                 </div>
 
                 <div class="sd-pane" id="tab-profile">
-                    <div class="mb-3 text-end" id="sdEditWrap">
-                        <a asp-area="ERP" asp-controller="Student" asp-action="EditStudent"
-                           asp-route-id="@studentPublicId"
-                           class="btn btn-primary btn-sm">
-                            <i class="bx bx-edit me-1"></i>Edit Profile
-                        </a>
-                    </div>
+                    @if (canManage)
+                    {
+                        <div class="mb-3 text-end" id="sdEditWrap">
+                            <a asp-area="ERP" asp-controller="Student" asp-action="EditStudent"
+                               asp-route-id="@studentPublicId"
+                               class="btn btn-primary btn-sm">
+                                <i class="bx bx-edit me-1"></i>Edit Profile
+                            </a>
+                        </div>
+                    }
                     <div id="profileContent"></div>
 
                     <!-- Session history — real data from core.student_enrolment.
@@ -254,7 +280,18 @@
 
 </div>
 
+@* Payment History rows open the real receipt, so the shared receipt modal and
+   renderer are needed (only for users who can see fees). *@
+@if (canViewFees)
+{
+    @await Html.PartialAsync("_FeeReceiptModal")
+}
+
 @section PageScripts {
+@if (canViewFees)
+{
+    <script src="~/js/fee-receipt.js" asp-append-version="true"></script>
+}
 <script>
 (function(){
 'use strict';
@@ -263,6 +300,8 @@ var STUDENT_ID = '@studentPublicId';   // uuid, so quoted
 var ENROL_HISTORY_URL = '@Url.Action("EnrolmentHistory","Student",new{area="ERP"})';
 var STUDENT_HISTORY_URL = '@Url.Action("History","Student",new{area="ERP"})';
 var DATA_URL          = '@Url.Action("DashboardData","Student",new{area="ERP"})';
+var COLLECT_URL       = '@Url.Action("ManageFee","Fee",new{area="ERP"})';
+var CAN_FEES          = @(canViewFees ? "true" : "false");   // fees.view
 var charts = {};
 
 /* ── Helpers ─────────────────────────────────── */
@@ -282,6 +321,27 @@ function attHtml(p){
     +'<span style="font-weight:800;font-size:.8rem;color:'+tc+'">'+p+'%</span></div>';
 }
 function badge(txt,cls){return '<span class="sd-bdg '+cls+'">'+txt+'</span>';}
+function hide(id){ var el=document.getElementById(id); if(el) el.classList.add('d-none'); }
+
+/* ── Tabs ─────────────────────────────────────── */
+// Shows one pane and marks its button. An unknown name (or #fee for a user who
+// has no Fee tab) falls back to Overview.
+function activateTab(name){
+    var btn=document.querySelector('.sd-tab-btn[data-tab="'+name+'"]');
+    if(!btn){ name='overview'; btn=document.querySelector('.sd-tab-btn[data-tab="overview"]'); }
+    document.querySelectorAll('.sd-tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.querySelectorAll('.sd-pane').forEach(function(p){ p.classList.remove('active'); });
+    btn.classList.add('active');
+    document.getElementById('tab-'+name).classList.add('active');
+}
+document.querySelectorAll('.sd-tab-btn').forEach(function(b){
+    b.addEventListener('click', function(){
+        var name=this.getAttribute('data-tab');
+        activateTab(name);
+        // Keep the tab in the URL without adding a history entry per click.
+        history.replaceState(null, '', '#'+name);
+    });
+});
 
 /* ── Shape the API payload for the render functions ──
    Same keys the mock used, so nothing below this line changed. Anything the
@@ -289,35 +349,30 @@ function badge(txt,cls){return '<span class="sd-bdg '+cls+'">'+txt+'</span>';}
    filled attendance, exam marks and the timetable with Math.random(), which
    looked like real data and was not. */
 function buildDetail(api){
-    var st = api.student, fee = api.fee;
-
-    var feeStructure = {};
-    (fee.rows || []).forEach(function(r){
-        var k = r.head;
-        if(!feeStructure[k]) feeStructure[k] = {head:k, total:0, paid:0, balance:0};
-        feeStructure[k].total   += r.due;
-        feeStructure[k].paid    += r.paid;
-        feeStructure[k].balance += r.outstanding;
-    });
+    var st = api.student;
+    // fee is null for a user without fees.view (the server leaves it out).
+    var fee = api.fee || { rows:[], totalDue:0, totalPaid:0, concession:0, outstanding:0 };
 
     return {
         dob:st.dob, age:(st.age!=null ? st.age+' yrs' : '—'), blood:st.blood,
         religion:st.religion, category:st.category, nationality:st.nation,
-        aadhaar:st.idProof, motherTongue:'—', caste:'—',
+        aadhaar:st.idProof, motherTongue:st.motherTongue, apaar:st.apaar, udise:st.udise,
         fatherName:st.guardian, motherName:st.mother, guardianName:st.guardian,
-        occupation:'—', income:'—', email:'—',
-        prevSchool:st.prevSchool, prevBoard:'—', prevClass:'—', tcNo:'—', tcDate:'—',
+        fatherOcc:st.fatherOcc, fatherQual:st.fatherQual, fatherEmail:st.fatherEmail,
+        motherOcc:st.motherOcc, motherQual:st.motherQual, motherEmail:st.motherEmail,
+        income:(st.income!=null ? inr(st.income) : '—'),
+        prevSchool:st.prevSchool, prevBoard:st.prevBoard, prevClass:st.prevClass, tcNo:st.prevTc,
 
         /* attendance, timetable and exams are attached from the API in loadDashboard */
 
-        feeStructure: Object.keys(feeStructure).map(function(k){ return feeStructure[k]; }),
+        // One row per instalment still owing (the ledger's dues list).
+        pendingDues: fee.rows || [],
         feeHistory: (api.receipts || []).map(function(r){
-            return {date:r.date, head:'Fee payment', amt:r.amount, mode:r.mode,
-                    receipt:r.receiptNo, by:r.cancelled ? 'CANCELLED' : (r.collectedBy || '—')};
+            return {date:r.date, amt:r.amount, mode:r.mode, receipt:r.receiptNo,
+                    cancelled:r.cancelled, by:r.cancelled ? 'CANCELLED' : (r.collectedBy || '—')};
         }),
         totalFee: fee.totalDue, totalPaid: fee.totalPaid,
-        hasConcession: fee.concession > 0, concessionAmt: fee.concession,
-        docs: []
+        hasConcession: fee.concession > 0, concessionAmt: fee.concession
     };
 }
 
@@ -341,8 +396,8 @@ function loadDashboard(){
             id:STUDENT_ID, name:st.name, roll:st.roll, cls:st.cls, sec:st.sec,
             gender:st.gender, guardian:st.guardian, status:st.status || 'Active', admDate:st.admDate,
             phone:st.mobile, address:st.address,
-            feeDue:api.fee.outstanding,
-            feeSt:api.fee.outstanding<=0 ? 'Paid' : (api.fee.totalPaid>0 ? 'Partial' : 'Pending'),
+            feeDue:api.fee ? api.fee.outstanding : null,
+            feeSt:!api.fee ? null : api.fee.outstanding<=0 ? 'Paid' : (api.fee.totalPaid>0 ? 'Partial' : 'Pending'),
             attend:null, color:'primary', subjects:st.subjects
         };
 
@@ -366,15 +421,24 @@ function loadDashboard(){
         }
 
         // A student who has left: read-only. Say when and why, and hide Edit.
+        // (The Edit buttons only exist for users with students.manage.)
         if(st.isActive===false){
             var left=document.getElementById('sdLeft');
             left.textContent='Left the school'+(st.leftOn?' on '+st.leftOn:'')+(st.leftWhy?' — '+st.leftWhy:'')+'. This record is read-only.';
             left.classList.remove('d-none');
-            document.getElementById('sdEditWrap').classList.add('d-none');
+            hide('sdEditWrap'); hide('sdEditBtn');
         }
+
+        // Collect Fee opens the fee counter with this student already picked.
+        var collect=document.getElementById('sdCollectBtn');
+        if(collect && st.isActive!==false && st.admNo && st.admNo!=='—'){
+            collect.href=COLLECT_URL+'?adm='+encodeURIComponent(st.admNo)+'&session='+encodeURIComponent(st.year||'');
+            collect.classList.remove('d-none');
+        }
+
         document.getElementById('sdName').textContent=s.name;
-        document.getElementById('sdMeta').textContent=s.roll+' · '+s.cls+' – '+s.sec+' · '+st.admNo;
-        document.getElementById('sdBadges').innerHTML=statB(s.status)+' '+feeB(s.feeSt);
+        document.getElementById('sdMeta').textContent='Roll '+s.roll+' · '+s.cls+' – '+s.sec+' · '+st.admNo;
+        document.getElementById('sdBadges').innerHTML=statB(s.status)+(s.feeSt ? ' '+feeB(s.feeSt) : '');
 
         document.getElementById('sdLoader').classList.add('d-none');
         renderOverview(s,DETAIL);
@@ -384,7 +448,9 @@ function loadDashboard(){
         renderAttendance(s,DETAIL);
         renderTimetable(DETAIL);
         renderExams(s,DETAIL);
-        activateTab('overview');
+        // Open the tab named in the URL (#fee, #profile ...) so a tab can be linked
+        // to and survives a reload; otherwise Overview.
+        activateTab(location.hash ? location.hash.substring(1) : 'overview');
     })
     .fail(function(){
         document.getElementById('sdLoader').classList.add('d-none');
@@ -404,7 +470,9 @@ function renderOverview(s,d){
        +mc('Last Exam',  (ex&&ex.options.length) ? ex.percent+'%' : '—','bg-label-info text-info','bx-book-open')
        // The class's subjects (Subject Management); else the last exam's count.
        +mc('Subjects',   s.subjects!=null ? String(s.subjects) : (ex&&ex.options.length) ? String(ex.subjectCount) : '—','bg-label-primary text-primary','bx-list-check')
-       +mc('Fee Due',    inr(s.feeDue),(s.feeDue>0?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-wallet');
+       +(CAN_FEES
+           ? mc('Fee Due', inr(s.feeDue),(s.feeDue>0?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-wallet')
+           : mc('Admitted', EC.esc(s.admDate||'—'),'bg-label-info text-info','bx-calendar'));
 
     // Subject bars come from the latest published exam's real marks; absent
     // subjects have no percentage, so they are not drawn as a zero-length bar.
@@ -682,33 +750,41 @@ document.getElementById('examSel').addEventListener('change',function(){
 });
 
 function renderFee(s,d){
+    if(!CAN_FEES) return;   // no Fee tab for this user
     document.getElementById('fee-metrics').innerHTML=
         mc('Total Fee', inr(d.totalFee),'bg-label-primary text-primary','bx-calculator')
        +mc('Paid',      inr(d.totalPaid),'bg-label-success text-success','bx-check-shield')
        +mc('Balance',   inr(s.feeDue),(s.feeDue>0?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-error-circle')
        +mc('Receipts',  d.feeHistory.length+' txn','bg-label-info text-info','bx-receipt');
 
-    document.getElementById('feeStructBody').innerHTML=d.feeStructure.map(function(f){
-        var balStyle=f.balance>0?' class="text-danger fw-bold"':'';
-        return '<tr>'
-            +'<td class="fw-bold">'+EC.esc(f.head)+'</td>'
-            +'<td>'+inr(f.total)+'</td>'
-            +'<td class="text-success fw-bold">'+inr(f.paid)+'</td>'
-            +'<td'+balStyle+'>'+inr(f.balance)+(f.balance>0?' ⚠':'')+'</td>'
-            +'</tr>';
-    }).join('');
+    document.getElementById('feeStructBody').innerHTML = d.pendingDues.length
+      ? d.pendingDues.map(function(f){
+            return '<tr>'
+                +'<td class="fw-bold">'+EC.esc(f.head)+'</td>'
+                +'<td>'+EC.esc(f.installment)+'</td>'
+                +'<td>'+EC.esc(f.dueDate)+'</td>'
+                +'<td>'+inr(f.due)+'</td>'
+                +'<td class="text-success fw-bold">'+inr(f.paid)+'</td>'
+                +'<td class="text-danger fw-bold">'+inr(f.outstanding)+'</td>'
+                +'</tr>';
+        }).join('')
+      : '<tr><td colspan="6" class="text-muted small">Nothing is pending. All dues are paid.</td></tr>';
 
-    document.getElementById('feeHistBody').innerHTML=d.feeHistory.map(function(f){
-        return '<tr>'
-            +'<td>'+EC.esc(f.date)+'</td>'
-            +'<td class="fw-bold">'+EC.esc(f.head)+'</td>'
-            +'<td class="text-success fw-bold">'+inr(f.amt)+'</td>'
-            +'<td>'+EC.esc(f.mode)+'</td>'
-            +'<td>'+EC.esc(f.receipt)+'</td>'
-            +'<td>'+EC.esc(f.by)+'</td>'
-            +'<td><button class="btn btn-sm btn-outline-secondary" onclick="window.print()" title="Print Receipt"><i class="bx bx-printer"></i></button></td>'
-            +'</tr>';
-    }).join('');
+    // The printer button opens the real receipt (shared receipt modal), which
+    // has its own Print button.
+    document.getElementById('feeHistBody').innerHTML = d.feeHistory.length
+      ? d.feeHistory.map(function(f){
+            return '<tr'+(f.cancelled?' class="text-muted" style="text-decoration:line-through;"':'')+'>'
+                +'<td>'+EC.esc(f.date)+'</td>'
+                +'<td class="fw-bold">Fee payment</td>'
+                +'<td class="text-success fw-bold">'+inr(f.amt)+'</td>'
+                +'<td>'+EC.esc(f.mode)+'</td>'
+                +'<td>'+EC.esc(f.receipt)+'</td>'
+                +'<td>'+EC.esc(f.by)+'</td>'
+                +'<td><button type="button" class="btn btn-sm btn-outline-secondary btn-receipt" data-rcp="'+EC.esc(f.receipt)+'" title="View / print receipt"><i class="bx bx-printer"></i></button></td>'
+                +'</tr>';
+        }).join('')
+      : '<tr><td colspan="7" class="text-muted small">No payments yet.</td></tr>';
 
     if(s.feeDue>0){
         document.getElementById('feeHistBody').innerHTML+=
@@ -724,27 +800,35 @@ function renderFee(s,d){
     }
 }
 
+// Receipt buttons are drawn by renderFee, so the click is caught on the table.
+$('#feeHistBody').on('click', '.btn-receipt', function(){
+    if(window.EcReceipt) EcReceipt.show($(this).data('rcp'));
+});
+
 /* ── Tab 7: Profile ──────────────────────────── */
+// Every value here comes from the student record; Edit Student changes all of them.
 function renderProfile(s,d){
     document.getElementById('profileContent').innerHTML=
         ps('Personal Details',[
             ['Full Name',s.name],['Roll No',s.roll],['Class / Section',s.cls+' – '+s.sec],
             ['DOB',d.dob],['Age',d.age],['Gender',s.gender],
             ['Blood Group',d.blood],['Mother Tongue',d.motherTongue],
-            ['Religion',d.religion],['Caste',d.caste],
-            ['Category',d.category],['Nationality',d.nationality],
-            ['Aadhaar',d.aadhaar],['Address',s.address||'—']
+            ['Religion',d.religion],['Category',d.category],
+            ['Nationality',d.nationality],['Aadhaar',d.aadhaar],
+            ['APAAR ID',d.apaar],['UDISE+ PEN',d.udise],
+            ['Address',s.address||'—']
         ])
        +ps('Parent / Guardian',[
-            ['Father Name',d.fatherName],['Mother Name',d.motherName],
-            ['Guardian',d.guardianName],['Occupation',d.occupation],
-            ['Annual Income',d.income],['Contact',s.phone||'—'],['Email',d.email]
+            ['Father / Guardian',d.fatherName],['Mother Name',d.motherName],
+            ['Father Occupation',d.fatherOcc],['Father Qualification',d.fatherQual],
+            ['Mother Occupation',d.motherOcc],['Mother Qualification',d.motherQual],
+            ['Father Email',d.fatherEmail],['Mother Email',d.motherEmail],
+            ['Mobile',s.phone||'—'],['Annual Income',d.income]
         ])
        +ps('Previous School',[
             ['School Name',d.prevSchool],['Board',d.prevBoard],
-            ['Last Class',d.prevClass],['TC Number',d.tcNo],['TC Date',d.tcDate]
-        ])
-       +docsSection(d.docs);
+            ['Last Class',d.prevClass],['TC Number',d.tcNo]
+        ]);
 }
 function ps(title,rows){
     return '<div class="mb-4">'
@@ -753,29 +837,6 @@ function ps(title,rows){
         +rows.map(function(r){return '<div class="sd-pf"><label>'+r[0]+'</label><span>'+EC.esc(r[1]==null?'—':r[1])+'</span></div>';}).join('')
         +'</div></div>';
 }
-function docsSection(docs){
-    var html='<div class="mb-4"><div class="ec-detail-title mb-2">Documents</div>';
-    html+=docs.map(function(doc){
-        var ic=doc.type==='PDF'?'bx-file-pdf':'bx-image';
-        var icCol=doc.type==='PDF'?'bg-label-danger text-danger':'bg-label-info text-info';
-        var stCol=doc.status==='Uploaded'?'b-active':'b-partial';
-        return '<div class="sd-doc-row">'
-            +'<div class="sd-doc-ic '+icCol+'"><i class="bx '+ic+'"></i></div>'
-            +'<div class="flex-grow-1"><div class="fw-bold" style="font-size:.85rem;">'+EC.esc(doc.name)+'</div>'
-            +'<div class="text-muted" style="font-size:.73rem;">'+EC.esc(doc.type)+' · '+EC.esc(doc.date)+'</div></div>'
-            +'<span class="sd-bdg '+stCol+'">'+EC.esc(doc.status)+'</span>'
-            +(doc.status==='Uploaded'
-                ?'<button class="btn btn-sm btn-outline-secondary ms-2" title="Download"><i class="bx bx-download"></i></button>'
-                :'<button class="btn btn-sm btn-outline-warning ms-2" title="Upload"><i class="bx bx-upload"></i></button>')
-            +'</div>';
-    }).join('');
-    return html+'</div>';
-}
-
-/* ── Exam selector ───────────────────────────── */
-// Exam results have no per-student source yet, so the selector has nothing to
-// switch between. Left in place for when the exam module exposes one.
-
 /* ── Session history ──────────────────────────
    Loaded separately from the rest of the page: the dashboard payload is per
    student, this is their whole timeline out of core.student_enrolment. */

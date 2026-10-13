@@ -40,7 +40,19 @@
 --
 -- Target DB: PostgreSQL. Safe to re-run. Additive — a new operation on an
 -- existing proc, so no signature change and nothing else is affected.
+--
+-- 2026-10-12: the rest of the admission form became editable (mother tongue,
+-- APAAR / UDISE, previous board / class / TC, both parents' occupation /
+-- qualification / email, annual income). Admission saved
+-- them but nothing could change or even show them afterwards. They arrive
+-- AFTER p_result and are written only when p_extended is TRUE: an app that does
+-- not know them (the old build, during a deploy) passes nothing and the stored
+-- values are kept, instead of every one of them being blanked. The old
+-- signature is dropped first so exactly one overload exists.
 -- ============================================================================
+
+DROP PROCEDURE IF EXISTS core.sp_student_update(integer, integer, integer, integer,
+    text, text, text, date, text, text, text, text, text, text, text, text, text, text, text, text, text, refcursor);
 
 CREATE OR REPLACE PROCEDURE core.sp_student_update(
     IN  p_tenant_id       integer,
@@ -64,7 +76,21 @@ CREATE OR REPLACE PROCEDURE core.sp_student_update(
     IN  p_nationality     text    DEFAULT NULL,
     IN  p_id_proof_no     text    DEFAULT NULL,
     IN  p_prev_school     text    DEFAULT NULL,
-    INOUT p_result        refcursor DEFAULT 'student_update_cursor'::refcursor)
+    INOUT p_result        refcursor DEFAULT 'student_update_cursor'::refcursor,
+    IN  p_extended        boolean DEFAULT FALSE,
+    IN  p_mother_tongue   text    DEFAULT NULL,
+    IN  p_apaar_id        text    DEFAULT NULL,
+    IN  p_udise_student_id text   DEFAULT NULL,
+    IN  p_prev_board      text    DEFAULT NULL,
+    IN  p_prev_class      text    DEFAULT NULL,
+    IN  p_prev_tc_no      text    DEFAULT NULL,
+    IN  p_father_occupation    text DEFAULT NULL,
+    IN  p_father_qualification text DEFAULT NULL,
+    IN  p_father_email         text DEFAULT NULL,
+    IN  p_mother_occupation    text DEFAULT NULL,
+    IN  p_mother_qualification text DEFAULT NULL,
+    IN  p_mother_email         text DEFAULT NULL,
+    IN  p_annual_income   numeric DEFAULT NULL)
 LANGUAGE plpgsql
 AS $procedure$
 DECLARE
@@ -165,6 +191,25 @@ BEGIN
         RAISE EXCEPTION 'Aadhaar number must be 12 digits.';
     END IF;
 
+    -- The extended fields (see header). Same "only when changed" rule.
+    IF p_extended THEN
+        IF NULLIF(TRIM(COALESCE(p_apaar_id, '')), '') IS DISTINCT FROM s.apaar_id
+           AND NULLIF(TRIM(COALESCE(p_apaar_id, '')), '') !~ '^[0-9]{12}$' THEN
+            RAISE EXCEPTION 'APAAR ID must be 12 digits.';
+        END IF;
+        IF NULLIF(TRIM(COALESCE(p_father_email, '')), '') IS DISTINCT FROM s.father_email
+           AND NULLIF(TRIM(COALESCE(p_father_email, '')), '') !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' THEN
+            RAISE EXCEPTION 'Father email is not a valid email address.';
+        END IF;
+        IF NULLIF(TRIM(COALESCE(p_mother_email, '')), '') IS DISTINCT FROM s.mother_email
+           AND NULLIF(TRIM(COALESCE(p_mother_email, '')), '') !~ '^[^@[:space:]]+@[^@[:space:]]+[.][^@[:space:]]+$' THEN
+            RAISE EXCEPTION 'Mother email is not a valid email address.';
+        END IF;
+        IF p_annual_income IS NOT NULL AND p_annual_income < 0 THEN
+            RAISE EXCEPTION 'Annual income cannot be negative.';
+        END IF;
+    END IF;
+
     -- Gender drives the Male / Female counts; store the canonical spelling.
     IF v_gender IS NOT NULL THEN
         v_gender := CASE lower(v_gender) WHEN 'male' THEN 'Male' WHEN 'female' THEN 'Female'
@@ -223,6 +268,24 @@ BEGIN
        OR NULLIF(TRIM(COALESCE(p_nationality, '')), '') IS DISTINCT FROM s.nationality
        OR NULLIF(TRIM(COALESCE(p_prev_school, '')), '') IS DISTINCT FROM s.prev_school_name THEN
         v_changes := v_changes || 'Religion / category / nationality / previous school changed'::text; END IF;
+    IF p_extended THEN
+        IF NULLIF(TRIM(COALESCE(p_mother_tongue, '')), '') IS DISTINCT FROM s.mother_tongue
+           OR NULLIF(TRIM(COALESCE(p_apaar_id, '')), '') IS DISTINCT FROM s.apaar_id
+           OR NULLIF(TRIM(COALESCE(p_udise_student_id, '')), '') IS DISTINCT FROM s.udise_student_id THEN
+            v_changes := v_changes || 'Mother tongue / APAAR / UDISE changed'::text; END IF;
+        IF NULLIF(TRIM(COALESCE(p_prev_board, '')), '') IS DISTINCT FROM s.prev_board
+           OR NULLIF(TRIM(COALESCE(p_prev_class, '')), '') IS DISTINCT FROM s.prev_class
+           OR NULLIF(TRIM(COALESCE(p_prev_tc_no, '')), '') IS DISTINCT FROM s.prev_tc_no THEN
+            v_changes := v_changes || 'Previous board / class / TC changed'::text; END IF;
+        IF NULLIF(TRIM(COALESCE(p_father_occupation, '')), '') IS DISTINCT FROM s.father_occupation
+           OR NULLIF(TRIM(COALESCE(p_father_qualification, '')), '') IS DISTINCT FROM s.father_qualification
+           OR NULLIF(TRIM(COALESCE(p_father_email, '')), '') IS DISTINCT FROM s.father_email
+           OR NULLIF(TRIM(COALESCE(p_mother_occupation, '')), '') IS DISTINCT FROM s.mother_occupation
+           OR NULLIF(TRIM(COALESCE(p_mother_qualification, '')), '') IS DISTINCT FROM s.mother_qualification
+           OR NULLIF(TRIM(COALESCE(p_mother_email, '')), '') IS DISTINCT FROM s.mother_email
+           OR p_annual_income IS DISTINCT FROM s.annual_income THEN
+            v_changes := v_changes || 'Parent occupation / qualification / email / income changed'::text; END IF;
+    END IF;
 
     UPDATE core.students
     SET student_name   = v_name,
@@ -242,6 +305,19 @@ BEGIN
         nationality    = NULLIF(TRIM(COALESCE(p_nationality, '')), ''),
         id_proof_no    = v_idp,
         prev_school_name = NULLIF(TRIM(COALESCE(p_prev_school, '')), ''),
+        mother_tongue        = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_mother_tongue, '')), '') ELSE mother_tongue END,
+        apaar_id             = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_apaar_id, '')), '') ELSE apaar_id END,
+        udise_student_id     = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_udise_student_id, '')), '') ELSE udise_student_id END,
+        prev_board           = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_prev_board, '')), '') ELSE prev_board END,
+        prev_class           = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_prev_class, '')), '') ELSE prev_class END,
+        prev_tc_no           = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_prev_tc_no, '')), '') ELSE prev_tc_no END,
+        father_occupation    = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_father_occupation, '')), '') ELSE father_occupation END,
+        father_qualification = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_father_qualification, '')), '') ELSE father_qualification END,
+        father_email         = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_father_email, '')), '') ELSE father_email END,
+        mother_occupation    = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_mother_occupation, '')), '') ELSE mother_occupation END,
+        mother_qualification = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_mother_qualification, '')), '') ELSE mother_qualification END,
+        mother_email         = CASE WHEN p_extended THEN NULLIF(TRIM(COALESCE(p_mother_email, '')), '') ELSE mother_email END,
+        annual_income        = CASE WHEN p_extended THEN p_annual_income ELSE annual_income END,
         updated_by     = p_action_user_id,
         updated_at     = NOW()
     WHERE student_id = p_student_id

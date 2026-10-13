@@ -237,6 +237,54 @@
                     </div>
                 </div>
 
+                <!-- ②b Parents' details (same fields as the admission form) -->
+                <div class="es-card">
+                    <div class="es-card-hdr">
+                        <div class="es-sec-ic" style="background:#f3e5f5;color:#6a1b9a;">
+                            <i class="bx bx-group"></i>
+                        </div>
+                        <div>
+                            <div class="es-sec-title">Parents' Details</div>
+                            <div class="es-sec-sub">Occupation, qualification, email and family income</div>
+                        </div>
+                    </div>
+                    <div class="es-card-body">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Father Occupation</label>
+                                <input type="text" name="FatherOccupation" id="fFatherOcc" class="form-control" maxlength="80" placeholder="Optional" value="@Model.FatherOccupation">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Father Qualification</label>
+                                <input type="text" name="FatherQualification" id="fFatherQual" class="form-control" maxlength="80" placeholder="Optional" value="@Model.FatherQualification">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Mother Occupation</label>
+                                <input type="text" name="MotherOccupation" id="fMotherOcc" class="form-control" maxlength="80" placeholder="Optional" value="@Model.MotherOccupation">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Mother Qualification</label>
+                                <input type="text" name="MotherQualification" id="fMotherQual" class="form-control" maxlength="80" placeholder="Optional" value="@Model.MotherQualification">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Father Email</label>
+                                <input type="email" name="FatherEmail" id="fFatherEmail" class="form-control" maxlength="120" placeholder="Optional" value="@Model.FatherEmail">
+                                <div class="invalid-feedback">Enter a valid email address.</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Mother Email</label>
+                                <input type="email" name="MotherEmail" id="fMotherEmail" class="form-control" maxlength="120" placeholder="Optional" value="@Model.MotherEmail">
+                                <div class="invalid-feedback">Enter a valid email address.</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Annual Family Income (₹)</label>
+                                <input type="number" min="0" step="1" name="AnnualIncome" id="fIncome" class="form-control" placeholder="Used for concession / RTE" value="@Model.AnnualIncome?.ToString("0")">
+                                <div class="invalid-feedback">Income cannot be negative.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ③ Additional Details -->
                 <div class="es-card">
                     <div class="es-card-hdr">
@@ -295,6 +343,32 @@
                                 <label class="es-label">Previous School</label>
                                 <input type="text" name="PrevSchoolName" id="fPrevSchool" class="form-control"
                                        placeholder="Name of last school attended">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Mother Tongue</label>
+                                <input type="text" name="MotherTongue" id="fMotherTongue" class="form-control" maxlength="40" placeholder="e.g. Hindi" value="@Model.MotherTongue">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">APAAR ID</label>
+                                <input type="text" name="ApaarId" id="fApaar" class="form-control" inputmode="numeric"
+                                       maxlength="12" pattern="[0-9]{12}" placeholder="12-digit APAAR (optional)" value="@Model.ApaarId">
+                                <div class="invalid-feedback">APAAR ID must be 12 digits.</div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">UDISE+ PEN</label>
+                                <input type="text" name="UdiseStudentId" id="fUdise" class="form-control" maxlength="30" placeholder="Permanent Education No (optional)" value="@Model.UdiseStudentId">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Previous Board</label>
+                                <input type="text" name="PrevBoard" id="fPrevBoard" class="form-control" maxlength="40" placeholder="e.g. CBSE / ICSE / State" value="@Model.PrevBoard">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Previous Class</label>
+                                <input type="text" name="PrevClass" id="fPrevClass" class="form-control" maxlength="40" placeholder="Last class passed" value="@Model.PrevClass">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="es-label">Previous TC No</label>
+                                <input type="text" name="PrevTcNo" id="fPrevTc" class="form-control" maxlength="50" placeholder="Transfer Certificate no" value="@Model.PrevTcNo">
                             </div>
                         </div>
                     </div>
@@ -606,7 +680,7 @@
     });
 
     // ── Mobile number input: digits only ─────────────────────────────────
-    ["fMobile", "fAltMobile", "fAadhar"].forEach(id => {
+    ["fMobile", "fAltMobile", "fAadhar", "fApaar"].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         el.addEventListener("input", function () {

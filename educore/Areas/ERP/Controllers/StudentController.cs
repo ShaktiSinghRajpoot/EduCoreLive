@@ -295,6 +295,11 @@ namespace educore.Areas.ERP.Controllers
                 return RedirectToAction("StudentList");
 
             ViewBag.StudentPublicId = id;   // the page's own ajax calls pass this straight back
+
+            // Header buttons and the Fee tab follow the user's permissions.
+            ViewBag.CanManage  = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
+            ViewBag.CanViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
+            ViewBag.CanCollect = await HasPermissionAttribute.UserHasAsync(this, "fees.collect");
             return View();
         }
 
@@ -314,6 +319,10 @@ namespace educore.Areas.ERP.Controllers
             // Whole-ledger totals. The dues list above holds only rows still owing,
             // so summing it dropped every fully paid charge from "Total Paid".
             var totals  = await _admissionService.GetStudentFeeTotalsAsync(studentId, TenantId(), SchoolId(), UserId());
+
+            // Fee figures go only to users who may see fees (a Teacher opens this
+            // page too). The page hides the Fee tab when fee comes back null.
+            bool canViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
 
             // month/year null on the first load: the page picks a month from the list
             // that comes back and asks again, so we do not guess which one it wants.
@@ -388,9 +397,22 @@ namespace educore.Areas.ERP.Controllers
                     category  = student.Category ?? "—",
                     nation    = student.Nationality ?? "—",
                     idProof   = student.IdProofNo ?? "—",
-                    prevSchool= student.PrevSchoolName ?? "—"
+                    prevSchool= student.PrevSchoolName ?? "—",
+                    prevBoard = student.PrevBoard ?? "—",
+                    prevClass = student.PrevClass ?? "—",
+                    prevTc    = student.PrevTcNo ?? "—",
+                    motherTongue = student.MotherTongue ?? "—",
+                    apaar     = student.ApaarId ?? "—",
+                    udise     = student.UdiseStudentId ?? "—",
+                    fatherOcc  = student.FatherOccupation ?? "—",
+                    fatherQual = student.FatherQualification ?? "—",
+                    fatherEmail = student.FatherEmail ?? "—",
+                    motherOcc  = student.MotherOccupation ?? "—",
+                    motherQual = student.MotherQualification ?? "—",
+                    motherEmail = student.MotherEmail ?? "—",
+                    income    = student.AnnualIncome
                 },
-                fee = new
+                fee = !canViewFees ? null : (object)new
                 {
                     // Outstanding is what the ledger says, not a recomputation here —
                     // core.student_ledger stays the single source of truth for money.
@@ -479,7 +501,7 @@ namespace educore.Areas.ERP.Controllers
                     sectionRank  = exam.SectionRank,
                     sectionSize  = exam.SectionSize
                 },
-                receipts = history.Select(h => new
+                receipts = !canViewFees ? null : (object)history.Select(h => new
                 {
                     receiptNo = h.ReceiptNo,
                     date      = string.IsNullOrWhiteSpace(h.PaymentDate) ? "—" : Dates.Show(h.PaymentDate, "dd MMM yyyy"),
