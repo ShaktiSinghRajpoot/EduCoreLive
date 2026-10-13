@@ -151,6 +151,7 @@ $(function () {
         $.getJSON(URL.list).done(function (rows) {
             notices = rows || [];
             draw();
+            $('#navBellCount').addClass('d-none');   // opening the board read them all
         }).fail(function () { ecToast('error', 'Could not load the notices.'); });
     }
 
