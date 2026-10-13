@@ -5201,3 +5201,15 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   re-generates the draft with a REGENERATED row in the money trail; a paid payslip is never touched.
 - `staff_payroll.sql`, `staff_self_service.sql` (`deploy_2026_10_14e.sql`); 6 rolled-back checks in
   `tests/payroll_attendance_tests.sql`; `tests/leave_payroll_tests.sql` still 29/29.
+
+### [2026-10-14] Homework › Overview tab (who is / is not giving homework)
+- New **Overview** tab on the Homework page for `academics.view`: quick ranges (Today / 7 days / 30 days /
+  This session / Custom) and class chips with done %; cards (teachers giving none, missing some sections,
+  homework given, checked in class); a "Who is giving homework?" donut (All / Some / None of the sections
+  they teach — tap to filter the table); "Nobody is giving homework here" (busiest first); homework by
+  teacher (given, sections covered, periods/week, last given, checked %, done %); a leaderboard
+  (60% sections covered + 40% students checked; done % shown, not scored); was it done (done / not done /
+  not checked); by subject; by class.
+- Teachers come from the LIVE timetable of the current session, so someone who gives nothing still shows.
+  One read-only proc `academic.sp_homework_overview` (`homework_overview.sql`, `deploy_2026_10_14f.sql`).
+- Not built: parent messages / parent-app completion (there is no parent login).

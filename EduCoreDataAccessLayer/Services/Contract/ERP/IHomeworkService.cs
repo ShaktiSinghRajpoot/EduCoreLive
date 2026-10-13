@@ -20,6 +20,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<(bool Success, string Message)> CheckAsync(int id, List<HomeworkStudent> marks, bool canManage,
                                                         int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>The overview: teachers (from the timetable), classes and subjects, for homework given from..to.</summary>
+        Task<HomeworkOverview> GetOverviewAsync(string from, string to, string? className, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>One student's homework of the last 30 days, with their status (Student Dashboard).</summary>
         Task<List<Homework>> GetForStudentAsync(int studentId, int tenantId, int schoolId, int actionUserId);
     }

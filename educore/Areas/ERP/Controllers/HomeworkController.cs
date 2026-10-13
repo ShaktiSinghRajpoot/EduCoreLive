@@ -35,6 +35,7 @@ namespace educore.Areas.ERP.Controllers
 
             ViewBag.IsStaff = await _self.HasStaffRecordAsync(TenantId(), SchoolId(), UserId());
             ViewBag.CanManage = await CanManageAsync();
+            ViewBag.CanOverview = await HasPermissionAttribute.UserHasAsync(this, "academics.view");
             return View();
         }
 
@@ -54,6 +55,29 @@ namespace educore.Areas.ERP.Controllers
             if (!await AllowedAsync()) return Forbid();
             var grid = await _timetable.GetGridAsync(sectionId, TenantId(), SchoolId(), UserId());
             return Json(grid.Subjects.Select(s => new { id = s.SubjectId, name = s.SubjectName }));
+        }
+
+        // ── GET: /ERP/Homework/Overview ── who is (not) giving homework; academics.view only
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> Overview(string? from, string? to, string? cls)
+        {
+            var f = Dates.Norm(from) ?? Dates.AddMonths(Dates.Today, -1)!;
+            var t = Dates.Norm(to) ?? Dates.Today;
+            var o = await _homework.GetOverviewAsync(f, t, string.IsNullOrWhiteSpace(cls) ? null : cls.Trim(), TenantId(), SchoolId(), UserId());
+
+            object Row(HomeworkOverviewRow r) => new
+            {
+                id = r.Id, name = r.Name, sections = r.Sections, periods = r.Periods, covered = r.Covered, students = r.Students,
+                sets = r.Sets, checkedSets = r.CheckedSets, expected = r.Expected, recorded = r.Recorded, done = r.Done, last = r.LastGiven
+            };
+            return Json(new
+            {
+                from = f, to = t,
+                teachers = o.Teachers.Select(Row),
+                classes  = o.Classes.Select(Row),
+                subjects = o.Subjects.Select(Row)
+            });
         }
 
         [HttpGet]

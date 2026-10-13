@@ -18,6 +18,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     public class HomeworkService : IHomeworkService
     {
         private const string Sp = "academic.sp_homework_manage";
+        private const string SpOverview = "academic.sp_homework_overview";
         private readonly PgExec _db;
         private readonly ILogger<HomeworkService> _logger;
 
@@ -48,6 +49,71 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             });
             return list;
         }
+
+        public async Task<HomeworkOverview> GetOverviewAsync(string from, string to, string? className,
+                                                            int tenantId, int schoolId, int actionUserId)
+        {
+            var o = new HomeworkOverview();
+            var f = Dates.Parse(from);
+            var t = Dates.Parse(to);
+            if (!InScope(tenantId, schoolId) || f == null || t == null) return o;
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_from",           NpgsqlDbType.Date)    { Value = f.Value },
+                new("p_to",             NpgsqlDbType.Date)    { Value = t.Value },
+                new("p_class",          NpgsqlDbType.Text)    { Value = (object?)className ?? DBNull.Value },
+                new("p_teachers", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "hw_teachers" },
+                new("p_classes",  NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "hw_classes" },
+                new("p_subjects", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "hw_subjects" }
+            };
+
+            await _db.ExecuteCursorsAsync(SpOverview, p,
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                    {
+                        var r = ReadOverviewRow(reader, cols, "full_name");
+                        r.Id        = DbRead.Int(reader, cols, "staff_id");
+                        r.Periods   = DbRead.Int(reader, cols, "periods");
+                        r.Covered   = DbRead.Int(reader, cols, "covered");
+                        r.LastGiven = DbRead.NStr(reader, cols, "last_given");
+                        o.Teachers.Add(r);
+                    }
+                },
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                    {
+                        var r = ReadOverviewRow(reader, cols, "class_name");
+                        r.Students = DbRead.Int(reader, cols, "students");
+                        o.Classes.Add(r);
+                    }
+                },
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                        o.Subjects.Add(ReadOverviewRow(reader, cols, "subject_name"));
+                });
+            return o;
+        }
+
+        private static HomeworkOverviewRow ReadOverviewRow(NpgsqlDataReader reader, HashSet<string> cols, string nameColumn) => new HomeworkOverviewRow
+        {
+            Name        = DbRead.Str(reader, cols, nameColumn),
+            Sections    = DbRead.Int(reader, cols, "sections"),
+            Sets        = DbRead.Int(reader, cols, "sets"),
+            CheckedSets = DbRead.Int(reader, cols, "checked_sets"),
+            Expected    = DbRead.Int(reader, cols, "expected"),
+            Recorded    = DbRead.Int(reader, cols, "recorded"),
+            Done        = DbRead.Int(reader, cols, "done")
+        };
 
         public async Task<List<Homework>> GetForStudentAsync(int studentId, int tenantId, int schoolId, int actionUserId)
         {

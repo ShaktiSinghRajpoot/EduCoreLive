@@ -23,6 +23,34 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? MyStatus     { get; set; }
     }
 
+    /// <summary>Homework page › Overview (academic.sp_homework_overview).</summary>
+    public class HomeworkOverview
+    {
+        public List<HomeworkOverviewRow> Teachers { get; set; } = new();
+        public List<HomeworkOverviewRow> Classes  { get; set; } = new();
+        public List<HomeworkOverviewRow> Subjects { get; set; } = new();
+    }
+
+    /// <summary>
+    /// One teacher, class or subject on the overview. Expected = homework x students of
+    /// its section; Recorded = students the teacher marked; Done = marked Done or Late.
+    /// </summary>
+    public class HomeworkOverviewRow
+    {
+        public int     Id          { get; set; }             // staff id (teachers)
+        public string  Name        { get; set; } = string.Empty;
+        public int     Sections    { get; set; }             // taught (teachers) / in the class (classes)
+        public int     Periods     { get; set; }             // teachers: periods a week
+        public int     Covered     { get; set; }             // teachers: sections given homework
+        public int     Students    { get; set; }             // classes
+        public int     Sets        { get; set; }
+        public int     CheckedSets { get; set; }
+        public int     Expected    { get; set; }
+        public int     Recorded    { get; set; }
+        public int     Done        { get; set; }
+        public string? LastGiven   { get; set; }             // teachers, yyyy-MM-dd
+    }
+
     /// <summary>A student on the "who did it" sheet.</summary>
     public class HomeworkStudent
     {

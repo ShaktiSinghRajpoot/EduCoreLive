@@ -4,6 +4,7 @@
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var isStaff   = (bool?)ViewBag.IsStaff ?? false;
     var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
+    var canOverview = (bool?)ViewBag.CanOverview ?? false; // academics.view
 }
 
 @*
@@ -33,6 +34,15 @@
       </div>
     </div>
 
+    @if (canOverview)
+    {
+        <div class="hw-tabs mb-3" id="hwTabs">
+          <button class="on" data-t="list"><i class="bx bx-list-ul me-1"></i>Homework</button>
+          <button data-t="overview"><i class="bx bx-pie-chart-alt-2 me-1"></i>Overview</button>
+        </div>
+    }
+
+    <div id="paneList">
     <div class="ec-card mb-3"><div class="ec-card-body hw-tools">
       <div><label class="form-label mb-1">Class</label><select id="hSection" class="form-select form-select-sm"><option value="">All classes</option></select></div>
       <div><label class="form-label mb-1">Given from</label><input type="date" id="hFrom" class="form-control form-control-sm"></div>
@@ -45,6 +55,79 @@
     </div></div>
 
     <div id="hList"></div>
+    </div>
+
+    @if (canOverview)
+    {
+    @* ── Overview: who is (not) giving homework, from the timetable ── *@
+    <div id="paneOverview" class="d-none">
+      <div class="ec-card mb-3"><div class="ec-card-body">
+        <div class="hw-ov-bar">
+          <div class="hw-chips" id="ovRange">
+            <button data-r="0">Today</button><button data-r="6">7 days</button><button class="on" data-r="29">30 days</button>
+            <button data-r="all">This session</button><button data-r="custom">Custom</button>
+          </div>
+          <div class="hw-ov-custom d-none" id="ovCustom">
+            <input type="date" id="ovFrom" class="form-control form-control-sm"><span>to</span><input type="date" id="ovTo" class="form-control form-control-sm">
+          </div>
+        </div>
+        <div class="hw-chips mt-2" id="ovClasses"></div>
+      </div></div>
+
+      <div class="hw-kpis" id="ovKpis"></div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-lg-5">
+          <div class="ec-card h-100"><div class="ec-card-body">
+            <h6 class="hw-ov-h">Who is giving homework?</h6>
+            <div class="hw-donut-wrap"><div class="hw-donut" id="ovDonut"><div><b id="ovDonutN">0</b><small>teachers</small></div></div>
+              <div class="hw-legend" id="ovLegend"></div></div>
+            <div class="hw-note">From the timetable: a teacher who gives nothing still appears here. Tap a line to list those teachers.</div>
+          </div></div>
+        </div>
+        <div class="col-12 col-lg-7">
+          <div class="ec-card h-100"><div class="ec-card-body">
+            <h6 class="hw-ov-h">Nobody is giving homework here</h6>
+            <div class="hw-nobody" id="ovNobody"></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="ec-card mb-3"><div class="ec-card-body">
+        <div class="d-flex flex-wrap justify-content-between gap-2 align-items-center mb-2">
+          <h6 class="hw-ov-h mb-0">Homework by teacher <small class="text-muted" id="ovTeacherFilter"></small></h6>
+          <input id="ovSearch" class="form-control form-control-sm" style="max-width:220px" placeholder="Search teacher">
+        </div>
+        <div class="table-responsive"><table class="table align-middle mb-0 hw-ov-table">
+          <thead><tr><th>Teacher</th><th>Status</th><th class="text-center">Given</th><th class="text-center">Sections</th><th class="text-center">Periods / week</th><th>Last given</th><th class="text-center">Checked</th><th class="text-center">Done</th></tr></thead>
+          <tbody id="ovTeachers"></tbody>
+        </table></div>
+      </div></div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-lg-6">
+          <div class="ec-card h-100"><div class="ec-card-body">
+            <h6 class="hw-ov-h">Leaderboard</h6>
+            <div id="ovLeaders"></div>
+            <div class="hw-note">Score = 60% sections covered + 40% students checked: the parts a teacher controls. How many students did it is shown, not scored.</div>
+          </div></div>
+        </div>
+        <div class="col-12 col-lg-6">
+          <div class="ec-card h-100"><div class="ec-card-body">
+            <h6 class="hw-ov-h">Was the homework done?</h6>
+            <div id="ovDone"></div>
+            <h6 class="hw-ov-h mt-4">By subject</h6>
+            <div id="ovSubjects"></div>
+          </div></div>
+        </div>
+      </div>
+
+      <div class="ec-card mb-3"><div class="ec-card-body">
+        <h6 class="hw-ov-h">By class</h6>
+        <div class="hw-class-grid" id="ovClassGrid"></div>
+      </div></div>
+    </div>
+    }
 
   </div>
 </div>
@@ -109,7 +192,8 @@ $(function () {
         save:     '@Url.Action("Save","Homework",new{area="ERP"})',
         del:      '@Url.Action("Delete","Homework",new{area="ERP"})',
         students: '@Url.Action("Students","Homework",new{area="ERP"})',
-        check:    '@Url.Action("Check","Homework",new{area="ERP"})'
+        check:    '@Url.Action("Check","Homework",new{area="ERP"})',
+        overview: '@Url.Action("Overview","Homework",new{area="ERP"})'
     };
 
     function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -297,6 +381,160 @@ $(function () {
             .fail(function () { ecToast('error', 'Could not save. Please try again.'); })
             .always(function () { EC.buttonReset($b); });
     });
+
+    // ── Overview (academics.view) ───────────────────────────────────────
+    // Teachers come from the timetable, so someone who gives nothing still shows.
+    var OV = null, ovClass = '', ovFilter = '', ovAllClasses = null;
+
+    $('#hwTabs').on('click', 'button', function () {
+        $('#hwTabs button').removeClass('on'); $(this).addClass('on');
+        var ov = $(this).data('t') === 'overview';
+        $('#paneList').toggleClass('d-none', ov); $('#paneOverview').toggleClass('d-none', !ov);
+        $('#btnNew').toggleClass('d-none', ov);
+        if (ov && !OV) loadOverview();
+    });
+
+    function pct(a, b) { return b > 0 ? Math.round(a * 100 / b) : null; }
+    function pctText(a, b) { var p = pct(a, b); return p === null ? '—' : p + '%'; }
+    function daysAgo(iso) {
+        if (!iso) return 'never';
+        var n = Math.round((new Date(TODAY + 'T00:00:00') - new Date(iso + 'T00:00:00')) / 86400000);
+        return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
+    }
+    // All = homework in every section they teach; Some = in a few; None = nothing in these dates
+    function coverage(t) { return t.sets === 0 ? 'None' : t.covered >= t.sections ? 'All' : 'Some'; }
+
+    function ovRange() {
+        var r = $('#ovRange .on').data('r');
+        if (r === 'custom') return { from: $('#ovFrom').val(), to: $('#ovTo').val() };
+        if (r === 'all') return { from: '2000-01-01', to: TODAY };
+        return { from: addDays(-r), to: TODAY };
+    }
+
+    function loadOverview() {
+        var r = ovRange();
+        if (!r.from || !r.to) return;
+        $('#ovTeachers').html('<tr><td colspan="8" class="text-muted text-center py-3">Loading...</td></tr>');
+        $.getJSON(URL.overview, { from: r.from, to: r.to, cls: ovClass }).done(function (d) {
+            OV = d; drawOverview();
+        }).fail(function () { ecToast('error', 'Could not load the overview.'); });
+    }
+
+    $('#ovRange').on('click', 'button', function () {
+        $('#ovRange button').removeClass('on'); $(this).addClass('on');
+        var custom = $(this).data('r') === 'custom';
+        $('#ovCustom').toggleClass('d-none', !custom);
+        if (custom && !$('#ovFrom').val()) { $('#ovFrom').val(addDays(-29)); $('#ovTo').val(TODAY); }
+        loadOverview();
+    });
+    $('#ovFrom, #ovTo').on('change', loadOverview);
+    $('#ovClasses').on('click', 'button', function () { ovClass = $(this).data('c') || ''; ovFilter = ''; loadOverview(); });
+    $('#ovLegend').on('click', '.hw-leg', function () { ovFilter = ovFilter === $(this).data('f') ? '' : $(this).data('f'); drawTeachers(); });
+    $('#ovSearch').on('input', drawTeachers);
+
+    function drawOverview() {
+        var T = OV.teachers || [], C = OV.classes || [], S = OV.subjects || [];
+
+        // class chips (done % of the homework given in that class); the list is kept from the "All" load
+        if (!ovClass) ovAllClasses = C;
+        var chips = ovAllClasses || C;
+        $('#ovClasses').html('<button data-c="" class="' + (ovClass ? '' : 'on') + '">All classes</button>' + chips.map(function (c) {
+            return '<button data-c="' + EC.esc(c.name) + '" class="' + (ovClass === c.name ? 'on' : '') + '">' + EC.esc(c.name)
+                 + ' <small>' + (c.sets ? pctText(c.done, c.expected) : '—') + '</small></button>';
+        }).join(''));
+
+        var none = T.filter(function (t) { return coverage(t) === 'None'; }),
+            some = T.filter(function (t) { return coverage(t) === 'Some'; }),
+            all  = T.filter(function (t) { return coverage(t) === 'All'; });
+        var sets = 0, givers = 0, checked = 0, classSets = 0;
+        T.forEach(function (t) { sets += t.sets; checked += t.checkedSets; if (t.sets) givers++; });
+        // homework given by someone with no timetable periods (e.g. the admin) still counts in the class totals
+        C.forEach(function (c) { classSets += c.sets; });
+
+        $('#ovKpis').html(
+            kpi('bx-user-x', 'red', none.length, 'Teachers giving none', 'of ' + T.length + ' teaching here')
+          + kpi('bx-error-circle', 'amber', some.length, 'Missing some sections', 'give homework, but not in every section')
+          + kpi('bx-book-open', 'blue', classSets, 'Homework given', 'by ' + givers + ' teacher(s)')
+          + kpi('bx-check-square', 'green', pctText(checked, sets), 'Checked in class', checked + ' of ' + sets + ' marked'));
+
+        // donut
+        var n = T.length || 1, a = all.length * 360 / n, b = (all.length + some.length) * 360 / n;
+        $('#ovDonut').css('background', T.length
+            ? 'conic-gradient(#28c76f 0 ' + a + 'deg, #ff9f43 ' + a + 'deg ' + b + 'deg, #ea5455 ' + b + 'deg 360deg)' : '#eef0f2');
+        $('#ovDonutN').text(T.length);
+        var legend = [['All', 'All their sections', '#28c76f', all], ['Some', 'Some sections', '#ff9f43', some], ['None', 'None at all', '#ea5455', none]];
+        $('#ovLegend').html(legend.map(function (l) {
+            return '<div class="hw-leg" data-f="' + l[0] + '"><i style="background:' + l[2] + '"></i>' + l[1]
+                 + '<b>' + l[3].length + '</b><small>' + pctText(l[3].length, T.length) + '</small></div>';
+        }).join(''));
+
+        // nobody giving homework: the busiest teachers first
+        none.sort(function (x, y) { return y.periods - x.periods; });
+        $('#ovNobody').html(none.length ? none.map(function (t) {
+            return '<div class="hw-nb"><div><b>' + EC.esc(t.name) + '</b><small>' + t.periods + ' periods/week across ' + t.sections + ' section(s)</small></div>'
+                 + '<span>' + EC.esc(t.last ? 'last ' + daysAgo(t.last) : 'never') + '</span></div>';
+        }).join('') : '<div class="text-muted p-3 text-center"><i class="bx bx-check-circle me-1"></i>Every teacher gave homework in these dates.</div>');
+
+        drawTeachers();
+
+        // leaderboard: only teachers who gave something
+        var lead = T.filter(function (t) { return t.sets > 0; }).map(function (t) {
+            var cov = t.sections ? Math.min(t.covered / t.sections, 1) : 0, rec = t.expected ? t.recorded / t.expected : 0;
+            return { t: t, cov: cov, rec: rec, score: Math.round(60 * cov + 40 * rec) };
+        });
+        lead.sort(function (x, y) { return y.score - x.score || y.t.sets - x.t.sets; });
+        $('#ovLeaders').html(lead.length ? lead.slice(0, 10).map(function (l, i) {
+            return '<div class="hw-lead"><span class="hw-rank">' + (i + 1) + '</span><div class="hw-lead-n"><b>' + EC.esc(l.t.name) + '</b>'
+                 + '<small>' + l.t.sets + ' given · ' + l.t.covered + '/' + l.t.sections + ' sections · ' + pctText(l.t.done, l.t.expected) + ' done</small></div>'
+                 + '<div class="hw-lead-s"><small>Coverage ' + Math.round(l.cov * 100) + '% · Checked ' + Math.round(l.rec * 100) + '%</small><b>' + l.score + '</b></div></div>';
+        }).join('') : '<div class="text-muted">No homework given in these dates.</div>');
+
+        // was it done (class totals)
+        var exp = 0, recd = 0, done = 0;
+        C.forEach(function (c) { exp += c.expected; recd += c.recorded; done += c.done; });
+        var notDone = recd - done, noRecord = Math.max(exp - recd, 0);
+        $('#ovDone').html(exp
+            ? '<div class="hw-stack"><i style="width:' + pct(done, exp) + '%;background:#28c76f"></i><i style="width:' + pct(notDone, exp) + '%;background:#ea5455"></i></div>'
+              + '<div class="hw-done-legend"><span><b class="s-d">' + done + '</b> done (' + pctText(done, exp) + ')</span>'
+              + '<span><b class="s-n">' + notDone + '</b> not done</span><span><b>' + noRecord + '</b> not checked</span></div>'
+            : '<div class="text-muted">No homework given in these dates.</div>');
+
+        $('#ovSubjects').html(S.length ? S.map(function (x) {
+            var p = pct(x.done, x.expected);
+            return '<div class="hw-subj-row"><span>' + EC.esc(x.name) + '</span><small>' + x.sets + ' given</small>'
+                 + '<div class="hw-bar"><i style="width:' + (p || 0) + '%"></i></div><b>' + (p === null ? '—' : p + '%') + '</b></div>';
+        }).join('') : '<div class="text-muted">—</div>');
+
+        $('#ovClassGrid').html(C.map(function (c) {
+            return '<div class="hw-class-card' + (c.sets ? '' : ' empty') + '"><b>' + EC.esc(c.name) + '</b>'
+                 + '<small>' + c.sections + ' section(s) · ' + c.students + ' students</small>'
+                 + '<div>' + (c.sets ? c.sets + ' homework · <b>' + pctText(c.done, c.expected) + '</b> done' : 'No homework') + '</div></div>';
+        }).join('') || '<div class="text-muted">No classes.</div>');
+    }
+
+    function kpi(icon, tone, value, label, sub) {
+        return '<div class="hw-kpi"><span class="hw-kpi-ic ' + tone + '"><i class="bx ' + icon + '"></i></span><b>' + EC.esc(value) + '</b>'
+             + '<div class="hw-kpi-l">' + EC.esc(label) + '</div><small>' + EC.esc(sub) + '</small></div>';
+    }
+
+    function drawTeachers() {
+        if (!OV) return;
+        var q = ($('#ovSearch').val() || '').trim().toLowerCase();
+        var rows = (OV.teachers || []).filter(function (t) {
+            return (!ovFilter || coverage(t) === ovFilter) && (!q || t.name.toLowerCase().indexOf(q) >= 0);
+        });
+        var filterName = { All: 'all their sections', Some: 'some sections', None: 'none at all' };
+        $('#ovTeacherFilter').text(ovFilter ? '· ' + filterName[ovFilter] : '');
+        $('#ovLegend .hw-leg').each(function () { $(this).toggleClass('on', $(this).data('f') === ovFilter); });
+        var badge = { All: 'ok', Some: 'some', None: 'none' }, label = { All: 'All sections', Some: 'Some sections', None: 'None set' };
+        $('#ovTeachers').html(rows.length ? rows.map(function (t) {
+            var c = coverage(t);
+            return '<tr><td class="fw-semibold">' + EC.esc(t.name) + '</td><td><span class="hw-badge ' + badge[c] + '">' + label[c] + '</span></td>'
+                 + '<td class="text-center">' + t.sets + '</td><td class="text-center">' + t.covered + '/' + t.sections + '</td>'
+                 + '<td class="text-center">' + t.periods + '</td><td>' + EC.esc(daysAgo(t.last)) + '</td>'
+                 + '<td class="text-center">' + pctText(t.recorded, t.expected) + '</td><td class="text-center">' + pctText(t.done, t.expected) + '</td></tr>';
+        }).join('') : '<tr><td colspan="8" class="text-muted text-center py-3">No teachers.</td></tr>');
+    }
 
     load();
 });
