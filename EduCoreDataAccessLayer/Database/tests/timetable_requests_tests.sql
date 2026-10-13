@@ -62,11 +62,12 @@ BEGIN
 
     -- 6. teacher sees it under Mine; admin sees it under Pending with what is live now
     CALL academic.sp_timetable_request_manage('Mine', T, S, TEACHER, NULL, NULL, NULL, NULL, NULL, NULL, c);
-    v_n := 0; LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; v_n := v_n + 1; END LOOP; CLOSE c;
+    -- count only this test's request: the teacher may have real ones too
+    v_n := 0; LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.request_id = v_id THEN v_n := v_n + 1; END IF; END LOOP; CLOSE c;
     CALL academic.sp_timetable_request_manage('Pending', T, S, ADMIN, NULL, NULL, NULL, NULL, NULL, NULL, c);
-    FETCH c INTO r; CLOSE c;
-    IF v_n = 1 AND r.request_id = v_id AND r.live_now IS NOT NULL
-    THEN pass := pass + 1; RAISE NOTICE 'PASS 6 Mine=% row; admin Pending shows % % for % (live now: %)', v_n, r.section_label, r.subject_name, r.teacher_name, r.live_now;
+    LOOP FETCH c INTO r; EXIT WHEN NOT FOUND OR r.request_id = v_id; END LOOP; CLOSE c;
+    IF v_n = 1 AND r.request_id = v_id AND r.live_now IS NOT NULL AND r.period_label LIKE 'Period %'
+    THEN pass := pass + 1; RAISE NOTICE 'PASS 6 in Mine; admin Pending shows %, % % for % (live now: %)', r.period_label, r.section_label, r.subject_name, r.teacher_name, r.live_now;
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 6 mine=% pending=%', v_n, r; END IF;
 
     -- a competing request from another teacher for the SAME section + period (no login, so inserted directly)

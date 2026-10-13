@@ -184,7 +184,7 @@ $(function () {
         var badge = { Pending: 'bg-label-warning', Approved: 'bg-label-success', Rejected: 'bg-label-danger' };
         $('#mtReqBody').html(D.requests.map(function (q) {
             var day = (D.days.filter(function (d) { return d.day === q.day; })[0] || { label: '?' }).label;
-            return '<tr><td class="text-nowrap">' + EC.esc(day) + ', period ' + q.seq + '</td>'
+            return '<tr><td class="text-nowrap">' + EC.esc(day) + ', ' + EC.esc(q.period || ('period ' + q.seq)) + '</td>'
                  + '<td>' + EC.esc(q.section) + '</td><td>' + EC.esc(q.subject) + '</td>'
                  + '<td><span class="badge ' + (badge[q.status] || 'bg-label-secondary') + '">' + EC.esc(q.status) + '</span>'
                  + (q.note ? '<div class="small text-muted mt-1">' + EC.esc(q.note) + '</div>' : '') + '</td>'

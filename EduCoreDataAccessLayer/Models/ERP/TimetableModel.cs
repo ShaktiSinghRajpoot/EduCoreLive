@@ -111,6 +111,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string Note         { get; set; } = string.Empty;   // why it was rejected
         public int    DayOfWeek    { get; set; }
         public int    PeriodSeq    { get; set; }
+        public string PeriodLabel  { get; set; } = string.Empty;   // "Period 6"
         public int    SectionId    { get; set; }
         public string SectionLabel { get; set; } = string.Empty;
         public string SubjectName  { get; set; } = string.Empty;

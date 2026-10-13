@@ -149,6 +149,12 @@ BEGIN
     ELSIF p_operation IN ('Mine', 'Pending') THEN
         OPEN p_result FOR
         SELECT q.request_id, q.status, q.note, q.day_of_week, q.period_seq,
+               -- the period's name ("Period 6") from that day's bell schedule, else the default one;
+               -- period_seq alone counts the assembly and breaks too
+               (SELECT ps.label FROM academic.period_structure ps
+                WHERE ps.tenant_id = q.tenant_id AND ps.school_id = q.school_id AND ps.seq = q.period_seq
+                  AND (ps.day_of_week = q.day_of_week OR ps.day_of_week IS NULL)
+                ORDER BY ps.day_of_week NULLS LAST LIMIT 1) AS period_label,
                to_char(q.requested_at, 'DD Mon YYYY, HH12:MI AM') AS requested_at,
                q.academic_class_section_id AS section_id,
                c.class_name || ' – ' || sec.section_name        AS section_label,

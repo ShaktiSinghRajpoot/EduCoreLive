@@ -1312,7 +1312,7 @@ namespace educore.Areas.ERP.Controllers
             var rows = await _timetableService.GetPendingRequestsAsync(SmTenant(), SmSchool(), SmUser());
             return Json(rows.Select(r => new
             {
-                id = r.RequestId, day = r.DayOfWeek, seq = r.PeriodSeq, section = r.SectionLabel,
+                id = r.RequestId, day = r.DayOfWeek, seq = r.PeriodSeq, period = r.PeriodLabel, section = r.SectionLabel,
                 subject = r.SubjectName, teacher = r.TeacherName, liveNow = r.LiveNow, at = r.RequestedAt
             }));
         }

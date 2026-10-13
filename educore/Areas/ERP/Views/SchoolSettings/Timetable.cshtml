@@ -586,7 +586,7 @@ $(function () {
             $('#ttReqCount').text(rows.length);
             $('#ttReqBody').html(rows.map(function (r) {
                 return '<tr><td class="fw-semibold">' + EC.esc(r.teacher) + '<div class="small text-muted">' + EC.esc(r.at) + '</div></td>'
-                     + '<td class="text-nowrap">' + EC.esc(DAY_NAMES[r.day] || '?') + ', period ' + r.seq + '</td>'
+                     + '<td class="text-nowrap">' + EC.esc(DAY_NAMES[r.day] || '?') + ', ' + EC.esc(r.period || ('period ' + r.seq)) + '</td>'
                      + '<td>' + EC.esc(r.section) + '</td><td>' + EC.esc(r.subject) + '</td>'
                      + '<td class="text-muted">' + EC.esc(r.liveNow || 'Free') + '</td>'
                      + '<td class="text-end text-nowrap">'

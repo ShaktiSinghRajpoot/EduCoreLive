@@ -293,6 +293,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     Note         = Str(row, "note"),
                     DayOfWeek    = IntVal(row, "day_of_week"),
                     PeriodSeq    = IntVal(row, "period_seq"),
+                    PeriodLabel  = Str(row, "period_label"),
                     SectionId    = IntVal(row, "section_id"),
                     SectionLabel = Str(row, "section_label"),
                     SubjectName  = Str(row, "subject_name"),

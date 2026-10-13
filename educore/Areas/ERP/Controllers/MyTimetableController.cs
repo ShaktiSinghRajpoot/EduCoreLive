@@ -56,7 +56,7 @@ namespace educore.Areas.ERP.Controllers
                 live     = live.Select(e => new { day = e.DayOfWeek, seq = e.PeriodSeq, subjectId = e.SubjectId, subject = e.SubjectName, section = e.SectionLabel }),
                 requests = requests.Select(r => new
                 {
-                    id = r.RequestId, status = r.Status, note = r.Note, day = r.DayOfWeek, seq = r.PeriodSeq,
+                    id = r.RequestId, status = r.Status, note = r.Note, day = r.DayOfWeek, seq = r.PeriodSeq, period = r.PeriodLabel,
                     section = r.SectionLabel, subject = r.SubjectName, liveNow = r.LiveNow, at = r.RequestedAt
                 })
             });
