@@ -4,6 +4,10 @@
     var me = ViewBag.Me as EduCoreDataAccessLayer.Models.ERP.MyStaffInfo;
 }
 
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/SchoolSettings/Timetable.css" asp-append-version="true" />
+}
+
 <div class="ec-page-shell">
   <div class="ec-page-content">
 
@@ -34,16 +38,14 @@
           <div>
             <div class="ec-section-title">My week</div>
             <div class="ec-section-subtitle">
-              <span class="badge bg-label-success">Live</span>
-              <span class="badge bg-label-warning">Requested</span>
-              <span class="text-muted ms-1">Free periods show “+ Request”.</span>
+              Coloured = your live periods · <span class="text-warning fw-bold">dashed orange</span> = waiting for approval · “+ Request” on a free period.
             </div>
           </div>
         </div>
       </div>
       <div class="ec-card-body p-0">
         <div class="table-responsive">
-          <table class="table table-bordered align-middle mb-0 text-center" style="font-size:.8rem;">
+          <table class="sv-grid" style="min-width:640px;">
             <thead id="mtHead"></thead>
             <tbody id="mtBody"><tr><td class="text-muted py-4">Loading…</td></tr></tbody>
           </table>
@@ -148,25 +150,32 @@ $(function () {
 
         $('#mtBody').html(rows.map(function (r) {
             if (r.type !== 'class') {
-                return '<tr><td class="text-muted">' + EC.esc(r.time) + '</td><td colspan="' + D.days.length + '" class="text-muted text-start">' + EC.esc(r.label) + '</td></tr>';
+                return '<tr class="tt-break"><td colspan="' + (D.days.length + 1) + '">' + EC.esc(r.label) + ' · ' + EC.esc(r.time) + '</td></tr>';
             }
-            return '<tr><td class="text-muted text-nowrap">' + EC.esc(r.label) + '<br><small>' + EC.esc(r.time) + '</small></td>'
+            return '<tr><td><div class="tt-pcell"><div class="tt-pname">' + EC.esc(r.label) + '</div><div class="tt-ptime">' + EC.esc(r.time) + '</div></div></td>'
                  + D.days.map(function (d) { return cell(d, r); }).join('') + '</tr>';
         }).join(''));
     }
 
     function cell(d, r) {
         var isPeriod = D.periods.some(function (p) { return p.day === d.day && p.seq === r.seq && p.type === 'class'; });
-        if (!isPeriod) return '<td class="text-muted">—</td>';
+        if (!isPeriod) return '<td><div class="sv-empty" style="opacity:.5">—</div></td>';
 
         var live = D.live.filter(function (e) { return e.day === d.day && e.seq === r.seq; })[0];
         var req  = D.requests.filter(function (q) { return q.day === d.day && q.seq === r.seq && q.status === 'Pending'; })[0];
 
         var html = '';
-        if (live) html += '<div class="badge bg-label-success d-block text-wrap mb-1">' + EC.esc(live.subject) + '<br>' + EC.esc(live.section) + '</div>';
-        if (req)  html += '<div class="badge bg-label-warning d-block text-wrap">Requested: ' + EC.esc(req.subject) + '<br>' + EC.esc(req.section) + '</div>';
-        if (!req) html += '<button type="button" class="btn btn-sm btn-link p-0 mt-ask" data-day="' + d.day + '" data-seq="' + r.seq + '"'
-                        + ' data-label="' + EC.esc(d.label + ', ' + r.label) + '">' + (live ? 'Change' : '+ Request') + '</button>';
+        var ask = ' data-day="' + d.day + '" data-seq="' + r.seq + '" data-label="' + EC.esc(d.label + ', ' + r.label) + '"';
+        if (live) {
+            // Same tinted card as the School view; clicking it asks for a change.
+            var n = ((Math.abs(live.subjectId) - 1) % 8) + 1;
+            html += '<div class="sv-cell t' + n + (req ? '' : ' mt-ask') + '"' + ask + ' title="' + (req ? '' : 'Click to request a change') + '">'
+                  + '<span class="sv-ini s' + n + '">' + EC.esc(live.subject.slice(0, 2).toUpperCase()) + '</span>'
+                  + '<div><div class="sv-sub">' + EC.esc(live.subject) + '</div><div class="sv-tch">' + EC.esc(live.section) + '</div></div></div>';
+        } else if (!req) {
+            html += '<div class="sv-empty mt-ask" style="cursor:pointer"' + ask + '>+ Request</div>';
+        }
+        if (req) html += '<div class="sv-req"><div>Waiting: ' + EC.esc(req.subject) + '<br>' + EC.esc(req.section) + '</div></div>';
         return '<td>' + html + '</td>';
     }
 

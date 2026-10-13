@@ -53,7 +53,7 @@ namespace educore.Areas.ERP.Controllers
                 periods  = setup.Periods.Select(p => new { day = p.DayOfWeek, seq = p.PeriodSeq, label = p.Label, type = p.PeriodType,
                                                           time = p.StartTime + "–" + p.EndTime }),
                 sections = setup.Sections.Select(s => new { id = s.SectionId, label = s.Label }),
-                live     = live.Select(e => new { day = e.DayOfWeek, seq = e.PeriodSeq, subject = e.SubjectName, section = e.SectionLabel }),
+                live     = live.Select(e => new { day = e.DayOfWeek, seq = e.PeriodSeq, subjectId = e.SubjectId, subject = e.SubjectName, section = e.SectionLabel }),
                 requests = requests.Select(r => new
                 {
                     id = r.RequestId, status = r.Status, note = r.Note, day = r.DayOfWeek, seq = r.PeriodSeq,

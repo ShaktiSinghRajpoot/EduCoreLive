@@ -91,6 +91,18 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int    Skipped { get; set; }
     }
 
+    /// <summary>One live period of the School view (every section, one session).</summary>
+    public class TimetableSchoolEntry
+    {
+        public int    SectionId   { get; set; }
+        public int    DayOfWeek   { get; set; }
+        public int    PeriodSeq   { get; set; }
+        public int    SubjectId   { get; set; }
+        public string SubjectName { get; set; } = string.Empty;
+        public int?   StaffId     { get; set; }
+        public string StaffName   { get; set; } = string.Empty;
+    }
+
     /// <summary>A teacher's request for one period (academic.timetable_requests).</summary>
     public class TimetableRequestRow
     {

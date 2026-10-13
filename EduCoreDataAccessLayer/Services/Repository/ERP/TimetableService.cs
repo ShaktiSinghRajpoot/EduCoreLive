@@ -196,6 +196,40 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return await RunWriteAsync(p, "Day copied.");
         }
 
+        // ── School view: every live period of a session in one call ──
+        public async Task<List<TimetableSchoolEntry>> GetSchoolViewAsync(int tenantId, int schoolId, int actionUserId, int academicYearId = 0)
+        {
+            var list = new List<TimetableSchoolEntry>();
+            if (tenantId <= 1 || schoolId <= 0) return list;
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",        NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",        NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id",   NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_academic_year_id", NpgsqlDbType.Integer) { Value = academicYearId > 0 ? academicYearId : DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "school_view_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("academic.sp_timetable_school_view", p);
+            if (ds.Tables.Count == 0) return list;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                list.Add(new TimetableSchoolEntry
+                {
+                    SectionId   = IntVal(row, "section_id"),
+                    DayOfWeek   = IntVal(row, "day_of_week"),
+                    PeriodSeq   = IntVal(row, "period_seq"),
+                    SubjectId   = IntVal(row, "subject_id"),
+                    SubjectName = Str(row, "subject_name"),
+                    StaffId     = NullInt(row, "staff_id"),
+                    StaffName   = Str(row, "staff_name")
+                });
+            }
+            return list;
+        }
+
         // ── Teacher requests: academic.sp_timetable_request_manage ──
 
         private const string SpRequest = "academic.sp_timetable_request_manage";

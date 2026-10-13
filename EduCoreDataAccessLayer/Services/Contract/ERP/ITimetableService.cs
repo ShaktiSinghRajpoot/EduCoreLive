@@ -37,6 +37,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<TimetableSaveResult> CopyDayAsync(
             int sectionId, int fromDay, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Every live period of a session, all sections (the School view).</summary>
+        Task<List<TimetableSchoolEntry>> GetSchoolViewAsync(int tenantId, int schoolId, int actionUserId, int academicYearId = 0);
+
         // ── Teacher requests (academic.sp_timetable_request_manage) ──
         // The teacher is always the logged-in user's own staff record.
 

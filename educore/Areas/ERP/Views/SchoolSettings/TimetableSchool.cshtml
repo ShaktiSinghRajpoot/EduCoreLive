@@ -1,0 +1,282 @@
+@{
+    ViewData["Title"] = "Timetable — School view";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage: may approve requests
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/SchoolSettings/Timetable.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-grid-alt fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Timetable — School view</h4>
+            <div class="ec-page-subtitle">One day, every class. Click a period (or search a teacher) to see that teacher's whole day.</div>
+          </div>
+        </div>
+        <a class="tt-btn" href="@Url.Action("Timetable", "SchoolSettings", new { area = "ERP", academicYearId = ViewBag.AcademicYearId })">
+          <i class="bx bx-edit"></i>Class / Teacher view
+        </a>
+      </div>
+    </div>
+
+    <div class="ec-card mb-0">
+      <div class="ec-card-body">
+        <div class="tt-days" id="svDays"></div>
+
+        <div class="sv-top">
+          <div class="sv-progress">
+            <div class="sv-progress-row"><span id="svFilled"></span><span id="svBusy"></span></div>
+            <div class="sv-bar"><span id="svBar" style="width:0"></span></div>
+          </div>
+          <div class="sv-find">
+            <input type="text" id="svFind" list="svTeachers" placeholder="Find teacher…" autocomplete="off">
+            <datalist id="svTeachers"></datalist>
+            <button type="button" id="svClear" title="Clear"><i class="bx bx-x"></i></button>
+          </div>
+        </div>
+
+        @if (canManage)
+        {
+            <div class="sv-banner d-none" id="svBanner">
+              <i class="bx bx-bell"></i>
+              <span id="svBannerText"></span>
+              <button type="button" class="btn btn-sm btn-primary ms-auto" id="svApproveAll"><i class="bx bx-check-double me-1"></i>Approve all</button>
+            </div>
+        }
+
+        <!-- desktop: every section of the day -->
+        <div class="tt-wrap sv-wrap" id="svWrap">
+          <table class="sv-grid"><thead id="svHead"></thead><tbody id="svBody"><tr><td class="text-muted py-4">Loading…</td></tr></tbody></table>
+        </div>
+
+        <!-- phone: one section at a time -->
+        <div class="sv-mob" id="svMob">
+          <select class="tt-select w-100 mb-3" id="svMobSec"></select>
+          <div id="svMobList"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var DATA_URL    = '@Url.Action("TimetableSchoolData", "SchoolSettings", new { area = "ERP" })';
+    var APPROVE_URL = '@Url.Action("ApproveTimetableRequest", "SchoolSettings", new { area = "ERP" })';
+    var REJECT_URL  = '@Url.Action("RejectTimetableRequest", "SchoolSettings", new { area = "ERP" })';
+    var SESSION_ID  = @(ViewBag.AcademicYearId ?? 0);
+    var CAN_MANAGE  = @(canManage ? "true" : "false");
+
+    var D = null;        // everything from DATA_URL
+    var DAY = null;      // the day shown (0-6)
+    var SEL = 0;         // the selected teacher's staff id, 0 = none
+    var MOB_SEC = 0;     // the section shown on a phone
+
+    // ── small helpers ──
+    function key(sec, day, seq) { return sec + '_' + day + '_' + seq; }
+    function tint(id) { return 't' + (((Math.abs(id) - 1) % 8) + 1); }   // same 8 colours as the class grid's dots
+    function dot(id)  { return 's' + (((Math.abs(id) - 1) % 8) + 1); }
+    function initials(name) {
+        var p = (name || '').split(' ').filter(function (x) { return x; });
+        return ((p[0] || '?')[0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
+    }
+    function periodsOf(day) {
+        return D.periods.filter(function (p) { return p.day === day; }).sort(function (a, b) { return a.seq - b.seq; });
+    }
+    function classPeriodsOf(day) { return periodsOf(day).filter(function (p) { return p.type === 'class'; }); }
+
+    var ENTRY = {}, REQ = {};
+    function index() {
+        ENTRY = {}; REQ = {};
+        D.entries.forEach(function (e) { ENTRY[key(e.sec, e.day, e.seq)] = e; });
+        D.pending.forEach(function (r) { (REQ[key(r.sec, r.day, r.seq)] = REQ[key(r.sec, r.day, r.seq)] || []).push(r); });
+    }
+
+    function load() {
+        $.getJSON(DATA_URL, { academicYearId: SESSION_ID }).done(function (d) {
+            D = d; index();
+            if (DAY === null || !D.days.some(function (x) { return x.day === DAY; })) {
+                var today = new Date().getDay();
+                DAY = D.days.some(function (x) { return x.day === today; }) ? today : (D.days[0] || { day: 1 }).day;
+            }
+            if (!MOB_SEC && D.sections.length) MOB_SEC = D.sections[0].id;
+            $('#svTeachers').html(D.teachers.map(function (t) { return '<option value="' + EC.esc(t.name) + '">'; }).join(''));
+            $('#svMobSec').html(D.sections.map(function (s) { return '<option value="' + s.id + '">' + EC.esc(s.label) + '</option>'; }).join('')).val(MOB_SEC);
+            draw();
+        }).fail(function () { ecToast('error', 'Could not load the timetable.'); });
+    }
+
+    function draw() { drawDays(); drawStats(); drawBanner(); drawGrid(); drawMob(); applySel(); }
+
+    // Day pills with filled / total periods.
+    function drawDays() {
+        $('#svDays').html(D.days.map(function (d) {
+            var total = D.sections.length * classPeriodsOf(d.day).length;
+            var filled = D.entries.filter(function (e) { return e.day === d.day; }).length;
+            return '<button type="button" class="tt-day' + (d.day === DAY ? ' on' : '') + '" data-day="' + d.day + '">'
+                 + EC.esc(d.label.slice(0, 3)) + '<small>' + filled + '/' + total + '</small></button>';
+        }).join(''));
+    }
+
+    // "X of Y periods filled" and the busiest teacher of the day.
+    function drawStats() {
+        var total = D.sections.length * classPeriodsOf(DAY).length;
+        var today = D.entries.filter(function (e) { return e.day === DAY; });
+        var pct = total ? Math.round(today.length * 100 / total) : 0;
+        $('#svFilled').html('<b>' + today.length + '</b> of ' + total + ' periods filled (' + pct + '%)');
+        $('#svBar').css('width', pct + '%');
+
+        var count = {}, best = null;
+        today.forEach(function (e) { if (e.staffId) count[e.staffId] = (count[e.staffId] || 0) + 1; });
+        Object.keys(count).forEach(function (id) { if (!best || count[id] > count[best]) best = id; });
+        var t = best && D.teachers.filter(function (x) { return String(x.id) === best; })[0];
+        $('#svBusy').html(t ? 'Most busy: <b>' + EC.esc(t.name) + '</b> · ' + count[best] + ' periods' : '');
+    }
+
+    function drawBanner() {
+        if (!CAN_MANAGE) return;
+        var n = D.pending.filter(function (r) { return r.day === DAY; }).length;
+        $('#svBanner').toggleClass('d-none', n === 0);
+        $('#svBannerText').text(n + ' teacher request' + (n === 1 ? '' : 's') + ' for this day — approve ✓ or reject ✕ in the cells, or approve all.');
+    }
+
+    // One cell's inner HTML: the live period (if any) and any pending requests.
+    function cellHtml(sec, seq) {
+        var e = ENTRY[key(sec, DAY, seq)], html = '';
+        if (e) {
+            html += '<div class="sv-cell ' + tint(e.subjectId) + '" data-staff="' + (e.staffId || 0) + '" title="' + EC.esc(e.subject + (e.staff ? ' · ' + e.staff : '')) + '">'
+                  + '<span class="sv-ini ' + dot(e.subjectId) + '">' + EC.esc(initials(e.staff || e.subject)) + '</span>'
+                  + '<div><div class="sv-sub">' + EC.esc(e.subject) + '</div><div class="sv-tch">' + EC.esc(e.staff || 'No teacher') + '</div></div></div>';
+        } else {
+            html += '<div class="sv-empty">—</div>';
+        }
+        (REQ[key(sec, DAY, seq)] || []).forEach(function (r) {
+            html += '<div class="sv-req"><div>' + EC.esc(r.teacher) + '<br>' + EC.esc(r.subject) + '</div>'
+                  + '<button type="button" class="ok" data-id="' + r.id + '" title="Approve"><i class="bx bx-check"></i></button>'
+                  + '<button type="button" class="no" data-id="' + r.id + '" title="Reject"><i class="bx bx-x"></i></button></div>';
+        });
+        return html;
+    }
+
+    function isFull(sec) {
+        return classPeriodsOf(DAY).every(function (p) { return ENTRY[key(sec, DAY, p.seq)]; });
+    }
+
+    // Desktop: rows = sections grouped by class, columns = the day's periods.
+    function drawGrid() {
+        var ps = periodsOf(DAY);
+        $('#svHead').html('<tr><th>Section</th>' + ps.map(function (p) {
+            return p.type === 'class'
+                ? '<th>' + EC.esc(p.label) + '<small>' + EC.esc(p.time) + '</small></th>'
+                : '<th class="sv-brk"><span>' + EC.esc(p.label) + '</span></th>';
+        }).join('') + '</tr>');
+
+        var html = '', lastClass = null;
+        D.sections.forEach(function (s) {
+            if (s.cls !== lastClass) { html += '<tr class="sv-group"><td colspan="' + (ps.length + 1) + '">' + EC.esc(s.cls) + '</td></tr>'; lastClass = s.cls; }
+            html += '<tr><td><div class="sv-sec' + (isFull(s.id) ? ' full' : '') + '">' + EC.esc(s.sec || s.label) + '</div></td>'
+                  + ps.map(function (p) { return p.type === 'class' ? '<td>' + cellHtml(s.id, p.seq) + '</td>' : '<td class="sv-brk"></td>'; }).join('')
+                  + '</tr>';
+        });
+        $('#svBody').html(html || '<tr><td class="text-muted py-4">No classes yet.</td></tr>');
+    }
+
+    // Phone: one section, its periods stacked (same row style as the class grid's phone view).
+    function drawMob() {
+        $('#svMobList').html(periodsOf(DAY).map(function (p) {
+            if (p.type !== 'class') return '<div class="tt-mbreak">' + EC.esc(p.label) + '</div>';
+            return '<div class="tt-mrow"><div class="tt-mp"><div class="tt-mp-name">' + EC.esc(p.label) + '</div><div class="tt-mp-time">' + EC.esc(p.time) + '</div></div>'
+                 + '<div>' + cellHtml(MOB_SEC, p.seq) + '</div></div>';
+        }).join(''));
+    }
+
+    // Selected teacher: ring their periods, fade the rest.
+    function applySel() {
+        $('#svWrap, #svMob').toggleClass('sv-has-sel', SEL > 0);
+        $('.sv-cell').each(function () { $(this).toggleClass('sel', SEL > 0 && Number($(this).attr('data-staff')) === SEL); });
+    }
+
+    // ── events ──
+    $('#svDays').on('click', '.tt-day', function () { DAY = Number($(this).attr('data-day')); draw(); });
+
+    $('#svWrap, #svMob').on('click', '.sv-cell', function () {
+        var id = Number($(this).attr('data-staff'));
+        SEL = (SEL === id) ? 0 : id;                     // click again to clear
+        var t = D.teachers.filter(function (x) { return x.id === SEL; })[0];
+        $('#svFind').val(t ? t.name : '');
+        applySel();
+    });
+
+    $('#svFind').on('change input', function () {
+        var name = $(this).val().trim().toLowerCase();
+        var t = D.teachers.filter(function (x) { return x.name.toLowerCase() === name; })[0];
+        if (t) { SEL = t.id; applySel(); } else if (!name) { SEL = 0; applySel(); }
+    });
+    $('#svClear').on('click', function () { $('#svFind').val(''); SEL = 0; applySel(); });
+    $(document).on('keydown', function (e) { if (e.key === 'Escape' && SEL) { $('#svClear').click(); } });
+
+    $('#svMobSec').on('change', function () { MOB_SEC = Number($(this).val()); drawMob(); applySel(); });
+
+    // ── approve / reject a teacher's request in its cell ──
+    function post(url, body) {
+        return $.ajax({ url: url, type: 'POST', contentType: 'application/json',
+                        headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val() },
+                        data: JSON.stringify(body) });
+    }
+
+    $('#svWrap, #svMob').on('click', '.sv-req .ok', function () {
+        var $btn = $(this); EC.buttonBusy($btn);
+        post(APPROVE_URL, { requestId: Number($btn.attr('data-id')) })
+            .done(function (res) { ecToast(res && res.success ? 'success' : 'error', (res && res.message) || 'Could not approve.'); load(); })
+            .fail(function () { EC.buttonReset($btn); ecToast('error', 'Could not approve.'); });
+    });
+
+    $('#svWrap, #svMob').on('click', '.sv-req .no', function () {
+        var id = Number($(this).attr('data-id'));
+        EC.prompt({ title: 'Reject this request?', label: 'Reason (the teacher sees it)', required: true, okText: 'Reject' })
+            .then(function (reason) {
+                if (reason === null) return;
+                post(REJECT_URL, { requestId: id, reason: reason })
+                    .done(function (res) { ecToast(res && res.success ? 'success' : 'error', (res && res.message) || 'Could not reject.'); load(); });
+            });
+    });
+
+    // Approve every request of the day, one after another. A clash is reported
+    // and that request stays pending for the admin to decide.
+    $('#svApproveAll').on('click', function () {
+        var ids = D.pending.filter(function (r) { return r.day === DAY; }).map(function (r) { return r.id; });
+        var $btn = $(this), ok = 0, failed = [];
+        EC.buttonBusy($btn, 'Approving…');
+        function next(i) {
+            if (i >= ids.length) {
+                EC.buttonReset($btn);
+                ecToast(failed.length ? 'warning' : 'success', ok + ' approved' + (failed.length ? '; ' + failed.length + ' not: ' + failed[0] : '.'));
+                load(); return;
+            }
+            post(APPROVE_URL, { requestId: ids[i] })
+                .done(function (res) { if (res && res.success) ok++; else failed.push((res && res.message) || 'clash'); })
+                .fail(function () { failed.push('error'); })
+                .always(function () { next(i + 1); });
+        }
+        next(0);
+    });
+
+    load();
+});
+</script>
+}

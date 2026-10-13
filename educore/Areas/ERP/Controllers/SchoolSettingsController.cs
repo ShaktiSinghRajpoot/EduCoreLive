@@ -1268,6 +1268,41 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = result.Success, message = result.Message, copied = result.Copied, skipped = result.Skipped });
         }
 
+        // ── School view: one day, every section, with the teachers' requests in their cells ──
+
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> TimetableSchool(int academicYearId = 0)
+        {
+            await ResolveSessionAsync(academicYearId);
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "academics.manage");
+            return View();
+        }
+
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> TimetableSchoolData(int academicYearId = 0)
+        {
+            var setup   = await _timetableService.GetSetupAsync(SmTenant(), SmSchool(), SmUser(), academicYearId);
+            var entries = await _timetableService.GetSchoolViewAsync(SmTenant(), SmSchool(), SmUser(), academicYearId);
+            // Requests are only shown to those who can approve them.
+            var pending = await HasPermissionAttribute.UserHasAsync(this, "academics.manage")
+                ? await _timetableService.GetPendingRequestsAsync(SmTenant(), SmSchool(), SmUser())
+                : new List<TimetableRequestRow>();
+
+            return Json(new
+            {
+                days     = setup.Days.Select(d => new { day = d.DayOfWeek, label = d.DayLabel }),
+                periods  = setup.Periods.Select(x => new { day = x.DayOfWeek, seq = x.PeriodSeq, label = x.Label, type = x.PeriodType,
+                                                          time = x.StartTime + "–" + x.EndTime }),
+                sections = setup.Sections.Select(x => new { id = x.SectionId, cls = x.ClassName, sec = x.SectionName, label = x.Label }),
+                teachers = setup.Teachers.Select(x => new { id = x.StaffId, name = x.FullName }),
+                entries  = entries.Select(e => new { sec = e.SectionId, day = e.DayOfWeek, seq = e.PeriodSeq,
+                                                     subjectId = e.SubjectId, subject = e.SubjectName, staffId = e.StaffId, staff = e.StaffName }),
+                pending  = pending.Select(r => new { id = r.RequestId, sec = r.SectionId, day = r.DayOfWeek, seq = r.PeriodSeq,
+                                                     subject = r.SubjectName, teacher = r.TeacherName })
+            });
+        }
+
         // ── Teachers' period requests (they ask on My Timetable, an admin decides here) ──
 
         [HttpGet]

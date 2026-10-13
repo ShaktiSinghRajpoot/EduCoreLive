@@ -5105,3 +5105,16 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - **Tests:** `tests/timetable_requests_tests.sql`, 11 checks on QA Test School data, rolled back.
 - Menu: the admin Timetable item now matches `SchoolSettings/Timetable` so it does not light up on
   My Timetable.
+
+### [2026-10-13] Timetable School view (one day, every section) + same look on My Timetable
+- **School view** (`SchoolSettings/TimetableSchool`, linked from the Timetable toolbar): day pills with
+  filled/total periods, a filled-periods bar and the busiest teacher, a "Find teacher" box, and a grid
+  of every section (grouped by class) for the day. Click a period or search a teacher: their periods
+  get an orange ring and everything else fades to 40%. Hover dims a cell slightly. A section's label
+  is underlined green with ✓ when its day is full. Teachers' pending requests sit in their cells with
+  ✓ / ✕, plus "Approve all" for the day. Phone: pick a section, its periods stacked. Our existing
+  theme (`Timetable.css`, `tt-` classes, the 8 subject colours as soft tints `t1`–`t8`).
+- Data: one call. New read-only `academic.sp_timetable_school_view` (`timetable_school_view.sql`,
+  `deploy_2026_10_13d.sql`) returns every live period of the session; setup and pending requests come
+  from the existing procs.
+- **My Timetable** uses the same tinted cells and the dashed card for a waiting request.

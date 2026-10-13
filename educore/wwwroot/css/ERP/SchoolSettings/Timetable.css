@@ -72,3 +72,72 @@
     .tt-wrap{ display:none; }
     .tt-mob{ display:block; }
 }
+
+/* ================================================================
+   School view (TimetableSchool): one day, every section.
+   Same theme as the grid above; only the subject tints are new.
+   ================================================================ */
+.sv-top{ display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; margin-bottom:.75rem; }
+.sv-progress{ flex:1 1 260px; min-width:220px; }
+.sv-progress-row{ display:flex; justify-content:space-between; font-size:.75rem; font-weight:700; color:var(--ec-text-muted); margin-bottom:.3rem; }
+.sv-progress-row b{ color:var(--ec-text-dark); }
+.sv-bar{ height:7px; border-radius:999px; background:var(--ec-primary-light); overflow:hidden; }
+.sv-bar span{ display:block; height:100%; background:var(--ec-primary); border-radius:999px; transition:width .3s; }
+.sv-find{ position:relative; flex:0 1 260px; min-width:200px; }
+.sv-find input{ height:36px; width:100%; padding:0 2rem 0 .7rem; border-radius:8px; border:1px solid var(--ec-border); font-size:.8rem; }
+.sv-find input:focus{ outline:0; border-color:rgba(255,138,0,.55); box-shadow:0 0 0 3px rgba(255,138,0,.1); }
+.sv-find button{ position:absolute; right:.35rem; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--ec-text-muted); }
+.tt-day small{ font-weight:700; margin-left:.25rem; opacity:.85; }
+
+.sv-banner{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; border:1px dashed rgba(255,138,0,.5); background:var(--ec-primary-soft);
+            border-radius:10px; padding:.55rem .8rem; margin-bottom:.75rem; font-size:.8rem; font-weight:700; color:var(--ec-text-dark); }
+
+.sv-grid{ border-collapse:separate; border-spacing:4px; width:100%; min-width:900px; }
+.sv-grid th{ background:linear-gradient(180deg,#fffaf3,#fff6ea); color:var(--ec-text-light,#9a938b); font-size:.68rem; font-weight:800;
+             text-transform:uppercase; letter-spacing:.04em; padding:.4rem; border-radius:8px; text-align:center; white-space:nowrap; }
+.sv-grid th small{ display:block; font-size:.6rem; text-transform:none; letter-spacing:0; font-weight:650; }
+.sv-grid th.sv-brk, .sv-grid td.sv-brk{ width:26px; padding:0; }
+.sv-grid td.sv-brk{ background:repeating-linear-gradient(45deg,#faf7f2,#faf7f2 6px,#f4efe7 6px,#f4efe7 12px); border-radius:6px; }
+.sv-grid th.sv-brk span{ writing-mode:vertical-rl; transform:rotate(180deg); font-size:.58rem; }
+.sv-group td{ font-size:.7rem; font-weight:800; color:var(--ec-text-muted); text-transform:uppercase; letter-spacing:.05em; padding:.45rem .2rem .1rem; }
+.sv-sec{ font-weight:800; font-size:.8rem; color:var(--ec-text-dark); text-align:center; white-space:nowrap; padding:.2rem .5rem;
+         border-bottom:2px solid #ffc27a; }
+.sv-sec.full{ border-bottom-color:#28c76f; }
+.sv-sec.full::after{ content:" ✓"; color:#28c76f; }
+
+/* a live period */
+.sv-cell{ display:flex; align-items:center; gap:.35rem; min-height:38px; padding:.25rem .4rem; border-radius:8px; border:1px solid var(--ec-border);
+          background:#fff; cursor:pointer; transition:opacity .15s, box-shadow .15s; text-align:left; }
+.sv-cell:hover{ opacity:.9; box-shadow:0 0 0 1px rgba(255,138,0,.45); }
+.sv-ini{ flex:0 0 auto; width:22px; height:22px; border-radius:6px; color:#fff; font-size:.6rem; font-weight:800; display:flex; align-items:center; justify-content:center; }
+.sv-sub{ font-size:.72rem; font-weight:800; color:var(--ec-text-dark); line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sv-tch{ font-size:.63rem; font-weight:650; color:var(--ec-text-muted); line-height:1.1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sv-cell > div{ min-width:0; }
+.sv-empty{ min-height:38px; border-radius:8px; border:1px dashed var(--ec-border); color:var(--ec-text-muted); display:flex; align-items:center; justify-content:center; font-size:.75rem; }
+
+/* soft subject tints, same 8 colours as the dots */
+.t1{ background:#f1f0fe; border-color:#d5d1fb; } .t2{ background:#fff4e6; border-color:#ffd6a3; }
+.t3{ background:#eafaf1; border-color:#b8ecd0; } .t4{ background:#e6fbfe; border-color:#a8eef7; }
+.t5{ background:#fdeeee; border-color:#f6c4c4; } .t6{ background:#f6ebf8; border-color:#e0bfe7; }
+.t7{ background:#fff3e8; border-color:#ffd5ae; } .t8{ background:#e9f3fd; border-color:#b5d6f6; }
+
+/* a teacher selected: their periods ringed in orange, the rest faded */
+.sv-has-sel .sv-cell{ opacity:.4; }
+.sv-has-sel .sv-cell.sel{ opacity:1; box-shadow:0 0 0 2px var(--ec-primary); }
+
+/* a teacher's pending request, approved / rejected in place */
+.sv-req{ display:flex; align-items:center; gap:.3rem; margin-top:3px; padding:.2rem .35rem; border-radius:8px; border:1px dashed rgba(255,138,0,.6);
+         background:var(--ec-primary-soft); font-size:.63rem; font-weight:700; color:var(--ec-text-dark); }
+.sv-req > div{ flex:1; min-width:0; line-height:1.15; }
+.sv-req button{ border:0; width:22px; height:22px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-size:.85rem; }
+.sv-req .ok{ background:#28c76f; color:#fff; }
+.sv-req .no{ background:#f1efec; color:var(--ec-text-muted); }
+
+/* phone: one section at a time, periods stacked */
+.sv-mob{ display:none; }
+@media (max-width:767.98px){
+    .sv-wrap{ display:none; }
+    .sv-mob{ display:block; }
+    .sv-mob .tt-mrow .sv-cell, .sv-mob .tt-mrow .sv-empty{ min-height:48px; }
+    .sv-find{ flex-basis:100%; }
+}
