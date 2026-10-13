@@ -1,0 +1,216 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    ViewData["Title"] = "Year-End Fee Closure";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;
+    var sessions = ViewBag.Sessions as List<SelectListItem> ?? new List<SelectListItem>();
+}
+
+@*
+   Year-End Fee Closure — before a session is closed, every unpaid fee line of
+   that session is either carried forward (stays payable next session) or
+   written off (closed with a reason). Both can be undone. core.sp_fee_year_end_manage.
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Fee/YearEnd.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell ye-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-calendar-check"></i></div>
+          <div><h4 class="ec-page-title mb-1">Year-End Fee Closure</h4>
+            <p class="ec-page-subtitle">Carry forward or write off unpaid dues before closing the session</p></div>
+        </div>
+        <div class="d-flex gap-2 align-items-end flex-wrap">
+          <div><label class="form-label mb-1">Session</label>
+            <select id="ySession" class="form-select form-select-sm">
+              @foreach (var s in sessions)
+              {
+                  <option value="@s.Text" selected="@s.Selected">@s.Text</option>
+              }
+            </select></div>
+          <a href="@Url.Action("Reports","Fee",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-bar-chart-alt-2 me-1"></i>Reports</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi open"><div class="l">To decide</div><div class="v" id="kOpen">₹0</div><div class="s" id="kOpenN">0 lines</div></div>
+      <div class="kpi"><div class="l">Carried forward</div><div class="v" id="kCarry">₹0</div><div class="s" id="kCarryN">0 lines</div></div>
+      <div class="kpi"><div class="l">Written off</div><div class="v" id="kWrite">₹0</div><div class="s" id="kWriteN">0 lines</div></div>
+      <div class="kpi"><div class="l">Students owing</div><div class="v" id="kStu">0</div><div class="s">in this session</div></div>
+    </div>
+
+    <div class="ec-card mb-3"><div class="ec-card-body ye-tools">
+      <div class="ye-tabs" id="yTabs">
+        <button class="on" data-s="Open">To decide</button>
+        <button data-s="Carried">Carried</button>
+        <button data-s="WrittenOff">Written off</button>
+        <button data-s="">All</button>
+      </div>
+      <input id="ySearch" class="form-control form-control-sm" placeholder="Name, father, mobile or adm. no">
+      <select id="yClass" class="form-select form-select-sm"><option value="">All classes</option></select>
+      @if (canManage)
+      {
+          <button id="btnCarryAll" class="btn btn-sm ec-btn-soft"><i class="bx bx-fast-forward me-1"></i>Carry all remaining</button>
+      }
+    </div></div>
+
+    <div id="yList"></div>
+    <div class="text-center my-3"><button id="btnMore" class="btn btn-sm btn-outline-secondary d-none">Show more students</button></div>
+
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var CSRF = $('input[name="__RequestVerificationToken"]').val();
+    var URL = { lines:'@Url.Action("GetYearEndLines","Fee",new{area="ERP"})', act:'@Url.Action("YearEndAction","Fee",new{area="ERP"})' };
+    var CAN_MANAGE = @(canManage ? "true" : "false");   // fees.manage
+    var PAGE = 40;
+
+    var lines = [];      // every line of the session from the server
+    var state = 'Open';  // tab
+    var shown = PAGE;    // how many student cards are drawn
+
+    function load() {
+        EC.listLoading('#yList', 'Loading dues...');
+        $.getJSON(URL.lines, { session: $('#ySession').val() }).done(function (rows) {
+            lines = rows || [];
+            fillClasses();
+            drawKpis();
+            draw();
+        }).fail(function () { ecToast('error', 'Could not load the dues.'); });
+    }
+
+    function fillClasses() {
+        var cur = $('#yClass').val(), seen = {}, opts = '<option value="">All classes</option>';
+        lines.forEach(function (l) {
+            var k = classOf(l);
+            if (k && !seen[k]) { seen[k] = 1; opts += '<option value="' + EC.esc(k) + '">' + EC.esc(k) + '</option>'; }
+        });
+        $('#yClass').html(opts).val(seen[cur] ? cur : '');
+    }
+
+    function classOf(l) { return (l.cls || '') + (l.sec ? '-' + l.sec : ''); }
+
+    function drawKpis() {
+        var t = { Open: [0, 0], Carried: [0, 0], WrittenOff: [0, 0] }, owing = {};
+        lines.forEach(function (l) {
+            t[l.state][0] += EC.num(l.amount); t[l.state][1]++;
+            if (l.state !== 'WrittenOff') owing[l.sid] = 1;
+        });
+        $('#kOpen').text(EC.money(t.Open[0]));          $('#kOpenN').text(t.Open[1] + ' lines');
+        $('#kCarry').text(EC.money(t.Carried[0]));      $('#kCarryN').text(t.Carried[1] + ' lines');
+        $('#kWrite').text(EC.money(t.WrittenOff[0]));   $('#kWriteN').text(t.WrittenOff[1] + ' lines');
+        $('#kStu').text(Object.keys(owing).length);
+        $('#btnCarryAll').prop('disabled', t.Open[1] === 0);
+    }
+
+    // Lines that pass the tab, class and search filters, grouped per student.
+    function students() {
+        var q = $('#ySearch').val().trim().toLowerCase(), cls = $('#yClass').val(), map = {}, list = [];
+        lines.forEach(function (l) {
+            if (state && l.state !== state) return;
+            if (cls && classOf(l) !== cls) return;
+            if (q && [l.name, l.adm, l.guardian, l.mobile].join(' ').toLowerCase().indexOf(q) < 0) return;
+            if (!map[l.sid]) { map[l.sid] = { first: l, lines: [] }; list.push(map[l.sid]); }
+            map[l.sid].lines.push(l);
+        });
+        return list;
+    }
+
+    function draw() {
+        var list = students();
+        if (!list.length) {
+            EC.listEmpty('#yList', state === 'Open' ? 'Nothing left to decide here.' : 'No dues match.', 'bx-check-circle');
+            $('#btnMore').addClass('d-none');
+            return;
+        }
+        $('#yList').html(list.slice(0, shown).map(card).join(''));
+        $('#btnMore').toggleClass('d-none', list.length <= shown).text('Show more students (' + (list.length - shown) + ' left)');
+    }
+
+    function card(s) {
+        var f = s.first, total = 0, open = 0;
+        s.lines.forEach(function (l) { total += EC.num(l.amount); if (l.state === 'Open') open++; });
+        var who = [classOf(f), f.adm, f.guardian ? 'F: ' + f.guardian : '', f.mobile].filter(Boolean).map(EC.esc).join(' · ');
+        var btns = CAN_MANAGE && open > 0
+            ? '<div class="ye-btns"><button class="btn btn-sm ec-btn-soft ye-act" data-op="Carry" data-sid="' + f.sid + '">Carry all</button>'
+            + '<button class="btn btn-sm btn-outline-danger ye-act" data-op="WriteOff" data-sid="' + f.sid + '">Write off all</button></div>'
+            : '';
+        return '<div class="ec-card ye-stu"><div class="ye-head"><div><div class="ye-name">' + EC.esc(f.name)
+             + ' <span class="ye-total">' + EC.money(total) + '</span></div><div class="ye-who">' + who + '</div></div>' + btns + '</div>'
+             + s.lines.map(row).join('') + '</div>';
+    }
+
+    function row(l) {
+        var label = { Open: '', Carried: '<span class="ye-badge carry">Carried</span>', WrittenOff: '<span class="ye-badge write">Written off</span>' }[l.state];
+        var note = l.state === 'WrittenOff' && l.reason ? '<div class="ye-note">' + EC.esc(l.reason) + (l.decided ? ' · ' + EC.esc(l.decided) : '') + '</div>'
+                 : l.state === 'Carried' && l.decided ? '<div class="ye-note">Carried on ' + EC.esc(l.decided) + '</div>' : '';
+        var btns = '';
+        if (CAN_MANAGE) {
+            btns = l.state === 'Open'
+                ? '<button class="btn btn-xs ec-btn-soft ye-act" data-op="Carry" data-id="' + l.id + '">Carry fwd</button>'
+                + '<button class="btn btn-xs btn-outline-danger ye-act" data-op="WriteOff" data-id="' + l.id + '">Write off</button>'
+                : '<button class="btn btn-xs btn-outline-secondary ye-act" data-op="Undo" data-id="' + l.id + '">Undo</button>';
+        }
+        return '<div class="ye-line"><div class="ye-what"><b>' + EC.esc(l.head) + '</b>' + (l.inst ? ' · ' + EC.esc(l.inst) : '') + ' ' + label + note + '</div>'
+             + '<div class="ye-amt">' + EC.money(l.amount) + '</div><div class="ye-btns">' + btns + '</div></div>';
+    }
+
+    function send(body, $btn) {
+        body.session = $('#ySession').val();
+        if ($btn) EC.buttonBusy($btn);
+        $.ajax({ url: URL.act, type: 'POST', contentType: 'application/json', headers: { 'RequestVerificationToken': CSRF }, data: JSON.stringify(body) })
+            .done(function (r) {
+                ecToast(r.success ? 'success' : 'error', r.message);
+                if (r.success) load(); else if ($btn) EC.buttonReset($btn);
+            })
+            .fail(function () { ecToast('error', 'Could not save. Please try again.'); if ($btn) EC.buttonReset($btn); });
+    }
+
+    $('#yList').on('click', '.ye-act', function () {
+        var $b = $(this), op = $b.data('op'), id = $b.data('id'), sid = $b.data('sid');
+        var body = { operation: op, ledgerId: id || null, studentId: sid || null };
+        if (op === 'WriteOff') {
+            EC.prompt({ title: sid ? 'Write off all open dues of this student?' : 'Write off this due?',
+                        label: 'Reason', required: true, okText: 'Write off',
+                        message: 'The amount stops showing as owed. You can undo it later.' })
+              .then(function (reason) { if (reason === null) return; body.reason = reason; send(body, $b); });
+        } else {
+            send(body, $b);
+        }
+    });
+
+    $('#btnCarryAll').on('click', function () {
+        var $b = $(this);
+        EC.confirm({ title: 'Carry forward every due still to decide?', danger: false, okText: 'Carry all',
+                     message: 'They stay payable in the next session. Write-offs you already made are not changed.' })
+          .then(function (ok) { if (ok) send({ operation: 'CarryAll' }, $b); });
+    });
+
+    $('#yTabs').on('click', 'button', function () {
+        $('#yTabs button').removeClass('on'); $(this).addClass('on');
+        state = $(this).data('s'); shown = PAGE; draw();
+    });
+    $('#ySearch').on('input', function () { shown = PAGE; draw(); });
+    $('#yClass').on('change', function () { shown = PAGE; draw(); });
+    $('#ySession').on('change', load);
+    $('#btnMore').on('click', function () { shown += PAGE; draw(); });
+
+    load();
+});
+</script>
+}

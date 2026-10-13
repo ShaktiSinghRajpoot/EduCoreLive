@@ -567,6 +567,71 @@ namespace educore.Areas.ERP.Controllers
             public string?  Remarks     { get; set; }
         }
 
+        // ── Year-End closure: /ERP/Fee/YearEnd ───────────────────
+        // Unpaid dues of a session, each carried forward or written off before
+        // the session is closed. Seeing it needs fees.view; acting needs fees.manage.
+        public async Task<IActionResult> YearEnd()
+        {
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "fees.manage");
+            try
+            {
+                ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
+            }
+            catch { ViewBag.Sessions = new List<SelectListItem>(); }
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetYearEndLines(string? session)
+        {
+            if (string.IsNullOrWhiteSpace(session))
+                return Json(Array.Empty<object>());
+
+            var rows = await _feePaymentService.GetYearEndLinesAsync(session.Trim(), TenantId(), SchoolId(), UserId());
+            return Json(rows.Select(r => new
+            {
+                id       = r.LedgerId,
+                sid      = r.StudentId,
+                name     = r.StudentName,
+                adm      = r.AdmissionNo,
+                cls      = r.ClassName,
+                sec      = r.Section,
+                guardian = r.GuardianName,
+                mobile   = r.Mobile,
+                head     = r.FeeHead,
+                inst     = r.Installment,
+                due      = r.DueDate,
+                amount   = r.Amount,
+                state    = r.State,
+                reason   = r.Reason,
+                decided  = r.DecidedAt.HasValue ? Dates.ToSchool(r.DecidedAt.Value).ToString("dd MMM yyyy") : null
+            }));
+        }
+
+        [HttpPost]
+        [HasPermission("fees.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> YearEndAction([FromBody] YearEndRequest req)
+        {
+            var allowed = new[] { "Carry", "WriteOff", "Undo", "CarryAll" };
+            if (req == null || string.IsNullOrWhiteSpace(req.Session) || !allowed.Contains(req.Operation))
+                return Json(new { success = false, message = "Invalid request." });
+
+            var (ok, msg) = await _feePaymentService.YearEndActionAsync(
+                req.Operation!, req.Session!.Trim(), req.LedgerId, req.StudentId, NullIfEmpty(req.Reason),
+                TenantId(), SchoolId(), UserId());
+            return Json(new { success = ok, message = msg });
+        }
+
+        public class YearEndRequest
+        {
+            public string? Operation { get; set; }   // Carry | WriteOff | Undo | CarryAll
+            public string? Session   { get; set; }
+            public int?    LedgerId  { get; set; }
+            public int?    StudentId { get; set; }
+            public string? Reason    { get; set; }
+        }
+
         // ── POST: /ERP/Fee/SaveReceiptFormat (AJAX) ──────────────
         // The school picks how receipts print: A4 (letterhead) / A5 (compact) /
         // Thermal (80mm counter roll). Stored per school, applied to every receipt.

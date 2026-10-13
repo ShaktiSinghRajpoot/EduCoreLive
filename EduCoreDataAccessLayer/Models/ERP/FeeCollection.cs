@@ -248,6 +248,28 @@
         public decimal  D60Plus          { get; set; }
     }
 
+    /// <summary>One unpaid fee line on the Year-End closure screen.</summary>
+    public class YearEndLine
+    {
+        public int       LedgerId     { get; set; }
+        public int       StudentId    { get; set; }
+        public string    StudentName  { get; set; } = string.Empty;
+        public string    AdmissionNo  { get; set; } = string.Empty;
+        public string?   ClassName    { get; set; }
+        public string?   Section      { get; set; }
+        public string?   GuardianName { get; set; }
+        public string?   Mobile       { get; set; }
+        public string    FeeHead      { get; set; } = string.Empty;
+        public string?   Installment  { get; set; }
+        public string?   DueDate      { get; set; }
+        /// <summary>Still owed (Open / Carried), or the amount written off.</summary>
+        public decimal   Amount       { get; set; }
+        /// <summary>Open, Carried or WrittenOff.</summary>
+        public string    State        { get; set; } = "Open";
+        public string?   Reason       { get; set; }
+        public DateTime? DecidedAt    { get; set; }
+    }
+
     /// <summary>One concession/discount given (audit register).</summary>
     public class ConcessionRow
     {

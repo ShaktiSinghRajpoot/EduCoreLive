@@ -179,5 +179,17 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Audit register: concessions given + receipts cancelled, in a date range.</summary>
         Task<(List<ConcessionRow> Concessions, List<CancellationRow> Cancellations)> GetConcessionCancelRegisterAsync(
             string? from, string? to, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Year-End closure: every unpaid line of a session, plus the lines already written off.</summary>
+        Task<List<YearEndLine>> GetYearEndLinesAsync(
+            string academicYear, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>
+        /// Year-End closure action: Carry | WriteOff | Undo on one line (ledgerId), Carry | WriteOff
+        /// on all open lines of one student (studentId), or CarryAll for the whole session.
+        /// </summary>
+        Task<(bool Success, string Message)> YearEndActionAsync(
+            string operation, string academicYear, int? ledgerId, int? studentId, string? reason,
+            int tenantId, int schoolId, int actionUserId);
     }
 }

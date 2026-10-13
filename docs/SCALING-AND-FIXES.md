@@ -5118,3 +5118,16 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   `deploy_2026_10_13d.sql`) returns every live period of the session; setup and pending requests come
   from the existing procs.
 - **My Timetable** uses the same tinted cells and the dashed card for a waiting request.
+
+### [2026-10-13] Year-End Fee Closure (Fee › Year-End Closure)
+- New page `Fee/YearEnd`: every unpaid fee line of a session, grouped per student (search by name,
+  father, mobile or adm. no; class filter; tabs To decide / Carried / Written off / All). Per line
+  **Carry fwd** / **Write off**, per student **Carry all** / **Write off all**, and **Carry all
+  remaining** for the session. Every decision has **Undo**. Viewing needs `fees.view`, acting `fees.manage`.
+- Carry does not move money: the ledger is not year-scoped, so the due already shows at the counter
+  next session. Carry only records that it was reviewed (`student_ledger.carried_at/by`).
+- Write off reuses `core.fn_ledger_close` with `close_source = 'YearEnd'` and a required reason, the
+  same mechanism Exit uses, so every report reading `amount_due - amount_paid - concession` drops it
+  without changes; Undo is `core.fn_ledger_reopen`.
+- One proc `core.sp_fee_year_end_manage` (`fee_year_end.sql`, `deploy_2026_10_13f.sql`), 12 rolled-back
+  checks in `tests/fee_year_end_tests.sql`.

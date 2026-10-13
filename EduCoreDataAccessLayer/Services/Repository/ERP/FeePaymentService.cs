@@ -36,6 +36,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpAdvanceGet = "core.sp_student_advance_get";
         private const string SpConcessionCancel = "core.sp_fee_concession_cancel_register";
         private const string SpRefundRegister = "core.sp_fee_refund_register";
+        private const string SpYearEnd = "core.sp_fee_year_end_manage";
 
         private readonly PgExec _db;
         // WHY: ILogger lets us record WHY a financial operation failed before we map it to a
@@ -1043,6 +1044,90 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
             return reg;
         }
+
+        public async Task<List<YearEndLine>> GetYearEndLinesAsync(
+            string academicYear, int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<YearEndLine>();
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(academicYear))
+                return list;
+
+            await _db.ExecuteCursorsAsync(SpYearEnd, YearEndParams("List", academicYear, null, null, null, tenantId, schoolId, actionUserId),
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                    {
+                        list.Add(new YearEndLine
+                        {
+                            LedgerId     = DbRead.Int(reader, cols, "ledger_id"),
+                            StudentId    = DbRead.Int(reader, cols, "student_id"),
+                            StudentName  = DbRead.Str(reader, cols, "student_name"),
+                            AdmissionNo  = DbRead.Str(reader, cols, "admission_no"),
+                            ClassName    = DbRead.NStr(reader, cols, "class_name"),
+                            Section      = DbRead.NStr(reader, cols, "section"),
+                            GuardianName = DbRead.NStr(reader, cols, "guardian_name"),
+                            Mobile       = DbRead.NStr(reader, cols, "mobile"),
+                            FeeHead      = DbRead.Str(reader, cols, "fee_head_name"),
+                            Installment  = DbRead.NStr(reader, cols, "installment_label"),
+                            DueDate      = DbRead.NStr(reader, cols, "due_date"),
+                            Amount       = DbRead.Dec(reader, cols, "amount"),
+                            State        = DbRead.Str(reader, cols, "state"),
+                            Reason       = DbRead.NStr(reader, cols, "reason"),
+                            DecidedAt    = DbRead.DateTimeN(reader, cols, "decided_at")
+                        });
+                    }
+                });
+
+            return list;
+        }
+
+        public async Task<(bool Success, string Message)> YearEndActionAsync(
+            string operation, string academicYear, int? ledgerId, int? studentId, string? reason,
+            int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(academicYear))
+                return (false, "Invalid request.");
+
+            try
+            {
+                string msg = "Done.";
+                await _db.ExecuteCursorsAsync(SpYearEnd,
+                    YearEndParams(operation, academicYear, ledgerId, studentId, reason, tenantId, schoolId, actionUserId),
+                    async reader =>
+                    {
+                        var cols = reader.Columns();
+                        if (await reader.ReadAsync())
+                            msg = DbRead.NStr(reader, cols, "message") ?? msg;
+                    });
+                return (true, msg);
+            }
+            catch (PostgresException pex)
+            {
+                _logger.LogWarning(pex, "Year-end {Operation} rejected for school {SchoolId}. SqlState {SqlState}", operation, schoolId, pex.SqlState);
+                return (false, pex.MessageText);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error in year-end {Operation} for school {SchoolId}.", operation, schoolId);
+                return (false, "Could not save. Please try again.");
+            }
+        }
+
+        private static NpgsqlParameter[] YearEndParams(
+            string operation, string academicYear, int? ledgerId, int? studentId, string? reason,
+            int tenantId, int schoolId, int actionUserId) => new NpgsqlParameter[]
+        {
+            new("p_operation",      NpgsqlDbType.Text)    { Value = operation },
+            new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+            new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+            new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+            new("p_academic_year",  NpgsqlDbType.Text)    { Value = academicYear.Trim() },
+            new("p_ledger_id",      NpgsqlDbType.Integer) { Value = (object?)ledgerId  ?? DBNull.Value },
+            new("p_student_id",     NpgsqlDbType.Integer) { Value = (object?)studentId ?? DBNull.Value },
+            new("p_reason",         NpgsqlDbType.Text)    { Value = (object?)reason    ?? DBNull.Value },
+            new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "year_end_cursor" }
+        };
 
         public async Task<(List<ConcessionRow> Concessions, List<CancellationRow> Cancellations)> GetConcessionCancelRegisterAsync(
             string? from, string? to, int tenantId, int schoolId, int actionUserId)
