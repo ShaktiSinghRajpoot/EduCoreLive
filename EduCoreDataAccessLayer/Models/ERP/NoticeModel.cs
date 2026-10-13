@@ -20,12 +20,12 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int       SeenCount   { get; set; }
         public int       StaffCount  { get; set; }
 
-        /// <summary>"Everyone", "Staff", "All parents" or "Parents of Class 5, 6".</summary>
+        /// <summary>"Everyone", "Staff", "All parents" or "Parents of Class 5, Class 6" (class names already say "Class").</summary>
         public string AudienceText => Audience switch
         {
             "Staff"   => "Staff",
             "Parents" => "All parents",
-            "Classes" => "Parents of Class " + (ClassNames ?? "").Replace(",", ", "),
+            "Classes" => "Parents of " + (ClassNames ?? "").Replace(",", ", "),
             _         => "Everyone"
         };
     }
