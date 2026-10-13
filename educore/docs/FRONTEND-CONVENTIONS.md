@@ -158,6 +158,12 @@ a partial, an inline `<script>` — runs *before* jQuery exists. `_FeeReceiptMod
 used `$` there and threw `$ is not defined` on six pages, so its buttons never
 got a handler. Use plain JS with event delegation in partials.
 
+**Page scripts go in `@section PageScripts`, never `@section Scripts`.**
+`_ContentNavbarLayout` renders a `Scripts` section *above* the page body, so a
+script there runs before the form exists. Edit Student used it: its first
+`getElementById(...).addEventListener` threw on null, `populate()` never ran,
+Name and Mobile (both required) stayed empty, and the page could never be saved.
+
 **`$` is shadowed in two files.** `FeeDueReminders/Index.cshtml` and
 `PaymentVerification/Index.cshtml` do `const $ = s => document.querySelector(s)`.
 Inside those files use `jQuery(...)` explicitly, never `$(...)`.

@@ -324,7 +324,9 @@
         '.rc-logo{object-fit:contain;flex:0 0 auto}' +
         // CANCELLED banner on a voided receipt.
         '.rc-void{border:2px solid #c00;color:#c00;padding:6px 8px;margin:8px 0;text-align:center;font-size:12px}' +
-        '.rc-void b{font-size:15px;letter-spacing:2px}';
+        '.rc-void b{font-size:15px;letter-spacing:2px}' +
+        // Balance / outstanding lines: label left, amount right on every format.
+        '.rc-balance .rc-kv{display:flex;justify-content:space-between;gap:6px}';
 
         if (format === 'Thermal') {
             return base +
