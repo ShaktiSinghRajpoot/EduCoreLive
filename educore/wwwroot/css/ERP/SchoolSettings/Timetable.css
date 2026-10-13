@@ -88,6 +88,7 @@
 .sv-find input:focus{ outline:0; border-color:rgba(255,138,0,.55); box-shadow:0 0 0 3px rgba(255,138,0,.1); }
 .sv-find button{ position:absolute; right:.35rem; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--ec-text-muted); }
 .tt-day small{ font-weight:700; margin-left:.25rem; opacity:.85; }
+.tt-day.on small{ color:#fff; opacity:1; }
 
 .sv-banner{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; border:1px dashed rgba(255,138,0,.5); background:var(--ec-primary-soft);
             border-radius:10px; padding:.55rem .8rem; margin-bottom:.75rem; font-size:.8rem; font-weight:700; color:var(--ec-text-dark); }
@@ -104,6 +105,10 @@
          border-bottom:2px solid #ffc27a; }
 .sv-sec.full{ border-bottom-color:#28c76f; }
 .sv-sec.full::after{ content:" ✓"; color:#28c76f; }
+
+/* the Section column stays put while the periods scroll sideways */
+.sv-grid tbody td:first-child, .sv-grid thead th:first-child{ position:sticky; left:0; z-index:2; }
+.sv-grid tbody td:first-child{ background:#fff; }
 
 /* a live period */
 .sv-cell{ display:flex; align-items:center; gap:.35rem; min-height:38px; padding:.25rem .4rem; border-radius:8px; border:1px solid var(--ec-border);
