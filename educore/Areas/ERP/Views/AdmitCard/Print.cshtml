@@ -1,0 +1,190 @@
+@model educore.Models.AdmitCardPrintModel
+@using EduCoreDataAccessLayer.Helpers
+@{
+    Layout = null;
+    var sc = Model.School;
+    var addr = string.Join(", ", new[] { sc.AddressLine1, sc.City, sc.State }
+        .Where(p => !string.IsNullOrWhiteSpace(p)));
+
+    string V(string? s) => string.IsNullOrWhiteSpace(s) ? "—" : s;
+
+    // "2026-10-20" -> "20 Oct 2026, Tue"
+    string PaperDate(string? iso)
+    {
+        var d = Dates.Parse(iso);
+        return d == null ? "—" : d.Value.ToString("dd MMM yyyy, ddd");
+    }
+
+    // "09:00" + "11:00" -> "09:00 – 11:00"
+    string PaperTime(string? from, string? to) =>
+        string.IsNullOrWhiteSpace(from) ? "—" : from + (string.IsNullOrWhiteSpace(to) ? "" : " – " + to);
+
+    var fmt = Model.Format;                    // Classic | Compact | FullPage
+    var withInstructions = fmt != "Compact";
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Admit Cards — @Model.ExamName</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111; background: #eceff3; }
+
+        .ac-toolbar { text-align: center; padding: 10px; }
+        .ac-toolbar button { padding: 8px 18px; font-size: 14px; cursor: pointer; }
+        .ac-note { text-align: center; color: #667; font-size: 12px; padding: 0 10px 8px; }
+
+        .ac-sheet { display: flex; flex-wrap: wrap; gap: 6mm; padding: 8mm; max-width: 210mm; margin: 0 auto; }
+
+        /* One admit card. The template only changes its size and font. */
+        .ac-card { background: #fff; border: 1.5px solid #26426b; border-radius: 6px; padding: 4mm;
+                   display: flex; flex-direction: column; page-break-inside: avoid; break-inside: avoid; }
+        .ac-Classic  { width: 194mm; min-height: 132mm; font-size: 11px; }
+        .ac-Compact  { width: 95mm;  min-height: 132mm; font-size: 9px; padding: 3mm; }
+        .ac-FullPage { width: 194mm; min-height: 270mm; font-size: 13px; padding: 7mm; }
+
+        .ac-head { display: flex; align-items: center; gap: 3mm; border-bottom: 2px solid #26426b; padding-bottom: 2mm; }
+        .ac-logo { max-height: 14mm; max-width: 20mm; object-fit: contain; }
+        .ac-Compact .ac-logo { max-height: 10mm; max-width: 14mm; }
+        .ac-school { flex: 1; text-align: center; }
+        .ac-school .n { font-size: 1.45em; font-weight: 800; color: #26426b; line-height: 1.15; }
+        .ac-school .a { font-size: .85em; color: #555; }
+
+        .ac-title { text-align: center; margin: 2mm 0; }
+        .ac-title .t { display: inline-block; background: #26426b; color: #fff; font-weight: 800;
+                       letter-spacing: 2px; padding: 1mm 4mm; border-radius: 3px; font-size: 1.05em; }
+        .ac-title .e { font-weight: 700; margin-top: 1mm; }
+
+        .ac-info { display: flex; gap: 3mm; }
+        .ac-rows { flex: 1; border-collapse: collapse; }
+        .ac-rows td { padding: .6mm 1mm; vertical-align: top; }
+        .ac-rows .k { color: #555; width: 32%; white-space: nowrap; }
+        .ac-rows .v { font-weight: 700; }
+        .ac-photo { width: 25mm; height: 30mm; border: 1px solid #9bb0cc; border-radius: 3px; flex: 0 0 auto;
+                    display: flex; align-items: center; justify-content: center; color: #9bb0cc; font-size: 8px; background: #f2f5f9; }
+        .ac-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 3px; }
+        .ac-Compact .ac-photo { width: 18mm; height: 22mm; }
+
+        .ac-papers { width: 100%; border-collapse: collapse; margin-top: 2mm; }
+        .ac-papers th, .ac-papers td { border: 1px solid #9bb0cc; padding: .8mm 1.2mm; text-align: left; }
+        .ac-papers th { background: #eef2f8; font-size: .9em; }
+
+        .ac-instr { margin: 2mm 0 0; padding-left: 4mm; color: #333; font-size: .9em; }
+        .ac-sign { display: flex; justify-content: space-between; margin-top: auto; padding-top: 8mm; font-size: .9em; }
+        .ac-sign div { border-top: 1px solid #555; padding-top: 1mm; min-width: 30%; text-align: center; }
+
+        @@media print {
+            body { background: #fff; }
+            .ac-toolbar, .ac-note { display: none; }
+            .ac-sheet { padding: 0; gap: 5mm; }
+            @@page { size: A4; margin: 8mm; }
+            .ac-FullPage { page-break-after: always; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ac-toolbar">
+        <button type="button" onclick="window.print()">Print @Model.Students.Count admit card(s)</button>
+    </div>
+    @if (!Model.Students.Any())
+    {
+        <div class="ac-note" style="color:#b00020;">No students found for this class / section in @Model.SessionName.</div>
+    }
+    else if (!Model.Papers.Any())
+    {
+        <div class="ac-note" style="color:#b00020;">This exam has no papers for this class yet. Add them in Exam Schedule.</div>
+    }
+
+    <div class="ac-sheet">
+        @foreach (var s in Model.Students)
+        {
+            var papers = Model.PapersFor(s);
+            <div class="ac-card ac-@fmt">
+                <div class="ac-head">
+                    @if (!string.IsNullOrWhiteSpace(Model.LogoUrl))
+                    {
+                        <img class="ac-logo" src="@Model.LogoUrl" alt="" />
+                    }
+                    <div class="ac-school">
+                        <div class="n">@V(sc.SchoolName)</div>
+                        <div class="a">@addr</div>
+                    </div>
+                </div>
+
+                <div class="ac-title">
+                    <span class="t">ADMIT CARD</span>
+                    <div class="e">@Model.ExamName · Session @Model.SessionName</div>
+                </div>
+
+                <div class="ac-info">
+                    <table class="ac-rows">
+                        <tr><td class="k">Student</td><td class="v">@s.StudentName</td></tr>
+                        <tr><td class="k">Class</td><td class="v">@s.ClassDisplay</td></tr>
+                        <tr><td class="k">Roll No</td><td class="v">@V(s.RollNo)</td></tr>
+                        <tr><td class="k">Admission No</td><td class="v">@V(s.AdmissionNo)</td></tr>
+                        <tr><td class="k">Father / Guardian</td><td class="v">@V(s.GuardianName)</td></tr>
+                        <tr><td class="k">Date of Birth</td><td class="v">@s.DobDisplay</td></tr>
+                    </table>
+                    <div class="ac-photo">
+                        @if (!string.IsNullOrWhiteSpace(s.PhotoUrl))
+                        {
+                            <img src="@s.PhotoUrl" alt="" />
+                        }
+                        else
+                        {
+                            <span>PHOTO</span>
+                        }
+                    </div>
+                </div>
+
+                <table class="ac-papers">
+                    <thead>
+                        <tr>
+                            <th>Date</th><th>Time</th><th>Subject</th>
+                            @if (fmt != "Compact") { <th>Invigilator</th> }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!papers.Any())
+                        {
+                            <tr><td colspan="4">No papers scheduled.</td></tr>
+                        }
+                        @foreach (var p in papers)
+                        {
+                            <tr>
+                                <td>@PaperDate(p.ExamDate)</td>
+                                <td>@PaperTime(p.StartTime, p.EndTime)</td>
+                                <td>@p.SubjectName</td>
+                                @if (fmt != "Compact") { <td></td> }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (withInstructions)
+                {
+                    <ol class="ac-instr">
+                        <li>Bring this admit card to every paper. It must be shown on demand.</li>
+                        <li>Reach the exam room 15 minutes before the paper starts.</li>
+                        @if (fmt == "FullPage")
+                        {
+                            <li>Mobile phones, smart watches and notes are not allowed in the exam room.</li>
+                            <li>Write your roll number on the answer sheet before you start.</li>
+                            <li>Leave the room only after the invigilator collects your answer sheet.</li>
+                        }
+                    </ol>
+                }
+
+                <div class="ac-sign">
+                    <div>Class Teacher</div>
+                    @if (fmt == "FullPage") { <div>Student</div> }
+                    <div>Principal</div>
+                </div>
+            </div>
+        }
+    </div>
+
+</body>
+</html>

@@ -273,7 +273,7 @@
         @* ---- Examinations ---- *@
         @if (gExams)
         {
-        <li class='menu-item @Open("CreateExam","Datesheet","MarkEntry","ResultSheet","GradeScale")'>
+        <li class='menu-item @Open("CreateExam","Datesheet","AdmitCard","MarkEntry","ResultSheet","GradeScale")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-file ic-exam"></i>
                 <div class="text-truncate">Examinations</div>
@@ -281,6 +281,7 @@
             <ul class="menu-sub">
                 <li class='menu-item @On("CreateExam")'><a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-red"></i><div class="text-truncate">Exam Schedule</div></a></li>
                 <li class='menu-item @On("Datesheet")'><a asp-area="ERP" asp-controller="Exam" asp-action="Datesheet" class="menu-link"><i class="bx bx-calendar submenu-icon c-teal"></i><div class="text-truncate">Datesheet</div></a></li>
+                <li class='menu-item @On("AdmitCard")'><a asp-area="ERP" asp-controller="AdmitCard" asp-action="Index" class="menu-link"><i class="bx bx-id-card submenu-icon c-blue"></i><div class="text-truncate">Admit Cards</div></a></li>
                 <li class='menu-item @On("MarkEntry")'><a asp-area="ERP" asp-controller="Exam" asp-action="MarkEntry" class="menu-link"><i class="bx bx-edit submenu-icon c-purple"></i><div class="text-truncate">Marks Entry</div></a></li>
                 <li class='menu-item @On("ResultSheet")'><a asp-area="ERP" asp-controller="Exam" asp-action="ResultSheet" class="menu-link"><i class="bx bx-table submenu-icon c-green"></i><div class="text-truncate">Result Sheet</div></a></li>
                 <li class='menu-item @On("GradeScale")'><a asp-area="ERP" asp-controller="Exam" asp-action="GradeScale" class="menu-link"><i class="bx bx-award submenu-icon c-orange"></i><div class="text-truncate">Grade Scale</div></a></li>
