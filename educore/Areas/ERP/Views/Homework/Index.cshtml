@@ -1,0 +1,304 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Homework";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var isStaff   = (bool?)ViewBag.IsStaff ?? false;
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
+}
+
+@*
+   Homework — teachers give homework to a class section and tick who did it
+   (academic.sp_homework_manage). Grouped by day and class; each group can be
+   sent home on WhatsApp or printed as the class's homework diary.
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Homework/Homework.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell hw-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-book-open"></i></div>
+          <div><h4 class="ec-page-title mb-1">Homework</h4>
+            <p class="ec-page-subtitle">Give homework, check who did it, and send the day's homework home</p></div>
+        </div>
+        @if (isStaff || canManage)
+        {
+            <button id="btnNew" class="btn btn-primary btn-sm"><i class="bx bx-plus me-1"></i>Give homework</button>
+        }
+      </div>
+    </div>
+
+    <div class="ec-card mb-3"><div class="ec-card-body hw-tools">
+      <div><label class="form-label mb-1">Class</label><select id="hSection" class="form-select form-select-sm"><option value="">All classes</option></select></div>
+      <div><label class="form-label mb-1">Given from</label><input type="date" id="hFrom" class="form-control form-control-sm"></div>
+      <div><label class="form-label mb-1">to</label><input type="date" id="hTo" class="form-control form-control-sm"></div>
+      @if (isStaff)
+      {
+          <div class="form-check mb-1"><input id="hMine" class="form-check-input" type="checkbox" @(canManage ? "" : "checked")>
+            <label class="form-check-label" for="hMine">Only mine</label></div>
+      }
+    </div></div>
+
+    <div id="hList"></div>
+
+  </div>
+</div>
+
+<div class="modal fade" id="hwModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="hwModalTitle">Give homework</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-12 col-md-6"><label class="form-label">Class <span class="text-danger">*</span></label>
+            <select id="fSection" class="form-select"></select></div>
+          <div class="col-12 col-md-6"><label class="form-label">Subject <span class="text-danger">*</span></label>
+            <select id="fSubject" class="form-select"><option value="">Pick a class first</option></select></div>
+          <div class="col-12"><label class="form-label">Homework <span class="text-danger">*</span></label>
+            <input id="fTitle" class="form-control" maxlength="200" placeholder="e.g. Learn the poem 'The Rainbow'"></div>
+          <div class="col-12"><label class="form-label">Details <small class="text-muted">(optional)</small></label>
+            <textarea id="fDetails" class="form-control" rows="3" maxlength="2000" placeholder="Page numbers, questions, what to bring..."></textarea></div>
+          <div class="col-6"><label class="form-label">Given on</label><input id="fGiven" type="date" class="form-control"></div>
+          <div class="col-6"><label class="form-label">Due on <span class="text-danger">*</span></label><input id="fDue" type="date" class="form-control"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="btnSave"><i class="bx bx-send me-1"></i>Give homework</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="chkModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div><h5 class="modal-title mb-0">Who did it?</h5><small class="text-muted" id="chkTitle"></small></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-2" id="chkList"></div>
+      <div class="modal-footer justify-content-between">
+        <button type="button" class="btn btn-sm ec-btn-soft" id="btnAllDone"><i class="bx bx-check-double me-1"></i>Unmarked → Done</button>
+        <button type="button" class="btn btn-primary" id="btnChkSave"><i class="bx bx-save me-1"></i>Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var CSRF = $('input[name="__RequestVerificationToken"]').val();
+    var URL = {
+        sections: '@Url.Action("Sections","Homework",new{area="ERP"})',
+        subjects: '@Url.Action("Subjects","Homework",new{area="ERP"})',
+        list:     '@Url.Action("List","Homework",new{area="ERP"})',
+        save:     '@Url.Action("Save","Homework",new{area="ERP"})',
+        del:      '@Url.Action("Delete","Homework",new{area="ERP"})',
+        students: '@Url.Action("Students","Homework",new{area="ERP"})',
+        check:    '@Url.Action("Check","Homework",new{area="ERP"})'
+    };
+
+    function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function addDays(n) { var d = new Date(); d.setDate(d.getDate() + n); return iso(d); }
+    var TODAY = addDays(0);
+    function show(s) {   // "2026-10-14" -> "Wed, 14 Oct"
+        var d = new Date(s + 'T00:00:00');
+        return d.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' });
+    }
+    function post(url, body) {
+        return $.ajax({ url: url, type: 'POST', contentType: 'application/json', headers: { 'RequestVerificationToken': CSRF }, data: JSON.stringify(body) });
+    }
+
+    $('#hFrom').val(addDays(-6)); $('#hTo').val(TODAY);
+
+    var items = [], editId = 0;
+
+    // ── sections for the filter and the form ────────────────────────────
+    $.getJSON(URL.sections).done(function (list) {
+        var opts = (list || []).map(function (s) { return '<option value="' + s.id + '">' + EC.esc(s.label) + '</option>'; }).join('');
+        $('#hSection').append(opts);
+        $('#fSection').html('<option value="">Pick a class</option>' + opts);
+    });
+
+    function loadSubjects(sectionId, selected) {
+        if (!sectionId) { $('#fSubject').html('<option value="">Pick a class first</option>'); return; }
+        $('#fSubject').html('<option value="">Loading...</option>');
+        $.getJSON(URL.subjects, { sectionId: sectionId }).done(function (list) {
+            $('#fSubject').html('<option value="">Pick a subject</option>' + (list || []).map(function (s) {
+                return '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
+            }).join(''));
+            if (selected) $('#fSubject').val(selected);
+        });
+    }
+    $('#fSection').on('change', function () { loadSubjects(this.value); });
+
+    // ── list ────────────────────────────────────────────────────────────
+    function load() {
+        EC.listLoading('#hList', 'Loading homework...');
+        $.getJSON(URL.list, { sectionId: $('#hSection').val() || null, from: $('#hFrom').val(), to: $('#hTo').val(), mine: $('#hMine').is(':checked') })
+            .done(function (rows) { items = rows || []; draw(); })
+            .fail(function () { ecToast('error', 'Could not load the homework.'); });
+    }
+
+    function draw() {
+        if (!items.length) { EC.listEmpty('#hList', 'No homework in these dates.', 'bx-book-open'); return; }
+        // group by day given, then class
+        var groups = [], map = {};
+        items.forEach(function (h) {
+            var k = h.given + '|' + h.sectionId;
+            if (!map[k]) { map[k] = { given: h.given, section: h.section, list: [] }; groups.push(map[k]); }
+            map[k].list.push(h);
+        });
+        $('#hList').html(groups.map(function (g, gi) {
+            return '<div class="ec-card hw-group"><div class="hw-ghead"><div><b>' + EC.esc(show(g.given)) + '</b> · ' + EC.esc(g.section) + '</div>'
+                 + '<div class="hw-gacts"><a class="btn btn-xs hw-wa" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent(diaryText(g)) + '"><i class="bx bxl-whatsapp me-1"></i>WhatsApp</a>'
+                 + '<button class="btn btn-xs ec-btn-soft hw-print" data-g="' + gi + '"><i class="bx bx-printer me-1"></i>Diary</button></div></div>'
+                 + g.list.map(card).join('') + '</div>';
+        }).join(''));
+        window.__hwGroups = groups;
+    }
+
+    function dueText(h) {
+        if (h.due === TODAY) return '<span class="hw-due today">Due today</span>';
+        if (h.due < TODAY) return '<span class="hw-due late">Was due ' + EC.esc(show(h.due)) + '</span>';
+        return '<span class="hw-due">Due ' + EC.esc(show(h.due)) + '</span>';
+    }
+
+    function card(h) {
+        var checked = h.done + h.notDone;
+        var acts = '';
+        if (h.canEdit) {
+            acts = '<button class="btn btn-xs btn-primary hw-check" data-id="' + h.id + '"><i class="bx bx-check-square me-1"></i>Check (' + h.done + '/' + h.students + ' done)</button>'
+                 + '<button class="btn btn-xs btn-outline-secondary hw-edit" data-id="' + h.id + '"><i class="bx bx-edit-alt"></i></button>'
+                 + '<button class="btn btn-xs btn-outline-danger hw-del" data-id="' + h.id + '"><i class="bx bx-trash"></i></button>';
+        } else if (checked) {
+            acts = '<span class="text-muted small">' + h.done + ' of ' + h.students + ' done</span>';
+        }
+        return '<div class="hw-item"><div class="hw-main"><div><span class="hw-subj">' + EC.esc(h.subject) + '</span> ' + dueText(h) + '</div>'
+             + '<div class="hw-title">' + EC.esc(h.title) + '</div>'
+             + (h.details ? '<div class="hw-details">' + EC.esc(h.details) + '</div>' : '')
+             + '<div class="hw-meta">' + EC.esc(h.teacher || '') + '</div></div>'
+             + '<div class="hw-acts">' + acts + '</div></div>';
+    }
+
+    function diaryText(g) {
+        return '*Homework — ' + g.section + ' — ' + show(g.given) + '*\n\n' + g.list.map(function (h, i) {
+            return (i + 1) + '. *' + h.subject + '*: ' + h.title + (h.details ? '\n   ' + h.details : '') + '\n   (due ' + show(h.due) + ')';
+        }).join('\n');
+    }
+
+    $('#hList').on('click', '.hw-print', function () {
+        var g = window.__hwGroups[$(this).data('g')];
+        var w = window.open('', '_blank');
+        if (!w) { ecToast('error', 'Allow pop-ups to print the diary.'); return; }
+        w.document.write('<html><head><title>Homework diary</title><style>body{font-family:Segoe UI,Arial,sans-serif;padding:24px;color:#111}'
+            + 'h2{margin:0 0 4px;color:#26426b}table{border-collapse:collapse;width:100%;margin-top:14px}th,td{border:1px solid #bbb;padding:8px;text-align:left;vertical-align:top}'
+            + 'th{background:#f2f4f7}</style></head><body><h2>Homework diary</h2><div>' + EC.esc(g.section) + ' · ' + EC.esc(show(g.given)) + '</div>'
+            + '<table><tr><th>Subject</th><th>Homework</th><th>Due</th><th>Teacher</th></tr>'
+            + g.list.map(function (h) {
+                return '<tr><td><b>' + EC.esc(h.subject) + '</b></td><td>' + EC.esc(h.title) + (h.details ? '<br><small>' + EC.esc(h.details) + '</small>' : '')
+                     + '</td><td>' + EC.esc(show(h.due)) + '</td><td>' + EC.esc(h.teacher || '') + '</td></tr>';
+            }).join('') + '</table><p style="margin-top:40px">Parent\'s signature: ____________________</p></body></html>');
+        w.document.close(); w.focus(); w.print();
+    });
+
+    $('#hSection, #hFrom, #hTo, #hMine').on('change', load);
+
+    // ── give / edit ─────────────────────────────────────────────────────
+    function openForm(h) {
+        editId = h ? h.id : 0;
+        $('#hwModalTitle').text(h ? 'Edit homework' : 'Give homework');
+        $('#btnSave').html(h ? '<i class="bx bx-save me-1"></i>Save changes' : '<i class="bx bx-send me-1"></i>Give homework');
+        $('#fSection').val(h ? h.sectionId : ($('#hSection').val() || ''));
+        loadSubjects($('#fSection').val(), h ? h.subjectId : null);
+        $('#fTitle').val(h ? h.title : ''); $('#fDetails').val(h ? (h.details || '') : '');
+        $('#fGiven').val(h ? h.given : TODAY); $('#fDue').val(h ? h.due : addDays(1));
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('hwModal')).show();
+    }
+    function byId(id) { return items.filter(function (h) { return h.id === id; })[0]; }
+
+    $('#btnNew').on('click', function () { openForm(null); });
+    $('#hList').on('click', '.hw-edit', function () { openForm(byId($(this).data('id'))); });
+
+    $('#btnSave').on('click', function () {
+        var body = { id: editId || null, sectionId: +$('#fSection').val() || 0, subjectId: +$('#fSubject').val() || 0,
+                     title: $('#fTitle').val().trim(), details: $('#fDetails').val().trim(), given: $('#fGiven').val(), due: $('#fDue').val() };
+        if (!body.sectionId || !body.subjectId) { ecToast('error', 'Pick the class and subject.'); return; }
+        if (!body.title) { ecToast('error', 'Write what the homework is.'); return; }
+        if (!body.due) { ecToast('error', 'Choose the due date.'); return; }
+        var $b = $(this); EC.buttonBusy($b);
+        post(URL.save, body)
+            .done(function (r) {
+                ecToast(r.success ? 'success' : 'error', r.message);
+                if (r.success) { bootstrap.Modal.getInstance(document.getElementById('hwModal')).hide(); load(); }
+            })
+            .fail(function () { ecToast('error', 'Could not save. Please try again.'); })
+            .always(function () { EC.buttonReset($b); });
+    });
+
+    $('#hList').on('click', '.hw-del', function () {
+        var h = byId($(this).data('id'));
+        EC.confirm({ title: 'Delete this homework?', name: h.subject + ': ' + h.title, okText: 'Delete' }).then(function (ok) {
+            if (!ok) return;
+            $.ajax({ url: URL.del + '?id=' + h.id, type: 'POST', headers: { 'RequestVerificationToken': CSRF } })
+                .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) load(); })
+                .fail(function () { ecToast('error', 'Could not delete. Please try again.'); });
+        });
+    });
+
+    // ── who did it ──────────────────────────────────────────────────────
+    var chkId = 0, chk = [];
+    var MARKS = [['Done', 'Done'], ['NotDone', 'Not done'], ['Late', 'Late']];
+
+    $('#hList').on('click', '.hw-check', function () {
+        var h = byId($(this).data('id'));
+        chkId = h.id;
+        $('#chkTitle').text(h.section + ' · ' + h.subject + ': ' + h.title);
+        $('#chkList').html('<div class="text-muted p-3">Loading...</div>');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('chkModal')).show();
+        $.getJSON(URL.students, { id: h.id }).done(function (list) { chk = list || []; drawCheck(); });
+    });
+
+    function drawCheck() {
+        if (!chk.length) { $('#chkList').html('<div class="text-muted p-3">No students in this class.</div>'); return; }
+        $('#chkList').html(chk.map(function (s, i) {
+            return '<div class="hw-stu"><div class="hw-sname">' + (s.roll ? '<small>' + EC.esc(s.roll) + '.</small> ' : '') + EC.esc(s.name) + '</div><div class="hw-marks">'
+                 + MARKS.map(function (m) { return '<button class="hw-mk mk-' + m[0] + (s.status === m[0] ? ' on' : '') + '" data-i="' + i + '" data-s="' + m[0] + '">' + m[1] + '</button>'; }).join('')
+                 + '</div></div>';
+        }).join(''));
+    }
+    $('#chkList').on('click', '.hw-mk', function () {
+        var s = chk[$(this).data('i')], v = $(this).data('s');
+        s.status = s.status === v ? null : v;
+        $(this).siblings().removeClass('on'); $(this).toggleClass('on', !!s.status);
+    });
+    $('#btnAllDone').on('click', function () { chk.forEach(function (s) { if (!s.status) s.status = 'Done'; }); drawCheck(); });
+    $('#btnChkSave').on('click', function () {
+        var $b = $(this); EC.buttonBusy($b);
+        post(URL.check, { id: chkId, marks: chk.map(function (s) { return { id: s.id, status: s.status || '' }; }) })
+            .done(function (r) {
+                ecToast(r.success ? 'success' : 'error', r.message);
+                if (r.success) { bootstrap.Modal.getInstance(document.getElementById('chkModal')).hide(); load(); }
+            })
+            .fail(function () { ecToast('error', 'Could not save. Please try again.'); })
+            .always(function () { EC.buttonReset($b); });
+    });
+
+    load();
+});
+</script>
+}

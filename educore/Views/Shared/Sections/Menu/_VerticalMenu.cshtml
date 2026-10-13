@@ -164,6 +164,17 @@
         </li>
         }
 
+        @* Teachers (a staff record) give homework; academics.view sees all of it. *@
+        @if (gMyStaff || gAcademics)
+        {
+        <li class='menu-item @On("ERP/Homework")'>
+            <a asp-area="ERP" asp-controller="Homework" asp-action="Index" class="menu-link">
+                <i class="menu-icon icon-base bx bx-book-open ic-hr"></i>
+                <div class="text-truncate">Homework</div>
+            </a>
+        </li>
+        }
+
         @if (isPlatform)
         {
         <li class="menu-header"><span class="menu-header-text">Platform</span></li>

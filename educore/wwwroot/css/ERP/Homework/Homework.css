@@ -1,0 +1,36 @@
+/* Homework (Areas/ERP/Views/Homework/Index.cshtml) */
+.hw-page .hw-tools{ display:flex;flex-wrap:wrap;gap:.8rem;align-items:flex-end; }
+.hw-page .hw-tools .form-select{ min-width:190px; }
+.hw-page .btn-xs{ padding:.18rem .6rem;font-size:.76rem;border-radius:8px; }
+
+.hw-page .hw-group{ margin-bottom:.9rem;overflow:hidden; }
+.hw-page .hw-ghead{ display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.65rem 1rem;background:#fafafa;border-bottom:1px solid var(--ec-border); }
+.hw-page .hw-gacts{ display:flex;gap:.35rem; }
+.hw-page .hw-wa{ background:#e7f8ee;color:#128c4b;border:1px solid #bfe9cf; }
+.hw-page .hw-item{ display:flex;gap:.8rem;align-items:flex-start;padding:.7rem 1rem;border-bottom:1px solid #f1f1f1; }
+.hw-page .hw-item:last-child{ border-bottom:0; }
+.hw-page .hw-main{ flex:1;min-width:0; }
+.hw-page .hw-subj{ font-size:.72rem;font-weight:800;background:#fff1e0;color:#cc6a00;border-radius:999px;padding:2px 9px; }
+.hw-page .hw-due{ font-size:.72rem;font-weight:700;color:#6b7280;margin-left:.3rem; }
+.hw-page .hw-due.today{ color:#cc6a00; }
+.hw-page .hw-due.late{ color:#c4332f; }
+.hw-page .hw-title{ font-weight:800;color:var(--ec-text-dark);margin-top:.25rem; }
+.hw-page .hw-details{ font-size:.86rem;white-space:pre-line;overflow-wrap:anywhere; }
+.hw-page .hw-meta{ font-size:.75rem;color:var(--ec-text-muted);margin-top:.2rem; }
+.hw-page .hw-acts{ display:flex;gap:.3rem;flex-wrap:wrap;align-items:center; }
+
+/* who-did-it sheet (inside the modal, so not scoped to .hw-page) */
+.hw-stu{ display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.45rem .6rem;border-bottom:1px solid #f1f1f1; }
+.hw-sname{ font-weight:700;min-width:0; }
+.hw-sname small{ color:#6b7280; }
+.hw-marks{ display:flex;gap:.25rem;flex-shrink:0; }
+.hw-mk{ border:1px solid #e3e6ea;background:#fff;border-radius:8px;padding:.2rem .5rem;font-size:.75rem;font-weight:800;color:#4b5563; }
+.hw-mk.on.mk-Done{ background:#28c76f;border-color:#28c76f;color:#fff; }
+.hw-mk.on.mk-NotDone{ background:#ea5455;border-color:#ea5455;color:#fff; }
+.hw-mk.on.mk-Late{ background:#ff9f43;border-color:#ff9f43;color:#fff; }
+
+@media (max-width:767.98px){
+  .hw-page .hw-tools > div{ flex:1 1 45%; }
+  .hw-page .hw-item{ flex-wrap:wrap; }
+  .hw-page .hw-acts{ width:100%; }
+}

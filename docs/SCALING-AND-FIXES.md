@@ -5162,3 +5162,15 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   `core.sp_staff_attendance_manage`, `academic.sp_substitution_manage` (`staff_attendance.sql`,
   `deploy_2026_10_14b.sql`); 11 rolled-back checks in `tests/staff_attendance_tests.sql`.
 - Payroll is not linked to attendance yet (salary still uses leave only).
+
+### [2026-10-14] Homework
+- New page `Homework/Index` (menu: Homework, under Notice Board) for teachers (a staff record is
+  enough, like My Timetable) and anyone with `academics.view`. A Teaching staff member gives homework
+  to one class section for one subject (title, details, given on, due on); `academics.manage` may give
+  and change anyone's, a teacher only their own (enforced in the procedure).
+- "Who did it?": the section's students with Done / Not done / Late, "Unmarked → Done".
+- The list groups by day and class; each group has **WhatsApp** (the day's homework as text for the
+  parents' group) and **Diary** (a printable homework diary with a parent's signature line).
+- DB: `academic.homework`, `academic.homework_status`, `academic.sp_homework_manage`
+  (`homework.sql`, `deploy_2026_10_14c.sql`); 10 rolled-back checks in `tests/homework_tests.sql`.
+  Operation 'Student' (a student's last 30 days) is ready for the Student Dashboard.
