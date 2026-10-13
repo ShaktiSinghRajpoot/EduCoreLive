@@ -52,6 +52,7 @@
                 <button class="sd-tab-btn" data-tab="academic">Academic</button>
                 <button class="sd-tab-btn" data-tab="attendance">Attendance</button>
                 <button class="sd-tab-btn" data-tab="timetable">Timetable</button>
+                <button class="sd-tab-btn" data-tab="homework">Homework</button>
                 <button class="sd-tab-btn" data-tab="exams">Exam Results</button>
                 @if (canViewFees)
                 {
@@ -138,6 +139,21 @@
                             <table class="sd-tt" id="ttTable">
                                 <thead id="ttHead"></thead>
                                 <tbody id="ttBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sd-pane" id="tab-homework">
+                    <div class="ec-detail-box mb-0">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="ec-detail-title mb-0">Homework — last 30 days</div>
+                            <small class="text-muted fw-bold" id="hwSum"></small>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table sd-tbl align-middle mb-0">
+                                <thead><tr><th>Given</th><th>Subject</th><th>Homework</th><th>Due</th><th>Done?</th></tr></thead>
+                                <tbody id="hwBody"><tr><td colspan="5" class="text-muted text-center py-3">Open this tab to load.</td></tr></tbody>
                             </table>
                         </div>
                     </div>
@@ -335,6 +351,28 @@ function activateTab(name){
     document.querySelectorAll('.sd-pane').forEach(function(p){ p.classList.remove('active'); });
     btn.classList.add('active');
     document.getElementById('tab-'+name).classList.add('active');
+    if(name==='homework') loadHomework();
+}
+
+/* ── Homework tab: loaded the first time it is opened ── */
+var hwLoaded=false;
+function loadHomework(){
+    if(hwLoaded) return;
+    hwLoaded=true;
+    $.getJSON('@Url.Action("DashboardHomework","Student",new{area="ERP"})', { id: STUDENT_ID }).done(function(rows){
+        rows=rows||[];
+        var done=rows.filter(function(r){ return r.status==='Done'||r.status==='Late'; }).length,
+            checked=rows.filter(function(r){ return r.status; }).length;
+        $('#hwSum').text(rows.length ? done+' of '+checked+' checked done' : '');
+        var tag={ Done:['Done','bg-label-success'], Late:['Late','bg-label-warning'], NotDone:['Not done','bg-label-danger'] };
+        $('#hwBody').html(rows.length ? rows.map(function(r){
+            var t=tag[r.status];
+            return '<tr><td class="text-nowrap">'+EC.esc(r.given)+'</td><td class="fw-semibold">'+EC.esc(r.subject)+'</td>'
+                 + '<td>'+EC.esc(r.title)+(r.details?'<div class="small text-muted">'+EC.esc(r.details)+'</div>':'')+'</td>'
+                 + '<td class="text-nowrap">'+EC.esc(r.due)+'</td>'
+                 + '<td>'+(t?'<span class="badge '+t[1]+'">'+t[0]+'</span>':'<span class="text-muted small">Not checked</span>')+'</td></tr>';
+        }).join('') : '<tr><td colspan="5" class="text-muted text-center py-3">No homework for this class in the last 30 days.</td></tr>');
+    }).fail(function(){ hwLoaded=false; ecToast('error','Could not load the homework.'); });
 }
 document.querySelectorAll('.sd-tab-btn').forEach(function(b){
     b.addEventListener('click', function(){

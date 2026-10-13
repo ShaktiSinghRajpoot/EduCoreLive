@@ -5213,3 +5213,6 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - Teachers come from the LIVE timetable of the current session, so someone who gives nothing still shows.
   One read-only proc `academic.sp_homework_overview` (`homework_overview.sql`, `deploy_2026_10_14f.sql`).
 - Not built: parent messages / parent-app completion (there is no parent login).
+- Student Dashboard gets a **Homework** tab (loaded when opened, `Student/DashboardHomework`): the
+  student's homework of the last 30 days with Done / Late / Not done / Not checked, from the existing
+  `sp_homework_manage` 'Student' operation.

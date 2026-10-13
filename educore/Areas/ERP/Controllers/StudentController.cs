@@ -24,6 +24,7 @@ namespace educore.Areas.ERP.Controllers
         private readonly ITimetableService _timetableService;
         private readonly IExamService _examService;
         private readonly ISubjectService _subjectService;
+        private readonly IHomeworkService _homeworkService;
 
         public StudentController(
             IBaseService baseService,
@@ -36,9 +37,11 @@ namespace educore.Areas.ERP.Controllers
             ITimetableService timetableService,
             IExamService examService,
             ISubjectService subjectService,
+            IHomeworkService homeworkService,
             IWebHostEnvironment env, IConfiguration config)
         {
             _subjectService = subjectService;
+            _homeworkService = homeworkService;
             _publicIds = publicIds;
             _feeService = feeService;
             _attendanceService = attendanceService;
@@ -306,6 +309,22 @@ namespace educore.Areas.ERP.Controllers
         // Everything the dashboard shows, in one call — the page used to build this
         // from a hardcoded array of ten students.
         //
+        // The Homework tab: the student's homework of the last 30 days with whether
+        // they did it. Loaded only when the tab is opened.
+        [HttpGet]
+        public async Task<IActionResult> DashboardHomework(Guid id)
+        {
+            var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
+            if (studentId == 0) return Json(Array.Empty<object>());
+
+            var rows = await _homeworkService.GetForStudentAsync(studentId, TenantId(), SchoolId(), UserId());
+            return Json(rows.Select(h => new
+            {
+                subject = h.SubjectName, title = h.Title, details = h.Details, given = Dates.Show(h.AssignedOn),
+                due = Dates.Show(h.DueOn), teacher = h.TeacherName, status = h.MyStatus
+            }));
+        }
+
         public async Task<IActionResult> DashboardData(Guid id, int? month = null, int? year = null, int? examId = null)
         {
             var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
