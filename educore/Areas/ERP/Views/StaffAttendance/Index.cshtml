@@ -1,0 +1,287 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Staff Attendance";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canMark  = (bool?)ViewBag.CanMark ?? false;    // staff.manage
+    var canCover = (bool?)ViewBag.CanCover ?? false;   // academics.manage
+}
+
+@*
+   Staff Attendance — three tabs:
+     Mark        one day's marks (Present / Absent / Half day / Late / Leave);
+                 approved leave is pre-selected.
+     Register    the month, staff x days.
+     Substitutes the periods of anyone absent or on leave that day, each given
+                 to a free teacher (academic.timetable_substitutions).
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Staff/StaffAttendance.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell sa-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-user-check"></i></div>
+          <div><h4 class="ec-page-title mb-1">Staff Attendance</h4>
+            <p class="ec-page-subtitle">Mark the day, see the month, and cover the classes of absent teachers</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sa-tabs mb-3" id="saTabs">
+      <button class="on" data-t="mark"><i class="bx bx-check-square me-1"></i>Mark attendance</button>
+      <button data-t="month"><i class="bx bx-calendar me-1"></i>Month register</button>
+      <button data-t="subs"><i class="bx bx-transfer-alt me-1"></i>Substitutes</button>
+    </div>
+
+    @* ── Mark ───────────────────────────────────────────── *@
+    <div class="sa-pane" id="paneMark">
+      <div class="ec-card mb-3"><div class="ec-card-body sa-tools">
+        <div><label class="form-label mb-1">Date</label><input type="date" id="mDate" class="form-control form-control-sm"></div>
+        <div class="sa-sum" id="mSum"></div>
+        @if (canMark)
+        {
+            <button id="btnAllPresent" class="btn btn-sm ec-btn-soft"><i class="bx bx-check-double me-1"></i>Unmarked → Present</button>
+        }
+      </div></div>
+      <div id="mNote" class="alert alert-info py-2 d-none"></div>
+      <div id="mList"></div>
+      @if (canMark)
+      {
+          <div class="sa-savebar"><button id="btnSave" class="btn btn-primary"><i class="bx bx-save me-1"></i>Save attendance</button></div>
+      }
+    </div>
+
+    @* ── Month register ─────────────────────────────────── *@
+    <div class="sa-pane d-none" id="paneMonth">
+      <div class="ec-card mb-3"><div class="ec-card-body sa-tools">
+        <div><label class="form-label mb-1">Month</label><input type="month" id="rMonth" class="form-control form-control-sm"></div>
+        <div class="sa-legend"><b class="s-P">P</b> Present <b class="s-A">A</b> Absent <b class="s-H">H</b> Half day <b class="s-L">L</b> Late <b class="s-V">LV</b> Leave</div>
+        <button id="btnPrintReg" class="btn btn-sm btn-outline-secondary"><i class="bx bx-printer me-1"></i>Print</button>
+      </div></div>
+      <div class="ec-card"><div class="ec-card-body p-0"><div class="sa-reg-wrap" id="rWrap"></div></div></div>
+    </div>
+
+    @* ── Substitutes ────────────────────────────────────── *@
+    <div class="sa-pane d-none" id="paneSubs">
+      <div class="ec-card mb-3"><div class="ec-card-body sa-tools">
+        <div><label class="form-label mb-1">Date</label><input type="date" id="sDate" class="form-control form-control-sm"></div>
+        <div class="text-muted small">Periods of teachers marked Absent / Half day or on approved leave. Only free teachers are offered.</div>
+      </div></div>
+      <div id="sList"></div>
+    </div>
+
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var CSRF = $('input[name="__RequestVerificationToken"]').val();
+    var URL = {
+        day:    '@Url.Action("Day","StaffAttendance",new{area="ERP"})',
+        save:   '@Url.Action("Save","StaffAttendance",new{area="ERP"})',
+        month:  '@Url.Action("Month","StaffAttendance",new{area="ERP"})',
+        subs:   '@Url.Action("Substitutions","StaffAttendance",new{area="ERP"})',
+        assign: '@Url.Action("Assign","StaffAttendance",new{area="ERP"})'
+    };
+    var CAN_MARK  = @(canMark ? "true" : "false");
+    var CAN_COVER = @(canCover ? "true" : "false");
+    var STATUSES = [['Present', 'P'], ['Absent', 'A'], ['HalfDay', 'Half'], ['Late', 'Late'], ['Leave', 'Leave']];
+
+    function todayStr() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    $('#mDate, #sDate').val(todayStr()).attr('max', todayStr());
+    $('#sDate').removeAttr('max');   // substitutes can be planned ahead
+    $('#rMonth').val(todayStr().substring(0, 7));
+
+    function post(url, body) {
+        return $.ajax({ url: url, type: 'POST', contentType: 'application/json', headers: { 'RequestVerificationToken': CSRF }, data: JSON.stringify(body) });
+    }
+
+    // ── tabs ───────────────────────────────────────────────────────────
+    $('#saTabs').on('click', 'button', function () {
+        $('#saTabs button').removeClass('on'); $(this).addClass('on');
+        var t = $(this).data('t');
+        $('.sa-pane').addClass('d-none');
+        if (t === 'mark')  { $('#paneMark').removeClass('d-none'); }
+        if (t === 'month') { $('#paneMonth').removeClass('d-none'); loadMonth(); }
+        if (t === 'subs')  { $('#paneSubs').removeClass('d-none'); loadSubs(); }
+    });
+
+    // ── Mark ───────────────────────────────────────────────────────────
+    var day = [];   // [{id, name, ..., status, remark, leave}]
+
+    function loadDay() {
+        EC.listLoading('#mList', 'Loading staff...');
+        $.getJSON(URL.day, { date: $('#mDate').val() }).done(function (d) {
+            day = d.staff || [];
+            // approved leave is pre-selected when nobody marked the day yet
+            day.forEach(function (s) { if (!s.status && s.leave) { s.status = 'Leave'; s.fromLeave = true; } });
+            var dow = new Date($('#mDate').val() + 'T00:00:00').getDay();
+            var note = d.calendar ? d.calendar : (dow === 0 ? 'Sunday' : '');
+            $('#mNote').toggleClass('d-none', !note).text(note ? 'This date is marked in the school calendar: ' + note : '');
+            drawDay();
+        }).fail(function () { ecToast('error', 'Could not load the staff list.'); });
+    }
+
+    function drawDay() {
+        if (!day.length) { EC.listEmpty('#mList', 'No active staff yet.', 'bx-user'); drawSum(); return; }
+        $('#mList').html(day.map(function (s, i) {
+            var btns = STATUSES.map(function (st) {
+                return '<button class="sa-st st-' + st[0] + (s.status === st[0] ? ' on' : '') + '" data-i="' + i + '" data-s="' + st[0] + '"' + (CAN_MARK ? '' : ' disabled') + '>' + st[1] + '</button>';
+            }).join('');
+            var sub = [s.desg, s.code].filter(Boolean).map(EC.esc).join(' · ');
+            var tags = (s.leave ? '<span class="sa-tag lv">Leave: ' + EC.esc(s.leave) + '</span>' : '')
+                     + (s.marked ? '<span class="sa-tag">marked ' + EC.esc(s.marked) + '</span>' : '');
+            return '<div class="sa-row"><div class="sa-who"><div class="sa-name">' + EC.esc(s.name) + '</div><div class="sa-sub">' + sub + ' ' + tags + '</div></div>'
+                 + '<div class="sa-btns">' + btns + '</div>'
+                 + '<input class="form-control form-control-sm sa-remark" data-i="' + i + '" maxlength="200" placeholder="Remark" value="' + EC.esc(s.remark || '') + '"' + (CAN_MARK ? '' : ' disabled') + '></div>';
+        }).join(''));
+        drawSum();
+    }
+
+    function drawSum() {
+        var n = { Present: 0, Absent: 0, HalfDay: 0, Late: 0, Leave: 0, none: 0 };
+        day.forEach(function (s) { n[s.status || 'none']++; });
+        $('#mSum').html('<span class="s-P">' + n.Present + ' present</span><span class="s-A">' + n.Absent + ' absent</span>'
+            + '<span class="s-H">' + n.HalfDay + ' half day</span><span class="s-L">' + n.Late + ' late</span>'
+            + '<span class="s-V">' + n.Leave + ' leave</span><span class="s-N">' + n.none + ' not marked</span>');
+    }
+
+    $('#mList').on('click', '.sa-st', function () {
+        var s = day[$(this).data('i')], v = $(this).data('s');
+        s.status = s.status === v ? null : v;   // click again to clear
+        $(this).closest('.sa-btns').find('.sa-st').removeClass('on');
+        if (s.status) $(this).addClass('on');
+        drawSum();
+    });
+    $('#mList').on('input', '.sa-remark', function () { day[$(this).data('i')].remark = this.value; });
+    $('#mDate').on('change', loadDay);
+
+    $('#btnAllPresent').on('click', function () {
+        day.forEach(function (s) { if (!s.status) s.status = 'Present'; });
+        drawDay();
+    });
+
+    $('#btnSave').on('click', function () {
+        var marks = day.filter(function (s) { return s.status; })
+                       .map(function (s) { return { id: s.id, status: s.status, remark: s.remark || null }; });
+        if (!marks.length) { ecToast('error', 'Mark at least one staff member.'); return; }
+        var $b = $(this); EC.buttonBusy($b);
+        post(URL.save, { date: $('#mDate').val(), marks: marks })
+            .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) loadDay(); })
+            .fail(function () { ecToast('error', 'Could not save. Please try again.'); })
+            .always(function () { EC.buttonReset($b); });
+    });
+
+    // ── Month register ─────────────────────────────────────────────────
+    var CODE = { Present: ['P', 'P'], Absent: ['A', 'A'], HalfDay: ['H', 'H'], Late: ['L', 'L'], Leave: ['LV', 'V'] };
+
+    function loadMonth() {
+        var m = $('#rMonth').val();
+        if (!m) return;
+        $('#rWrap').html('<div class="text-muted p-4 text-center">Loading...</div>');
+        $.getJSON(URL.month, { month: m }).done(function (d) {
+            var parts = m.split('-'), days = new Date(+parts[0], +parts[1], 0).getDate(), marks = {};
+            (d.marks || []).forEach(function (x) { marks[x.id + '_' + x.day] = x.s; });
+
+            var head = '<tr><th class="sa-sticky">Staff</th>';
+            for (var i = 1; i <= days; i++) {
+                var sun = new Date(+parts[0], +parts[1] - 1, i).getDay() === 0;
+                head += '<th class="' + (sun ? 'sun' : '') + '">' + i + '</th>';
+            }
+            head += '<th>P</th><th>A</th><th>LV</th></tr>';
+
+            var body = (d.staff || []).map(function (s) {
+                var row = '<td class="sa-sticky"><b>' + EC.esc(s.name) + '</b><small>' + EC.esc(s.desg || '') + '</small></td>', p = 0, a = 0, lv = 0;
+                for (var i = 1; i <= days; i++) {
+                    var st = marks[s.id + '_' + i], c = st ? CODE[st] : null;
+                    if (st === 'Present' || st === 'Late') p++;
+                    if (st === 'HalfDay') p += 0.5;
+                    if (st === 'Absent') a++;
+                    if (st === 'Leave') lv++;
+                    row += '<td>' + (c ? '<b class="s-' + c[1] + '">' + c[0] + '</b>' : '') + '</td>';
+                }
+                return '<tr>' + row + '<td class="t">' + p + '</td><td class="t">' + a + '</td><td class="t">' + lv + '</td></tr>';
+            }).join('');
+
+            $('#rWrap').html(body
+                ? '<table class="sa-reg"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>'
+                : '<div class="text-muted p-4 text-center">No staff.</div>');
+        }).fail(function () { ecToast('error', 'Could not load the register.'); });
+    }
+    $('#rMonth').on('change', loadMonth);
+    $('#btnPrintReg').on('click', function () { window.print(); });
+
+    // ── Substitutes ────────────────────────────────────────────────────
+    var teachers = [];
+
+    function loadSubs() {
+        EC.listLoading('#sList', 'Loading periods...');
+        $.getJSON(URL.subs, { date: $('#sDate').val() }).done(function (d) {
+            teachers = d.teachers || [];
+            var needs = d.needs || [];
+            if (!needs.length) {
+                EC.listEmpty('#sList', 'No periods need cover on this date. Absences are marked on the Mark attendance tab.', 'bx-check-circle');
+                return;
+            }
+            var open = needs.filter(function (n) { return !n.subId; }).length;
+            $('#sList').html('<div class="sa-subhead">' + needs.length + ' period(s) to cover · <b>' + open + ' still open</b></div>'
+                + needs.map(needRow).join(''));
+        }).fail(function () { ecToast('error', 'Could not load the periods.'); });
+    }
+
+    // free = not away and not already teaching / covering this period
+    function freeFor(seq) {
+        return teachers.filter(function (t) { return !t.away && t.busy.indexOf(seq) < 0; })
+                       .sort(function (a, b) { return a.busy.length - b.busy.length || a.name.localeCompare(b.name); });
+    }
+
+    function needRow(n) {
+        var what = '<div class="sa-per">' + EC.esc(n.period || ('Slot ' + n.seq)) + '</div>'
+                 + '<div class="sa-what"><b>' + EC.esc(n.section) + '</b> · ' + EC.esc(n.subject || '')
+                 + '<div class="sa-sub">' + EC.esc(n.teacher) + ' — <span class="text-danger">' + EC.esc(n.reason || '') + '</span></div></div>';
+        var right;
+        if (n.subId) {
+            right = '<div class="sa-cover"><span class="sa-tag ok"><i class="bx bx-check"></i> ' + EC.esc(n.subName) + '</span>'
+                  + (CAN_COVER ? '<button class="btn btn-xs btn-outline-secondary sa-unassign" data-sec="' + n.sectionId + '" data-seq="' + n.seq + '">Remove</button>' : '') + '</div>';
+        } else if (CAN_COVER) {
+            var opts = freeFor(n.seq).map(function (t) {
+                return '<option value="' + t.id + '">' + EC.esc(t.name) + ' (' + t.busy.length + ' periods)</option>';
+            }).join('');
+            right = '<div class="sa-cover"><select class="form-select form-select-sm sa-pick"><option value="">Pick a free teacher</option>' + opts + '</select>'
+                  + '<button class="btn btn-xs btn-primary sa-assign" data-sec="' + n.sectionId + '" data-seq="' + n.seq + '">Assign</button></div>';
+        } else {
+            right = '<div class="sa-cover"><span class="sa-tag">Not covered</span></div>';
+        }
+        return '<div class="sa-need' + (n.subId ? ' done' : '') + '">' + what + right + '</div>';
+    }
+
+    $('#sList').on('click', '.sa-assign', function () {
+        var $b = $(this), sub = +$b.siblings('.sa-pick').val();
+        if (!sub) { ecToast('error', 'Pick a teacher first.'); return; }
+        EC.buttonBusy($b);
+        post(URL.assign, { date: $('#sDate').val(), sectionId: $b.data('sec'), seq: $b.data('seq'), substituteId: sub })
+            .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) loadSubs(); else EC.buttonReset($b); })
+            .fail(function () { ecToast('error', 'Could not save. Please try again.'); EC.buttonReset($b); });
+    });
+    $('#sList').on('click', '.sa-unassign', function () {
+        var $b = $(this); EC.buttonBusy($b);
+        post(URL.assign, { date: $('#sDate').val(), sectionId: $b.data('sec'), seq: $b.data('seq'), substituteId: 0 })
+            .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) loadSubs(); else EC.buttonReset($b); })
+            .fail(function () { ecToast('error', 'Could not save. Please try again.'); EC.buttonReset($b); });
+    });
+    $('#sDate').on('change', loadSubs);
+
+    loadDay();
+});
+</script>
+}

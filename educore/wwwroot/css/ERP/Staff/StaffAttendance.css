@@ -1,0 +1,63 @@
+/* Staff Attendance (Areas/ERP/Views/StaffAttendance/Index.cshtml) */
+.sa-page .sa-tabs{ display:flex;gap:.4rem;flex-wrap:wrap; }
+.sa-page .sa-tabs button{ border:1px solid var(--ec-border);background:#fff;border-radius:999px;padding:.4rem .95rem;font-size:.85rem;font-weight:700;color:var(--ec-text); }
+.sa-page .sa-tabs button.on{ background:var(--ec-primary);border-color:var(--ec-primary);color:#fff; }
+.sa-page .sa-tools{ display:flex;flex-wrap:wrap;gap:.8rem;align-items:flex-end;justify-content:space-between; }
+.sa-page .btn-xs{ padding:.18rem .6rem;font-size:.76rem;border-radius:8px; }
+
+/* status colours, shared by summary, buttons and register */
+.sa-page .s-P{ color:#1f9254; } .sa-page .s-A{ color:#c4332f; } .sa-page .s-H{ color:#cc6a00; }
+.sa-page .s-L{ color:#7c3aed; } .sa-page .s-V{ color:#2952cc; } .sa-page .s-N{ color:#6b7280; }
+.sa-page .sa-sum{ display:flex;gap:.8rem;flex-wrap:wrap;font-weight:800;font-size:.85rem; }
+
+.sa-page .sa-row{ display:flex;align-items:center;gap:.8rem;background:#fff;border:1px solid var(--ec-border);border-radius:12px;padding:.6rem .9rem;margin-bottom:.5rem; }
+.sa-page .sa-who{ flex:1;min-width:0; }
+.sa-page .sa-name{ font-weight:800;color:var(--ec-text-dark); }
+.sa-page .sa-sub{ font-size:.76rem;color:var(--ec-text-muted); }
+.sa-page .sa-tag{ display:inline-block;font-size:.68rem;font-weight:700;background:#eef0f2;color:#4b5563;border-radius:999px;padding:1px 8px;margin-left:.2rem; }
+.sa-page .sa-tag.lv{ background:#e8f0ff;color:#2952cc; }
+.sa-page .sa-tag.ok{ background:#e8fadf;color:#1f9254;font-size:.8rem;padding:3px 10px; }
+.sa-page .sa-btns{ display:flex;gap:.25rem;flex-wrap:wrap; }
+.sa-page .sa-st{ border:1px solid var(--ec-border);background:#fff;border-radius:8px;padding:.25rem .55rem;font-size:.78rem;font-weight:800;color:#4b5563;min-width:2.4rem; }
+.sa-page .sa-st.on.st-Present{ background:#28c76f;border-color:#28c76f;color:#fff; }
+.sa-page .sa-st.on.st-Absent { background:#ea5455;border-color:#ea5455;color:#fff; }
+.sa-page .sa-st.on.st-HalfDay{ background:#ff9f43;border-color:#ff9f43;color:#fff; }
+.sa-page .sa-st.on.st-Late   { background:#a26bfa;border-color:#a26bfa;color:#fff; }
+.sa-page .sa-st.on.st-Leave  { background:#4f7cff;border-color:#4f7cff;color:#fff; }
+.sa-page .sa-remark{ flex:0 0 180px; }
+.sa-page .sa-savebar{ position:sticky;bottom:.75rem;text-align:right;margin-top:.75rem; }
+.sa-page .sa-savebar .btn{ box-shadow:0 6px 18px rgba(255,138,0,.35); }
+
+/* month register */
+.sa-page .sa-legend{ font-size:.8rem;color:var(--ec-text-muted); }
+.sa-page .sa-legend b{ margin-left:.5rem; }
+.sa-page .sa-reg-wrap{ overflow-x:auto; }
+.sa-page .sa-reg{ border-collapse:collapse;font-size:.76rem;width:100%; }
+.sa-page .sa-reg th,.sa-page .sa-reg td{ border:1px solid #eef0f2;padding:.3rem .25rem;text-align:center;min-width:1.7rem; }
+.sa-page .sa-reg th{ background:#fafafa;font-weight:800; }
+.sa-page .sa-reg th.sun{ background:#fdeceb;color:#c4332f; }
+.sa-page .sa-reg td.t{ font-weight:800;background:#fafafa; }
+.sa-page .sa-reg .sa-sticky{ position:sticky;left:0;background:#fff;text-align:left;min-width:150px;z-index:1; }
+.sa-page .sa-reg th.sa-sticky{ background:#fafafa; }
+.sa-page .sa-reg .sa-sticky small{ display:block;color:var(--ec-text-muted);font-weight:400; }
+
+/* substitutes */
+.sa-page .sa-subhead{ font-size:.85rem;margin-bottom:.5rem;color:var(--ec-text-muted); }
+.sa-page .sa-need{ display:flex;align-items:center;gap:.8rem;background:#fff;border:1px solid var(--ec-border);border-left:4px solid #ea5455;border-radius:12px;padding:.6rem .9rem;margin-bottom:.5rem; }
+.sa-page .sa-need.done{ border-left-color:#28c76f; }
+.sa-page .sa-per{ font-weight:800;color:var(--ec-primary);min-width:70px; }
+.sa-page .sa-what{ flex:1;min-width:0; }
+.sa-page .sa-cover{ display:flex;gap:.4rem;align-items:center;flex-wrap:wrap; }
+.sa-page .sa-cover .form-select{ width:230px; }
+
+@media (max-width:767.98px){
+  .sa-page .sa-row,.sa-page .sa-need{ flex-wrap:wrap; }
+  .sa-page .sa-who,.sa-page .sa-what{ flex:1 1 100%; }
+  .sa-page .sa-remark{ flex:1 1 100%; }
+  .sa-page .sa-cover,.sa-page .sa-cover .form-select{ width:100%; }
+  .sa-page .sa-cover .form-select{ flex:1; }
+}
+@media print{
+  .layout-menu,.layout-navbar,.sa-tabs,.sa-tools .btn,.ec-page-header{ display:none!important; }
+  .sa-page .sa-reg-wrap{ overflow:visible; }
+}

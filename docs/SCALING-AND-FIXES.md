@@ -5146,3 +5146,19 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - DB: `core.announcements`, `core.announcement_reads`, proc `core.sp_announcement_manage`
   (`announcements.sql`, `deploy_2026_10_14.sql`); 9 rolled-back checks in `tests/announcements_tests.sql`.
 - Also: the Year-End page no longer converts its "decided on" time to school time twice.
+
+### [2026-10-14] Staff attendance + substitute teachers
+- New page `StaffAttendance/Index` (menu: Staff › Staff Attendance) with three tabs:
+  - **Mark attendance**: one day, every active staff member, Present / Absent / Half day / Late /
+    Leave plus a remark. Approved leave (`core.staff_leave`) is pre-selected; "Unmarked → Present"
+    fills the rest. Future dates are refused. Needs `staff.manage` (viewing `staff.view`).
+  - **Month register**: staff × days with P / A / H / L / LV and totals; unmarked days of approved
+    leave show as LV. Printable.
+  - **Substitutes**: every period of a teacher who is Absent / Half day / on leave that date, each
+    given to a free teacher (present, not on leave, not already teaching or covering that period,
+    least-loaded first). Needs `academics.manage`. The live timetable is never changed.
+- **My Timetable** shows a teacher the periods they cover from today on.
+- DB: `core.staff_attendance`, `academic.timetable_substitutions`, `core.fn_staff_away`,
+  `core.sp_staff_attendance_manage`, `academic.sp_substitution_manage` (`staff_attendance.sql`,
+  `deploy_2026_10_14b.sql`); 11 rolled-back checks in `tests/staff_attendance_tests.sql`.
+- Payroll is not linked to attendance yet (salary still uses leave only).

@@ -14,7 +14,6 @@
         ("Examinations",      "bx-file",           new[] { "Report cards", "Result analysis" }),
         ("Academics",         "bx-book",           new[] { "Syllabus & lesson plans", "Assignments / homework", "Study materials" }),
         ("Front office",      "bx-buildings",      new[] { "Document verification", "Entrance test", "Interview", "Visitor book", "Phone call log", "Complaints" }),
-        ("Attendance",        "bx-user-check",     new[] { "Staff attendance" }),
         ("Inventory",         "bx-package",        new[] { "Suppliers", "Issue items" }),
         ("Reports",           "bx-bar-chart-alt-2",new[] { "Reports & analytics" }),
         ("Administration",    "bx-cog",            new[] { "SMS / payment gateway", "Backup & restore", "Billing & subscription" })
@@ -26,7 +25,8 @@
     var shipped = new (string Group, string Icon, string Item, string Controller, string Action)[]
     {
         ("Transport", "bx-bus", "Live bus tracking", "Transport", "LiveTracking"),
-        ("Communication", "bx-broadcast", "Notice board", "Notice", "Index")
+        ("Communication", "bx-broadcast", "Notice board", "Notice", "Index"),
+        ("Attendance", "bx-user-check", "Staff attendance & substitutes", "StaffAttendance", "Index")
     };
 
     // These are school modules. The platform super admin (tenant 1) has no school,

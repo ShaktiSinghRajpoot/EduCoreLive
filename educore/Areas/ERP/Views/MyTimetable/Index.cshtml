@@ -31,6 +31,8 @@
     }
     else
     {
+    <div class="alert alert-warning d-none" id="mtCovers"></div>
+
     <div class="ec-card mb-4">
       <div class="ec-card-header">
         <div class="ec-section-title-wrap">
@@ -142,6 +144,7 @@ $(function () {
             drawWeek();
             drawMobile();
             drawRequests();
+            drawCovers();
         }).fail(function () { ecToast('error', 'Could not load your timetable.'); });
     }
 
@@ -207,6 +210,18 @@ $(function () {
         }
         if (req) html += '<div class="sv-req"><div>Waiting: ' + EC.esc(req.subject) + '<br>' + EC.esc(req.section) + '</div></div>';
         return html;
+    }
+
+    // Periods this teacher covers for an absent colleague (Staff Attendance › Substitutes).
+    function drawCovers() {
+        var c = D.covers || [];
+        $('#mtCovers').toggleClass('d-none', !c.length).html(c.length
+            ? '<b><i class="bx bx-transfer-alt me-1"></i>You are covering ' + c.length + ' period(s):</b><ul class="mb-0 mt-1">'
+              + c.map(function (x) {
+                    return '<li>' + EC.esc(x.day) + ', ' + EC.esc(x.period) + ' — ' + EC.esc(x.section) + ' · ' + EC.esc(x.subject || '')
+                         + (x.forName ? ' <span class="text-muted">(for ' + EC.esc(x.forName) + ')</span>' : '') + '</li>';
+                }).join('') + '</ul>'
+            : '');
     }
 
     function drawRequests() {

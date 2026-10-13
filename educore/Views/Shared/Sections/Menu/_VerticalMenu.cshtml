@@ -344,7 +344,7 @@
 
         @if (gStaff)
         {
-        <li class='menu-item @Open("StaffList","AddStaff","EditStaff","StaffProfile","Staff/Inactive","LeaveManagement","PayrollManagement")'>
+        <li class='menu-item @Open("StaffList","AddStaff","EditStaff","StaffProfile","Staff/Inactive","LeaveManagement","PayrollManagement","StaffAttendance")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-group ic-hr"></i>
                 <div class="text-truncate">Staff</div>
@@ -354,6 +354,7 @@
                 {
                 <li class='menu-item @On("StaffList")'><a asp-area="ERP" asp-controller="Staff" asp-action="StaffList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Staff Directory</div></a></li>
                 <li class='menu-item @On("Staff/Inactive")'><a asp-area="ERP" asp-controller="Staff" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive Staff</div></a></li>
+                <li class='menu-item @On("StaffAttendance")'><a asp-area="ERP" asp-controller="StaffAttendance" asp-action="Index" class="menu-link"><i class="bx bx-user-check submenu-icon c-green"></i><div class="text-truncate">Staff Attendance</div></a></li>
                 }
                 @if (showPayroll && gStaffDir)
                 {

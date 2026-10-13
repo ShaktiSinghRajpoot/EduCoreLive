@@ -20,11 +20,13 @@ namespace educore.Areas.ERP.Controllers
     {
         private readonly ITimetableService _timetable;
         private readonly IStaffSelfService _self;
+        private readonly IStaffAttendanceService _att;
 
-        public MyTimetableController(ITimetableService timetable, IStaffSelfService self)
+        public MyTimetableController(ITimetableService timetable, IStaffSelfService self, IStaffAttendanceService att)
         {
             _timetable = timetable;
             _self = self;
+            _att = att;
         }
 
         [HttpGet]
@@ -45,6 +47,7 @@ namespace educore.Areas.ERP.Controllers
             var setup    = await _timetable.GetSetupAsync(TenantId(), SchoolId(), UserId());
             var live     = await _timetable.GetTeacherGridAsync(me.StaffId, TenantId(), SchoolId(), UserId());
             var requests = await _timetable.GetMyRequestsAsync(TenantId(), SchoolId(), UserId());
+            var covers   = await _att.GetMySubstitutionsAsync(TenantId(), SchoolId(), UserId());
 
             return Json(new
             {
@@ -58,6 +61,12 @@ namespace educore.Areas.ERP.Controllers
                 {
                     id = r.RequestId, status = r.Status, note = r.Note, day = r.DayOfWeek, seq = r.PeriodSeq, period = r.PeriodLabel,
                     section = r.SectionLabel, subject = r.SubjectName, liveNow = r.LiveNow, at = r.RequestedAt
+                }),
+                // periods this teacher covers for an absent colleague, from today on
+                covers   = covers.Select(x => new
+                {
+                    day = x.DayLabel, period = x.PeriodLabel ?? ("Slot " + x.PeriodSeq), section = x.SectionLabel,
+                    subject = x.SubjectName, forName = x.OriginalName
                 })
             });
         }
