@@ -90,4 +90,20 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int    Copied  { get; set; }
         public int    Skipped { get; set; }
     }
+
+    /// <summary>A teacher's request for one period (academic.timetable_requests).</summary>
+    public class TimetableRequestRow
+    {
+        public int    RequestId    { get; set; }
+        public string Status       { get; set; } = string.Empty;   // Pending | Approved | Rejected
+        public string Note         { get; set; } = string.Empty;   // why it was rejected
+        public int    DayOfWeek    { get; set; }
+        public int    PeriodSeq    { get; set; }
+        public int    SectionId    { get; set; }
+        public string SectionLabel { get; set; } = string.Empty;
+        public string SubjectName  { get; set; } = string.Empty;
+        public string TeacherName  { get; set; } = string.Empty;
+        public string LiveNow      { get; set; } = string.Empty;   // what is live in that slot today
+        public string RequestedAt  { get; set; } = string.Empty;
+    }
 }

@@ -33,6 +33,30 @@
       </div>
     </div>
 
+    @if (canManage)
+    {
+    <!-- Teachers ask for periods on My Timetable; nothing is live until approved here. -->
+    <div class="ec-card mb-4 d-none" id="ttReqCard">
+      <div class="ec-card-header">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-bell"></i></span>
+          <div>
+            <div class="ec-section-title">Teacher requests <span class="badge bg-label-warning" id="ttReqCount"></span></div>
+            <div class="ec-section-subtitle">Approve to put the period live (the usual clash rules apply), or reject with a reason.</div>
+          </div>
+        </div>
+      </div>
+      <div class="ec-card-body p-0">
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead><tr><th>Teacher</th><th>Period</th><th>Class</th><th>Subject</th><th>Live now</th><th></th></tr></thead>
+            <tbody id="ttReqBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    }
+
     <!-- Main -->
     <div class="ec-card mb-0">
       <div class="ec-card-header">
@@ -537,4 +561,65 @@ loadSetup();
         window.location.href = url.toString();
     });
 </script>
+
+@if (canManage)
+{
+<script>
+// Teacher requests: list, approve, reject. The card stays hidden when there are none.
+$(function () {
+    var REQ_URL     = '@Url.Action("TimetableRequests", "SchoolSettings", new { area = "ERP" })';
+    var APPROVE_URL = '@Url.Action("ApproveTimetableRequest", "SchoolSettings", new { area = "ERP" })';
+    var REJECT_URL  = '@Url.Action("RejectTimetableRequest", "SchoolSettings", new { area = "ERP" })';
+    var DAY_NAMES   = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    function postReq(url, body) {
+        return $.ajax({ url: url, type: 'POST', contentType: 'application/json',
+                        headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').val() },
+                        data: JSON.stringify(body) });
+    }
+
+    function loadRequests() {
+        $.getJSON(REQ_URL).done(function (rows) {
+            rows = rows || [];
+            $('#ttReqCard').toggleClass('d-none', rows.length === 0);
+            $('#ttReqCount').text(rows.length);
+            $('#ttReqBody').html(rows.map(function (r) {
+                return '<tr><td class="fw-semibold">' + EC.esc(r.teacher) + '<div class="small text-muted">' + EC.esc(r.at) + '</div></td>'
+                     + '<td class="text-nowrap">' + EC.esc(DAY_NAMES[r.day] || '?') + ', period ' + r.seq + '</td>'
+                     + '<td>' + EC.esc(r.section) + '</td><td>' + EC.esc(r.subject) + '</td>'
+                     + '<td class="text-muted">' + EC.esc(r.liveNow || 'Free') + '</td>'
+                     + '<td class="text-end text-nowrap">'
+                     + '<button type="button" class="btn btn-sm btn-success tt-approve" data-id="' + r.id + '">Approve</button> '
+                     + '<button type="button" class="btn btn-sm btn-outline-danger tt-reject" data-id="' + r.id + '">Reject</button></td></tr>';
+            }).join(''));
+        });
+    }
+
+    // After a decision: refresh the list and the grid on screen.
+    function done(res) {
+        ecToast(res && res.success ? 'success' : 'error', (res && res.message) || 'Could not save.');
+        loadRequests();
+        document.getElementById('pickClass').dispatchEvent(new Event('change'));
+    }
+
+    $('#ttReqBody').on('click', '.tt-approve', function () {
+        var $btn = $(this); EC.buttonBusy($btn);
+        postReq(APPROVE_URL, { requestId: Number($btn.attr('data-id')) })
+            .done(done).fail(function () { ecToast('error', 'Could not approve.'); })
+            .always(function () { EC.buttonReset($btn); });
+    });
+
+    $('#ttReqBody').on('click', '.tt-reject', function () {
+        var id = Number($(this).attr('data-id'));
+        EC.prompt({ title: 'Reject this request?', label: 'Reason (the teacher sees it)', required: true, okText: 'Reject' })
+            .then(function (reason) {
+                if (reason === null) return;
+                postReq(REJECT_URL, { requestId: id, reason: reason }).done(done);
+            });
+    });
+
+    loadRequests();
+});
+</script>
+}
 }

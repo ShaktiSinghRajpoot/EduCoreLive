@@ -196,6 +196,125 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return await RunWriteAsync(p, "Day copied.");
         }
 
+        // ── Teacher requests: academic.sp_timetable_request_manage ──
+
+        private const string SpRequest = "academic.sp_timetable_request_manage";
+
+        public async Task<TimetableSaveResult> RequestPeriodAsync(
+            int sectionId, int day, int periodSeq, int subjectId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (sectionId <= 0 || subjectId <= 0)
+                return new TimetableSaveResult { Message = "Pick a class, a subject and a period." };
+
+            var p = RequestParams("Request", tenantId, schoolId, actionUserId);
+            p[4].Value = sectionId;            // p_section_id
+            p[5].Value = (short)day;           // p_day
+            p[6].Value = (short)periodSeq;     // p_period_seq
+            p[7].Value = subjectId;            // p_subject_id
+            return await RunRequestWriteAsync(p);
+        }
+
+        public async Task<TimetableSaveResult> CancelRequestAsync(int requestId, int tenantId, int schoolId, int actionUserId)
+        {
+            var p = RequestParams("Cancel", tenantId, schoolId, actionUserId);
+            p[8].Value = requestId;            // p_request_id
+            return await RunRequestWriteAsync(p);
+        }
+
+        public async Task<TimetableSaveResult> ApproveRequestAsync(int requestId, int tenantId, int schoolId, int actionUserId)
+        {
+            var p = RequestParams("Approve", tenantId, schoolId, actionUserId);
+            p[8].Value = requestId;
+            return await RunRequestWriteAsync(p);
+        }
+
+        public async Task<TimetableSaveResult> RejectRequestAsync(int requestId, string? reason, int tenantId, int schoolId, int actionUserId)
+        {
+            var p = RequestParams("Reject", tenantId, schoolId, actionUserId);
+            p[8].Value = requestId;
+            p[9].Value = (object?)reason ?? DBNull.Value;   // p_reason
+            return await RunRequestWriteAsync(p);
+        }
+
+        public Task<List<TimetableRequestRow>> GetMyRequestsAsync(int tenantId, int schoolId, int actionUserId)
+            => ReadRequestsAsync("Mine", tenantId, schoolId, actionUserId);
+
+        public Task<List<TimetableRequestRow>> GetPendingRequestsAsync(int tenantId, int schoolId, int actionUserId)
+            => ReadRequestsAsync("Pending", tenantId, schoolId, actionUserId);
+
+        private async Task<List<TimetableRequestRow>> ReadRequestsAsync(string operation, int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<TimetableRequestRow>();
+            if (tenantId <= 1 || schoolId <= 0) return list;
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpRequest, RequestParams(operation, tenantId, schoolId, actionUserId));
+            if (ds.Tables.Count == 0) return list;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                list.Add(new TimetableRequestRow
+                {
+                    RequestId    = IntVal(row, "request_id"),
+                    Status       = Str(row, "status"),
+                    Note         = Str(row, "note"),
+                    DayOfWeek    = IntVal(row, "day_of_week"),
+                    PeriodSeq    = IntVal(row, "period_seq"),
+                    SectionId    = IntVal(row, "section_id"),
+                    SectionLabel = Str(row, "section_label"),
+                    SubjectName  = Str(row, "subject_name"),
+                    TeacherName  = Str(row, "teacher_name"),
+                    LiveNow      = Str(row, "live_now"),
+                    RequestedAt  = Str(row, "requested_at")
+                });
+            }
+            return list;
+        }
+
+        private async Task<TimetableSaveResult> RunRequestWriteAsync(NpgsqlParameter[] p)
+        {
+            if ((int)p[1].Value! <= 1 || (int)p[2].Value! <= 0)
+                return new TimetableSaveResult { Message = "Invalid school scope." };
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpRequest, p);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return new TimetableSaveResult { Message = "Nothing changed." };
+
+                var row = ds.Tables[0].Rows[0];
+                return new TimetableSaveResult
+                {
+                    Success = Has(row, "success") && row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]),
+                    Message = Str(row, "message")
+                };
+            }
+            catch (PostgresException ex)
+            {
+                // Proc RAISE: a clash, a duplicate request, not a teacher, not pending any more.
+                _logger.LogWarning(ex, "Timetable request {Operation} refused for school {SchoolId}. SqlState {SqlState}", p[0].Value, p[2].Value, ex.SqlState);
+                return new TimetableSaveResult { Message = ex.MessageText };
+            }
+        }
+
+        // Fixed positional layout matching sp_timetable_request_manage.
+        private static NpgsqlParameter[] RequestParams(string operation, int tenantId, int schoolId, int actionUserId)
+        {
+            return new NpgsqlParameter[]
+            {
+                new("p_operation",      NpgsqlDbType.Varchar)  { Value = operation },
+                new("p_tenant_id",      NpgsqlDbType.Integer)  { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer)  { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer)  { Value = actionUserId },
+                new("p_section_id",     NpgsqlDbType.Integer)  { Value = DBNull.Value },
+                new("p_day",            NpgsqlDbType.Smallint) { Value = DBNull.Value },
+                new("p_period_seq",     NpgsqlDbType.Smallint) { Value = DBNull.Value },
+                new("p_subject_id",     NpgsqlDbType.Integer)  { Value = DBNull.Value },
+                new("p_request_id",     NpgsqlDbType.Integer)  { Value = DBNull.Value },
+                new("p_reason",         NpgsqlDbType.Varchar)  { Value = DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "request_cursor" }
+            };
+        }
+
         private async Task<TimetableSaveResult> RunWriteAsync(NpgsqlParameter[] p, string fallbackMessage)
         {
             try

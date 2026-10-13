@@ -1267,6 +1267,44 @@ namespace educore.Areas.ERP.Controllers
 
             return Json(new { success = result.Success, message = result.Message, copied = result.Copied, skipped = result.Skipped });
         }
+
+        // ── Teachers' period requests (they ask on My Timetable, an admin decides here) ──
+
+        [HttpGet]
+        [HasPermission("academics.view")]
+        public async Task<IActionResult> TimetableRequests()
+        {
+            var rows = await _timetableService.GetPendingRequestsAsync(SmTenant(), SmSchool(), SmUser());
+            return Json(rows.Select(r => new
+            {
+                id = r.RequestId, day = r.DayOfWeek, seq = r.PeriodSeq, section = r.SectionLabel,
+                subject = r.SubjectName, teacher = r.TeacherName, liveNow = r.LiveNow, at = r.RequestedAt
+            }));
+        }
+
+        public class TimetableRequestDto
+        {
+            public int     RequestId { get; set; }
+            public string? Reason    { get; set; }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> ApproveTimetableRequest([FromBody] TimetableRequestDto dto)
+        {
+            var result = await _timetableService.ApproveRequestAsync(dto?.RequestId ?? 0, SmTenant(), SmSchool(), SmUser());
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> RejectTimetableRequest([FromBody] TimetableRequestDto dto)
+        {
+            var result = await _timetableService.RejectRequestAsync(dto?.RequestId ?? 0, dto?.Reason, SmTenant(), SmSchool(), SmUser());
+            return Json(new { success = result.Success, message = result.Message });
+        }
         #endregion
 
         #region PeriodStructure

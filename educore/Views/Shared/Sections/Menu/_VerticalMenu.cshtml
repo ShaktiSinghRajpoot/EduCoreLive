@@ -187,6 +187,12 @@
 
         @if (gMyStaff)
         {
+        <li class='menu-item @On("MyTimetable")'>
+            <a asp-area="ERP" asp-controller="MyTimetable" asp-action="Index" class="menu-link">
+                <i class="menu-icon icon-base bx bx-time-five ic-hr"></i>
+                <div class="text-truncate">My Timetable</div>
+            </a>
+        </li>
         <li class='menu-item @On("MyLeave")'>
             <a asp-area="ERP" asp-controller="MyLeave" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-calendar-minus ic-hr"></i>
@@ -292,7 +298,7 @@
         @* ---- Timetable: a single screen, so a direct link beats a group of one ---- *@
         @if (gAcademics)
         {
-        <li class='menu-item @On("Timetable")'>
+        <li class='menu-item @On("SchoolSettings/Timetable")'>
             <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="Timetable" class="menu-link">
                 <i class="menu-icon icon-base bx bx-time-five ic-academic"></i>
                 <div class="text-truncate">Timetable</div>

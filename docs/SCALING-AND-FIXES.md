@@ -5090,3 +5090,18 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   `core.sp_exam_result_student` rounded the subject and overall % to 1 decimal. Both are now
   `ROUND(..., 2)` (`exam_result_student.sql`, deployed with `deploy_2026_10_13b.sql`), and the
   dashboard prints exam percentages with `examPct()` (`toFixed(2)`), like the Result Sheet.
+
+### [2026-10-13] Teachers request timetable periods, admins approve
+- **My Timetable** (staff menu, no permission key: a staff record is the permission, like My Leave):
+  a teacher's own week; a free period shows "+ Request", an own period "Change". A request is
+  Pending and not live; "My requests" shows the status and the admin's reason on a rejection.
+- **Timetable page** (academics.manage): a "Teacher requests" card with what is live in that slot
+  now, Approve and Reject (reason required). The admin can still edit the grid directly.
+- **Storage:** new `academic.timetable_requests` + `academic.sp_timetable_request_manage`
+  (`timetable_requests.sql`, deployed with `deploy_2026_10_13c.sql`). `academic.timetable` is still
+  the live timetable and nothing that reads it changed. Approve calls the existing `SaveCell`, so
+  every timetable rule applies; approving one request rejects other pending requests for the same
+  section + period. The teacher always comes from the logged-in user, never from the browser.
+- **Tests:** `tests/timetable_requests_tests.sql`, 11 checks on QA Test School data, rolled back.
+- Menu: the admin Timetable item now matches `SchoolSettings/Timetable` so it does not light up on
+  My Timetable.

@@ -36,5 +36,27 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Copy one day across the rest of the working week, skipping clashes.</summary>
         Task<TimetableSaveResult> CopyDayAsync(
             int sectionId, int fromDay, int tenantId, int schoolId, int actionUserId);
+
+        // ── Teacher requests (academic.sp_timetable_request_manage) ──
+        // The teacher is always the logged-in user's own staff record.
+
+        /// <summary>Teacher asks for a period. It stays Pending until an admin approves it.</summary>
+        Task<TimetableSaveResult> RequestPeriodAsync(
+            int sectionId, int day, int periodSeq, int subjectId, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Teacher cancels their own pending request.</summary>
+        Task<TimetableSaveResult> CancelRequestAsync(int requestId, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>The logged-in teacher's requests of the last 60 days.</summary>
+        Task<List<TimetableRequestRow>> GetMyRequestsAsync(int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Every pending request of the school (admin).</summary>
+        Task<List<TimetableRequestRow>> GetPendingRequestsAsync(int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Admin approves: the period goes live through SaveCell's rules.</summary>
+        Task<TimetableSaveResult> ApproveRequestAsync(int requestId, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Admin rejects with a reason the teacher can see.</summary>
+        Task<TimetableSaveResult> RejectRequestAsync(int requestId, string? reason, int tenantId, int schoolId, int actionUserId);
     }
 }
