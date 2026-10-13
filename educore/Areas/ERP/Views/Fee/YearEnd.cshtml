@@ -144,7 +144,11 @@ $(function () {
 
     function card(s) {
         var f = s.first, total = 0, open = 0;
-        s.lines.forEach(function (l) { total += EC.num(l.amount); if (l.state === 'Open') open++; });
+        // The total is what the student still owes; on the Written off tab, what was written off.
+        s.lines.forEach(function (l) {
+            if ((state === 'WrittenOff') === (l.state === 'WrittenOff')) total += EC.num(l.amount);
+            if (l.state === 'Open') open++;
+        });
         var who = [classOf(f), f.adm, f.guardian ? 'F: ' + f.guardian : '', f.mobile].filter(Boolean).map(EC.esc).join(' · ');
         var btns = CAN_MANAGE && open > 0
             ? '<div class="ye-btns"><button class="btn btn-sm ec-btn-soft ye-act" data-op="Carry" data-sid="' + f.sid + '">Carry all</button>'
