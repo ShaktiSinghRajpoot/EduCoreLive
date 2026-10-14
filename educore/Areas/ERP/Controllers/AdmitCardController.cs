@@ -21,13 +21,16 @@ namespace educore.Areas.ERP.Controllers
         private readonly IIdCardService _cards;
         private readonly ISchoolSettingsService _settings;
         private readonly IBaseService _baseService;
+        private readonly IFeePaymentService _fees;
 
-        public AdmitCardController(IExamService exam, IIdCardService cards, ISchoolSettingsService settings, IBaseService baseService)
+        public AdmitCardController(IExamService exam, IIdCardService cards, ISchoolSettingsService settings, IBaseService baseService,
+                                   IFeePaymentService fees)
         {
             _exam = exam;
             _cards = cards;
             _settings = settings;
             _baseService = baseService;
+            _fees = fees;
         }
 
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -88,7 +91,10 @@ namespace educore.Areas.ERP.Controllers
 
         // The print sheet.
         [HttpGet]
-        public async Task<IActionResult> Print(int examId, int classId, string? section, string? format)
+        // holdDues = true: students with fees fallen due are left out and listed on
+        // screen instead, so the office can hand those cards over once fees are paid
+        // (QA BUG-075; a common school practice, so it is a choice, not a rule).
+        public async Task<IActionResult> Print(int examId, int classId, string? section, string? format, bool holdDues = false)
         {
             var exam  = await _exam.GetExamAsync(examId, TenantId(), SchoolId(), UserId());
             var sheet = await _exam.GetDatesheetAsync(classId, examId, TenantId(), SchoolId(), UserId());
@@ -109,9 +115,20 @@ namespace educore.Areas.ERP.Controllers
                 .ThenBy(s => s.StudentName)
                 .ToList();
 
+            var held = new List<AdmitCardHeld>();
+            if (holdDues && students.Count > 0)
+            {
+                var dues = await StudentsWithDuesAsync(className!);
+                foreach (var s in students)
+                    if (dues.TryGetValue(s.StudentId, out var amount))
+                        held.Add(new AdmitCardHeld { Student = s, Outstanding = amount });
+                students = students.Where(s => !dues.ContainsKey(s.StudentId)).ToList();
+            }
+
             var model = new AdmitCardPrintModel
             {
                 Students    = students,
+                Held        = held,
                 Papers      = sheet.Rows,
                 School      = school,
                 LogoUrl     = AbsoluteLogo(school.LogoUrl),
@@ -120,6 +137,21 @@ namespace educore.Areas.ERP.Controllers
                 Format      = format is "Compact" or "FullPage" ? format : "Classic"
             };
             return View("Print", model);
+        }
+
+        // Student id -> fees fallen due and unpaid, for one class (the Due Reminders list).
+        private async Task<Dictionary<int, decimal>> StudentsWithDuesAsync(string className)
+        {
+            var result = new Dictionary<int, decimal>();
+            for (int page = 1; page <= 20; page++)
+            {
+                var list = await _fees.GetFeeDueListAsync(
+                    new FeeDueItem { FilterClass = className, Page = page, PageSize = 200 },
+                    TenantId(), SchoolId(), UserId());
+                foreach (var d in list.Items) result[d.StudentId] = d.TotalOutstanding;
+                if (list.Items.Count < 200) break;
+            }
+            return result;
         }
 
         private string? AbsoluteLogo(string? logoUrl)

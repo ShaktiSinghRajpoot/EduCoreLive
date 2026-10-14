@@ -214,6 +214,7 @@ DECLARE
     v_keep     integer[];
     v_total    integer   := 0;
     v_clash    text;
+    v_missing  text;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school admin scope.';
@@ -443,6 +444,21 @@ BEGIN
            AND NOT EXISTS (SELECT 1 FROM academic.exam_subjects
                            WHERE exam_id = p_exam_id) THEN
             RAISE EXCEPTION 'This exam has no subjects yet, so there is nothing to publish.';
+        END IF;
+
+        -- Every paper needs its date before the datesheet goes out, or the admit
+        -- card prints "-" for it (QA BUG-094).
+        IF p_status = 'Published' THEN
+            SELECT string_agg(COALESCE(sub.subject_name, 'Subject ' || es.subject_id)
+                              || ' (' || COALESCE(c.class_name, 'class') || ')', ', ')
+              INTO v_missing
+            FROM academic.exam_subjects es
+            LEFT JOIN academic.school_subjects sub ON sub.subject_id = es.subject_id
+            LEFT JOIN academic.academic_classes c ON c.academic_class_id = es.academic_class_id
+            WHERE es.exam_id = p_exam_id AND es.exam_date IS NULL;
+            IF v_missing IS NOT NULL THEN
+                RAISE EXCEPTION 'These papers have no date yet: %. Give every paper a date before publishing.', v_missing;
+            END IF;
         END IF;
 
         UPDATE academic.exams

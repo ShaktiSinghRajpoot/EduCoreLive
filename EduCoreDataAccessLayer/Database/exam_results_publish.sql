@@ -26,9 +26,11 @@
 -- the bands cover 0-100 with no overlap and no gap wider than 1.
 --
 -- RANK. By overall percentage within the class (and within the section), ties
--- share a rank (1, 1, 3). Today's result rules apply: an absent paper is out of
--- the total, marks of a paper no longer on the datesheet do not count, and a
--- student absent from every paper has no percentage, no grade and no rank.
+-- share a rank (1, 1, 3). Today's result rules apply: an absent paper counts as
+-- 0 out of its max marks (QA BUG-095 -- leaving it out gave the absent student a
+-- higher % and rank than those who sat every paper), marks of a paper no longer
+-- on the datesheet do not count, and a student absent from every paper has no
+-- percentage, no grade and no rank. A paper with no mark yet is left out.
 --
 -- Run BEFORE exam_marks.sql, exam_result_student.sql and exam_schedule.sql (their
 -- procs read results_status and fn_exam_class_result).
@@ -248,7 +250,8 @@ AS $function$
                MAX(m.section)::text AS section,
                COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL)::int            AS subjects,
                COALESCE(SUM(m.marks_obtained), 0)                                   AS obtained,
-               COALESCE(SUM(es.max_marks) FILTER (WHERE m.marks_obtained IS NOT NULL), 0) AS total,
+               -- an absent paper is 0 out of its max
+               COALESCE(SUM(es.max_marks) FILTER (WHERE m.marks_obtained IS NOT NULL OR m.is_absent), 0) AS total,
                COUNT(*) FILTER (WHERE m.is_absent)::int                             AS absent,
                COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL
                                   AND m.marks_obtained < es.pass_marks)::int        AS failed
@@ -263,7 +266,8 @@ AS $function$
     ),
     p AS (
         SELECT t.*,
-               CASE WHEN t.total > 0 THEN ROUND(t.obtained * 100.0 / t.total, 2) END AS pct
+               -- absent from every paper (nothing sat) = no percentage
+               CASE WHEN t.subjects > 0 AND t.total > 0 THEN ROUND(t.obtained * 100.0 / t.total, 2) END AS pct
         FROM t
     )
     SELECT p.student_id,

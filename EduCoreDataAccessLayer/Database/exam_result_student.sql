@@ -14,10 +14,11 @@
 -- school's grade scale, the rank by overall percentage within the class and the
 -- section, ties sharing a rank.
 --
--- ABSENT IS NOT ZERO. is_absent means the student did not sit the paper, which
--- is a different fact from scoring 0. An absent subject is reported as absent and
--- is left OUT of the totals and the percentage, so one missed paper does not read
--- as a failed one. The count of absences is returned so the page can say so.
+-- ABSENT. is_absent means the student did not sit the paper. The subject is shown
+-- as absent (no marks, no pass/fail), but it counts as 0 out of its max marks in
+-- the total and the percentage (QA BUG-095), the same as the class result sheet,
+-- so missing a paper never raises a student's % or rank. The count of absences
+-- is returned so the page can say so.
 --
 -- Target DB: PostgreSQL. Safe to re-run.
 -- ============================================================================
@@ -129,16 +130,17 @@ BEGIN
       AND m.tenant_id = p_tenant_id AND m.school_id = p_school_id
     LIMIT 1;
 
-    -- ── 3. Totals, absences and not-yet-entered marks excluded ─────────────
+    -- ── 3. Totals: an absent paper is 0 of its max; not-yet-entered marks are left out
     -- grade / rank columns come last so older positional readers still line up.
     OPEN p_summary FOR
     SELECT COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL)::int   AS subjects,
            COALESCE(SUM(m.marks_obtained) FILTER (WHERE m.marks_obtained IS NOT NULL), 0) AS obtained,
-           COALESCE(SUM(es.max_marks)     FILTER (WHERE m.marks_obtained IS NOT NULL), 0) AS total,
-           CASE WHEN COALESCE(SUM(es.max_marks) FILTER (WHERE m.marks_obtained IS NOT NULL), 0) = 0
+           COALESCE(SUM(es.max_marks)     FILTER (WHERE m.marks_obtained IS NOT NULL OR m.is_absent), 0) AS total,
+           CASE WHEN COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL) = 0
+                  OR COALESCE(SUM(es.max_marks) FILTER (WHERE m.marks_obtained IS NOT NULL OR m.is_absent), 0) = 0
                 THEN 0::numeric
-                ELSE ROUND(SUM(m.marks_obtained) FILTER (WHERE m.marks_obtained IS NOT NULL) * 100.0
-                         / SUM(es.max_marks)     FILTER (WHERE m.marks_obtained IS NOT NULL), 2)
+                ELSE ROUND(COALESCE(SUM(m.marks_obtained), 0) * 100.0
+                         / SUM(es.max_marks)     FILTER (WHERE m.marks_obtained IS NOT NULL OR m.is_absent), 2)
            END                                                             AS percent,
            COUNT(*) FILTER (WHERE COALESCE(m.is_absent, FALSE))::int       AS absent_count,
            COUNT(*) FILTER (WHERE m.marks_obtained IS NOT NULL

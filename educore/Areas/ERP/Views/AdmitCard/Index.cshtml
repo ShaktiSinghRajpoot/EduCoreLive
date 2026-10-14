@@ -73,6 +73,11 @@
           </div>
         </div>
 
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" id="acHoldDues" />
+          <label class="form-check-label" for="acHoldDues">Hold cards of students with fees due (they are listed instead, to hand over once paid)</label>
+        </div>
+
         <div class="mt-3 d-flex gap-2 flex-wrap">
           <button type="button" class="btn btn-primary" id="acOpen">
             <i class="bx bx-printer me-1"></i>Open admit cards
@@ -131,7 +136,8 @@
                 + '?examId='  + encodeURIComponent($('#acExam').val())
                 + '&classId=' + encodeURIComponent($('#acClass').val())
                 + '&section=' + encodeURIComponent($('#acSection').val() || '')
-                + '&format='  + encodeURIComponent($('#acFormat').val());
+                + '&format='  + encodeURIComponent($('#acFormat').val())
+                + '&holdDues=' + ($('#acHoldDues').is(':checked') ? 'true' : 'false');
 
             window.open(url, '_blank');
         });

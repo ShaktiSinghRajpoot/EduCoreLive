@@ -88,7 +88,16 @@
     <div class="ac-toolbar">
         <button type="button" onclick="window.print()">Print @Model.Students.Count admit card(s)</button>
     </div>
-    @if (!Model.Students.Any())
+    @if (Model.Held.Any())
+    {
+        <div class="ac-note" style="color:#b00020;">
+            Held for fees due (@Model.Held.Count):
+            @string.Join(", ", Model.Held.Select(h => h.Student.StudentName
+                + (string.IsNullOrWhiteSpace(h.Student.Section) ? "" : " (" + h.Student.Section + ")")
+                + " ₹" + h.Outstanding.ToString("N0")))
+        </div>
+    }
+    @if (!Model.Students.Any() && !Model.Held.Any())
     {
         <div class="ac-note" style="color:#b00020;">No students found for this class / section in @Model.SessionName.</div>
     }

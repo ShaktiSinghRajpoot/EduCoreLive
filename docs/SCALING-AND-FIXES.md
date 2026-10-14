@@ -5338,3 +5338,17 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - **BUG-112** The Enquiry CRM register dialog already sends payment mode + reference (the tester left it on
   Cash); a cheque now needs its number.
 - Bundle `deploy_2026_10_14n.sql` (fee_day_close).
+
+### 2026-10-14 — QA round 3, batch 3 (exams)
+- **BUG-095** An absent paper now counts as 0 out of its max marks in the total, % and rank
+  (`fn_exam_class_result`, `sp_exam_result_student`); a student absent from every paper still has no
+  % / rank. The report card says "Absent in N subject(s)" instead of "Passed (absent …)".
+- **BUG-094** An exam cannot be published while any paper has no date (the error names the papers);
+  Publish asks for confirmation.
+- **BUG-076** Marks cannot be saved before the paper's date (`SaveMarks`); Marks Entry shows
+  "Paper not written yet" and locks the grid.
+- **BUG-075** Admit cards: optional "Hold cards of students with fees due" — those students are left
+  out and listed on the print page with their due amount (uses the Due Reminders list).
+- **BUG-079** Result publish dialog no longer promises a parent view that does not exist.
+- BUG-054 was already handled (changing the default max/pass updates cells still on the old default).
+- Bundle `deploy_2026_10_14o.sql` (exam_results_publish, exam_marks, exam_result_student, exam_schedule).

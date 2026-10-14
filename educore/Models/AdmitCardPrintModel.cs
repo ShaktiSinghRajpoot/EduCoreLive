@@ -21,6 +21,9 @@ namespace educore.Models
 
         public string Format { get; set; } = "Classic";   // Classic | Compact | FullPage
 
+        /// <summary>Cards held back because fees are due (only when the user asked).</summary>
+        public List<AdmitCardHeld> Held { get; set; } = new();
+
         /// <summary>
         /// The papers one student sits: a paper with no section list is for the
         /// whole class; otherwise only the sections it names.
@@ -34,5 +37,12 @@ namespace educore.Models
                 .OrderBy(p => p.ExamDate).ThenBy(p => p.StartTime)
                 .ToList();
         }
+    }
+
+    /// <summary>A student whose admit card was held for unpaid fees.</summary>
+    public class AdmitCardHeld
+    {
+        public IdCardStudent Student     { get; set; } = new();
+        public decimal       Outstanding { get; set; }
     }
 }

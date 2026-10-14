@@ -156,6 +156,7 @@ DECLARE
     v_year_id integer;
     v_max     numeric;
     v_pass    numeric;
+    v_paper   date;
     v_final   boolean;
     v_items   jsonb;
     v_item    jsonb;
@@ -311,7 +312,7 @@ BEGIN
 
     ELSIF p_operation = 'SaveMarks' THEN
 
-        SELECT es.max_marks, es.pass_marks INTO v_max, v_pass
+        SELECT es.max_marks, es.pass_marks, es.exam_date INTO v_max, v_pass, v_paper
         FROM academic.exam_subjects es
         WHERE es.exam_id = p_exam_id
           AND es.academic_class_id = p_academic_class_id
@@ -342,6 +343,11 @@ BEGIN
         -- drafts, and the server holds the same line.
         IF v_status IS DISTINCT FROM 'Published' THEN
             RAISE EXCEPTION 'This exam is still a draft. Publish it before entering marks.';
+        END IF;
+
+        -- No marks before the paper has been written (QA BUG-076).
+        IF v_paper > CURRENT_DATE THEN
+            RAISE EXCEPTION 'This paper is on %. Marks can be entered from that day.', to_char(v_paper, 'DD Mon YYYY');
         END IF;
 
         -- An exam that targets specific sections of this class takes marks only

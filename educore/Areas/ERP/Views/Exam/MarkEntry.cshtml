@@ -105,6 +105,10 @@
                 <span class="me-lock-chip" id="lockChip" style="display:none;">
                     <i class="bx bx-lock-alt"></i> Finalized
                 </span>
+                <span class="me-lock-chip" id="futureChip" style="display:none;"
+                      title="Marks can be entered from the day of the paper">
+                    <i class="bx bx-time-five"></i> Paper not written yet
+                </span>
                 <span class="me-lock-chip" id="pubChip" style="display:none;"
                       title="Unpublish the results on the Result Sheet page to change marks">
                     <i class="bx bx-check-shield"></i> Results published
@@ -249,6 +253,7 @@ function closeSheet() {
     state.finalized = false;
     state.resultsPublished = false;
     $('#pubChip').hide();
+    $('#futureChip').hide();
     document.getElementById('markTableBody').innerHTML = '';
     document.getElementById('mobList').innerHTML       = '';
     document.getElementById('meEmpty').style.display   = 'flex';
@@ -450,6 +455,7 @@ function renderContext() {
 
     $('#lockChip').toggle(state.finalized);
     $('#pubChip').toggle(state.resultsPublished);
+    $('#futureChip').toggle(paperAhead());
     // Reopening is refused server-side while the results are published.
     $('#btnReopen').toggle(state.finalized && !state.resultsPublished);
 
@@ -465,7 +471,14 @@ function entered() {
 
 // Marks and the absent toggle are locked once finalized, once the exam's
 // results are published, and for anyone without exams.marks / exams.manage.
-function locked() { return state.finalized || state.resultsPublished || !CAN_ENTER_MARKS; }
+function locked() { return state.finalized || state.resultsPublished || paperAhead() || !CAN_ENTER_MARKS; }
+
+// The paper's date is still to come: no marks yet (the server refuses them too).
+// Dates are yyyy-MM-dd text, so they compare as strings.
+function paperAhead() {
+    var d = new Date(), today = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    return !!state.examDate && state.examDate > today;
+}
 
 // A mark below 0 or above the maximum. It is kept as typed (never silently
 // clamped) and flagged, and Save stays blocked until it is corrected.

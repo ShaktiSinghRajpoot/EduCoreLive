@@ -898,7 +898,13 @@ $(document).ready(function () {
     }
 
     $(document).on('click', '.exam-pub', function () {
-        setStatus($(this), $(this).closest('tr').data('exam-id'), 'Published');
+        var $btn = $(this), id = $btn.closest('tr').data('exam-id');
+        EC.confirm({
+            title:   'Publish this exam?',
+            message: 'Teachers will see the datesheet, admit cards can be printed and marks can be entered.',
+            okText:  'Publish',
+            danger:  false
+        }).then(function (ok) { if (ok) setStatus($btn, id, 'Published'); });
     });
 
     $(document).on('click', '.exam-unpub', function () {
