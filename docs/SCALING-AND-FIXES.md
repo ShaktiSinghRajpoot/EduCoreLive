@@ -5421,3 +5421,6 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - **BUG-063 (discounts)** Collect Fees' discount dialog no longer has a self-picked "Approved by" list:
   the approver is the signed-in user (who needs fees.concession), set by FeeController, and the receipt
   drops "(entered by …)" when it is the same person. Refunds / cancellations already worked this way.
+- Student attendance is marked Present / Absent only (school's decision, 15 Oct): the Late and Leave buttons
+  are removed again. Days saved earlier as Late show as Present; an old Leave keeps its tag until changed.
+- Mobile check (375 px, live, 15 Oct): 27 pages, none scrolls sideways.

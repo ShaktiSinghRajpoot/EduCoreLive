@@ -237,7 +237,13 @@ $(document).ready(function () {
                       : status[s.id] === 'late'  ? ' <span class="badge bg-label-warning ms-1">Late</span>'
                       : status[s.id] === 'leave' ? ' <span class="badge bg-label-info ms-1">Leave</span>'
                       : '';
-            const on = function (st) { return !notMarkedYet(s) && status[s.id] === st ? 'on' : ''; };
+            // Only Present / Absent are marked here (the school's choice). A day saved
+            // earlier as Late shows as Present; Leave keeps its tag until someone taps.
+            const on = function (st) {
+                if (notMarkedYet(s)) return '';
+                var cur = status[s.id] === 'late' ? 'present' : status[s.id];
+                return cur === st ? 'on' : '';
+            };
             const notify = ab
                 ? '<div class="att-notify">' +
                     '<span class="notify-chip ' + (notified[s.id]?'sent':'pending') + '">' +
@@ -252,8 +258,6 @@ $(document).ready(function () {
                     '<div class="att-toggle">' +
                         '<button class="seg-p ' + on('present') + '" data-id="' + s.id + '" data-set="present" title="Present"><i class="bx bx-check"></i>Present</button>' +
                         '<button class="seg-a ' + on('absent') + '" data-id="' + s.id + '" data-set="absent" title="Absent"><i class="bx bx-x"></i>Absent</button>' +
-                        '<button class="seg-l ' + on('late') + '" data-id="' + s.id + '" data-set="late" title="Late"><i class="bx bx-time-five"></i>Late</button>' +
-                        '<button class="seg-v ' + on('leave') + '" data-id="' + s.id + '" data-set="leave" title="Leave"><i class="bx bx-calendar-minus"></i>Leave</button>' +
                     '</div>' +
                     notify +
                 '</div>'
