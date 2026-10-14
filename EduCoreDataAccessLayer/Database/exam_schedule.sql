@@ -455,7 +455,7 @@ BEGIN
             FROM academic.exam_subjects es
             LEFT JOIN academic.school_subjects sub ON sub.subject_id = es.subject_id
             LEFT JOIN academic.academic_classes c ON c.academic_class_id = es.academic_class_id
-            WHERE es.exam_id = p_exam_id AND es.exam_date IS NULL;
+            WHERE es.exam_id = p_exam_id AND NULLIF(es.exam_date::text, '') IS NULL;
             IF v_missing IS NOT NULL THEN
                 RAISE EXCEPTION 'These papers have no date yet: %. Give every paper a date before publishing.', v_missing;
             END IF;

@@ -312,7 +312,7 @@ BEGIN
 
     ELSIF p_operation = 'SaveMarks' THEN
 
-        SELECT es.max_marks, es.pass_marks, es.exam_date INTO v_max, v_pass, v_paper
+        SELECT es.max_marks, es.pass_marks, NULLIF(es.exam_date::text, '')::date INTO v_max, v_pass, v_paper
         FROM academic.exam_subjects es
         WHERE es.exam_id = p_exam_id
           AND es.academic_class_id = p_academic_class_id

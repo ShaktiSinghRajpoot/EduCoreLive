@@ -545,6 +545,15 @@ BEGIN
             RAISE EXCEPTION 'The results of this exam are already published.';
         END IF;
 
+        -- A paper still to be written has no real marks (QA BUG-076).
+        SELECT MIN(NULLIF(es.exam_date::text, '')::date)::text INTO v_first
+          FROM academic.exam_subjects es
+         WHERE es.exam_id = p_exam_id AND NULLIF(es.exam_date::text, '')::date > CURRENT_DATE;
+        IF v_first IS NOT NULL THEN
+            RAISE EXCEPTION 'Results cannot be published before every paper is written (next paper on %).',
+                to_char(v_first::date, 'DD Mon YYYY');
+        END IF;
+
         SELECT COUNT(*)::int, COUNT(*) FILTER (WHERE NOT out_finalized)::int
           INTO v_expected, v_pending
         FROM academic.fn_exam_pending_sheets(p_exam_id);

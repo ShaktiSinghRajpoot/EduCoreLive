@@ -5398,3 +5398,12 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   to My Timetable.
 - Bundle `deploy_2026_10_14r.sql` (student_master_fields, transfer_certificate, class_teacher_acting,
   staff_leave).
+
+### 2026-10-14 — QA round 3 retest (database)
+- New suite `Database/tests/qa_round3_fixes_tests.sql` (11 checks, rolled back on the QA school): all pass.
+  It found that exam paper dates are stored as text on live, so the undated / future-paper checks now use
+  `NULLIF(exam_date::text, '')`, and that Half Yearly results had been published before its papers were
+  written: `PublishResults` now refuses while any paper is still to come (BUG-076).
+- `report_card_certificates_tests` / `student_data_checks_tests` no longer assume an empty register /
+  no roll gaps on the live QA data. All tenant-32 suites pass.
+- Bundle `deploy_2026_10_14s.sql` (exam_results_publish, exam_marks, exam_schedule).

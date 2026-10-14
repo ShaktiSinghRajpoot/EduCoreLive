@@ -9,7 +9,7 @@ BEGIN;
 DO $t$
 DECLARE
     TN int := 32; SC int := 45; ADMIN int := 62;
-    c refcursor; r record; v_a int; v_b int; v_c int; v_n int; v_txt text;
+    c refcursor; r record; v_a int; v_b int; v_c int; v_n int; v_txt text; v_before int;
     pass int := 0; fail int := 0;
 BEGIN
     -- three students of Class 1-A
@@ -17,6 +17,10 @@ BEGIN
      WHERE tenant_id = TN AND class_name = 'Class 1' AND section = 'A' AND is_active;
     SELECT student_id INTO v_b FROM core.students
      WHERE tenant_id = TN AND class_name = 'Class 1' AND section = 'A' AND is_active AND student_id NOT IN (v_a, v_c) LIMIT 1;
+
+    -- students already without a roll on the live data (the summary adds ours to them)
+    SELECT COUNT(*) INTO v_before FROM core.students
+     WHERE tenant_id = TN AND school_id = SC AND is_active AND NULLIF(trim(COALESCE(roll_no, '')), '') IS NULL;
 
     -- make problems: a missing roll, a duplicate roll, a bad mobile, no DOB
     UPDATE core.students SET roll_no = NULL WHERE student_id = v_a;
@@ -29,7 +33,7 @@ BEGIN
     LOOP FETCH c INTO r; EXIT WHEN NOT FOUND;
         IF r.issue IN ('no_roll', 'dup_roll', 'bad_mobile', 'no_dob') THEN v_txt := v_txt || r.issue || '=' || r.students || ' '; END IF;
     END LOOP; CLOSE c;
-    IF v_txt LIKE '%no_roll=1%' AND v_txt LIKE '%dup_roll=2%' AND v_txt LIKE '%bad_mobile=1%' AND v_txt LIKE '%no_dob=1%'
+    IF v_txt LIKE '%no_roll=' || (v_before + 1) || ' %' AND v_txt LIKE '%dup_roll=2%' AND v_txt LIKE '%bad_mobile=1%' AND v_txt LIKE '%no_dob=1%'
     THEN pass := pass + 1; RAISE NOTICE 'PASS 1 summary: %', v_txt;
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 1 summary: %', v_txt; END IF;
 

@@ -82,7 +82,10 @@ BEGIN
 
     -- 8. the register lists them; filter by type; another school sees none
     CALL core.sp_certificate_manage('List', TN, SC, ADMIN, NULL, NULL, 'Bonafide', NULL, NULL, NULL, NULL, c);
-    v_n := 0; LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.cert_type = 'Bonafide' THEN v_n := v_n + 1; ELSE v_n := v_n - 100; END IF; END LOOP; CLOSE c;
+    -- only the two this test issued (the live register may hold real ones too)
+    v_n := 0; LOOP FETCH c INTO r; EXIT WHEN NOT FOUND;
+        IF r.cert_type <> 'Bonafide' THEN v_n := v_n - 100; ELSIF r.cert_id >= v_id THEN v_n := v_n + 1; END IF;
+    END LOOP; CLOSE c;
     CALL core.sp_certificate_manage('Get', 30, 1, ADMIN, v_id, NULL, NULL, NULL, NULL, NULL, NULL, c);
     FETCH c INTO r; CLOSE c;
     IF v_n = 2 AND r.cert_id IS NULL THEN pass := pass + 1; RAISE NOTICE 'PASS 8 register: 2 bonafide, other school sees nothing';
