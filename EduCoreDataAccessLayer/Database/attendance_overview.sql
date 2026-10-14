@@ -104,7 +104,9 @@ BEGIN
            COUNT(*) FILTER (WHERE a.status = 'Late')::int                      AS late,
            COUNT(*) FILTER (WHERE a.status = 'Leave')::int                     AS leave,
            core.fn_user_display_name(MIN(a.marked_by))                         AS marked_by,
-           MIN(a.marked_at)                                                    AS marked_at
+           -- as text on the school's clock: a timestamp that travels through a DataTable
+           -- loses its UTC tag, and the page would show 06:29 for 11:59 IST
+           to_char(MIN(a.marked_at) AT TIME ZONE 'Asia/Kolkata', 'DD Mon, HH12:MI AM') AS marked_at
       FROM tmp_ao_sec ts
       LEFT JOIN core.student_attendance a
              ON a.tenant_id = p_tenant_id AND a.school_id = p_school_id AND a.academic_year = v_year

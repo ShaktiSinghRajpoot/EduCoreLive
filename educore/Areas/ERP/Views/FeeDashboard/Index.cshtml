@@ -271,7 +271,7 @@ $(function () {
         $('#fdHeads').html('<thead><tr><th>Fee head</th><th class="n">Collected</th><th class="n">Overdue</th><th class="n">Not due yet</th></tr></thead><tbody>'
             + (H.map(function (h) {
                 return '<tr><td class="fw-semibold">' + EC.esc(h.fee_head) + '</td><td class="n">' + EC.money(h.collected || 0) + '</td>'
-                     + '<td class="n text-danger">' + EC.money(h.overdue || 0) + '</td><td class="n">' + EC.money(h.not_yet_due || 0) + '</td></tr>';
+                     + '<td class="n' + (n(h.overdue) > 0 ? ' text-danger' : '') + '">' + EC.money(h.overdue || 0) + '</td><td class="n">' + EC.money(h.not_yet_due || 0) + '</td></tr>';
             }).join('') || '<tr><td colspan="4" class="in-muted">—</td></tr>') + '</tbody>');
         $('#fdMakeup').html(overdueTotal > 0 ? H.filter(function (h) { return n(h.overdue) > 0; }).map(function (h) {
             return hbar(h.fee_head, '', h.overdue, overdueTotal, 'r0', short(h.overdue) + ' <small class="in-muted">' + pctText(h.overdue, overdueTotal) + '</small>');

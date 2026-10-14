@@ -181,16 +181,21 @@ BEGIN
       FROM tmp_fd t
      WHERE t.active
      GROUP BY t.class_name, t.section
-     ORDER BY t.class_name, t.section;
+     -- the school's class order (Nursery, Class 1, Class 2 ...), not alphabetical
+     ORDER BY (SELECT MIN(c.display_order) FROM academic.academic_classes c
+                WHERE c.tenant_id = p_tenant_id AND c.school_id = p_school_id
+                  AND c.class_name = t.class_name AND NOT COALESCE(c.is_deleted, FALSE)) NULLS LAST, t.class_name, t.section;
 
     -- ── class x fee head (session dues that are due)
     OPEN p_matrix FOR
-    SELECT class_name, fee_head, SUM(billed) AS billed_due, SUM(paid) AS paid_due
-      FROM tmp_fd
-     WHERE in_session AND COALESCE(due_on, v_today) <= v_today
-     GROUP BY class_name, fee_head
-    HAVING SUM(billed) > 0
-     ORDER BY class_name, fee_head;
+    SELECT t.class_name, t.fee_head, SUM(t.billed) AS billed_due, SUM(t.paid) AS paid_due
+      FROM tmp_fd t
+     WHERE t.in_session AND COALESCE(t.due_on, v_today) <= v_today
+     GROUP BY t.class_name, t.fee_head
+    HAVING SUM(t.billed) > 0
+     ORDER BY (SELECT MIN(c.display_order) FROM academic.academic_classes c
+                WHERE c.tenant_id = p_tenant_id AND c.school_id = p_school_id
+                  AND c.class_name = t.class_name AND NOT COALESCE(c.is_deleted, FALSE)) NULLS LAST, t.class_name, t.fee_head;
 
     -- ── fee heads (older sessions' unpaid lines are "Old dues")
     OPEN p_heads FOR
@@ -381,7 +386,9 @@ BEGIN
            COUNT(*) FILTER (WHERE a.status = 'Late')::int                      AS late,
            COUNT(*) FILTER (WHERE a.status = 'Leave')::int                     AS leave,
            core.fn_user_display_name(MIN(a.marked_by))                         AS marked_by,
-           MIN(a.marked_at)                                                    AS marked_at
+           -- as text on the school's clock: a timestamp that travels through a DataTable
+           -- loses its UTC tag, and the page would show 06:29 for 11:59 IST
+           to_char(MIN(a.marked_at) AT TIME ZONE 'Asia/Kolkata', 'DD Mon, HH12:MI AM') AS marked_at
       FROM tmp_ao_sec ts
       LEFT JOIN core.student_attendance a
              ON a.tenant_id = p_tenant_id AND a.school_id = p_school_id AND a.academic_year = v_year
