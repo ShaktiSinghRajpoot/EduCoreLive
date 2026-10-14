@@ -19,8 +19,10 @@
     {
         @* View-only (e.g. Accountant): hide the form and buttons the server would refuse. *@
         <style>
-            .ec-card:has(#feeHeadFormTitle), .edit-fee-head,
+            .col-xl-4:has(#feeHeadFormTitle), .edit-fee-head,
             form[action*="ToggleFeeHeadStatus"], form[action*="DeleteFeeHead"] { display: none !important; }
+            /* the list then takes the full width instead of leaving the form's column empty */
+            .col-xl-8:has(#feeHeadFilterForm) { flex: 0 0 100%; max-width: 100%; }
         </style>
     }
 }
