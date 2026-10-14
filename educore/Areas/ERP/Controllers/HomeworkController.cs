@@ -180,10 +180,11 @@ namespace educore.Areas.ERP.Controllers
             public string? Status { get; set; }
         }
 
-        // Staff (teachers) and anyone who can see academics.
+        // Teachers (a class on the timetable, or a class teacher) and anyone who can see
+        // academics. An accountant's or clerk's staff record is not enough.
         private async Task<bool> AllowedAsync() =>
-            await _self.HasStaffRecordAsync(TenantId(), SchoolId(), UserId())
-            || await HasPermissionAttribute.UserHasAsync(this, "academics.view");
+            await HasPermissionAttribute.UserHasAsync(this, "academics.view")
+            || await _homework.TeachesAnyClassAsync(TenantId(), SchoolId(), UserId());
 
         private Task<bool> CanManageAsync() => HasPermissionAttribute.UserHasAsync(this, "academics.manage");
 

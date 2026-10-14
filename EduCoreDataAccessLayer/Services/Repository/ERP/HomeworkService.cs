@@ -21,11 +21,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpOverview = "academic.sp_homework_overview";
         private readonly PgExec _db;
         private readonly ILogger<HomeworkService> _logger;
+        private readonly AppCache _cache;
 
-        public HomeworkService(PgExec db, ILogger<HomeworkService> logger)
+        public HomeworkService(PgExec db, ILogger<HomeworkService> logger, AppCache cache)
         {
             _db = db;
             _logger = logger;
+            _cache = cache;
         }
 
         private static bool InScope(int tenantId, int schoolId) => tenantId > 1 && schoolId > 0;
@@ -114,6 +116,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             Recorded    = DbRead.Int(reader, cols, "recorded"),
             Done        = DbRead.Int(reader, cols, "done")
         };
+
+        public Task<bool> TeachesAnyClassAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            if (!InScope(tenantId, schoolId)) return Task.FromResult(false);
+            string key = AppCache.Key("teaches:u" + actionUserId, tenantId, schoolId);
+            return _cache.GetOrCreateAsync(key, async () =>
+                (await GetMyClassesAsync(tenantId, schoolId, actionUserId)).Count > 0, TimeSpan.FromMinutes(5));
+        }
 
         public async Task<List<(int SectionId, int? SubjectId)>> GetMyClassesAsync(int tenantId, int schoolId, int actionUserId)
         {

@@ -29,6 +29,12 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// </summary>
         Task<List<(int SectionId, int? SubjectId)>> GetMyClassesAsync(int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>
+        /// Does this user teach any class (timetable or class teacher)? Drives the Homework
+        /// menu, so an accountant or clerk with a staff record does not see it. Cached 5 min.
+        /// </summary>
+        Task<bool> TeachesAnyClassAsync(int tenantId, int schoolId, int actionUserId);
+
         /// <summary>One student's homework of the last 30 days, with their status (Student Dashboard).</summary>
         Task<List<Homework>> GetForStudentAsync(int studentId, int tenantId, int schoolId, int actionUserId);
     }

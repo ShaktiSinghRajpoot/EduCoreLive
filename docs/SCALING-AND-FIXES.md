@@ -5413,3 +5413,6 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   History dates were ISO (now `EC.date`); Collect Fees opened from `?adm=` showed " - A" with no class
   (the class list arrived after the student and wiped it — the student now opens after the list); the
   admission form's part-payment hint now says it covers the admission-day charges only.
+- Homework menu and page are for people who teach a class (timetable or class teacher, new cached
+  `IHomeworkService.TeachesAnyClassAsync`) or have academics.view — an accountant's or clerk's staff record
+  no longer shows it.

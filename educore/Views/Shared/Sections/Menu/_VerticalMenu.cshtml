@@ -4,6 +4,7 @@
 @inject IAdmissionWorkflowService AdmissionWorkflowService
 @inject ITransportTrackingService TransportTrackingService
 @inject IStaffSelfService StaffSelfService
+@inject IHomeworkService HomeworkService
 @inject EduCoreDataAccessLayer.Services.IPermissionService PermissionService
 
 @{
@@ -91,6 +92,13 @@
         try { gMyStaff = await StaffSelfService.HasStaffRecordAsync(_tId, _sId, _uId); }
         catch { /* the menu must never fail to render */ }
     }
+    // Homework is for people who teach a class -- not every staff record (cached 5 min).
+    bool gTeaches = false;
+    if (_tId > 1 && _sId > 0 && !gAcademics)
+    {
+        try { gTeaches = await HomeworkService.TeachesAnyClassAsync(_tId, _sId, _uId); }
+        catch { /* the menu must never fail to render */ }
+    }
     bool gInventory  = showInventory && Can("inventory.view");
     bool secPeople    = gStaff || gTransport || gInventory;
 
@@ -167,8 +175,9 @@
         </li>
         }
 
-        @* Teachers (a staff record) give homework; academics.view sees all of it. *@
-        @if (gMyStaff || gAcademics)
+        @* Teachers (a class on the timetable, or a class teacher) give homework;
+           academics.view sees all of it. Other staff (accountant, clerk) do not. *@
+        @if (gTeaches || gAcademics)
         {
         <li class='menu-item @On("ERP/Homework")'>
             <a asp-area="ERP" asp-controller="Homework" asp-action="Index" class="menu-link">
