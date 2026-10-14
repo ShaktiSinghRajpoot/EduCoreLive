@@ -40,7 +40,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             foreach (var c in FeeCursors)
                 p.Add(new("p_" + c, NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "fd_" + c });
 
-            return Read(await _db.ExecuteProcedureWithCursorsAsync(SpFee, p.ToArray()), FeeCursors);
+            return CursorRows.From(await _db.ExecuteProcedureWithCursorsAsync(SpFee, p.ToArray()), FeeCursors);
         }
 
         public async Task<Dictionary<string, List<Dictionary<string, object?>>>> GetAttendanceOverviewAsync(
@@ -61,34 +61,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             foreach (var c in AttendanceCursors)
                 p.Add(new(c == "day" ? "p_dayinfo" : "p_" + c, NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "ao_" + c });
 
-            return Read(await _db.ExecuteProcedureWithCursorsAsync(SpAttendance, p.ToArray()), AttendanceCursors);
-        }
-
-        // DataSet tables come back in cursor order. Timestamps are turned to the school's clock.
-        private static Dictionary<string, List<Dictionary<string, object?>>> Read(DataSet ds, string[] names)
-        {
-            var result = new Dictionary<string, List<Dictionary<string, object?>>>();
-            for (int i = 0; i < names.Length; i++)
-            {
-                var rows = new List<Dictionary<string, object?>>();
-                if (i < ds.Tables.Count)
-                {
-                    foreach (DataRow r in ds.Tables[i].Rows)
-                    {
-                        var row = new Dictionary<string, object?>();
-                        foreach (DataColumn col in ds.Tables[i].Columns)
-                        {
-                            var v = r[col];
-                            row[col.ColumnName] = v == DBNull.Value ? null
-                                                : v is DateTime dt ? Dates.ToSchool(dt).ToString("dd MMM, hh:mm tt")
-                                                : v;
-                        }
-                        rows.Add(row);
-                    }
-                }
-                result[names[i]] = rows;
-            }
-            return result;
+            return CursorRows.From(await _db.ExecuteProcedureWithCursorsAsync(SpAttendance, p.ToArray()), AttendanceCursors);
         }
     }
 }

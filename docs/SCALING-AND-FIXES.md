@@ -5238,3 +5238,15 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - Both pages read through `DashboardReportService` (cursor rows passed to the page as column → value).
   DB: `fee_dashboard.sql`, `attendance_overview.sql` (`deploy_2026_10_14g.sql`).
 - Not built: register lock / unlock and the Half day / Excused student statuses (they change marking).
+
+### [2026-10-14] Students › Data Checks + bulk roll numbers
+- New page `DataChecks/Index` (`students.view`; numbering `students.manage`): active students of the session
+  failing each check — no / duplicate roll number, no / duplicate admission number, no valid section, mobile
+  missing or not 10 digits, no guardian, DOB or gender (all "fix"), no photo / APAAR ID ("info") — each
+  listed with View / Fix (Edit Student) links.
+- **Assign roll numbers** for one section: only students without a number (continues after the highest)
+  or renumber 1..n in name order. Written to `core.students` and the session's `core.student_enrolment`,
+  with an `admission_audit` row, exactly like Edit Student.
+- One proc `core.sp_student_data_checks` (`student_data_checks.sql`, `deploy_2026_10_14h.sql`); 6 rolled-back
+  checks in `tests/student_data_checks_tests.sql`. Shared helper `Helpers/CursorRows.cs` (cursor rows for
+  read-only pages) now also backs `DashboardReportService`.
