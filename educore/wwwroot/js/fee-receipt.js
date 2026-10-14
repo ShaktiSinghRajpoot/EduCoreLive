@@ -62,22 +62,40 @@
 
     /* ---------- shared pieces ---------- */
 
-    // Fee particulars. `compact` drops the per-line waiver note (no room on 80mm).
+    // The lines money was paid against. A line with no cash on it (only a
+    // concession, e.g. later months of an admission concession) is not listed:
+    // it printed as a column of Rs 0.00 (QA BUG-093).
+    function paidLines(r) {
+        return (r.lines || []).filter(function (l) { return l.amount > 0; });
+    }
+
+    // Concession on the listed lines, and on fees not paid on this receipt.
+    function concessionOnLines(r) {
+        var sum = 0;
+        paidLines(r).forEach(function (l) { sum += l.concession || 0; });
+        return Math.round(sum * 100) / 100;
+    }
+
+    // Fee particulars, each at its full charge (cash + concession), so the lines
+    // minus the Concession row add up to Total Paid.
+    // `compact` drops the per-line waiver note (no room on 80mm).
     function lineRows(r, compact) {
-        return (r.lines || []).map(function (l, i) {
+        return paidLines(r).map(function (l, i) {
             var extra  = l.lineType === 'Extra' ? ' <span class="rc-muted">(extra)</span>' : '';
             var waived = (!compact && l.concession > 0)
                 ? ' <span class="rc-muted">(−' + EC.money(l.concession) + ' waived)</span>' : '';
             return '<tr>' +
                    (compact ? '' : '<td class="rc-sn">' + (i + 1) + '</td>') +
                    '<td>' + EC.esc(l.label) + extra + waived + '</td>' +
-                   '<td class="rc-amt">' + EC.money(l.amount) + '</td></tr>';
+                   '<td class="rc-amt">' + EC.money(l.amount + (l.concession || 0)) + '</td></tr>';
         }).join('');
     }
 
     // Deductions / adjustments that change what was actually taken.
     function adjustmentRows(r, cols) {
         var out = '';
+        var concNow   = concessionOnLines(r);
+        var concLater = Math.round((r.concession - concNow) * 100) / 100;
         if (r.concession > 0) {
             var lbl = 'Concession' +
                 (r.discountType === 'Percent' ? ' (' + r.discountValue + '%)' : '') +
@@ -85,7 +103,15 @@
                 // The approver is picked from a list by the cashier, so say who entered it too.
                 (r.discountApprovedBy ? ' <span class="rc-muted">· approved by ' + EC.esc(r.discountApprovedBy) +
                     (r.collectedBy ? ' (entered by ' + EC.esc(r.collectedBy) + ')' : '') + '</span>' : '');
-            out += '<tr><td colspan="' + cols + '">' + lbl + '</td><td class="rc-amt">−' + EC.money(r.concession) + '</td></tr>';
+            if (concNow > 0)
+                out += '<tr><td colspan="' + cols + '">' + lbl + '</td><td class="rc-amt">−' + EC.money(concNow) + '</td></tr>';
+            // Taken off fees that fall due later; not part of this payment, so no amount column.
+            if (concLater > 0) {
+                var note = concNow > 0
+                    ? 'Also a concession of ' + EC.money(concLater) + ' on fees not paid on this receipt'
+                    : lbl + ': ' + EC.money(concLater) + ' on fees not paid on this receipt';
+                out += '<tr><td colspan="' + (cols + 1) + '" class="rc-muted">' + note + '</td></tr>';
+            }
         }
         // A registration fee's discount sits on the receipt header, not on lines.
         if (r.discountAmount > 0) {

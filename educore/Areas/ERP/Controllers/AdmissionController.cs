@@ -429,13 +429,14 @@ namespace educore.Areas.ERP.Controllers
 
                         receiptNo = res.Success ? res.ReceiptNo : null;
 
-                        // What is still due on the one-time charges after this cash and
-                        // concession, worked out from the real ledger rows.
-                        var admissionRows = dues.Where(d => IsAdmissionLabel(d.InstallmentLabel)).Select(d => d.LedgerId).ToHashSet();
-                        decimal stillDue = dues.Where(d => admissionRows.Contains(d.LedgerId)).Sum(d => d.Outstanding)
-                                         - items.Where(i => admissionRows.Contains(i.LedgerId)).Sum(i => i.Amount + i.Concession);
+                        // What is still due as on today after this cash and concession --
+                        // the same figure the receipt prints as "Outstanding as on" (QA BUG-093).
+                        var dueRows = dues.Where(d => string.IsNullOrWhiteSpace(d.DueDate) || string.CompareOrdinal(d.DueDate, today) <= 0)
+                                          .Select(d => d.LedgerId).ToHashSet();
+                        decimal stillDue = dues.Where(d => dueRows.Contains(d.LedgerId)).Sum(d => d.Outstanding)
+                                         - items.Where(i => dueRows.Contains(i.LedgerId)).Sum(i => i.Amount + i.Concession);
                         string balance = stillDue > 0.005m
-                            ? $" ₹{stillDue:N0} is still due — collect it from Fee → Collect Fees."
+                            ? $" ₹{stillDue:N0} is still due as on today — collect it from Fee → Collect Fees."
                             : string.Empty;
 
                         if (!res.Success)
@@ -706,7 +707,7 @@ namespace educore.Areas.ERP.Controllers
 
             // The share of the concession that lands on today's one-time charges.
             decimal nowShare = !annual ? q.Concession
-                             : discountableAnnual > 0 ? Math.Round(q.Concession * discountableNow / discountableAnnual, 2)
+                             : discountableAnnual > 0 ? Math.Floor(q.Concession * discountableNow / discountableAnnual)
                              : 0m;
             if (q.Concession > ConcessionCap) nowShare = 0m;   // not applied until approved
 
@@ -885,15 +886,28 @@ namespace educore.Areas.ERP.Controllers
             decimal baseSum = eligible.Sum(d => d.Outstanding);
             decimal concLeft = Math.Min(concession, baseSum);
 
+            // Whole rupees per row (QA BUG-092): a share like 1,909.09 left fees in paise
+            // and a parent paying the round figure got a few paise put to advance.
             for (int i = 0; i < eligible.Count && concLeft > 0; i++)
             {
                 var d = eligible[i];
                 decimal take = i == eligible.Count - 1
                     ? concLeft
-                    : Math.Round(concession * d.Outstanding / baseSum, 2);
+                    : Math.Floor(concession * d.Outstanding / baseSum);
                 take = Math.Min(Math.Min(take, d.Outstanding), concLeft);
                 if (take <= 0) continue;
                 concByLedger[d.LedgerId] = take;
+                concLeft -= take;
+            }
+            // Anything left over (the last row was too small to take it) goes to the
+            // first rows that still have room, so no concession is lost.
+            foreach (var d in eligible)
+            {
+                if (concLeft <= 0) break;
+                decimal room = d.Outstanding - concByLedger.GetValueOrDefault(d.LedgerId);
+                decimal take = Math.Min(room, concLeft);
+                if (take <= 0) continue;
+                concByLedger[d.LedgerId] = concByLedger.GetValueOrDefault(d.LedgerId) + take;
                 concLeft -= take;
             }
 

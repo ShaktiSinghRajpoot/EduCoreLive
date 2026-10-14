@@ -99,6 +99,7 @@ $$;
 --     the session bills from SessionStart (unless p_force_from). Never before
 --     the session starts; cycles longer than a month snap to the school's own
 --     quarters / halves counted from the session start.
+--     A cycle that started before p_from is due on p_from, not on the 1st.
 --   * Anything else: one row dated p_from ('Admission' for One Time, else 'Annual').
 -- Moved here unchanged from sp_admission_manage so promotion, class change and
 -- the admission preview count months exactly the way admission bills them.
@@ -175,7 +176,10 @@ BEGIN
     v_m := v_month_start;
     WHILE v_m <= v_month_end LOOP
         v_period_end := LEAST((v_m + make_interval(months => v_step - 1))::date, v_month_end);
-        due_date := v_m;
+        -- A cycle that began before the joining day falls due ON the joining day,
+        -- so a student admitted on 14 Oct is not overdue for October on day one
+        -- (QA BUG-100).
+        due_date := GREATEST(v_m, p_from);
         label    := CASE WHEN v_step = 1 OR v_period_end = v_m
                          THEN TO_CHAR(v_m, 'Mon YYYY')
                          ELSE TO_CHAR(v_m, 'Mon YYYY') || ' - ' || TO_CHAR(v_period_end, 'Mon YYYY')

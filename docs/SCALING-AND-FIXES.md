@@ -5352,3 +5352,13 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - **BUG-079** Result publish dialog no longer promises a parent view that does not exist.
 - BUG-054 was already handled (changing the default max/pass updates cells still on the old default).
 - Bundle `deploy_2026_10_14o.sql` (exam_results_publish, exam_marks, exam_result_student, exam_schedule).
+
+### 2026-10-14 — QA round 3, batch 2c (admission fees)
+- **BUG-092** The admission concession is spread over the session in whole rupees (any remainder goes to
+  rows with room), so no fee ends in paise and a round payment no longer leaves a few paise in advance.
+- **BUG-093** Receipts list only lines that money was paid against, each at its full charge, so the lines
+  minus the Concession row add up to Total Paid; concession on later fees shows as a note, not a ₹0.00
+  column. The admission "still due" message now uses the receipt's "due as on today" figure.
+- **BUG-100** `fn_plan_periods`: a cycle that began before the joining day is due on the joining day, so a
+  student admitted mid-month is not overdue on day one.
+- Bundle `deploy_2026_10_14p.sql` (student_money_lifecycle).
