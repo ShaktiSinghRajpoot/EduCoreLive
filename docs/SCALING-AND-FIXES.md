@@ -5203,6 +5203,7 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   `tests/payroll_attendance_tests.sql`; `tests/leave_payroll_tests.sql` still 29/29.
 
 ### [2026-10-14] Homework › Overview tab (who is / is not giving homework)
+- (Restricted to `academics.manage` after the first live check: teachers hold academics.view by default and should not see a colleague leaderboard.)
 - New **Overview** tab on the Homework page for `academics.view`: quick ranges (Today / 7 days / 30 days /
   This session / Custom) and class chips with done %; cards (teachers giving none, missing some sections,
   homework given, checked in class); a "Who is giving homework?" donut (All / Some / None of the sections
