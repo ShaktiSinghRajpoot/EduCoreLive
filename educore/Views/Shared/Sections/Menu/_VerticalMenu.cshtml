@@ -233,7 +233,7 @@
         @* ---- Admissions: the funnel, in the order it happens ---- *@
         @if (gAdmissions)
         {
-        <li class='menu-item @Open("EnquiryCRM","Registration","Admission/Create")'>
+        <li class='menu-item @Open("EnquiryCRM","Registration","Admission/Create","FrontOffice")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-buildings ic-front"></i>
                 <div class="text-truncate">Admissions</div>
@@ -242,6 +242,7 @@
                 @if (Can("enquiry.view"))
                 {
                 <li class='menu-item @On("EnquiryCRM")'><a asp-area="ERP" asp-controller="Enquiry" asp-action="EnquiryCRM" class="menu-link"><i class="bx bx-message-square-detail submenu-icon c-pink"></i><div class="text-truncate">Enquiries</div><span class="ec-badge ec-badge-hot">CRM</span></a></li>
+                <li class='menu-item @On("FrontOffice")'><a asp-area="ERP" asp-controller="FrontOffice" asp-action="Index" class="menu-link"><i class="bx bx-buildings submenu-icon c-teal"></i><div class="text-truncate">Front Office</div></a></li>
                 }
                 @if (showRegistration && Can("registration.view"))
                 {

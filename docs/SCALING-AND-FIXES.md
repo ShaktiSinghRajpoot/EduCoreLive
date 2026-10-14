@@ -5277,3 +5277,14 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - The Timetable cell editor's Room box now suggests the listed rooms (datalist; free text still allowed).
 - `academic.rooms`, `academic.sp_room_manage` (`rooms.sql`, `deploy_2026_10_14j.sql`); 6 rolled-back checks
   in `tests/rooms_tests.sql`. New base `Services/Repository/ProcRowsService.cs` for small one-proc modules.
+
+### [2026-10-14] Front Office: visitor book, calls, complaints
+- New page `FrontOffice/Index` (menu Admissions › Front Office; `enquiry.view`, entries `enquiry.manage` —
+  the reception's keys). Cards: visitors today, inside now, calls today, follow-ups due, open complaints.
+- **Visitors**: name, mobile, purpose, whom to meet, people, ID proof, note; time in, "Mark out".
+- **Calls**: incoming / outgoing, purpose, what was said, optional follow-up date; a pending follow-up stays
+  on the list until "Done" (its note is appended).
+- **Complaints**: numbered `CMP-YYYY-0001`, from parent / student / staff, category, about which student,
+  assigned to; Open → In progress → Resolved / Closed, a note required to resolve.
+- Nothing is deleted. `core.fo_visitors`, `core.fo_calls`, `core.fo_complaints`, `core.sp_front_office_manage`
+  (`front_office.sql`, `deploy_2026_10_14k.sql`); 6 rolled-back checks in `tests/front_office_tests.sql`.

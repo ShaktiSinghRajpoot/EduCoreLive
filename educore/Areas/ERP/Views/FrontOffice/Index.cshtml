@@ -1,0 +1,225 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Front Office";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // enquiry.manage
+}
+
+@*
+   Front Office (core.sp_front_office_manage): visitor book, phone calls, complaints.
+   Nothing is deleted — visitors are marked out, calls followed up, complaints resolved.
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Insights.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell in-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-buildings"></i></div>
+          <div><h4 class="ec-page-title mb-1">Front Office</h4>
+            <p class="ec-page-subtitle">Visitor book, phone calls and complaints at the reception desk</p></div>
+        </div>
+        <a href="@Url.Action("EnquiryCRM","Enquiry",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-user-voice me-1"></i>Enquiries</a>
+      </div>
+    </div>
+
+    <div class="in-kpis mb-3" id="foKpis"></div>
+
+    <div class="in-chips mb-3" id="foTabs">
+      <button class="on" data-t="visitors"><i class="bx bx-walk me-1"></i>Visitors</button>
+      <button data-t="calls"><i class="bx bx-phone me-1"></i>Calls</button>
+      <button data-t="complaints"><i class="bx bx-message-error me-1"></i>Complaints</button>
+    </div>
+
+    <div class="in-card" style="height:auto">
+      <div class="d-flex flex-wrap gap-2 align-items-end mb-3">
+        <div id="foDates" class="d-flex gap-2 align-items-end">
+          <div><label class="form-label mb-1">From</label><input type="date" id="fFrom" class="form-control form-control-sm"></div>
+          <div><label class="form-label mb-1">To</label><input type="date" id="fTo" class="form-control form-control-sm"></div>
+        </div>
+        <div id="foStatus" class="d-none"><label class="form-label mb-1">Show</label>
+          <select id="fStatus" class="form-select form-select-sm"><option value="Pending">Open &amp; in progress</option><option value="Resolved">Resolved</option><option value="Closed">Closed</option><option value="">All</option></select></div>
+        @if (canManage)
+        {
+            <button id="btnNew" class="btn btn-sm btn-primary ms-auto"><i class="bx bx-plus me-1"></i><span id="btnNewText">New visitor</span></button>
+        }
+      </div>
+      <div class="in-wrap"><table class="in-table" id="foTable"></table></div>
+    </div>
+
+  </div>
+</div>
+
+<div class="modal fade" id="foModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="foModalTitle">New visitor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><div class="row g-3" id="foForm"></div></div>
+      <div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button><button class="btn btn-primary" id="btnSave"><i class="bx bx-save me-1"></i>Save</button></div>
+    </div>
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var CSRF = $('input[name="__RequestVerificationToken"]').val();
+    var URL = { list: '@Url.Action("List","FrontOffice",new{area="ERP"})', save: '@Url.Action("Save","FrontOffice",new{area="ERP"})' };
+    var CAN_MANAGE = @(canManage ? "true" : "false");
+    var tab = 'visitors', ROWS = [], formOp = '', formId = null;
+
+    function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    var TODAY = iso(new Date());
+    $('#fFrom, #fTo').val(TODAY);
+    function show(s) { return s ? new Date(s + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''; }
+    function post(op, body) {
+        return $.ajax({ url: URL.save + '?op=' + op, type: 'POST', contentType: 'application/json', headers: { 'RequestVerificationToken': CSRF }, data: JSON.stringify(body) });
+    }
+    function kpi(label, value, sub, cls) {
+        return '<div class="in-kpi ' + (cls || '') + '"><div class="l">' + EC.esc(label) + '</div><div class="v">' + value + '</div><div class="s">' + EC.esc(sub) + '</div></div>';
+    }
+
+    function loadSummary() {
+        $.getJSON(URL.list, { op: 'Summary' }).done(function (rows) {
+            var s = (rows || [])[0] || {};
+            $('#foKpis').html(
+                kpi('Visitors today', s.visitors_today || 0, '', 'main')
+              + kpi('Inside now', s.inside_now || 0, 'not marked out yet', s.inside_now ? 'warn' : '')
+              + kpi('Calls today', s.calls_today || 0, '')
+              + kpi('Follow-ups due', s.follow_ups_due || 0, 'calls to return', s.follow_ups_due ? 'warn' : 'good')
+              + kpi('Open complaints', s.complaints_open || 0, 'open or in progress', s.complaints_open ? 'warn' : 'good'));
+        });
+    }
+
+    function load() {
+        var op = { visitors: 'Visitors', calls: 'Calls', complaints: 'Complaints' }[tab];
+        $('#foTable').html('<tbody><tr><td class="in-muted">Loading...</td></tr></tbody>');
+        $.getJSON(URL.list, { op: op, from: $('#fFrom').val(), to: $('#fTo').val(), status: $('#fStatus').val() }).done(function (rows) {
+            ROWS = rows || []; draw();
+        }).fail(function () { ecToast('error', 'Could not load.'); });
+    }
+
+    function draw() {
+        if (tab === 'visitors') {
+            $('#foTable').html('<thead><tr><th>Date</th><th>Visitor</th><th>Purpose</th><th>To meet</th><th>In</th><th>Out</th><th></th></tr></thead><tbody>'
+                + (ROWS.map(function (v) {
+                    return '<tr><td>' + EC.esc(show(v.visit_date)) + '</td><td><b>' + EC.esc(v.visitor_name) + '</b>' + (v.persons > 1 ? ' <span class="in-muted">+' + (v.persons - 1) + '</span>' : '')
+                         + '<div class="in-muted">' + EC.esc(v.mobile || '') + (v.id_proof ? ' · ' + EC.esc(v.id_proof) : '') + '</div></td>'
+                         + '<td>' + EC.esc(v.purpose) + (v.note ? '<div class="in-muted">' + EC.esc(v.note) + '</div>' : '') + '</td><td>' + EC.esc(v.to_meet || '') + '</td>'
+                         + '<td>' + EC.esc(v.time_in || '') + '</td><td>' + (v.time_out ? EC.esc(v.time_out) : '<span class="in-tag t1">Inside</span>') + '</td>'
+                         + '<td class="text-end">' + (CAN_MANAGE && !v.time_out ? '<button class="btn btn-sm btn-outline-secondary fo-out" data-id="' + v.visitor_id + '">Mark out</button>' : '') + '</td></tr>';
+                }).join('') || '<tr><td colspan="7" class="in-muted text-center py-3">No visitors in these dates.</td></tr>') + '</tbody>');
+        } else if (tab === 'calls') {
+            $('#foTable').html('<thead><tr><th>Date</th><th></th><th>Caller</th><th>Purpose</th><th>Note</th><th>Follow-up</th><th></th></tr></thead><tbody>'
+                + (ROWS.map(function (c) {
+                    var due = c.follow_up_on && !c.followed_up_at;
+                    var fu = !c.follow_up_on ? '' : c.followed_up_at ? '<span class="in-tag t3">Done ' + EC.esc(c.followed_up_at) + '</span>'
+                           : '<span class="in-tag ' + (c.follow_up_on <= TODAY ? 't0' : 't1') + '">' + EC.esc(show(c.follow_up_on)) + '</span>';
+                    return '<tr><td>' + EC.esc(show(c.call_date)) + '<div class="in-muted">' + EC.esc(c.call_time || '') + '</div></td>'
+                         + '<td><i class="bx ' + (c.direction === 'Incoming' ? 'bx-phone-incoming text-success' : 'bx-phone-outgoing text-primary') + '" title="' + c.direction + '"></i></td>'
+                         + '<td><b>' + EC.esc(c.caller_name) + '</b><div class="in-muted">' + EC.esc(c.mobile || '') + '</div></td><td>' + EC.esc(c.purpose) + '</td>'
+                         + '<td style="white-space:pre-line">' + EC.esc(c.note || '') + '</td><td>' + fu + '</td>'
+                         + '<td class="text-end">' + (CAN_MANAGE && due ? '<button class="btn btn-sm btn-outline-secondary fo-done" data-id="' + c.call_id + '">Done</button>' : '') + '</td></tr>';
+                }).join('') || '<tr><td colspan="7" class="in-muted text-center py-3">No calls in these dates.</td></tr>') + '</tbody>');
+        } else {
+            var tone = { Open: 't0', 'In progress': 't1', Resolved: 't3', Closed: 'tn' };
+            $('#foTable').html('<thead><tr><th>No.</th><th>From</th><th>Complaint</th><th>Assigned to</th><th>Status</th><th></th></tr></thead><tbody>'
+                + (ROWS.map(function (x) {
+                    return '<tr><td><b>' + EC.esc(x.complaint_no) + '</b><div class="in-muted">' + EC.esc(show(x.raised_on)) + (x.status === 'Open' || x.status === 'In progress' ? ' · ' + x.days_open + ' day(s)' : '') + '</div></td>'
+                         + '<td>' + EC.esc(x.from_name) + '<div class="in-muted">' + EC.esc(x.from_type) + (x.mobile ? ' · ' + EC.esc(x.mobile) : '') + '</div></td>'
+                         + '<td><span class="in-tag tn">' + EC.esc(x.category) + '</span> ' + (x.about_student ? '<span class="in-muted">' + EC.esc(x.about_student) + '</span>' : '')
+                         + '<div>' + EC.esc(x.description) + '</div>' + (x.resolution ? '<div class="in-muted">Resolution: ' + EC.esc(x.resolution) + (x.resolved_on ? ' (' + EC.esc(x.resolved_on) + ')' : '') + '</div>' : '') + '</td>'
+                         + '<td>' + EC.esc(x.assigned_to || '') + '</td><td><span class="in-tag ' + (tone[x.status] || 'tn') + '">' + EC.esc(x.status) + '</span></td>'
+                         + '<td class="text-end">' + (CAN_MANAGE ? '<button class="btn btn-sm btn-outline-secondary fo-status" data-id="' + x.complaint_id + '">Update</button>' : '') + '</td></tr>';
+                }).join('') || '<tr><td colspan="6" class="in-muted text-center py-3">No complaints.</td></tr>') + '</tbody>');
+        }
+    }
+
+    $('#foTabs').on('click', 'button', function () {
+        $('#foTabs button').removeClass('on'); $(this).addClass('on');
+        tab = $(this).data('t');
+        $('#foDates').toggleClass('d-none', tab === 'complaints').toggleClass('d-flex', tab !== 'complaints');
+        $('#foStatus').toggleClass('d-none', tab !== 'complaints');
+        $('#btnNewText').text({ visitors: 'New visitor', calls: 'Log a call', complaints: 'New complaint' }[tab]);
+        load();
+    });
+    $('#fFrom, #fTo, #fStatus').on('change', load);
+
+    // ── forms ──────────────────────────────────────────────────────────
+    function field(id, label, html, col) { return '<div class="col-' + (col || 12) + '"><label class="form-label">' + label + '</label>' + html + '</div>'; }
+    function input(id, attrs) { return '<input id="' + id + '" class="form-control" ' + (attrs || '') + '>'; }
+    function select(id, opts) { return '<select id="' + id + '" class="form-select">' + opts.map(function (o) { return '<option>' + EC.esc(o) + '</option>'; }).join('') + '</select>'; }
+
+    function openForm(op, id) {
+        formOp = op; formId = id || null;
+        var html = '', title = '';
+        if (op === 'VisitorSave') {
+            title = 'New visitor';
+            html = field('', 'Name <span class="text-danger">*</span>', input('eName', 'maxlength="120"'), 7) + field('', 'Mobile', input('eMobile', 'maxlength="15" inputmode="numeric"'), 5)
+                 + field('', 'Purpose <span class="text-danger">*</span>', select('ePurpose', ['Admission enquiry', 'Meet teacher', 'Meet principal', 'Fee payment', 'Collect document', 'Delivery', 'Interview', 'Other']), 7)
+                 + field('', 'People', input('ePersons', 'type="number" min="1" value="1"'), 5)
+                 + field('', 'To meet', input('eToMeet', 'maxlength="120" placeholder="e.g. Class 5 teacher, Principal"'), 7) + field('', 'ID proof', input('eIdProof', 'maxlength="60" placeholder="e.g. Aadhaar xx1234"'), 5)
+                 + field('', 'Note', input('eNote', 'maxlength="300"'));
+        } else if (op === 'CallSave') {
+            title = 'Log a call';
+            html = field('', 'Call', select('eDirection', ['Incoming', 'Outgoing']), 5) + field('', 'Purpose <span class="text-danger">*</span>', select('ePurpose', ['Admission enquiry', 'Fee', 'Transport', 'Attendance / leave', 'Complaint', 'Exam / result', 'Other']), 7)
+                 + field('', 'Name <span class="text-danger">*</span>', input('eName', 'maxlength="120"'), 7) + field('', 'Mobile', input('eMobile', 'maxlength="15" inputmode="numeric"'), 5)
+                 + field('', 'What was said', '<textarea id="eNote" class="form-control" rows="2" maxlength="400"></textarea>')
+                 + field('', 'Follow up on <small class="text-muted">(optional)</small>', input('eFollowUp', 'type="date" min="' + TODAY + '"'), 6);
+        } else if (op === 'ComplaintSave') {
+            title = 'New complaint';
+            html = field('', 'From', select('eDirection', ['Parent', 'Student', 'Staff', 'Other']), 5) + field('', 'Category <span class="text-danger">*</span>', select('ePurpose', ['Academic', 'Teacher / staff', 'Transport', 'Fee', 'Facilities', 'Safety', 'Bullying', 'Other']), 7)
+                 + field('', 'Name <span class="text-danger">*</span>', input('eName', 'maxlength="120"'), 7) + field('', 'Mobile', input('eMobile', 'maxlength="15" inputmode="numeric"'), 5)
+                 + field('', 'About student <small class="text-muted">(optional)</small>', input('eStudent', 'maxlength="150" placeholder="Name and class"'), 7)
+                 + field('', 'Assign to', input('eToMeet', 'maxlength="120" placeholder="e.g. Transport in-charge"'), 5)
+                 + field('', 'Complaint <span class="text-danger">*</span>', '<textarea id="eNote" class="form-control" rows="3" maxlength="1000"></textarea>');
+        } else if (op === 'ComplaintStatus') {
+            var x = ROWS.filter(function (r) { return r.complaint_id === id; })[0] || {};
+            title = 'Update ' + (x.complaint_no || 'complaint');
+            html = '<div class="col-12 in-muted">' + EC.esc(x.description || '') + '</div>'
+                 + field('', 'Status', select('eStatus', ['Open', 'In progress', 'Resolved', 'Closed']), 6) + field('', 'Assigned to', input('eToMeet', 'maxlength="120"'), 6)
+                 + field('', 'Note / how it was resolved', '<textarea id="eNote" class="form-control" rows="3" maxlength="1000"></textarea>');
+            setTimeout(function () { $('#eStatus').val(x.status === 'Open' ? 'In progress' : x.status); $('#eToMeet').val(x.assigned_to || ''); $('#eNote').val(x.resolution || ''); }, 0);
+        }
+        $('#foModalTitle').text(title); $('#foForm').html(html);
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('foModal')).show();
+    }
+
+    $('#btnNew').on('click', function () { openForm({ visitors: 'VisitorSave', calls: 'CallSave', complaints: 'ComplaintSave' }[tab]); });
+    $('#foTable').on('click', '.fo-status', function () { openForm('ComplaintStatus', $(this).data('id')); });
+
+    $('#btnSave').on('click', function () {
+        var body = { id: formId, name: $('#eName').val(), mobile: $('#eMobile').val(), purpose: $('#ePurpose').val(), toMeet: $('#eToMeet').val(),
+                     persons: $('#ePersons').length ? +$('#ePersons').val() || 1 : null, idProof: $('#eIdProof').val(), note: $('#eNote').val(),
+                     direction: $('#eDirection').val(), followUp: $('#eFollowUp').val() || null, student: $('#eStudent').val(), status: $('#eStatus').val() };
+        var $b = $(this); EC.buttonBusy($b);
+        post(formOp, body)
+            .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) { bootstrap.Modal.getInstance(document.getElementById('foModal')).hide(); load(); loadSummary(); } })
+            .fail(function () { ecToast('error', 'Could not save. Please try again.'); })
+            .always(function () { EC.buttonReset($b); });
+    });
+
+    $('#foTable').on('click', '.fo-out', function () {
+        post('VisitorOut', { id: $(this).data('id') }).done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) { load(); loadSummary(); } });
+    });
+    $('#foTable').on('click', '.fo-done', function () {
+        var id = $(this).data('id');
+        EC.prompt({ title: 'Follow-up done?', label: 'What happened (optional)', okText: 'Mark done' }).then(function (note) {
+            if (note === null) return;
+            post('CallDone', { id: id, note: note }).done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) { load(); loadSummary(); } });
+        });
+    });
+
+    loadSummary(); load();
+});
+</script>
+}
