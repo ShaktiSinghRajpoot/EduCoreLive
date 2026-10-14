@@ -15,6 +15,14 @@
 
 @section PageStyles {
     <link rel="stylesheet" href="~/css/ERP/SchoolSettings/FeeHead.css" asp-append-version="true" />
+    @if (ViewBag.CanManage != true)
+    {
+        @* View-only (e.g. Accountant): hide the form and buttons the server would refuse. *@
+        <style>
+            .ec-card:has(#feeHeadFormTitle), .edit-fee-head,
+            form[action*="ToggleFeeHeadStatus"], form[action*="DeleteFeeHead"] { display: none !important; }
+        </style>
+    }
 }
 
 <div class="ec-page-shell fee-head-page">

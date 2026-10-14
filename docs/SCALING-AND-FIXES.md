@@ -5362,3 +5362,21 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - **BUG-100** `fn_plan_periods`: a cycle that began before the joining day is due on the joining day, so a
   student admitted mid-month is not overdue on day one.
 - Bundle `deploy_2026_10_14p.sql` (student_money_lifecycle).
+
+### 2026-10-14 — QA round 3, batch 5 + small batch-4 items
+- **BUG-019** `Strict-Transport-Security` is sent whenever the request really came over HTTPS (after
+  `UseForwardedHeaders`), so the live site gets HSTS without flipping `Security:RequireHttps`.
+- **BUG-059/065** Fee Head and Fee Structure hide their write buttons from users without
+  `settings.manage` (the other setup pages already did). **BUG-066** Enquiry CRM hides Convert to
+  Admission without `students.manage` (the admission page already redirects with a message, BUG-107).
+- **BUG-086** Super Admin › Schools: a From date after the To date is swapped, with a note.
+- **BUG-087** Run Payroll asks first, saying how many drafts are rebuilt and that paid ones stay.
+  **BUG-089** No Void button on adjustments of a paid payslip.
+- **BUG-103** Absent WhatsApp text: no "Class Class", no "(Today)"; "Notified" is remembered on this
+  browser per student per day.
+- **BUG-040** Student dashboard shows the ID proof number masked to the last 4 digits.
+- **BUG-110** Inventory: a negative quantity says so (not "decimal places"); stock in messages prints
+  without ".00" (`trim_scale`). `inventory.sql` is re-runnable again (the old short move-type check
+  failed once transfers existed).
+- BUG-026 / BUG-035 were already fixed.
+- Bundle `deploy_2026_10_14q.sql` (inventory).

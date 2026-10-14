@@ -324,6 +324,11 @@ app.Use(async (context, next) =>
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";
     context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
     context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)";
+    // HSTS only when the visit really came over HTTPS (Railway ends TLS at its proxy;
+    // UseForwardedHeaders above makes IsHttps true then). A browser ignores HSTS on
+    // plain HTTP, so this can never lock out an HTTP-only install (QA BUG-019).
+    if (context.Request.IsHttps && !requireHttps)
+        context.Response.Headers["Strict-Transport-Security"] = "max-age=31536000";
 
     await next();
 });

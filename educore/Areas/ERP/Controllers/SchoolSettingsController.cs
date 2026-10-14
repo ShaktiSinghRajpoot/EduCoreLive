@@ -450,6 +450,9 @@ namespace educore.Areas.ERP.Controllers
             ViewBag.RegistrationFeeOn = workflow.EnableRegistration && workflow.EnableRegistrationFee;
             ViewBag.SecurityFeeOn     = workflow.EnableSecurityFee;
 
+            // The fee master is changed with settings.manage; a cashier who can only view it
+            // does not see the buttons the server would refuse (QA BUG-059 / BUG-065).
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "settings.manage");
             return View(query);
         }
 
@@ -663,6 +666,9 @@ namespace educore.Areas.ERP.Controllers
                 }).ToList()
             };
 
+            // The fee master is changed with settings.manage; a cashier who can only view it
+            // does not see the buttons the server would refuse (QA BUG-059 / BUG-065).
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "settings.manage");
             return View(model);
         }
 

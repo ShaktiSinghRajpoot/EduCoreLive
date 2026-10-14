@@ -383,6 +383,13 @@ document.querySelectorAll('.sd-tab-btn').forEach(function(b){
     });
 });
 
+// ID numbers (Aadhaar) show only the last 4 digits (QA BUG-040); Edit Student has the full one.
+function maskIdNo(v) {
+    var d = String(v || '').replace(/\s/g, '');
+    if (d.length < 8) return v || '';
+    return 'XXXX XXXX ' + d.slice(-4);
+}
+
 /* ── Shape the API payload for the render functions ──
    Same keys the mock used, so nothing below this line changed. Anything the
    backend cannot answer yet is left EMPTY rather than invented — the old page
@@ -396,7 +403,7 @@ function buildDetail(api){
     return {
         dob:st.dob, age:(st.age!=null ? st.age+' yrs' : '—'), blood:st.blood,
         religion:st.religion, category:st.category, nationality:st.nation,
-        aadhaar:st.idProof, motherTongue:st.motherTongue, apaar:st.apaar, udise:st.udise,
+        aadhaar:maskIdNo(st.idProof), motherTongue:st.motherTongue, apaar:st.apaar, udise:st.udise,
         fatherName:st.guardian, motherName:st.mother, guardianName:st.guardian,
         fatherOcc:st.fatherOcc, fatherQual:st.fatherQual, fatherEmail:st.fatherEmail,
         motherOcc:st.motherOcc, motherQual:st.motherQual, motherEmail:st.motherEmail,

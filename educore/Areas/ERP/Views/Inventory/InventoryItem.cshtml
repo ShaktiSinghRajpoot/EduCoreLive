@@ -782,6 +782,8 @@
         var type = $('#mvType').val();
         var raw  = $.trim($('#mvQty').val());
         var qty  = EC.numPos(raw);
+        // A minus sign is a wrong quantity, not a decimals problem (QA BUG-110).
+        if (raw.charAt(0) === '-') { ecToast('warning', 'The quantity cannot be negative.'); $('#mvQty').focus(); return; }
         if (!twoDp(raw)) { ecToast('warning', 'Use at most 2 decimal places.'); $('#mvQty').focus(); return; }
         if (type === 'StockTake') {
             if (raw === '') { ecToast('warning', 'Enter the quantity you counted.'); $('#mvQty').focus(); return; }
@@ -836,6 +838,7 @@
         var to   = EC.num($('#trTo').val());
         if (!to)          { ecToast('warning', 'Choose where the stock is going.'); $('#trTo').focus(); return; }
         if (from === to)  { ecToast('warning', 'Choose two different locations.'); $('#trTo').focus(); return; }
+        if (raw.charAt(0) === '-') { ecToast('warning', 'Quantity must be more than 0.'); $('#trQty').focus(); return; }
         if (!twoDp(raw))  { ecToast('warning', 'Use at most 2 decimal places.'); $('#trQty').focus(); return; }
         if (qty <= 0)     { ecToast('warning', 'Enter a quantity.'); $('#trQty').focus(); return; }
         if (!$.trim($('#trReason').val())) { ecToast('warning', 'Give a reason for the transfer.'); $('#trReason').focus(); return; }

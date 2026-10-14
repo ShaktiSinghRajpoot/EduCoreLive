@@ -242,9 +242,8 @@ CREATE INDEX IF NOT EXISTS ix_inventory_ledger_item
 --   * Hard floors behind the procs: stock and prices never below zero.
 ALTER TABLE core.inventory_stock_ledger ADD COLUMN IF NOT EXISTS unit_rate numeric(14,2);
 
-ALTER TABLE core.inventory_stock_ledger DROP CONSTRAINT IF EXISTS chk_inv_move_type;
-ALTER TABLE core.inventory_stock_ledger ADD CONSTRAINT chk_inv_move_type CHECK (movement_type IN
-    ('Opening','Purchase','Issue','Return','Damage','Adjustment','StockTake','PurchaseCancel'));
+-- (chk_inv_move_type is set once, further down, with the transfer types too:
+--  setting the shorter list here failed on a re-run once transfers existed.)
 
 ALTER TABLE core.inventory_items DROP CONSTRAINT IF EXISTS chk_inv_item_stock;
 ALTER TABLE core.inventory_items ADD CONSTRAINT chk_inv_item_stock CHECK (current_stock >= 0);
@@ -829,7 +828,7 @@ BEGIN
         -- Deleting something still on the shelf loses track of real stock.
         IF v_stock <> 0 THEN
             RAISE EXCEPTION 'Cannot delete %: % still in stock. Issue or adjust it to zero first.',
-                v_name, TRIM(TO_CHAR(v_stock, 'FM999999990.00'));
+                v_name, trim_scale(v_stock)::text;
         END IF;
 
         UPDATE core.inventory_items
@@ -905,12 +904,12 @@ BEGIN
 
         IF v_qty = 0 THEN
             RAISE EXCEPTION 'The count matches the % % on record at %, so there is nothing to adjust.',
-                TRIM(TO_CHAR(v_stock, 'FM999999990.00')), v_unit, v_lname;
+                trim_scale(v_stock)::text, v_unit, v_lname;
         END IF;
 
         IF v_stock + v_qty < 0 THEN
             RAISE EXCEPTION 'Only % % of % left at %.',
-                TRIM(TO_CHAR(v_stock, 'FM999999990.00')), v_unit, v_name, v_lname;
+                trim_scale(v_stock)::text, v_unit, v_name, v_lname;
         END IF;
 
         v_new := core.fn_inventory_post_movement(
@@ -983,7 +982,7 @@ BEGIN
           INTO v_stock;
         IF v_stock < p_quantity THEN
             RAISE EXCEPTION 'Only % % of % left at %.',
-                TRIM(TO_CHAR(v_stock, 'FM999999990.00')), v_unit, v_name, v_lname;
+                trim_scale(v_stock)::text, v_unit, v_name, v_lname;
         END IF;
 
         INSERT INTO core.inventory_transfers
@@ -1006,7 +1005,7 @@ BEGIN
         OPEN p_result FOR
             SELECT TRUE AS success,
                    format('Moved %s %s of %s from %s to %s.',
-                          TRIM(TO_CHAR(p_quantity, 'FM999999990.00')), v_unit, v_name, v_lname, v_tname) AS message,
+                          trim_scale(p_quantity)::text, v_unit, v_name, v_lname, v_tname) AS message,
                    v_new AS current_stock;
         RETURN;
 
@@ -1197,7 +1196,7 @@ BEGIN
             WHERE location_id = p_location_id AND quantity > 0;
             IF v_n > 0 THEN
                 RAISE EXCEPTION '% still holds stock (% item(s), % in all). Transfer it out first.',
-                    v_lname, v_n, TRIM(TO_CHAR(v_stock, 'FM999999990.00'));
+                    v_lname, v_n, trim_scale(v_stock)::text;
             END IF;
         END IF;
 
@@ -1695,10 +1694,10 @@ BEGIN
         LOOP
             IF v_line.qty > v_line.bought - v_line.returned THEN
                 RAISE EXCEPTION 'Only % % of % can still be returned on this bill (bought %, already returned %).',
-                    TRIM(TO_CHAR(v_line.bought - v_line.returned, 'FM999999990.00')), v_line.unit_type,
+                    trim_scale(v_line.bought - v_line.returned)::text, v_line.unit_type,
                     v_line.item_name,
-                    TRIM(TO_CHAR(v_line.bought, 'FM999999990.00')),
-                    TRIM(TO_CHAR(v_line.returned, 'FM999999990.00'));
+                    trim_scale(v_line.bought)::text,
+                    trim_scale(v_line.returned)::text;
             END IF;
         END LOOP;
 
@@ -1717,7 +1716,7 @@ BEGIN
         LOOP
             IF v_line.at_loc < v_line.qty THEN
                 RAISE EXCEPTION 'Cannot return: only % % of % left at %.',
-                    TRIM(TO_CHAR(v_line.at_loc, 'FM999999990.00')), v_line.unit_type,
+                    trim_scale(v_line.at_loc)::text, v_line.unit_type,
                     v_line.item_name, v_lname;
             END IF;
         END LOOP;
@@ -1809,8 +1808,8 @@ BEGIN
             -- issued (or moved), so the purchase cannot simply be un-received.
             IF v_line.at_loc - v_line.qty < 0 THEN
                 RAISE EXCEPTION 'Cannot cancel: only % % of % left, and this purchase brought in % to %.',
-                    TRIM(TO_CHAR(v_line.at_loc, 'FM999999990.00')), v_line.unit_type,
-                    v_line.item_name, TRIM(TO_CHAR(v_line.qty, 'FM999999990.00')), v_lname;
+                    trim_scale(v_line.at_loc)::text, v_line.unit_type,
+                    v_line.item_name, trim_scale(v_line.qty)::text, v_lname;
             END IF;
         END LOOP;
 

@@ -8,6 +8,8 @@
     // ShowRegistration comes from the parent view via ViewData: the Registration
     // stage only exists when the school enables it in Admission Workflow settings.
     var showRegistration = ViewData["ShowRegistration"] as bool? ?? false;
+    // Set by EnquiryCRM: only users who can admit see Convert to Admission.
+    var canAdmit = ViewData["CanAdmit"] as bool? ?? true;
 
     // A lead whose status was set by an action (Register / admission save) is
     // locked: that status carries a registration number or a student record.
@@ -42,7 +44,7 @@
     </button>
 }
 
-@if (!Model.IsTerminal)
+@if (!Model.IsTerminal && canAdmit)
 {
     <button type="button" class="btn btn-sm btn-icon btn-success crm-action-btn btn-convert-admission"
             title="Convert to Admission"

@@ -111,6 +111,10 @@
               <div class="ec-section-subtitle">
                   @(total == 0 ? "No schools found" : $"Showing {ViewBag.FromRecord}–{ViewBag.ToRecord} of {total} schools")
               </div>
+              @if (ViewBag.DateNote != null)
+              {
+                  <div class="small text-warning">@ViewBag.DateNote</div>
+              }
             </div>
           </div>
         </div>

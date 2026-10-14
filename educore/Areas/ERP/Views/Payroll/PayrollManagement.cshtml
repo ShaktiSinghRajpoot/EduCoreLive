@@ -372,8 +372,22 @@ $(document).ready(function () {
 
     $('#fMonth, #fDept').on('change', load);
 
+    // Running again rebuilds every draft payslip of the month, so ask first (QA BUG-087).
     $('#btnRun').on('click', function(){
-        var p=period(), $btn=$(this);
+        var $btn=$(this), drafts=0, paidCount=0;
+        ROWS.forEach(function(s){ if ((s.status||'').toLowerCase()==='paid') paidCount++; else drafts++; });
+        // With a department filter the list shows only part of the month, so no counts then.
+        var msg = $('#fDept').val()
+            ? 'This rebuilds every draft payslip of ' + $('#fMonth option:selected').text() + ' (all departments). Paid payslips are not changed.'
+            : ROWS.length
+            ? 'This rebuilds the ' + drafts + ' draft payslip(s) of ' + $('#fMonth option:selected').text() + ' from the latest salary, attendance and leave.' +
+              (paidCount ? ' The ' + paidCount + ' paid payslip(s) are not changed.' : '')
+            : 'This generates the payslips of ' + $('#fMonth option:selected').text() + ' for every active staff member.';
+        EC.confirm({ title:'Run payroll?', message:msg, okText:'Run payroll', danger:false })
+          .then(function(ok){ if (ok) runPayroll($btn); });
+    });
+    function runPayroll($btn){
+        var p=period();
         EC.buttonBusy($btn,'Running…');
         $.ajax({ url:RUN_URL, type:'POST',
                  headers:{ 'RequestVerificationToken': token() },
@@ -391,9 +405,15 @@ $(document).ready(function () {
                 : 'Could not reach the server. Nothing was generated.');
         })
         .always(function(){ EC.buttonReset($btn); });
-    });
+    }
 
     /* ── Adjustments ── */
+    // A paid payslip's adjustments cannot be voided (the server refuses), so no button.
+    function slipPaid(staffId){
+        for (var i = 0; i < ROWS.length; i++)
+            if (ROWS[i].staffId === staffId && (ROWS[i].status || '').toLowerCase() === 'paid') return true;
+        return false;
+    }
     function renderAdj(rows){
         if (!rows || !rows.length) { EC.listEmpty('#adjBody', 'No adjustments for this month.', 'bx-list-ul'); return; }
         $('#adjBody').html(rows.map(function (a) {
@@ -404,7 +424,9 @@ $(document).ready(function () {
                  + '<td class="text-end">' + amt + '</td>'
                  + '<td>' + EC.esc(a.reason) + (a.isVoid ? '<div class="small">void: ' + EC.esc(a.voidReason) + '</div>' : '') + '</td>'
                  + '<td class="small">' + EC.esc(a.at) + ' · ' + EC.esc(a.by || '—') + '</td>'
-                 + '<td class="text-end">' + (a.isVoid ? '' : '<button class="btn btn-sm btn-outline-danger adj-void" data-id="' + a.id + '">Void</button>') + '</td>'
+                 + '<td class="text-end">' + (a.isVoid ? ''
+                       : slipPaid(a.staffId) ? '<span class="small text-muted">Paid month</span>'
+                       : '<button class="btn btn-sm btn-outline-danger adj-void" data-id="' + a.id + '">Void</button>') + '</td>'
                  + '</tr>';
         }).join(''));
     }
@@ -493,8 +515,10 @@ $(document).ready(function () {
             ROWS=[];
             EC.listEmpty('#prBody', 'Could not load payroll. Please retry.', 'bx-error-circle');
          })
-         .always(EC.hideLoader);
-        loadAdj();
+         .always(function(){
+            EC.hideLoader();
+            loadAdj();   // after the payslips, so it knows which are paid
+         });
     }
 
     load();

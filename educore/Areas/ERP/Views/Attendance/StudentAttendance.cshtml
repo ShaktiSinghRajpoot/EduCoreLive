@@ -193,10 +193,14 @@ $(document).ready(function () {
     // yyyy-MM-dd -> local Date (new Date('yyyy-MM-dd') would parse it as UTC).
     function parseDay(v) { var p = String(v || iso).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
 
+    // The date as a parent reads it: "Wed, 14 Oct 2026" (no "(Today)" in a message).
+    function plainDateStr() {
+        const v = $('#attendanceDate').val() || iso;
+        return parseDay(v).toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' }).replace(/,(?= \d{4})/, '');
+    }
     function dateStr() {
         const v = $('#attendanceDate').val() || iso;
-        const s = parseDay(v).toLocaleDateString('en-IN', { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
-        return v === iso ? s + ' (Today)' : s;
+        return v === iso ? plainDateStr() + ' (Today)' : plainDateStr();
     }
 
     // ── Attractive live date banner ──
@@ -285,7 +289,7 @@ $(document).ready(function () {
                     var st = rows[i].status;   // '' when the day is not marked yet
                     status[s.id]   = (st === 'absent' || st === 'late' || st === 'leave') ? st : 'present';
                     marked[s.id]   = !!rows[i].marked;
-                    notified[s.id] = false;
+                    notified[s.id] = wasNotified(s.id);
                 });
                 var dayWhy = dayBlockReason(res);
                 if (dayWhy) $('#dayNotice').text(dayWhy).show();
@@ -377,17 +381,24 @@ $(document).ready(function () {
         .always(function () { EC.buttonReset($btn); });
     }
 
-    function template() { return 'Dear {parent}, your ward {student} (Class {class}) was marked absent on {date}. Kindly inform the school if this is unexpected.'; }
+    // {class} is already "Class 8-A", so the template must not add "Class" again (QA BUG-103).
+    function template() { return 'Dear {parent}, your ward {student} ({class}) was marked absent on {date}. Kindly inform the school if this is unexpected.'; }
     function buildMsg(s) {
         return ($('#msgTemplate').val() || template())
             .replace(/{parent}/g, s.parent || 'Parent').replace(/{student}/g, s.name)
-            .replace(/{class}/g, classStr()).replace(/{date}/g, dateStr());
+            .replace(/{class}/g, classStr()).replace(/{date}/g, plainDateStr());
     }
+    // "Notified" survives a reload on this browser (the WhatsApp message itself
+    // is sent from the phone, so the server never knows). Per student per day.
+    function notifiedKey(id) { return 'ec-att-notified-' + ($('#attendanceDate').val() || iso) + '-' + id; }
+    function rememberNotified(id) { try { localStorage.setItem(notifiedKey(id), '1'); } catch (e) { } }
+    function wasNotified(id) { try { return localStorage.getItem(notifiedKey(id)) === '1'; } catch (e) { return false; } }
+
     function sendWA(id) {
         const s = students.find(x => x.id === id); if (!s) return;
         if (!s.phone) { ecToast('warning', 'No mobile number on record for ' + s.name + '.'); return; }
         window.open('https://wa.me/91' + String(s.phone).replace(/\D/g,'') + '?text=' + encodeURIComponent(buildMsg(s)), '_blank');
-        notified[id] = true; render(); refreshModal();
+        notified[id] = true; rememberNotified(id); render(); refreshModal();
     }
     $(document).on('click', '.wa-one', function () { sendWA(Number($(this).data('id'))); });
     $(document).on('click', '.wa-modal', function () { sendWA(Number($(this).data('id'))); });

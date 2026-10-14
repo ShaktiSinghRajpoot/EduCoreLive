@@ -63,6 +63,13 @@ namespace educore.Areas.SuperAdmin.Controllers
             if (page < 1) page = 1;
             if (pageSize < 1) pageSize = 10;
 
+            // "From" after "To" matched nothing and gave no reason (QA BUG-086): swap them and say so.
+            if (fromDate.HasValue && toDate.HasValue && fromDate > toDate)
+            {
+                (fromDate, toDate) = (toDate, fromDate);
+                ViewBag.DateNote = "The From date was after the To date, so the two were swapped.";
+            }
+
             var (rows, total, active) = await _schoolService.GetSchoolsAsync(
                 tenantId, userId,
                 Trim(search), Trim(city), Trim(state),

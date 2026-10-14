@@ -55,6 +55,9 @@ namespace educore.Areas.ERP.Controllers
             query.Workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, actionUserId);
 
             await _enquiryService.GetEnquiryCrmPageAsync(query, tenantId, schoolId, actionUserId);
+            // Convert to Admission needs students.manage; without it the button only led to
+            // a refusal (QA BUG-066), so the rows do not show it.
+            ViewData["CanAdmit"] = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
             return View(query);
         }
 
