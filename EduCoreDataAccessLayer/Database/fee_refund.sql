@@ -112,6 +112,9 @@ BEGIN
           AND sl.school_id  = p_school_id
           AND sl.student_id = p_student_id
           AND (sl.amount_paid - sl.refund_amount) > 0
+          -- only heads marked Refundable (deposits); tuition, admission etc. are not
+          -- handed back — a wrong receipt is cancelled instead (QA BUG-083)
+          AND COALESCE(core.fn_ledger_head_refundable(sl.ledger_id), FALSE)
 
         UNION ALL
 
@@ -187,6 +190,12 @@ BEGIN
 
         IF NOT FOUND THEN
             OPEN p_result FOR SELECT FALSE AS success, 'Charge not found.' AS message, NULL::varchar AS refund_no;
+            RETURN;
+        END IF;
+        IF NOT COALESCE(core.fn_ledger_head_refundable(p_ledger_id), FALSE) THEN
+            OPEN p_result FOR SELECT FALSE AS success,
+                   'This fee is not refundable. Mark its fee head as refundable, or cancel the receipt if it was taken by mistake.' AS message,
+                   NULL::varchar AS refund_no;
             RETURN;
         END IF;
     END IF;

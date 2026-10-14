@@ -5308,3 +5308,23 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   register taken".
 - **BUG-105 Fee Dashboard**: students who left stay in their class's money, so class totals add up.
 - Bundle `deploy_2026_10_14l.sql`; tests updated: year-end 8, homework 11, staff attendance 11, announcements 9.
+
+### [2026-10-14] QA round 3 — batch 2a (fees / cash)
+- **BUG-097 / 109 Day Close**: a drawer that does not tally needs a remark (`sp_fee_day_close` refuses
+  without one; the page asks first); the difference reads "Short by ₹3.00" (no double minus) and the
+  closing message "short / over by Rs …".
+- **BUG-096** Fee Reports register: receipt and line dates now "12 Oct 2026" — a SQL `date` read with
+  `NStr` printed the server's US culture ("10/12/2026"); new `DbRead.IsoDate` reads it as ISO text.
+- **BUG-072** Collect Fees due dates via a new shared helper **`EC.date`** (site.js): "Due 01 Oct 2026".
+- **BUG-081** exit message amounts "Rs 10,500.00"; the leaving toast uses `EC.money`.
+- **BUG-063** cancellations and refunds are recorded as authorised by the signed-in person (who must hold
+  `fees.cancel` / `fees.refund`); the self-chosen "Principal / Accountant…" list is gone.
+- **BUG-083 / 084 Refunds**: only refundable heads (deposits) and the advance are refundable — enforced in
+  `sp_student_refundables_get` and `sp_fee_refund_record`; a wrong receipt is cancelled instead. The
+  Student Dashboard lists refunds (RFD-…) beside receipts and "Paid" is net of refunds.
+- **BUG-082** Collect Fees also finds students who have LEFT (tagged "Left") and opens their dues
+  directly, so their fees can be cleared for a TC. **BUG-080** Mark-as-left shows the fees still on the
+  account before confirming.
+- **BUG-108** Collect Fees header shows "Due now" (fallen due) plus "Whole session"; the month chips also
+  tick one-time / annual fees that are already due.
+- Bundle `deploy_2026_10_14m.sql` (fee_day_close, fee_refund, student_exit).

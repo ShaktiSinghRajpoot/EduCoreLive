@@ -335,6 +335,8 @@ namespace educore.Areas.ERP.Controllers
 
             var dues    = await _feeService.GetStudentDuesAsync(studentId, TenantId(), SchoolId(), UserId());
             var history = await _feeService.GetPaymentHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
+            // money handed back, listed beside the receipts (QA BUG-084)
+            var refunds = await _feeService.GetRefundHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
             // Whole-ledger totals. The dues list above holds only rows still owing,
             // so summing it dropped every fully paid charge from "Total Paid".
             var totals  = await _admissionService.GetStudentFeeTotalsAsync(studentId, TenantId(), SchoolId(), UserId());
@@ -528,6 +530,15 @@ namespace educore.Areas.ERP.Controllers
                     mode      = h.PaymentMode,
                     collectedBy = h.CollectedBy,   // the payer is not recorded; the cashier is
                     cancelled = h.IsCancelled      // a cancelled receipt still shows, marked
+                }),
+                refunds = !canViewFees ? null : (object)refunds.Select(r => new
+                {
+                    refundNo = r.RefundNo,
+                    date     = Dates.Show(r.RefundDate),
+                    amount   = r.Amount,
+                    mode     = r.Mode,
+                    against  = r.Against,
+                    by       = r.RefundedBy
                 })
             });
         }

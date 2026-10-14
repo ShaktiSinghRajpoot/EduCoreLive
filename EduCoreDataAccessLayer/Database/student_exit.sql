@@ -201,7 +201,7 @@ BEGIN
         SELECT TRUE AS success,
                v_name || ' marked as ' || TRIM(p_status) || '.' ||
                CASE WHEN v_closed > 0
-                    THEN ' ' || to_char(v_closed, 'FM99999990.00') || ' of fees due after the leaving date closed.'
+                    THEN ' Rs ' || to_char(v_closed, 'FM99,99,99,990.00') || ' of fees due after the leaving date closed.'
                     ELSE '' END AS message,
                GREATEST(v_dues, 0) AS outstanding,
                v_closed AS closed_amount;
@@ -251,7 +251,7 @@ BEGIN
         SELECT TRUE AS success,
                v_name || ' re-activated.' ||
                CASE WHEN v_closed > 0
-                    THEN ' ' || to_char(v_closed, 'FM99999990.00') || ' of dues closed at exit restored.'
+                    THEN ' Rs ' || to_char(v_closed, 'FM99,99,99,990.00') || ' of dues closed at exit restored.'
                     ELSE '' END AS message,
                0::numeric AS outstanding,
                v_closed AS closed_amount;

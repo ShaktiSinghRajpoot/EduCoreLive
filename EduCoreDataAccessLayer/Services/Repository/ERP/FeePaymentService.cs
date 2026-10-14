@@ -941,7 +941,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         reg.Receipts.Add(new RegisterReceipt
                         {
                             Entry       = DbRead.Str(reader, cols, "entry"),
-                            LineDate    = DbRead.NStr(reader, cols, "line_date"),
+                            LineDate    = DbRead.IsoDate(reader, cols, "line_date"),
                             IsCancelled = DbRead.Bool(reader, cols, "is_cancelled"),
                             CancelledAt = DbRead.DateTimeN(reader, cols, "cancelled_at"),
                             CancelReason = DbRead.NStr(reader, cols, "cancel_reason"),

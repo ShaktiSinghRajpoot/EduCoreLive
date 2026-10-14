@@ -266,7 +266,7 @@
                           <i class="bx bx-camera"></i>
                         </button>
                         <button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-exit"
-                                title="Mark as left" data-id="@s.StudentId" data-name="@s.StudentName">
+                                title="Mark as left" data-id="@s.StudentId" data-name="@s.StudentName" data-due="@s.FeeDue">
                           <i class="bx bx-user-x"></i>
                         </button>
                         }
@@ -375,6 +375,8 @@
       </div>
       <div class="modal-body">
         <p class="mb-3">Marking <strong id="exitName">—</strong> as left. Their fees, receipts and history are kept.</p>
+        @* Shown before confirming, so the office settles fees first (QA BUG-080). *@
+        <div class="alert alert-warning py-2 small d-none" id="exitDues"></div>
         <div class="mb-3">
           <label class="form-label">How did they leave?</label>
           <select class="form-select" id="exitStatus">
@@ -498,6 +500,12 @@ document.getElementById('btnPdf').addEventListener('click',function(){window.pri
             $('#exitName').text($(this).data('name'));
             $('#exitDate').val(new Date().toISOString().slice(0, 10));
             $('#exitReason').val('');
+            var due = Number($(this).data('due')) || 0;
+            $('#exitDues').toggleClass('d-none', due <= 0).html(due > 0
+                ? 'Fees still on the account: <b>' + EC.money(due) + '</b> (including later months). Fees due after the leaving date are closed '
+                  + 'automatically; collect what is owed up to that date in Collect Fees (left students can be found there) before issuing a TC. '
+                  + 'A refundable deposit is returned from Collect Fees › Refund.'
+                : '');
             new bootstrap.Modal(document.getElementById('exitModal')).show();
         });
 
@@ -522,7 +530,7 @@ document.getElementById('btnPdf').addEventListener('click',function(){window.pri
                     ecToast('success', res.message);
                     // Dues do not block the exit, but the office needs to know.
                     if (res.outstanding > 0) {
-                        ecToast('warning', 'Outstanding dues of ' + Number(res.outstanding).toFixed(2) + ' remain.');
+                        ecToast('warning', 'Outstanding dues of ' + EC.money(res.outstanding) + ' remain.');
                     }
                     setTimeout(function () { location.reload(); }, 1200);
                 } else {

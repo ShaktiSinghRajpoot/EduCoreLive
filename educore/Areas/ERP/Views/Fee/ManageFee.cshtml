@@ -92,7 +92,7 @@
             <div class="stu-name" id="dName">—</div>
             <div class="stu-sub" id="dSub">—</div>
           </div>
-          <div class="stu-out"><div class="amt" id="dOutstanding">₹0.00</div><div class="lbl">Total Outstanding</div></div>
+          <div class="stu-out"><div class="amt" id="dOutstanding">₹0.00</div><div class="lbl">Due now</div><div class="lbl" id="dSession"></div></div>
         </div>
         <div class="view-tabs mt-3">
           <button type="button" class="view-tab active" data-view="dues">Dues &amp; Collect</button>
@@ -209,8 +209,7 @@
     <div class="alert alert-warning py-2 small mb-3"><i class="bx bx-error me-1"></i>This reverses the <b id="cmAmt">₹0.00</b> payment and <b>re-opens the dues</b>. The receipt stays on record marked <b>Cancelled</b> (never deleted).</div>
     <label class="form-label">Reason for cancellation <span class="text-danger">*</span></label>
     <input class="form-control mb-3" id="cmReason" placeholder="e.g. Wrong student / duplicate / mode change">
-    <label class="form-label">Authorised by <span class="text-danger">*</span></label>
-    <select class="form-select" id="cmAuth"><option value="">— choose —</option><option>Principal</option><option>Accountant</option><option>Admin</option><option>Management</option></select>
+    <div class="small text-muted"><i class="bx bx-user-check me-1"></i>Recorded as authorised by you (only staff allowed to cancel receipts can do this).</div>
   </div>
   <div class="modal-footer py-2">
     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Keep receipt</button>
@@ -230,8 +229,7 @@
     <div class="row g-2 mb-3">
       <div class="col-6"><label class="form-label">Refund via</label>
         <select class="form-select" id="rfMode"><option>Cash</option><option>Bank Transfer</option><option>Cheque</option><option>UPI</option></select></div>
-      <div class="col-6"><label class="form-label">Authorised by <span class="text-danger">*</span></label>
-        <select class="form-select" id="rfAuth"><option value="">— choose —</option><option>Principal</option><option>Accountant</option><option>Admin</option><option>Management</option></select></div>
+      <div class="col-6 small text-muted d-flex align-items-end"><span><i class="bx bx-user-check me-1"></i>Recorded as authorised by you.</span></div>
     </div>
     <label class="form-label">Reason <span class="text-danger">*</span></label>
     <input class="form-control" id="rfReason" placeholder="e.g. TC issued / deposit returned / overpayment">
@@ -404,15 +402,15 @@ $(function () {
         api.search($session.val(),q).done(function(list){
             list=list||[];
             var exact=list.filter(function(s){ return (s.admNo||'').toLowerCase()===q.toLowerCase(); })[0];
-            if(exact || list.length===1){ openByAdm((exact||list[0]).admNo); return; }
+            if(exact || list.length===1){ openPick(exact||list[0]); return; }
             if(!list.length){ ecToast('error','No student found for "'+q+'" in '+$session.val()+'.'); return; }
 
             $('#admResultsTitle').text(list.length+' students match "'+q+'". Pick the right one:');
             $('#admResultsBody').html(list.map(function(s){
-                return '<tr class="adm-pick" style="cursor:pointer" data-adm="'+EC.esc(s.admNo)+'">'
+                return '<tr class="adm-pick" style="cursor:pointer" data-i="'+list.indexOf(s)+'">'
                      // On a phone the other columns are hidden and the same facts sit
                      // under the name, so two children with one name can be told apart.
-                     + '<td><div class="fw-semibold">'+EC.esc(s.name)+'</div>'
+                     + '<td><div class="fw-semibold">'+EC.esc(s.name)+(s.left?' <span class="badge bg-label-secondary">Left</span>':'')+'</div>'
                      + '<div class="small text-muted d-md-none">'+EC.esc(s.cls)+(s.sec?' – '+EC.esc(s.sec):'')
                      + ' · '+EC.esc(s.guardian||'—')+' · '+EC.esc(s.mobile||'—')+'</div></td>'
                      + '<td class="d-none d-md-table-cell">'+EC.esc(s.cls)+(s.sec?' – '+EC.esc(s.sec):'')+'</td>'
@@ -420,15 +418,23 @@ $(function () {
                      + '<td class="d-none d-md-table-cell">'+EC.esc(s.mobile||'—')+'</td>'
                      + '<td class="d-none d-md-table-cell">'+EC.esc(s.admNo)+'</td></tr>';
             }).join(''));
-            $('#admResults').removeClass('d-none');
+            $('#admResults').removeClass('d-none').data('list', list);
         }).fail(function(){ ecToast('error','Could not search students.'); });
+    }
+    // A current student opens through their class and section; one who has LEFT is not
+    // on any class list any more, so their dues open directly (QA BUG-082).
+    function openPick(s){
+        if(!s.left){ openByAdm(s.admNo); return; }
+        $('#admResults').addClass('d-none');
+        currentStudent = { id:s.id, name:s.name, admNo:s.admNo, roll:'', cls:s.cls, sec:s.sec, left:true };
+        api.dues(s.id).done(openStudent).fail(function(){ ecToast('error','Could not load dues.'); });
     }
     function openByAdm(admNo){
         $('#admResults').addClass('d-none');
         $adm.val(admNo);
         doAdmSearch();
     }
-    $('#admResultsBody').on('click','.adm-pick',function(){ openByAdm($(this).attr('data-adm')); });  // attr, not data(): data() turns "0012" into 12
+    $('#admResultsBody').on('click','.adm-pick',function(){ openPick($('#admResults').data('list')[$(this).attr('data-i')]); });
     $('#admGo').on('click',findStudent);
     $adm.on('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); findStudent(); } });
 
@@ -448,11 +454,17 @@ $(function () {
         });
         otherDues = bucket(dues,'Quarterly').concat(bucket(dues,'Yearly'));
 
-        var total=0; months.forEach(function(m){ m.dues.forEach(function(d){ total+=d.amount; }); }); otherDues.forEach(function(d){ total+=d.amount; });
+        // "Due now" is what has fallen due (overdue + today); the whole session's balance
+        // includes months still ahead. One "Total outstanding" mixed the two (QA BUG-108).
+        var total=0, dueNow=0;
+        allDues().forEach(function(d){ total+=d.amount; if(d.overdue || !d.dueDate || d.dueDate<=todayIso()) dueNow+=d.amount; });
         $('#dAvatar').text(initials(currentStudent.name));
         $('#dName').text(currentStudent.name);
-        $('#dSub').text(currentStudent.admNo + ' · ' + $class.val() + ' - ' + $section.val() + ' · Roll ' + (currentStudent.roll||'—'));
-        $('#dOutstanding').text(EC.money(total));
+        $('#dSub').text(currentStudent.left
+            ? currentStudent.admNo + ' · ' + (currentStudent.cls||'') + (currentStudent.sec ? ' - ' + currentStudent.sec : '') + ' · LEFT the school'
+            : currentStudent.admNo + ' · ' + $class.val() + ' - ' + $section.val() + ' · Roll ' + (currentStudent.roll||'—'));
+        $('#dOutstanding').text(EC.money(dueNow));
+        $('#dSession').text(total>dueNow ? 'Whole session '+EC.money(total) : '');
         $duesEmpty.addClass('d-none'); $duesPane.removeClass('d-none');
         switchView('dues');
         $('.chip').removeClass('active'); $('#scope').text('—');
@@ -477,12 +489,13 @@ $(function () {
 
     /* ── dues ── */
     function allDues(){ return months.flatMap(function(m){return m.dues;}).concat(otherDues); }
+    function todayIso(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
     function dueRow(d,deposit){
         var s=!!sel[d.id];
         return '<div class="due'+(s?' sel':'')+'" data-id="'+d.id+'">'+
             '<label class="due-main"><input type="checkbox" class="form-check-input due-chk"'+(s?' checked':'')+'>'+
               '<div class="due-info"><div class="due-label">'+EC.esc(d.label)+((deposit||d.refundable)?'<span class="deposit-tag">refundable</span>':'')+'</div>'+
-              '<div class="due-meta">'+(d.overdue?'<span class="overdue">Overdue</span> · ':'')+'Due '+EC.esc(d.dueDate||'—')+'</div></div>'+
+              '<div class="due-meta">'+(d.overdue?'<span class="overdue">Overdue</span> · ':'')+'Due '+EC.esc(d.dueDate ? EC.date(d.dueDate) : '—')+'</div></div>'+
               '<div class="due-amt">'+EC.money(d.amount)+'</div></label></div>';
     }
     function renderDues(){
@@ -510,9 +523,13 @@ $(function () {
     $('.chip').on('click', function(){
         $('.chip').removeClass('active'); $(this).addClass('active');
         var n=Number($(this).data('n')); sel={};
-        months.forEach(function(m,i){ if(i<n) m.dues.forEach(function(d){ sel[d.id]={label:d.label,outstanding:d.amount,dueDate:d.dueDate||'',refundable:!!d.refundable}; }); });
+        function pick(d){ sel[d.id]={label:d.label,outstanding:d.amount,dueDate:d.dueDate||'',refundable:!!d.refundable}; }
+        months.forEach(function(m,i){ if(i<n) m.dues.forEach(pick); });
+        // one-time / annual fees that have already fallen due go with any month choice (QA BUG-108)
+        var extraDue=otherDues.filter(function(d){ return d.overdue || (d.dueDate && d.dueDate<=todayIso()); });
+        extraDue.forEach(pick);
         var names=months.slice(0,n).map(function(m){return m.title;});
-        $('#scope').text(names.length? (n+' month'+(n>1?'s':'')+' · '+names[0]+(n>1?' – '+names[names.length-1]:'')) : 'Nothing to select');
+        $('#scope').text(names.length? (n+' month'+(n>1?'s':'')+' · '+names[0]+(n>1?' – '+names[names.length-1]:'')+(extraDue.length?' + '+extraDue.length+' fee(s) already due':'')) : 'Nothing to select');
         renderDues(); settle();
     });
     $('#clearSel').on('click', function(){ sel={}; $('.chip').removeClass('active'); $('#scope').text('—'); renderDues(); settle(); });
@@ -761,15 +778,14 @@ $(function () {
     var cancelModal=new bootstrap.Modal(document.getElementById('cancelModal'));
     $('#histList').on('click','.hist-cancel', function(){
         $('#cmNo').text($(this).data('rcp')); $('#cmAmt').text(EC.money($(this).data('amt')));
-        $('#cmReason').val(''); $('#cmAuth').val('');
+        $('#cmReason').val('');
         cancelModal.show();
     });
     $('#cmConfirm').on('click', function(){
-        var rcp=$('#cmNo').text(), reason=$('#cmReason').val().trim(), auth=$('#cmAuth').val();
+        var rcp=$('#cmNo').text(), reason=$('#cmReason').val().trim();
         if(!reason){ ecToast('warning','A reason is required.'); return; }
-        if(!auth){ ecToast('warning','Choose who authorised the cancellation.'); return; }
         var $btn=$(this); EC.buttonBusy($btn);
-        api.cancel({ receiptNo:rcp, reason:reason, authorizedBy:auth })
+        api.cancel({ receiptNo:rcp, reason:reason })
         .done(function(res){
             EC.buttonReset($btn);
             if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not cancel.'); return; }
@@ -787,9 +803,9 @@ $(function () {
         if(!currentStudent){ ecToast('warning','Select a student first.'); return; }
         api.refundable(currentStudent.id).done(function(rows){
             refundables=rows||[];
-            if(!refundables.length){ ecToast('info','Nothing to refund — no paid amount is held for this student.'); return; }
-            $('#rfItem').html(refundables.map(function(r,i){ return '<option value="'+i+'">'+(r.isRefundable?'★ ':'')+EC.esc(r.label)+' — '+EC.money(r.refundable)+' refundable</option>'; }).join(''));
-            $('#rfReason').val(''); $('#rfAuth').val(''); $('#rfMode').val('Cash');
+            if(!refundables.length){ ecToast('info','Nothing to refund: no refundable deposit or advance is held for this student. A wrong payment is corrected by cancelling its receipt.'); return; }
+            $('#rfItem').html(refundables.map(function(r,i){ return '<option value="'+i+'">'+EC.esc(r.label)+' — '+EC.money(r.refundable)+' refundable</option>'; }).join(''));
+            $('#rfReason').val(''); $('#rfMode').val('Cash');
             refundItemChanged(); refundModal.show();
         }).fail(function(){ ecToast('error','Could not load refundable amounts.'); });
     });
@@ -811,9 +827,8 @@ $(function () {
         if(Math.abs(Math.round(amt*100)-amt*100)>1e-6){ ecToast('warning','Use at most two decimal places.'); return; }
         if(amt>r.refundable+0.001){ ecToast('warning','Amount exceeds the refundable balance ('+EC.money(r.refundable)+').'); return; }
         if(!reason){ ecToast('warning','A reason is required.'); return; }
-        if(!$('#rfAuth').val()){ ecToast('warning','Choose who authorised the refund.'); return; }
         var $btn=$(this); EC.buttonBusy($btn);
-        api.refund({ studentId:currentStudent.id, ledgerId:r.ledgerId, amount:amt, mode:$('#rfMode').val(), reason:reason, authorizedBy:$('#rfAuth').val() })
+        api.refund({ studentId:currentStudent.id, ledgerId:r.ledgerId, amount:amt, mode:$('#rfMode').val(), reason:reason })
         .done(function(res){
             EC.buttonReset($btn);
             if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not refund.'); return; }

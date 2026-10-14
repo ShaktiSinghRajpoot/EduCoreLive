@@ -83,7 +83,7 @@
 
             <div class="diff ok" id="diffBox"><span id="diffLabel">Difference</span><span id="diffVal">₹0.00</span></div>
 
-            <div class="mt-3"><label class="form-label">Remarks</label><input type="text" id="remarks" class="form-control" placeholder="Optional note"></div>
+            <div class="mt-3"><label class="form-label">Remarks</label><input type="text" id="remarks" class="form-control" maxlength="300" placeholder="Required when the cash does not tally"></div>
 
             <button id="btnClose" class="btn btn-primary w-100 mt-3 no-print"><i class="bx bx-lock-alt me-1"></i>Close day</button>
             <button id="btnReopen" class="btn btn-outline-secondary w-100 mt-2 no-print d-none"><i class="bx bx-lock-open-alt me-1"></i>Re-open day</button>
@@ -217,7 +217,8 @@ $(function () {
     }
     function diff(){
         var counted=EC.num($('#counted').val()), d=counted-expected;
-        $('#diffVal').text((d>0?'+':'')+EC.money(d));
+        // the label says short / excess, so the amount is shown without a sign (QA BUG-109)
+        $('#diffVal').text(EC.money(Math.abs(d)));
         var $b=$('#diffBox').removeClass('ok short over');
         $('#diffLabel').text(d===0?'Tallies' : (d<0?'Short by':'Excess'));
         $b.addClass(d===0?'ok':(d<0?'short':'over'));
@@ -253,6 +254,9 @@ $(function () {
         var counted=$('#counted').val();
         if(counted===''||isNaN(Number(counted))){ ecToast('warning','Enter the counted cash.'); return; }
         if(Number(counted)<0){ ecToast('warning','Counted cash can not be negative.'); return; }
+        if(Math.abs(Number(counted)-expected)>0.004 && !$('#remarks').val().trim()){
+            ecToast('warning','The cash does not tally. Write a remark explaining the difference.'); $('#remarks').focus(); return;
+        }
         var $btn=$(this); EC.buttonBusy($btn);
         $.ajax({url:URL.close,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},
                 data:JSON.stringify({ date:$('#dDate').val(), countedCash:Number(counted), remarks:$('#remarks').val() })})

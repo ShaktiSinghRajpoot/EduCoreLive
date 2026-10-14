@@ -327,6 +327,12 @@ BEGIN
     v_expected := v_cash_collected - v_cash_refunded;
     v_diff     := p_counted_cash - v_expected;
 
+    -- A drawer that does not tally needs a reason on record (QA BUG-097).
+    IF v_diff <> 0 AND NULLIF(trim(p_remarks), '') IS NULL THEN
+        RAISE EXCEPTION 'The cash is % by Rs %. Write a remark explaining the difference.',
+            CASE WHEN v_diff < 0 THEN 'short' ELSE 'over' END, to_char(abs(v_diff), 'FM99,99,99,990.00');
+    END IF;
+
     v_modes := (SELECT jsonb_agg(jsonb_build_object('mode', mode, 'amount', amt) ORDER BY mode)
                 FROM (SELECT mode, SUM(amount) AS amt
                       FROM core.fn_fee_money_lines(p_tenant_id, p_school_id, v_date, v_date)
@@ -364,9 +370,11 @@ BEGIN
 
     OPEN p_result FOR
     SELECT TRUE AS success,
-           'Day ' || to_char(v_date, 'DD Mon YYYY') || ' closed. Expected cash '
-             || to_char(v_expected, 'FM999999990.00') || ', difference '
-             || to_char(v_diff, 'FM999999990.00') || '.' AS message,
+           'Day ' || to_char(v_date, 'DD Mon YYYY') || ' closed. Expected cash Rs '
+             || to_char(v_expected, 'FM99,99,99,990.00')
+             || CASE WHEN v_diff = 0 THEN ', the drawer tallies.'
+                     WHEN v_diff < 0 THEN ', short by Rs ' || to_char(-v_diff, 'FM99,99,99,990.00') || '.'
+                     ELSE ', over by Rs ' || to_char(v_diff, 'FM99,99,99,990.00') || '.' END AS message,
            v_expected AS expected_cash,
            v_diff     AS difference;
 END;

@@ -17,13 +17,16 @@ namespace educore.Areas.ERP.Controllers
         private readonly IAdmissionService _admissionService;
         private readonly ISchoolSettingsService _schoolSettingsService;
         private readonly IFeePaymentService _feePaymentService;
+        private readonly ICertificateService _certificates;
 
         public FeeController(
             IBaseService baseService,
             IAdmissionService admissionService,
             ISchoolSettingsService schoolSettingsService,
-            IFeePaymentService feePaymentService)
+            IFeePaymentService feePaymentService,
+            ICertificateService certificates)
         {
+            _certificates = certificates;
             _baseService = baseService;
             _admissionService = admissionService;
             _schoolSettingsService = schoolSettingsService;
@@ -155,15 +158,28 @@ namespace educore.Areas.ERP.Controllers
                 search: q.Trim(),
                 filterYear: NullIfEmpty(session));
 
-            return Json(rows.Select(s => new
+            var list = rows.Select(s => new
             {
+                id       = s.StudentId,
                 admNo    = s.AdmissionNo,
                 name     = s.StudentName,
                 cls      = s.ClassName,
                 sec      = s.Section,
                 guardian = s.GuardianName,
-                mobile   = s.Mobile
+                mobile   = s.Mobile,
+                left     = false
+            }).ToList();
+
+            // Students who have LEFT may still owe fees (and need them cleared for a TC), so
+            // the counter finds them too, marked "Left" (QA BUG-082). The certificate search
+            // already covers former students.
+            var former = await _certificates.SearchStudentsAsync(q.Trim(), TenantId(), SchoolId(), UserId());
+            list.AddRange(former.Where(f => !f.IsCurrent).Select(f => new
+            {
+                id = f.StudentId, admNo = f.AdmissionNo ?? "", name = f.StudentName, cls = f.ClassName, sec = f.Section,
+                guardian = f.GuardianName, mobile = f.Mobile, left = true
             }));
+            return Json(list);
         }
 
         // ── GET: /ERP/Fee/GetAdvance ─────────────────────────────
@@ -381,11 +397,10 @@ namespace educore.Areas.ERP.Controllers
                 return Json(new { success = false, message = "Receipt number is required." });
             if (string.IsNullOrWhiteSpace(req.Reason))
                 return Json(new { success = false, message = "A reason is required to cancel a receipt." });
-            if (string.IsNullOrWhiteSpace(req.AuthorizedBy))
-                return Json(new { success = false, message = "Say who authorised the cancellation." });
-
+            // The authoriser is the signed-in person, who holds fees.cancel. It used to be
+            // picked from a list, so any cashier could write "Principal" (QA BUG-063).
             var (ok, msg) = await _feePaymentService.CancelReceiptAsync(
-                req.ReceiptNo.Trim(), req.Reason.Trim(), NullIfEmpty(req.AuthorizedBy),
+                req.ReceiptNo.Trim(), req.Reason.Trim(), CurrentUserName(),
                 TenantId(), SchoolId(), UserId());
 
             return Json(new { success = ok, message = msg });
@@ -430,12 +445,10 @@ namespace educore.Areas.ERP.Controllers
                 return Json(new { success = false, message = "Enter a refund amount." });
             if (string.IsNullOrWhiteSpace(req.Reason))
                 return Json(new { success = false, message = "A reason is required to refund." });
-            if (string.IsNullOrWhiteSpace(req.AuthorizedBy))
-                return Json(new { success = false, message = "Say who authorised the refund." });
-
+            // authorised by the signed-in person, who holds fees.refund (QA BUG-063)
             var (ok, msg, refundNo) = await _feePaymentService.RecordRefundAsync(
                 req.StudentId, req.LedgerId, req.Amount,
-                NullIfEmpty(req.Mode) ?? "Cash", req.Reason!.Trim(), NullIfEmpty(req.AuthorizedBy),
+                NullIfEmpty(req.Mode) ?? "Cash", req.Reason!.Trim(), CurrentUserName(),
                 TenantId(), SchoolId(), UserId());
 
             return Json(new { success = ok, message = msg, refundNo });
@@ -697,12 +710,12 @@ namespace educore.Areas.ERP.Controllers
                 receipts = reg.Receipts.Select(r => new
                 {
                     entry     = r.Entry,
-                    lineDate  = r.LineDate,
+                    lineDate  = Dates.Show(r.LineDate),   // "12 Oct 2026", like the refund rows (QA BUG-096)
                     cancelled = r.IsCancelled,
                     cancelReason = r.CancelReason,
                     cashier   = r.CashierName,
                     receiptNo = r.ReceiptNo,
-                    date      = r.Date,
+                    date      = Dates.Show(r.Date),
                     student   = r.StudentName,
                     admNo     = r.AdmissionNo,
                     cls       = string.IsNullOrWhiteSpace(r.ClassName) ? "" : $"{r.ClassName}{(string.IsNullOrWhiteSpace(r.Section) ? "" : " - " + r.Section)}",
@@ -944,6 +957,7 @@ namespace educore.Areas.ERP.Controllers
         private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
         private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
         private static string? NullIfEmpty(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+        private string CurrentUserName() => User.FindFirst(Common.SK_UserName)?.Value ?? User.Identity?.Name ?? "User #" + UserId();
     }
 
     public class ReceiptFormatRequest

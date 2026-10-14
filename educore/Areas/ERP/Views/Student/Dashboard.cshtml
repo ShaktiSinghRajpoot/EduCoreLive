@@ -410,8 +410,13 @@ function buildDetail(api){
         feeHistory: (api.receipts || []).map(function(r){
             return {date:r.date, amt:r.amount, mode:r.mode, receipt:r.receiptNo,
                     cancelled:r.cancelled, by:r.cancelled ? 'CANCELLED' : (r.collectedBy || '—')};
-        }),
-        totalFee: fee.totalDue, totalPaid: fee.totalPaid,
+        }).concat((api.refunds || []).map(function(r){
+            // a refund is money handed back: shown as its own (negative) line
+            return {date:r.date, amt:-Math.abs(r.amount), mode:r.mode, receipt:r.refundNo, refund:true,
+                    note:r.against, by:r.by || '—'};
+        })),
+        // "Paid" is what the school kept: payments less refunds (QA BUG-084)
+        totalFee: fee.totalDue, totalPaid: (fee.totalPaid || 0) - (fee.refunded || 0),
         hasConcession: fee.concession > 0, concessionAmt: fee.concession
     };
 }
@@ -815,6 +820,11 @@ function renderFee(s,d){
     // has its own Print button.
     document.getElementById('feeHistBody').innerHTML = d.feeHistory.length
       ? d.feeHistory.map(function(f){
+            if(f.refund) return '<tr>'
+                +'<td>'+EC.esc(f.date)+'</td>'
+                +'<td class="fw-bold">Refund'+(f.note?'<div class="small text-muted fw-normal">'+EC.esc(f.note)+'</div>':'')+'</td>'
+                +'<td class="text-danger fw-bold">−'+inr(Math.abs(f.amt))+'</td>'
+                +'<td>'+EC.esc(f.mode)+'</td><td>'+EC.esc(f.receipt)+'</td><td>'+EC.esc(f.by)+'</td><td></td></tr>';
             return '<tr'+(f.cancelled?' class="text-muted" style="text-decoration:line-through;"':'')+'>'
                 +'<td>'+EC.esc(f.date)+'</td>'
                 +'<td class="fw-bold">Fee payment</td>'

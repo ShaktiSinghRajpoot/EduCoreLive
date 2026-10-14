@@ -45,6 +45,21 @@ namespace EduCoreDataAccessLayer.Helpers
         public static string? NStr(NpgsqlDataReader r, HashSet<string> cols, string c)
             => cols.Contains(c) && r[c] != DBNull.Value ? r[c].ToString() : null;
 
+        /// <summary>
+        /// A real `date` column as ISO text (yyyy-MM-dd). NStr would print it in the
+        /// server's culture ("10/12/2026" = 12 Oct), which reads as 10 Dec in India.
+        /// </summary>
+        public static string? IsoDate(NpgsqlDataReader r, HashSet<string> cols, string c)
+        {
+            if (!cols.Contains(c) || r[c] == DBNull.Value) return null;
+            return r[c] switch
+            {
+                DateTime d => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                DateOnly d => d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                var v      => v.ToString()
+            };
+        }
+
 
         /// <summary>
         /// A timestamp column, on the school's clock: a timestamptz arrives as UTC

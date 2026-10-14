@@ -579,6 +579,19 @@ EC.money = function (n) {
     });
 };
 
+// ── Dates ───────────────────────────────────────────────────────────────
+// ISO text from the server ("2026-10-01") to the way schools write it
+// ("01 Oct 2026"). Anything that is not an ISO date comes back unchanged, and
+// empty stays empty, so it is safe to wrap any date field.
+//
+//     EC.date('2026-10-01')   -> "01 Oct 2026"
+EC.date = function (iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+    if (!m) return iso || '';
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return m[3] + ' ' + months[Number(m[2]) - 1] + ' ' + m[1];
+};
+
 // ── Numbers ─────────────────────────────────────────────────────────────
 // Safe Number(): anything unparseable becomes 0, so arithmetic never turns
 // into NaN and prints "₹NaN" on screen.
