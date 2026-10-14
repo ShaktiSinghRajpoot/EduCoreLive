@@ -50,7 +50,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 Designation  = NullStr(row, "designation"),
                 Department   = NullStr(row, "department"),
                 Status       = Str(row, "status"),
-                JoiningDate  = NullStr(row, "joining_date")
+                JoiningDate  = NullStr(row, "joining_date"),
+                StaffType    = NullStr(row, "staff_type")
             };
         }
 
@@ -62,6 +63,17 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             {
                 var me = await GetMeAsync(tenantId, schoolId, actionUserId);
                 return me != null && me.IsCurrent;
+            }, TimeSpan.FromMinutes(5));
+        }
+
+        public Task<bool> IsTeachingStaffAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            if (!InScope(tenantId, schoolId, actionUserId)) return Task.FromResult(false);
+            string key = AppCache.Key("isteacher:u" + actionUserId, tenantId, schoolId);
+            return _cache.GetOrCreateAsync(key, async () =>
+            {
+                var me = await GetMeAsync(tenantId, schoolId, actionUserId);
+                return me != null && me.IsCurrent && me.IsTeachingType;
             }, TimeSpan.FromMinutes(5));
         }
 

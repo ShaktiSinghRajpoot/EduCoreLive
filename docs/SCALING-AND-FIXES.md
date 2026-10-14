@@ -5416,3 +5416,5 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - Homework menu and page are for people who teach a class (timetable or class teacher, new cached
   `IHomeworkService.TeachesAnyClassAsync`) or have academics.view — an accountant's or clerk's staff record
   no longer shows it.
+- My Timetable shows only for teaching staff (`staff_type` Teaching or not recorded) or anyone with
+  periods; `sp_staff_my_leave` 'ME' now returns `staff_type`. Bundle `deploy_2026_10_14t.sql`.

@@ -92,6 +92,15 @@
         try { gMyStaff = await StaffSelfService.HasStaffRecordAsync(_tId, _sId, _uId); }
         catch { /* the menu must never fail to render */ }
     }
+    // My Timetable is for teaching staff (or anyone who has periods); an accountant or
+    // clerk has no timetable (cached 5 min).
+    bool gMyTimetable = false;
+    if (gMyStaff)
+    {
+        try { gMyTimetable = await StaffSelfService.IsTeachingStaffAsync(_tId, _sId, _uId)
+                          || await HomeworkService.TeachesAnyClassAsync(_tId, _sId, _uId); }
+        catch { /* the menu must never fail to render */ }
+    }
     // Homework is for people who teach a class -- not every staff record (cached 5 min).
     bool gTeaches = false;
     if (_tId > 1 && _sId > 0 && !gAcademics)
@@ -214,7 +223,7 @@
         </li>
         }
 
-        @if (gMyStaff)
+        @if (gMyTimetable)
         {
         <li class='menu-item @On("MyTimetable")'>
             <a asp-area="ERP" asp-controller="MyTimetable" asp-action="Index" class="menu-link">
@@ -222,6 +231,9 @@
                 <div class="text-truncate">My Timetable</div>
             </a>
         </li>
+        }
+        @if (gMyStaff)
+        {
         <li class='menu-item @On("MyLeave")'>
             <a asp-area="ERP" asp-controller="MyLeave" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-calendar-minus ic-hr"></i>

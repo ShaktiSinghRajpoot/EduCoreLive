@@ -83,7 +83,8 @@ BEGIN
     IF p_operation = 'ME' THEN
         OPEN p_result FOR
         SELECT s.staff_id, s.full_name, s.employee_code, s.designation, s.department,
-               s.status, s.joining_date
+               s.status, s.joining_date,
+               s.staff_type          -- Teaching / Non-Teaching / ... (menu: My Timetable)
         FROM core.staff s
         WHERE s.staff_id = v_staff;
         RETURN;

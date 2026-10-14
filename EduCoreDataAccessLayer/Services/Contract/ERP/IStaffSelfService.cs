@@ -15,6 +15,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// Cached for 5 minutes: it is asked on every menu render.</summary>
         Task<bool> HasStaffRecordAsync(int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Current staff whose type is Teaching (or not recorded). Cached 5 min.</summary>
+        Task<bool> IsTeachingStaffAsync(int tenantId, int schoolId, int actionUserId);
+
         Task<List<MyLeaveItem>> GetMyLeavesAsync(int tenantId, int schoolId, int actionUserId);
         Task<List<StaffLeaveBalance>> GetMyBalanceAsync(string? anyDateInYear, int tenantId, int schoolId, int actionUserId);
         Task<StaffLeaveResult> CountDaysAsync(string fromDate, string toDate, bool halfDay, int tenantId, int schoolId, int actionUserId);

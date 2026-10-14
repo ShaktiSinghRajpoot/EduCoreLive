@@ -10,6 +10,11 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? Department   { get; set; }
         public string  Status       { get; set; } = string.Empty;
         public string? JoiningDate  { get; set; }
+        public string? StaffType    { get; set; }   // Teaching / Non-Teaching / Transport ...
+
+        /// <summary>No type recorded counts as teaching, so nobody loses My Timetable by accident.</summary>
+        public bool IsTeachingType => string.IsNullOrWhiteSpace(StaffType)
+                                   || string.Equals(StaffType, "Teaching", System.StringComparison.OrdinalIgnoreCase);
 
         /// <summary>Active or "On Leave": can still apply. Inactive staff can only read.</summary>
         public bool IsCurrent => !string.Equals(Status, "Inactive", System.StringComparison.OrdinalIgnoreCase);
