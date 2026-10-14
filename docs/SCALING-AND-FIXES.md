@@ -5264,5 +5264,5 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   proc on live differs from the repo file, so it was deliberately not touched. `GetBasicProfileAsync`
   reads the signature too (a failure there never breaks the profile).
 
-### [2026-10-14] Staff Attendance › Month at a glance
+### [2026-10-14] Staff Attendance â€º Month at a glance
 - Under the month register: average present, days marked, absences, late arrivals, leave days, a present-each-day chart and the five staff most absent / late / on leave. Worked out in the page from the register's own data (no new call, no DB change).
