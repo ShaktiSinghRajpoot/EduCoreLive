@@ -177,6 +177,10 @@ DECLARE
     v_from   date;
     v_to     date;
     v_staff  integer;
+    v_note   text := '';
+    v_list   text;
+    v_n      integer;
+    v_name   text;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -370,9 +374,51 @@ BEGIN
             decided_at      = now()
         WHERE leave_id = p_leave_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
 
+        -- What the approval leaves to arrange, said in the same message (QA BUG-115,
+        -- BUG-090): the class charge, the periods to cover, and salary already paid.
+        IF p_status = 'Approved' THEN
+            SELECT l.from_date::date, l.to_date::date, l.staff_id, l.leave_type, s.full_name
+              INTO v_from, v_to, v_staff, v_type, v_name
+              FROM core.staff_leave l JOIN core.staff s ON s.staff_id = l.staff_id
+             WHERE l.leave_id = p_leave_id;
+
+            SELECT string_agg(DISTINCT c.class_name || '-' || sec.section_name, ', ') INTO v_list
+              FROM academic.academic_class_sections sec
+              JOIN academic.academic_classes c ON c.academic_class_id = sec.academic_class_id
+              JOIN academic.academic_years y   ON y.academic_year_id  = sec.academic_year_id
+             WHERE sec.tenant_id = p_tenant_id AND sec.school_id = p_school_id
+               AND sec.class_teacher_staff_id = v_staff AND NOT COALESCE(sec.is_deleted, FALSE)
+               AND v_from <= y.end_date::date AND v_to >= y.start_date::date;
+            IF v_list IS NOT NULL THEN
+                v_note := v_note || ' ' || v_name || ' is class teacher of ' || v_list
+                       || ': a teacher with a period there that day can take the register.';
+            END IF;
+
+            SELECT COUNT(*) INTO v_n
+              FROM generate_series(v_from, v_to, interval '1 day') d(day)
+              JOIN academic.timetable t
+                ON t.tenant_id = p_tenant_id AND t.school_id = p_school_id AND t.staff_id = v_staff
+               AND t.day_of_week = EXTRACT(ISODOW FROM d.day)::int
+              JOIN academic.academic_years y ON y.academic_year_id = t.academic_year_id
+                                            AND d.day::date BETWEEN y.start_date::date AND y.end_date::date;
+            IF v_n > 0 THEN
+                v_note := v_note || ' ' || v_n || ' timetable period(s) need a substitute -- Staff Attendance > Substitutes.';
+            END IF;
+
+            IF LOWER(v_type) = 'unpaid' AND EXISTS (
+                   SELECT 1 FROM core.staff_payroll p
+                    WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
+                      AND p.staff_id = v_staff AND p.status = 'Paid'
+                      AND make_date(p.pay_year, p.pay_month, 1)
+                          BETWEEN DATE_TRUNC('month', v_from)::date AND v_to) THEN
+                v_note := v_note || ' Salary for that month is already paid, so this unpaid leave is not deducted:'
+                       || ' add a deduction in Payroll > Adjustments of the next unpaid month.';
+            END IF;
+        END IF;
+
         OPEN p_result FOR
         SELECT TRUE AS success, p_leave_id AS leave_id, 0::numeric AS days,
-               'Leave ' || LOWER(p_status) || '.' AS message;
+               'Leave ' || LOWER(p_status) || '.' || v_note AS message;
         RETURN;
     END IF;
 

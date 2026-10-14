@@ -5380,3 +5380,21 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   failed once transfers existed).
 - BUG-026 / BUG-035 were already fixed.
 - Bundle `deploy_2026_10_14q.sql` (inventory).
+
+### 2026-10-14 — QA round 3, batch 4 (students / attendance / staff)
+- **BUG-074** Admission with no roll number typed gets the next one in the class-section (highest numeric
+  roll + 1) in `sp_admission_manage`.
+- **BUG-106** Mark Attendance has Late and Leave buttons. A student added after the day's register was
+  saved shows "Not marked" and is not counted Present until someone taps a status.
+- **BUG-085** Every TC (Basic too) prints DOB in words, fees paid up to, working days and days present.
+  Left blank on the form, `sp_tc_manage` fills them from the register and the fee ledger.
+- **BUG-114** Acting class teacher: on a day the class teacher is away (approved leave / marked absent),
+  a teacher with a period in that section that day (timetable or substitute) may take the register —
+  new `core.sp_class_teacher_acting` (class_teacher_acting.sql), used by AttendanceController.
+- **BUG-115 / BUG-090** Approving leave says which class the person is class teacher of, how many
+  timetable periods need a substitute, and — for unpaid leave in an already-paid month — that a payroll
+  deduction must be added (automatic LOP recovery is not built; it is a warning).
+- **BUG-116** The navbar bell lists the periods a teacher covers as a substitute (from today on), linking
+  to My Timetable.
+- Bundle `deploy_2026_10_14r.sql` (student_master_fields, transfer_certificate, class_teacher_acting,
+  staff_leave).

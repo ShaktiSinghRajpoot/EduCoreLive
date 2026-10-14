@@ -22,5 +22,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Is this user the class teacher of the given class-section?</summary>
         Task<bool> IsClassTeacherAsync(
             string className, string? section, int tenantId, int schoolId, int userId);
+
+        /// <summary>
+        /// Is this user standing in for the section's class teacher on that date?
+        /// True when the class teacher is away and the user takes a period there that
+        /// day (timetable or substitute). ClassTeacher is the absent teacher's name.
+        /// </summary>
+        Task<(bool IsActing, string? ClassTeacher)> IsActingClassTeacherAsync(
+            string className, string? section, string date, int tenantId, int schoolId, int userId);
     }
 }

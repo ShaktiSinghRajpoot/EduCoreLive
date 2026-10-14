@@ -13,19 +13,18 @@
     string N(int? n)      => n?.ToString() ?? "—";
 
     // The certificate particulars, in order. The Board template adds the fields
-    // CBSE / ICSE / State boards ask for; Basic keeps the common set.
+    // CBSE / ICSE / State boards ask for; Basic keeps the common set, which still
+    // has the DOB in words, attendance and fees paid up to that every Indian TC
+    // carries (QA BUG-085).
     var rows = new List<(string Label, string Value)>
     {
         ("Admission No.",       V(tc.AdmissionNo)),
         ("Student's Name",      V(tc.StudentName)),
         ("Father's Name",       V(tc.FatherName)),
         ("Mother's Name",       V(tc.MotherName)),
-        ("Date of Birth (fig.)", D(tc.Dob))
+        ("Date of Birth (fig.)", D(tc.Dob)),
+        ("Date of Birth (words)", Dates.Parse(tc.Dob) is { } dobDate ? DobInWords(dobDate) : "—")
     };
-    if (board)
-    {
-        rows.Add(("Date of Birth (words)", Dates.Parse(tc.Dob) is { } dobDate ? DobInWords(dobDate) : "—"));
-    }
     rows.Add(("Gender",              V(tc.Gender)));
     rows.Add(("Nationality",         V(tc.Nationality)));
     rows.Add(("Religion / Category", $"{V(tc.Religion)} / {V(tc.Category)}"));
@@ -43,11 +42,11 @@
         rows.Add(("Subjects Studied",         V(tc.SubjectsStudied)));
     }
     rows.Add(("Qualified for Promotion", V(tc.Result)));
+    rows.Add(("Fees Paid Up To",          V(tc.FeesPaidUpto)));
+    rows.Add(("Total Working Days",       N(tc.WorkingDays)));
+    rows.Add(("Days Present",             N(tc.DaysPresent)));
     if (board)
     {
-        rows.Add(("Fees Paid Up To",          V(tc.FeesPaidUpto)));
-        rows.Add(("Total Working Days",       N(tc.WorkingDays)));
-        rows.Add(("Days Present",             N(tc.DaysPresent)));
         rows.Add(("Games / Co-curricular",    V(tc.Activities)));
     }
     rows.Add(("Date of Leaving",     D(tc.DateOfLeaving)));

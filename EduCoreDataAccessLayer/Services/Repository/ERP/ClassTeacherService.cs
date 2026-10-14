@@ -104,6 +104,32 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return v != DBNull.Value && Convert.ToBoolean(v);
         }
 
+        public async Task<(bool IsActing, string? ClassTeacher)> IsActingClassTeacherAsync(
+            string className, string? section, string date, int tenantId, int schoolId, int userId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(className)) return (false, null);
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = userId },
+                new("p_class",          NpgsqlDbType.Varchar) { Value = className },
+                new("p_section",        NpgsqlDbType.Varchar) { Value = (object?)section ?? DBNull.Value },
+                new("p_date",           NpgsqlDbType.Date)    { Value = DateTime.ParseExact(date, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "acting_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_class_teacher_acting", p);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, null);
+
+            var row = ds.Tables[0].Rows[0];
+            bool acting = row["is_acting"] != DBNull.Value && Convert.ToBoolean(row["is_acting"]);
+            string? teacher = row["class_teacher"] == DBNull.Value ? null : row["class_teacher"].ToString();
+            return (acting, teacher);
+        }
+
         // Fixed positional layout matching sp_class_teacher_manage.
         private static NpgsqlParameter[] Params(string operation, int tenantId, int schoolId, int actionUserId)
         {

@@ -108,7 +108,8 @@
                         if (d.unread > 0) { badge.textContent = d.unread > 9 ? '9+' : d.unread; badge.classList.remove('d-none'); }
                         if (!d.items || !d.items.length) return;
                         document.getElementById('navBellList').innerHTML = d.items.map(function (n) {
-                            return '<a class="dropdown-item py-2 text-wrap" href="@Url.Action("Index", "Notice", new { area = "ERP" })">'
+                            // A substitute period links to My Timetable; a notice to the board.
+                            return '<a class="dropdown-item py-2 text-wrap" href="' + esc(n.url || '@Url.Action("Index", "Notice", new { area = "ERP" })') + '">'
                                  + (n.isNew ? '<span class="badge bg-label-success me-1">New</span>' : '')
                                  + '<span class="fw-semibold">' + esc(n.title) + '</span>'
                                  + '<div class="small text-muted">' + esc(n.category) + ' · ' + esc(n.posted) + '</div></a>';

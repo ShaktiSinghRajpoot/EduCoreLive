@@ -286,6 +286,22 @@
           <input type="text" class="form-control" id="tcRemarks" />
         </div>
 
+        <!-- Printed on every TC. Left blank, they are filled from the attendance
+             register and the fee ledger when the certificate is issued. -->
+        <div class="row g-2 mt-1">
+            <div class="col-md-4">
+              <label class="form-label">Fees paid up to</label>
+              <input type="text" class="form-control" id="tcFeesUpto" placeholder="Blank = from fee records" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Total working days</label>
+              <input type="number" min="0" class="form-control" id="tcWorkingDays" placeholder="Blank = from register" />
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Days present</label>
+              <input type="number" min="0" class="form-control" id="tcDaysPresent" placeholder="Blank = from register" />
+            </div>
+        </div>
         @* Board-only fields — shown when the Board format is chosen. All optional. *@
         <div id="tcBoardFields" class="d-none">
           <hr />
@@ -308,20 +324,8 @@
               <input type="text" class="form-control" id="tcSubjects" placeholder="English, Hindi, Mathematics…" />
             </div>
             <div class="col-md-6">
-              <label class="form-label">Fees paid up to</label>
-              <input type="text" class="form-control" id="tcFeesUpto" placeholder="e.g. March 2026" />
-            </div>
-            <div class="col-md-6">
               <label class="form-label">Date of application</label>
               <input type="date" class="form-control" id="tcAppDate" />
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Total working days</label>
-              <input type="number" min="0" class="form-control" id="tcWorkingDays" />
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Days present</label>
-              <input type="number" min="0" class="form-control" id="tcDaysPresent" />
             </div>
             <div class="col-12">
               <label class="form-label">Games / co-curricular (NCC, Scouts, Guides)</label>

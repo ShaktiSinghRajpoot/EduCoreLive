@@ -25,12 +25,15 @@ namespace educore.Areas.ERP.Controllers
         private readonly INoticeService _notices;
         private readonly IBaseService _baseService;
         private readonly ISchoolSettingsService _settings;
+        private readonly IStaffAttendanceService _att;
 
-        public NoticeController(INoticeService notices, IBaseService baseService, ISchoolSettingsService settings)
+        public NoticeController(INoticeService notices, IBaseService baseService, ISchoolSettingsService settings,
+                                IStaffAttendanceService att)
         {
             _notices = notices;
             _baseService = baseService;
             _settings = settings;
+            _att = att;
         }
 
         public async Task<IActionResult> Index()
@@ -80,16 +83,37 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> Latest()
         {
             var rows = await _notices.GetBoardAsync(TenantId(), SchoolId(), UserId());
+
+            // Periods this teacher covers for an absent colleague, from today on, come
+            // first in the bell (QA BUG-116). The bell must never fail over them.
+            var covers = new List<object>();
+            try
+            {
+                foreach (var x in (await _att.GetMySubstitutionsAsync(TenantId(), SchoolId(), UserId())).Take(5))
+                    covers.Add(new
+                    {
+                        title    = "Cover " + (x.PeriodLabel ?? "slot " + x.PeriodSeq) + " — " + x.SectionLabel
+                                   + (string.IsNullOrWhiteSpace(x.SubjectName) ? "" : " · " + x.SubjectName),
+                        category = "Substitute" + (string.IsNullOrWhiteSpace(x.OriginalName) ? "" : " for " + x.OriginalName),
+                        posted   = x.DayLabel,
+                        isNew    = true,
+                        url      = Url.Action("Index", "MyTimetable", new { area = "ERP" })
+                    });
+            }
+            catch { /* no staff record, or the module is off: just the notices */ }
+
+            var notices = rows.OrderByDescending(r => r.CreatedAt).Take(5).Select(r => (object)new
+            {
+                title    = r.Title,
+                category = r.Category,
+                posted   = r.CreatedAt?.ToString("dd MMM"),
+                isNew    = !r.IsRead,
+                url      = (string?)null
+            });
             return Json(new
             {
-                unread = rows.Count(r => !r.IsRead),
-                items  = rows.OrderByDescending(r => r.CreatedAt).Take(5).Select(r => new
-                {
-                    title    = r.Title,
-                    category = r.Category,
-                    posted   = r.CreatedAt?.ToString("dd MMM"),
-                    isNew    = !r.IsRead
-                })
+                unread = rows.Count(r => !r.IsRead) + covers.Count,
+                items  = covers.Concat(notices)
             });
         }
 

@@ -214,6 +214,9 @@ DECLARE
     v_offset integer;
     v_was_printed boolean;
     v_wallet numeric(12,2);
+    v_work   integer;
+    v_pres   integer;
+    v_upto   varchar(50);
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -289,6 +292,43 @@ BEGIN
             RAISE EXCEPTION 'The date of application cannot be after the date of issue.';
         END IF;
 
+        -- Left blank on the form, these come from the school's own records
+        -- (QA BUG-085): working days = days the register of the student's section
+        -- was taken this session, days present = their Present / Late days, and
+        -- fees paid up to = the last fee line paid before the first unpaid one.
+        v_work := p_working_days;
+        IF v_work IS NULL THEN
+            SELECT NULLIF(COUNT(DISTINCT a.attendance_date), 0)::int INTO v_work
+              FROM core.student_attendance a
+             WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
+               AND a.academic_year = s.academic_year AND a.class_name = s.class_name
+               AND COALESCE(a.section, '') = COALESCE(s.section, '');
+        END IF;
+        v_pres := p_days_present;
+        IF v_pres IS NULL AND v_work IS NOT NULL THEN
+            SELECT COUNT(*)::int INTO v_pres
+              FROM core.student_attendance a
+             WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
+               AND a.student_id = p_student_id AND a.academic_year = s.academic_year
+               AND a.status IN ('Present', 'Late');
+        END IF;
+        v_upto := NULLIF(TRIM(p_fees_paid_upto), '');
+        IF v_upto IS NULL THEN
+            SELECT l.installment_label INTO v_upto
+              FROM core.student_ledger l
+             WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
+               AND l.student_id = p_student_id AND l.academic_year = s.academic_year
+               AND l.amount_paid + COALESCE(l.concession, 0) >= l.amount_due
+               AND l.due_date < COALESCE(
+                     (SELECT MIN(u.due_date) FROM core.student_ledger u
+                       WHERE u.tenant_id = p_tenant_id AND u.school_id = p_school_id
+                         AND u.student_id = p_student_id AND u.academic_year = s.academic_year
+                         AND u.amount_paid + COALESCE(u.concession, 0) + COALESCE(u.closed_amount, 0) < u.amount_due),
+                     '9999-12-31')
+             ORDER BY l.due_date DESC, l.ledger_id DESC
+             LIMIT 1;
+        END IF;
+
         v_fmt  := CASE WHEN p_format IN ('Basic', 'Board') THEN p_format ELSE 'Basic' END;
         -- The series restarts on 1 January (calendar year), not at the session
         -- start. Kept on purpose: the school confirmed it (2026-10-10).
@@ -321,8 +361,8 @@ BEGIN
             NULLIF(TRIM(p_conduct), ''), NULLIF(TRIM(p_result), ''),
             NULLIF(TRIM(p_remarks), ''), 0,
             NULLIF(TRIM(p_exam_result), ''), NULLIF(TRIM(p_failed_status), ''),
-            NULLIF(TRIM(p_subjects), ''), NULLIF(TRIM(p_fees_paid_upto), ''),
-            p_working_days, p_days_present, NULLIF(TRIM(p_activities), ''), p_application_date,
+            NULLIF(TRIM(p_subjects), ''), v_upto,
+            v_work, v_pres, NULLIF(TRIM(p_activities), ''), p_application_date,
             p_action_user_id, now())
         RETURNING tc_id, public_id INTO v_new_id, v_public;
 

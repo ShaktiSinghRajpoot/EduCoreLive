@@ -32,13 +32,18 @@ namespace educore.Areas.ERP.Controllers
             _calendar = calendar;
         }
 
-        // Admins/principals may mark any section; a class teacher only their own.
-        private async Task<bool> CanMarkAsync(string? className, string? section)
+        // Admins/principals may mark any section; a class teacher only their own --
+        // or, on a day the class teacher is away, a teacher who takes a period in
+        // that section that day (QA BUG-114, see class_teacher_acting.sql).
+        private async Task<bool> CanMarkAsync(string? className, string? section, string date)
         {
             var (isAdmin, _) = await _permission.GetUserAccessAsync(TenantId(), SchoolId(), UserId());
             if (isAdmin) return true;
-            return !string.IsNullOrWhiteSpace(className)
-                && await _classTeacher.IsClassTeacherAsync(className, section, TenantId(), SchoolId(), UserId());
+            if (string.IsNullOrWhiteSpace(className)) return false;
+            if (await _classTeacher.IsClassTeacherAsync(className, section, TenantId(), SchoolId(), UserId()))
+                return true;
+            var (acting, _) = await _classTeacher.IsActingClassTeacherAsync(className, section, date, TenantId(), SchoolId(), UserId());
+            return acting;
         }
 
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -75,8 +80,16 @@ namespace educore.Areas.ERP.Controllers
             string? cannotMark = null;
             if (!await HasPermissionAttribute.UserHasAsync(this, "attendance.manage"))
                 cannotMark = "Your role can view attendance but not mark it.";
-            else if (!await CanMarkAsync(@class, section))
-                cannotMark = "You can mark attendance only for classes where you are the class teacher.";
+            else if (!await CanMarkAsync(@class, section, d))
+                cannotMark = "You can mark attendance only for classes where you are the class teacher (or, when the class teacher is away, a class you teach that day).";
+
+            // Standing in for an absent class teacher: say so on the page.
+            string? actingFor = null;
+            if (cannotMark == null)
+            {
+                var (acting, teacher) = await _classTeacher.IsActingClassTeacherAsync(@class, section, d, TenantId(), SchoolId(), UserId());
+                if (acting) actingFor = teacher;
+            }
 
             // Holiday / weekly off from the School Calendar -- sp_attendance_save refuses these days.
             var day = await _calendar.GetDayStatusAsync(
@@ -87,6 +100,7 @@ namespace educore.Areas.ERP.Controllers
             {
                 canMark = cannotMark == null,
                 cannotMark,
+                actingFor,
                 dayType  = day.DayType,     // working | weekly_off | holiday | half_day
                 dayTitle = day.Title,
                 students = roster.Select(s => new
@@ -113,7 +127,7 @@ namespace educore.Areas.ERP.Controllers
                 return Json(new { success = false, message = "Choose a valid date." });
 
             // Only the class teacher of this section (or an admin) may save it.
-            if (!await CanMarkAsync(request!.Class, request.Section))
+            if (!await CanMarkAsync(request!.Class, request.Section, d))
                 return Json(new { success = false, message = "You can mark attendance only for your assigned class-section." });
 
             // The class-section goes to the proc too, so it can refuse any student

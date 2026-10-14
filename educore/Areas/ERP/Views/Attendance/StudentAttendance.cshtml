@@ -147,7 +147,7 @@ $(document).ready(function () {
     // status[id] is present | absent | late | leave. Late and Leave come from the
     // stored mark and are kept as they are unless the teacher taps a button.
     let students = [];
-    const status = {}, notified = {}, marked = {};
+    const status = {}, notified = {}, marked = {}, picked = {};   // picked = a status was tapped
     let touched = false; // true once teacher interacts with any toggle
     let canMark = true;  // false when Save would be refused (see cannotMarkWhy)
     let cannotMarkWhy = '';
@@ -225,15 +225,19 @@ $(document).ready(function () {
             return;
         }
         var anyMarked = students.some(function (s) { return marked[s.id]; });
-        var head = anyMarked ? '' :
+        var head = anyMarked ? (students.some(notMarkedYet)
+                ? '<p class="text-warning text-center small py-2 mb-0"><i class="bx bx-info-circle me-1"></i>' +
+                  'Some students were added after this register was saved. Mark them and save again.</p>' : '') :
             '<p class="text-muted text-center small py-2 mb-0"><i class="bx bx-info-circle me-1"></i>' +
             'This day is not marked yet — everyone starts as Present until you save.</p>';
         $('#list').html(head + students.map(function (s) {
             const ab = status[s.id] === 'absent';
             // Late / Leave are shown, never silently turned into Present.
-            const tag = status[s.id] === 'late'  ? ' <span class="badge bg-label-warning ms-1">Late</span>'
+            const tag = notMarkedYet(s) ? ' <span class="badge bg-label-secondary ms-1">Not marked</span>'
+                      : status[s.id] === 'late'  ? ' <span class="badge bg-label-warning ms-1">Late</span>'
                       : status[s.id] === 'leave' ? ' <span class="badge bg-label-info ms-1">Leave</span>'
                       : '';
+            const on = function (st) { return !notMarkedYet(s) && status[s.id] === st ? 'on' : ''; };
             const notify = ab
                 ? '<div class="att-notify">' +
                     '<span class="notify-chip ' + (notified[s.id]?'sent':'pending') + '">' +
@@ -246,8 +250,10 @@ $(document).ready(function () {
                     '<div class="att-av">' + EC.esc(s.av) + '</div>' +
                     '<div class="att-info"><div class="att-name">' + EC.esc(s.name) + tag + '</div><div class="att-roll">Roll No. ' + EC.esc(s.roll || '—') + '</div></div>' +
                     '<div class="att-toggle">' +
-                        '<button class="seg-p ' + (status[s.id] === 'present' || status[s.id] === 'late' ? 'on' : '') + '" data-id="' + s.id + '" data-set="present"><i class="bx bx-check"></i>Present</button>' +
-                        '<button class="seg-a ' + (ab?'on':'') + '" data-id="' + s.id + '" data-set="absent"><i class="bx bx-x"></i>Absent</button>' +
+                        '<button class="seg-p ' + on('present') + '" data-id="' + s.id + '" data-set="present" title="Present"><i class="bx bx-check"></i>Present</button>' +
+                        '<button class="seg-a ' + on('absent') + '" data-id="' + s.id + '" data-set="absent" title="Absent"><i class="bx bx-x"></i>Absent</button>' +
+                        '<button class="seg-l ' + on('late') + '" data-id="' + s.id + '" data-set="late" title="Late"><i class="bx bx-time-five"></i>Late</button>' +
+                        '<button class="seg-v ' + on('leave') + '" data-id="' + s.id + '" data-set="leave" title="Leave"><i class="bx bx-calendar-minus"></i>Leave</button>' +
                     '</div>' +
                     notify +
                 '</div>'
@@ -257,8 +263,9 @@ $(document).ready(function () {
 
     function renderStats() {
         const total = students.length;
-        // Late counts as present; Leave is neither present nor absent.
-        const present = students.filter(s => status[s.id]==='present' || status[s.id]==='late').length;
+        // Late counts as present; Leave is neither present nor absent; a student
+        // not on the saved register yet is not counted as present (QA BUG-106).
+        const present = students.filter(s => !notMarkedYet(s) && (status[s.id]==='present' || status[s.id]==='late')).length;
         const absent = students.filter(s => status[s.id]==='absent').length;
         const rate = total ? Math.round(present/total*100) : 0;
         $('#sumPresent').text(present); $('#sumAbsent').text(absent); $('#sumTotal').text(total); $('#sumRate').text(rate + '%');
@@ -268,6 +275,12 @@ $(document).ready(function () {
     }
 
     function render() { renderList(); renderStats(); }
+
+    // The register was saved for this day, but this student was not on it (added
+    // later) and nobody has tapped a status for them yet.
+    function notMarkedYet(s) {
+        return !marked[s.id] && !picked[s.id] && students.some(function (x) { return marked[x.id]; });
+    }
 
     // Load the real roster for the current class/section/date.
     function loadRoster() {
@@ -289,10 +302,13 @@ $(document).ready(function () {
                     var st = rows[i].status;   // '' when the day is not marked yet
                     status[s.id]   = (st === 'absent' || st === 'late' || st === 'leave') ? st : 'present';
                     marked[s.id]   = !!rows[i].marked;
+                    picked[s.id]   = false;
                     notified[s.id] = wasNotified(s.id);
                 });
                 var dayWhy = dayBlockReason(res);
                 if (dayWhy) $('#dayNotice').text(dayWhy).show();
+                else if (res && res.actingFor)
+                    $('#dayNotice').text('You are taking this register for ' + res.actingFor + ', who is away today.').show();
                 cannotMarkWhy = dayWhy || (res && res.cannotMark) || '';
                 canMark = !cannotMarkWhy && (!res || res.canMark !== false);
                 applyCanMark();
@@ -316,7 +332,9 @@ $(document).ready(function () {
         // Any tap counts as reviewing the roster, even Present on a student
         // who already shows Present.
         if (!touched) { touched = true; updateSaveBtn(); }
-        if (status[id] === set) return;
+        var wasPending = !picked[id];
+        picked[id] = true;
+        if (status[id] === set && !wasPending) return;
         status[id] = set;
         if (set === 'present') notified[id] = false;
         render();

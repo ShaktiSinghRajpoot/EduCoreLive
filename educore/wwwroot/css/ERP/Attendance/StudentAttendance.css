@@ -98,9 +98,11 @@
         display: inline-flex; align-items: center; justify-content: center; transition: .14s;
     }
     .att-toggle button i { font-size: 1.2rem; }
-    .att-toggle .seg-p { border-right: 1px solid var(--ec-border); }
+    .att-toggle .seg-p, .att-toggle .seg-a, .att-toggle .seg-l { border-right: 1px solid var(--ec-border); }
     .att-toggle .seg-p.on { background: var(--ec-success); color: #fff; }
     .att-toggle .seg-a.on { background: var(--ec-danger); color: #fff; }
+    .att-toggle .seg-l.on { background: var(--ec-warning); color: #fff; }
+    .att-toggle .seg-v.on { background: var(--ec-info); color: #fff; }
 
     /* notify: full-width row, comes after toggle in DOM so it wraps below row 1 */
     .att-notify { display: flex; flex: 1 1 100%; align-items: center; gap: .5rem; }

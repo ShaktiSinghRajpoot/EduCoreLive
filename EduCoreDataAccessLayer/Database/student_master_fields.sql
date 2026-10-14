@@ -138,6 +138,7 @@ DECLARE
     v_cycles        INTEGER;
     v_reg_balance   NUMERIC;
     v_reg_agreed    NUMERIC;
+    v_roll          TEXT;
 BEGIN
 
     -- ── SaveAdmission ────────────────────────────────────────
@@ -295,6 +296,19 @@ BEGIN
             RETURN;
         END IF;
 
+        -- No roll number typed: give the next one in the class + section
+        -- (highest numeric roll + 1), so a new child is never "-" on the register,
+        -- admit card or result sheet (QA BUG-074). It can be changed in Edit Student.
+        v_roll := NULLIF(TRIM(COALESCE(p_roll_no, '')), '');
+        IF v_roll IS NULL AND NULLIF(TRIM(COALESCE(p_section, '')), '') IS NOT NULL THEN
+            SELECT (COALESCE(MAX(TRIM(o.roll_no)::int), 0) + 1)::text INTO v_roll
+              FROM core.students o
+             WHERE o.tenant_id = p_tenant_id AND o.school_id = p_school_id AND o.is_active
+               AND o.academic_year = v_year AND o.class_name = TRIM(p_class_name)
+               AND COALESCE(o.section, '') = TRIM(p_section)
+               AND TRIM(o.roll_no) ~ '^[0-9]{1,6}$';
+        END IF;
+
         -- Admission number: use supplied value or auto-generate per school+year
         IF p_admission_no IS NULL OR TRIM(p_admission_no) = '' THEN
             INSERT INTO core.admission_counters (tenant_id, school_id, academic_year, last_seq)
@@ -355,7 +369,7 @@ BEGIN
             created_by, updated_by
         ) VALUES (
             p_tenant_id, p_school_id,
-            v_admission_no, p_roll_no, p_student_name, p_gender, p_dob,
+            v_admission_no, v_roll, p_student_name, p_gender, p_dob,
             p_class_name, p_section, v_year, v_adm_date,
             p_guardian_name, p_mother_name, p_mobile, p_alt_mobile, p_address,
             p_blood_group, p_religion, p_category, p_nationality, p_mother_tongue, p_id_proof_no,
@@ -378,7 +392,7 @@ BEGIN
         -- per-session record that keeps the history once they are promoted.
         PERFORM core.fn_student_enrolment_open(
             p_tenant_id, p_school_id, v_student_id,
-            v_year, p_class_name, p_section, p_roll_no, p_action_user_id);
+            v_year, p_class_name, p_section, v_roll, p_action_user_id);
 
         -- Freeze the fee plan + generate ledger rows. The month arithmetic
         -- (charge-from policy, quarter snapping, session end) moved to
