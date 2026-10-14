@@ -820,7 +820,9 @@ $(function () {
         var left = Math.round((payTodayMax - take) * 100) / 100;
         if (payTodayMax <= 0)   $h.text('');
         else if (take <= 0)     $h.html('<span class="text-warning-emphasis">Nothing collected now — ' + EC.money(payTodayMax) + ' stays due.</span>');
-        else if (left > 0.005)  $h.html('<span class="text-warning-emphasis">Part payment — <strong>' + EC.money(left) + '</strong> will still be due. Collect it later from Fee → Collect Fees.</span>');
+        // Only the admission-day charges are known here; after saving, the receipt and the
+        // message give the whole amount due as on today (it can include this month's fees).
+        else if (left > 0.005)  $h.html('<span class="text-warning-emphasis">Part payment — <strong>' + EC.money(left) + '</strong> of the admission-day charges will still be due. The receipt shows everything due as on today.</span>');
         else                    $h.text('Clears everything due at admission.');
     }
     $('#paymentAmount').on('input', function () { window._payEdited = true; payUpdateHint(); });

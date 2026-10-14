@@ -5407,3 +5407,9 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - `report_card_certificates_tests` / `student_data_checks_tests` no longer assume an empty register /
   no roll gaps on the live QA data. All tenant-32 suites pass.
 - Bundle `deploy_2026_10_14s.sql` (exam_results_publish, exam_marks, exam_schedule).
+
+### 2026-10-14 — QA round 3 retest (screens, as School Admin)
+- Found while retesting: `EC.money` printed a negative as "₹-3.00" (now "−₹3.00", site-wide); Payment
+  History dates were ISO (now `EC.date`); Collect Fees opened from `?adm=` showed " - A" with no class
+  (the class list arrived after the student and wiped it — the student now opens after the list); the
+  admission form's part-payment hint now says it covers the admission-day charges only.

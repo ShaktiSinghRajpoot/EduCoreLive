@@ -343,14 +343,17 @@ $(function () {
     api.sessions().done(function(s){
         fillSelect($session,s,null);
         $session.val(linkSession && s.indexOf(linkSession)>=0 ? linkSession : s[0]);
-        loadClasses();
-        if(linkAdm){ $adm.val(linkAdm); doAdmSearch(); }
+        // Open the linked student only once the class list is in: filled later, the list
+        // wiped the class doAdmSearch had picked and the header read " - A".
+        loadClasses().always(function(){
+            if(linkAdm){ $adm.val(linkAdm); doAdmSearch(); }
+        });
     });
     function loadClasses(){
         clearStudentView(); students=[];
         $section.prop('disabled',true).html('<option value="">Select class first</option>');
         $student.prop('disabled',true).html('<option value="">Select section first</option>');
-        api.classes($session.val()).done(function(c){ fillSelect($class,c,'Select Class'); });
+        return api.classes($session.val()).done(function(c){ fillSelect($class,c,'Select Class'); });
     }
     function loadSections(){
         clearStudentView(); students=[];
@@ -717,7 +720,7 @@ $(function () {
     var historyRefunds=[];
     function receiptRow(r){
         var x=r.isCancelled;
-        var meta=[EC.esc(r.date||'—'), EC.esc(r.mode)];
+        var meta=[EC.esc(r.date ? EC.date(r.date) : '—'), EC.esc(r.mode)];
         if(r.reference) meta.push(EC.esc(r.reference));
         if(r.concession>0) meta.push(EC.money(r.concession)+' off');
         if(r.advanceUsed>0) meta.push(EC.money(r.advanceUsed)+' from advance');
@@ -736,7 +739,7 @@ $(function () {
                '</div>';
     }
     function refundRow(f,i){
-        var meta=[EC.esc(f.date||'—'), EC.esc(f.mode), 'against '+EC.esc(f.against||'—')];
+        var meta=[EC.esc(f.date ? EC.date(f.date) : '—'), EC.esc(f.mode), 'against '+EC.esc(f.against||'—')];
         if(f.refundedBy) meta.push('by '+EC.esc(f.refundedBy));
         if(f.authorised) meta.push('authorised: '+EC.esc(f.authorised));
         return '<div class="hist-row"><div class="hist-info">'+

@@ -572,8 +572,10 @@ EC.esc = function (s) {
 // rounded to whole rupees and one that did not, so the same amount printed
 // differently on the fee screens and the inventory screens. Rounding also hides
 // paise from the person counting cash, so the exact figure wins.
+// A negative amount reads "−₹3.00", not "₹-3.00".
 EC.money = function (n) {
-    return '₹' + Number(n || 0).toLocaleString('en-IN', {
+    var v = Number(n || 0);
+    return (v < 0 ? '−' : '') + '₹' + Math.abs(v).toLocaleString('en-IN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
