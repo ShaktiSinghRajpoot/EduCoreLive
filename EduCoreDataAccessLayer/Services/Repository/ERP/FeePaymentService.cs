@@ -1073,6 +1073,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             DueDate      = DbRead.NStr(reader, cols, "due_date"),
                             Amount       = DbRead.Dec(reader, cols, "amount"),
                             State        = DbRead.Str(reader, cols, "state"),
+                            NotDue       = DbRead.Bool(reader, cols, "not_due"),
+                            NextSession  = DbRead.NStr(reader, cols, "next_session"),
                             Reason       = DbRead.NStr(reader, cols, "reason"),
                             DecidedAt    = DbRead.DateTimeN(reader, cols, "decided_at")
                         });

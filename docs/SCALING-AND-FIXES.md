@@ -5288,3 +5288,23 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   assigned to; Open → In progress → Resolved / Closed, a note required to resolve.
 - Nothing is deleted. `core.fo_visitors`, `core.fo_calls`, `core.fo_complaints`, `core.sp_front_office_manage`
   (`front_office.sql`, `deploy_2026_10_14k.sql`); 6 rolled-back checks in `tests/front_office_tests.sql`.
+
+### [2026-10-14] QA round 3 — batch 1 (newest modules)
+- **BUG-091 (P1) Year-End**: only fees already due can be carried or written off; **Carry now moves the line
+  into the next session** (`academic_year` = next, `carried_from` = old) so it leaves this session's
+  defaulters — refused until the next session exists; Undo moves it back. Write-off needs the new key
+  **`fees.writeoff`** (School Admin bypasses; Principal template has it), checked in the controller; the
+  page hides write-off buttons without it and tags "Not due yet" lines. Old carry marks that moved nothing
+  were cleared (lines open again).
+- **BUG-098 / 111 Homework**: a teacher may give homework only for a class + subject on their timetable, or
+  any subject of the section they are class teacher of (`sp_homework_manage` 'MyClasses' + check in Save);
+  the give form lists only those; "Give homework" is hidden from staff who cannot use it. **BUG-113**: the
+  admin's name shows when the admin gave homework; Late counts as done.
+- **BUG-101 Substitutes**: only staff working on that date (joined, not left) are offered / accepted.
+- **BUG-102 / 113 Notice Board**: "show until" cannot be in the past (an old notice may keep its date);
+  posted-by and seen-by show names; "until" in Indian format; no staff "seen by" on parent-only notices.
+- **BUG-104 Attendance Overview**: a section's registers are expected only from its first admission date
+  (no September "misses" for a section filled in October); empty weeks hidden; label "sections with every
+  register taken".
+- **BUG-105 Fee Dashboard**: students who left stay in their class's money, so class totals add up.
+- Bundle `deploy_2026_10_14l.sql`; tests updated: year-end 8, homework 11, staff attendance 11, announcements 9.

@@ -80,7 +80,7 @@ BEGIN
         OPEN p_result FOR
         SELECT a.announcement_id, a.title, a.body, a.category, a.audience, a.class_names,
                a.is_pinned, to_char(a.show_until, 'YYYY-MM-DD') AS show_until, a.created_at,
-               COALESCE(st.full_name, split_part(u.email, '@', 1)) AS posted_by,
+               COALESCE(st.full_name, core.fn_user_display_name(u.user_id)) AS posted_by,
                (r.user_id IS NOT NULL) AS is_read,
                (SELECT COUNT(*) FROM core.announcement_reads x WHERE x.announcement_id = a.announcement_id) AS seen_count,
                v_staff AS staff_count
@@ -101,7 +101,7 @@ BEGIN
         OPEN p_result FOR
         SELECT a.announcement_id, a.title, a.body, a.category, a.audience, a.class_names,
                a.is_pinned, to_char(a.show_until, 'YYYY-MM-DD') AS show_until, a.created_at,
-               COALESCE(st.full_name, split_part(u.email, '@', 1)) AS posted_by,
+               COALESCE(st.full_name, core.fn_user_display_name(u.user_id)) AS posted_by,
                (r.user_id IS NOT NULL) AS is_read,
                (SELECT COUNT(*) FROM core.announcement_reads x WHERE x.announcement_id = a.announcement_id) AS seen_count,
                v_staff AS staff_count
@@ -119,7 +119,7 @@ BEGIN
     -- ── SeenBy: who opened one notice
     IF p_operation = 'SeenBy' THEN
         OPEN p_result FOR
-        SELECT COALESCE(st.full_name, split_part(u.email, '@', 1)) AS name, r.read_at
+        SELECT COALESCE(st.full_name, core.fn_user_display_name(u.user_id)) AS name, r.read_at
           FROM core.announcement_reads r
           JOIN core.announcements a ON a.announcement_id = r.announcement_id
                                    AND a.tenant_id = p_tenant_id AND a.school_id = p_school_id
@@ -156,6 +156,11 @@ BEGIN
         END IF;
         IF v_audience <> 'Classes' THEN
             v_classes := NULL;
+        END IF;
+        -- a notice cannot be posted already expired (QA BUG-102); an old notice may keep its old date
+        IF p_show_until IS NOT NULL AND p_show_until < CURRENT_DATE
+           AND (p_id IS NULL OR p_show_until IS DISTINCT FROM (SELECT show_until FROM core.announcements WHERE announcement_id = p_id)) THEN
+            RAISE EXCEPTION 'The "show until" date cannot be in the past.';
         END IF;
 
         IF p_id IS NULL THEN

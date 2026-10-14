@@ -231,7 +231,8 @@ $(function () {
     });
 
     function drawInsights() {
-        var S = INS.sections || [], W = INS.weeks || [], info = (INS.day || [])[0] || {};
+        // weeks before any section had students expect nothing: leave them out
+        var S = INS.sections || [], W = (INS.weeks || []).filter(function (w) { return w.expected > 0; }), info = (INS.day || [])[0] || {};
         var exp = 0, taken = 0, marked = 0, present = 0, complete = 0, missing = (INS.missing || []).length;
         S.forEach(function (s) {
             exp += n(s.expected); taken += n(s.taken); marked += n(s.marked); present += n(s.present);
@@ -241,7 +242,7 @@ $(function () {
         $('#iKpis').html(
             kpi('Registers taken', pctText(taken, exp), taken + ' of ' + exp + ' expected · ' + (exp - taken) + ' missed', exp - taken > 0 ? 'warn' : 'good')
           + kpi('Students present', pctText(present, marked), present + ' of ' + marked + ' student-days marked', 'main')
-          + kpi('Sections complete', complete + '/' + S.length, 'no register missed in this range'));
+          + kpi('Sections complete', complete + '/' + S.length, 'sections with every register taken'));
         $('#iNote').toggleClass('d-none', !(exp - taken > 0)).text(
             (exp - taken) + ' register(s) were never taken in this range, so the present percentage describes only the days somebody recorded.');
 

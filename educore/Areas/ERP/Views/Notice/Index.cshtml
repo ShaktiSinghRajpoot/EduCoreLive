@@ -95,7 +95,7 @@
         <div class="row g-3 align-items-end">
           <div class="col-12 col-md-6">
             <label class="form-label">Show until <small class="text-muted">(optional)</small></label>
-            <input id="fUntil" type="date" class="form-control">
+            <input id="fUntil" type="date" class="form-control" min="@EduCoreDataAccessLayer.Helpers.Dates.Today">
           </div>
           <div class="col-12 col-md-6">
             <div class="form-check"><input id="fPinned" class="form-check-input" type="checkbox">
@@ -173,14 +173,17 @@ $(function () {
                  + (n.pinned ? '<span class="nb-tag pin"><i class="bx bxs-pin"></i> Pinned</span>' : '')
                  + (n.isNew ? '<span class="nb-tag new">New</span>' : '')
                  + (n.expired ? '<span class="nb-tag old">Expired</span>' : '');
-        var meta = ['For: ' + n.audienceText, n.posted, n.by ? 'by ' + n.by : '', n.until ? 'until ' + n.until : '']
+        var until = n.until ? new Date(n.until + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+        var meta = ['For: ' + n.audienceText, n.posted, n.by ? 'by ' + n.by : '', until ? 'until ' + until : '']
                    .filter(Boolean).map(EC.esc).join(' · ');
         var acts = '<a class="btn btn-xs ec-btn-soft" target="_blank" href="' + URL.print + '/' + n.id + '"><i class="bx bx-printer me-1"></i>Print</a>'
                  + '<a class="btn btn-xs nb-wa" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent('*' + n.title + '*\n\n' + n.body) + '"><i class="bx bxl-whatsapp me-1"></i>WhatsApp</a>';
         if (CAN_MANAGE) {
             acts += '<button class="btn btn-xs btn-outline-secondary nb-edit" data-id="' + n.id + '"><i class="bx bx-edit-alt me-1"></i>Edit</button>'
                   + '<button class="btn btn-xs btn-outline-danger nb-del" data-id="' + n.id + '"><i class="bx bx-trash"></i></button>'
-                  + '<button class="btn btn-xs btn-link nb-seen" data-id="' + n.id + '">Seen by ' + n.seen + ' of ' + n.staff + '</button>';
+                  // staff reads only mean something when the notice is for staff; parents have no login yet
+                  + (n.audience === 'Everyone' || n.audience === 'Staff'
+                       ? '<button class="btn btn-xs btn-link nb-seen" data-id="' + n.id + '">Seen by ' + n.seen + ' of ' + n.staff + ' staff</button>' : '');
         }
         return '<div class="ec-card nb-card' + (n.expired ? ' is-old' : '') + '"><div class="nb-bar c-' + EC.esc(n.category) + '"></div><div class="nb-in">'
              + '<div class="nb-tags">' + tags + '</div>'

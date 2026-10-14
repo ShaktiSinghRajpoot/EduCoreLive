@@ -266,6 +266,10 @@
         public decimal   Amount       { get; set; }
         /// <summary>Open, Carried or WrittenOff.</summary>
         public string    State        { get; set; } = "Open";
+        /// <summary>Due date still ahead: cannot be carried or written off yet.</summary>
+        public bool      NotDue       { get; set; }
+        /// <summary>The session carried dues move into (null when it is not created yet).</summary>
+        public string?   NextSession  { get; set; }
         public string?   Reason       { get; set; }
         public DateTime? DecidedAt    { get; set; }
     }

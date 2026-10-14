@@ -14,12 +14,23 @@ DECLARE
     c refcursor; r record;
     pass int := 0; fail int := 0;
 BEGIN
-    -- a section with students and one of its subjects
-    SELECT sec.academic_class_section_id INTO SEC
-      FROM academic.academic_class_sections sec
-      JOIN academic.academic_classes cl ON cl.academic_class_id = sec.academic_class_id
-     WHERE sec.tenant_id = TN AND cl.class_name = 'Class 1' AND sec.section_name = 'A' LIMIT 1;
-    SELECT subject_id INTO SUBJ FROM academic.school_subjects WHERE tenant_id = TN AND subject_name = 'English' LIMIT 1;
+    -- a class + subject QA Teacher really teaches (timetable), from MyClasses
+    CALL academic.sp_homework_manage('MyClasses', TN, SC, TEACHER, FALSE, NULL, NULL, NULL, NULL, NULL, NULL, NULL, FALSE, NULL, NULL, NULL, c);
+    LOOP FETCH c INTO r; EXIT WHEN NOT FOUND;
+        IF r.subject_id IS NOT NULL AND SEC IS NULL THEN SEC := r.section_id; SUBJ := r.subject_id; END IF;
+    END LOOP; CLOSE c;
+    RAISE NOTICE 'QA Teacher teaches section % subject %', SEC, SUBJ;
+
+    -- 0. a class the teacher does not teach is refused (QA BUG-098)
+    BEGIN
+        SELECT os.academic_class_section_id INTO v_n FROM academic.academic_class_sections os
+         WHERE os.tenant_id = TN AND os.academic_class_section_id <> SEC
+           AND COALESCE(os.class_teacher_staff_id, 0) <> 92
+           AND NOT EXISTS (SELECT 1 FROM academic.timetable t WHERE t.academic_class_section_id = os.academic_class_section_id AND t.staff_id = 92)
+         LIMIT 1;
+        CALL academic.sp_homework_manage('Save', TN, SC, TEACHER, FALSE, NULL, v_n, SUBJ, 'x', NULL, CURRENT_DATE, CURRENT_DATE + 1, FALSE, NULL, NULL, NULL, c);
+        fail := fail + 1; RAISE NOTICE 'FAIL 0 homework for a class not taught';
+    EXCEPTION WHEN raise_exception THEN pass := pass + 1; RAISE NOTICE 'PASS 0 %', SQLERRM; END;
 
     -- 1. a teacher gives homework
     CALL academic.sp_homework_manage('Save', TN, SC, TEACHER, FALSE, NULL, SEC, SUBJ, 'Read chapter 3', 'Answer Q1-Q5 in the notebook.',
@@ -45,7 +56,7 @@ BEGIN
     CALL academic.sp_homework_manage('List', TN, SC, TEACHER, FALSE, NULL, SEC, NULL, NULL, NULL, NULL, NULL, TRUE, NULL, NULL, NULL, c);
     v_txt := NULL;
     LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.homework_id = v_id THEN v_txt := r.section_label || '/' || r.subject_name || '/' || r.student_count || '/' || r.can_edit; END IF; END LOOP; CLOSE c;
-    IF v_txt LIKE 'Class 1 – A/English/%/true' AND split_part(v_txt, '/', 3)::int > 0 THEN pass := pass + 1; RAISE NOTICE 'PASS 4 list: %', v_txt;
+    IF v_txt LIKE '%/true' AND split_part(v_txt, '/', 3)::int > 0 THEN pass := pass + 1; RAISE NOTICE 'PASS 4 list: %', v_txt;
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 4 list: %', v_txt; END IF;
 
     -- 5. Students lists the section; Check saves Done / NotDone, a blank clears

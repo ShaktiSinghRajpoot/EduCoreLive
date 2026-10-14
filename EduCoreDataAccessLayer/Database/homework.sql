@@ -12,9 +12,11 @@
 -- Students belong to a section by text (students.class_name / section /
 -- academic_year), the same way attendance and fees match them.
 --
--- Who may give homework: a Teaching staff member, or anyone the app says can
--- manage academics (p_can_manage). A teacher edits / deletes / checks only
--- their own homework unless p_can_manage.
+-- Who may give homework: anyone the app says can manage academics
+-- (p_can_manage), or a teacher for a class + subject they teach on the live
+-- timetable, or any subject of the section they are class teacher of
+-- (operation 'MyClasses' lists exactly those, QA BUG-098). A teacher edits /
+-- deletes / checks only their own homework unless p_can_manage.
 -- Re-runnable.
 -- ============================================================================
 
@@ -48,7 +50,7 @@ CREATE TABLE IF NOT EXISTS academic.homework_status (
 
 
 CREATE OR REPLACE PROCEDURE academic.sp_homework_manage(
-    IN    p_operation      varchar,          -- List | Save | Delete | Students | Check | Student
+    IN    p_operation      varchar,          -- List | Save | Delete | Students | Check | Student | MyClasses
     IN    p_tenant_id      integer,
     IN    p_school_id      integer,
     IN    p_action_user_id integer,
@@ -90,12 +92,14 @@ BEGIN
         OPEN p_result FOR
         SELECT h.homework_id, h.academic_class_section_id AS section_id,
                c.class_name || ' – ' || sec.section_name AS section_label,
-               h.subject_id, sj.subject_name, h.staff_id, st.full_name AS teacher_name,
+               -- who gave it: the teacher, or the admin's name when no staff record (QA BUG-113)
+               h.subject_id, sj.subject_name, h.staff_id, COALESCE(st.full_name, core.fn_user_display_name(h.created_by)) AS teacher_name,
                h.title, h.details, to_char(h.assigned_on, 'YYYY-MM-DD') AS assigned_on,
                to_char(h.due_on, 'YYYY-MM-DD') AS due_on,
                (h.staff_id IS NOT DISTINCT FROM v_me OR p_can_manage) AS can_edit,
-               (SELECT COUNT(*) FROM academic.homework_status x WHERE x.homework_id = h.homework_id AND x.status = 'Done')    AS done_count,
-               (SELECT COUNT(*) FROM academic.homework_status x WHERE x.homework_id = h.homework_id AND x.status <> 'Done')   AS not_done_count,
+               -- late work is still done work
+               (SELECT COUNT(*) FROM academic.homework_status x WHERE x.homework_id = h.homework_id AND x.status IN ('Done', 'Late')) AS done_count,
+               (SELECT COUNT(*) FROM academic.homework_status x WHERE x.homework_id = h.homework_id AND x.status = 'NotDone')          AS not_done_count,
                (SELECT COUNT(*) FROM core.students s
                  WHERE s.tenant_id = h.tenant_id AND s.school_id = h.school_id AND COALESCE(s.is_active, TRUE)
                    AND s.class_name = c.class_name AND lower(COALESCE(s.section, '')) = lower(sec.section_name)
@@ -113,6 +117,23 @@ BEGIN
            AND (NOT COALESCE(p_mine, FALSE) OR h.staff_id = v_me)
          ORDER BY h.assigned_on DESC, c.display_order, sec.section_name, sj.subject_name
          LIMIT 500;
+        RETURN;
+    END IF;
+
+    -- ── MyClasses: what the caller may give homework for. subject_id NULL = any
+    --    subject of that section (they are its class teacher).
+    IF p_operation = 'MyClasses' THEN
+        OPEN p_result FOR
+        SELECT DISTINCT t.academic_class_section_id AS section_id, t.subject_id
+          FROM academic.timetable t
+          JOIN academic.academic_years y ON y.academic_year_id = t.academic_year_id AND COALESCE(y.is_current, FALSE)
+         WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id AND t.staff_id = v_me AND v_me IS NOT NULL
+        UNION
+        SELECT sec.academic_class_section_id, NULL::int
+          FROM academic.academic_class_sections sec
+          JOIN academic.academic_years y ON y.academic_year_id = sec.academic_year_id AND COALESCE(y.is_current, FALSE)
+         WHERE sec.tenant_id = p_tenant_id AND sec.school_id = p_school_id
+           AND sec.class_teacher_staff_id = v_me AND v_me IS NOT NULL AND NOT COALESCE(sec.is_deleted, FALSE);
         RETURN;
     END IF;
 
@@ -168,6 +189,18 @@ BEGIN
     IF p_operation = 'Save' THEN
         IF p_id IS NULL AND NOT p_can_manage AND COALESCE(v_type, '') <> 'Teaching' THEN
             RAISE EXCEPTION 'Only teachers can give homework.';
+        END IF;
+        -- a teacher: only a class + subject they teach, or their own class
+        IF NOT p_can_manage AND NOT EXISTS (
+                SELECT 1 FROM academic.timetable t
+                  JOIN academic.academic_years y ON y.academic_year_id = t.academic_year_id AND COALESCE(y.is_current, FALSE)
+                 WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id AND t.staff_id = v_me
+                   AND t.academic_class_section_id = p_section_id AND t.subject_id = p_subject_id)
+           AND NOT EXISTS (
+                SELECT 1 FROM academic.academic_class_sections sec
+                 WHERE sec.academic_class_section_id = p_section_id AND sec.tenant_id = p_tenant_id
+                   AND sec.school_id = p_school_id AND sec.class_teacher_staff_id = v_me) THEN
+            RAISE EXCEPTION 'You can give homework only for the classes and subjects you teach (see My Timetable).';
         END IF;
         IF NULLIF(trim(p_title), '') IS NULL THEN RAISE EXCEPTION 'Write what the homework is.'; END IF;
         IF p_due_on IS NULL THEN RAISE EXCEPTION 'Choose the due date.'; END IF;

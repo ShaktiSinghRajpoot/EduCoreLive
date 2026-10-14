@@ -173,9 +173,10 @@ BEGIN
            SUM(t.paid)   FILTER (WHERE t.in_session AND COALESCE(t.due_on, v_today) <= v_today) AS paid_due,
            SUM(t.owed)   FILTER (WHERE COALESCE(t.due_on, v_today) <= v_today)                  AS overdue,
            COUNT(DISTINCT t.student_id) FILTER (WHERE t.owed > 0 AND COALESCE(t.due_on, v_today) <= v_today) AS students_owing,
-           COUNT(DISTINCT t.student_id) AS students
+           COUNT(DISTINCT t.student_id) FILTER (WHERE t.active) AS students
       FROM tmp_fd t
-     WHERE t.active
+     -- students who have left stay in their class's money, so class totals add up to
+     -- the school total (QA BUG-105); only the head count is of current students
      GROUP BY t.class_name, t.section
      -- the school's class order (Nursery, Class 1, Class 2 ...), not alphabetical
      ORDER BY (SELECT MIN(c.display_order) FROM academic.academic_classes c

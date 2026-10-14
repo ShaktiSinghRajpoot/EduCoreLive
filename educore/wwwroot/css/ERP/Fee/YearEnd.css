@@ -26,7 +26,7 @@
 .ye-page .ye-amt{ font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap; }
 .ye-page .ye-btns{ display:flex;gap:.35rem;flex-wrap:wrap; }
 .ye-page .btn-xs{ padding:.15rem .55rem;font-size:.75rem;border-radius:8px; }
-.ye-page .ye-badge{ font-size:.68rem;font-weight:800;padding:2px 8px;border-radius:999px;margin-left:.25rem; }
+.ye-page .ye-badge{ font-size:.68rem;font-weight:800;padding:2px 8px;border-radius:999px;margin-left:.25rem;background:#eef0f2;color:#6b7280; }
 .ye-page .ye-badge.carry{ background:#e8f4ff;color:#1f6fb2; }
 .ye-page .ye-badge.write{ background:#fdeceb;color:#c4332f; }
 

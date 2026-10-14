@@ -12,7 +12,7 @@ DECLARE
     TN int := 32; SC int := 45; ADMIN int := 62; TEACHER_LOGIN int := 63; QA_T int := 92; MEENA int := 119;
     D date;                       -- the most recent weekday Meena teaches on
     c refcursor; c2 refcursor; r record;
-    v_n int; v_total int; v_txt text; v_sec int; v_seq smallint; v_free int; v_busy int;
+    v_n int; v_total int; v_txt text; v_sec int; v_seq smallint; v_free int; v_busy int; v_subst int;
     pass int := 0; fail int := 0;
 BEGIN
     SELECT gs::date INTO D FROM generate_series(CURRENT_DATE - 6, CURRENT_DATE, interval '1 day') gs
@@ -20,6 +20,11 @@ BEGIN
                      AND t.day_of_week = EXTRACT(ISODOW FROM gs))
      ORDER BY gs DESC LIMIT 1;
     RAISE NOTICE 'test date %', D;
+    -- start the day clean (live QA data may already hold marks, leave and substitutes for it)
+    DELETE FROM core.staff_attendance WHERE tenant_id = TN AND att_date = D;
+    DELETE FROM academic.timetable_substitutions WHERE tenant_id = TN AND sub_date = D;
+    UPDATE core.staff_leave SET status = 'Cancelled' WHERE tenant_id = TN AND staff_id IN (MEENA, QA_T)
+       AND status = 'Approved' AND D::text BETWEEN from_date AND to_date;
 
     -- 1. Day lists every active staff member, unmarked
     CALL core.sp_staff_attendance_manage('Day', TN, SC, ADMIN, D, NULL, NULL, NULL, NULL, c, c2);
@@ -69,23 +74,24 @@ BEGIN
     LOOP FETCH c INTO r; EXIT WHEN NOT FOUND;
         IF r.staff_id = MEENA AND r.away_reason = 'Absent' THEN
             v_n := v_n + 1;
-            -- first of her periods where QA Teacher is free
-            IF v_sec IS NULL AND NOT EXISTS (SELECT 1 FROM academic.timetable t WHERE t.tenant_id = TN AND t.staff_id = QA_T
-                                                AND t.day_of_week = EXTRACT(ISODOW FROM D) AND t.period_seq = r.period_seq) THEN
-                v_sec := r.section_id; v_seq := r.period_seq;
-            END IF;
+            IF v_sec IS NULL THEN v_sec := r.section_id; v_seq := r.period_seq; END IF;   -- her first period
         END IF;
     END LOOP; CLOSE c;
     v_busy := 0; LOOP FETCH c2 INTO r; EXIT WHEN NOT FOUND; v_busy := v_busy + 1; END LOOP; CLOSE c2;
     IF v_n > 0 AND v_sec IS NOT NULL AND v_busy > 10 THEN pass := pass + 1; RAISE NOTICE 'PASS 6 % periods of Meena to cover, % teachers listed', v_n, v_busy;
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 6 periods % sec % teachers %', v_n, v_sec, v_busy; END IF;
 
-    -- 7. Assign QA Teacher (free that period) -> saved; shows on the board and in QA Teacher's "Mine"
-    --    (Mine lists from today on, so only checked when D is today)
-    CALL academic.sp_substitution_manage('Assign', TN, SC, ADMIN, D, v_sec, v_seq, QA_T, c, c2); CLOSE c; CLOSE c2;
+    -- 7. Assign a teacher who is free that period (and works here that day) -> saved
+    SELECT st.staff_id INTO v_subst FROM core.staff st
+     WHERE st.tenant_id = TN AND st.school_id = SC AND st.staff_type = 'Teaching' AND st.is_active AND st.staff_id <> MEENA
+       AND (NULLIF(st.joining_date, '') IS NULL OR st.joining_date <= D::text)
+       AND NOT EXISTS (SELECT 1 FROM academic.timetable t WHERE t.tenant_id = TN AND t.staff_id = st.staff_id
+                         AND t.day_of_week = EXTRACT(ISODOW FROM D) AND t.period_seq = v_seq)
+     ORDER BY (st.staff_id = QA_T) DESC, st.staff_id LIMIT 1;
+    CALL academic.sp_substitution_manage('Assign', TN, SC, ADMIN, D, v_sec, v_seq, v_subst, c, c2); CLOSE c; CLOSE c2;
     IF EXISTS (SELECT 1 FROM academic.timetable_substitutions WHERE sub_date = D AND academic_class_section_id = v_sec
-                AND period_seq = v_seq AND substitute_staff_id = QA_T AND original_staff_id = MEENA)
-    THEN pass := pass + 1; RAISE NOTICE 'PASS 7 QA Teacher covers section % period %', v_sec, v_seq;
+                AND period_seq = v_seq AND substitute_staff_id = v_subst AND original_staff_id = MEENA)
+    THEN pass := pass + 1; RAISE NOTICE 'PASS 7 staff % covers section % period %', v_subst, v_sec, v_seq;
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 7 not saved'; END IF;
     IF D = CURRENT_DATE THEN
         CALL academic.sp_substitution_manage('Mine', TN, SC, TEACHER_LOGIN, NULL, NULL, NULL, NULL, c, c2);
@@ -95,7 +101,7 @@ BEGIN
 
     -- 8. An absent teacher cannot cover
     BEGIN
-        SELECT staff_id INTO v_free FROM core.staff WHERE tenant_id = TN AND staff_type = 'Teaching' AND staff_id NOT IN (MEENA, QA_T) AND is_active
+        SELECT staff_id INTO v_free FROM core.staff WHERE tenant_id = TN AND staff_type = 'Teaching' AND staff_id NOT IN (MEENA, QA_T, v_subst) AND is_active
           ORDER BY staff_id LIMIT 1;
         CALL core.sp_staff_attendance_manage('Save', TN, SC, ADMIN, D, NULL, ARRAY[v_free], ARRAY['Absent'], ARRAY[NULL::varchar], c, c2); CLOSE c; CLOSE c2;
         CALL academic.sp_substitution_manage('Assign', TN, SC, ADMIN, D, v_sec, v_seq, v_free, c, c2);
@@ -106,7 +112,7 @@ BEGIN
     BEGIN
         SELECT t.staff_id INTO v_busy FROM academic.timetable t
          WHERE t.tenant_id = TN AND t.day_of_week = EXTRACT(ISODOW FROM D) AND t.period_seq = v_seq
-           AND t.staff_id NOT IN (MEENA, QA_T) LIMIT 1;
+           AND t.staff_id NOT IN (MEENA, QA_T, v_subst) LIMIT 1;
         CALL academic.sp_substitution_manage('Assign', TN, SC, ADMIN, D, v_sec, v_seq, v_busy, c, c2);
         fail := fail + 1; RAISE NOTICE 'FAIL 9 busy substitute accepted';
     EXCEPTION WHEN raise_exception THEN pass := pass + 1; RAISE NOTICE 'PASS 9 %', SQLERRM; END;

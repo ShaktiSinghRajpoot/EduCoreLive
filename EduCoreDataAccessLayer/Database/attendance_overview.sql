@@ -6,7 +6,9 @@
 -- one student of the section has a mark that day. The class teacher of the
 -- section (academic_class_sections.class_teacher_staff_id) is the one
 -- responsible for it. Only sections of the current session that have students
--- count, and only days from the session start up to today.
+-- count, and only days from the session start up to today — and for each
+-- section only from the day its first student was admitted (QA BUG-104: a
+-- section filled in October is not "missing" September's registers).
 --
 --   p_day   (Today tab) cursor 1 sections: every section with that day's counts
 --                                          (present / absent / late / leave), who marked it
@@ -56,7 +58,8 @@ BEGIN
 
     -- the session's sections that have students, with their class teacher
     CREATE TEMP TABLE IF NOT EXISTS tmp_ao_sec (section_id int PRIMARY KEY, class_name varchar, section varchar,
-                                                display_order int, students int, teacher_id int, teacher varchar) ON COMMIT DROP;
+                                                display_order int, students int, teacher_id int, teacher varchar,
+                                                start_on date) ON COMMIT DROP;
     TRUNCATE tmp_ao_sec;
     INSERT INTO tmp_ao_sec
     SELECT x.* FROM (
@@ -65,7 +68,12 @@ BEGIN
                  WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND COALESCE(s.is_active, TRUE)
                    AND s.class_name = c.class_name AND lower(COALESCE(s.section, '')) = lower(sec.section_name)
                    AND s.academic_year = v_year)::int AS students,
-               sec.class_teacher_staff_id, st.full_name
+               sec.class_teacher_staff_id, st.full_name,
+               -- the day the section's first (active) student was admitted
+               COALESCE((SELECT MIN(NULLIF(s.admission_date, '')::date) FROM core.students s
+                          WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND COALESCE(s.is_active, TRUE)
+                            AND s.class_name = c.class_name AND lower(COALESCE(s.section, '')) = lower(sec.section_name)
+                            AND s.academic_year = v_year), v_start) AS start_on
           FROM academic.academic_class_sections sec
           JOIN academic.academic_classes c ON c.academic_class_id = sec.academic_class_id
           LEFT JOIN core.staff st ON st.staff_id = sec.class_teacher_staff_id
@@ -118,7 +126,7 @@ BEGIN
     -- ── Insights per section
     OPEN p_sections FOR
     SELECT ts.section_id, ts.class_name, ts.section, ts.display_order, ts.students, ts.teacher_id, ts.teacher,
-           (SELECT COUNT(*) FROM tmp_ao_days)::int                                                  AS expected,
+           (SELECT COUNT(*) FROM tmp_ao_days dd WHERE dd.d >= ts.start_on)::int                     AS expected,
            (SELECT COUNT(*) FROM tmp_ao_reg r JOIN tmp_ao_days dd ON dd.d = r.d WHERE r.section_id = ts.section_id)::int AS taken,
            (SELECT COUNT(*) FROM tmp_ao_reg r JOIN tmp_ao_days dd ON dd.d = r.d WHERE r.section_id = ts.section_id AND r.same_day)::int AS same_day,
            (SELECT COALESCE(SUM(r.marked), 0) FROM tmp_ao_reg r WHERE r.section_id = ts.section_id)::int  AS marked,
@@ -129,7 +137,8 @@ BEGIN
     -- ── week by week (week starting Monday)
     OPEN p_weeks FOR
     SELECT to_char(w.wk, 'YYYY-MM-DD') AS week_start, w.first_day::text AS first_day, w.last_day::text AS last_day,
-           (w.days * (SELECT COUNT(*) FROM tmp_ao_sec))::int AS expected,
+           (SELECT COUNT(*) FROM tmp_ao_days dd JOIN tmp_ao_sec ts ON ts.start_on <= dd.d
+             WHERE date_trunc('week', dd.d) = w.wk)::int AS expected,
            (SELECT COUNT(*) FROM tmp_ao_reg r JOIN tmp_ao_days dd ON dd.d = r.d WHERE date_trunc('week', r.d) = w.wk)::int AS taken,
            (SELECT COALESCE(SUM(r.marked), 0) FROM tmp_ao_reg r WHERE date_trunc('week', r.d) = w.wk)::int AS marked,
            (SELECT COALESCE(SUM(r.present), 0) FROM tmp_ao_reg r WHERE date_trunc('week', r.d) = w.wk)::int AS present
@@ -141,7 +150,7 @@ BEGIN
     OPEN p_missing FOR
     SELECT to_char(dd.d, 'YYYY-MM-DD') AS day, ts.section_id, ts.class_name, ts.section, ts.teacher
       FROM tmp_ao_days dd
-      CROSS JOIN tmp_ao_sec ts
+      JOIN tmp_ao_sec ts ON ts.start_on <= dd.d
      WHERE NOT EXISTS (SELECT 1 FROM tmp_ao_reg r WHERE r.section_id = ts.section_id AND r.d = dd.d)
      ORDER BY dd.d DESC, ts.display_order, ts.class_name, ts.section
      LIMIT 500;

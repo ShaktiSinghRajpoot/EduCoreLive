@@ -34,6 +34,10 @@ namespace educore.Areas.ERP.Controllers
             if (!await AllowedAsync()) return Forbid();
 
             ViewBag.IsStaff = await _self.HasStaffRecordAsync(TenantId(), SchoolId(), UserId());
+            // "Give homework" only for someone who can use it: academics.manage, or a teacher
+            // with classes on the timetable / a class of their own (QA BUG-111).
+            ViewBag.CanGive = await CanManageAsync()
+                              || (await _homework.GetMyClassesAsync(TenantId(), SchoolId(), UserId())).Count > 0;
             ViewBag.CanManage = await CanManageAsync();
             // The overview compares teachers (with a leaderboard): reports.view (admin / principal),
             // which the teacher role does not hold. Same key as the Attendance Overview.
@@ -43,11 +47,19 @@ namespace educore.Areas.ERP.Controllers
 
         // ── GET: /ERP/Homework/Sections ── class sections of the current session
         [HttpGet]
-        public async Task<IActionResult> Sections()
+        public async Task<IActionResult> Sections(bool mine = false)
         {
             if (!await AllowedAsync()) return Forbid();
             var setup = await _timetable.GetSetupAsync(TenantId(), SchoolId(), UserId());
-            return Json(setup.Sections.Select(s => new { id = s.SectionId, label = s.Label }));
+            var sections = setup.Sections.AsEnumerable();
+            // the filter list shows every class; mine=true is the "give homework" list, which
+            // for a teacher holds only the classes they teach (QA BUG-098)
+            if (mine && !await CanManageAsync())
+            {
+                var my = (await _homework.GetMyClassesAsync(TenantId(), SchoolId(), UserId())).Select(x => x.SectionId).ToHashSet();
+                sections = sections.Where(s => my.Contains(s.SectionId));
+            }
+            return Json(sections.Select(s => new { id = s.SectionId, label = s.Label }));
         }
 
         // ── GET: /ERP/Homework/Subjects?sectionId= ── the subjects of that section's class
@@ -56,7 +68,15 @@ namespace educore.Areas.ERP.Controllers
         {
             if (!await AllowedAsync()) return Forbid();
             var grid = await _timetable.GetGridAsync(sectionId, TenantId(), SchoolId(), UserId());
-            return Json(grid.Subjects.Select(s => new { id = s.SubjectId, name = s.SubjectName }));
+            var subjects = grid.Subjects.AsEnumerable();
+            if (!await CanManageAsync())
+            {
+                // a teacher: the subjects they teach in this section, or all of them in their own class
+                var mine = (await _homework.GetMyClassesAsync(TenantId(), SchoolId(), UserId())).Where(x => x.SectionId == sectionId).ToList();
+                if (!mine.Any(x => x.SubjectId == null))
+                    subjects = subjects.Where(s => mine.Any(x => x.SubjectId == s.SubjectId));
+            }
+            return Json(subjects.Select(s => new { id = s.SubjectId, name = s.SubjectName }));
         }
 
         // ── GET: /ERP/Homework/Overview ── who is (not) giving homework; reports.view only

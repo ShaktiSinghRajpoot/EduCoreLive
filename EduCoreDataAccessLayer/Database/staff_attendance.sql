@@ -289,6 +289,9 @@ BEGIN
          WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id
            AND NOT COALESCE(s.is_deleted, FALSE) AND COALESCE(s.is_active, TRUE)
            AND COALESCE(s.status, 'Active') = 'Active' AND s.staff_type = 'Teaching'
+           -- only staff working here on that date (QA BUG-101: a joiner was offered before joining)
+           AND (NULLIF(s.joining_date, '') IS NULL OR s.joining_date <= p_date::text)
+           AND (NULLIF(s.last_working_date, '') IS NULL OR s.last_working_date >= p_date::text)
          ORDER BY s.full_name;
         RETURN;
     END IF;
@@ -309,6 +312,10 @@ BEGIN
                         AND tenant_id = p_tenant_id AND school_id = p_school_id
                         AND COALESCE(is_active, TRUE) AND NOT COALESCE(is_deleted, FALSE)) THEN
             RAISE EXCEPTION 'Teacher not found.';
+        END IF;
+        IF EXISTS (SELECT 1 FROM core.staff WHERE staff_id = p_substitute_id
+                    AND (NULLIF(joining_date, '') > p_date::text OR NULLIF(last_working_date, '') < p_date::text)) THEN
+            RAISE EXCEPTION 'That teacher does not work here on this date.';
         END IF;
         v_away := core.fn_staff_away(p_tenant_id, p_school_id, p_substitute_id, p_date);
         IF v_away IS NOT NULL THEN

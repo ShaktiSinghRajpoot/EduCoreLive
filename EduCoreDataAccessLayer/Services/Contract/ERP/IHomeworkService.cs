@@ -23,6 +23,12 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>The overview: teachers (from the timetable), classes and subjects, for homework given from..to.</summary>
         Task<HomeworkOverview> GetOverviewAsync(string from, string to, string? className, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>
+        /// What the caller may give homework for: (sectionId, subjectId) from their timetable, and
+        /// (sectionId, null) for the section they are class teacher of (any subject).
+        /// </summary>
+        Task<List<(int SectionId, int? SubjectId)>> GetMyClassesAsync(int tenantId, int schoolId, int actionUserId);
+
         /// <summary>One student's homework of the last 30 days, with their status (Student Dashboard).</summary>
         Task<List<Homework>> GetForStudentAsync(int studentId, int tenantId, int schoolId, int actionUserId);
     }

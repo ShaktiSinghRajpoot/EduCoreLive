@@ -56,9 +56,17 @@ BEGIN
     IF v_txt = 'PTM moved to Sunday/Parents/none' THEN pass := pass + 1; RAISE NOTICE 'PASS 6 edited: %', v_txt;
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 6 %', v_txt; END IF;
 
-    -- 7. an expired notice leaves the board but stays in the manage list
-    CALL core.sp_announcement_manage('Save', T, S, ADMIN, NULL, 'Old holiday', 'Was yesterday', 'Holiday', 'Everyone', NULL, FALSE, CURRENT_DATE - 1, c);
+    -- 7. a notice cannot be posted already expired; one that expires later leaves the board
+    --    but stays in the manage list
+    BEGIN
+        CALL core.sp_announcement_manage('Save', T, S, ADMIN, NULL, 'Old holiday', 'Was yesterday', 'Holiday', 'Everyone', NULL, FALSE, CURRENT_DATE - 1, c);
+        RAISE EXCEPTION 'expired notice accepted';
+    EXCEPTION WHEN raise_exception THEN
+        IF SQLERRM = 'expired notice accepted' THEN RAISE; END IF;
+    END;
+    CALL core.sp_announcement_manage('Save', T, S, ADMIN, NULL, 'Old holiday', 'Was yesterday', 'Holiday', 'Everyone', NULL, FALSE, CURRENT_DATE, c);
     FETCH c INTO r; CLOSE c; v_old := r.announcement_id;
+    UPDATE core.announcements SET show_until = CURRENT_DATE - 1 WHERE announcement_id = v_old;   -- time passes
     CALL core.sp_announcement_manage('Board', T, S, ACC, NULL, NULL, NULL, NULL, NULL, NULL, FALSE, NULL, c);
     v_n := 0; LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.announcement_id = v_old THEN v_n := v_n + 1; END IF; END LOOP; CLOSE c;
     CALL core.sp_announcement_manage('List', T, S, ADMIN, NULL, NULL, NULL, NULL, NULL, NULL, FALSE, NULL, c);

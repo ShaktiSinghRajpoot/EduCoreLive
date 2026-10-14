@@ -115,6 +115,20 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             Done        = DbRead.Int(reader, cols, "done")
         };
 
+        public async Task<List<(int SectionId, int? SubjectId)>> GetMyClassesAsync(int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<(int SectionId, int? SubjectId)>();
+            if (!InScope(tenantId, schoolId)) return list;
+
+            await _db.ExecuteCursorsAsync(Sp, Params("MyClasses", tenantId, schoolId, actionUserId, false), async reader =>
+            {
+                var cols = reader.Columns();
+                while (await reader.ReadAsync())
+                    list.Add((DbRead.Int(reader, cols, "section_id"), DbRead.IntN(reader, cols, "subject_id")));
+            });
+            return list;
+        }
+
         public async Task<List<Homework>> GetForStudentAsync(int studentId, int tenantId, int schoolId, int actionUserId)
         {
             var list = new List<Homework>();

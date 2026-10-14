@@ -573,6 +573,8 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> YearEnd()
         {
             ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "fees.manage");
+            // Writing dues off is for the head of school (QA BUG-091), not the fee counter.
+            ViewBag.CanWriteOff = await HasPermissionAttribute.UserHasAsync(this, "fees.writeoff");
             try
             {
                 ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
@@ -603,6 +605,8 @@ namespace educore.Areas.ERP.Controllers
                 due      = r.DueDate,
                 amount   = r.Amount,
                 state    = r.State,
+                notDue   = r.NotDue,
+                next     = r.NextSession,
                 reason   = r.Reason,
                 decided  = r.DecidedAt?.ToString("dd MMM yyyy")
             }));
@@ -616,6 +620,8 @@ namespace educore.Areas.ERP.Controllers
             var allowed = new[] { "Carry", "WriteOff", "Undo", "CarryAll" };
             if (req == null || string.IsNullOrWhiteSpace(req.Session) || !allowed.Contains(req.Operation))
                 return Json(new { success = false, message = "Invalid request." });
+            if (req.Operation == "WriteOff" && !await HasPermissionAttribute.UserHasAsync(this, "fees.writeoff"))
+                return Json(new { success = false, message = "Writing dues off needs the school admin or principal." });
 
             var (ok, msg) = await _feePaymentService.YearEndActionAsync(
                 req.Operation!, req.Session!.Trim(), req.LedgerId, req.StudentId, NullIfEmpty(req.Reason),

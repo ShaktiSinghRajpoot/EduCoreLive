@@ -5,6 +5,7 @@
     var isStaff   = (bool?)ViewBag.IsStaff ?? false;
     var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
     var canOverview = (bool?)ViewBag.CanOverview ?? false; // reports.view
+    var canGive     = (bool?)ViewBag.CanGive ?? false;     // manage, or a teacher with classes
 }
 
 @*
@@ -27,7 +28,7 @@
           <div><h4 class="ec-page-title mb-1">Homework</h4>
             <p class="ec-page-subtitle">Give homework, check who did it, and send the day's homework home</p></div>
         </div>
-        @if (isStaff || canManage)
+        @if (canGive)
         {
             <button id="btnNew" class="btn btn-primary btn-sm"><i class="bx bx-plus me-1"></i>Give homework</button>
         }
@@ -211,12 +212,10 @@ $(function () {
 
     var items = [], editId = 0;
 
-    // ── sections for the filter and the form ────────────────────────────
-    $.getJSON(URL.sections).done(function (list) {
-        var opts = (list || []).map(function (s) { return '<option value="' + s.id + '">' + EC.esc(s.label) + '</option>'; }).join('');
-        $('#hSection').append(opts);
-        $('#fSection').html('<option value="">Pick a class</option>' + opts);
-    });
+    // ── sections: every class for the filter, only "my" classes for the give form ──
+    function opts(list) { return (list || []).map(function (s) { return '<option value="' + s.id + '">' + EC.esc(s.label) + '</option>'; }).join(''); }
+    $.getJSON(URL.sections).done(function (list) { $('#hSection').append(opts(list)); });
+    $.getJSON(URL.sections, { mine: true }).done(function (list) { $('#fSection').html('<option value="">Pick a class</option>' + opts(list)); });
 
     function loadSubjects(sectionId, selected) {
         if (!sectionId) { $('#fSubject').html('<option value="">Pick a class first</option>'); return; }
