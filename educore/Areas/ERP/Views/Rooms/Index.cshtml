@@ -1,0 +1,188 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Rooms";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
+}
+
+@*
+   School Setup › Rooms (academic.sp_room_manage). The Timetable books rooms by name
+   and refuses a clash; this page keeps the list, shows how busy each room is, its
+   week, and room names the timetable uses that are not in the list.
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Insights.css" asp-append-version="true" />
+    <style>
+        .rm-grid{ display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.7rem; }
+        .rm-card{ border:1px solid var(--ec-border);border-radius:12px;padding:.8rem .9rem;background:#fff; }
+        .rm-card .nm{ font-weight:800;color:var(--ec-text-dark);font-size:1.02rem; }
+        .rm-card .meta{ font-size:.76rem;color:var(--ec-text-muted); }
+        .rm-week{ width:100%;border-collapse:collapse;font-size:.78rem; }
+        .rm-week th,.rm-week td{ border:1px solid #eef0f2;padding:.35rem;vertical-align:top; }
+        .rm-week th{ background:#fafafa;font-size:.7rem;text-transform:uppercase; }
+        .rm-week td b{ display:block; }
+    </style>
+}
+
+<div class="ec-page-shell in-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-door-open"></i></div>
+          <div><h4 class="ec-page-title mb-1">Rooms</h4>
+            <p class="ec-page-subtitle">Classrooms, labs and halls · how busy each one is in the timetable</p></div>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="@Url.Action("Timetable","SchoolSettings",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-time-five me-1"></i>Timetable</a>
+          @if (canManage)
+          {
+              <button id="btnNew" class="btn btn-sm btn-primary"><i class="bx bx-plus me-1"></i>Add room</button>
+          }
+        </div>
+      </div>
+    </div>
+
+    <div id="rmUnknown" class="alert alert-warning py-2 d-none"></div>
+    <div class="rm-grid" id="rmList"></div>
+
+  </div>
+</div>
+
+<div class="modal fade" id="rmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="rmModalTitle">Add room</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-7"><label class="form-label">Name / number <span class="text-danger">*</span></label><input id="fName" class="form-control" maxlength="50" placeholder="e.g. 204, Physics Lab"></div>
+          <div class="col-5"><label class="form-label">Type</label>
+            <select id="fType" class="form-select"><option>Classroom</option><option>Lab</option><option>Library</option><option>Hall</option><option>Staff room</option><option>Office</option><option>Other</option></select></div>
+          <div class="col-5"><label class="form-label">Seats</label><input id="fCap" type="number" min="0" class="form-control"></div>
+          <div class="col-7"><label class="form-label">Building / floor</label><input id="fBuilding" class="form-control" maxlength="80" placeholder="e.g. Main block, 2nd floor"></div>
+          <div class="col-12"><label class="form-label">Notes</label><input id="fNotes" class="form-control" maxlength="200" placeholder="e.g. Projector, 20 computers"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button><button class="btn btn-primary" id="btnSave"><i class="bx bx-save me-1"></i>Save</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="wkModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="wkTitle">Room week</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body"><div class="in-wrap" id="wkBody"></div></div>
+    </div>
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var CSRF = $('input[name="__RequestVerificationToken"]').val();
+    var URL = {
+        data:  '@Url.Action("Data","Rooms",new{area="ERP"})',
+        usage: '@Url.Action("Usage","Rooms",new{area="ERP"})',
+        save:  '@Url.Action("Save","Rooms",new{area="ERP"})',
+        del:   '@Url.Action("Delete","Rooms",new{area="ERP"})'
+    };
+    var CAN_MANAGE = @(canManage ? "true" : "false");
+    var DAYS = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    var ROOMS = [], editId = 0;
+
+    function load() {
+        EC.listLoading('#rmList', 'Loading rooms...');
+        $.getJSON(URL.data).done(function (d) {
+            ROOMS = d.rooms || [];
+            var unk = d.unknown || [];
+            $('#rmUnknown').toggleClass('d-none', !unk.length).html(unk.length
+                ? '<b>Rooms in the timetable that are not in this list:</b> ' + unk.map(function (u) {
+                    return EC.esc(u.room_text) + ' <small>(' + u.periods_week + ' periods)</small>'
+                         + (CAN_MANAGE ? ' <a href="#" class="rm-add-unk" data-n="' + EC.esc(u.room_text) + '">Add</a>' : '');
+                  }).join(' · ') + '<div class="small mt-1">A spelling difference ("Lab-2" vs "Lab 2") is matched automatically; anything else is a different room.</div>'
+                : '');
+            if (!ROOMS.length) { EC.listEmpty('#rmList', 'No rooms yet. Add your classrooms and labs.', 'bx-door-open'); return; }
+            var max = Math.max.apply(null, ROOMS.map(function (r) { return r.periods_week; }).concat([1]));
+            $('#rmList').html(ROOMS.map(function (r) {
+                var w = Math.round(r.periods_week * 100 / max);
+                return '<div class="rm-card"><div class="d-flex justify-content-between gap-2"><div><div class="nm">' + EC.esc(r.room_name) + '</div>'
+                     + '<div class="meta">' + EC.esc(r.room_type) + (r.capacity ? ' · ' + r.capacity + ' seats' : '') + (r.building ? ' · ' + EC.esc(r.building) : '') + '</div></div>'
+                     + (CAN_MANAGE ? '<div class="text-nowrap"><button class="btn btn-sm btn-outline-secondary rm-edit" data-id="' + r.room_id + '"><i class="bx bx-edit-alt"></i></button> '
+                                   + '<button class="btn btn-sm btn-outline-danger rm-del" data-id="' + r.room_id + '"><i class="bx bx-trash"></i></button></div>' : '') + '</div>'
+                     + (r.home_sections ? '<div class="meta mt-1">Home room of ' + EC.esc(r.home_sections) + '</div>' : '')
+                     + (r.notes ? '<div class="meta">' + EC.esc(r.notes) + '</div>' : '')
+                     + '<div class="in-hbar mt-2" style="grid-template-columns:1fr auto"><div class="in-track"><i class="r3" style="width:' + w + '%"></i></div>'
+                     + '<div class="val">' + r.periods_week + ' periods/week</div></div>'
+                     + '<button class="btn btn-sm btn-link px-0 rm-week" data-n="' + EC.esc(r.room_name) + '">See the week</button></div>';
+            }).join(''));
+        }).fail(function () { ecToast('error', 'Could not load the rooms.'); });
+    }
+
+    function openForm(r, name) {
+        editId = r ? r.room_id : 0;
+        $('#rmModalTitle').text(r ? 'Edit room' : 'Add room');
+        $('#fName').val(r ? r.room_name : (name || '')); $('#fType').val(r ? r.room_type : 'Classroom');
+        $('#fCap').val(r && r.capacity != null ? r.capacity : ''); $('#fBuilding').val(r ? r.building || '' : ''); $('#fNotes').val(r ? r.notes || '' : '');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('rmModal')).show();
+    }
+    $('#btnNew').on('click', function () { openForm(null); });
+    $('#rmUnknown').on('click', '.rm-add-unk', function (e) { e.preventDefault(); openForm(null, $(this).data('n')); });
+    $('#rmList').on('click', '.rm-edit', function () { var id = $(this).data('id'); openForm(ROOMS.filter(function (r) { return r.room_id === id; })[0]); });
+
+    $('#btnSave').on('click', function () {
+        var body = { id: editId || null, name: $('#fName').val().trim(), type: $('#fType').val(),
+                     capacity: $('#fCap').val() === '' ? null : +$('#fCap').val(), building: $('#fBuilding').val(), notes: $('#fNotes').val() };
+        if (!body.name) { ecToast('error', 'Give the room a name or number.'); return; }
+        var $b = $(this); EC.buttonBusy($b);
+        $.ajax({ url: URL.save, type: 'POST', contentType: 'application/json', headers: { 'RequestVerificationToken': CSRF }, data: JSON.stringify(body) })
+            .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) { bootstrap.Modal.getInstance(document.getElementById('rmModal')).hide(); load(); } })
+            .fail(function () { ecToast('error', 'Could not save. Please try again.'); })
+            .always(function () { EC.buttonReset($b); });
+    });
+
+    $('#rmList').on('click', '.rm-del', function () {
+        var id = $(this).data('id'), r = ROOMS.filter(function (x) { return x.room_id === id; })[0];
+        EC.confirm({ title: 'Remove this room from the list?', name: r.room_name, message: 'Timetable bookings that use it are kept.', okText: 'Remove' }).then(function (ok) {
+            if (!ok) return;
+            $.ajax({ url: URL.del + '?id=' + id, type: 'POST', headers: { 'RequestVerificationToken': CSRF } })
+                .done(function (x) { ecToast(x.success ? 'success' : 'error', x.message); if (x.success) load(); });
+        });
+    });
+
+    // the room's week: days across, periods down
+    $('#rmList').on('click', '.rm-week', function () {
+        var name = $(this).data('n');
+        $('#wkTitle').text(name + ' — week'); $('#wkBody').html('<div class="in-muted">Loading...</div>');
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('wkModal')).show();
+        $.getJSON(URL.usage, { room: name }).done(function (rows) {
+            rows = rows || [];
+            if (!rows.length) { $('#wkBody').html('<div class="in-muted">Not booked in the timetable.</div>'); return; }
+            var days = [], seqs = [], cell = {}, label = {};
+            rows.forEach(function (x) {
+                if (days.indexOf(x.day_of_week) < 0) days.push(x.day_of_week);
+                if (seqs.indexOf(x.period_seq) < 0) seqs.push(x.period_seq);
+                label[x.period_seq] = label[x.period_seq] || x.period_label || ('Slot ' + x.period_seq);
+                (cell[x.day_of_week + '_' + x.period_seq] = cell[x.day_of_week + '_' + x.period_seq] || []).push(x);
+            });
+            days.sort(); seqs.sort(function (a, b) { return a - b; });
+            $('#wkBody').html('<table class="rm-week"><thead><tr><th>Period</th>' + days.map(function (d) { return '<th>' + DAYS[d] + '</th>'; }).join('') + '</tr></thead><tbody>'
+                + seqs.map(function (q) {
+                    return '<tr><th>' + EC.esc(label[q]) + '</th>' + days.map(function (d) {
+                        var c = cell[d + '_' + q] || [];
+                        return '<td>' + c.map(function (x) { return '<b>' + EC.esc(x.section_label) + '</b>' + EC.esc(x.subject_name || '') + '<div class="in-muted">' + EC.esc(x.teacher || '') + '</div>'; }).join('<hr class="my-1">') + '</td>';
+                    }).join('') + '</tr>';
+                }).join('') + '</tbody></table>');
+        });
+    });
+
+    load();
+});
+</script>
+}

@@ -261,6 +261,7 @@ builder.Services.AddScoped<IHomeworkService, HomeworkService>();     // Homework
 builder.Services.AddScoped<ICertificateService, CertificateService>(); // Bonafide / Character certificates + report-card extras
 builder.Services.AddScoped<IDashboardReportService, DashboardReportService>(); // Fee Dashboard + Attendance Overview (read-only)
 builder.Services.AddScoped<IStudentDataCheckService, StudentDataCheckService>(); // Students › Data Checks
+builder.Services.AddScoped<IRoomService, RoomService>();             // School Setup › Rooms
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 
 // The landing dashboard. Every number on it used to be hardcoded in the view.

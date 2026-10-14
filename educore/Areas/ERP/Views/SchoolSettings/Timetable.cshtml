@@ -156,7 +156,8 @@
           </div>
           <div class="col-12">
             <label class="form-label tt-modal-lbl">Room</label>
-            <input type="text" class="form-control" id="mRoom" placeholder="e.g. 204">
+            <input type="text" class="form-control" id="mRoom" placeholder="e.g. 204" list="mRoomList" autocomplete="off">
+            <datalist id="mRoomList"></datalist>
           </div>
         </div>
         <div class="tt-mwarn mt-3" id="cellWarn"><i class="bx bx-error fs-5"></i><span id="cellWarnTxt"></span></div>
@@ -620,6 +621,14 @@ $(function () {
     });
 
     loadRequests();
+});
+</script>
+<script>
+// Room suggestions from School Setup › Rooms. Typing a new name still works.
+$(function () {
+    $.getJSON('@Url.Action("Names","Rooms",new{area="ERP"})').done(function (names) {
+        $('#mRoomList').html((names || []).map(function (n) { return '<option value="' + EC.esc(n) + '"></option>'; }).join(''));
+    });
 });
 </script>
 }

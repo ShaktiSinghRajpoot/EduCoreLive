@@ -5266,3 +5266,14 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 
 ### [2026-10-14] Staff Attendance › Month at a glance
 - Under the month register: average present, days marked, absences, late arrivals, leave days, a present-each-day chart and the five staff most absent / late / on leave. Worked out in the page from the register's own data (no new call, no DB change).
+
+### [2026-10-14] School Setup › Rooms
+- New page `Rooms/Index` (`academics.view`; changes `academics.manage`): the school's rooms (name, type,
+  seats, building / floor, notes) as cards with periods a week booked in the current timetable, the
+  sections it is home to, and "See the week" (days × periods with section, subject, teacher).
+- Rooms the timetable uses that are not in the list are flagged with an Add link. Names match through the
+  existing `academic.fn_room_key` ("Lab-2" = "Lab 2"), the same key the timetable's clash check uses; a
+  unique index stops two live rooms with one key. Removing a room keeps timetable bookings.
+- The Timetable cell editor's Room box now suggests the listed rooms (datalist; free text still allowed).
+- `academic.rooms`, `academic.sp_room_manage` (`rooms.sql`, `deploy_2026_10_14j.sql`); 6 rolled-back checks
+  in `tests/rooms_tests.sql`. New base `Services/Repository/ProcRowsService.cs` for small one-proc modules.
