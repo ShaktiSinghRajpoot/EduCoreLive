@@ -475,11 +475,28 @@ namespace educore.Areas.ERP.Controllers
             ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "fees.manage");
             // Writing dues off is for the head of school (QA BUG-091), not the fee counter.
             ViewBag.CanWriteOff = await HasPermissionAttribute.UserHasAsync(this, "fees.writeoff");
+            List<SelectListItem> sessions;
             try
             {
-                ViewBag.Sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
+                sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
             }
-            catch { ViewBag.Sessions = new List<SelectListItem>(); }
+            catch { sessions = new List<SelectListItem>(); }
+
+            // Year-End closes the session that has just ENDED: once the new one is current,
+            // open on the latest earlier session ("2026-27" before "2027-28" by name) while it
+            // is not closed and still has lines to decide. Otherwise stay on the current one.
+            var current = sessions.FirstOrDefault(x => x.Selected)?.Text;
+            var previous = sessions.Select(x => x.Text)
+                .Where(t => current != null && string.CompareOrdinal(t, current) < 0)
+                .OrderByDescending(t => t, StringComparer.Ordinal)
+                .FirstOrDefault();
+            var prevStatus = previous == null ? null
+                           : await _feePaymentService.GetYearEndStatusAsync(previous, TenantId(), SchoolId(), UserId());
+            if (prevStatus != null && prevStatus.ClosedAt == null && prevStatus.OpenLines > 0)
+            {
+                foreach (var x in sessions) x.Selected = x.Text == previous;
+            }
+            ViewBag.Sessions = sessions;
             return View();
         }
 

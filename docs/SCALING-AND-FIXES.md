@@ -5444,3 +5444,18 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   Close disabled while 518 lines remain. Found: three Promotion alerts used `d-flex` + inline `display:none`,
   which Bootstrap's `d-flex !important` overrides, so the "will be held back" warning showed with 0 students —
   they now use the `d-none` class.
+
+### 2026-10-15 — New session: copy the whole set-up; "current" only after promotion
+- The class copy (`sp_academic_year_clone`) now brings each class's **subjects** too. New
+  `academic.sp_academic_year_copy_setup` copies class subjects / **class teachers** / **timetable** into a session
+  that already has its classes (matched by class + section name; only staff still working; nothing already set
+  is overwritten). Classes & Sections shows a "Copy from <previous>" card with the three tick boxes.
+- Audit of "which session does each page use": most pages open on the current session but list students by the
+  session the STUDENT is in, so making a new session current before promotion left Collect Fees, attendance
+  overview, homework, data checks and the fee dashboard empty. `SetCurrentAcademicYear` now refuses a session
+  with no classes, and refuses while any active student is still in another session ("N student(s) are still in
+  2026-27. Promote them first"). Order: set up → promote → make current.
+- Promotion's default target is the session right after the source (by name), not "the first other one".
+  Year-End opens on the previous session while it still has lines to decide and is not closed.
+- `tests/session_change_tests.sql` now 11 checks, all pass (uses its own ZZ sessions; rolled back).
+- Bundle `deploy_2026_10_15b.sql` (academic_session_rollover, academic_year_class_section_fixes).

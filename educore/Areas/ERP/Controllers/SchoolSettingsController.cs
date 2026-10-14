@@ -919,6 +919,9 @@ namespace educore.Areas.ERP.Controllers
             ViewBag.ClassDataJson = System.Text.Json.JsonSerializer.Serialize(classes);
             ViewBag.Coordinators = coordinators;
             ViewBag.CanCopySetup = structure.ClassCount == 0 && structure.CanCopy;
+            // A session that has its classes can still take subjects / class teachers /
+            // timetable from the earlier one.
+            ViewBag.CanCopyExtras = structure.ClassCount > 0 && structure.SourceYearId > 0;
             ViewBag.CopyFromYearId = structure.SourceYearId;
             ViewBag.CopyFromYearName = structure.SourceYearName;
             // Add / edit / delete buttons are shown only with academics.manage
@@ -952,6 +955,28 @@ namespace educore.Areas.ERP.Controllers
                 classesCopied  = result.ClassesCopied,
                 sectionsCopied = result.SectionsCopied
             });
+        }
+
+        // Subjects, class teachers and the timetable from an earlier session into this one
+        // (which already has its classes). Anything already set is kept.
+        [HttpPost]
+        [HasPermission("academics.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CopySessionSetup([FromBody] CopySessionSetupDto dto)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            if (dto == null || dto.FromAcademicYearId <= 0 || dto.ToAcademicYearId <= 0)
+                return Json(new { success = false, message = "Choose both sessions." });
+            if (!dto.Subjects && !dto.Teachers && !dto.Timetable)
+                return Json(new { success = false, message = "Tick at least one thing to copy." });
+
+            var (ok, msg) = await _schoolSettingsService.CopySessionSetupAsync(
+                dto.FromAcademicYearId, dto.ToAcademicYearId, dto.Subjects, dto.Teachers, dto.Timetable,
+                tenantId, schoolId, actionUserId);
+            return Json(new { success = ok, message = msg });
         }
 
         // Limits below match the academic.academic_classes / academic_class_sections
@@ -1764,6 +1789,15 @@ namespace educore.Areas.ERP.Controllers
     {
         public int FromAcademicYearId { get; set; }
         public int ToAcademicYearId { get; set; }
+    }
+
+    public class CopySessionSetupDto
+    {
+        public int  FromAcademicYearId { get; set; }
+        public int  ToAcademicYearId   { get; set; }
+        public bool Subjects  { get; set; }
+        public bool Teachers  { get; set; }
+        public bool Timetable { get; set; }
     }
 
     public class ClassSectionItemDto

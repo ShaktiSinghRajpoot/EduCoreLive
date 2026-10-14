@@ -1,6 +1,6 @@
 -- Session change, end to end, on the QA Test School (tenant 32, school 45, admin
 -- login 62): new session -> copy classes -> copy fees -> promote -> Year-End
--- carry / close / reopen. Everything happens inside the transaction and is
+-- carry / close / reopen -> copy teachers & timetable -> make it current. Everything happens inside the transaction and is
 -- ROLLED BACK. Run from this folder:
 --     psql ... -f session_change_tests.sql
 \set ON_ERROR_STOP 1
@@ -8,6 +8,8 @@ BEGIN;
 \ir ../fee_structure_copy.sql
 \ir ../fee_year_end.sql
 \ir ../student_promotion.sql
+\ir ../academic_session_rollover.sql
+\ir ../academic_year_class_section_fixes.sql
 
 DO $t$
 DECLARE
@@ -20,11 +22,11 @@ BEGIN
 
     -- 1. a new session, and its classes / sections copied from 2026-27
     c := 'c1';
-    CALL academic.sp_school_admin_academic_year_manage('SaveAcademicYear', T, S, A, NULL, 'ZZ 2027-28',
-         '2027-04-01', '2028-03-31', FALSE, 'AdmissionMonth', c);
+    CALL academic.sp_school_admin_academic_year_manage('SaveAcademicYear', T, S, A, NULL, 'ZZ 2031-32',
+         '2031-04-01', '2032-03-31', FALSE, 'AdmissionMonth', c);
     CLOSE c;
     SELECT academic_year_id INTO v_new FROM academic.academic_years
-     WHERE tenant_id = T AND school_id = S AND academic_year_name = 'ZZ 2027-28';
+     WHERE tenant_id = T AND school_id = S AND academic_year_name = 'ZZ 2031-32';
     c := 'c2';
     CALL academic.sp_academic_year_clone(T, S, A, v_old, v_new, c); FETCH c INTO r; CLOSE c;
     IF r.classes_copied > 0 THEN pass := pass + 1; RAISE NOTICE 'PASS 1 %', r.message;
@@ -32,12 +34,12 @@ BEGIN
 
     -- 2. fee structure copied with a 10%% increase, in whole rupees
     c := 'c3';
-    CALL core.sp_fee_structure_copy(T, S, A, '2026-27', 'ZZ 2027-28', 10, c); FETCH c INTO r; CLOSE c;
+    CALL core.sp_fee_structure_copy(T, S, A, '2026-27', 'ZZ 2031-32', 10, c); FETCH c INTO r; CLOSE c;
     SELECT COUNT(*) INTO v_n
       FROM core.school_fee_structure_details o
       JOIN core.school_fee_structures os ON os.fee_structure_id = o.fee_structure_id AND os.academic_year = '2026-27'
       JOIN core.school_fee_structures ns ON ns.tenant_id = os.tenant_id AND ns.school_id = os.school_id
-                                        AND ns.class_name = os.class_name AND ns.academic_year = 'ZZ 2027-28'
+                                        AND ns.class_name = os.class_name AND ns.academic_year = 'ZZ 2031-32'
       JOIN core.school_fee_structure_details n ON n.fee_structure_id = ns.fee_structure_id AND n.fee_head_id = o.fee_head_id
      WHERE os.tenant_id = T AND os.school_id = S AND NOT o.is_deleted AND n.amount <> ROUND(o.amount * 1.10);
     IF r.copied > 0 AND v_n = 0 THEN pass := pass + 1; RAISE NOTICE 'PASS 2 %', r.message;
@@ -45,7 +47,7 @@ BEGIN
 
     -- 3. copying again changes nothing
     c := 'c4';
-    CALL core.sp_fee_structure_copy(T, S, A, '2026-27', 'ZZ 2027-28', 10, c); FETCH c INTO r; CLOSE c;
+    CALL core.sp_fee_structure_copy(T, S, A, '2026-27', 'ZZ 2031-32', 10, c); FETCH c INTO r; CLOSE c;
     IF r.copied = 0 AND r.skipped > 0 THEN pass := pass + 1; RAISE NOTICE 'PASS 3 re-run: %', r.message;
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 3 %', r.message; END IF;
 
@@ -58,11 +60,11 @@ BEGIN
     SELECT string_agg(COALESCE(roll_no, '-'), ',' ORDER BY student_id) INTO v_txt
       FROM core.students WHERE student_id IN (SELECT (x->>'studentId')::int FROM jsonb_array_elements(v_students) x);
     c := 'c5';
-    CALL core.sp_student_promote(T, S, A, '2026-27', 'ZZ 2027-28', NULL, TRUE, v_students, c); FETCH c INTO r; CLOSE c;
+    CALL core.sp_student_promote(T, S, A, '2026-27', 'ZZ 2031-32', NULL, TRUE, v_students, c); FETCH c INTO r; CLOSE c;
     SELECT COUNT(*) INTO v_n FROM core.students s
      WHERE s.student_id IN (SELECT (x->>'studentId')::int FROM jsonb_array_elements(v_students) x)
-       AND s.class_name = 'Class 9' AND s.academic_year = 'ZZ 2027-28'
-       AND EXISTS (SELECT 1 FROM core.student_ledger l WHERE l.student_id = s.student_id AND l.academic_year = 'ZZ 2027-28');
+       AND s.class_name = 'Class 9' AND s.academic_year = 'ZZ 2031-32'
+       AND EXISTS (SELECT 1 FROM core.student_ledger l WHERE l.student_id = s.student_id AND l.academic_year = 'ZZ 2031-32');
     IF r.promoted = jsonb_array_length(v_students) AND v_n = r.promoted
     THEN pass := pass + 1; RAISE NOTICE 'PASS 4 %', r.message;
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 4 % (% billed in Class 9)', r.message, v_n; END IF;
@@ -105,6 +107,48 @@ BEGIN
         c := 'c11'; CALL core.sp_fee_year_end_manage('Reopen', T, S, A, '2026-27', NULL, NULL, NULL, c); FETCH c INTO r; CLOSE c;
         pass := pass + 1; RAISE NOTICE 'PASS 7 closed session refused changes; %', r.message;
     END;
+
+    -- 8. subjects came with the class copy; class teachers + timetable copy on request, once
+    c := 'c12';
+    CALL academic.sp_academic_year_copy_setup(T, S, A, v_old, v_new, TRUE, TRUE, TRUE, c); FETCH c INTO r; CLOSE c;
+    v_txt := r.subjects || '/' || r.teachers || '/' || r.periods;
+    c := 'c13';
+    CALL academic.sp_academic_year_copy_setup(T, S, A, v_old, v_new, TRUE, TRUE, TRUE, c); FETCH c INTO r; CLOSE c;
+    IF split_part(v_txt, '/', 1) = '0' AND split_part(v_txt, '/', 2)::int > 0 AND split_part(v_txt, '/', 3)::int > 0
+       AND r.subjects = 0 AND r.teachers = 0 AND r.periods = 0
+       AND (SELECT COUNT(*) FROM academic.class_subjects WHERE academic_year_id = v_new) > 0
+    THEN pass := pass + 1; RAISE NOTICE 'PASS 8 subjects/teachers/periods copied % then nothing', v_txt;
+    ELSE fail := fail + 1; RAISE NOTICE 'FAIL 8 first % then %/%/%', v_txt, r.subjects, r.teachers, r.periods; END IF;
+
+    -- 9. the new session cannot be made current while students are still in the old one
+    BEGIN
+        c := 'c14';
+        CALL academic.sp_school_admin_academic_year_manage('SetCurrentAcademicYear', T, S, A, v_new, NULL, NULL, NULL, FALSE, NULL, c);
+        fail := fail + 1; RAISE NOTICE 'FAIL 9 made current with students still in 2026-27';
+    EXCEPTION WHEN raise_exception THEN pass := pass + 1; RAISE NOTICE 'PASS 9 %', SQLERRM; END;
+
+    -- 10. a session with no classes cannot be made current
+    c := 'c15';
+    CALL academic.sp_school_admin_academic_year_manage('SaveAcademicYear', T, S, A, NULL, 'ZZ 2029-30',
+         '2029-04-01', '2030-03-31', FALSE, 'AdmissionMonth', c);
+    CLOSE c;
+    SELECT academic_year_id INTO v_n FROM academic.academic_years
+     WHERE tenant_id = T AND school_id = S AND academic_year_name = 'ZZ 2029-30';
+    BEGIN
+        c := 'c16';
+        CALL academic.sp_school_admin_academic_year_manage('SetCurrentAcademicYear', T, S, A, v_n,
+             NULL, NULL, NULL, FALSE, NULL, c);
+        fail := fail + 1; RAISE NOTICE 'FAIL 10 empty session made current';
+    EXCEPTION WHEN raise_exception THEN pass := pass + 1; RAISE NOTICE 'PASS 10 %', SQLERRM; END;
+
+    -- 11. once every student is in the new session, it can be made current
+    UPDATE core.students SET academic_year = 'ZZ 2031-32' WHERE tenant_id = T AND school_id = S AND is_active;
+    c := 'c17';
+    CALL academic.sp_school_admin_academic_year_manage('SetCurrentAcademicYear', T, S, A, v_new, NULL, NULL, NULL, FALSE, NULL, c);
+    CLOSE c;
+    IF (SELECT is_current FROM academic.academic_years WHERE academic_year_id = v_new)
+    THEN pass := pass + 1; RAISE NOTICE 'PASS 11 made current after everyone moved';
+    ELSE fail := fail + 1; RAISE NOTICE 'FAIL 11 not current'; END IF;
 
     RAISE NOTICE '== % passed, % failed ==', pass, fail;
 END;

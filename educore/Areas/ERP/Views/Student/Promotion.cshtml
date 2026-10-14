@@ -719,8 +719,15 @@ function initTargetYear(){
       tgt=document.getElementById('tgtYear'),
       other=null, i;
 
+  // The session right after the source ("2026-27" -> "2027-28": the smallest name
+  // above it). The list is newest-first by id, so "first other" could be an older one.
   for(i=0;i<tgt.options.length;i++){
-    if(tgt.options[i].value!==src.value){ other=tgt.options[i].value; break; }
+    var v=tgt.options[i].value;
+    if(v>src.value && (other===null || v<other)) other=v;
+  }
+  // No later session: fall back to the first one that is not the source.
+  for(i=0;other===null && i<tgt.options.length;i++){
+    if(tgt.options[i].value!==src.value){ other=tgt.options[i].value; }
   }
 
   if(other===null){

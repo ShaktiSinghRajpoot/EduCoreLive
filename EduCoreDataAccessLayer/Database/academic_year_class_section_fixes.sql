@@ -336,6 +336,29 @@ BEGIN
             RAISE EXCEPTION 'This academic year no longer exists. Refresh the page.';
         END IF;
 
+        -- Every page opens on the current session and lists the students who are
+        -- IN it. Switching before the session is set up, or before the students
+        -- were promoted into it, left Collect Fees, attendance and homework showing
+        -- nobody. So the order is: set it up, promote, then make it current.
+        IF NOT EXISTS (
+            SELECT 1 FROM academic.academic_classes
+            WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+              AND academic_year_id = p_academic_year_id AND COALESCE(is_deleted, FALSE) = FALSE
+        ) THEN
+            RAISE EXCEPTION 'This session has no classes yet. Set up its classes and sections first (Classes & Sections).';
+        END IF;
+
+        SELECT COUNT(*), string_agg(DISTINCT s.academic_year, ', ')
+          INTO v_student_count, v_name
+          FROM core.students s
+         WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND s.is_active
+           AND s.academic_year IS DISTINCT FROM (SELECT y.academic_year_name FROM academic.academic_years y
+                                                  WHERE y.academic_year_id = p_academic_year_id);
+        IF v_student_count > 0 THEN
+            RAISE EXCEPTION '% student(s) are still in %. Promote them into this session first (Students › Promotion), then make it current.',
+                v_student_count, v_name;
+        END IF;
+
         UPDATE academic.academic_years
         SET is_current = FALSE, updated_by = p_action_user_id, updated_at = NOW()
         WHERE tenant_id = p_tenant_id

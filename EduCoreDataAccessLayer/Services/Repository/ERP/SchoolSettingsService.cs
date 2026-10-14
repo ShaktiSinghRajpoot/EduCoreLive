@@ -572,6 +572,39 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return info;
         }
 
+        public async Task<(bool Success, string Message)> CopySessionSetupAsync(
+            int fromAcademicYearId, int toAcademicYearId, bool subjects, bool teachers, bool timetable,
+            int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school scope.");
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_from_year_id", fromAcademicYearId),
+                new NpgsqlParameter("p_to_year_id", toAcademicYearId),
+                new NpgsqlParameter("p_subjects", subjects),
+                new NpgsqlParameter("p_teachers", teachers),
+                new NpgsqlParameter("p_timetable", timetable),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "copy_setup_cursor" }
+            };
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync("academic.sp_academic_year_copy_setup", parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "Nothing was copied.");
+                return (true, AsStr(ds.Tables[0].Rows[0], "message") ?? "Copied.");
+            }
+            catch (PostgresException ex)
+            {
+                _logger.LogWarning(ex, "Session set-up copy refused ({SqlState}) tenant {TenantId}, school {SchoolId}",
+                    ex.SqlState, tenantId, schoolId);
+                return (false, ex.MessageText);
+            }
+        }
+
         public async Task<SessionCloneResult> CloneAcademicYearAsync(
             int fromAcademicYearId, int toAcademicYearId, int tenantId, int schoolId, int actionUserId)
         {

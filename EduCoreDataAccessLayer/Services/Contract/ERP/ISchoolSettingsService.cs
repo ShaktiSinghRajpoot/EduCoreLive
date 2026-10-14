@@ -36,6 +36,14 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Copies classes + sections from one session into an empty one (the rollover step).</summary>
         Task<SessionCloneResult> CloneAcademicYearAsync(
             int fromAcademicYearId, int toAcademicYearId, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>
+        /// Into a session that already has classes: copy class subjects, class teachers and/or
+        /// the timetable from an earlier session. Anything already set is kept.
+        /// </summary>
+        Task<(bool Success, string Message)> CopySessionSetupAsync(
+            int fromAcademicYearId, int toAcademicYearId, bool subjects, bool teachers, bool timetable,
+            int tenantId, int schoolId, int actionUserId);
         #endregion
 
         #region Period Structure

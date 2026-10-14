@@ -114,8 +114,10 @@ $procedure$;
 
 
 -- ── copy the structure forward ─────────────────────────────────────────────
--- Copies classes (with display_order, stream, coordinator) and their sections
--- (with display_order, capacity, room) from one session into another.
+-- Copies classes (with display_order, stream, coordinator), their sections
+-- (with display_order, capacity, room) and each class's subjects from one
+-- session into another. Without the subjects the new session has no exams,
+-- timetable, homework or report cards.
 --
 -- The class teacher is deliberately NOT copied: staff change between sessions
 -- and it is assigned on its own page. Strength is derived from core.students,
@@ -217,6 +219,14 @@ BEGIN
 
         GET DIAGNOSTICS v_copied_sec = ROW_COUNT;
         v_sections := v_sections + v_copied_sec;
+
+        -- the class's subjects come along
+        INSERT INTO academic.class_subjects
+            (tenant_id, school_id, academic_year_id, academic_class_id, subject_id, display_order, created_by)
+        SELECT p_tenant_id, p_school_id, p_to_academic_year_id, v_new_class, cs.subject_id, cs.display_order, p_action_user_id
+        FROM   academic.class_subjects cs
+        WHERE  cs.academic_class_id = c.academic_class_id
+        ON CONFLICT DO NOTHING;
     END LOOP;
 
     IF v_classes = 0 THEN
@@ -230,5 +240,120 @@ BEGIN
            'Copied ' || v_classes || ' classes and ' || v_sections ||
            ' sections from ' || v_from_name || ' into ' || v_to_name || '.' AS message;
     RETURN;
+END;
+$procedure$;
+
+-- ── copy the rest of the set-up into a session that already has classes ────
+-- For a session whose classes were already copied (or typed in): its classes'
+-- subjects, the class teachers and the timetable, from an earlier session.
+-- Classes match by class name and sections by section name. Only staff who are
+-- still working are copied; a period of someone who left is copied without a
+-- teacher. Nothing that is already set in the target is overwritten, so it is
+-- safe to run twice.
+--   p_subjects / p_teachers / p_timetable choose what to copy.
+CREATE OR REPLACE PROCEDURE academic.sp_academic_year_copy_setup(
+    IN    p_tenant_id      integer,
+    IN    p_school_id      integer,
+    IN    p_action_user_id integer,
+    IN    p_from_year_id   integer,
+    IN    p_to_year_id     integer,
+    IN    p_subjects       boolean DEFAULT TRUE,
+    IN    p_teachers       boolean DEFAULT FALSE,
+    IN    p_timetable      boolean DEFAULT FALSE,
+    INOUT p_result         refcursor DEFAULT 'copy_setup_cursor'::refcursor)
+LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+    v_subjects  integer := 0;
+    v_teachers  integer := 0;
+    v_periods   integer := 0;
+    v_from_name varchar;
+    v_to_name   varchar;
+BEGIN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
+        RAISE EXCEPTION 'Invalid school scope.';
+    END IF;
+    IF COALESCE(p_from_year_id, 0) <= 0 OR COALESCE(p_to_year_id, 0) <= 0 OR p_from_year_id = p_to_year_id THEN
+        RAISE EXCEPTION 'Choose two different sessions.';
+    END IF;
+
+    SELECT academic_year_name INTO v_from_name FROM academic.academic_years
+     WHERE academic_year_id = p_from_year_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
+    SELECT academic_year_name INTO v_to_name FROM academic.academic_years
+     WHERE academic_year_id = p_to_year_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
+    IF v_from_name IS NULL OR v_to_name IS NULL THEN
+        RAISE EXCEPTION 'One of the sessions does not belong to this school.';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM academic.academic_classes
+                    WHERE academic_year_id = p_to_year_id AND NOT COALESCE(is_deleted, FALSE)) THEN
+        RAISE EXCEPTION 'Session % has no classes yet. Copy the classes and sections first.', v_to_name;
+    END IF;
+
+    -- Subjects of each class (matched by class name)
+    IF p_subjects THEN
+        INSERT INTO academic.class_subjects
+            (tenant_id, school_id, academic_year_id, academic_class_id, subject_id, display_order, created_by)
+        SELECT p_tenant_id, p_school_id, p_to_year_id, nc.academic_class_id, cs.subject_id, cs.display_order, p_action_user_id
+          FROM academic.class_subjects cs
+          JOIN academic.academic_classes oc ON oc.academic_class_id = cs.academic_class_id
+          JOIN academic.academic_classes nc ON nc.tenant_id = oc.tenant_id AND nc.school_id = oc.school_id
+                                           AND nc.academic_year_id = p_to_year_id AND nc.class_name = oc.class_name
+                                           AND NOT COALESCE(nc.is_deleted, FALSE)
+         WHERE cs.tenant_id = p_tenant_id AND cs.school_id = p_school_id AND cs.academic_year_id = p_from_year_id
+        ON CONFLICT DO NOTHING;
+        GET DIAGNOSTICS v_subjects = ROW_COUNT;
+    END IF;
+
+    -- Class teachers (class + section name); only staff still working; only where none is set
+    IF p_teachers THEN
+        UPDATE academic.academic_class_sections ns
+           SET class_teacher_staff_id = os.class_teacher_staff_id, updated_by = p_action_user_id, updated_at = now()
+          FROM academic.academic_class_sections os
+          JOIN academic.academic_classes oc ON oc.academic_class_id = os.academic_class_id
+          JOIN core.staff st ON st.staff_id = os.class_teacher_staff_id
+                            AND NOT COALESCE(st.is_deleted, FALSE) AND COALESCE(st.is_active, TRUE)
+                            AND COALESCE(st.status, 'Active') <> 'Inactive',
+               academic.academic_classes nc
+         WHERE os.tenant_id = p_tenant_id AND os.school_id = p_school_id AND os.academic_year_id = p_from_year_id
+           AND NOT COALESCE(os.is_deleted, FALSE)
+           AND nc.academic_class_id = ns.academic_class_id AND nc.class_name = oc.class_name
+           AND ns.academic_year_id = p_to_year_id AND ns.section_name = os.section_name
+           AND NOT COALESCE(ns.is_deleted, FALSE) AND ns.class_teacher_staff_id IS NULL;
+        GET DIAGNOSTICS v_teachers = ROW_COUNT;
+    END IF;
+
+    -- Timetable (class + section name); the period of a teacher who has left is copied without a teacher
+    IF p_timetable THEN
+        INSERT INTO academic.timetable
+            (tenant_id, school_id, academic_year_id, academic_class_section_id, day_of_week, period_seq,
+             subject_id, staff_id, room_no, created_by, created_at)
+        SELECT p_tenant_id, p_school_id, p_to_year_id, ns.academic_class_section_id, t.day_of_week, t.period_seq,
+               t.subject_id,
+               CASE WHEN EXISTS (SELECT 1 FROM core.staff st WHERE st.staff_id = t.staff_id
+                                    AND NOT COALESCE(st.is_deleted, FALSE) AND COALESCE(st.is_active, TRUE)
+                                    AND COALESCE(st.status, 'Active') <> 'Inactive') THEN t.staff_id END,
+               t.room_no, p_action_user_id, now()
+          FROM academic.timetable t
+          JOIN academic.academic_class_sections os ON os.academic_class_section_id = t.academic_class_section_id
+          JOIN academic.academic_classes oc ON oc.academic_class_id = os.academic_class_id
+          JOIN academic.academic_classes nc ON nc.tenant_id = oc.tenant_id AND nc.school_id = oc.school_id
+                                           AND nc.academic_year_id = p_to_year_id AND nc.class_name = oc.class_name
+                                           AND NOT COALESCE(nc.is_deleted, FALSE)
+          JOIN academic.academic_class_sections ns ON ns.academic_class_id = nc.academic_class_id
+                                                  AND ns.section_name = os.section_name
+                                                  AND NOT COALESCE(ns.is_deleted, FALSE)
+         WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id AND t.academic_year_id = p_from_year_id
+        ON CONFLICT DO NOTHING;
+        GET DIAGNOSTICS v_periods = ROW_COUNT;
+    END IF;
+
+    OPEN p_result FOR
+    SELECT v_subjects AS subjects, v_teachers AS teachers, v_periods AS periods,
+           'Copied from ' || v_from_name || ' into ' || v_to_name || ': '
+           || concat_ws(', ',
+                CASE WHEN p_subjects  THEN v_subjects || ' class subject(s)' END,
+                CASE WHEN p_teachers  THEN v_teachers || ' class teacher(s)' END,
+                CASE WHEN p_timetable THEN v_periods  || ' timetable period(s)' END)
+           || '. Anything already set was kept.' AS message;
 END;
 $procedure$;

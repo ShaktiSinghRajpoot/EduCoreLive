@@ -125,6 +125,22 @@
                 </button>
             </div>
         }
+        @if (ViewBag.CanCopyExtras == true && canManage)
+        {
+            <!-- This session has its classes: bring the rest of last session's set-up over. -->
+            <div class="alert alert-light border d-flex flex-column flex-md-row align-items-md-center gap-2 mt-2 mb-0" id="copyExtras">
+                <i class="bx bx-copy fs-5"></i>
+                <div class="flex-grow-1 small">
+                    <div class="fw-semibold mb-1">Copy from @ViewBag.CopyFromYearName</div>
+                    <label class="me-3"><input type="checkbox" class="form-check-input me-1" id="cxSubjects" checked>Class subjects</label>
+                    <label class="me-3"><input type="checkbox" class="form-check-input me-1" id="cxTeachers">Class teachers</label>
+                    <label><input type="checkbox" class="form-check-input me-1" id="cxTimetable">Timetable</label>
+                    <div class="text-muted" style="font-size:.75rem">Only staff still working are copied. Anything already set here is kept.</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" id="btnCopyExtras"
+                        data-from="@ViewBag.CopyFromYearId">Copy</button>
+            </div>
+        }
       </div>
 
       <div class="ec-card-body pt-2">
@@ -255,6 +271,7 @@
 var ACADEMIC_YEAR_ID = @(ViewBag.AcademicYearId ?? 0);
 var URL_SAVE = '@Url.Action("SaveClassSection", "SchoolSettings", new { area = "ERP" })';
 var URL_COPY = '@Url.Action("CopyClassSection", "SchoolSettings", new { area = "ERP" })';
+var URL_COPY_EXTRAS = '@Url.Action("CopySessionSetup", "SchoolSettings", new { area = "ERP" })';
 var seed = @Html.Raw(ViewBag.ClassDataJson ?? "[]");
 
 var nextClassId=100, nextSecId=900;
@@ -370,6 +387,36 @@ if (btnCopy) {
       ecToast('error', EC.ajaxError(xhr, 'Copy failed'));
       EC.buttonReset(btnCopy);
     });
+  });
+}
+
+/* -- Copy subjects / class teachers / timetable into this session (it has classes) -- */
+var btnExtras = document.getElementById('btnCopyExtras');
+if (btnExtras) {
+  btnExtras.addEventListener('click', function(){
+    var body = {
+      fromAcademicYearId: parseInt(btnExtras.getAttribute('data-from'), 10) || 0,
+      toAcademicYearId:   ACADEMIC_YEAR_ID,
+      subjects:  document.getElementById('cxSubjects').checked,
+      teachers:  document.getElementById('cxTeachers').checked,
+      timetable: document.getElementById('cxTimetable').checked
+    };
+    if (!body.subjects && !body.teachers && !body.timetable) { ecToast('warning', 'Tick at least one thing to copy.'); return; }
+
+    EC.buttonBusy(btnExtras, 'Copying…');
+    $.ajax({
+      url:         URL_COPY_EXTRAS,
+      type:        'POST',
+      contentType: 'application/json',
+      headers:     { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+      data:        JSON.stringify(body)
+    })
+    .done(function(res){
+      ecToast(res && res.success ? 'success' : 'error', (res && res.message) || 'Copy failed.');
+      if (res && res.success) setTimeout(function(){ window.location.reload(); }, 1500);
+      else EC.buttonReset(btnExtras);
+    })
+    .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Copy failed')); EC.buttonReset(btnExtras); });
   });
 }
 
