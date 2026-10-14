@@ -32,7 +32,10 @@
         </div>
         <div class="d-flex gap-2 align-items-end no-print">
           <div><label class="form-label mb-1">Date</label><input type="date" id="dDate" class="form-control form-control-sm"></div>
+          @if (ViewBag.CanCounter == true)
+          {
           <a href="@Url.Action("ManageFee","Fee",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-wallet me-1"></i>Counter</a>
+          }
           <button id="btnPrint" class="btn btn-sm ec-btn-soft"><i class="bx bx-printer me-1"></i>Print</button>
         </div>
       </div>
@@ -93,11 +96,11 @@
 
       @if (canReopen)
       {
-      <!-- every counter closed on this date: lets an admin re-open a cashier's day -->
+      <!-- every counter that took money on this date, closed or not; an admin can re-open a closed day -->
       <div class="col-12 no-print">
         <div class="ec-card"><div class="ec-card-header"><div class="ec-section-title-wrap">
           <div class="ec-section-icon"><i class="bx bx-group"></i></div>
-          <div><h6 class="ec-section-title">All counters on this date</h6><div class="ec-section-subtitle">Re-open a cashier's closed day so they can collect or correct again</div></div>
+          <div><h6 class="ec-section-title">All counters on this date</h6><div class="ec-section-subtitle">Every drawer that took money, closed or not. Re-open a closed day so the cashier can correct it</div></div>
         </div></div>
           <div class="ec-card-body p-0">
             <div class="table-responsive"><table class="table ec-table mb-0">
@@ -136,7 +139,7 @@ $(function () {
     'use strict';
 
     var CSRF=$('input[name="__RequestVerificationToken"]').val();
-    var URL={ get:'@Url.Action("GetDayCollection","Fee",new{area="ERP"})', close:'@Url.Action("CloseDay","Fee",new{area="ERP"})', reopen:'@Url.Action("ReopenDay","Fee",new{area="ERP"})', counters:'@Url.Action("GetClosedCounters","Fee",new{area="ERP"})' };
+    var URL={ get:'@Url.Action("GetDayCollection","DayClose",new{area="ERP"})', close:'@Url.Action("CloseDay","DayClose",new{area="ERP"})', reopen:'@Url.Action("ReopenDay","DayClose",new{area="ERP"})', counters:'@Url.Action("GetClosedCounters","DayClose",new{area="ERP"})' };
     var expected=0;
     var CAN_REOPEN = @(canReopen ? "true" : "false");   // fees.reopen
 
@@ -200,20 +203,23 @@ $(function () {
         loadCounters();
     }
 
-    // Every counter closed on the date (admins with fees.reopen only).
+    // Every counter that took money on the date (admins with fees.reopen only).
     function loadCounters(){
         if(!CAN_REOPEN) return;
         $.getJSON(URL.counters,{date:$('#dDate').val()}).done(function(rows){
             $('#counterRows').html((rows||[]).length ? rows.map(function(r){
+                // No close time and never re-opened = this drawer took money but was not closed.
+                var notClosed = !r.closedAt && !r.reopenedAt;
                 var status = r.isClosed ? '<span class="closed-badge">Closed</span>'
+                           : notClosed ? '<span class="text-warning fw-semibold">Not closed yet</span>'
                            : '<span class="text-muted">Re-opened'+(r.reopenedAt?' '+EC.esc(r.reopenedAt):'')+(r.reopenedBy?' by '+EC.esc(r.reopenedBy):'')+'</span>';
                 var btn = r.isClosed ? '<button class="btn btn-sm ec-btn-soft btn-reopen-counter" data-id="'+r.cashierId+'" data-name="'+EC.esc(r.cashier||'')+'"><i class="bx bx-lock-open-alt me-1"></i>Re-open</button>' : '';
                 return '<tr><td class="fw-semibold">'+EC.esc(r.cashier||'')+'</td><td class="text-muted">'+EC.esc(r.closedAt||'')+'</td>'
                      + '<td class="text-end">'+EC.money(r.collected)+'</td><td class="text-end">'+EC.money(r.expected)+'</td>'
-                     + '<td class="text-end">'+EC.money(r.counted)+'</td><td class="text-end">'+EC.money(r.diff)+'</td>'
+                     + '<td class="text-end">'+(notClosed ? '—' : EC.money(r.counted))+'</td><td class="text-end">'+(notClosed ? '—' : EC.money(r.diff))+'</td>'
                      + '<td>'+status+'</td><td class="text-end">'+btn+'</td></tr>';
-            }).join('') : '<tr><td colspan="8" class="text-muted text-center py-4">No counter was closed on this date.</td></tr>');
-        }).fail(function(){ ecToast('error','Could not load the closed counters.'); });
+            }).join('') : '<tr><td colspan="8" class="text-muted text-center py-4">No money was taken at any counter on this date.</td></tr>');
+        }).fail(function(){ ecToast('error','Could not load the counters.'); });
     }
     function diff(){
         var counted=EC.num($('#counted').val()), d=counted-expected;

@@ -65,7 +65,10 @@
     bool secAcademic  = gAdmissions || gStudents || gAttendance || gExams || gAcademics;
 
     bool gFees        = Can("fees.view");
-    bool secFinance   = gFees;
+    // The front desk takes registration fees (fees.collect) without seeing the fee
+    // pages; they still close their own cash counter (QA BUG-099).
+    bool gDayClose    = gFees || Can("fees.collect");
+    bool secFinance   = gDayClose;
 
     bool gStaffDir    = Can("staff.view");
     bool gPayroll     = showPayroll && Can("payroll.view");   // salary has its own key
@@ -337,7 +340,7 @@
         <li class="menu-header"><span class="menu-header-text">Finance</span></li>
         }
 
-        @if (gFees)
+        @if (gDayClose)
         {
         <li class='menu-item @Open("ManageFee","FeeDueReminders","Fee/Reports","DayClose","Fee/YearEnd","FeeDashboard")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
@@ -346,12 +349,18 @@
             </a>
             <ul class="menu-sub">
                 @* Fee Heads / Fee Structure are one-time setup → School Settings. *@
+                @if (gFees)
+                {
                 <li class='menu-item @On("FeeDashboard")'><a asp-area="ERP" asp-controller="FeeDashboard" asp-action="Index" class="menu-link"><i class="bx bx-line-chart submenu-icon c-orange"></i><div class="text-truncate">Fee Dashboard</div></a></li>
                 <li class='menu-item @On("ManageFee")'><a asp-area="ERP" asp-controller="Fee" asp-action="ManageFee" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Collect Fees</div></a></li>
                 <li class='menu-item @On("FeeDueReminders")'><a asp-area="ERP" asp-controller="FeeDueReminders" asp-action="Index" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Due Reminders</div></a></li>
-                <li class='menu-item @On("DayClose")'><a asp-area="ERP" asp-controller="Fee" asp-action="DayClose" class="menu-link"><i class="bx bx-lock-alt submenu-icon c-teal"></i><div class="text-truncate">Day Close</div></a></li>
+                }
+                <li class='menu-item @On("DayClose")'><a asp-area="ERP" asp-controller="DayClose" asp-action="Index" class="menu-link"><i class="bx bx-lock-alt submenu-icon c-teal"></i><div class="text-truncate">Day Close</div></a></li>
+                @if (gFees)
+                {
                 <li class='menu-item @On("Fee/Reports")'><a asp-area="ERP" asp-controller="Fee" asp-action="Reports" class="menu-link"><i class="bx bx-bar-chart-alt-2 submenu-icon c-blue"></i><div class="text-truncate">Fee Reports</div></a></li>
                 <li class='menu-item @On("Fee/YearEnd")'><a asp-area="ERP" asp-controller="Fee" asp-action="YearEnd" class="menu-link"><i class="bx bx-calendar-check submenu-icon c-purple"></i><div class="text-truncate">Year-End Closure</div></a></li>
+                }
             </ul>
         </li>
         }

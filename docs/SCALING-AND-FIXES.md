@@ -5328,3 +5328,13 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - **BUG-108** Collect Fees header shows "Due now" (fallen due) plus "Whole session"; the month chips also
   tick one-time / annual fees that are already due.
 - Bundle `deploy_2026_10_14m.sql` (fee_day_close, fee_refund, student_exit).
+
+### 2026-10-14 — QA round 3, batch 2b (day close for every cash-taker)
+- **BUG-099** Day Close moved to its own `DayCloseController` (`/ERP/DayClose`, old `/ERP/Fee/DayClose`
+  redirects). It needs `fees.collect` instead of `fees.view`, so the front desk that takes registration
+  fees can close its own drawer; closing no longer needs `fees.manage`. The menu shows a Fees group with
+  only Day Close to such users. The admin's "All counters" list (`sp_fee_day_close_list`) now also lists
+  drawers that took money but were never closed ("Not closed yet").
+- **BUG-112** The Enquiry CRM register dialog already sends payment mode + reference (the tester left it on
+  Cash); a cheque now needs its number.
+- Bundle `deploy_2026_10_14n.sql` (fee_day_close).

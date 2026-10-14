@@ -440,6 +440,9 @@ $procedure$;
 -- the drawer an accountant had closed (QA BUG-067). This lists each cashier's
 -- close row for the date; the page shows it only to users with fees.reopen,
 -- and ReopenDay then passes that row's cashier_id to sp_fee_day_reopen.
+-- Counters that took money on the date but were never closed are listed too
+-- (closed_at NULL, "Not closed yet"), so the admin sees every drawer -- e.g.
+-- the front desk's registration-fee cash (QA BUG-099).
 CREATE OR REPLACE PROCEDURE core.sp_fee_day_close_list(
     IN    p_tenant_id      integer,
     IN    p_school_id      integer,
@@ -468,6 +471,29 @@ BEGIN
     FROM core.fee_day_close dc
     WHERE dc.tenant_id = p_tenant_id AND dc.school_id = p_school_id
       AND dc.close_date = v_iso
-    ORDER BY (dc.reopened_at IS NULL) DESC, dc.closed_at DESC;
+
+    UNION ALL
+
+    -- never closed: what the drawer took today, and the cash it should hold
+    SELECT ml.user_id,
+           core.fn_user_display_name(ml.user_id),
+           NULL::timestamp,
+           SUM(ml.amount),
+           COALESCE(SUM(ml.amount) FILTER (WHERE ml.mode = 'Cash'), 0)
+             - COALESCE((SELECT SUM(r.amount) FROM core.fee_refunds r
+                          WHERE r.tenant_id = p_tenant_id AND r.school_id = p_school_id
+                            AND r.refunded_by = ml.user_id
+                            AND r.refunded_at::date = COALESCE(p_date, CURRENT_DATE)
+                            AND COALESCE(NULLIF(trim(r.refund_mode), ''), 'Cash') = 'Cash'), 0),
+           0::numeric, 0::numeric,
+           FALSE, NULL::timestamp, NULL::varchar, NULL::varchar
+    FROM core.fn_fee_money_lines(p_tenant_id, p_school_id, COALESCE(p_date, CURRENT_DATE), COALESCE(p_date, CURRENT_DATE)) ml
+    WHERE NOT EXISTS (SELECT 1 FROM core.fee_day_close dc
+                      WHERE dc.tenant_id = p_tenant_id AND dc.school_id = p_school_id
+                        AND dc.close_date = v_iso AND dc.cashier_id = ml.user_id)
+    GROUP BY ml.user_id
+
+    -- not closed first (they need attention), then the latest close
+    ORDER BY 3 DESC NULLS FIRST;
 END;
 $procedure$;

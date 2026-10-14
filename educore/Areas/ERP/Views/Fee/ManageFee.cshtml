@@ -30,7 +30,7 @@
       <div class="ec-page-icon"><i class="bx bx-wallet"></i></div>
       <div><div class="title">Fee Collection</div><div class="sub">Find a student, choose how many months to collect, then take payment</div></div>
       <div class="today"><div class="dot"><i class="bx bx-rupee"></i></div><div><div class="n" id="todayN">₹0.00</div><div class="l" title="Everything you collected today, admission and registration receipts included -- the same figure as Day close">Your collection today · <span id="todayC">0</span> receipts</div></div></div>
-      <a href="@Url.Action("DayClose","Fee",new{area="ERP"})" class="btn btn-sm ec-btn-soft"><i class="bx bx-lock-open-alt me-1"></i>Day close</a>
+      <a href="@Url.Action("Index","DayClose",new{area="ERP"})" class="btn btn-sm ec-btn-soft"><i class="bx bx-lock-open-alt me-1"></i>Day close</a>
       <a href="@Url.Action("Reports","Fee",new{area="ERP"})" class="btn btn-sm ec-btn-soft"><i class="bx bx-bar-chart-alt-2 me-1"></i>Reports</a>
     </div>
 
@@ -283,7 +283,7 @@ $(function () {
         refundable: '@Url.Action("GetRefundables","Fee",new{area="ERP"})',
         refund:     '@Url.Action("Refund","Fee",new{area="ERP"})',
         advance:    '@Url.Action("GetAdvance","Fee",new{area="ERP"})',
-        day:        '@Url.Action("GetDayCollection","Fee",new{area="ERP"})'
+        day:        '@Url.Action("GetDayCollection","DayClose",new{area="ERP"})'
     };
     var api = {
         sessions:  function(){ return $.getJSON(URL.sessions); },

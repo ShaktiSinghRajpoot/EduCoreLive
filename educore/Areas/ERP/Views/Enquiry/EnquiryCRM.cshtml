@@ -1512,6 +1512,12 @@ $(document).ready(function () {
                     return;
                 }
             }
+            // A cheque is traced by its number, so ask for it.
+            if ($('#regPaymentMode').val() === 'Cheque' && !$.trim($('#regPaymentReference').val())) {
+                ecToast('error', 'Please enter the cheque number in Reference No.');
+                $('#regPaymentReference').focus();
+                return;
+            }
             var payable = fee - disc;
             if (EC.numPos($('#regCollectAmount').val()) > payable + 0.005) {
                 ecToast('error', 'Collecting ' + EC.money(EC.numPos($('#regCollectAmount').val())) +
