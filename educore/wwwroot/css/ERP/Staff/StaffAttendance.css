@@ -61,3 +61,18 @@
   .layout-menu,.layout-navbar,.sa-tabs,.sa-tools .btn,.ec-page-header{ display:none!important; }
   .sa-page .sa-reg-wrap{ overflow:visible; }
 }
+
+/* month at a glance (under the register) */
+.sa-page .sa-kpis{ display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.6rem; }
+.sa-page .sa-kpis > div{ border:1px solid var(--ec-border);border-radius:12px;padding:.6rem .75rem; }
+.sa-page .sa-kpis b{ display:block;font-size:1.25rem;font-weight:900; }
+.sa-page .sa-kpis small{ color:var(--ec-text-muted);font-size:.74rem; }
+.sa-page .sa-cols{ display:flex;align-items:flex-end;gap:3px;height:120px;border-bottom:1px solid var(--ec-border); }
+.sa-page .sa-col{ flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative;min-width:0; }
+.sa-page .sa-col i{ display:block;width:100%;max-width:18px;border-radius:4px 4px 0 0; }
+.sa-page .sa-col i.ok{ background:#28c76f; } .sa-page .sa-col i.mid{ background:#ff9f43; } .sa-page .sa-col i.low{ background:#ea5455; }
+.sa-page .sa-col span{ position:absolute;bottom:-1.2rem;font-size:.65rem;color:var(--ec-text-muted); }
+.sa-page .sa-insights .row{ margin-top:1.4rem !important; }
+.sa-page .sa-top{ display:flex;justify-content:space-between;gap:.5rem;font-size:.84rem;padding:.3rem 0;border-bottom:1px solid #f1f1f1; }
+@media (max-width:767.98px){ .sa-page .sa-kpis{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media print{ .sa-page .sa-insights{ display:none; } }

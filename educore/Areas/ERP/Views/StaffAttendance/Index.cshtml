@@ -65,6 +65,23 @@
         <button id="btnPrintReg" class="btn btn-sm btn-outline-secondary"><i class="bx bx-printer me-1"></i>Print</button>
       </div></div>
       <div class="ec-card"><div class="ec-card-body p-0"><div class="sa-reg-wrap" id="rWrap"></div></div></div>
+
+      @* Month at a glance: worked out from the register above, no extra call *@
+      <div class="ec-card mt-3 sa-insights"><div class="ec-card-body">
+        <h6 class="fw-bold mb-1">Month at a glance</h6>
+        <div class="text-muted small mb-3">From the marks above. Days with no mark are left out.</div>
+        <div class="sa-kpis" id="rKpis"></div>
+        <div class="row g-3 mt-1">
+          <div class="col-12 col-lg-6"><div class="fw-semibold small mb-1">Present each day</div><div id="rDaily"></div></div>
+          <div class="col-12 col-lg-6">
+            <div class="row g-3">
+              <div class="col-12 col-sm-6"><div class="fw-semibold small mb-1">Most absent</div><div id="rAbsent"></div></div>
+              <div class="col-12 col-sm-6"><div class="fw-semibold small mb-1">Most late</div><div id="rLate"></div></div>
+              <div class="col-12"><div class="fw-semibold small mb-1">Most leave</div><div id="rLeave"></div></div>
+            </div>
+          </div>
+        </div>
+      </div></div>
     </div>
 
     @* ── Substitutes ────────────────────────────────────── *@
@@ -217,8 +234,55 @@ $(function () {
             $('#rWrap').html(body
                 ? '<table class="sa-reg"><thead>' + head + '</thead><tbody>' + body + '</tbody></table>'
                 : '<div class="text-muted p-4 text-center">No staff.</div>');
+            drawMonthInsights(d.staff || [], marks, days, parts);
         }).fail(function () { ecToast('error', 'Could not load the register.'); });
     }
+    // Month at a glance: daily presence, and who was absent / late / on leave most.
+    function drawMonthInsights(staff, marks, days, parts) {
+        var per = staff.map(function (s) { return { name: s.name, A: 0, L: 0, V: 0, H: 0 }; }), daily = [], markedDays = 0, presentSum = 0;
+        for (var i = 1; i <= days; i++) {
+            var marked = 0, present = 0;
+            staff.forEach(function (s, k) {
+                var st = marks[s.id + '_' + i];
+                if (!st) return;
+                marked++;
+                if (st === 'Present' || st === 'Late') present++;
+                if (st === 'HalfDay') { present += 0.5; per[k].H++; }
+                if (st === 'Absent') per[k].A++;
+                if (st === 'Late') per[k].L++;
+                if (st === 'Leave') per[k].V++;
+            });
+            daily.push({ day: i, marked: marked, present: present });
+            if (marked) { markedDays++; presentSum += present / marked; }
+        }
+        var avg = markedDays ? Math.round(presentSum * 100 / markedDays) : null;
+        var totA = 0, totL = 0, totV = 0;
+        per.forEach(function (p) { totA += p.A; totL += p.L; totV += p.V; });
+        $('#rKpis').html(
+            '<div><b>' + (avg === null ? '—' : avg + '%') + '</b><small>average present</small></div>'
+          + '<div><b>' + markedDays + '</b><small>day(s) marked</small></div>'
+          + '<div><b class="s-A">' + totA + '</b><small>absences</small></div>'
+          + '<div><b class="s-L">' + totL + '</b><small>late arrivals</small></div>'
+          + '<div><b class="s-V">' + totV + '</b><small>leave days</small></div>');
+
+        var maxM = Math.max.apply(null, daily.map(function (x) { return x.marked; }).concat([1]));
+        $('#rDaily').html(markedDays ? '<div class="sa-cols">' + daily.map(function (x) {
+            var p = x.marked ? Math.round(x.present * 100 / x.marked) : 0;
+            return '<div class="sa-col" title="' + x.day + ': ' + (x.marked ? p + '% present (' + x.present + ' of ' + x.marked + ')' : 'not marked') + '">'
+                 + '<i style="height:' + (x.marked ? Math.max(p, 3) : 0) + '%" class="' + (p >= 90 ? 'ok' : p >= 75 ? 'mid' : 'low') + '"></i><span>' + (x.day % 5 === 1 ? x.day : '') + '</span></div>';
+        }).join('') + '</div>' : '<div class="text-muted small">Nothing marked this month.</div>');
+
+        function top(key, cls, word) {
+            var list = per.filter(function (p) { return p[key] > 0; }).sort(function (a, b) { return b[key] - a[key]; }).slice(0, 5);
+            return list.length ? list.map(function (p) {
+                return '<div class="sa-top"><span>' + EC.esc(p.name) + '</span><b class="' + cls + '">' + p[key] + ' ' + word + '</b></div>';
+            }).join('') : '<div class="text-muted small">Nobody.</div>';
+        }
+        $('#rAbsent').html(top('A', 's-A', 'day(s)'));
+        $('#rLate').html(top('L', 's-L', 'time(s)'));
+        $('#rLeave').html(top('V', 's-V', 'day(s)'));
+    }
+
     $('#rMonth').on('change', loadMonth);
     $('#btnPrintReg').on('click', function () { window.print(); });
 
