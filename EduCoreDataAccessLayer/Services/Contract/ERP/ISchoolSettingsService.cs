@@ -141,6 +141,14 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             bool refundableOnly = false
         );
 
+        /// <summary>
+        /// Copy every class's fee structure from one session into another (classes that
+        /// already have one there are left alone), raised by a percentage, whole rupees.
+        /// </summary>
+        Task<(bool Success, string Message)> CopyFeeStructureAsync(
+            string fromYear, string toYear, decimal increasePercent,
+            int tenantId, int schoolId, int actionUserId);
+
         // Returns which classes were written, and where it stopped if it did.
         Task<(bool Success, string Message)> SaveFeeStructureAsync(
             FeeStructureModel model,

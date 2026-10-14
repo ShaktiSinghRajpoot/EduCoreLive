@@ -578,6 +578,23 @@ namespace educore.Areas.ERP.Controllers
         #region FeeStructure
 
         [HttpGet]
+        // Copy every class's fee structure from an earlier session into this one, optionally
+        // raised by a percentage (whole rupees). Classes already set up are left alone.
+        [HttpPost]
+        [HasPermission("settings.manage")]   // fee master: admin-level, not the cashier's fees.manage
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CopyFeeStructure(string? fromYear, string? toYear, decimal increasePercent = 0)
+        {
+            if (string.IsNullOrWhiteSpace(fromYear) || string.IsNullOrWhiteSpace(toYear))
+                return Json(new { success = false, message = "Choose the session to copy from." });
+            int tenantId     = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId     = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value   ?? "0");
+            var (ok, msg) = await _schoolSettingsService.CopyFeeStructureAsync(
+                fromYear.Trim(), toYear.Trim(), increasePercent, tenantId, schoolId, actionUserId);
+            return Json(new { success = ok, message = msg });
+        }
+
         [HasPermission("fees.view")]
         public async Task<IActionResult> FeeStructure(string? academicYear)
         {

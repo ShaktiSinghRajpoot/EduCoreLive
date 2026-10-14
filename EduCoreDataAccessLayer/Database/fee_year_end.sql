@@ -16,6 +16,10 @@
 --                line goes back to the session it came from.
 -- Only lines that are already DUE (due date today or earlier) can be carried or
 -- written off: next month's fee is not a year-end matter (QA BUG-091).
+--   Status -> next session, whether the session is closed, lines still to decide.
+--   Close  -> once every line is carried or written off, the session's fees are
+--             closed: nothing on this page can change until it is re-opened.
+--   Reopen -> undoes Close (fees.writeoff, like a write-off).
 --
 -- Needs student_money_lifecycle.sql (fn_ledger_close / fn_ledger_reopen).
 -- Re-runnable.
@@ -31,6 +35,11 @@ ALTER TABLE core.student_ledger
 UPDATE core.student_ledger SET carried_at = NULL, carried_by = NULL
  WHERE carried_at IS NOT NULL AND carried_from IS NULL;
 
+-- When the session's fees were closed on the Year-End page (NULL = open).
+ALTER TABLE academic.academic_years
+    ADD COLUMN IF NOT EXISTS fees_closed_at timestamptz,
+    ADD COLUMN IF NOT EXISTS fees_closed_by integer;
+
 -- Writing dues off is a decision for the head of school, not the fee counter.
 INSERT INTO config.permissions (permission_key, module_group, display_name, sort_order)
 VALUES ('fees.writeoff', 'Finance', 'Fees & Collection — Write off dues (year-end)', 78)
@@ -38,7 +47,7 @@ ON CONFLICT (permission_key) DO NOTHING;
 
 
 CREATE OR REPLACE PROCEDURE core.sp_fee_year_end_manage(
-    IN    p_operation      varchar,    -- List | Carry | WriteOff | Undo | CarryAll
+    IN    p_operation      varchar,    -- List | Status | Carry | WriteOff | Undo | CarryAll | Close | Reopen
     IN    p_tenant_id      integer,
     IN    p_school_id      integer,
     IN    p_action_user_id integer,
@@ -55,6 +64,9 @@ DECLARE
     v_next   varchar;            -- the session after v_year, where carried dues go
     v_count  integer := 0;
     v_amount numeric(12,2) := 0;
+    v_closed timestamptz;        -- when this session's fees were closed (NULL = open)
+    v_open   integer := 0;       -- lines still to decide
+    v_notdue integer := 0;       -- ... of which not due yet
     r        record;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
@@ -72,6 +84,59 @@ BEGIN
        AND n.start_date > cur.start_date
      ORDER BY n.start_date
      LIMIT 1;
+
+    SELECT y.fees_closed_at INTO v_closed
+      FROM academic.academic_years y
+     WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id
+       AND lower(y.academic_year_name) = v_year AND NOT COALESCE(y.is_deleted, FALSE)
+     LIMIT 1;
+
+    -- Lines of this session still unpaid and not yet carried or written off.
+    SELECT COUNT(*), COUNT(*) FILTER (WHERE NULLIF(l.due_date, '')::date > CURRENT_DATE)
+      INTO v_open, v_notdue
+      FROM core.student_ledger l
+      JOIN core.students s ON s.student_id = l.student_id
+     WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
+       AND lower(COALESCE(NULLIF(trim(l.academic_year), ''), s.academic_year)) = v_year
+       AND l.amount_due > l.amount_paid + l.concession
+       AND COALESCE(l.close_source, '') <> 'YearEnd';
+
+    -- ── Status: what the page needs to know about the session as a whole
+    IF p_operation = 'Status' THEN
+        OPEN p_result FOR
+        SELECT v_next AS next_session, v_closed AS closed_at,
+               (SELECT core.fn_user_display_name(y.fees_closed_by) FROM academic.academic_years y
+                 WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id
+                   AND lower(y.academic_year_name) = v_year LIMIT 1) AS closed_by,
+               v_open AS open_lines, v_notdue AS not_due_lines;
+        RETURN;
+    END IF;
+
+    -- ── Close / Reopen the session's fees
+    IF p_operation = 'Close' THEN
+        IF v_closed IS NOT NULL THEN
+            RAISE EXCEPTION 'This session is already closed.';
+        END IF;
+        IF v_open > 0 THEN
+            RAISE EXCEPTION '% fee line(s) are still to decide% Carry or write off every line first.',
+                v_open, CASE WHEN v_notdue > 0 THEN ' (' || v_notdue || ' not due yet).' ELSE '.' END;
+        END IF;
+        UPDATE academic.academic_years
+           SET fees_closed_at = now(), fees_closed_by = p_action_user_id
+         WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND lower(academic_year_name) = v_year;
+        OPEN p_result FOR SELECT 'Session ' || p_academic_year || ' is closed.' AS message;
+        RETURN;
+    END IF;
+    IF p_operation = 'Reopen' THEN
+        IF v_closed IS NULL THEN
+            RAISE EXCEPTION 'This session is not closed.';
+        END IF;
+        UPDATE academic.academic_years
+           SET fees_closed_at = NULL, fees_closed_by = NULL
+         WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND lower(academic_year_name) = v_year;
+        OPEN p_result FOR SELECT 'Session ' || p_academic_year || ' is open again.' AS message;
+        RETURN;
+    END IF;
 
     -- ── List: the session's open lines, its write-offs, and what it carried forward
     IF p_operation = 'List' THEN
@@ -103,6 +168,9 @@ BEGIN
 
     IF p_operation NOT IN ('Carry', 'WriteOff', 'Undo', 'CarryAll') THEN
         RAISE EXCEPTION 'Unknown operation.';
+    END IF;
+    IF v_closed IS NOT NULL THEN
+        RAISE EXCEPTION 'Session % is closed. Re-open it to change anything.', p_academic_year;
     END IF;
     IF p_operation = 'WriteOff' AND v_reason IS NULL THEN
         RAISE EXCEPTION 'Give a reason for the write-off.';

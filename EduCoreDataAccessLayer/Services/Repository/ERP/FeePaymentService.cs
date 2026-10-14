@@ -1084,6 +1084,30 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return list;
         }
 
+        public async Task<YearEndStatus> GetYearEndStatusAsync(
+            string academicYear, int tenantId, int schoolId, int actionUserId)
+        {
+            var status = new YearEndStatus();
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(academicYear))
+                return status;
+
+            await _db.ExecuteCursorsAsync(SpYearEnd,
+                YearEndParams("Status", academicYear, null, null, null, tenantId, schoolId, actionUserId),
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    if (await reader.ReadAsync())
+                    {
+                        status.NextSession = DbRead.NStr(reader, cols, "next_session");
+                        status.ClosedAt    = DbRead.DateTimeN(reader, cols, "closed_at");
+                        status.ClosedBy    = DbRead.NStr(reader, cols, "closed_by");
+                        status.OpenLines   = DbRead.Int(reader, cols, "open_lines");
+                        status.NotDueLines = DbRead.Int(reader, cols, "not_due_lines");
+                    }
+                });
+            return status;
+        }
+
         public async Task<(bool Success, string Message)> YearEndActionAsync(
             string operation, string academicYear, int? ledgerId, int? studentId, string? reason,
             int tenantId, int schoolId, int actionUserId)

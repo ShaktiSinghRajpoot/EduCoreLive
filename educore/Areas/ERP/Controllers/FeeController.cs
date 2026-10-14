@@ -512,16 +512,35 @@ namespace educore.Areas.ERP.Controllers
             }));
         }
 
+        // The session as a whole: is there a next session, is it closed, what is left.
+        [HttpGet]
+        public async Task<IActionResult> GetYearEndStatus(string? session)
+        {
+            if (string.IsNullOrWhiteSpace(session)) return Json(new { });
+            var st = await _feePaymentService.GetYearEndStatusAsync(session.Trim(), TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                next     = st.NextSession,
+                closedAt = st.ClosedAt?.ToString("dd MMM yyyy"),
+                closedBy = st.ClosedBy,
+                open     = st.OpenLines,
+                notDue   = st.NotDueLines
+            });
+        }
+
         [HttpPost]
         [HasPermission("fees.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> YearEndAction([FromBody] YearEndRequest req)
         {
-            var allowed = new[] { "Carry", "WriteOff", "Undo", "CarryAll" };
+            var allowed = new[] { "Carry", "WriteOff", "Undo", "CarryAll", "Close", "Reopen" };
             if (req == null || string.IsNullOrWhiteSpace(req.Session) || !allowed.Contains(req.Operation))
                 return Json(new { success = false, message = "Invalid request." });
             if (req.Operation == "WriteOff" && !await HasPermissionAttribute.UserHasAsync(this, "fees.writeoff"))
                 return Json(new { success = false, message = "Writing dues off needs the school admin or principal." });
+            // Opening a closed session again is the head of school's call, like a write-off.
+            if (req.Operation == "Reopen" && !await HasPermissionAttribute.UserHasAsync(this, "fees.writeoff"))
+                return Json(new { success = false, message = "Re-opening a closed session needs the school admin or principal." });
 
             var (ok, msg) = await _feePaymentService.YearEndActionAsync(
                 req.Operation!, req.Session!.Trim(), req.LedgerId, req.StudentId, NullIfEmpty(req.Reason),
@@ -531,7 +550,7 @@ namespace educore.Areas.ERP.Controllers
 
         public class YearEndRequest
         {
-            public string? Operation { get; set; }   // Carry | WriteOff | Undo | CarryAll
+            public string? Operation { get; set; }   // Carry | WriteOff | Undo | CarryAll | Close | Reopen
             public string? Session   { get; set; }
             public int?    LedgerId  { get; set; }
             public int?    StudentId { get; set; }

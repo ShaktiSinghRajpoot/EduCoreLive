@@ -46,6 +46,44 @@
             </div>
         </div>
 
+        @await Html.PartialAsync("_SessionSteps", 2)
+
+        @if (ViewBag.CanManage == true && Model.AcademicYears.Count > 1)
+        {
+            @* A new session starts empty: copy last session's fees instead of typing them again. *@
+            <div class="ec-card mb-4">
+                <div class="ec-card-body d-flex flex-wrap align-items-end gap-2">
+                    <div class="me-auto">
+                        <div class="fw-semibold">Copy fees from another session</div>
+                        <div class="small text-muted">Every class's structure is copied; classes already set up in the target session are left as they are.</div>
+                    </div>
+                    <div>
+                        <label class="form-label mb-1 small">From</label>
+                        <select id="cpFrom" class="form-select form-select-sm">
+                            @foreach (var yr in Model.AcademicYears)
+                            {
+                                <option value="@yr">@yr</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label mb-1 small">Into</label>
+                        <select id="cpTo" class="form-select form-select-sm">
+                            @foreach (var yr in Model.AcademicYears)
+                            {
+                                <option value="@yr" selected="@(yr == Model.AcademicYear)">@yr</option>
+                            }
+                        </select>
+                    </div>
+                    <div style="width:110px">
+                        <label class="form-label mb-1 small">Increase %</label>
+                        <input id="cpPct" type="number" min="0" max="100" step="1" value="0" class="form-control form-control-sm" />
+                    </div>
+                    <button type="button" id="cpBtn" class="btn btn-sm btn-primary"><i class="bx bx-copy me-1"></i>Copy</button>
+                </div>
+            </div>
+        }
+
         <form asp-area="ERP"
               asp-controller="SchoolSettings"
               asp-action="SaveFeeStructure"
@@ -952,6 +990,29 @@
             });
 
             updateSummary();
+        });
+
+        // Copy last session's fees into a new session (sp_fee_structure_copy).
+        $('#cpBtn').on('click', function () {
+            var $b = $(this), from = $('#cpFrom').val(), to = $('#cpTo').val(), pct = EC.num($('#cpPct').val());
+            if (from === to) { ecToast('warning', 'Choose two different sessions.'); return; }
+            if (pct < 0 || pct > 100) { ecToast('warning', 'The increase must be between 0 and 100 percent.'); return; }
+            EC.confirm({ title: 'Copy fees from ' + from + ' into ' + to + '?', danger: false, okText: 'Copy',
+                         message: (pct > 0 ? 'Every amount is raised by ' + pct + '% and rounded to whole rupees. ' : '') +
+                                  'Classes that already have a structure in ' + to + ' are not changed.' })
+              .then(function (ok) {
+                  if (!ok) return;
+                  EC.buttonBusy($b, 'Copying…');
+                  $.ajax({ url: '@Url.Action("CopyFeeStructure", "SchoolSettings", new { area = "ERP" })', type: 'POST',
+                           headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+                           data: { fromYear: from, toYear: to, increasePercent: pct } })
+                    .done(function (r) {
+                        ecToast(r.success ? 'success' : 'error', r.message);
+                        if (r.success) location.href = '@Url.Action("FeeStructure", "SchoolSettings", new { area = "ERP" })?academicYear=' + encodeURIComponent(to);
+                        else EC.buttonReset($b);
+                    })
+                    .fail(function () { ecToast('error', 'Could not copy. Please try again.'); EC.buttonReset($b); });
+              });
         });
     </script>
 }

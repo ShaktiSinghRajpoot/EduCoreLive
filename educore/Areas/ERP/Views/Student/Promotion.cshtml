@@ -34,6 +34,8 @@
       </div>
     </div>
 
+    @await Html.PartialAsync("_SessionSteps", 3)
+
     <!-- Source → Target flow -->
     <div class="ec-card mb-4">
       <div class="ec-card-body">
@@ -111,8 +113,8 @@
             <span>
               Promote students who still owe fees
               <span class="d-block text-muted" style="font-size:.75rem;">
-                Untick to hold them back instead. Dues follow the student either way —
-                the fee ledger is not session-wise, so nothing is written off here.
+                Untick to hold them back instead. Old dues stay on the student's account
+                either way; decide them afterwards on Year-End (carry forward or write off).
               </span>
             </span>
           </label>

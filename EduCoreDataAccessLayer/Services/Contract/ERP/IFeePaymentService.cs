@@ -188,6 +188,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// Year-End closure action: Carry | WriteOff | Undo on one line (ledgerId), Carry | WriteOff
         /// on all open lines of one student (studentId), or CarryAll for the whole session.
         /// </summary>
+        Task<YearEndStatus> GetYearEndStatusAsync(
+            string academicYear, int tenantId, int schoolId, int actionUserId);
+
         Task<(bool Success, string Message)> YearEndActionAsync(
             string operation, string academicYear, int? ledgerId, int? studentId, string? reason,
             int tenantId, int schoolId, int actionUserId);

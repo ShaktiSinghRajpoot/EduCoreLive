@@ -1,0 +1,33 @@
+@*
+    The five steps of moving a school into a new session, shown on each page that
+    is one of them so a school knows what comes before and after.
+    The page passes its own step: @await Html.PartialAsync("_SessionSteps", 3)
+*@
+@model int
+@{
+    var steps = new[]
+    {
+        (No: 1, Title: "New session",   Hint: "Session, classes & sections", Area: "ERP", Controller: "SchoolSettings", Action: "AcademicYears"),
+        (No: 2, Title: "Fee structure", Hint: "Copy last year's fees",       Area: "ERP", Controller: "SchoolSettings", Action: "FeeStructure"),
+        (No: 3, Title: "Promotion",     Hint: "Move students up",            Area: "ERP", Controller: "Student",        Action: "Promotion"),
+        (No: 4, Title: "Year-End",      Hint: "Old dues: carry / write off", Area: "ERP", Controller: "Fee",            Action: "YearEnd"),
+        (No: 5, Title: "Make it current", Hint: "Set the new session current", Area: "ERP", Controller: "SchoolSettings", Action: "AcademicYears")
+    };
+}
+<div class="ec-card mb-3 no-print">
+  <div class="ec-card-body py-2">
+    <div class="small text-muted mb-1">Session change, in this order</div>
+    <div class="d-flex flex-wrap gap-2">
+      @foreach (var s in steps)
+      {
+          var current = s.No == Model;
+          <a href="@Url.Action(s.Action, s.Controller, new { area = s.Area })"
+             class="btn btn-sm @(current ? "btn-primary" : "btn-outline-secondary") text-start"
+             style="min-width:150px">
+            <span class="fw-bold">@s.No. @s.Title</span>
+            <span class="d-block" style="font-size:.72rem;opacity:.85">@s.Hint</span>
+          </a>
+      }
+    </div>
+  </div>
+</div>

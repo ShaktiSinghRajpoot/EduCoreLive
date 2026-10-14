@@ -41,7 +41,22 @@
       </div>
     </div>
 
+    @await Html.PartialAsync("_SessionSteps", 4)
+
     <div id="yNext" class="alert py-2 d-none"></div>
+
+    <!-- the session as a whole: closed or not, and the Close / Re-open button -->
+    <div id="yClose" class="ec-card mb-3 d-none"><div class="ec-card-body py-2 d-flex flex-wrap align-items-center gap-2">
+      <div class="flex-grow-1 small" id="yCloseText"></div>
+      @if (canManage)
+      {
+          <button id="btnClose" class="btn btn-sm btn-outline-primary d-none"><i class="bx bx-lock-alt me-1"></i>Close session</button>
+      }
+      @if (canWriteOff)
+      {
+          <button id="btnReopen" class="btn btn-sm btn-outline-secondary d-none"><i class="bx bx-lock-open-alt me-1"></i>Re-open session</button>
+      }
+    </div></div>
 
     <div class="kpis">
       <div class="kpi open"><div class="l">To decide</div><div class="v" id="kOpen">₹0</div><div class="s" id="kOpenN">0 lines</div></div>
@@ -79,18 +94,39 @@ $(function () {
     'use strict';
 
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
-    var URL = { lines:'@Url.Action("GetYearEndLines","Fee",new{area="ERP"})', act:'@Url.Action("YearEndAction","Fee",new{area="ERP"})' };
+    var URL = { lines:'@Url.Action("GetYearEndLines","Fee",new{area="ERP"})', act:'@Url.Action("YearEndAction","Fee",new{area="ERP"})',
+                status:'@Url.Action("GetYearEndStatus","Fee",new{area="ERP"})' };
     var CAN_MANAGE = @(canManage ? "true" : "false");     // fees.manage: carry
     var CAN_WRITEOFF = @(canWriteOff ? "true" : "false"); // fees.writeoff: write off
     var PAGE = 40;
 
     var lines = [];      // every line of the session from the server
+    var status = {};     // next session, closed or not, lines still to decide
     var state = 'Open';  // tab
     var shown = PAGE;    // how many student cards are drawn
 
+    // Carrying needs a next session; nothing changes once the session is closed.
+    function canCarry() { return CAN_MANAGE && !!status.next && !status.closedAt; }
+    function canAct()   { return CAN_MANAGE && !status.closedAt; }
+
+    function drawStatus() {
+        var closed = !!status.closedAt;
+        $('#yClose').removeClass('d-none');
+        $('#yCloseText').html(closed
+            ? '<i class="bx bx-lock-alt me-1"></i>This session was closed on <b>' + EC.esc(status.closedAt) + '</b>' + (status.closedBy ? ' by ' + EC.esc(status.closedBy) : '') + '. Nothing here can change until it is re-opened.'
+            : status.open > 0
+                ? status.open + ' fee line(s) still to decide' + (status.notDue > 0 ? ' (' + status.notDue + ' not due yet)' : '') + '. Close the session once every line is carried or written off.'
+                : 'Every line is decided. You can close the session now.');
+        $('#btnClose').toggleClass('d-none', closed).prop('disabled', status.open > 0);
+        $('#btnReopen').toggleClass('d-none', !closed);
+        $('#btnCarryAll').toggleClass('d-none', !canCarry());
+    }
+
     function load() {
         EC.listLoading('#yList', 'Loading dues...');
-        $.getJSON(URL.lines, { session: $('#ySession').val() }).done(function (rows) {
+        var session = $('#ySession').val();
+        $.getJSON(URL.status, { session: session }).done(function (st) { status = st || {}; drawStatus(); draw(); });
+        $.getJSON(URL.lines, { session: session }).done(function (rows) {
             lines = rows || [];
             // where carried dues go; without a next session nothing can be carried
             var next = lines.length ? lines[0].next : null;
@@ -160,8 +196,8 @@ $(function () {
             if (l.state === 'Open' && !l.notDue) open++;
         });
         var who = [classOf(f), f.adm, f.guardian ? 'F: ' + f.guardian : '', f.mobile].filter(Boolean).map(EC.esc).join(' · ');
-        var btns = CAN_MANAGE && open > 0
-            ? '<div class="ye-btns"><button class="btn btn-sm ec-btn-soft ye-act" data-op="Carry" data-sid="' + f.sid + '">Carry all due</button>'
+        var btns = canAct() && open > 0
+            ? '<div class="ye-btns">' + (canCarry() ? '<button class="btn btn-sm ec-btn-soft ye-act" data-op="Carry" data-sid="' + f.sid + '">Carry all due</button>' : '')
             + (CAN_WRITEOFF ? '<button class="btn btn-sm btn-outline-danger ye-act" data-op="WriteOff" data-sid="' + f.sid + '">Write off all due</button>' : '') + '</div>'
             : '';
         return '<div class="ec-card ye-stu"><div class="ye-head"><div><div class="ye-name">' + EC.esc(f.name)
@@ -174,9 +210,9 @@ $(function () {
         var note = l.state === 'WrittenOff' && l.reason ? '<div class="ye-note">' + EC.esc(l.reason) + (l.decided ? ' · ' + EC.esc(l.decided) : '') + '</div>'
                  : l.state === 'Carried' ? '<div class="ye-note">' + EC.esc(l.reason || 'Carried') + (l.decided ? ' · ' + EC.esc(l.decided) : '') + '</div>' : '';
         var btns = '';
-        if (CAN_MANAGE) {
+        if (canAct()) {
             btns = l.state === 'Open'
-                ? (l.notDue ? '' : '<button class="btn btn-xs ec-btn-soft ye-act" data-op="Carry" data-id="' + l.id + '">Carry fwd</button>'
+                ? (l.notDue ? '' : (canCarry() ? '<button class="btn btn-xs ec-btn-soft ye-act" data-op="Carry" data-id="' + l.id + '">Carry fwd</button>' : '')
                   + (CAN_WRITEOFF ? '<button class="btn btn-xs btn-outline-danger ye-act" data-op="WriteOff" data-id="' + l.id + '">Write off</button>' : ''))
                 : '<button class="btn btn-xs btn-outline-secondary ye-act" data-op="Undo" data-id="' + l.id + '">Undo</button>';
         }
@@ -213,6 +249,19 @@ $(function () {
         EC.confirm({ title: 'Carry forward every due still to decide?', danger: false, okText: 'Carry all',
                      message: 'Fees already due move into the next session and stay payable there. Fees not due yet stay here. Write-offs are not changed.' })
           .then(function (ok) { if (ok) send({ operation: 'CarryAll' }, $b); });
+    });
+
+    $('#btnClose').on('click', function () {
+        var $b = $(this);
+        EC.confirm({ title: 'Close session ' + $('#ySession').val() + '?', danger: false, okText: 'Close session',
+                     message: 'Every fee line of this session is decided. After closing, nothing can be carried, written off or undone here until the session is re-opened.' })
+          .then(function (ok) { if (ok) send({ operation: 'Close' }, $b); });
+    });
+    $('#btnReopen').on('click', function () {
+        var $b = $(this);
+        EC.confirm({ title: 'Re-open session ' + $('#ySession').val() + '?', danger: false, okText: 'Re-open',
+                     message: 'Carry, write off and undo work again for this session.' })
+          .then(function (ok) { if (ok) send({ operation: 'Reopen' }, $b); });
     });
 
     $('#yTabs').on('click', 'button', function () {

@@ -163,6 +163,7 @@ DECLARE
     v_tgt_start   date;
     v_plan        jsonb;
     v_billed      integer := 0;
+    v_roll        varchar;   -- the roll number in the new class (see below)
     v_unbilled    text[]  := '{}';
     v_route       integer;
     v_stop        integer;
@@ -427,9 +428,35 @@ BEGIN
             --    student's PRESENT position (overwritten), and
             --    core.student_enrolment gains a row per session so the position
             --    they are leaving is not lost. See student_enrolment.sql.
+            -- Roll number in the new class: keep it, unless the student has none or
+            -- someone already in that class-section uses it -- then the next free
+            -- number (highest + 1). Renumbering a whole class is Students › Data Checks.
+            v_roll := NULLIF(TRIM(COALESCE(s.roll_no, '')), '');
+            IF v_outcome IN ('Promote', 'Retain') AND (v_roll IS NULL OR EXISTS (
+                   SELECT 1 FROM core.students o
+                    WHERE o.tenant_id = p_tenant_id AND o.school_id = p_school_id AND o.is_active
+                      AND o.student_id <> s.student_id AND o.academic_year = v_tgt
+                      AND o.class_name = v_to_class AND COALESCE(o.section, '') = COALESCE(v_to_section, '')
+                      AND lower(TRIM(o.roll_no)) = lower(v_roll))) THEN
+                -- counts those already moved in AND classmates of this run still to come,
+                -- so a missing roll goes after everyone else's instead of taking roll 1
+                SELECT (COALESCE(MAX(TRIM(x.roll_no)::int), 0) + 1)::text INTO v_roll
+                  FROM (SELECT o.roll_no FROM core.students o
+                         WHERE o.tenant_id = p_tenant_id AND o.school_id = p_school_id AND o.is_active
+                           AND o.student_id <> s.student_id AND o.academic_year = v_tgt
+                           AND o.class_name = v_to_class AND COALESCE(o.section, '') = COALESCE(v_to_section, '')
+                        UNION ALL
+                        SELECT o.roll_no FROM core.students o
+                         WHERE o.student_id IN (SELECT (j->>'studentId')::int FROM jsonb_array_elements(p_students) j)
+                           AND o.student_id <> s.student_id AND o.academic_year = s.academic_year
+                           AND o.class_name = s.class_name AND COALESCE(o.section, '') = COALESCE(s.section, '')) x
+                 WHERE TRIM(x.roll_no) ~ '^[0-9]{1,6}$';
+            END IF;
+
             IF v_outcome = 'Promote' THEN
                 UPDATE core.students
                 SET class_name    = v_to_class,
+                    roll_no       = v_roll,
                     section       = v_to_section,
                     academic_year = v_tgt,
                     updated_by    = p_action_user_id,
@@ -440,13 +467,14 @@ BEGIN
                     s.student_id, s.academic_year, 'Promoted', p_action_user_id);
                 PERFORM core.fn_student_enrolment_open(
                     p_tenant_id, p_school_id, s.student_id,
-                    v_tgt, v_to_class, v_to_section, s.roll_no, p_action_user_id);
+                    v_tgt, v_to_class, v_to_section, v_roll, p_action_user_id);
 
                 v_promoted := v_promoted + 1;
 
             ELSIF v_outcome = 'Retain' THEN
                 UPDATE core.students
                 SET section       = v_to_section,
+                    roll_no       = v_roll,
                     academic_year = v_tgt,
                     updated_by    = p_action_user_id,
                     updated_at    = now()
@@ -456,7 +484,7 @@ BEGIN
                     s.student_id, s.academic_year, 'Retained', p_action_user_id);
                 PERFORM core.fn_student_enrolment_open(
                     p_tenant_id, p_school_id, s.student_id,
-                    v_tgt, v_to_class, v_to_section, s.roll_no, p_action_user_id);
+                    v_tgt, v_to_class, v_to_section, v_roll, p_action_user_id);
 
                 v_retained := v_retained + 1;
 

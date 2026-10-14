@@ -5424,3 +5424,18 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - Student attendance is marked Present / Absent only (school's decision, 15 Oct): the Late and Leave buttons
   are removed again. Days saved earlier as Late show as Present; an old Leave keeps its tag until changed.
 - Mobile check (375 px, live, 15 Oct): 27 pages, none scrolls sideways.
+
+### 2026-10-15 — Session change: Promotion and Year-End work as one path
+- Shared `Views/Shared/_SessionSteps.cshtml` on Sessions, Fee Structure, Promotion and Year-End:
+  1 new session → 2 fee structure → 3 promotion → 4 year-end → 5 make it current, with links.
+- **Copy fee structure** (Fee Structure page, `core.sp_fee_structure_copy`, new file
+  fee_structure_copy.sql): every class's structure from one session into another, optional % increase in
+  whole rupees; classes already set up are left alone (safe to run twice).
+- **Year-End**: new ops `Status` / `Close` / `Reopen` in `sp_fee_year_end_manage`
+  (`academic_years.fees_closed_at/by`). Close only when no line is left to decide; a closed session refuses
+  Carry / Write off / Undo; Reopen needs fees.writeoff. Carry buttons are hidden when there is no next session.
+- **Promotion**: a student with no roll number, or whose roll is already taken in the new class-section, gets
+  the next free number (after classmates of the same run); others keep theirs. The "promote students who owe"
+  note now points to Year-End for the old dues.
+- New suite `tests/session_change_tests.sql` (7 checks, rolled back): all pass.
+- Bundle `deploy_2026_10_15a.sql` (fee_structure_copy, fee_year_end, student_promotion).

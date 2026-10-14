@@ -1540,6 +1540,37 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return (true, $"Fee structure saved for {saved.Count} class(es): {string.Join(", ", saved)}.");
         }
 
+        public async Task<(bool Success, string Message)> CopyFeeStructureAsync(
+            string fromYear, string toYear, decimal increasePercent,
+            int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid school admin scope.");
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_tenant_id", tenantId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_from_year", fromYear),
+                new NpgsqlParameter("p_to_year", toYear),
+                new NpgsqlParameter("p_increase_percent", increasePercent),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "fee_copy_cursor" }
+            };
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_fee_structure_copy", parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "No response from server.");
+                return (true, AsStr(ds.Tables[0].Rows[0], "message") ?? "Copied.");
+            }
+            catch (PostgresException ex)
+            {
+                _logger.LogWarning(ex, "Fee structure copy refused ({SqlState}) tenant {TenantId}, school {SchoolId}",
+                    ex.SqlState, tenantId, schoolId);
+                return (false, ex.MessageText);
+            }
+        }
+
         public async Task<int> DeleteFeeStructureAsync(int feeStructureId, int tenantId, int schoolId, int actionUserId)
         {
             if (tenantId <= 1 || schoolId <= 0) return 0;

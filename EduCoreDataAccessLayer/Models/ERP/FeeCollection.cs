@@ -248,6 +248,16 @@
         public decimal  D60Plus          { get; set; }
     }
 
+    /// <summary>The Year-End screen's session as a whole.</summary>
+    public class YearEndStatus
+    {
+        public string?   NextSession { get; set; }   // where carried dues go (null = none yet)
+        public DateTime? ClosedAt    { get; set; }   // null = session still open
+        public string?   ClosedBy    { get; set; }
+        public int       OpenLines   { get; set; }   // still to carry / write off
+        public int       NotDueLines { get; set; }   // ... of which not due yet
+    }
+
     /// <summary>One unpaid fee line on the Year-End closure screen.</summary>
     public class YearEndLine
     {
