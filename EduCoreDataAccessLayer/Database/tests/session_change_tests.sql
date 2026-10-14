@@ -10,6 +10,8 @@ BEGIN;
 \ir ../student_promotion.sql
 \ir ../academic_session_rollover.sql
 \ir ../academic_year_class_section_fixes.sql
+\ir ../id_card.sql
+\ir ../transfer_certificate.sql
 
 DO $t$
 DECLARE
@@ -140,6 +142,24 @@ BEGIN
              NULL, NULL, NULL, FALSE, NULL, c);
         fail := fail + 1; RAISE NOTICE 'FAIL 10 empty session made current';
     EXCEPTION WHEN raise_exception THEN pass := pass + 1; RAISE NOTICE 'PASS 10 %', SQLERRM; END;
+
+    -- 12. ID cards for the OLD session still list the promoted students, with their old class
+    c := 'c18';
+    CALL core.sp_id_card_students(T, S, A, 'Class 8', 'A', '2026-27', NULL, c);
+    v_n := 0; LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.class_name = 'Class 8' AND r.academic_year = '2026-27' THEN v_n := v_n + 1; END IF; END LOOP; CLOSE c;
+    IF v_n = jsonb_array_length(v_students) THEN pass := pass + 1; RAISE NOTICE 'PASS 12 old-session ID cards: % promoted students as Class 8', v_n;
+    ELSE fail := fail + 1; RAISE NOTICE 'FAIL 12 % of % on old-session cards', v_n, jsonb_array_length(v_students); END IF;
+
+    -- 13. a TC right after promotion is written for the session they finished
+    v_n := (v_students->0->>'studentId')::int;
+    UPDATE core.students SET is_active = FALSE, status = 'Transfer', date_of_leaving = CURRENT_DATE WHERE student_id = v_n;
+    UPDATE core.student_ledger SET amount_paid = amount_due - COALESCE(concession, 0) WHERE student_id = v_n;
+    c := 'c19';
+    CALL core.sp_tc_manage('Issue', T, S, A, NULL, v_n, 'Basic', 'Good', 'Passed', 'Parent transfer', NULL, p_result_cur => c);
+    CLOSE c;
+    SELECT class_name || ' ' || academic_year INTO v_txt FROM core.tc_register WHERE student_id = v_n AND NOT is_void;
+    IF v_txt = 'Class 8 2026-27' THEN pass := pass + 1; RAISE NOTICE 'PASS 13 TC after promotion: %', v_txt;
+    ELSE fail := fail + 1; RAISE NOTICE 'FAIL 13 TC says %', v_txt; END IF;
 
     -- 11. once every student is in the new session, it can be made current
     UPDATE core.students SET academic_year = 'ZZ 2031-32' WHERE tenant_id = T AND school_id = S AND is_active;

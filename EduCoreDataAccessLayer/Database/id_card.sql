@@ -94,25 +94,40 @@ BEGIN
         RETURN;
     END IF;
 
+    -- A chosen session reads the student's class / section / roll FOR THAT session
+    -- (core.student_enrolment), so promoted students still print on an older
+    -- session's cards, with that session's class. No session = where they are now.
     OPEN p_result FOR
-    SELECT
-        s.student_id, s.admission_no, s.roll_no, s.student_name,
-        s.class_name, s.section, s.academic_year,
-        s.dob, s.blood_group, s.gender,
-        s.guardian_name, s.mobile, s.address, s.photo_url
-    FROM core.students s
-    WHERE s.tenant_id = p_tenant_id
-      AND s.school_id = p_school_id
-      AND s.is_active = TRUE
-      AND (p_student_id IS NULL OR s.student_id = p_student_id)
-      AND (p_class IS NULL OR TRIM(p_class) = '' OR LOWER(s.class_name) = LOWER(TRIM(p_class)))
-      AND (p_section IS NULL OR TRIM(p_section) = '' OR LOWER(COALESCE(s.section, '')) = LOWER(TRIM(p_section)))
-      AND (p_academic_year IS NULL OR TRIM(p_academic_year) = '' OR s.academic_year = TRIM(p_academic_year))
+    SELECT x.student_id, x.admission_no, x.roll_no, x.student_name,
+           x.class_name, x.section, x.academic_year,
+           x.dob, x.blood_group, x.gender,
+           x.guardian_name, x.mobile, x.address, x.photo_url
+    FROM (
+        SELECT s.student_id, s.admission_no, s.student_name,
+               COALESCE(e.roll_no, s.roll_no)             AS roll_no,
+               COALESCE(e.class_name, s.class_name)       AS class_name,
+               COALESCE(e.section, s.section)             AS section,
+               COALESCE(e.academic_year, s.academic_year) AS academic_year,
+               s.dob, s.blood_group, s.gender,
+               s.guardian_name, s.mobile, s.address, s.photo_url
+          FROM core.students s
+          LEFT JOIN core.student_enrolment e
+                 ON e.student_id = s.student_id
+                AND NULLIF(TRIM(p_academic_year), '') IS NOT NULL
+                AND e.academic_year = TRIM(p_academic_year)
+         WHERE s.tenant_id = p_tenant_id
+           AND s.school_id = p_school_id
+           AND s.is_active = TRUE
+           AND (p_student_id IS NULL OR s.student_id = p_student_id)
+    ) x
+    WHERE (p_class IS NULL OR TRIM(p_class) = '' OR LOWER(x.class_name) = LOWER(TRIM(p_class)))
+      AND (p_section IS NULL OR TRIM(p_section) = '' OR LOWER(COALESCE(x.section, '')) = LOWER(TRIM(p_section)))
+      AND (p_academic_year IS NULL OR TRIM(p_academic_year) = '' OR x.academic_year = TRIM(p_academic_year))
     ORDER BY
         -- Roll numbers are text; sort them numerically when they are numbers,
         -- then fall back to name so the sheet reads in register order.
-        CASE WHEN s.roll_no ~ '^[0-9]+$' THEN lpad(s.roll_no, 6, '0') ELSE NULL END NULLS LAST,
-        s.student_name;
+        CASE WHEN x.roll_no ~ '^[0-9]+$' THEN lpad(x.roll_no, 6, '0') ELSE NULL END NULLS LAST,
+        x.student_name;
 END;
 $procedure$;
 
@@ -136,15 +151,25 @@ BEGIN
         RETURN;
     END IF;
 
+    -- Same rule as the cards: a chosen session uses that session's class / section.
     OPEN p_result FOR
-    SELECT DISTINCT TRIM(s.section) AS section
-    FROM core.students s
-    WHERE s.tenant_id = p_tenant_id
-      AND s.school_id = p_school_id
-      AND s.is_active = TRUE
-      AND COALESCE(TRIM(s.section), '') <> ''
-      AND (p_class IS NULL OR TRIM(p_class) = '' OR LOWER(s.class_name) = LOWER(TRIM(p_class)))
-      AND (p_academic_year IS NULL OR TRIM(p_academic_year) = '' OR s.academic_year = TRIM(p_academic_year))
+    SELECT DISTINCT TRIM(x.section) AS section
+    FROM (
+        SELECT COALESCE(e.class_name, s.class_name)       AS class_name,
+               COALESCE(e.section, s.section)             AS section,
+               COALESCE(e.academic_year, s.academic_year) AS academic_year
+          FROM core.students s
+          LEFT JOIN core.student_enrolment e
+                 ON e.student_id = s.student_id
+                AND NULLIF(TRIM(p_academic_year), '') IS NOT NULL
+                AND e.academic_year = TRIM(p_academic_year)
+         WHERE s.tenant_id = p_tenant_id
+           AND s.school_id = p_school_id
+           AND s.is_active = TRUE
+    ) x
+    WHERE COALESCE(TRIM(x.section), '') <> ''
+      AND (p_class IS NULL OR TRIM(p_class) = '' OR LOWER(x.class_name) = LOWER(TRIM(p_class)))
+      AND (p_academic_year IS NULL OR TRIM(p_academic_year) = '' OR x.academic_year = TRIM(p_academic_year))
     ORDER BY 1;
 END;
 $procedure$;

@@ -217,6 +217,8 @@ DECLARE
     v_work   integer;
     v_pres   integer;
     v_upto   varchar(50);
+    v_days   integer;
+    e        record;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -290,6 +292,28 @@ BEGIN
         END IF;
         IF p_application_date IS NOT NULL AND p_application_date > CURRENT_DATE THEN
             RAISE EXCEPTION 'The date of application cannot be after the date of issue.';
+        END IF;
+
+        -- Left just after promotion: the student has hardly studied in the new class.
+        -- Fewer than 30 register days in the new session -> the TC is written for the
+        -- session they finished (class last studied, its attendance, its fees), the
+        -- way a school writes it ("last studied Class 8, qualified for Class 9").
+        SELECT COUNT(DISTINCT a.attendance_date) INTO v_days
+          FROM core.student_attendance a
+         WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
+           AND a.academic_year = s.academic_year AND a.class_name = s.class_name
+           AND COALESCE(a.section, '') = COALESCE(s.section, '');
+        IF v_days < 30 THEN
+            SELECT en.academic_year, en.class_name, en.section INTO e
+              FROM core.student_enrolment en
+             WHERE en.student_id = p_student_id AND en.academic_year <> s.academic_year
+             ORDER BY en.academic_year DESC
+             LIMIT 1;
+            IF e.academic_year IS NOT NULL THEN
+                s.academic_year := e.academic_year;
+                s.class_name    := e.class_name;
+                s.section       := e.section;
+            END IF;
         END IF;
 
         -- Left blank on the form, these come from the school's own records

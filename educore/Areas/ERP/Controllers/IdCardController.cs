@@ -122,14 +122,22 @@ namespace educore.Areas.ERP.Controllers
             return $"{Request.Scheme}://{Request.Host}{slash}{logoUrl}";
         }
 
+        // The session a sample shows: today's April-March session ("2026-27"), so the
+        // preview never shows a year that has gone by. Sample only -- real cards use the student's.
+        private static string SampleSession()
+        {
+            int y = DateTime.Today.Month >= 4 ? DateTime.Today.Year : DateTime.Today.Year - 1;
+            return $"{y}-{(y + 1) % 100:00}";
+        }
+
         private static List<IdCardStudent> SampleStudents() => new()
         {
             new IdCardStudent { StudentName = "Aarav Sharma", AdmissionNo = "ADM-0001", RollNo = "01",
-                ClassName = "Class V", Section = "A", AcademicYear = "2026-2027",
+                ClassName = "Class V", Section = "A", AcademicYear = SampleSession(),
                 Dob = "2015-04-12", BloodGroup = "O+", Gender = "Male",
                 GuardianName = "Rajesh Sharma", Mobile = "9810000001", Address = "12, Green Park, New Delhi" },
             new IdCardStudent { StudentName = "Bhavya Gupta", AdmissionNo = "ADM-0002", RollNo = "02",
-                ClassName = "Class V", Section = "A", AcademicYear = "2026-2027",
+                ClassName = "Class V", Section = "A", AcademicYear = SampleSession(),
                 Dob = "2015-07-08", BloodGroup = "B+", Gender = "Female",
                 GuardianName = "Anil Gupta", Mobile = "9810000002", Address = "5, Rose Lane, New Delhi" }
         };

@@ -126,6 +126,14 @@ namespace educore.Areas.ERP.Controllers
             return $"{Request.Scheme}://{Request.Host}{slash}{logoUrl}";
         }
 
+        // The session a sample shows: today's April-March session ("2026-27"), so the
+        // preview never shows a year that has gone by. Sample only -- real cards use the student's.
+        private static string SampleSession()
+        {
+            int y = DateTime.Today.Month >= 4 ? DateTime.Today.Year : DateTime.Today.Year - 1;
+            return $"{y}-{(y + 1) % 100:00}";
+        }
+
         private static TransferCertificate SampleCertificate(string format) => new()
         {
             Format        = format is "Board" or "Basic" ? format : "Basic",
@@ -139,7 +147,7 @@ namespace educore.Areas.ERP.Controllers
             MotherName    = "Priya Sharma",
             ClassName     = "Class V",
             Section        = "A",
-            AcademicYear  = "2026-2027",
+            AcademicYear  = SampleSession(),
             AdmissionDate = "2021-04-01",
             DateOfLeaving = Dates.Today,
             Religion      = "Hindu",

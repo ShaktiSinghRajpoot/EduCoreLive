@@ -5459,3 +5459,10 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   Year-End opens on the previous session while it still has lines to decide and is not closed.
 - `tests/session_change_tests.sql` now 11 checks, all pass (uses its own ZZ sessions; rolled back).
 - Bundle `deploy_2026_10_15b.sql` (academic_session_rollover, academic_year_class_section_fixes).
+- **Session change edge cases**: ID cards of a chosen (older) session read the student's class / section / roll for
+  that session from `core.student_enrolment`, so promoted students still print on last session's cards with last
+  session's class. A TC issued when the new session has fewer than 30 register days for the student's section is
+  written for the session they finished (class last studied, session, its attendance and fees paid up to).
+  ID card / TC sample previews show today's April–March session instead of a fixed "2026-2027".
+  `tests/session_change_tests.sql` now 13 checks, all pass. Bundle `deploy_2026_10_15c.sql` (id_card,
+  transfer_certificate).
