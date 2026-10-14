@@ -102,7 +102,7 @@
         <!-- Classes and sections belong to one session, so a session that has not
              been set up yet cannot receive anyone. Say so here rather than letting
              the write fail at the very last step. -->
-        <div class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0" id="tgtNotReady" style="display:none;">
+        <div class="alert alert-warning d-flex d-none align-items-start gap-2 mt-3 mb-0" id="tgtNotReady">
           <i class="bx bx-error-circle fs-5"></i>
           <div class="small flex-grow-1" id="tgtNotReadyText"></div>
         </div>
@@ -207,7 +207,7 @@
         <!-- Why the promotion cannot run yet. Inline rather than a toast: the old
              code toasted from inside the confirm modal, so the message appeared
              behind it and the modal just sat there looking broken. -->
-        <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" id="promoteError" style="display:none;border-radius:12px;font-size:.85rem;">
+        <div class="alert alert-warning d-flex d-none align-items-start gap-2 mb-3" id="promoteError" style="border-radius:12px;font-size:.85rem;">
           <i class="bx bx-error-circle fs-5"></i><span id="promoteErrorText"></span>
         </div>
 
@@ -273,7 +273,7 @@
         <div class="pr-sum-line"><span class="pr-chip retain"><i class="bx bx-revision"></i>Retain in class</span><span class="v" id="mRetain">0</span></div>
         <div class="pr-sum-line"><span class="pr-chip passout"><i class="bx bx-graduation"></i>Pass out / Graduate</span><span class="v" id="mPassout">0</span></div>
         <div class="pr-sum-line"><span><i class="bx bx-wallet me-1"></i>Students who owe fees</span><span class="v" id="mDues">—</span></div>
-        <div class="alert alert-danger d-flex align-items-start gap-2 mt-3 mb-0" id="mDuesWarn" style="display:none;border-radius:12px;font-size:.82rem;">
+        <div class="alert alert-danger d-flex d-none align-items-start gap-2 mt-3 mb-0" id="mDuesWarn" style="border-radius:12px;font-size:.82rem;">
           <i class="bx bx-wallet fs-5"></i>
           <span><strong id="mDuesCount">0</strong> selected student(s) have pending dues and will be <strong>held back</strong>
                 (not promoted). Tick "Promote students who still owe fees" to move them anyway, or settle the dues first.</span>
@@ -682,7 +682,7 @@ function checkTargetSession(){
     targetReady = !!(res && res.ready);
 
     if(targetReady){
-      banner.style.display='none';
+      banner.classList.add('d-none');
       reviewBtn.removeAttribute('disabled');
       if(res.ladder && res.ladder.length){ LADDER=res.ladder; }
       // The reachable classes just changed — re-evaluate the picked one and the
@@ -703,7 +703,7 @@ function checkTargetSession(){
       ? 'Open Settings → Classes &amp; Sections, pick '+tgtY+', and copy the structure from '+res.sourceYearName+'.'
       : 'Set up its classes and sections first under Settings → Classes &amp; Sections.';
     text.innerHTML=msg;
-    banner.style.display='';
+    banner.classList.remove('d-none');
     reviewBtn.setAttribute('disabled','disabled');
   });
 }
@@ -729,7 +729,7 @@ function initTargetYear(){
     document.getElementById('tgtNotReadyText').textContent =
       'This school has only one academic session (' + src.value + '), so there is nowhere to promote students into. '
       + 'Create the next session first under Settings → Academic Year, then set up its classes and sections.';
-    document.getElementById('tgtNotReady').style.display='';
+    document.getElementById('tgtNotReady').classList.remove('d-none');
     return;
   }
 
@@ -771,9 +771,9 @@ function validate(){
 
 function showErr(msg){
   document.getElementById('promoteErrorText').textContent=msg;
-  document.getElementById('promoteError').style.display='';
+  document.getElementById('promoteError').classList.remove('d-none');
 }
-function clearErr(){ document.getElementById('promoteError').style.display='none'; }
+function clearErr(){ document.getElementById('promoteError').classList.add('d-none'); }
 
 /* Unticking the fees box makes the proc hold back anyone who owes money (a
    pass-out is exempt). Count them here so the confirm modal can say so instead of
@@ -801,7 +801,8 @@ document.getElementById('reviewBtn').addEventListener('click', function(){
 
   var dn=duesSkipCount();
   document.getElementById('mDuesCount').textContent=dn;
-  document.getElementById('mDuesWarn').style.display = dn>0 ? '' : 'none';
+  // d-flex beats an inline display:none, so the box is hidden with the d-none class
+  document.getElementById('mDuesWarn').classList.toggle('d-none', dn === 0);
 
   bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).show();
 });

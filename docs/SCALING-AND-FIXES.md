@@ -5439,3 +5439,8 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   note now points to Year-End for the old dues.
 - New suite `tests/session_change_tests.sql` (7 checks, rolled back): all pass.
 - Bundle `deploy_2026_10_15a.sql` (fee_structure_copy, fee_year_end, student_promotion).
+- Screen check on live (QA school, 15 Oct): created session 2027-28, copied 14 classes / 15 sections and the
+  fees (+10%), opened Promotion up to Review (not confirmed), Year-End shows 2027-28 as the next session with
+  Close disabled while 518 lines remain. Found: three Promotion alerts used `d-flex` + inline `display:none`,
+  which Bootstrap's `d-flex !important` overrides, so the "will be held back" warning showed with 0 students —
+  they now use the `d-none` class.
