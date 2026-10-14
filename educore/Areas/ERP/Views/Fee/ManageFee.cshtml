@@ -192,8 +192,8 @@
     <input type="number" min="0" class="form-control mb-3" id="discVal" placeholder="0">
     <label class="form-label">Reason <span class="text-danger">*</span></label>
     <input class="form-control mb-3" id="discReasonIn" placeholder="e.g. sibling / merit / staff ward">
-    <label class="form-label">Approved by <span class="text-danger">*</span></label>
-    <select class="form-select" id="discApprovedIn"><option value="">— choose —</option><option>Principal</option><option>Accountant</option><option>Admin</option><option>Management</option></select>
+    @* Recorded as the signed-in user, who must hold the concession permission (QA BUG-063). *@
+    <div class="small text-muted">Approved by: <b>@ViewBag.UserName</b> (you)</div>
     <div class="form-text mt-2" id="discPreview"></div>
   </div>
   <div class="modal-footer py-2">
@@ -309,7 +309,7 @@ $(function () {
     var otherDues=[];
     var sel={};           // ledgerId -> {label, outstanding, dueDate}
     var extras=[];        // {label, amount, note}
-    var discount=null;    // {type:'flat'|'pct', value, reason, approvedBy}
+    var discount=null;    // {type:'flat'|'pct', value, reason} -- approved by the signed-in user
     var discType='flat';
     var tenders=[{mode:'Cash',amt:0,ref:''}];   // ref = cheque no / UPI ref / txn id
     var amtTouched=false, advanceAvail=0;
@@ -569,19 +569,18 @@ $(function () {
     $('#discModal .fc-seg').on('click', function(){ setSeg($(this).data('t')); });
     $('#discVal').on('input', discPreview);
     function openDiscountModal(){
-        if(discount){ setSeg(discount.type); $('#discVal').val(discount.value); $('#discReasonIn').val(discount.reason||''); $('#discApprovedIn').val(discount.approvedBy||''); }
-        else { setSeg('flat'); $('#discVal').val(''); $('#discReasonIn').val(''); $('#discApprovedIn').val(''); }
+        if(discount){ setSeg(discount.type); $('#discVal').val(discount.value); $('#discReasonIn').val(discount.reason||''); }
+        else { setSeg('flat'); $('#discVal').val(''); $('#discReasonIn').val(''); }
         discPreview(); discModal.show();
     }
     $('#openDisc').on('click', openDiscountModal);
     $('#applyDisc').on('click', function(){
-        var v=EC.numPos($('#discVal').val()), reason=$('#discReasonIn').val().trim(), approvedBy=$('#discApprovedIn').val();
+        var v=EC.numPos($('#discVal').val()), reason=$('#discReasonIn').val().trim();
         if(v<=0){ ecToast('warning','Enter a discount value.'); return; }
         if(!reason){ ecToast('warning','A reason is required for a discount.'); return; }
-        if(!approvedBy){ ecToast('warning','Choose who approved the discount.'); return; }
         var base=discBase(), amt=discType==='pct'?Math.round(base*v/100):v;
         if(amt>base){ ecToast('warning','Discount cannot exceed the payable amount ('+EC.money(base)+').'); return; }
-        discount={type:discType,value:v,reason:reason,approvedBy:approvedBy}; discModal.hide(); settle();
+        discount={type:discType,value:v,reason:reason}; discModal.hide(); settle();
     });
     function renderDiscount(){
         var $cell=$('#discCell'), $rsn=$('#discReason');
@@ -695,7 +694,6 @@ $(function () {
                       discountType: discount ? (discount.type==='pct'?'Percent':'Flat') : null,
                       discountValue: discount ? discount.value : 0,
                       discountReason: discount ? discount.reason : null,
-                      discountApprovedBy: discount ? discount.approvedBy : null,
                       tenders: paidTenders, advanceUsed: advUse, clientRef: collectKey })
         .done(function(res){
             EC.buttonReset($btn);

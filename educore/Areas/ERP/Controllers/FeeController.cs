@@ -34,7 +34,11 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── Pages ────────────────────────────────────────────────
-        public IActionResult ManageFee() => View();
+        public IActionResult ManageFee()
+        {
+            ViewBag.UserName = CurrentUserName();   // shown as "Approved by" on a discount
+            return View();
+        }
         // Day Close moved to its own page so everyone who takes cash can close
         // their counter (QA BUG-099); old links still land there.
         public IActionResult DayClose() => RedirectToAction("Index", "DayClose", new { area = "ERP" });
@@ -286,7 +290,9 @@ namespace educore.Areas.ERP.Controllers
                 TenantId(), SchoolId(), UserId(),
                 NullIfEmpty(req.DiscountType), req.DiscountValue, NullIfEmpty(req.DiscountReason),
                 tenders.Count > 0 ? tenders : null, req.AdvanceUsed,
-                NullIfEmpty(req.ClientRef), NullIfEmpty(req.DiscountApprovedBy));
+                // The person who gives a discount is the signed-in user (their fees.concession
+                // key is what allows it); a name picked from a list proved nothing (QA BUG-063).
+                NullIfEmpty(req.ClientRef), req.DiscountValue > 0 ? CurrentUserName() : null);
 
             return Json(new
             {

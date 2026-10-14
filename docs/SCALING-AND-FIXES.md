@@ -5418,3 +5418,6 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   no longer shows it.
 - My Timetable shows only for teaching staff (`staff_type` Teaching or not recorded) or anyone with
   periods; `sp_staff_my_leave` 'ME' now returns `staff_type`. Bundle `deploy_2026_10_14t.sql`.
+- **BUG-063 (discounts)** Collect Fees' discount dialog no longer has a self-picked "Approved by" list:
+  the approver is the signed-in user (who needs fees.concession), set by FeeController, and the receipt
+  drops "(entered by …)" when it is the same person. Refunds / cancellations already worked this way.

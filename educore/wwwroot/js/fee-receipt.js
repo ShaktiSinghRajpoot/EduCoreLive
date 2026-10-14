@@ -100,9 +100,9 @@
             var lbl = 'Concession' +
                 (r.discountType === 'Percent' ? ' (' + r.discountValue + '%)' : '') +
                 (r.discountReason ? ' <span class="rc-muted">' + EC.esc(r.discountReason) + '</span>' : '') +
-                // The approver is picked from a list by the cashier, so say who entered it too.
+                // Older receipts named the approver from a list; then say who entered it too.
                 (r.discountApprovedBy ? ' <span class="rc-muted">· approved by ' + EC.esc(r.discountApprovedBy) +
-                    (r.collectedBy ? ' (entered by ' + EC.esc(r.collectedBy) + ')' : '') + '</span>' : '');
+                    (r.collectedBy && r.collectedBy !== r.discountApprovedBy ? ' (entered by ' + EC.esc(r.collectedBy) + ')' : '') + '</span>' : '');
             if (concNow > 0)
                 out += '<tr><td colspan="' + cols + '">' + lbl + '</td><td class="rc-amt">−' + EC.money(concNow) + '</td></tr>';
             // Taken off fees that fall due later; not part of this payment, so no amount column.
