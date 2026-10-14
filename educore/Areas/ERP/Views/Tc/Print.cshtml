@@ -223,7 +223,7 @@
         <div class="tc-sign">
             <div class="tc-sign-box"><div class="tc-line"></div>Class Teacher</div>
             <div class="tc-sign-box"><div class="tc-line"></div>Checked By</div>
-            <div class="tc-sign-box"><div class="tc-line"></div>Principal</div>
+            <div class="tc-sign-box">@await Html.PartialAsync("_HeadSignature", sc, new ViewDataDictionary(ViewData) { ["Part"] = "images" })<div class="tc-line"></div>@await Html.PartialAsync("_HeadSignature", sc, new ViewDataDictionary(ViewData) { ["Part"] = "label" })</div>
         </div>
 
         <div class="tc-foot">

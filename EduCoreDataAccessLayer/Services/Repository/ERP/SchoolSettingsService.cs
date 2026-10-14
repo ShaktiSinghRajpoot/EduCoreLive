@@ -31,6 +31,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpPeriodStructureManage = "academic.sp_school_admin_period_structure_manage";
         private const string SpFeeHeadManage = "core.sp_school_admin_fee_head_manage";
         private const string SpFeeStructureManage = "core.sp_school_admin_fee_structure_manage";
+        private const string SpSignature = "core.sp_school_signature_manage";
 
         public SchoolSettingsService(PgExec db, AppCache cache, ILogger<SchoolSettingsService> logger)
         {
@@ -158,8 +159,70 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             model.CreateSchoolAdmin = false;
             model.AutoGeneratePassword = true;
 
+            await FillSignatureAsync(model, tenantId, schoolId, actionUserId);
             return model;
         }
+
+        // ── Seal & signature (school_signature.sql) ───────────────────────────
+        // Read beside the basic profile so every print page that loads the profile
+        // can print them. A failure here must never break the profile itself.
+        private async Task FillSignatureAsync(SchoolManageModel model, int tenantId, int schoolId, int actionUserId)
+        {
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpSignature, SignatureParams("Get", tenantId, schoolId, actionUserId));
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return;
+                var row = ds.Tables[0].Rows[0];
+                model.SignatureUrl         = row["signature_url"] == DBNull.Value ? null : row["signature_url"].ToString();
+                model.SealUrl              = row["seal_url"] == DBNull.Value ? null : row["seal_url"].ToString();
+                model.SignatoryName        = row["signatory_name"] == DBNull.Value ? null : row["signatory_name"].ToString();
+                model.SignatoryDesignation = row["signatory_designation"] == DBNull.Value ? null : row["signatory_designation"].ToString();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Seal / signature could not be read for school {SchoolId}", schoolId);
+            }
+        }
+
+        public Task<(bool Success, string Message, string? OldUrl)> SaveSignatureImageAsync(string kind, string url, int tenantId, int schoolId, int actionUserId)
+            => SignatureWriteAsync(SignatureParams("SaveImage", tenantId, schoolId, actionUserId, kind, url), tenantId, schoolId);
+
+        public Task<(bool Success, string Message, string? OldUrl)> RemoveSignatureImageAsync(string kind, int tenantId, int schoolId, int actionUserId)
+            => SignatureWriteAsync(SignatureParams("Remove", tenantId, schoolId, actionUserId, kind), tenantId, schoolId);
+
+        public Task<(bool Success, string Message, string? OldUrl)> SaveSignatoryAsync(string? name, string? designation, int tenantId, int schoolId, int actionUserId)
+            => SignatureWriteAsync(SignatureParams("SaveName", tenantId, schoolId, actionUserId, null, null, name, designation), tenantId, schoolId);
+
+        private async Task<(bool Success, string Message, string? OldUrl)> SignatureWriteAsync(NpgsqlParameter[] parameters, int tenantId, int schoolId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return (false, "Invalid request.", null);
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(SpSignature, parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "Could not save.", null);
+                var row = ds.Tables[0].Rows[0];
+                return (true, row["message"]?.ToString() ?? "Saved.", row["old_url"] == DBNull.Value ? null : row["old_url"].ToString());
+            }
+            catch (PostgresException ex)
+            {
+                _logger.LogWarning(ex, "Seal / signature change refused ({SqlState}) for school {SchoolId}", ex.SqlState, schoolId);
+                return (false, ex.MessageText, null);
+            }
+        }
+
+        private static NpgsqlParameter[] SignatureParams(string operation, int tenantId, int schoolId, int actionUserId,
+                                                         string? kind = null, string? url = null, string? name = null, string? designation = null) => new NpgsqlParameter[]
+        {
+            new NpgsqlParameter("p_operation", NpgsqlDbType.Text) { Value = operation },
+            new NpgsqlParameter("p_tenant_id", NpgsqlDbType.Integer) { Value = tenantId },
+            new NpgsqlParameter("p_school_id", NpgsqlDbType.Integer) { Value = schoolId },
+            new NpgsqlParameter("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+            new NpgsqlParameter("p_kind", NpgsqlDbType.Text) { Value = (object?)kind ?? DBNull.Value },
+            new NpgsqlParameter("p_url", NpgsqlDbType.Text) { Value = (object?)url ?? DBNull.Value },
+            new NpgsqlParameter("p_name", NpgsqlDbType.Text) { Value = (object?)name ?? DBNull.Value },
+            new NpgsqlParameter("p_designation", NpgsqlDbType.Text) { Value = (object?)designation ?? DBNull.Value },
+            new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "signature_cursor" }
+        };
 
         public async Task<int> SaveBasicProfileAsync(SchoolManageModel model, int tenantId, int schoolId, int actionUserId)
         {

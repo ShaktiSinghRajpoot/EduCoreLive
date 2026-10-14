@@ -215,6 +215,13 @@ namespace educore.Models
         // Image paths
         public string? LogoUrl { get; set; }
         public string? HeaderImageUrl { get; set; }
+
+        // Seal & signature for printed documents (school_signature.sql), filled by
+        // GetBasicProfileAsync; Views/Shared/_HeadSignature.cshtml prints them.
+        public string? SignatureUrl { get; set; }
+        public string? SealUrl { get; set; }
+        public string? SignatoryName { get; set; }
+        public string? SignatoryDesignation { get; set; }
         public List<SelectListItem> TenantList { get; set; } = new();
         public List<SelectListItem> StatusList { get; set; } = new();
         public List<SelectListItem> BoardList { get; set; } = new();

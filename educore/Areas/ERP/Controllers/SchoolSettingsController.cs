@@ -221,6 +221,82 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = ok, message });
         }
 
+        // ── School Setup › Seal & Signature ─────────────────────────────────────
+        // The head of school's signature and the school seal, printed on certificates,
+        // report cards, circulars, TC and admit cards (Views/Shared/_HeadSignature).
+        [HttpGet]
+        [HasPermission("settings.view")]
+        public async Task<IActionResult> SealSignature()
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+            ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "settings.manage");
+            var model = await _schoolSettingsService.GetBasicProfileAsync(tenantId, schoolId, actionUserId) ?? new SchoolManageModel();
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("settings.manage")]
+        public async Task<IActionResult> UploadSignature(string kind, IFormFile? file)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            if (kind != "signature" && kind != "seal") return Json(new { success = false, message = "Choose signature or seal." });
+            if (file == null || file.Length == 0) return Json(new { success = false, message = "Choose an image." });
+            if (file.Length > 1024 * 1024) return Json(new { success = false, message = "The image must be under 1 MB." });
+
+            string url;
+            try { url = await SaveSchoolImageAsync(file, tenantId, schoolId, kind); }
+            catch (InvalidOperationException ex) { return Json(new { success = false, message = ex.Message }); }
+
+            var (ok, message, oldUrl) = await _schoolSettingsService.SaveSignatureImageAsync(kind, url, tenantId, schoolId, actionUserId);
+            DeleteSchoolFile(ok ? oldUrl : url, tenantId, schoolId);   // the replaced file, or the new one when refused
+            return Json(new { success = ok, message, url = ok ? url : null });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("settings.manage")]
+        public async Task<IActionResult> RemoveSignature(string kind)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var (ok, message, oldUrl) = await _schoolSettingsService.RemoveSignatureImageAsync(kind, tenantId, schoolId, actionUserId);
+            if (ok) DeleteSchoolFile(oldUrl, tenantId, schoolId);
+            return Json(new { success = ok, message });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("settings.manage")]
+        public async Task<IActionResult> SaveSignatory(string? name, string? designation)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+            var (ok, message, _) = await _schoolSettingsService.SaveSignatoryAsync(name, designation, tenantId, schoolId, actionUserId);
+            return Json(new { success = ok, message });
+        }
+
+        // Deletes a file only when its URL is in THIS school's upload folder, cut down to
+        // a bare file name (same rule as RemoveLogo).
+        private void DeleteSchoolFile(string? url, int tenantId, int schoolId)
+        {
+            var prefix = UploadPaths.UrlFor("schools", tenantId, schoolId, "");
+            if (string.IsNullOrWhiteSpace(url) || !url.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) return;
+            var name = Path.GetFileName(url);
+            if (string.IsNullOrWhiteSpace(name)) return;
+            var folder = UploadPaths.FolderFor(_config, _webHostEnvironment, "schools", tenantId, schoolId);
+            try { System.IO.File.Delete(Path.Combine(folder, name)); } catch { }
+        }
+
         private async Task<string> SaveSchoolImageAsync(IFormFile file, int tenantId, int schoolId, string imageType)
         {
             string extension = Path.GetExtension(file.FileName).ToLower();

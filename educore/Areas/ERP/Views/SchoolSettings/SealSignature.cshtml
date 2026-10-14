@@ -1,0 +1,144 @@
+@model educore.Models.SchoolManageModel
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Seal & Signature";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // settings.manage
+}
+
+@*
+   School Setup › Seal & Signature (core.sp_school_signature_manage). Printed on
+   certificates, report cards, circulars, TC and admit cards by
+   Views/Shared/_HeadSignature.cshtml. A transparent PNG looks best.
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Insights.css" asp-append-version="true" />
+    <style>
+        .ss-img{ height:110px;border:1px dashed var(--ec-border);border-radius:12px;display:flex;align-items:center;justify-content:center;background:#fafafa;margin-bottom:.6rem; }
+        .ss-img img{ max-height:96px;max-width:90%;object-fit:contain; }
+        .ss-preview{ border:1px solid var(--ec-border);border-radius:12px;padding:1.2rem;display:flex;justify-content:flex-end;font-family:"Segoe UI",Arial,sans-serif;font-size:13px; }
+        .ss-preview > div{ text-align:center;border-top:1px solid #333;padding-top:4px;min-width:180px; }
+    </style>
+}
+
+<div class="ec-page-shell in-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-pen"></i></div>
+          <div><h4 class="ec-page-title mb-1">Seal &amp; Signature</h4>
+            <p class="ec-page-subtitle">Printed on certificates, report cards, circulars, TC and admit cards</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <div class="in-card">
+          <h6 class="in-h">Signature</h6>
+          <div class="in-sub">The head of school's signature on white or transparent background · JPG / PNG / WEBP, under 1 MB</div>
+          <div class="ss-img" id="imgSignature">
+            @if (!string.IsNullOrWhiteSpace(Model.SignatureUrl)) { <img src="@Model.SignatureUrl" alt="" /> } else { <span class="in-muted">No signature yet</span> }
+          </div>
+          @if (canManage)
+          {
+              <div class="d-flex gap-2 flex-wrap">
+                <label class="btn btn-sm btn-primary mb-0"><i class="bx bx-upload me-1"></i>Upload<input type="file" class="d-none ss-file" data-kind="signature" accept=".jpg,.jpeg,.png,.webp"></label>
+                <button class="btn btn-sm btn-outline-danger ss-remove" data-kind="signature"><i class="bx bx-trash me-1"></i>Remove</button>
+              </div>
+          }
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="in-card">
+          <h6 class="in-h">School seal</h6>
+          <div class="in-sub">The round stamp, photographed or scanned · JPG / PNG / WEBP, under 1 MB</div>
+          <div class="ss-img" id="imgSeal">
+            @if (!string.IsNullOrWhiteSpace(Model.SealUrl)) { <img src="@Model.SealUrl" alt="" /> } else { <span class="in-muted">No seal yet</span> }
+          </div>
+          @if (canManage)
+          {
+              <div class="d-flex gap-2 flex-wrap">
+                <label class="btn btn-sm btn-primary mb-0"><i class="bx bx-upload me-1"></i>Upload<input type="file" class="d-none ss-file" data-kind="seal" accept=".jpg,.jpeg,.png,.webp"></label>
+                <button class="btn btn-sm btn-outline-danger ss-remove" data-kind="seal"><i class="bx bx-trash me-1"></i>Remove</button>
+              </div>
+          }
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="in-card">
+          <h6 class="in-h">Name under the signature</h6>
+          <div class="in-sub">Optional name, and the designation printed instead of "Principal"</div>
+          <div class="row g-2">
+            <div class="col-7"><input id="ssName" class="form-control" maxlength="120" placeholder="e.g. Dr. R. K. Sharma" value="@Model.SignatoryName" @(canManage ? "" : "disabled")></div>
+            <div class="col-5"><input id="ssDesignation" class="form-control" maxlength="80" placeholder="Principal" value="@Model.SignatoryDesignation" @(canManage ? "" : "disabled")></div>
+          </div>
+          @if (canManage)
+          {
+              <button class="btn btn-sm btn-primary mt-2" id="btnSaveName"><i class="bx bx-save me-1"></i>Save</button>
+          }
+        </div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="in-card">
+          <h6 class="in-h">How it prints</h6>
+          <div class="in-sub">The sign-off at the bottom of a certificate (reload after a change)</div>
+          <div class="ss-preview"><div>@await Html.PartialAsync("_HeadSignature", Model)</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var CSRF = $('input[name="__RequestVerificationToken"]').val();
+    var URL = {
+        upload: '@Url.Action("UploadSignature","SchoolSettings",new{area="ERP"})',
+        remove: '@Url.Action("RemoveSignature","SchoolSettings",new{area="ERP"})',
+        name:   '@Url.Action("SaveSignatory","SchoolSettings",new{area="ERP"})'
+    };
+
+    $('.ss-file').on('change', function () {
+        var kind = $(this).data('kind'), f = this.files && this.files[0];
+        if (!f) return;
+        var fd = new FormData();
+        fd.append('kind', kind); fd.append('file', f);
+        $.ajax({ url: URL.upload, type: 'POST', data: fd, processData: false, contentType: false, headers: { 'RequestVerificationToken': CSRF } })
+            .done(function (r) {
+                ecToast(r.success ? 'success' : 'error', r.message);
+                if (r.success) location.reload();
+            })
+            .fail(function () { ecToast('error', 'Could not upload. Please try again.'); });
+        this.value = '';
+    });
+
+    $('.ss-remove').on('click', function () {
+        var kind = $(this).data('kind');
+        EC.confirm({ title: 'Remove the ' + kind + '?', message: 'Printed documents will no longer show it.', okText: 'Remove' }).then(function (ok) {
+            if (!ok) return;
+            $.ajax({ url: URL.remove, type: 'POST', data: { kind: kind }, headers: { 'RequestVerificationToken': CSRF } })
+                .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) location.reload(); })
+                .fail(function () { ecToast('error', 'Could not remove. Please try again.'); });
+        });
+    });
+
+    $('#btnSaveName').on('click', function () {
+        var $b = $(this); EC.buttonBusy($b);
+        $.ajax({ url: URL.name, type: 'POST', data: { name: $('#ssName').val(), designation: $('#ssDesignation').val() }, headers: { 'RequestVerificationToken': CSRF } })
+            .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) location.reload(); })
+            .fail(function () { ecToast('error', 'Could not save. Please try again.'); })
+            .always(function () { EC.buttonReset($b); });
+    });
+});
+</script>
+}

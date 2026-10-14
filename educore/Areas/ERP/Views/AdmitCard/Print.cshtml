@@ -180,7 +180,7 @@
                 <div class="ac-sign">
                     <div>Class Teacher</div>
                     @if (fmt == "FullPage") { <div>Student</div> }
-                    <div>Principal</div>
+                    <div style="border:0;padding:0;min-width:0">@await Html.PartialAsync("_HeadSignature", sc, new ViewDataDictionary(ViewData) { ["Part"] = "images" })<div style="border-top:1px solid #555;padding-top:1mm;text-align:center">@await Html.PartialAsync("_HeadSignature", sc, new ViewDataDictionary(ViewData) { ["Part"] = "label" })</div></div>
                 </div>
             </div>
         }

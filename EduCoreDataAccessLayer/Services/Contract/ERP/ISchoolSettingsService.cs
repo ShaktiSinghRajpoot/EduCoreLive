@@ -15,6 +15,12 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<int> SaveBasicProfileAsync(SchoolManageModel model, int tenantId, int schoolId, int actionUserId);
         /// <summary>Clears the school's logo. RemovedUrl is the old logo URL (null when there was none).</summary>
         Task<(bool Success, string Message, string? RemovedUrl)> RemoveLogoAsync(int tenantId, int schoolId, int actionUserId);
+
+        // Seal & signature on printed documents. kind = "signature" | "seal"; OldUrl is the
+        // replaced / removed file so the caller can delete it.
+        Task<(bool Success, string Message, string? OldUrl)> SaveSignatureImageAsync(string kind, string url, int tenantId, int schoolId, int actionUserId);
+        Task<(bool Success, string Message, string? OldUrl)> RemoveSignatureImageAsync(string kind, int tenantId, int schoolId, int actionUserId);
+        Task<(bool Success, string Message, string? OldUrl)> SaveSignatoryAsync(string? name, string? designation, int tenantId, int schoolId, int actionUserId);
         Task<SchoolDropdownModel> GetBasicProfileDropdownsAsync(int tenantId, int schoolId);
         #endregion
 

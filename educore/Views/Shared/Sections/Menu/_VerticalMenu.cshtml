@@ -430,7 +430,7 @@
         @* ---- School setup: done once at onboarding ---- *@
         @if (gSetupSchool)
         {
-        <li class='menu-item @Open("BasicProfile","Documents","AcademicYears","WorkflowSettings")'>
+        <li class='menu-item @Open("BasicProfile","Documents","AcademicYears","WorkflowSettings","SealSignature")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-buildings ic-settings"></i>
                 <div class="text-truncate">School Setup</div>
@@ -440,6 +440,7 @@
                 {
                 <li class='menu-item @On("BasicProfile")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="BasicProfile" class="menu-link"><i class="bx bx-buildings submenu-icon c-blue"></i><div class="text-truncate">School Profile</div></a></li>
                 <li class='menu-item @On("Documents")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="Documents" class="menu-link"><i class="bx bx-printer submenu-icon c-blue"></i><div class="text-truncate">Documents &amp; Formats</div></a></li>
+                <li class='menu-item @On("SealSignature")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SealSignature" class="menu-link"><i class="bx bx-pen submenu-icon c-purple"></i><div class="text-truncate">Seal &amp; Signature</div></a></li>
                 <li class='menu-item @On("AcademicYears")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AcademicYears" class="menu-link"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Sessions</div></a></li>
                 }
                 @if (gWorkflow)

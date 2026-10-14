@@ -5250,3 +5250,16 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - One proc `core.sp_student_data_checks` (`student_data_checks.sql`, `deploy_2026_10_14h.sql`); 6 rolled-back
   checks in `tests/student_data_checks_tests.sql`. Shared helper `Helpers/CursorRows.cs` (cursor rows for
   read-only pages) now also backs `DashboardReportService`.
+
+### [2026-10-14] Seal & signature on printed documents
+- School Setup › **Seal & Signature** (`SchoolSettings/SealSignature`; view `settings.view`, change
+  `settings.manage`): upload the head of school's signature and the school seal (JPG / PNG / WEBP, < 1 MB,
+  stored like the logo under the school's upload folder; a replaced or removed file is deleted), and an
+  optional name + designation (default "Principal").
+- `Views/Shared/_HeadSignature.cshtml` prints them (seal + signature above the line, name / designation
+  below) on certificates, report cards, circulars, TC and admit cards. Nothing uploaded = the old
+  "Principal" line.
+- Stored in four new nullable `core.school_profiles` columns through a separate proc
+  `core.sp_school_signature_manage` (`school_signature.sql`, `deploy_2026_10_14i.sql`) — the basic-profile
+  proc on live differs from the repo file, so it was deliberately not touched. `GetBasicProfileAsync`
+  reads the signature too (a failure there never breaks the profile).

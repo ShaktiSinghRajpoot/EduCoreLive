@@ -108,7 +108,7 @@
 
         <div class="sign">
             <div>Class Teacher</div>
-            <div>Principal<br /><small style="font-weight:400">(Seal &amp; Signature)</small></div>
+            <div style="border:0;padding:0;min-width:0">@await Html.PartialAsync("_HeadSignature", sc, new ViewDataDictionary(ViewData) { ["Part"] = "images" })<div style="border-top:1px solid #333;padding-top:4px;min-width:170px;text-align:center;font-weight:700">@await Html.PartialAsync("_HeadSignature", sc, new ViewDataDictionary(ViewData) { ["Part"] = "label" })</div></div>
         </div>
     </div>
 </body>

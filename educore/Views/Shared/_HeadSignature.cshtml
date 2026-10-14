@@ -1,0 +1,46 @@
+@model educore.Models.SchoolManageModel
+@*
+   The head of school's sign-off on printed documents (certificates, report cards,
+   circulars, TC, admit cards): the seal and signature images uploaded on
+   School Setup › Seal & Signature, then the name and designation. With nothing
+   uploaded it prints only the designation ("Principal"), as the documents did
+   before. Image URLs are made absolute because some print pages open in a
+   blank pop-up.
+
+   ViewData["Part"]: "images" (above the signature line), "label" (below it), or
+   nothing for both.
+*@
+@{
+    var sc = Model ?? new educore.Models.SchoolManageModel();
+    var part = ViewData["Part"] as string ?? "";
+    string? Abs(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        if (url.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return url;
+        return $"{Context.Request.Scheme}://{Context.Request.Host}{(url.StartsWith('/') ? "" : "/")}{url}";
+    }
+    var sig  = Abs(sc.SignatureUrl);
+    var seal = Abs(sc.SealUrl);
+    var designation = string.IsNullOrWhiteSpace(sc.SignatoryDesignation) ? "Principal" : sc.SignatoryDesignation;
+}
+@if (part != "label" && (sig != null || seal != null))
+{
+    <span style="display:flex;align-items:flex-end;justify-content:center;gap:2mm;height:16mm;margin-bottom:1mm;">
+        @if (seal != null)
+        {
+            <img src="@seal" alt="" style="height:16mm;max-width:22mm;object-fit:contain;opacity:.9;" />
+        }
+        @if (sig != null)
+        {
+            <img src="@sig" alt="" style="height:12mm;max-width:38mm;object-fit:contain;" />
+        }
+    </span>
+}
+@if (part != "images")
+{
+    @if (!string.IsNullOrWhiteSpace(sc.SignatoryName))
+    {
+        <span style="display:block;font-weight:700;">@sc.SignatoryName</span>
+    }
+    <span>@designation</span>
+}
