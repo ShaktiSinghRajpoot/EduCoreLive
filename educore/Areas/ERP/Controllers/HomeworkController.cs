@@ -35,8 +35,9 @@ namespace educore.Areas.ERP.Controllers
 
             ViewBag.IsStaff = await _self.HasStaffRecordAsync(TenantId(), SchoolId(), UserId());
             ViewBag.CanManage = await CanManageAsync();
-            // The overview compares teachers (with a leaderboard), so it is for people who manage academics.
-            ViewBag.CanOverview = await CanManageAsync();
+            // The overview compares teachers (with a leaderboard): reports.view (admin / principal),
+            // which the teacher role does not hold. Same key as the Attendance Overview.
+            ViewBag.CanOverview = await HasPermissionAttribute.UserHasAsync(this, "reports.view");
             return View();
         }
 
@@ -58,9 +59,9 @@ namespace educore.Areas.ERP.Controllers
             return Json(grid.Subjects.Select(s => new { id = s.SubjectId, name = s.SubjectName }));
         }
 
-        // ── GET: /ERP/Homework/Overview ── who is (not) giving homework; academics.manage only
+        // ── GET: /ERP/Homework/Overview ── who is (not) giving homework; reports.view only
         [HttpGet]
-        [HasPermission("academics.manage")]
+        [HasPermission("reports.view")]
         public async Task<IActionResult> Overview(string? from, string? to, string? cls)
         {
             var f = Dates.Norm(from) ?? Dates.AddMonths(Dates.Today, -1)!;

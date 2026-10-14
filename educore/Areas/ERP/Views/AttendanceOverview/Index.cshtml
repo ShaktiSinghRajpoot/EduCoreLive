@@ -1,0 +1,304 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Attendance Overview";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@*
+   Attendance Overview — read-only (core.sp_attendance_overview).
+     Today     every section's register for one day: taken or waiting on its class teacher.
+     Insights  a date range: registers taken vs expected (school working days), week by
+               week, a class-teacher leaderboard, sections worst-first, every missing register.
+   A register = one class section's attendance on one working day; the class teacher owns it.
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Insights.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell in-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-pie-chart-alt-2"></i></div>
+          <div><h4 class="ec-page-title mb-1">Attendance Overview</h4>
+            <p class="ec-page-subtitle">Which registers were taken, which were missed, and whose they are</p></div>
+        </div>
+        <a href="@Url.Action("StudentAttendance","Attendance",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-check-square me-1"></i>Mark attendance</a>
+      </div>
+    </div>
+
+    <div class="in-chips mb-3" id="aoTabs">
+      <button class="on" data-t="today"><i class="bx bx-calendar me-1"></i>Today</button>
+      <button data-t="insights"><i class="bx bx-line-chart me-1"></i>Insights</button>
+    </div>
+
+    @* ── Today ── *@
+    <div id="paneToday">
+      <div class="in-card mb-3" style="height:auto">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <button class="btn btn-sm btn-outline-secondary" id="tPrev"><i class="bx bx-chevron-left"></i></button>
+          <input type="date" id="tDay" class="form-control form-control-sm" style="width:auto">
+          <button class="btn btn-sm btn-outline-secondary" id="tNext"><i class="bx bx-chevron-right"></i></button>
+          <span class="in-muted ms-2" id="tNote"></span>
+        </div>
+      </div>
+      <div class="in-kpis" id="tKpis" style="grid-template-columns:repeat(3,1fr)"></div>
+      <div class="row g-3 mt-1">
+        <div class="col-12 col-lg-5"><div class="in-card">
+          <h6 class="in-h">Students</h6>
+          <div class="in-sub">Marks of the day, out of the students on roll</div>
+          <div class="d-flex gap-3 align-items-center flex-wrap">
+            <div class="in-donut" id="tDonut"><div><b id="tDonutP">—</b><small>present</small></div></div>
+            <div class="flex-grow-1" id="tStatus"></div>
+          </div>
+        </div></div>
+        <div class="col-12 col-lg-7"><div class="in-card">
+          <h6 class="in-h" id="tPendingH">Pending registers</h6>
+          <div class="in-sub">Waiting on the class teacher</div>
+          <div class="in-scroll" id="tPending"></div>
+        </div></div>
+        <div class="col-12"><div class="in-card">
+          <h6 class="in-h">Taken</h6>
+          <div class="in-wrap"><table class="in-table" id="tTaken"></table></div>
+        </div></div>
+      </div>
+    </div>
+
+    @* ── Insights ── *@
+    <div id="paneInsights" class="d-none">
+      <div class="in-card mb-3" style="height:auto">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <div class="in-chips" id="iRange">
+            <button data-r="7">Last 7 days</button><button class="on" data-r="30">Last 30 days</button>
+            <button data-r="month">This month</button><button data-r="90">Last 3 months</button><button data-r="custom">Custom</button>
+          </div>
+          <div class="d-none gap-2 align-items-center" id="iCustom">
+            <input type="date" id="iFrom" class="form-control form-control-sm" style="width:auto"><span>to</span>
+            <input type="date" id="iTo" class="form-control form-control-sm" style="width:auto">
+          </div>
+          <span class="in-muted ms-auto" id="iRangeText"></span>
+        </div>
+      </div>
+      <div class="in-kpis" id="iKpis" style="grid-template-columns:repeat(3,1fr)"></div>
+      <div id="iNote" class="alert alert-warning py-2 mt-3 d-none"></div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Week by week</h6>
+          <div class="in-sub">Registers taken against registers expected, and students present against students marked</div>
+          <div id="iWeeks"></div>
+        </div></div>
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Class-teacher leaderboard</h6>
+          <div class="in-sub">Score = 70% registers taken + 30% taken the same day. Class attendance is shown, not scored.</div>
+          <div class="in-scroll" id="iLeaders"></div>
+        </div></div>
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+            <div><h6 class="in-h">Where it stands</h6><div class="in-sub">Worst first, so the section that needs attention is on top</div></div>
+            <div class="in-chips" id="iSort"><button class="on" data-s="reg">Registers</button><button data-s="att">Attendance</button></div>
+          </div>
+          <div class="in-scroll" id="iSections"></div>
+        </div></div>
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h" id="iMissingH">Missing registers</h6>
+          <div class="in-sub">Working days on which nobody recorded the section, with its class teacher</div>
+          <div class="in-scroll" id="iMissing"></div>
+        </div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var URL_DATA = '@Url.Action("Data","AttendanceOverview",new{area="ERP"})';
+
+    function n(v) { return EC.num(v); }
+    function pct(a, b) { return n(b) > 0 ? Math.round(n(a) * 100 / n(b)) : null; }
+    function pctText(a, b) { var p = pct(a, b); return p === null ? '—' : p + '%'; }
+    function rateClass(p) { return p === null ? 'n' : p >= 90 ? '3' : p >= 75 ? '2' : p >= 50 ? '1' : '0'; }
+    function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function addDays(s, k) { var d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + k); return iso(d); }
+    function show(s) { return new Date(s + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' }); }
+    function secName(x) { return x.class_name + (x.section ? ' – ' + x.section : ''); }
+    function hbar(label, sub, value, max, cls, valText) {
+        var w = max > 0 ? Math.max(Math.min(n(value) * 100 / max, 100), n(value) > 0 ? 1 : 0) : 0;
+        return '<div class="in-hbar"><div class="lbl">' + EC.esc(label) + (sub ? '<small>' + EC.esc(sub) + '</small>' : '') + '</div>'
+             + '<div class="in-track"><i class="' + cls + '" style="width:' + w + '%"></i></div><div class="val">' + valText + '</div></div>';
+    }
+    function kpi(label, value, sub, cls) {
+        return '<div class="in-kpi ' + (cls || '') + '"><div class="l">' + EC.esc(label) + '</div><div class="v">' + value + '</div><div class="s">' + EC.esc(sub) + '</div></div>';
+    }
+
+    var TODAY = iso(new Date());
+    $('#tDay').val(TODAY).attr('max', TODAY);
+
+    $('#aoTabs').on('click', 'button', function () {
+        $('#aoTabs button').removeClass('on'); $(this).addClass('on');
+        var ins = $(this).data('t') === 'insights';
+        $('#paneToday').toggleClass('d-none', ins); $('#paneInsights').toggleClass('d-none', !ins);
+        if (ins && !INS) loadInsights();
+    });
+
+    // ── Today ──────────────────────────────────────────────────────────
+    function loadToday() {
+        var day = $('#tDay').val() || TODAY;
+        $('#tPending').html('<div class="in-muted">Loading...</div>');
+        $.getJSON(URL_DATA, { day: day, from: day, to: day }).done(function (r) {
+            var T = r.data.today || [], info = (r.data.day || [])[0] || {};
+            var roll = 0, marked = 0, present = 0, absent = 0, late = 0, leave = 0, taken = [], pending = [], teachers = {}, filed = {};
+            T.forEach(function (s) {
+                roll += n(s.students); marked += n(s.marked); present += n(s.present); absent += n(s.absent); late += n(s.late); leave += n(s.leave);
+                (n(s.marked) > 0 ? taken : pending).push(s);
+                if (s.teacher_id) { teachers[s.teacher_id] = 1; if (n(s.marked) > 0) filed[s.teacher_id] = 1; }
+            });
+            var working = n(info.working) > 0;
+            $('#tNote').text(working ? (info.note ? info.note : '') : 'Not a school working day' + (info.note ? ' (' + info.note + ')' : '') + ' — no register is expected.');
+            var nT = Object.keys(teachers).length, nF = Object.keys(filed).length;
+            $('#tKpis').html(
+                kpi('Students present', pctText(present + late, roll), (present + late) + ' of ' + roll + ' on roll', 'main')
+              + kpi('Registers taken', taken.length + '/' + T.length, pending.length + ' pending', pending.length && working ? 'warn' : 'good')
+              + kpi('Class teachers', nF + '/' + nT, 'have filed'));
+
+            var p = pct(present + late, roll) || 0, a = pct(absent, roll) || 0, l = pct(leave, roll) || 0;
+            $('#tDonut').css('background', roll ? 'conic-gradient(#28c76f 0 ' + p * 3.6 + 'deg, #ea5455 ' + p * 3.6 + 'deg ' + (p + a) * 3.6 + 'deg, #4f7cff '
+                + (p + a) * 3.6 + 'deg ' + (p + a + l) * 3.6 + 'deg, #e3e6ea ' + (p + a + l) * 3.6 + 'deg 360deg)' : '#eef0f2');
+            $('#tDonutP').text(pctText(present + late, roll));
+            $('#tStatus').html(
+                hbar('Present', '', present, roll, 'r3', present) + hbar('Late', '', late, roll, 'r2', late)
+              + hbar('Absent', '', absent, roll, 'r0', absent) + hbar('Leave', '', leave, roll, 'r1', leave)
+              + hbar('Not yet marked', '', roll - marked, roll, 'tn', Math.max(roll - marked, 0)));
+
+            $('#tPendingH').text(pending.length + ' register(s) pending');
+            $('#tPending').html(pending.length ? pending.map(function (s) {
+                return '<div class="in-row' + (working ? ' bad' : '') + '"><div><b>' + EC.esc(secName(s)) + '</b><small>'
+                     + EC.esc(s.teacher ? 'Waiting on ' + s.teacher : 'No class teacher assigned') + ' · ' + s.students + ' students</small></div></div>';
+            }).join('') : '<div class="text-success fw-semibold"><i class="bx bx-check-circle me-1"></i>Every register is in.</div>');
+
+            $('#tTaken').html(taken.length
+                ? '<thead><tr><th>Section</th><th class="n">Present</th><th class="n">Late</th><th class="n">Absent</th><th class="n">Leave</th><th class="n">%</th><th>Marked by</th></tr></thead><tbody>'
+                  + taken.map(function (s) {
+                        var pp = pct(n(s.present) + n(s.late), s.marked);
+                        return '<tr><td class="fw-semibold">' + EC.esc(secName(s)) + '<div class="in-muted">' + EC.esc(s.teacher || '') + '</div></td>'
+                             + '<td class="n">' + s.present + '</td><td class="n">' + s.late + '</td><td class="n">' + s.absent + '</td><td class="n">' + s.leave + '</td>'
+                             + '<td class="n"><span class="in-tag t' + rateClass(pp) + '">' + (pp === null ? '—' : pp + '%') + '</span></td>'
+                             + '<td>' + EC.esc(s.marked_by || '') + '<div class="in-muted">' + EC.esc(s.marked_at || '') + '</div></td></tr>';
+                    }).join('') + '</tbody>'
+                : '<tbody><tr><td class="in-muted">No register taken on this day yet.</td></tr></tbody>');
+        }).fail(function () { ecToast('error', 'Could not load the attendance.'); });
+    }
+    $('#tDay').on('change', loadToday);
+    $('#tPrev').on('click', function () { $('#tDay').val(addDays($('#tDay').val() || TODAY, -1)); loadToday(); });
+    $('#tNext').on('click', function () { var d = addDays($('#tDay').val() || TODAY, 1); if (d <= TODAY) { $('#tDay').val(d); loadToday(); } });
+
+    // ── Insights ───────────────────────────────────────────────────────
+    var INS = null, sortBy = 'reg';
+
+    function range() {
+        var r = $('#iRange .on').data('r');
+        if (r === 'custom') return { from: $('#iFrom').val(), to: $('#iTo').val() };
+        if (r === 'month') return { from: TODAY.substring(0, 8) + '01', to: TODAY };
+        return { from: addDays(TODAY, -(r - 1)), to: TODAY };
+    }
+
+    function loadInsights() {
+        var rg = range();
+        if (!rg.from || !rg.to) return;
+        $('#iSections, #iMissing, #iLeaders, #iWeeks').html('<div class="in-muted">Loading...</div>');
+        $.getJSON(URL_DATA, { day: rg.to, from: rg.from, to: rg.to }).done(function (r) {
+            INS = r.data; drawInsights();
+        }).fail(function () { ecToast('error', 'Could not load the insights.'); });
+    }
+
+    $('#iRange').on('click', 'button', function () {
+        $('#iRange button').removeClass('on'); $(this).addClass('on');
+        var custom = $(this).data('r') === 'custom';
+        $('#iCustom').toggleClass('d-none', !custom).toggleClass('d-flex', custom);
+        if (custom && !$('#iFrom').val()) { $('#iFrom').val(addDays(TODAY, -29)); $('#iTo').val(TODAY); }
+        loadInsights();
+    });
+    $('#iFrom, #iTo').on('change', loadInsights);
+    $('#iSort').on('click', 'button', function () {
+        $('#iSort button').removeClass('on'); $(this).addClass('on'); sortBy = $(this).data('s'); drawSections();
+    });
+
+    function drawInsights() {
+        var S = INS.sections || [], W = INS.weeks || [], info = (INS.day || [])[0] || {};
+        var exp = 0, taken = 0, marked = 0, present = 0, complete = 0, missing = (INS.missing || []).length;
+        S.forEach(function (s) {
+            exp += n(s.expected); taken += n(s.taken); marked += n(s.marked); present += n(s.present);
+            if (n(s.expected) > 0 && n(s.taken) >= n(s.expected)) complete++;
+        });
+        $('#iRangeText').text(info.range_from ? show(info.range_from) + ' – ' + show(info.range_to) : '');
+        $('#iKpis').html(
+            kpi('Registers taken', pctText(taken, exp), taken + ' of ' + exp + ' expected · ' + (exp - taken) + ' missed', exp - taken > 0 ? 'warn' : 'good')
+          + kpi('Students present', pctText(present, marked), present + ' of ' + marked + ' student-days marked', 'main')
+          + kpi('Sections complete', complete + '/' + S.length, 'no register missed in this range'));
+        $('#iNote').toggleClass('d-none', !(exp - taken > 0)).text(
+            (exp - taken) + ' register(s) were never taken in this range, so the present percentage describes only the days somebody recorded.');
+
+        $('#iWeeks').html(W.length ? W.map(function (w) {
+            var pr = pct(w.taken, w.expected), pa = pct(w.present, w.marked);
+            return hbar(show(w.first_day) + ' – ' + show(w.last_day), w.taken + '/' + w.expected + ' registers · ' + (pa === null ? '—' : pa + '% present'),
+                        w.taken, w.expected, 'r' + rateClass(pr), pr === null ? '—' : pr + '%');
+        }).join('') : '<div class="in-muted">No working days in this range.</div>');
+
+        // leaderboard: class teachers, from the sections they own
+        var T = {}, order = [];
+        S.forEach(function (s) {
+            if (!s.teacher_id) return;
+            if (!T[s.teacher_id]) { T[s.teacher_id] = { name: s.teacher, exp: 0, taken: 0, same: 0, marked: 0, present: 0, secs: [] }; order.push(s.teacher_id); }
+            var t = T[s.teacher_id];
+            t.exp += n(s.expected); t.taken += n(s.taken); t.same += n(s.same_day); t.marked += n(s.marked); t.present += n(s.present); t.secs.push(secName(s));
+        });
+        var lead = order.map(function (k) {
+            var t = T[k], reg = t.exp ? t.taken / t.exp : 0, same = t.taken ? t.same / t.taken : 0;
+            t.score = Math.round(70 * reg + 30 * same); return t;
+        }).sort(function (a, b) { return b.score - a.score || b.taken - a.taken; });
+        var medal = ['🥇', '🥈', '🥉'];
+        $('#iLeaders').html(lead.length ? lead.map(function (t, i) {
+            return '<div class="in-row"><div><b>' + (medal[i] || (i + 1) + '.') + ' ' + EC.esc(t.name) + '</b><small>' + EC.esc(t.secs.join(', ')) + '</small>'
+                 + '<small>' + t.taken + '/' + t.exp + ' registers · ' + pctText(t.same, t.taken) + ' same day · ' + pctText(t.present, t.marked) + ' present</small></div>'
+                 + '<div class="fw-bold" style="font-size:1.15rem;color:var(--ec-primary)">' + t.score + '</div></div>';
+        }).join('') : '<div class="in-muted">No class teachers assigned. Assign them in School Setup › Assign Class Teacher.</div>');
+
+        drawSections();
+
+        var Ms = INS.missing || [];
+        $('#iMissingH').text(missing + (missing >= 500 ? '+' : '') + ' missing register(s)');
+        var lastDay = '';
+        $('#iMissing').html(Ms.length ? Ms.slice(0, 200).map(function (m) {
+            var head = m.day !== lastDay ? '<div class="in-muted fw-bold mt-2 mb-1">' + EC.esc(show(m.day)) + '</div>' : '';
+            lastDay = m.day;
+            return head + '<div class="in-row bad"><div><b>' + EC.esc(secName(m)) + '</b><small>' + EC.esc(m.teacher || 'No class teacher') + '</small></div></div>';
+        }).join('') + (Ms.length > 200 ? '<div class="in-muted mt-2">Showing the latest 200.</div>' : '')
+            : '<div class="text-success fw-semibold"><i class="bx bx-check-circle me-1"></i>No register was missed in this range.</div>');
+    }
+
+    function drawSections() {
+        var S = (INS && INS.sections || []).slice();
+        S.forEach(function (s) {
+            s._reg = n(s.expected) ? n(s.taken) / n(s.expected) : 1;
+            s._att = n(s.marked) ? n(s.present) / n(s.marked) : 2;   // nothing marked sorts after
+        });
+        S.sort(function (a, b) { return sortBy === 'att' ? a._att - b._att : a._reg - b._reg; });
+        $('#iSections').html(S.length ? S.map(function (s) {
+            var pr = pct(s.taken, s.expected), pa = pct(s.present, s.marked);
+            return hbar(secName(s), (s.teacher || 'No class teacher') + ' · ' + (n(s.expected) - n(s.taken)) + ' missed · ' + (pa === null ? '—' : pa + '% present'),
+                        sortBy === 'att' ? s.present : s.taken, sortBy === 'att' ? s.marked : s.expected,
+                        'r' + rateClass(sortBy === 'att' ? pa : pr), sortBy === 'att' ? (pa === null ? '—' : pa + '%') : (pr === null ? '—' : pr + '%'));
+        }).join('') : '<div class="in-muted">No sections with students.</div>');
+    }
+
+    loadToday();
+});
+</script>
+}

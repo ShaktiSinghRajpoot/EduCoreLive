@@ -1,0 +1,328 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Fee Dashboard";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@*
+   Fee Dashboard — read-only (core.sp_fee_dashboard). Every section is drawn from
+   one call; the bars are plain CSS. Rates: collected of what has fallen due.
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Insights.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell in-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-line-chart"></i></div>
+          <div><h4 class="ec-page-title mb-1">Fee Dashboard</h4>
+            <p class="ec-page-subtitle" id="fdSubtitle">Where the money stands</p></div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="@Url.Action("Reports","Fee",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-bar-chart-alt-2 me-1"></i>Reports</a>
+          <a href="@Url.Action("YearEnd","Fee",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-calendar-check me-1"></i>Year-End</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="fdLoading" class="text-center text-muted py-5"><div class="spinner-border spinner-border-sm me-2"></div>Loading the fee dashboard...</div>
+
+    <div id="fdBody" class="d-none">
+      <div class="in-kpis" id="fdKpis"></div>
+
+      <div class="in-sec">Where the money stands</div>
+      <div class="in-card"><div id="fdFunnel"></div></div>
+
+      <div class="in-sec">Collection</div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Collection rate, month by month</h6>
+          <div class="in-sub">Share of each month's fees that has been paid · older months should be near 100%</div>
+          <div id="fdMonths"></div>
+        </div></div>
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Daily collections</h6>
+          <div class="in-sub" id="fdDailySub">Last 30 days</div>
+          <div id="fdDaily"></div>
+        </div></div>
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Payment modes</h6>
+          <div class="in-sub">This month</div>
+          <div id="fdModes"></div>
+        </div></div>
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Who collected the money</h6>
+          <div class="in-sub">This month, by staff member and mode</div>
+          <div id="fdStaff"></div>
+        </div></div>
+      </div>
+
+      <div class="in-sec">Classes and class teachers</div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Collection rate by class</h6>
+          <div class="in-sub">Share of each class's fees due so far that has come in · red classes need chasing</div>
+          <div id="fdClasses"></div>
+        </div></div>
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Sections owing the most</h6>
+          <div class="in-sub">Overdue fees by section, with the class teacher to speak to</div>
+          <div class="in-scroll" id="fdSections"></div>
+        </div></div>
+        <div class="col-12"><div class="in-card">
+          <h6 class="in-h">Problem areas</h6>
+          <div class="in-sub">Collection rate by class and fee head (fees due so far)</div>
+          <div class="in-wrap"><table class="in-table in-matrix" id="fdMatrix"></table></div>
+          <div class="in-legend"><span><i class="r3"></i>90%+</span><span><i class="r2"></i>75–90%</span><span><i class="r1"></i>50–75%</span><span><i class="r0"></i>Below 50%</span></div>
+        </div></div>
+      </div>
+
+      <div class="in-sec">Fee heads</div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-7"><div class="in-card">
+          <h6 class="in-h">Collected and still due, by fee head</h6>
+          <div class="in-sub">Session collections; overdue includes older sessions' dues ("Old dues")</div>
+          <div class="in-wrap"><table class="in-table" id="fdHeads"></table></div>
+        </div></div>
+        <div class="col-12 col-lg-5"><div class="in-card">
+          <h6 class="in-h">What the dues are made of</h6>
+          <div class="in-sub">Share of the amount overdue</div>
+          <div id="fdMakeup"></div>
+        </div></div>
+      </div>
+
+      <div class="in-sec">Dues and families</div>
+      <div class="row g-3">
+        <div class="col-12 col-lg-5"><div class="in-card">
+          <h6 class="in-h">How old the dues are</h6>
+          <div class="in-sub" id="fdAgingSub"></div>
+          <div id="fdAging"></div>
+          <h6 class="in-h mt-4">How families pay</h6>
+          <div class="in-sub">From each family's payment history (siblings share the guardian's mobile)</div>
+          <div class="in-grid4" id="fdHabits"></div>
+        </div></div>
+        <div class="col-12 col-lg-7"><div class="in-card">
+          <h6 class="in-h">Families owing the most</h6>
+          <div class="in-sub">Overdue, siblings together · red: habitual defaulter · amber: usually pays late</div>
+          <div class="in-scroll" id="fdFamilies"></div>
+        </div></div>
+      </div>
+
+      <div class="in-sec">Doubtful dues</div>
+      <div class="in-card">
+        <h6 class="in-h">How likely the dues are to be recovered</h6>
+        <div class="in-sub">Every rupee owed, graded by its age and whether the student is still here</div>
+        <div class="in-grid4" id="fdRisk"></div>
+      </div>
+
+      <div class="in-sec">Money given away and billing checks</div>
+      <div class="row g-3 mb-4">
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Money given away</h6>
+          <div class="in-sub">Concessions and write-offs this session · counter discounts and voided receipts in the last 12 months</div>
+          <div id="fdGiven"></div>
+        </div></div>
+        <div class="col-12 col-lg-6"><div class="in-card">
+          <h6 class="in-h">Billing checks</h6>
+          <div class="in-sub">Things that stop a student from being billed correctly</div>
+          <div id="fdProblems"></div>
+        </div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var URL_DATA = '@Url.Action("Data","FeeDashboard",new{area="ERP"})';
+
+    function n(v) { return EC.num(v); }
+    function pct(a, b) { return n(b) > 0 ? Math.round(n(a) * 1000 / n(b)) / 10 : null; }
+    function pctText(a, b) { var p = pct(a, b); return p === null ? '—' : p + '%'; }
+    // short rupees for chart labels: 1.2L, 45k
+    function short(v) {
+        v = n(v);
+        if (Math.abs(v) >= 10000000) return '₹' + (v / 10000000).toFixed(1) + 'Cr';
+        if (Math.abs(v) >= 100000) return '₹' + (v / 100000).toFixed(1) + 'L';
+        if (Math.abs(v) >= 1000) return '₹' + (v / 1000).toFixed(1) + 'k';
+        return '₹' + Math.round(v);
+    }
+    function rateClass(p) { return p === null ? 'n' : p >= 90 ? '3' : p >= 75 ? '2' : p >= 50 ? '1' : '0'; }
+    function monthLabel(ym) { var d = new Date(ym + '-01T00:00:00'); return d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }); }
+    function hbar(label, sub, value, max, cls, valText) {
+        var w = max > 0 ? Math.max(Math.min(n(value) * 100 / max, 100), n(value) > 0 ? 1 : 0) : 0;
+        return '<div class="in-hbar"><div class="lbl">' + EC.esc(label) + (sub ? '<small>' + EC.esc(sub) + '</small>' : '') + '</div>'
+             + '<div class="in-track"><i class="' + cls + '" style="width:' + w + '%"></i></div><div class="val">' + valText + '</div></div>';
+    }
+    function kpi(label, value, sub, cls) {
+        return '<div class="in-kpi ' + (cls || '') + '"><div class="l">' + EC.esc(label) + '</div><div class="v">' + value + '</div><div class="s">' + EC.esc(sub) + '</div></div>';
+    }
+
+    $.getJSON(URL_DATA).done(function (r) {
+        var D = r.data || {}, S = (D.summary || [])[0] || {};
+        $('#fdSubtitle').text('Session ' + (S.session || '—') + ' · figures as of ' + new Date(r.today + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }));
+
+        // ── KPIs
+        var rate = pct(S.paid_due, S.billed_due), doubtful = n(S.doubtful) + n(S.likely_lost), owed = n(S.overdue) + n(S.not_yet_due);
+        var prev = n(S.collected_prev_month), now = n(S.collected_month);
+        $('#fdKpis').html(
+            kpi('Collection rate', rate === null ? '—' : rate + '%', 'of fees due so far', 'main')
+          + kpi('Collected this month', EC.money(now), S.receipts_month + ' receipt(s)' + (prev ? ' · last month ' + short(prev) : ''), 'good')
+          + kpi('Still due', EC.money(S.overdue), S.overdue_families + ' famil' + (S.overdue_families == 1 ? 'y' : 'ies') + ' overdue', n(S.overdue) > 0 ? 'warn' : '')
+          + kpi('Doubtful dues', EC.money(doubtful), pctText(doubtful, owed) + ' of everything owed', doubtful > 0 ? 'warn' : '')
+          + kpi('Falling due in 10 days', EC.money(S.due_next_10), S.due_next_10_families + ' famil' + (S.due_next_10_families == 1 ? 'y' : 'ies') + ' worth reminding'));
+
+        // ── where the money stands
+        var top = Math.max(n(S.billed_session), 1);
+        $('#fdFunnel').html(
+            hbar('The session should bring in', 'everything billed for ' + (S.session || 'the session'), S.billed_session, top, 'r3', EC.money(S.billed_session))
+          + hbar('Due so far', 'billed with a due date up to today', S.billed_due, top, 'r2', EC.money(S.billed_due))
+          + hbar('Collected', pctText(S.paid_due, S.billed_due) + ' of what is due', S.paid_due, top, 'r3', EC.money(S.paid_due))
+          + hbar('Still due', S.overdue_families + ' families', S.overdue, top, 'r0', EC.money(S.overdue))
+          + hbar('Not due yet', 'later months of the session', S.not_yet_due, top, 'r1', EC.money(S.not_yet_due))
+          + hbar('Doubtful or likely lost', 'over 90 days old, or the student has left', doubtful, top, 'r0', EC.money(doubtful)));
+
+        // ── months
+        var M = D.months || [];
+        $('#fdMonths').html(M.length ? M.map(function (m) {
+            var p = pct(m.paid, m.billed), due = m.month <= r.today.substring(0, 7);
+            return hbar(monthLabel(m.month), short(m.paid) + ' of ' + short(m.billed) + (due ? '' : ' · not due yet'), m.paid, n(m.billed), due ? 'r' + rateClass(p) : 'tn', p === null ? '—' : p + '%');
+        }).join('') : '<div class="in-muted">No fees billed this session.</div>');
+
+        // ── daily (column chart)
+        var Dy = D.daily || [], maxDay = Math.max.apply(null, Dy.map(function (d) { return n(d.amount); }).concat([1])), total = 0;
+        Dy.forEach(function (d) { total += n(d.amount); });
+        $('#fdDailySub').text('Last 30 days · ' + EC.money(total) + ' · today ' + EC.money((Dy[Dy.length - 1] || {}).amount || 0));
+        $('#fdDaily').html('<div class="in-cols">' + Dy.map(function (d) {
+            var h = Math.max(n(d.amount) * 100 / maxDay, 0);
+            return '<div class="in-col' + (n(d.amount) > 0 ? '' : ' zero') + '" title="' + EC.esc(d.day) + ': ' + EC.money(d.amount) + '"><i style="height:' + h + '%"></i></div>';
+        }).join('') + '</div><div class="in-col-l">' + Dy.map(function (d, i) {
+            return '<span>' + (i % 7 === 0 ? EC.esc(new Date(d.day + 'T00:00:00').getDate() + ' ' + new Date(d.day + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short' })) : '') + '</span>';
+        }).join('') + '</div>');
+
+        // ── modes
+        var Mo = D.modes || [], modeTotal = 0;
+        Mo.forEach(function (m) { modeTotal += n(m.amount); });
+        $('#fdModes').html(Mo.length ? Mo.map(function (m) {
+            return hbar(m.mode, '', m.amount, modeTotal, 'r3', EC.money(m.amount) + ' <small class="in-muted">' + pctText(m.amount, modeTotal) + '</small>');
+        }).join('') : '<div class="in-muted">Nothing collected this month.</div>');
+
+        // ── staff
+        var St = D.staff || [], byStaff = {}, staffOrder = [];
+        St.forEach(function (x) {
+            if (!byStaff[x.staff]) { byStaff[x.staff] = { total: 0, modes: [] }; staffOrder.push(x.staff); }
+            byStaff[x.staff].total += n(x.amount); byStaff[x.staff].modes.push(x.mode + ' ' + short(x.amount));
+        });
+        var staffMax = Math.max.apply(null, staffOrder.map(function (k) { return byStaff[k].total; }).concat([1]));
+        $('#fdStaff').html(staffOrder.length ? staffOrder.sort(function (a, b) { return byStaff[b].total - byStaff[a].total; }).map(function (k) {
+            return hbar(k || '—', byStaff[k].modes.join(' · '), byStaff[k].total, staffMax, 'r3', EC.money(byStaff[k].total));
+        }).join('') : '<div class="in-muted">Nothing collected this month.</div>');
+
+        // ── classes
+        var C = D.classes || [], cls = {}, clsOrder = [];
+        C.forEach(function (c) {
+            if (!cls[c.class_name]) { cls[c.class_name] = { billed: 0, paid: 0 }; clsOrder.push(c.class_name); }
+            cls[c.class_name].billed += n(c.billed_due); cls[c.class_name].paid += n(c.paid_due);
+        });
+        $('#fdClasses').html(clsOrder.length ? clsOrder.map(function (k) {
+            var p = pct(cls[k].paid, cls[k].billed);
+            return hbar(k, short(cls[k].paid) + ' of ' + short(cls[k].billed), cls[k].paid, cls[k].billed, 'r' + rateClass(p), p === null ? '—' : p + '%');
+        }).join('') : '<div class="in-muted">No dues yet.</div>');
+
+        var secs = C.filter(function (c) { return n(c.overdue) > 0; }).sort(function (a, b) { return n(b.overdue) - n(a.overdue); });
+        $('#fdSections').html(secs.length ? secs.map(function (c) {
+            var p = pct(c.paid_due, c.billed_due);
+            return '<div class="in-row"><div><b>' + EC.esc(c.class_name + (c.section ? ' – ' + c.section : '')) + '</b>'
+                 + '<small>' + EC.esc(c.class_teacher ? 'Class teacher: ' + c.class_teacher : 'No class teacher') + ' · ' + c.students_owing + ' of ' + c.students + ' owing · ' + (p === null ? '—' : p + '% collected') + '</small></div>'
+                 + '<div class="fw-bold text-danger">' + EC.money(c.overdue) + '</div></div>';
+        }).join('') : '<div class="in-muted">No section has overdue fees.</div>');
+
+        // ── matrix
+        var Mx = D.matrix || [], heads = [], rowsM = {}, rowOrder = [];
+        Mx.forEach(function (x) {
+            if (heads.indexOf(x.fee_head) < 0) heads.push(x.fee_head);
+            if (!rowsM[x.class_name]) { rowsM[x.class_name] = { all: { b: 0, p: 0 } }; rowOrder.push(x.class_name); }
+            rowsM[x.class_name][x.fee_head] = { b: n(x.billed_due), p: n(x.paid_due) };
+            rowsM[x.class_name].all.b += n(x.billed_due); rowsM[x.class_name].all.p += n(x.paid_due);
+        });
+        $('#fdMatrix').html(rowOrder.length
+            ? '<thead><tr><th>Class</th>' + heads.map(function (h) { return '<th class="text-center">' + EC.esc(h) + '</th>'; }).join('') + '<th class="text-center">All fees</th></tr></thead><tbody>'
+              + rowOrder.map(function (k) {
+                    return '<tr><td class="fw-semibold">' + EC.esc(k) + '</td>' + heads.concat(['all']).map(function (h) {
+                        var c = rowsM[k][h]; if (!c) return '<td class="c tn">—</td>';
+                        var p = pct(c.p, c.b);
+                        return '<td class="c t' + rateClass(p) + '" title="' + EC.esc(EC.money(c.p) + ' of ' + EC.money(c.b)) + '">' + (p === null ? '—' : p + '%') + '</td>';
+                    }).join('') + '</tr>';
+                }).join('') + '</tbody>'
+            : '<tbody><tr><td class="in-muted">No fees due yet.</td></tr></tbody>');
+
+        // ── heads
+        var H = D.heads || [], overdueTotal = 0;
+        H.forEach(function (h) { overdueTotal += n(h.overdue); });
+        $('#fdHeads').html('<thead><tr><th>Fee head</th><th class="n">Collected</th><th class="n">Overdue</th><th class="n">Not due yet</th></tr></thead><tbody>'
+            + (H.map(function (h) {
+                return '<tr><td class="fw-semibold">' + EC.esc(h.fee_head) + '</td><td class="n">' + EC.money(h.collected || 0) + '</td>'
+                     + '<td class="n text-danger">' + EC.money(h.overdue || 0) + '</td><td class="n">' + EC.money(h.not_yet_due || 0) + '</td></tr>';
+            }).join('') || '<tr><td colspan="4" class="in-muted">—</td></tr>') + '</tbody>');
+        $('#fdMakeup').html(overdueTotal > 0 ? H.filter(function (h) { return n(h.overdue) > 0; }).map(function (h) {
+            return hbar(h.fee_head, '', h.overdue, overdueTotal, 'r0', short(h.overdue) + ' <small class="in-muted">' + pctText(h.overdue, overdueTotal) + '</small>');
+        }).join('') : '<div class="in-muted">Nothing overdue.</div>');
+
+        // ── aging + habits
+        $('#fdAgingSub').text(EC.money(S.overdue) + ' overdue');
+        var ages = [['0–30 days', S.age_0_30, 'r1'], ['31–60 days', S.age_31_60, 'r1'], ['61–90 days', S.age_61_90, 'r0'], ['90+ days', S.age_90_plus, 'r0']];
+        $('#fdAging').html(ages.map(function (a) { return hbar(a[0], '', a[1], n(S.overdue), a[2], EC.money(a[1])); }).join(''));
+        $('#fdHabits').html(
+            '<div class="in-box t3"><b>' + S.fam_on_time + '</b><small>Pay on time</small></div>'
+          + '<div class="in-box t1"><b>' + S.fam_late + '</b><small>Pay late</small></div>'
+          + '<div class="in-box t0"><b>' + S.fam_defaulter + '</b><small>Habitual defaulters</small></div>'
+          + '<div class="in-box tn"><b>' + S.fam_new + '</b><small>Too new to tell</small></div>');
+
+        // ── families
+        var F = D.families || [];
+        var habitTag = { 'Habitual defaulter': 't0', 'Pays late': 't1', 'Pays on time': 't3' };
+        $('#fdFamilies').html(F.length ? F.map(function (f) {
+            return '<div class="in-row' + (f.habit === 'Habitual defaulter' ? ' bad' : '') + '"><div><b>' + EC.esc(f.guardian) + '</b>'
+                 + '<small>' + EC.esc(f.children) + '</small><small>' + (f.family.charAt(0) === 'S' ? '' : EC.esc(f.family) + ' · ') + 'oldest due ' + (f.oldest_days || 0) + ' day(s) · paid ' + EC.money(f.paid || 0) + '</small></div>'
+                 + '<div class="text-end"><div class="fw-bold text-danger">' + EC.money(f.overdue) + '</div><span class="in-tag ' + (habitTag[f.habit] || 'tn') + '">' + EC.esc(f.habit || '') + '</span></div></div>';
+        }).join('') : '<div class="in-muted">No family has overdue fees.</div>');
+
+        // ── risk
+        var riskTotal = n(S.safe) + n(S.at_risk) + n(S.doubtful) + n(S.likely_lost);
+        $('#fdRisk').html(
+            '<div class="in-box t3"><small>Safe</small><b>' + EC.money(S.safe) + '</b><small>' + pctText(S.safe, riskTotal) + ' · not due yet, or under 30 days</small></div>'
+          + '<div class="in-box t1"><small>At risk</small><b>' + EC.money(S.at_risk) + '</b><small>' + pctText(S.at_risk, riskTotal) + ' · 31–90 days old</small></div>'
+          + '<div class="in-box t0"><small>Doubtful</small><b>' + EC.money(S.doubtful) + '</b><small>' + pctText(S.doubtful, riskTotal) + ' · 91–180 days old</small></div>'
+          + '<div class="in-box t0"><small>Likely lost</small><b>' + EC.money(S.likely_lost) + '</b><small>' + pctText(S.likely_lost, riskTotal) + ' · over 180 days, or the student left</small></div>');
+
+        // ── given away
+        var G = D.given || [];
+        $('#fdGiven').html(G.length ? '<table class="in-table"><tbody>' + G.map(function (g) {
+            return '<tr><td class="fw-semibold">' + EC.esc(g.kind) + '</td><td>' + EC.esc(g.staff || '') + (g.cnt ? ' <span class="in-muted">(' + g.cnt + ')</span>' : '') + '</td><td class="n">' + EC.money(g.amount || 0) + '</td></tr>';
+        }).join('') + '</tbody></table>' : '<div class="in-muted">Nothing given away.</div>');
+
+        // ── billing checks
+        var P = D.problems || [];
+        var why = { 'No price set': 'Fee heads ticked in the fee structure with no amount — those students get no bill for them.',
+                    'No fee structure': 'Students in this class, but the class has no fee structure for this session.',
+                    'Never billed': 'Active students of this session with no fee line at all.' };
+        $('#fdProblems').html(P.length ? P.map(function (p) {
+            return '<div class="in-row bad"><div><b>' + EC.esc(p.kind) + (p.cnt ? ' (' + p.cnt + ')' : '') + '</b><small>' + EC.esc(why[p.kind] || '') + '</small><small>' + EC.esc(p.detail || '') + '</small></div></div>';
+        }).join('') : '<div class="text-success fw-semibold"><i class="bx bx-check-circle me-1"></i>Every class has a priced fee structure and every student is billed.</div>');
+
+        $('#fdLoading').addClass('d-none'); $('#fdBody').removeClass('d-none');
+    }).fail(function () {
+        $('#fdLoading').html('<span class="text-danger">Could not load the fee dashboard.</span>');
+    });
+});
+</script>
+}

@@ -5217,3 +5217,24 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
 - Student Dashboard gets a **Homework** tab (loaded when opened, `Student/DashboardHomework`): the
   student's homework of the last 30 days with Done / Late / Not done / Not checked, from the existing
   `sp_homework_manage` 'Student' operation.
+
+### [2026-10-14] Fee Dashboard + Attendance Overview (read-only dashboards)
+- **Fee › Fee Dashboard** (`FeeDashboard/Index`, `fees.view`): collection rate, collected this month (vs last),
+  still due (families), doubtful dues, falling due in 10 days; where the money stands; collection rate by
+  due month; daily collections (30 days); modes and staff this month; collection rate by class; sections
+  owing most with the class teacher; class × fee head matrix; fee heads (collected / overdue / not due,
+  older sessions = "Old dues") and what dues are made of; aging; how families pay (siblings grouped by the
+  guardian's mobile: on time / late / habitual defaulter / too new); families owing most; recovery grading
+  (safe / at risk / doubtful / likely lost by age, or the student left); money given away (concessions,
+  year-end write-offs, counter discount and voids by staff); billing checks (no price set, class without a
+  fee structure, students never billed). One proc `core.sp_fee_dashboard`, money in via
+  `fn_fee_money_lines` without Advance / To-wallet lines.
+- **Attendance › Overview** (`AttendanceOverview/Index`, `reports.view` because it ranks teachers):
+  Today — every section's register for a day, pending ones "waiting on" the class teacher, the day's
+  Present / Late / Absent / Leave; Insights — registers taken vs expected on school working days,
+  week by week, class-teacher leaderboard (70% taken + 30% same day), sections worst-first, every missing
+  register with its class teacher. One proc `core.sp_attendance_overview`.
+- Homework Overview now uses `reports.view` too (was `academics.manage`, which the Principal template lacks).
+- Both pages read through `DashboardReportService` (cursor rows passed to the page as column → value).
+  DB: `fee_dashboard.sql`, `attendance_overview.sql` (`deploy_2026_10_14g.sql`).
+- Not built: register lock / unlock and the Half day / Excused student statuses (they change marking).
