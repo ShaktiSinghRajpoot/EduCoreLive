@@ -141,6 +141,7 @@ namespace educore.Areas.ERP.Controllers
                     // which the admission form makes mandatory. Anything the
                     // enquiry holds and this form asks for is now carried.
                     ViewBag.PrefillEnquiryId = enquiry.EnquiryId;
+                    ViewBag.PreRegBalance    = await RegistrationBalanceAsync(enquiry.EnquiryId, TenantId(), SchoolId(), UserId());
                     ViewBag.PreStudentName   = enquiry.StudentName;
                     ViewBag.PreGender        = enquiry.Gender;
                     ViewBag.PreDob           = enquiry.Dob;
@@ -277,6 +278,10 @@ namespace educore.Areas.ERP.Controllers
                 : QuoteAdmission(fees,
                       await _admissionService.GetPlanInstalmentsAsync(form.AcademicYear!.Trim(), tenantId, schoolId, userId),
                       form.DiscountType, form.DiscountValue ?? 0m, form.DiscountApplyTo);
+
+            // The registration fee still unpaid is carried onto the student, due today,
+            // so it is collected at admission too (QA BUG-071).
+            quote.PayToday += await RegistrationBalanceAsync(form.EnquiryId, tenantId, schoolId, userId);
 
             if (quote.Concession > 0 && string.IsNullOrWhiteSpace(form.DiscountReason))
                 errors.Add("A concession reason is required when a discount is applied.");
@@ -722,6 +727,30 @@ namespace educore.Areas.ERP.Controllers
             q.PayToday -= nowShare;
             q.Annual   -= q.Concession > ConcessionCap ? 0m : q.Concession;
             return q;
+        }
+
+        // The registration fee the family still owes (paid in part, or not at all).
+        // sp_admission_manage carries it onto the student's ledger, due on the
+        // admission day. Same rule as there: the agreed fee, else (nothing paid yet)
+        // the fee the registration screen asks for.
+        private async Task<decimal> RegistrationBalanceAsync(int? enquiryId, int tenantId, int schoolId, int userId)
+        {
+            if (enquiryId is not > 0) return 0m;
+
+            var (fee, settled, balance, _) = await _feePaymentService.GetRegistrationFeeSummaryAsync(
+                enquiryId.Value, tenantId, schoolId, userId);
+            if (fee > 0) return balance;
+
+            var enquiry  = await _enquiryService.GetEnquiryByIdAsync(enquiryId.Value, tenantId, schoolId, userId);
+            var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
+            if (enquiry == null || string.IsNullOrWhiteSpace(enquiry.RegistrationNumber)
+                || !workflow.EnableRegistration || !workflow.EnableRegistrationFee)
+                return 0m;
+
+            decimal total = await _schoolSettingsService.GetCollectionPointResolvedTotalAsync(
+                enquiry.ClassName ?? string.Empty, enquiry.Session ?? string.Empty,
+                "Registration", tenantId, schoolId, userId);
+            return Math.Max(total - settled, 0m);
         }
 
         private static int DueNowFor(Dictionary<string, int> instalments, string? frequency) =>

@@ -476,6 +476,8 @@ $(function () {
     var $ledger     = $('#ledgerJson');
     var $form       = $('#admissionForm');
     var payTodayMax = 0;   // max cash collectable at admission = amount due now
+    // registration fee still unpaid on the enquiry: carried onto the student, due today
+    var regDue = @(((decimal?)ViewBag.PreRegBalance ?? 0m).ToString(System.Globalization.CultureInfo.InvariantCulture));
 
     // Set when an enquiry is being converted. Held here rather than read back
     // off the dropdown, because the dropdown is emptied while its options load.
@@ -755,13 +757,14 @@ $(function () {
         // Pay-today = one-time school fees − concession (if applied here). Store add-ons
         // are NOT charged at admission (sold separately at the store), so they never
         // contribute to the amount collected.
-        var payToday = payNow + firstDue - (applyTo === 'payToday' ? disc : 0);
+        var payToday = payNow + firstDue + regDue - (applyTo === 'payToday' ? disc : 0);
         var estAnnual = annual - (applyTo === 'annual' ? disc : 0);
 
         var summary = '<div class="fee-summary">' +
             '<div class="fee-group-title" style="margin:0 0 .5rem;">Due at Admission</div>' +
             '<div class="summary-line"><span>One-Time Fees</span><strong>' + EC.money(payNow) + '</strong></div>' +
-            (firstDue > 0 ? '<div class="summary-line"><span>First instalments (due on joining)</span><strong>' + EC.money(firstDue) + '</strong></div>' : '');
+            (firstDue > 0 ? '<div class="summary-line"><span>First instalments (due on joining)</span><strong>' + EC.money(firstDue) + '</strong></div>' : '') +
+            (regDue > 0 ? '<div class="summary-line"><span>Registration fee (unpaid)</span><strong>' + EC.money(regDue) + '</strong></div>' : '');
         if (applyTo === 'payToday' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + EC.money(disc) + '</strong></div>';
         summary += '<hr class="opacity-25"><div class="summary-line"><span style="color:var(--ec-heading);font-weight:950;">Collect at Admission</span><strong style="color:var(--ec-primary);">' + EC.money(payToday) + '</strong></div>';
         summary += '<div class="fee-group-title" style="margin:1rem 0 .5rem;">Scheduled — Billed Later</div>' +

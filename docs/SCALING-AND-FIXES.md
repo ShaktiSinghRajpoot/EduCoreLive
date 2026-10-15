@@ -5512,3 +5512,12 @@ New suite `tests/flow_fixes2_tests.sql` (10 checks, rolled back): all pass; the 
 - **Payroll Mark Paid** rebuilds the draft first (an old draft paid yesterday's figures after a leave or salary
   change) and is refused before the month's last day.
 - Bundle `deploy_2026_10_15e.sql`.
+
+### 2026-10-15 — Last two QA fails (BUG-071, BUG-090)
+- **Admission "Collect at Admission"** now includes the registration fee still unpaid on the enquiry (it is
+  carried onto the student, due on the admission day, so the panel said "clears everything" while Rs 500 was
+  left). `AdmissionController.RegistrationBalanceAsync` uses the same rule as `sp_admission_manage`.
+- **Unpaid leave approved for a month already paid** is taken back as a Deduction adjustment in the next unpaid
+  month, at the payslip's own rate (salary / school days). Days already cut as Absent are not taken twice; the
+  approval message says how much and in which month. Test 11 in `tests/flow_fixes2_tests.sql`.
+- Bundle `deploy_2026_10_15f.sql` (staff_leave.sql).

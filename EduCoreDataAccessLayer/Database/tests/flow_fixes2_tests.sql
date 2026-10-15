@@ -11,6 +11,7 @@ BEGIN;
 \ir ../transport_module.sql
 \ir ../sp_staff_manage.sql
 \ir ../staff_payroll.sql
+\ir ../staff_leave.sql
 \o
 
 DO $t$
@@ -118,6 +119,20 @@ BEGIN
         CALL core.sp_staff_payroll_manage('MARK_PAID', T, S, A, NULL, NULL, v_pid, NULL, c, 'Cash', NULL);
         fail := fail + 1; RAISE NOTICE 'FAIL 10 running month marked paid (payslip %)', v_pid;
     EXCEPTION WHEN raise_exception THEN pass := pass + 1; RAISE NOTICE 'PASS 10 %', SQLERRM; END;
+
+    -- 11. unpaid leave approved for a month already paid (September, paid in 9) is
+    --     taken back as a Deduction in the next unpaid month (October draft from 10)
+    INSERT INTO core.staff_leave (tenant_id, school_id, staff_id, leave_type, from_date, to_date, days, status, applied_by)
+    VALUES (T, S, 91, 'Unpaid', '2026-09-15', '2026-09-16', 2, 'Pending', A) RETURNING leave_id INTO v_pid;
+    c := 'c11';
+    CALL core.sp_staff_leave_manage('DECIDE', T, S, A, p_leave_id => v_pid, p_status => 'Approved', p_result => c);
+    FETCH c INTO r; CLOSE c;
+    SELECT COALESCE(SUM(amount), 0) INTO v_num FROM core.staff_payroll_adjustment
+     WHERE staff_id = 91 AND pay_month = 10 AND pay_year = 2026 AND kind = 'Deduction' AND NOT is_void;
+    SELECT other_deduct INTO v_n FROM core.staff_payroll WHERE staff_id = 91 AND pay_month = 10 AND pay_year = 2026;
+    IF v_num > 0 AND v_n >= v_num AND r.message LIKE '%will be deducted in October 2026%'
+    THEN pass := pass + 1; RAISE NOTICE 'PASS 11 Rs % recovered in October: %', v_num, right(r.message, 120);
+    ELSE fail := fail + 1; RAISE NOTICE 'FAIL 11 deduction %, draft deduct %, msg %', v_num, v_n, r.message; END IF;
 
     RAISE NOTICE '== % passed, % failed ==', pass, fail;
 END;

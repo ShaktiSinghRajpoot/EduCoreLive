@@ -181,6 +181,13 @@ DECLARE
     v_list   text;
     v_n      integer;
     v_name   text;
+    v_half   boolean;
+    v_pay    record;    -- a paid payslip the unpaid leave falls in
+    v_month  date;      -- that payslip's month
+    v_next   date;      -- the first unpaid month after it
+    v_amt    numeric;
+    v_adj    integer;
+    v_pid    integer;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -377,8 +384,8 @@ BEGIN
         -- What the approval leaves to arrange, said in the same message (QA BUG-115,
         -- BUG-090): the class charge, the periods to cover, and salary already paid.
         IF p_status = 'Approved' THEN
-            SELECT l.from_date::date, l.to_date::date, l.staff_id, l.leave_type, s.full_name
-              INTO v_from, v_to, v_staff, v_type, v_name
+            SELECT l.from_date::date, l.to_date::date, l.staff_id, l.leave_type, s.full_name, l.half_day
+              INTO v_from, v_to, v_staff, v_type, v_name, v_half
               FROM core.staff_leave l JOIN core.staff s ON s.staff_id = l.staff_id
              WHERE l.leave_id = p_leave_id;
 
@@ -405,14 +412,73 @@ BEGIN
                 v_note := v_note || ' ' || v_n || ' timetable period(s) need a substitute -- Staff Attendance > Substitutes.';
             END IF;
 
-            IF LOWER(v_type) = 'unpaid' AND EXISTS (
-                   SELECT 1 FROM core.staff_payroll p
-                    WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
-                      AND p.staff_id = v_staff AND p.status = 'Paid'
-                      AND make_date(p.pay_year, p.pay_month, 1)
-                          BETWEEN DATE_TRUNC('month', v_from)::date AND v_to) THEN
-                v_note := v_note || ' Salary for that month is already paid, so this unpaid leave is not deducted:'
-                       || ' add a deduction in Payroll > Adjustments of the next unpaid month.';
+            -- Unpaid leave in a month whose salary is already paid (QA BUG-090): a paid
+            -- payslip is never changed, so the days are taken back as a Deduction in the
+            -- next unpaid month, at the payslip's own rate (salary / school days).
+            -- Days already cut on that payslip as Absent are not taken twice.
+            IF LOWER(v_type) = 'unpaid' THEN
+                FOR v_pay IN
+                    SELECT * FROM core.staff_payroll p
+                     WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
+                       AND p.staff_id = v_staff AND p.status = 'Paid'
+                       AND make_date(p.pay_year, p.pay_month, 1)
+                           BETWEEN DATE_TRUNC('month', v_from)::date AND v_to
+                     ORDER BY p.pay_year, p.pay_month
+                LOOP
+                    v_month := make_date(v_pay.pay_year, v_pay.pay_month, 1);
+
+                    SELECT COALESCE(SUM(core.fn_school_working_days(p_tenant_id, p_school_id, d.day::date, d.day::date)), 0)
+                      INTO v_days
+                      FROM generate_series(GREATEST(v_from, v_month),
+                                           LEAST(v_to, (v_month + INTERVAL '1 month' - INTERVAL '1 day')::date),
+                                           interval '1 day') d(day)
+                     WHERE NOT EXISTS (SELECT 1 FROM core.staff_attendance a
+                                        WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
+                                          AND a.staff_id = v_staff AND a.att_date = d.day::date
+                                          AND a.status IN ('Absent', 'HalfDay', 'Leave'));
+                    IF v_half THEN v_days := LEAST(v_days, 1) * 0.5; END IF;
+
+                    v_amt := LEAST(ROUND(COALESCE(v_pay.monthly_salary, 0) * v_days / NULLIF(v_pay.working_days, 0), 2),
+                                   v_pay.net_pay);
+                    CONTINUE WHEN COALESCE(v_amt, 0) <= 0;
+
+                    v_next := (v_month + INTERVAL '1 month')::date;
+                    WHILE EXISTS (SELECT 1 FROM core.staff_payroll p
+                                   WHERE p.tenant_id = p_tenant_id AND p.school_id = p_school_id
+                                     AND p.staff_id = v_staff AND p.status = 'Paid'
+                                     AND p.pay_year = EXTRACT(YEAR FROM v_next) AND p.pay_month = EXTRACT(MONTH FROM v_next)) LOOP
+                        v_next := (v_next + INTERVAL '1 month')::date;
+                    END LOOP;
+
+                    INSERT INTO core.staff_payroll_adjustment
+                        (tenant_id, school_id, staff_id, pay_month, pay_year, kind, amount, reason, created_by)
+                    VALUES (p_tenant_id, p_school_id, v_staff, EXTRACT(MONTH FROM v_next), EXTRACT(YEAR FROM v_next),
+                            'Deduction', v_amt,
+                            'Unpaid leave ' || to_char(v_from, 'DD Mon') || ' - ' || to_char(v_to, 'DD Mon YYYY') || ': '
+                            || v_days || ' day(s) of ' || to_char(v_month, 'Mon YYYY') || ' (salary already paid)',
+                            p_action_user_id)
+                    RETURNING adjustment_id INTO v_adj;
+
+                    -- A draft for that month picks it up now (the net never goes below 0).
+                    SELECT payroll_id INTO v_pid FROM core.staff_payroll
+                     WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = v_staff
+                       AND pay_year = EXTRACT(YEAR FROM v_next) AND pay_month = EXTRACT(MONTH FROM v_next);
+                    IF v_pid IS NOT NULL THEN
+                        PERFORM core.fn_staff_payslip_build(p_tenant_id, p_school_id, p_action_user_id,
+                                    v_staff, EXTRACT(MONTH FROM v_next)::int, EXTRACT(YEAR FROM v_next)::int);
+                    END IF;
+
+                    INSERT INTO core.staff_payroll_history
+                        (tenant_id, school_id, payroll_id, staff_id, pay_month, pay_year, action, net_pay, note, action_by)
+                    VALUES (p_tenant_id, p_school_id, v_pid, v_staff, EXTRACT(MONTH FROM v_next), EXTRACT(YEAR FROM v_next),
+                            'ADJUSTMENT_ADDED', (SELECT net_pay FROM core.staff_payroll WHERE payroll_id = v_pid),
+                            format('#%s Deduction %s: unpaid leave in paid month %s', v_adj, v_amt, to_char(v_month, 'Mon YYYY')),
+                            p_action_user_id);
+
+                    v_note := v_note || ' Salary for ' || to_char(v_month, 'FMMonth YYYY') || ' is already paid: Rs '
+                           || to_char(v_amt, 'FM99,99,990.00') || ' for ' || v_days || ' unpaid day(s) will be deducted in '
+                           || to_char(v_next, 'FMMonth YYYY') || ' (Payroll > Adjustments).';
+                END LOOP;
             END IF;
         END IF;
 
