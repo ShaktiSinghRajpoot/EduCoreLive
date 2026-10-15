@@ -178,6 +178,14 @@ BEGIN
         RAISE EXCEPTION 'Student not found in this school.';
     END IF;
 
+    -- The TC says the account is settled: money taken after it (an overpayment that
+    -- lands in the wallet, say) would sit on a child who has gone. Void the TC first.
+    IF EXISTS (SELECT 1 FROM core.tc_register t
+                WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id
+                  AND t.student_id = p_student_id AND t.is_void = FALSE) THEN
+        RAISE EXCEPTION 'A Transfer Certificate has been issued for this student. Void it before collecting money.';
+    END IF;
+
     -- A retry of a settlement that already went through returns that receipt.
     v_client_ref := NULLIF(trim(p_client_ref), '');
     IF v_client_ref IS NOT NULL THEN

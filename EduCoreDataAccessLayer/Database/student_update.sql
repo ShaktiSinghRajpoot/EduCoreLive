@@ -107,6 +107,9 @@ DECLARE
     v_closed  numeric(12,2) := 0;
     v_billed  integer := 0;
     v_note    text := '';
+    v_prepaid numeric(12,2);
+    v_last_id integer;   -- highest ledger id before the new class is billed
+    v_running integer;   -- new lines dropped for a cycle already running
     r         record;
     v_roll    text := NULLIF(TRIM(COALESCE(p_roll_no, '')), '');
     v_gender  text := NULLIF(TRIM(COALESCE(p_gender, '')), '');
@@ -350,6 +353,20 @@ BEGIN
         FROM jsonb_array_elements(core.fn_class_fee_plan(p_tenant_id, p_school_id, v_cls, s.academic_year)) e
         WHERE lower(e->>'frequency') IN ('monthly', 'quarterly', 'half yearly');
 
+        -- Fees already PAID for later months of the old class: closing nothing and
+        -- billing the new class for the same months would charge the parent twice.
+        SELECT COALESCE(SUM(amount_paid), 0) INTO v_prepaid
+          FROM core.student_ledger
+         WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
+           AND fee_head_name <> 'Transport Fee'
+           AND lower(frequency) IN ('monthly', 'quarterly', 'half yearly')
+           AND (academic_year = s.academic_year OR academic_year IS NULL)
+           AND due_date IS NOT NULL AND due_date::date >= v_from AND amount_paid > 0;
+        IF v_plan IS NOT NULL AND v_prepaid > 0 THEN
+            RAISE EXCEPTION 'Rs % is already paid for months after this one in %. Cancel those receipts (or refund) before moving the class, so the new class is not billed for paid months.',
+                to_char(v_prepaid, 'FM99,99,99,990.00'), s.class_name;
+        END IF;
+
         IF v_plan IS NULL THEN
             v_note := ' No fee structure for ' || v_cls || ' in ' || s.academic_year || ': fees were not changed.';
         ELSE
@@ -372,8 +389,22 @@ BEGIN
             WHERE student_id = p_student_id AND tenant_id = p_tenant_id AND school_id = p_school_id
               AND is_current AND (academic_year = s.academic_year OR academic_year IS NULL);
 
+            SELECT COALESCE(MAX(ledger_id), 0) INTO v_last_id FROM core.student_ledger;
+
             v_billed := core.fn_student_bill_plan(p_tenant_id, p_school_id, p_action_user_id,
                             p_student_id, s.academic_year, v_from, v_plan, TRUE, v_from);
+
+            -- A quarter or half-year that is already running stays with the old class
+            -- (its line is still open), so the new class's line for that same cycle is
+            -- taken off again -- it was just made here, nothing is paid on it. Without
+            -- this the running quarter was charged twice.
+            DELETE FROM core.student_ledger
+             WHERE student_id = p_student_id AND ledger_id > v_last_id
+               AND lower(frequency) IN ('quarterly', 'half yearly')
+               AND installment_label ~ '^[A-Z][a-z]{2} [0-9]{4}'
+               AND to_date(left(installment_label, 8), 'Mon YYYY') < v_from;
+            GET DIAGNOSTICS v_running = ROW_COUNT;
+            v_billed := v_billed - v_running;
 
             v_note := ' Fees: ' || to_char(v_closed, 'FM99999990.00') || ' of ' || s.class_name ||
                       ' instalments closed, ' || v_billed || ' ' || v_cls || ' instalment(s) billed from ' ||

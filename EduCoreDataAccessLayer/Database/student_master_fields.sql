@@ -139,6 +139,7 @@ DECLARE
     v_reg_balance   NUMERIC;
     v_reg_agreed    NUMERIC;
     v_roll          TEXT;
+    v_dup_adm       TEXT;
 BEGIN
 
     -- ── SaveAdmission ────────────────────────────────────────
@@ -270,6 +271,27 @@ BEGIN
         IF v_dup > 0 THEN
             OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
                 'A student with the same name, DOB and mobile already exists.' AS message,
+                NULL::TEXT AS admission_no;
+            RETURN;
+        END IF;
+
+        -- The same child who LEFT earlier in this session comes back: re-admit the
+        -- old record (Students > Left Students > Re-admit) so their history, dues
+        -- and admission number stay one record, instead of making a second student.
+        SELECT admission_no INTO v_dup_adm
+        FROM core.students
+        WHERE tenant_id = p_tenant_id
+          AND school_id = p_school_id
+          AND is_active = FALSE
+          AND academic_year = v_year
+          AND regexp_replace(LOWER(TRIM(student_name)), '\s+', ' ', 'g')
+              = regexp_replace(LOWER(TRIM(COALESCE(p_student_name, ''))), '\s+', ' ', 'g')
+          AND COALESCE(dob::date, DATE '1900-01-01') = COALESCE(p_dob, DATE '1900-01-01')
+          AND COALESCE(mobile, '') = COALESCE(p_mobile, '')
+        LIMIT 1;
+        IF v_dup_adm IS NOT NULL THEN
+            OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
+                'This child left earlier this session (' || v_dup_adm || '). Re-admit them from Students > Left Students instead of a new admission.' AS message,
                 NULL::TEXT AS admission_no;
             RETURN;
         END IF;

@@ -706,7 +706,7 @@ $(function () {
         var csv = '﻿' + [head].concat(lines).map(function(row){
             return row.map(function(c){ return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'; }).join(',');
         }).join('\r\n');
-        var a = $('<a>').attr({ href:'data:text/csv;charset=utf-8,'+encodeURIComponent(csv), download:'registrations_'+new Date().toISOString().slice(0,10)+'.csv' }).appendTo('body');
+        var a = $('<a>').attr({ href:'data:text/csv;charset=utf-8,'+encodeURIComponent(csv), download:'registrations_'+EC.today()+'.csv' }).appendTo('body');
         a[0].click(); a.remove();
     });
 
@@ -775,7 +775,7 @@ $(function () {
         $('#rwDiscountType').val(''); $('#rwDiscountValue').val(''); $('#rwDiscountReason').val('');
         $('#rwFeeAmountLabel').text('Select class & session');
         RW_FEE_AMOUNT = 0; rwUpdateNet();
-        $('#rwRegDate').val(new Date().toISOString().slice(0, 10));
+        $('#rwRegDate').val(EC.today());
         new bootstrap.Modal(document.getElementById('registerWalkinModal')).show();
     });
 

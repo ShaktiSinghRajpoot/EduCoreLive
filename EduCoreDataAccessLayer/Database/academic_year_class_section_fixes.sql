@@ -124,6 +124,8 @@ CREATE OR REPLACE PROCEDURE academic.sp_school_admin_academic_year_manage(
 LANGUAGE plpgsql
 AS $procedure$
 DECLARE
+    v_first_used    date;   -- earliest fee due / attendance day already in the session
+    v_last_used     date;   -- latest one
     v_id            integer;
     v_name          text;
     v_year_name     text;
@@ -257,6 +259,21 @@ BEGIN
                     RAISE EXCEPTION 'Cannot rename % to %: it is already used by %. Those records keep the session name, so a rename would detach them.',
                         v_year_name, v_name, v_usage;
                 END IF;
+            END IF;
+
+            -- New dates must still hold what already happened in this session: fees
+            -- billed and attendance taken. Shrinking past them left months billed
+            -- outside the session and broke every "within the session" check.
+            SELECT MIN(d), MAX(d) INTO v_first_used, v_last_used FROM (
+                SELECT NULLIF(l.due_date, '')::date AS d FROM core.student_ledger l
+                 WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id AND l.academic_year = v_year_name
+                   AND l.carried_from IS NULL   -- a due carried in keeps its old date
+                UNION ALL
+                SELECT a.attendance_date::date FROM core.student_attendance a
+                 WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id AND a.academic_year = v_year_name) x;
+            IF v_first_used IS NOT NULL AND (p_start_date > v_first_used OR p_end_date < v_last_used) THEN
+                RAISE EXCEPTION 'Session % already has fees or attendance from % to %. The dates must cover that period.',
+                    v_year_name, to_char(v_first_used, 'DD Mon YYYY'), to_char(v_last_used, 'DD Mon YYYY');
             END IF;
 
             -- The guard this move exists for. A student's fee ledger is generated

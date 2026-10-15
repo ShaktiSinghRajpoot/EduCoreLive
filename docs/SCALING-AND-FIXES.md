@@ -5466,3 +5466,34 @@ Owner-approved design for D-10 (`educore/docs/test-cases/inventory_store.md`). N
   ID card / TC sample previews show today's April–March session instead of a fixed "2026-2027".
   `tests/session_change_tests.sql` now 13 checks, all pass. Bundle `deploy_2026_10_15c.sql` (id_card,
   transfer_certificate).
+
+### 2026-10-15 — Real-world flow test: new student, leaving / TC / re-admit, mid-year changes
+Found by walking whole flows (a new student on live; code audits of leaving and mid-year changes),
+each verified before fixing. New suite `tests/flow_fixes_tests.sql` (17 checks, rolled back): all pass;
+the other tenant-32 suites still pass.
+- **Admission "Pay Today"** left out the first instalments due on the joining day (Rs 5,300 due a minute
+  after "clears everything"). `sp_plan_instalments` returns `due_now`; the quote and the form include them.
+- **Leaving**: no future date / date before admission (a future date hid the child from homework, exams and
+  ID cards while still attending); an unpaid refundable deposit is closed; money already paid for later
+  months is reported.
+- **Re-admit**: only fees from this month on come back (not the months away); refused once the session the
+  child left is over (admit again instead); a roll number taken meanwhile gets the next free one; a new
+  admission of a child who left this session is refused with a pointer to Re-admit.
+- **TC**: working days / days present are the days the child was on the register (joined mid-year, moved
+  section, up to leaving) via `fn_attendance_student_days`; the 30-day "just promoted" rule uses the child's
+  own days; "fees paid up to" never names a line closed at leaving and prefers a month label; a warning when a
+  refundable deposit is still held.
+- **After a TC** no money can be collected and no receipt cancelled (void the TC first). Cancelling a receipt
+  on a CLOSED line keeps it closed instead of making it due again.
+- **Class change** no longer bills a running quarter / half-year twice (the new class's line for that cycle is
+  dropped); refused when later months are already paid (cancel / refund first).
+- **Exams**: a moved student's mark on the old section's finalised sheet cannot be overwritten from the new one.
+- **Fee heads**: a head with unpaid arrears of an earlier session cannot be deleted (inactive instead); the
+  "inactive" message says how many instalments already billed stay due.
+- **Calendar**: a day whose attendance was taken cannot be made a holiday.
+- **Staff leaving** (Deactivate or status Inactive): new `core.sp_staff_release_duties` frees their class
+  teacher role and timetable periods in the current and later sessions.
+- **Session dates** cannot be shrunk past fees or attendance already in the session (carried-in dues ignored).
+- **Dates on screen**: new `EC.today()` (local date); five pages used `toISOString()`, which in India is
+  yesterday until 05:30.
+- Bundle `deploy_2026_10_15d.sql`.

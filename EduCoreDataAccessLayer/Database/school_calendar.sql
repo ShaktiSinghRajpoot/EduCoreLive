@@ -279,6 +279,17 @@ BEGIN
                     END IF;
                 END IF;
 
+                -- A day whose attendance was taken WAS a school day. Making it a holiday
+                -- afterwards left those marks counted in the student % but not in the
+                -- registers expected, and the day could no longer be corrected.
+                IF v_type = 'holiday' AND EXISTS (
+                       SELECT 1 FROM core.student_attendance a
+                        WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
+                          AND a.attendance_date::date = v_day) THEN
+                    RAISE EXCEPTION 'Attendance was already taken on %, so it was a school day and cannot be made a holiday.',
+                        to_char(v_day, 'FMDay, FMDD Mon YYYY');
+                END IF;
+
                 INSERT INTO academic.school_calendar
                     (tenant_id, school_id, calendar_date, day_type, title, half_day_end, created_by, created_at)
                 VALUES

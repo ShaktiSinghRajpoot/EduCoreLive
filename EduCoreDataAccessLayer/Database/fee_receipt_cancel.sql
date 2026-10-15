@@ -89,6 +89,15 @@ BEGIN
         RETURN;
     END IF;
 
+    -- A Transfer Certificate says the account is settled. Cancelling a receipt now
+    -- would make money due on a child who has gone; void the TC first.
+    IF v_student_id IS NOT NULL AND EXISTS (
+           SELECT 1 FROM core.tc_register t
+            WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id
+              AND t.student_id = v_student_id AND t.is_void = FALSE) THEN
+        RAISE EXCEPTION 'A Transfer Certificate has been issued for this student. Void it before cancelling a receipt.';
+    END IF;
+
     -- Lock the ledger rows this receipt touched, and refuse if any of their
     -- money has already been refunded.
     SELECT string_agg(DISTINCT sl.fee_head_name || COALESCE(' ' || sl.installment_label, ''), ', ')
@@ -121,10 +130,17 @@ BEGIN
     END IF;
 
     -- Reverse every line that hit a real ledger row (extras have no ledger row).
+    -- A line that was CLOSED (student left, class or bus changed) stays closed: the
+    -- cancelled money joins the closed part instead of coming back as a due.
     UPDATE core.student_ledger sl
     SET amount_paid = sl.amount_paid - d.amount,
         concession  = sl.concession  - d.concession,
+        amount_due  = CASE WHEN COALESCE(sl.closed_amount, 0) > 0
+                           THEN sl.amount_due - d.amount - d.concession ELSE sl.amount_due END,
+        closed_amount = CASE WHEN COALESCE(sl.closed_amount, 0) > 0
+                             THEN sl.closed_amount + d.amount + d.concession ELSE sl.closed_amount END,
         status      = CASE
+                        WHEN COALESCE(sl.closed_amount, 0) > 0 THEN sl.status
                         WHEN (sl.amount_paid - d.amount) + (sl.concession - d.concession) <= 0 THEN 'Pending'
                         WHEN (sl.amount_paid - d.amount) + (sl.concession - d.concession) >= sl.amount_due THEN 'Paid'
                         ELSE 'Partial'

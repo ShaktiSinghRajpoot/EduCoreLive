@@ -582,7 +582,9 @@ namespace educore.Areas.ERP.Controllers
                 stage           = f.IsAdmissionPoint ? "Admission" : StageForFrequency(f.Frequency),
                 // All configured heads are part of the class structure → mandatory.
                 mandatory       = true,
-                instalments     = f.IsAdmissionPoint ? 1 : InstalmentsFor(instalments, f.Frequency)
+                instalments     = f.IsAdmissionPoint ? 1 : InstalmentsFor(instalments, f.Frequency),
+                // instalments already due on the joining day -> collected at admission
+                dueNow          = f.IsAdmissionPoint ? 1 : DueNowFor(instalments, f.Frequency)
             }).ToList();
 
             return Json(new { success = true, fees });
@@ -694,6 +696,12 @@ namespace educore.Areas.ERP.Controllers
                 }
                 else if (string.Equals(f.Frequency, "Monthly", StringComparison.OrdinalIgnoreCase)) q.Monthly += f.Amount;
                 else if (string.Equals(f.Frequency, "Yearly", StringComparison.OrdinalIgnoreCase))  q.Yearly  += f.Amount;
+
+                // The first instalment of a recurring fee (and, for a session billed from
+                // its start, the months already gone) is due on the joining day, so it is
+                // collected at admission too. A "Pay Today" concession stays on the one-time charges.
+                if (!f.IsAdmissionPoint)
+                    q.PayToday += f.Amount * DueNowFor(instalments, f.Frequency);
             }
 
             bool annual = IsAnnual(applyTo);
@@ -715,6 +723,9 @@ namespace educore.Areas.ERP.Controllers
             q.Annual   -= q.Concession > ConcessionCap ? 0m : q.Concession;
             return q;
         }
+
+        private static int DueNowFor(Dictionary<string, int> instalments, string? frequency) =>
+            instalments.TryGetValue("due:" + (string.IsNullOrWhiteSpace(frequency) ? "Yearly" : frequency), out var n) ? n : 0;
 
         private static int InstalmentsFor(Dictionary<string, int> instalments, string? frequency) =>
             instalments.TryGetValue(string.IsNullOrWhiteSpace(frequency) ? "Yearly" : frequency, out var n) && n > 0 ? n : 1;

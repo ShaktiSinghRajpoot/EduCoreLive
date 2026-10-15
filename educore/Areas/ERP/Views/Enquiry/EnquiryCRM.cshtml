@@ -1401,7 +1401,7 @@ $(document).ready(function () {
         }
 
         // Default date = today (YYYY-MM-DD).
-        $('#regDate').val(new Date().toISOString().slice(0, 10));
+        $('#regDate').val(EC.today());
 
         // Fee row (only when enabled). The amount is the sum of Registration-point
         // Fee Heads for this enquiry's class — fetched fresh from the fee structure.

@@ -74,6 +74,7 @@ CREATE OR REPLACE PROCEDURE core.sp_school_admin_fee_head_manage(
 LANGUAGE plpgsql
 AS $procedure$
 DECLARE
+    v_billed_ahead integer;
     v_name      varchar(80);
     v_old_name  varchar(80);
     v_moved     integer := 0;
@@ -364,12 +365,21 @@ BEGIN
         END IF;
 
         -- Say which way it went. "Status updated" told the user nothing, and
-        -- this flag now actually stops the head being charged.
+        -- this flag now actually stops the head being charged. Instalments ALREADY
+        -- billed to students are not removed, and the message says so.
+        SELECT COUNT(*) INTO v_billed_ahead
+          FROM core.student_ledger l
+         WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id AND l.fee_head_name = v_name
+           AND l.due_date IS NOT NULL AND l.due_date::date > CURRENT_DATE
+           AND l.amount_due - l.amount_paid - COALESCE(l.concession, 0) > 0;
         OPEN p_result FOR
         SELECT TRUE AS success,
                CASE WHEN v_active
                     THEN format('"%s" is active again and will be charged on new admissions.', v_name)
-                    ELSE format('"%s" is now inactive — it stays on past records but will not be charged again.', v_name)
+                    ELSE format('"%s" is now inactive — new admissions and class changes will not be charged it.', v_name)
+                         || CASE WHEN v_billed_ahead > 0
+                                 THEN format(' %s instalment(s) already billed to students for later months stay due; waive them at Collect Fees if they should not be paid.', v_billed_ahead)
+                                 ELSE '' END
                END AS message;
 
     ELSE

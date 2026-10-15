@@ -456,7 +456,9 @@ $$;
 -- How many instalments each billing cycle produces for someone joining a
 -- session today. The admission form uses it for the annual estimate and an
 -- "Estimated annual" concession, which used to assume 12 months even for a
--- student billed for six.
+-- student billed for six. due_now = how many of them are already due on the
+-- joining day (the first one always is), so "Collect at admission" can include
+-- them instead of the parent finding them due a minute later.
 CREATE OR REPLACE PROCEDURE core.sp_plan_instalments(
     IN    p_tenant_id      integer,
     IN    p_school_id      integer,
@@ -474,7 +476,10 @@ BEGIN
     OPEN p_result FOR
     SELECT f.frequency,
            (SELECT COUNT(*) FROM core.fn_plan_periods(p_tenant_id, p_school_id, p_academic_year,
-                                                      f.frequency, COALESCE(p_from, CURRENT_DATE)))::integer AS instalments
+                                                      f.frequency, COALESCE(p_from, CURRENT_DATE)))::integer AS instalments,
+           (SELECT COUNT(*) FROM core.fn_plan_periods(p_tenant_id, p_school_id, p_academic_year,
+                                                      f.frequency, COALESCE(p_from, CURRENT_DATE)) pp
+             WHERE pp.due_date <= COALESCE(p_from, CURRENT_DATE))::integer AS due_now
       FROM (VALUES ('Monthly'), ('Quarterly'), ('Half Yearly'), ('Yearly'), ('One Time')) AS f(frequency);
 END;
 $$;

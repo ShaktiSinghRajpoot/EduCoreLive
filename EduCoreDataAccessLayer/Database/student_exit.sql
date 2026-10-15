@@ -56,6 +56,15 @@ BEGIN
         p_tenant_id, p_school_id, p_student_id, p_date_of_leaving,
         v_reason, 'Exit', p_action_user_id);
 
+    -- A refundable deposit (caution money) still unpaid is not owed by someone who
+    -- is leaving: it would only be collected to be handed back. Close it as well.
+    SELECT v_closed + COALESCE(SUM(core.fn_ledger_close(l.ledger_id, v_reason, 'Exit', p_action_user_id)), 0)
+      INTO v_closed
+      FROM core.student_ledger l
+      JOIN core.school_fee_heads h ON h.fee_head_id = l.fee_head_id AND COALESCE(h.is_refundable, FALSE)
+     WHERE l.student_id = p_student_id AND l.tenant_id = p_tenant_id AND l.school_id = p_school_id
+       AND l.amount_due - l.amount_paid - l.concession > 0;
+
     UPDATE core.student_transport
        SET is_active  = FALSE,
            end_reason = v_reason,
@@ -82,7 +91,13 @@ DECLARE
     v_restored numeric(12,2);
     v_assign   integer;
 BEGIN
-    v_restored := core.fn_student_restore_closed_dues(p_tenant_id, p_school_id, p_student_id, 'Exit');
+    -- Put back only the fees from this month on: the months the child was away
+    -- are not billed again (re-admitted in January after leaving in July).
+    SELECT COALESCE(SUM(core.fn_ledger_reopen(l.ledger_id)), 0) INTO v_restored
+      FROM core.student_ledger l
+     WHERE l.student_id = p_student_id AND l.tenant_id = p_tenant_id AND l.school_id = p_school_id
+       AND l.close_source = 'Exit' AND l.closed_amount > 0
+       AND (l.due_date IS NULL OR l.due_date::date >= date_trunc('month', CURRENT_DATE)::date);
 
     -- The bus assignment the exit ended (the latest one), if it was not
     -- replaced by another since.
@@ -128,6 +143,9 @@ DECLARE
     v_year   varchar;   -- session the student is sitting in (for the enrolment row)
     v_dues   numeric(12,2);
     v_closed numeric(12,2);
+    v_prepaid numeric(12,2);   -- already paid for months after the leaving date
+    v_current varchar;         -- the school's current session
+    v_roll   varchar;
     s        core.students%ROWTYPE;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
@@ -158,6 +176,21 @@ BEGIN
         IF p_date_of_leaving IS NULL THEN
             RAISE EXCEPTION 'Date of leaving is required.';
         END IF;
+        -- A future date made the child disappear from homework, exams and ID cards
+        -- while still coming to school. Mark them as left on the day they leave.
+        IF p_date_of_leaving > CURRENT_DATE THEN
+            RAISE EXCEPTION 'The date of leaving cannot be in the future. Mark % as left on the day they leave.', v_name;
+        END IF;
+        IF s.admission_date IS NOT NULL AND p_date_of_leaving < s.admission_date::date THEN
+            RAISE EXCEPTION 'The date of leaving cannot be before the admission date (%).', to_char(s.admission_date::date, 'DD Mon YYYY');
+        END IF;
+
+        -- Fees already paid for months after leaving: not closed (they were paid),
+        -- so the office is told how much, to refund it or keep it as the school decides.
+        SELECT COALESCE(SUM(l.amount_paid), 0) INTO v_prepaid
+          FROM core.student_ledger l
+         WHERE l.student_id = p_student_id AND l.tenant_id = p_tenant_id AND l.school_id = p_school_id
+           AND l.due_date IS NOT NULL AND l.due_date::date > p_date_of_leaving AND l.amount_paid > 0;
 
         -- Instalments after the leaving date are closed and the bus ends.
         v_closed := core.fn_student_leave_money(
@@ -202,6 +235,9 @@ BEGIN
                v_name || ' marked as ' || TRIM(p_status) || '.' ||
                CASE WHEN v_closed > 0
                     THEN ' Rs ' || to_char(v_closed, 'FM99,99,99,990.00') || ' of fees due after the leaving date closed.'
+                    ELSE '' END ||
+               CASE WHEN v_prepaid > 0
+                    THEN ' Rs ' || to_char(v_prepaid, 'FM99,99,99,990.00') || ' was already paid for months after leaving.'
                     ELSE '' END AS message,
                GREATEST(v_dues, 0) AS outstanding,
                v_closed AS closed_amount;
@@ -217,6 +253,35 @@ BEGIN
                     WHERE tenant_id = p_tenant_id AND school_id = p_school_id
                       AND student_id = p_student_id AND is_void = FALSE) THEN
             RAISE EXCEPTION 'A Transfer Certificate has been issued for %. Void it before re-activating.', v_name;
+        END IF;
+
+        -- Re-admitting puts the child back in the session they left. Once that
+        -- session is over they would land in last year's class with no fees for
+        -- this year, so that is a new admission instead.
+        SELECT y.academic_year_name INTO v_current
+          FROM academic.academic_years y
+         WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id
+           AND COALESCE(y.is_current, FALSE) AND NOT COALESCE(y.is_deleted, FALSE)
+         LIMIT 1;
+        IF v_current IS NOT NULL AND v_year IS DISTINCT FROM v_current THEN
+            RAISE EXCEPTION '% left in %, which is not the current session (%). Admit them again for % instead.',
+                v_name, COALESCE(v_year, 'an earlier session'), v_current, v_current;
+        END IF;
+
+        -- Their roll number may have been given to someone else meanwhile.
+        v_roll := NULLIF(TRIM(COALESCE(s.roll_no, '')), '');
+        IF v_roll IS NULL OR EXISTS (
+               SELECT 1 FROM core.students o
+                WHERE o.tenant_id = p_tenant_id AND o.school_id = p_school_id AND o.is_active
+                  AND o.student_id <> p_student_id AND o.academic_year = v_year
+                  AND o.class_name = s.class_name AND COALESCE(o.section, '') = COALESCE(s.section, '')
+                  AND lower(TRIM(o.roll_no)) = lower(v_roll)) THEN
+            SELECT (COALESCE(MAX(TRIM(o.roll_no)::int), 0) + 1)::text INTO v_roll
+              FROM core.students o
+             WHERE o.tenant_id = p_tenant_id AND o.school_id = p_school_id AND o.is_active
+               AND o.student_id <> p_student_id AND o.academic_year = v_year
+               AND o.class_name = s.class_name AND COALESCE(o.section, '') = COALESCE(s.section, '')
+               AND TRIM(o.roll_no) ~ '^[0-9]{1,6}$';
         END IF;
 
         v_closed := core.fn_student_return_money(p_tenant_id, p_school_id, p_student_id, p_action_user_id);
@@ -235,6 +300,7 @@ BEGIN
         UPDATE core.students
         SET status           = 'Active',
             is_active        = TRUE,
+            roll_no          = v_roll,
             date_of_leaving  = NULL,
             leaving_reason   = NULL,
             exit_recorded_by = NULL,

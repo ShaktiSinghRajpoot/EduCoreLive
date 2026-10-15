@@ -41,6 +41,7 @@ DECLARE
     v_plan_rows   integer := 0;
     v_ledger_rows integer := 0;
     v_paid_rows   integer := 0;
+    v_old_dues   integer;
     v_emptied     integer := 0;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 OR COALESCE(p_fee_head_id, 0) <= 0 THEN
@@ -76,6 +77,25 @@ BEGIN
         SELECT FALSE AS success,
                format('"%s" cannot be deleted: %s due(s) still have money against them. Either mark it inactive (it stays on past records and stops being charged), or cancel the receipts collected against it and delete it then. A due that has been refunded cannot be cleared this way — that one can only be made inactive.',
                       v_name, v_paid_rows) AS message;
+        RETURN;
+    END IF;
+
+    -- Unpaid dues of an EARLIER session are arrears the school is still owed.
+    -- Deleting the head would wipe them with no trace, so that head can only be
+    -- made inactive.
+    SELECT COUNT(*) INTO v_old_dues
+      FROM core.student_ledger l
+     WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id AND l.fee_head_name = v_name
+       AND l.amount_due - l.amount_paid - COALESCE(l.concession, 0) > 0
+       AND l.academic_year IS DISTINCT FROM (SELECT y.academic_year_name FROM academic.academic_years y
+                                              WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id
+                                                AND COALESCE(y.is_current, FALSE) AND NOT COALESCE(y.is_deleted, FALSE)
+                                              LIMIT 1);
+    IF v_old_dues > 0 THEN
+        OPEN p_result FOR
+        SELECT FALSE AS success,
+               format('"%s" cannot be deleted: %s unpaid due(s) from an earlier session use it. Mark it inactive instead, so those arrears stay on record.',
+                      v_name, v_old_dues) AS message;
         RETURN;
     END IF;
 

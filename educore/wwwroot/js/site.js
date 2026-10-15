@@ -594,6 +594,13 @@ EC.date = function (iso) {
     return m[3] + ' ' + months[Number(m[2]) - 1] + ' ' + m[1];
 };
 
+// Today as "yyyy-MM-dd" on the user's own clock. new Date().toISOString() is UTC,
+// which in India is still YESTERDAY until 05:30 in the morning.
+EC.today = function () {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+};
+
 // ── Numbers ─────────────────────────────────────────────────────────────
 // Safe Number(): anything unparseable becomes 0, so arithmetic never turns
 // into NaN and prints "₹NaN" on screen.

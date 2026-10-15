@@ -95,7 +95,8 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         /// <summary>
         /// Instalments each billing cycle produces for someone joining the session
-        /// today (keyed Monthly / Quarterly / Half Yearly / Yearly / One Time).
+        /// today (keyed Monthly / Quarterly / Half Yearly / Yearly / One Time), plus
+        /// "due:Monthly" etc. = how many of them are already due on the joining day.
         /// </summary>
         Task<Dictionary<string, int>> GetPlanInstalmentsAsync(
             string academicYear, int tenantId, int schoolId, int actionUserId);

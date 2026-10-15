@@ -122,6 +122,39 @@ END;
 $procedure$;
 
 
+-- ── a staff member leaves: their class charge and periods are freed ─────────
+-- Left on them, the section showed a class teacher who had gone (only an admin
+-- could take its attendance; the acting-teacher rule never fires for someone
+-- inactive) and the timetable kept their periods, so no substitute was asked
+-- for. In the current and later sessions the section gets no class teacher and
+-- the periods no teacher, ready to be given to someone else.
+CREATE OR REPLACE PROCEDURE core.sp_staff_release_duties(
+    IN p_tenant_id      integer,
+    IN p_school_id      integer,
+    IN p_action_user_id integer,
+    IN p_staff_id       integer)
+LANGUAGE plpgsql
+AS $procedure$
+BEGIN
+    UPDATE academic.academic_class_sections sec
+       SET class_teacher_staff_id = NULL, updated_by = p_action_user_id, updated_at = now()
+      FROM academic.academic_years y
+     WHERE sec.tenant_id = p_tenant_id AND sec.school_id = p_school_id
+       AND sec.class_teacher_staff_id = p_staff_id
+       AND y.academic_year_id = sec.academic_year_id
+       AND NULLIF(y.end_date, '')::date >= CURRENT_DATE;
+
+    UPDATE academic.timetable t
+       SET staff_id = NULL, updated_by = p_action_user_id, updated_at = now()
+      FROM academic.academic_years y
+     WHERE t.tenant_id = p_tenant_id AND t.school_id = p_school_id
+       AND t.staff_id = p_staff_id
+       AND y.academic_year_id = t.academic_year_id
+       AND NULLIF(y.end_date, '')::date >= CURRENT_DATE;
+END;
+$procedure$;
+
+
 DROP PROCEDURE IF EXISTS core.sp_staff_manage(
     text, integer, integer, integer, integer,
     text, text, text, date, text, text, text, text, text,
@@ -275,6 +308,7 @@ BEGIN
         WHERE  tenant_id = p_tenant_id AND school_id = p_school_id AND staff_id = p_staff_id;
 
         CALL core.sp_staff_login_switch(p_tenant_id, p_school_id, p_action_user_id, p_staff_id, v_user_id, FALSE);
+        CALL core.sp_staff_release_duties(p_tenant_id, p_school_id, p_action_user_id, p_staff_id);
 
         OPEN p_result FOR SELECT p_staff_id AS staff_id;
         RETURN;
@@ -575,6 +609,7 @@ BEGIN
 
             IF v_going_off THEN
                 CALL core.sp_staff_login_switch(p_tenant_id, p_school_id, p_action_user_id, p_staff_id, v_user_id, FALSE);
+                CALL core.sp_staff_release_duties(p_tenant_id, p_school_id, p_action_user_id, p_staff_id);
             ELSIF v_coming_back THEN
                 CALL core.sp_staff_login_switch(p_tenant_id, p_school_id, p_action_user_id, p_staff_id, v_user_id, TRUE);
             END IF;

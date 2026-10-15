@@ -28,6 +28,11 @@ BEGIN
     SELECT ledger_id INTO v_future FROM core.student_ledger WHERE student_id = v_stu AND amount_due > amount_paid + concession
        AND due_date > to_char(CURRENT_DATE, 'YYYY-MM-DD') ORDER BY ledger_id LIMIT 1;
 
+    -- Sessions after 2026-27 that already exist on the QA school are hidden for this run
+    -- (renamed + deleted, rolled back), so the test starts with no next session.
+    UPDATE academic.academic_years SET academic_year_name = 'zz' || academic_year_id, is_deleted = TRUE
+     WHERE tenant_id = TN AND school_id = SC AND start_date::date > '2026-04-01';
+
     -- 1. no next session yet: carry is refused with a clear reason
     BEGIN
         CALL core.sp_fee_year_end_manage('Carry', TN, SC, U, Y, v_due, NULL, NULL, c);

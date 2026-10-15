@@ -665,6 +665,7 @@ $(function () {
                         // How many times this head bills in the session for someone
                         // joining today (server-side, same rule as the ledger).
                         instalments: Number(f.instalments || 1),
+                        dueNow: Number(f.dueNow || 0),
                         refundable: f.isRefundable === true,
                         mandatory: f.mandatory !== false, selected: true
                     };
@@ -698,7 +699,9 @@ $(function () {
                 : fee.cycle === 'Half Yearly' ? '/half-yr'
                 : (fee.stage === 'Yearly' ? '/yr' : '');
             var amt = '<strong>' + EC.money(fee.amount) + per + '</strong>';
-            var sub = fee.cycle + (muted ? ' · billed later' : ' · due now');
+            var sub = fee.cycle + (!muted ? ' · due now'
+                    : fee.dueNow > 0 ? ' · first ' + (fee.dueNow > 1 ? fee.dueNow + ' instalments' : 'instalment') + ' due now'
+                    : ' · billed later');
             if (!fee.mandatory) {
                 return '<div class="fee-check-row"><div class="d-flex gap-2">' +
                     '<input class="form-check-input optional-fee-checkbox" type="checkbox" data-index="' + idx + '" ' + (fee.selected ? 'checked' : '') + '>' +
@@ -723,11 +726,11 @@ $(function () {
         }
         if (recurringRows) {
             html += '<div><div class="fee-group-title"><i class="bx bx-calendar me-1"></i>Scheduled — Billed Later</div>' +
-                '<div class="kit-meta mb-2" style="margin-top:-.35rem;">Set up as the fee schedule. Collected each cycle from the Fee module — not now.</div>' +
+                '<div class="kit-meta mb-2" style="margin-top:-.35rem;">Set up as the fee schedule. The first instalment is due on the joining day and is collected now; the rest each cycle from the Fee module.</div>' +
                 recurringRows + '</div>';
         }
 
-        var payNow = 0, monthly = 0, quarterly = 0, halfYearly = 0, yearly = 0, annual = 0;
+        var payNow = 0, firstDue = 0, monthly = 0, quarterly = 0, halfYearly = 0, yearly = 0, annual = 0;
         // Discountable base excludes refundable deposits (Caution Money) — a discount
         // applies to income heads only, never to a deposit the school returns.
         var discountableNow = 0, discountableAnnual = 0;
@@ -743,6 +746,8 @@ $(function () {
             else if (f.stage === 'Quarterly') quarterly += f.amount;
             else if (f.stage === 'HalfYearly') halfYearly += f.amount;
             else if (f.stage === 'Yearly') yearly += f.amount;
+            // the first instalment(s) of a recurring fee fall due on the joining day
+            if (f.stage !== 'Admission') firstDue += f.amount * (f.dueNow || 0);
         });
 
         var applyTo = $discApply.val();
@@ -750,12 +755,13 @@ $(function () {
         // Pay-today = one-time school fees − concession (if applied here). Store add-ons
         // are NOT charged at admission (sold separately at the store), so they never
         // contribute to the amount collected.
-        var payToday = payNow - (applyTo === 'payToday' ? disc : 0);
+        var payToday = payNow + firstDue - (applyTo === 'payToday' ? disc : 0);
         var estAnnual = annual - (applyTo === 'annual' ? disc : 0);
 
         var summary = '<div class="fee-summary">' +
             '<div class="fee-group-title" style="margin:0 0 .5rem;">Due at Admission</div>' +
-            '<div class="summary-line"><span>One-Time Fees</span><strong>' + EC.money(payNow) + '</strong></div>';
+            '<div class="summary-line"><span>One-Time Fees</span><strong>' + EC.money(payNow) + '</strong></div>' +
+            (firstDue > 0 ? '<div class="summary-line"><span>First instalments (due on joining)</span><strong>' + EC.money(firstDue) + '</strong></div>' : '');
         if (applyTo === 'payToday' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + EC.money(disc) + '</strong></div>';
         summary += '<hr class="opacity-25"><div class="summary-line"><span style="color:var(--ec-heading);font-weight:950;">Collect at Admission</span><strong style="color:var(--ec-primary);">' + EC.money(payToday) + '</strong></div>';
         summary += '<div class="fee-group-title" style="margin:1rem 0 .5rem;">Scheduled — Billed Later</div>' +

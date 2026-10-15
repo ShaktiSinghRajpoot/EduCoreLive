@@ -778,7 +778,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_plan_instalments", parameters);
             if (ds.Tables.Count == 0) return map;
             foreach (DataRow row in ds.Tables[0].Rows)
+            {
                 map[Str(row, "frequency")] = IntVal(row, "instalments");
+                // "due:Monthly" = instalments already due on the joining day (see sp_plan_instalments)
+                map["due:" + Str(row, "frequency")] = IntVal(row, "due_now");
+            }
             return map;
         }
 

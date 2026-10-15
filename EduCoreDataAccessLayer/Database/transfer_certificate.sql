@@ -218,6 +218,7 @@ DECLARE
     v_pres   integer;
     v_upto   varchar(50);
     v_days   integer;
+    v_held   numeric(12,2);   -- refundable deposit paid and not yet refunded
     e        record;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
@@ -241,7 +242,7 @@ BEGIN
         IF s.is_active THEN
             RAISE EXCEPTION 'Mark % as left before issuing a Transfer Certificate.', s.student_name;
         END IF;
-        IF s.status NOT IN ('Transfer', 'Passout', 'Struck Off') THEN
+        IF COALESCE(s.status, '') NOT IN ('Transfer', 'Passout', 'Struck Off') THEN
             RAISE EXCEPTION 'A Transfer Certificate is not issued for status "%".', s.status;
         END IF;
 
@@ -298,11 +299,8 @@ BEGIN
         -- Fewer than 30 register days in the new session -> the TC is written for the
         -- session they finished (class last studied, its attendance, its fees), the
         -- way a school writes it ("last studied Class 8, qualified for Class 9").
-        SELECT COUNT(DISTINCT a.attendance_date) INTO v_days
-          FROM core.student_attendance a
-         WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
-           AND a.academic_year = s.academic_year AND a.class_name = s.class_name
-           AND COALESCE(a.section, '') = COALESCE(s.section, '');
+        SELECT COUNT(*) INTO v_days
+          FROM core.fn_attendance_student_days(p_tenant_id, p_school_id, p_student_id, s.academic_year);
         IF v_days < 30 THEN
             SELECT en.academic_year, en.class_name, en.section INTO e
               FROM core.student_enrolment en
@@ -320,13 +318,13 @@ BEGIN
         -- (QA BUG-085): working days = days the register of the student's section
         -- was taken this session, days present = their Present / Late days, and
         -- fees paid up to = the last fee line paid before the first unpaid one.
+        -- Working days are the days the student was on the register: from joining,
+        -- across a section move, up to leaving (core.fn_attendance_student_days).
         v_work := p_working_days;
         IF v_work IS NULL THEN
-            SELECT NULLIF(COUNT(DISTINCT a.attendance_date), 0)::int INTO v_work
-              FROM core.student_attendance a
-             WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
-               AND a.academic_year = s.academic_year AND a.class_name = s.class_name
-               AND COALESCE(a.section, '') = COALESCE(s.section, '');
+            SELECT NULLIF(COUNT(*), 0)::int INTO v_work
+              FROM core.fn_attendance_student_days(p_tenant_id, p_school_id, p_student_id, s.academic_year) d
+             WHERE s.date_of_leaving IS NULL OR d.day <= s.date_of_leaving::date;
         END IF;
         v_pres := p_days_present;
         IF v_pres IS NULL AND v_work IS NOT NULL THEN
@@ -334,7 +332,8 @@ BEGIN
               FROM core.student_attendance a
              WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
                AND a.student_id = p_student_id AND a.academic_year = s.academic_year
-               AND a.status IN ('Present', 'Late');
+               AND a.status IN ('Present', 'Late')
+               AND (s.date_of_leaving IS NULL OR a.attendance_date::date <= s.date_of_leaving::date);
         END IF;
         v_upto := NULLIF(TRIM(p_fees_paid_upto), '');
         IF v_upto IS NULL THEN
@@ -343,13 +342,16 @@ BEGIN
              WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
                AND l.student_id = p_student_id AND l.academic_year = s.academic_year
                AND l.amount_paid + COALESCE(l.concession, 0) >= l.amount_due
+               AND COALESCE(l.closed_amount, 0) = 0       -- closed at leaving = not paid
+               AND l.amount_due > 0
                AND l.due_date < COALESCE(
                      (SELECT MIN(u.due_date) FROM core.student_ledger u
                        WHERE u.tenant_id = p_tenant_id AND u.school_id = p_school_id
                          AND u.student_id = p_student_id AND u.academic_year = s.academic_year
                          AND u.amount_paid + COALESCE(u.concession, 0) + COALESCE(u.closed_amount, 0) < u.amount_due),
                      '9999-12-31')
-             ORDER BY l.due_date DESC, l.ledger_id DESC
+             -- the last MONTH paid ("Oct 2026"); "Annual" / "Admission" only when no month is paid
+             ORDER BY (l.installment_label ~ '^[A-Z][a-z]{2} [0-9]{4}') DESC, l.due_date DESC, l.ledger_id DESC
              LIMIT 1;
         END IF;
 
@@ -390,9 +392,24 @@ BEGIN
             p_action_user_id, now())
         RETURNING tc_id, public_id INTO v_new_id, v_public;
 
+        -- A refundable deposit still held is not a reason to refuse the TC, but the
+        -- office should return it now (Collect Fees > Refund).
+        SELECT COALESCE(SUM(l.amount_paid), 0)
+               - COALESCE((SELECT SUM(r.amount) FROM core.fee_refunds r
+                            WHERE r.student_id = p_student_id AND r.tenant_id = p_tenant_id AND r.school_id = p_school_id
+                              AND r.ledger_id IN (SELECT l2.ledger_id FROM core.student_ledger l2
+                                                    JOIN core.school_fee_heads h2 ON h2.fee_head_id = l2.fee_head_id
+                                                   WHERE l2.student_id = p_student_id AND COALESCE(h2.is_refundable, FALSE))), 0)
+          INTO v_held
+          FROM core.student_ledger l
+          JOIN core.school_fee_heads h ON h.fee_head_id = l.fee_head_id AND COALESCE(h.is_refundable, FALSE)
+         WHERE l.student_id = p_student_id AND l.tenant_id = p_tenant_id AND l.school_id = p_school_id;
+
         OPEN p_result_cur FOR
         SELECT TRUE AS success,
-               'Transfer Certificate ' || v_tc_no || ' issued for ' || s.student_name || '.' AS message,
+               'Transfer Certificate ' || v_tc_no || ' issued for ' || s.student_name || '.'
+               || CASE WHEN v_held > 0 THEN ' A refundable deposit of Rs ' || to_char(v_held, 'FM99,99,99,990.00')
+                       || ' is still held: return it from Collect Fees > Refund.' ELSE '' END AS message,
                v_new_id AS tc_id, v_tc_no AS tc_no,
                -- The page opens Tc/Print by this uuid (the int id is not routable).
                v_public AS public_id;

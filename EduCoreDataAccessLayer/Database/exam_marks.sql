@@ -157,6 +157,7 @@ DECLARE
     v_max     numeric;
     v_pass    numeric;
     v_paper   date;
+    v_old_sec text;      -- section of a moved student's finalised mark
     v_final   boolean;
     v_items   jsonb;
     v_item    jsonb;
@@ -383,6 +384,22 @@ BEGIN
 
             IF v_marks IS NOT NULL AND (v_marks < 0 OR v_marks > v_max) THEN
                 RAISE EXCEPTION 'Marks for % must be between 0 and %.', v_name, v_max;
+            END IF;
+
+            -- A student who moved section may already have this paper's mark on the
+            -- OLD section's sheet. If that sheet is finalised, saving here would change a
+            -- locked mark without anyone reopening it.
+            SELECT m.section INTO v_old_sec
+              FROM academic.exam_marks m
+              JOIN academic.exam_mark_sheets sh
+                ON sh.exam_id = m.exam_id AND sh.academic_class_id = m.academic_class_id
+               AND sh.subject_id = m.subject_id AND sh.section = m.section AND sh.is_finalized
+             WHERE m.exam_id = p_exam_id AND m.subject_id = p_subject_id AND m.student_id = v_sid
+               AND (m.section IS DISTINCT FROM v_section OR m.academic_class_id <> p_academic_class_id)
+             LIMIT 1;
+            IF v_old_sec IS NOT NULL THEN
+                RAISE EXCEPTION '%''s mark for this paper is on the finalised sheet of section %. Reopen that sheet first.',
+                    v_name, CASE WHEN v_old_sec = '' THEN '(none)' ELSE v_old_sec END;
             END IF;
 
             INSERT INTO academic.exam_marks
