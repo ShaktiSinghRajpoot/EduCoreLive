@@ -86,7 +86,20 @@ namespace educore.Areas.ERP.Controllers
             if (string.IsNullOrWhiteSpace(className)) return Json(Array.Empty<string>());
 
             var sections = await _cards.GetClassSectionsAsync(className, sheet.AcademicYearName, TenantId(), SchoolId(), UserId());
+            // An exam held for some sections only (9-A, 9-B) offers only those.
+            var held = await ExamSectionsAsync(examId, classId);
+            if (held.Count > 0)
+                sections = sections.Where(x => held.Contains(x.Trim(), StringComparer.OrdinalIgnoreCase)).ToList();
             return Json(sections);
+        }
+
+        // Sections an exam is held for in one class; empty = the whole class.
+        private async Task<List<string>> ExamSectionsAsync(int examId, int classId)
+        {
+            var exam = await _exam.GetExamAsync(examId, TenantId(), SchoolId(), UserId());
+            return exam?.Classes.FirstOrDefault(c => c.AcademicClassId == classId)?.Sections
+                       .Select(x => x.Trim()).ToList()
+                   ?? new List<string>();
         }
 
         // The print sheet.
@@ -107,6 +120,11 @@ namespace educore.Areas.ERP.Controllers
 
             var school = await _settings.GetBasicProfileAsync(TenantId(), SchoolId(), UserId())
                          ?? new SchoolManageModel { SchoolName = "Your School" };
+
+            // Only the sections the exam is held for (9-C gets no card for a 9-A / 9-B exam).
+            var examSections = exam?.Classes.FirstOrDefault(c => c.AcademicClassId == classId)?.Sections ?? new List<string>();
+            if (examSections.Count > 0)
+                students = students.Where(st => examSections.Any(h => string.Equals(h.Trim(), (st.Section ?? "").Trim(), StringComparison.OrdinalIgnoreCase))).ToList();
 
             // Section by section, then roll order, so a class set is handed out in order.
             students = students

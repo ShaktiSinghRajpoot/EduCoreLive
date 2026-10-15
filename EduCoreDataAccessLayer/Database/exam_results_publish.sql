@@ -573,6 +573,25 @@ BEGIN
                 v_pending, v_first;
         END IF;
 
+        -- A child admitted after a sheet was finalised is on the roster but has no
+        -- mark row, so they had no result, rank or report card and nobody was told.
+        SELECT COUNT(*), MIN(r.out_student_name || ' (' || ps.out_class_name
+                             || CASE WHEN ps.out_section = '' THEN '' ELSE '-' || ps.out_section END
+                             || ' ' || ps.out_subject_name || ')')
+          INTO v_pending, v_first
+          FROM academic.fn_exam_pending_sheets(p_exam_id) ps
+          CROSS JOIN LATERAL academic.fn_exam_sheet_roster(
+                p_tenant_id, p_school_id,
+                (SELECT e.academic_year_id FROM academic.exams e WHERE e.exam_id = p_exam_id),
+                ps.out_class_id, ps.out_section) r
+         WHERE NOT EXISTS (SELECT 1 FROM academic.exam_marks m
+                            WHERE m.exam_id = p_exam_id AND m.subject_id = ps.out_subject_id
+                              AND m.student_id = r.out_student_id);
+        IF v_pending > 0 THEN
+            RAISE EXCEPTION '% student mark(s) are missing (for example %): they joined after the sheet was finalised. Reopen that sheet and enter them.',
+                v_pending, v_first;
+        END IF;
+
         UPDATE academic.exams
            SET results_status       = 'Published',
                results_published_by = p_action_user_id,

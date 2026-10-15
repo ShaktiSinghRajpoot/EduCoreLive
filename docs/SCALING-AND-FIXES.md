@@ -5497,3 +5497,18 @@ the other tenant-32 suites still pass.
 - **Dates on screen**: new `EC.today()` (local date); five pages used `toISOString()`, which in India is
   yesterday until 05:30.
 - Bundle `deploy_2026_10_15d.sql`.
+
+### 2026-10-15 — Flow fixes, part 2 (exams, due list, transport, payroll)
+New suite `tests/flow_fixes2_tests.sql` (10 checks, rolled back): all pass; the other suites still pass.
+- **Publish results** is refused while a student on a sheet's roster has no mark row (joined after the sheet
+  was finalised): they had no result, rank or report card and nobody was told.
+- **Report card**: "Needs improvement in N subject(s)" also says "absent in M" when both happen.
+- **Admit cards**: an exam held for some sections only (9-A, 9-B) offers and prints only those sections.
+- **Due list** sets the advance wallet against the dues: a parent who overpaid is not a defaulter (no reminder,
+  no admit-card hold).
+- **Bus**: a start date before the admission date is refused; a start before the session begins is moved to its
+  first day; a driver marked as left cannot be put on a bus; a save that leaves fewer seats than riders is refused.
+- **Staff leaving**: `sp_staff_release_duties` also takes a driver off their bus.
+- **Payroll Mark Paid** rebuilds the draft first (an old draft paid yesterday's figures after a leave or salary
+  change) and is refused before the month's last day.
+- Bundle `deploy_2026_10_15e.sql`.

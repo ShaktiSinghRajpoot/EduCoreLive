@@ -554,6 +554,25 @@ BEGIN
             RAISE EXCEPTION 'This payslip is already marked paid.';
         END IF;
 
+        -- Leave or absence can still be marked until the month ends.
+        IF CURRENT_DATE < (make_date(v_slip.pay_year, v_slip.pay_month, 1) + INTERVAL '1 month' - INTERVAL '1 day')::date THEN
+            RAISE EXCEPTION 'This month is not over yet. Salary can be marked paid from its last day.';
+        END IF;
+
+        -- The draft may be old (leave approved or salary changed after it was made):
+        -- bring it up to date first, so the money paid is today's figure.
+        v_out := core.fn_staff_payslip_build(p_tenant_id, p_school_id, p_action_user_id,
+                     v_slip.staff_id, v_slip.pay_month, v_slip.pay_year);
+        IF v_out IN ('removed', 'none') THEN
+            RAISE EXCEPTION 'This staff member was not employed in that month; the payslip was removed.';
+        END IF;
+        SELECT * INTO v_slip FROM core.staff_payroll
+         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+           AND staff_id = v_slip.staff_id AND pay_month = v_slip.pay_month AND pay_year = v_slip.pay_year;
+        IF NOT FOUND OR v_slip.status = 'Paid' THEN
+            RAISE EXCEPTION 'Payslip not found. Run payroll for the month again.';
+        END IF;
+
         SELECT m INTO v_mode FROM unnest(ARRAY['Cash', 'Bank Transfer', 'Cheque', 'UPI']) AS m
         WHERE LOWER(m) = LOWER(TRIM(COALESCE(p_payment_mode, '')));
         IF v_mode IS NULL THEN
@@ -570,7 +589,7 @@ BEGIN
         UPDATE core.staff_payroll
         SET status = 'Paid', paid_by = p_action_user_id, paid_at = now(),
             payment_mode = v_mode, payment_reference = v_ref
-        WHERE payroll_id = p_payroll_id
+        WHERE payroll_id = v_slip.payroll_id
           AND tenant_id = p_tenant_id AND school_id = p_school_id
           AND status = 'Draft';
         IF NOT FOUND THEN

@@ -339,6 +339,10 @@ DECLARE
     v_route  integer;
     v_active boolean;
     v_riders integer;
+    v_old_route  integer;   -- route the vehicle was on before this save
+    v_old_seats  integer;   -- seats of that route before the save
+    v_new_seats  integer;   -- seats of the chosen route before the save
+    v_seats      integer;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -403,6 +407,21 @@ BEGIN
                   AND COALESCE(is_deleted, FALSE) = FALSE) THEN
             RAISE EXCEPTION 'Driver not found.';
         END IF;
+        -- A driver who has left cannot be put on a bus (sp_staff_release_duties
+        -- takes them off their bus when they leave).
+        IF COALESCE(p_driver_staff_id, 0) > 0 AND EXISTS (
+               SELECT 1 FROM core.staff
+                WHERE staff_id = p_driver_staff_id AND COALESCE(status, 'Active') = 'Inactive') THEN
+            RAISE EXCEPTION 'This driver is marked as left. Pick an active driver.';
+        END IF;
+
+        -- Seats before the save, to check below that children are not left
+        -- without a seat when capacity is lowered or the bus moves route.
+        SELECT route_id INTO v_old_route FROM core.transport_vehicles
+         WHERE vehicle_id = NULLIF(COALESCE(p_vehicle_id, 0), 0)
+           AND tenant_id = p_tenant_id AND school_id = p_school_id;
+        v_old_seats := core.fn_transport_route_seats(v_old_route);
+        v_new_seats := core.fn_transport_route_seats(NULLIF(COALESCE(p_route_id, 0), 0));
 
         -- Snapshot driver name/phone from the linked staff row (single source);
         -- fall back to any free-text passed in when no staff is linked.
@@ -435,6 +454,23 @@ BEGIN
             VALUES
                 (p_tenant_id, p_school_id, trim(p_vehicle_no), p_capacity, v_dname, v_dphone,
                  NULLIF(COALESCE(p_driver_staff_id, 0), 0), NULLIF(COALESCE(p_route_id, 0), 0), p_action_user_id);
+        END IF;
+
+        -- Fewer seats than children riding: refused (the save is rolled back).
+        -- Only when this save took seats away, so an old full route can still be edited.
+        IF v_old_route IS NOT NULL THEN
+            v_seats  := core.fn_transport_route_seats(v_old_route);
+            v_riders := core.fn_transport_route_riders(v_old_route);
+            IF v_seats IS NOT NULL AND v_seats < COALESCE(v_old_seats, 2147483647) AND v_riders > v_seats THEN
+                RAISE EXCEPTION 'The route would have % seat(s) for % student(s). Move some students or add a vehicle first.', v_seats, v_riders;
+            END IF;
+        END IF;
+        IF COALESCE(p_route_id, 0) > 0 AND p_route_id IS DISTINCT FROM v_old_route THEN
+            v_seats  := core.fn_transport_route_seats(p_route_id);
+            v_riders := core.fn_transport_route_riders(p_route_id);
+            IF v_seats IS NOT NULL AND v_seats < COALESCE(v_new_seats, 2147483647) AND v_riders > v_seats THEN
+                RAISE EXCEPTION 'The route would have % seat(s) for % student(s). Move some students or add a vehicle first.', v_seats, v_riders;
+            END IF;
         END IF;
         OPEN p_result FOR SELECT TRUE AS success, 'Vehicle saved.' AS message;
 
@@ -612,15 +648,24 @@ BEGIN
         v_start := COALESCE(p_start_date, CURRENT_DATE);
         v_year  := COALESCE(NULLIF(TRIM(p_academic_year), ''), v_student_year);
 
+        -- A start before the child joined would bill months they were not here.
+        IF v_start < (SELECT NULLIF(admission_date, '')::date FROM core.students WHERE student_id = p_student_id) THEN
+            RAISE EXCEPTION 'The bus start date is before the student''s admission date.';
+        END IF;
+
         -- Bill to the end of the SESSION the assignment is for, read from its
         -- real end date. The controllers used to send a month count worked out
         -- from the session NAME on an April-March assumption, and this proc
         -- trusted it, so a 12-month count from October ran into the next session.
-        SELECT end_date INTO v_sess_end
+        SELECT NULLIF(end_date, '')::date, GREATEST(v_start, NULLIF(start_date, '')::date)
+          INTO v_sess_end, v_start
         FROM academic.academic_years
         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
           AND academic_year_name = v_year AND COALESCE(is_deleted, FALSE) = FALSE
         LIMIT 1;
+        -- (a start before the session begins is moved to the session's first day:
+        --  an advance admission in February does not bill March of the old session)
+        v_start := COALESCE(v_start, COALESCE(p_start_date, CURRENT_DATE));
 
         v_months := GREATEST(COALESCE(NULLIF(p_months, 0), 12), 1);
         IF v_sess_end IS NOT NULL THEN

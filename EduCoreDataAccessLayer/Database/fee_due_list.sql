@@ -67,11 +67,15 @@ BEGIN
                COALESCE(NULLIF(TRIM(s.father_email), ''), NULLIF(TRIM(s.mother_email), '')) AS parent_email,
                CASE WHEN COALESCE(s.is_active, TRUE) THEN 'Active'
                     ELSE COALESCE(NULLIF(TRIM(s.status), ''), 'Left') END AS student_status,
-               SUM(d.outstanding) AS total_outstanding,
+               -- money waiting in the student's advance wallet is set against what is due:
+               -- a parent who overpaid is not a defaulter (no reminder, no admit-card hold)
+               SUM(d.outstanding) - COALESCE(MAX(adv.balance), 0) AS total_outstanding,
                -- days the OLDEST unpaid installment is past its due date (0 = due today)
                COALESCE(MAX(CURRENT_DATE - d.due_date::date), 0) AS overdue_days
         FROM dues d
         JOIN core.students s ON s.student_id = d.student_id
+        LEFT JOIN core.student_advance adv
+               ON adv.student_id = s.student_id AND adv.tenant_id = p_tenant_id AND adv.school_id = p_school_id
         WHERE s.tenant_id = p_tenant_id
           AND s.school_id = p_school_id
           AND (p_class IS NULL OR TRIM(p_class) = '' OR s.class_name = p_class)
@@ -82,7 +86,7 @@ BEGIN
         GROUP BY s.student_id, s.student_name, s.admission_no,
                  s.class_name, s.section, s.roll_no, s.mobile,
                  s.father_email, s.mother_email, s.is_active, s.status
-        HAVING SUM(d.outstanding) > 0
+        HAVING SUM(d.outstanding) - COALESCE(MAX(adv.balance), 0) > 0
     ),
     filtered AS (
         SELECT a.*,

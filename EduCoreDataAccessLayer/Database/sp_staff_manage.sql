@@ -151,6 +151,13 @@ BEGIN
        AND t.staff_id = p_staff_id
        AND y.academic_year_id = t.academic_year_id
        AND NULLIF(y.end_date, '')::date >= CURRENT_DATE;
+
+    -- A driver who leaves is taken off their bus; the name stays on the bus
+    -- page until a new driver is picked.
+    UPDATE core.transport_vehicles
+       SET driver_staff_id = NULL, updated_by = p_action_user_id, updated_at = now()
+     WHERE tenant_id = p_tenant_id AND school_id = p_school_id
+       AND driver_staff_id = p_staff_id;
 END;
 $procedure$;
 

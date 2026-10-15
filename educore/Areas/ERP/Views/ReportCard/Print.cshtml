@@ -71,6 +71,7 @@
         var remark = s.Grade != null && Model.GradeRemarks.TryGetValue(s.Grade, out var r) ? r : null;
         var result = s.Percent == null ? "Absent"
                    : s.FailedCount > 0 ? "Needs improvement in " + s.FailedCount + " subject(s)"
+                                         + (s.AbsentCount > 0 ? ", absent in " + s.AbsentCount : "")
                    // an absent paper counts as 0, so it is not a pass in that subject
                    : s.AbsentCount > 0 ? "Absent in " + s.AbsentCount + " subject(s)"
                    : "Passed";
