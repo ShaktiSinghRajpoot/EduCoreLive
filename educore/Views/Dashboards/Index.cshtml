@@ -410,8 +410,10 @@
         </div>
         }
 
-        @* ============ EVENTS · NOTICES · BIRTHDAYS ============ *@
-        <div class="col-12 col-lg-6 col-xl-4 dash-animate">
+        @* ============ EVENTS · BIRTHDAYS ============ *@
+        @* (Students per class is the "Class-wise Strength" chart above; the list
+           card that repeated it here was removed.) *@
+        <div class="col-12 col-lg-6 dash-animate">
             <div class="dash-card h-100">
                 <div class="dash-card-head"><h5 class="dash-card-title">Upcoming Events</h5><small class="dash-sub">Academic calendar</small></div>
                 <div class="dash-card-body">
@@ -434,41 +436,9 @@
             </div>
         </div>
 
-        @if (Model.ShowStudents)
-        {
-        <div class="col-12 col-lg-6 col-xl-4 dash-animate" style="animation-delay:.05s">
-            <div class="dash-card h-100">
-                @* There is no notices table, and the Post button linked to /ERP/NoticeBoard
-                   which does not exist. Four invented announcements on the first page
-                   after sign-in read as real school news — so this card lists the
-                   school calendar's own entries instead, which are real. *@
-                <div class="dash-card-head">
-                    <h5 class="dash-card-title">Class Strength</h5>
-                    <small class="dash-sub">Students per class</small>
-                </div>
-                <div class="dash-card-body dash-scroll">
-                    @if (!Model.Classes.Any())
-                    {
-                        <div class="text-muted small p-2">No active students yet.</div>
-                    }
-                    @foreach (var c in Model.Classes)
-                    {
-                        var pct = Model.Students == 0 ? 0 : Math.Round(c.Students * 100.0 / Model.Students);
-                        <div class="mb-2">
-                            <div class="d-flex justify-content-between mb-1">
-                                <span class="dash-sub">Class @c.ClassName</span><strong>@c.Students</strong>
-                            </div>
-                            <div class="dash-progress"><span style="width:@pct%;background:var(--ec-primary)"></span></div>
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-        }
-
         @if (Model.ShowStudents || Model.ShowStaff)
         {
-        <div class="col-12 col-xl-4 dash-animate" style="animation-delay:.1s">
+        <div class="col-12 col-lg-6 dash-animate" style="animation-delay:.1s">
             <div class="dash-card h-100">
                 <div class="dash-card-head"><h5 class="dash-card-title">🎂 Birthdays Today</h5><small class="dash-sub">Wish them well</small></div>
                 <div class="dash-card-body dash-scroll">
