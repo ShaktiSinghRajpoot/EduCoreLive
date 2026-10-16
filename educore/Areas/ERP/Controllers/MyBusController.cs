@@ -36,10 +36,12 @@ namespace educore.Areas.ERP.Controllers
         [HttpGet]
         public async Task<IActionResult> Index()
         {
-            ViewBag.ModuleOff = !await TransportOnAsync();
-            ViewBag.Buses = ViewBag.ModuleOff
-                ? new List<MyBusVehicle>()
-                : await _tracking.GetMyBusesAsync(TenantId(), SchoolId(), UserId());
+            // Transport off for this school: nothing of it is shown, the driver goes home.
+            if (!await TransportOnAsync())
+                return RedirectToAction("Index", "Dashboards", new { area = "" });
+
+            ViewBag.ModuleOff = false;
+            ViewBag.Buses = await _tracking.GetMyBusesAsync(TenantId(), SchoolId(), UserId());
             return View();
         }
 
@@ -87,7 +89,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── Helpers ──────────────────────────────────────────────
-        private const string ModuleOffMessage = "Transport is turned off for this school.";
+        private const string ModuleOffMessage = "This page is not available.";
 
         private async Task<bool> TransportOnAsync()
         {

@@ -1,6 +1,8 @@
-﻿@using System.Linq
+﻿@inject educore.Helpers.ModuleFlags Modules
+@using System.Linq
 @{
     ViewData["Title"] = "Promote Students";
+    bool examsOn = await Modules.ExamsOn();
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 
     // Teaching order with each class's display_order. The page compares orders
@@ -169,7 +171,6 @@
             <button class="pr-bulk-btn" data-all="promote"><i class="bx bx-check-circle"></i>Promote</button>
             <button class="pr-bulk-btn" data-all="retain"><i class="bx bx-revision"></i>Retain</button>
             <button class="pr-bulk-btn" data-all="passout"><i class="bx bx-graduation"></i>Pass Out</button>
-            <button class="pr-bulk-btn" id="promoteFailed" disabled title="Needs the exam results module (not available yet)"><i class="bx bx-filter-alt"></i>Auto by result</button>
           </div>
         </div>
       </div>
@@ -184,7 +185,6 @@
                 <th style="width:38px;"><input type="checkbox" class="form-check-input" id="selAll" checked></th>
                 <th>Student</th>
                 <th>Roll No</th>
-                <th>Result</th>
                 <th>Pending Dues</th>
                 <th>Next Class</th>
                 <th style="width:260px;">Outcome</th>
@@ -280,7 +280,7 @@
         </div>
         <div class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0" style="border-radius:12px;font-size:.82rem;">
           <i class="bx bx-error-circle fs-5"></i>
-          <span>This will move the selected students into the new academic session. Make sure exam results are finalised first.</span>
+          <span>This will move the selected students into the new academic session.@(examsOn ? " Make sure exam results are finalised first." : "")</span>
         </div>
       </div>
       <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
@@ -533,7 +533,6 @@ function render(){
       +   '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
       +'</div></td>'
       +'<td>'+EC.esc(s.roll||'—')+'</td>'
-      +'<td><span class="text-muted small" title="Exam results module not wired yet">—</span></td>'
       +'<td><span class="pr-due '+(s.due>0?'has':'clear')+'">'+inr(s.due)+'</span></td>'
       +'<td>'+ncTxt+'</td>'
       +'<td>'+seg(s.id, oc)+'</td>'
@@ -553,7 +552,6 @@ function render(){
       +  '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.roll||'—')+' · '+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
       +'</div>'
       +'<div class="pr-mob-meta">'
-      +  '<span class="text-muted small">Result —</span>'
       +  '<span class="pr-due '+(s.due>0?'has':'clear')+'">Dues '+inr(s.due)+'</span>'
       +'</div>'
       +'<div class="text-muted small fw-bold mb-2"><i class="bx bx-right-arrow-alt"></i> '+ncTxt+'</div>'
@@ -626,11 +624,6 @@ document.querySelectorAll('.pr-bulk-btn[data-all]').forEach(function(b){
     });
     render();
   });
-});
-document.getElementById('promoteFailed').addEventListener('click', function(){
-  roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
-  render();
-  ecToast('info','Outcomes reset to the default for each class.');
 });
 
 /* ── Select all ──────────────────────────────── */

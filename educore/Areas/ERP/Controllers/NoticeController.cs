@@ -36,10 +36,10 @@ namespace educore.Areas.ERP.Controllers
             _att = att;
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index([FromServices] ModuleFlags modules)
         {
             ViewBag.CanManage = await CanManageAsync();
-            ViewBag.Categories = Categories;
+            ViewBag.Categories = await modules.ExamsOn() ? Categories : Categories.Where(c => c != "Exam").ToArray();
             return View();
         }
 

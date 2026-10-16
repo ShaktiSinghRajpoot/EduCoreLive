@@ -5521,3 +5521,29 @@ New suite `tests/flow_fixes2_tests.sql` (10 checks, rolled back): all pass; the 
   month, at the payslip's own rate (salary / school days). Days already cut as Absent are not taken twice; the
   approval message says how much and in which month. Test 11 in `tests/flow_fixes2_tests.sql`.
 - Bundle `deploy_2026_10_15f.sql` (staff_leave.sql).
+
+### 2026-10-16 — Super Admin: modules per school, Login as School Admin
+- **Three levels.** Super Admin gives a school its modules (Transport, Exams, Inventory, Payroll) on
+  Schools > Modules; the School Admin switches given ones on/off (Workflow page) and sets who sees what
+  (Users & Roles). New columns `allow_*` on `core.school_admission_workflow_settings`; the Workflow read
+  returns `enable_* AND allow_*`, so the menu, `[RequiresModule]` and every flag reader respect it. A module
+  not given shows "Not in your plan" on the Workflow page and cannot be switched on. Existing schools: all given.
+- **Nothing of an off module anywhere.** New `educore/Helpers/ModuleFlags.cs` (scoped, one read per request)
+  and SQL `core.fn_module_on`. Gated: dashboard (My Bus, Leave link, Pending Approvals, on-leave KPI), student
+  profile (exam tab/cards, bus history rows), enquiry bus question and lost reason, front-office purposes,
+  promotion text (the unwired "Result" column and "Auto by result" button were removed), notice "Exam"
+  category, What's coming, fee group "Transport", staff salary (kept as a hidden field on Edit Staff),
+  staff profile leave/salary cards, staff attendance leave tags, Roles matrix rows (grants kept as hidden
+  inputs) and module templates, settings help texts. Promotion and re-admit no longer bring a bus back when
+  Transport is off; the public bus link honours the Super Admin choice. My Timetable no longer disappears
+  when Payroll is off (it was tied to the Payroll switch).
+- **Transport** cannot be taken away (Super Admin) or switched off (school) while students ride or owe bus
+  fees -- those dues would sit on the counter with no module. Paid history (receipts, reports) keeps
+  "Transport Fee": a reprint must match the original and totals must add up.
+- **Module guard** now sends a user to the dashboard ("not in your school's plan" / "turned off") instead of
+  the Workflow page, a dead end for anyone but the admin.
+- **Login as School Admin** (Schools list, Active schools): signs the Super Admin in as the school's first
+  active School Admin with two extra claims; every page shows a red "Back to Super Admin" bar. Logged in
+  `core.superadmin_login_as_log` (start/end). The school's own first-login password reset is not forced on
+  the Super Admin.
+- Tests: `tests/superadmin_modules_tests.sql` (8). Bundle `deploy_2026_10_16a.sql`.

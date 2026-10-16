@@ -164,7 +164,8 @@
                       Trend=Model.Students == 1 ? "1 active student" : $"{Model.Students} active students",
                       Soft="soft-green", Icon="bx-group", Spark="sparkStudents", Up=true },
                 new { Label="Total Staff", Value=Model.Staff.ToString(),
-                      Trend=Model.OnLeaveToday == 0 ? "nobody on leave today" : $"{Model.OnLeaveToday} on leave today",
+                      Trend=!Model.ShowLeave ? (Model.Staff == 1 ? "1 active staff member" : $"{Model.Staff} active staff")
+                          : Model.OnLeaveToday == 0 ? "nobody on leave today" : $"{Model.OnLeaveToday} on leave today",
                       Soft="soft-orange", Icon="bx-id-card", Spark="sparkStaff", Up=Model.OnLeaveToday == 0 },
                 new { Label="Today's Collection", Value=Money(Model.TodayCollection),
                       Trend=collectionTrend, Soft="soft-blue", Icon="bx-wallet", Spark="sparkCollection",
@@ -376,7 +377,7 @@
         </div>
 
         }
-        @if (Model.ShowStaff)
+        @if (Model.ShowStaff && Model.ShowLeave)
         {
         <div class="col-12 col-xl-4 dash-animate" style="animation-delay:.1s">
             <div class="dash-card h-100">

@@ -151,6 +151,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     var manage = feat.FirstOrDefault(x => x.Level == "manage");
                     mg.Rows.Add(new MatrixFeatureRow
                     {
+                        Feature       = feat.Key,
                         FeatureLabel  = feat.First().FeatureLabel,
                         ViewId        = view?.PermissionId,
                         ManageId      = manage?.PermissionId,

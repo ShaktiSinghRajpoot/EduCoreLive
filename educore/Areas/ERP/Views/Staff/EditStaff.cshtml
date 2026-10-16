@@ -1,7 +1,9 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+﻿@inject educore.Helpers.ModuleFlags Modules
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model EduCoreDataAccessLayer.Models.StaffModel
 @{
     ViewData["Title"] = "Edit Staff";
+    bool payrollOn = await Modules.PayrollOn();
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     int staffId = Model.StaffId;
 }
@@ -149,7 +151,7 @@
             <div class="col-12 col-md-4" id="lwdWrap" style="display:none;">
               <label class="es-label">Last Working Day</label>
               <input asp-for="LastWorkingDate" type="date" class="form-control" max="@Dates.Now.ToString("yyyy-MM-dd")">
-              <div class="text-muted small mt-1">Payroll pays the final month up to this day. Blank = today.</div>
+              <div class="text-muted small mt-1">@(payrollOn ? "Payroll pays the final month up to this day. Blank = today." : "Blank = today.")</div>
             </div>
           </div>
         </div>
@@ -159,14 +161,30 @@
       <div class="es-card">
         <div class="es-card-hdr">
           <div class="es-sec-ic"><i class="bx bx-money"></i></div>
-          <div><div class="es-sec-title">Payroll &amp; Bank</div><div class="es-sec-sub">Salary and account details for payroll</div></div>
+          @* Without the Payroll module there is no salary here: only bank and ID details. *@
+          @if (payrollOn)
+          {
+            <div><div class="es-sec-title">Payroll &amp; Bank</div><div class="es-sec-sub">Salary and account details for payroll</div></div>
+          }
+          else
+          {
+            <div><div class="es-sec-title">Bank &amp; ID</div><div class="es-sec-sub">Account and identity details</div></div>
+          }
         </div>
         <div class="es-card-body">
           <div class="row g-3">
+            @if (payrollOn)
+            {
             <div class="col-12 col-md-4">
               <label class="es-label">Monthly Salary (₹)</label>
               <input asp-for="MonthlySalary" type="number" min="0" class="form-control">
             </div>
+            }
+            else
+            {
+              @* kept as it is: the save writes every column *@
+              <input type="hidden" asp-for="MonthlySalary" />
+            }
             <div class="col-12 col-md-4">
               <label class="es-label">Bank Account No</label>
               <input asp-for="BankAccountNo" class="form-control">

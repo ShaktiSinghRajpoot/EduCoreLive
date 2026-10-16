@@ -540,7 +540,8 @@ BEGIN
                 ORDER BY assignment_id DESC
                 LIMIT 1;
 
-                IF v_route IS NOT NULL THEN
+                -- (not when the school's Transport module is off)
+                IF v_route IS NOT NULL AND core.fn_module_on(p_tenant_id, p_school_id, 'transport') THEN
                     v_bus := 'promote_bus_' || s.student_id;
                     CALL core.sp_transport_assign_manage('SaveAssignment', p_tenant_id, p_school_id,
                          p_action_user_id, s.student_id, v_route, v_stop, v_tgt,

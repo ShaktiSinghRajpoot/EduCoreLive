@@ -17,6 +17,7 @@ namespace educore.Helpers
             public string Name { get; set; } = string.Empty;
             public string[] Keys { get; set; } = Array.Empty<string>();
             public string? Hint { get; set; }   // shown under the select when chosen
+            public string? Module { get; set; } // a template for one module is not offered when it is off
         }
 
         public static readonly List<RoleTemplate> All = new()
@@ -27,14 +28,15 @@ namespace educore.Helpers
                 Keys = new[] { "*.view", "staff.manage", "exams.manage", "exams.marks", "fees.reopen", "fees.writeoff", "reports.view", "notices.manage" },
                 Hint = "Sees every module, approves leave, manages exams, posts notices and can re-open a closed fee day. No settings or roles."
             },
-            new RoleTemplate { Name = "Transport In-charge", Keys = new[] { "transport.view", "transport.manage" } },
+            new RoleTemplate { Name = "Transport In-charge", Keys = new[] { "transport.view", "transport.manage" }, Module = "transport" },
             new RoleTemplate
             {
                 Name = "Driver",
                 Keys = Array.Empty<string>(),
-                Hint = "No permissions. A driver's My Bus page comes from Transport → Vehicles → Driver."
+                Hint = "No permissions. A driver's My Bus page comes from Transport → Vehicles → Driver.",
+                Module = "transport"
             },
-            new RoleTemplate { Name = "Store Keeper", Keys = new[] { "inventory.view", "inventory.manage" } },
+            new RoleTemplate { Name = "Store Keeper", Keys = new[] { "inventory.view", "inventory.manage" }, Module = "inventory" },
             new RoleTemplate { Name = "HR / Office", Keys = new[] { "staff.view", "staff.manage", "payroll.view", "payroll.manage" } },
             new RoleTemplate { Name = "Cashier", Keys = new[] { "fees.view", "fees.collect" } },
             new RoleTemplate

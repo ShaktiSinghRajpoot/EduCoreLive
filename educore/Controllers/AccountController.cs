@@ -7,6 +7,8 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models;
 using EduCoreDataAccessLayer.Services;
+using EduCoreDataAccessLayer.Services.Contract.SuperAdmin;
+using Npgsql;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -80,6 +82,85 @@ namespace educore.Controllers
                 return Redirect(returnUrl);
 
             return RedirectToAction("Index", "Dashboards", new { area = "" });
+        }
+
+        // ── Super Admin: "Login as School Admin" ────────────────────────────────
+        // The Super Admin is signed in as the school's School Admin. Two extra claims
+        // remember who really is signed in and the log row, so every page shows a red
+        // "Back to Super Admin" bar. Each one is logged (core.superadmin_login_as_log).
+        public const string ImpersonatorClaim = "login_as_by";
+        public const string LoginAsLogClaim   = "login_as_log";
+
+        [HttpPost]
+        [Authorize(Roles = AppRoles.SuperAdmin)]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LoginAsSchool(int schoolId, [FromServices] ISchoolService schools)
+        {
+            int superId = ClaimInt(Common.SK_UserId);
+            try
+            {
+                var target = await schools.StartLoginAsAsync(schoolId, superId);
+                var user   = target == null ? null : await _loginService.GetUserInfoByUserIdAsync(target.UserId);
+                var role   = user == null ? null : (await _loginService.GetUserRolesAsync(user.UserId))
+                                 .FirstOrDefault(r => r.RoleCode == "SCHOOL_ADMIN" && r.SchoolId == target!.SchoolId);
+                if (target == null || user == null || role == null)
+                {
+                    TempData["Error"] = "This school has no active School Admin login.";
+                    return RedirectToAction("SchoolList", "Schools", new { area = "SuperAdmin" });
+                }
+
+                var check = await _loginService.SessionCheckAsync(user.UserId, target.SchoolId);
+                if (!check.SchoolOk || !check.UserOk)
+                {
+                    TempData["Error"] = "This school (or its admin login) is not active, so it cannot be opened.";
+                    return RedirectToAction("SchoolList", "Schools", new { area = "SuperAdmin" });
+                }
+
+                user.RoleCode = role.RoleCode;
+                user.RoleName = role.RoleName;
+                user.TenantId = role.TenantId;
+                user.SchoolId = role.SchoolId;
+                user.MustChangePassword = false;   // the school's own first-login reset is theirs, not the Super Admin's
+
+                HttpContext.Session.Remove(Common.SK_ActiveRoleId);
+                await UserAuthorization(user, false, superId, target.LogId);
+                return RedirectByRole(user.RoleName);
+            }
+            catch (PostgresException ex)
+            {
+                TempData["Error"] = ex.MessageText;
+                return RedirectToAction("SchoolList", "Schools", new { area = "SuperAdmin" });
+            }
+        }
+
+        [HttpPost]
+        [Authorize]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> BackToSuperAdmin([FromServices] ISchoolService schools)
+        {
+            int superId = ClaimInt(ImpersonatorClaim);
+            int logId   = ClaimInt(LoginAsLogClaim);
+            if (superId <= 0)
+                return RedirectToAction("Index", "Dashboards", new { area = "" });
+
+            var user = await _loginService.GetUserInfoByUserIdAsync(superId);
+            var role = user == null ? null : (await _loginService.GetUserRolesAsync(superId))
+                           .FirstOrDefault(r => r.RoleCode == "SUPER_ADMIN");
+            if (user == null || role == null || !user.IsActive || user.IsDeleted)
+            {
+                await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return RedirectToAction("Login");
+            }
+
+            user.RoleCode = role.RoleCode;
+            user.RoleName = role.RoleName;
+            user.TenantId = role.TenantId;
+            user.SchoolId = role.SchoolId;
+
+            HttpContext.Session.Remove(Common.SK_ActiveRoleId);
+            await UserAuthorization(user, false);
+            await schools.EndLoginAsAsync(logId, superId);
+            return RedirectToAction("SchoolList", "Schools", new { area = "SuperAdmin" });
         }
 
         private int ClaimInt(string type) =>
@@ -343,7 +424,9 @@ namespace educore.Controllers
             };
         }
 
-        private async Task<bool> UserAuthorization(UserViewModel user, bool rememberMe)
+        // impersonatorId / loginAsLogId: set only by LoginAsSchool (see above).
+        private async Task<bool> UserAuthorization(UserViewModel user, bool rememberMe,
+                                                   int impersonatorId = 0, int loginAsLogId = 0)
         {
             if (!IsValidSaasScope(user))
                 return false;
@@ -368,6 +451,11 @@ namespace educore.Controllers
         // Security stamp, compared on every request by SessionValidator.
         new Claim(SessionValidator.StampClaim, user.PasswordStamp ?? "0")
     };
+            if (impersonatorId > 0)
+            {
+                claims.Add(new Claim(ImpersonatorClaim, impersonatorId.ToString()));
+                claims.Add(new Claim(LoginAsLogClaim, loginAsLogId.ToString()));
+            }
 
             var claimsIdentity = new ClaimsIdentity(
                 claims,

@@ -1,6 +1,8 @@
 ﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model EduCoreDataAccessLayer.Models.ERP.RegistrationPageModel
+@inject educore.Helpers.ModuleFlags Modules
 @{
+    bool transportOn = await Modules.TransportOn();
     ViewData["Title"] = "Registrations";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var stats = Model.Stats;
@@ -193,7 +195,7 @@
           <option value="" disabled selected>Select reason</option>
           <option>Fees Too High</option>
           <option>Admitted to Another School</option>
-          <option>Distance / Transport Issue</option>
+          <option>@(transportOn ? "Distance / Transport Issue" : "Distance Issue")</option>
           <option>Changed Mind</option>
           <option>Not Responding</option>
           <option>Other</option>

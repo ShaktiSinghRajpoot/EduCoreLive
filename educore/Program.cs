@@ -240,6 +240,7 @@ builder.Services.AddScoped<IExamService, ExamService>();
 builder.Services.AddScoped<IExamResultService, ExamResultService>();
 builder.Services.AddScoped<ITimetableService, TimetableService>();
 builder.Services.AddScoped<IAdmissionWorkflowService, AdmissionWorkflowService>();
+builder.Services.AddScoped<educore.Helpers.ModuleFlags>();   // module on/off, read once per request
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<IFeePaymentService, FeePaymentService>();
 builder.Services.AddScoped<ITransportService, TransportService>();

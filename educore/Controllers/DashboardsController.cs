@@ -16,12 +16,14 @@ namespace educore.Controllers
         private readonly ITransportTrackingService _tracking;
         private readonly IBaseService _baseService;
         private readonly IStaffSelfService _self;
+        private readonly ModuleFlags _modules;
 
         public DashboardsController(IDashboardService dashboardService, IAdmissionWorkflowService workflow,
                                     ITransportTrackingService tracking, IBaseService baseService,
-                                    IStaffSelfService self)
+                                    IStaffSelfService self, ModuleFlags modules)
         {
             _self = self;
+            _modules = modules;
             _dashboardService = dashboardService;
             _workflow = workflow;
             _tracking = tracking;
@@ -76,7 +78,12 @@ namespace educore.Controllers
             // Birthdays name students and staff: each kind needs its own module.
             model.Birthdays.RemoveAll(b => (b.Who == "Student" && !canStudents) || (b.Who != "Student" && !canStaff));
 
-            try { model.IsDriver = await _tracking.IsDriverAsync(t, s, u); } catch { model.IsDriver = false; }
+            // Leave lives in the Payroll module, the bus in Transport: a module that is
+            // off leaves nothing of itself on the dashboard.
+            var mods = await _modules.GetAsync();
+            if (!mods.EnablePayroll) { model.ShowLeave = false; model.OnLeaveToday = 0; model.Approvals.Clear(); }
+
+            try { model.IsDriver = mods.EnableTransport && await _tracking.IsDriverAsync(t, s, u); } catch { model.IsDriver = false; }
 
             // The current session for the hero chip (was a hard-coded "2025–26").
             try
@@ -113,7 +120,7 @@ namespace educore.Controllers
                 ("Exams",      "bx-file",            "/ERP/Exam/CreateExam",               "#dc2626", "exams.view",      exams),
                 ("Staff",      "bx-id-card",         "/ERP/Staff/StaffList",               "#9333ea", "staff.view",      true),
                 ("Payroll",    "bx-money",           "/ERP/Payroll/PayrollManagement",     "#16a34a", "payroll.view",    payroll),
-                ("Leave",      "bx-calendar-minus",  "/ERP/Leave/LeaveManagement",         "#e83e8c", "staff.view",      true),
+                ("Leave",      "bx-calendar-minus",  "/ERP/Leave/LeaveManagement",         "#e83e8c", "staff.view",      payroll),
                 ("Inventory",  "bx-package",         "/ERP/Inventory/InventoryItem",       "#ff5722", "inventory.view",  inventory),
                 ("Transport",  "bx-bus",             "/ERP/Transport/LiveTracking",        "#0ea5e9", "transport.view",  transport),
                 ("Reminders",  "bx-bell",            "/ERP/FeeDueReminders",               "#ff8a00", "fees.view",       true),

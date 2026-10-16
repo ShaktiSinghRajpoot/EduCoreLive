@@ -1,5 +1,8 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@inject educore.Helpers.ModuleFlags Modules
 @{
+    bool transportOn = await Modules.TransportOn();   // modules that are off are not offered as a purpose
+    bool examsOn = await Modules.ExamsOn();
     ViewData["Title"] = "Front Office";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var canManage = (bool?)ViewBag.CanManage ?? false;   // enquiry.manage
@@ -79,6 +82,8 @@ $(function () {
 
     function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
     var TODAY = iso(new Date());
+    var TRANSPORT_ON = @(transportOn ? "true" : "false");
+    var EXAMS_ON = @(examsOn ? "true" : "false");
     $('#fFrom, #fTo').val(TODAY);
     function show(s) { return s ? new Date(s + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : ''; }
     function post(op, body) {
@@ -171,16 +176,16 @@ $(function () {
                  + field('', 'Note', input('eNote', 'maxlength="300"'));
         } else if (op === 'CallSave') {
             title = 'Log a call';
-            html = field('', 'Call', select('eDirection', ['Incoming', 'Outgoing']), 5) + field('', 'Purpose <span class="text-danger">*</span>', select('ePurpose', ['Admission enquiry', 'Fee', 'Transport', 'Attendance / leave', 'Complaint', 'Exam / result', 'Other']), 7)
+            html = field('', 'Call', select('eDirection', ['Incoming', 'Outgoing']), 5) + field('', 'Purpose <span class="text-danger">*</span>', select('ePurpose', ['Admission enquiry', 'Fee', 'Transport', 'Attendance / leave', 'Complaint', 'Exam / result', 'Other'].filter(function (p) { return (TRANSPORT_ON || p !== 'Transport') && (EXAMS_ON || p !== 'Exam / result'); })), 7)
                  + field('', 'Name <span class="text-danger">*</span>', input('eName', 'maxlength="120"'), 7) + field('', 'Mobile', input('eMobile', 'maxlength="15" inputmode="numeric"'), 5)
                  + field('', 'What was said', '<textarea id="eNote" class="form-control" rows="2" maxlength="400"></textarea>')
                  + field('', 'Follow up on <small class="text-muted">(optional)</small>', input('eFollowUp', 'type="date" min="' + TODAY + '"'), 6);
         } else if (op === 'ComplaintSave') {
             title = 'New complaint';
-            html = field('', 'From', select('eDirection', ['Parent', 'Student', 'Staff', 'Other']), 5) + field('', 'Category <span class="text-danger">*</span>', select('ePurpose', ['Academic', 'Teacher / staff', 'Transport', 'Fee', 'Facilities', 'Safety', 'Bullying', 'Other']), 7)
+            html = field('', 'From', select('eDirection', ['Parent', 'Student', 'Staff', 'Other']), 5) + field('', 'Category <span class="text-danger">*</span>', select('ePurpose', ['Academic', 'Teacher / staff', 'Transport', 'Fee', 'Facilities', 'Safety', 'Bullying', 'Other'].filter(function (p) { return TRANSPORT_ON || p !== 'Transport'; })), 7)
                  + field('', 'Name <span class="text-danger">*</span>', input('eName', 'maxlength="120"'), 7) + field('', 'Mobile', input('eMobile', 'maxlength="15" inputmode="numeric"'), 5)
                  + field('', 'About student <small class="text-muted">(optional)</small>', input('eStudent', 'maxlength="150" placeholder="Name and class"'), 7)
-                 + field('', 'Assign to', input('eToMeet', 'maxlength="120" placeholder="e.g. Transport in-charge"'), 5)
+                 + field('', 'Assign to', input('eToMeet', 'maxlength="120" placeholder="e.g. Class teacher, Principal"'), 5)
                  + field('', 'Complaint <span class="text-danger">*</span>', '<textarea id="eNote" class="form-control" rows="3" maxlength="1000"></textarea>');
         } else if (op === 'ComplaintStatus') {
             var x = ROWS.filter(function (r) { return r.complaint_id === id; })[0] || {};

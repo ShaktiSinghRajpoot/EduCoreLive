@@ -1,10 +1,13 @@
-﻿@{
+﻿@inject educore.Helpers.ModuleFlags Modules
+@{
     ViewData["Title"] = "Student Dashboard";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     Guid studentPublicId = ViewBag.StudentPublicId ?? Guid.Empty;
     bool canManage   = ViewBag.CanManage == true;     // students.manage: Edit
     bool canViewFees = ViewBag.CanViewFees == true;   // fees.view: Fee tab, fee figures
     bool canCollect  = ViewBag.CanCollect == true;    // fees.collect: Collect Fee button
+    bool examsOn     = await Modules.ExamsOn();       // no exam tab / cards when the module is off
+    bool transportOn = await Modules.TransportOn();
 }
 
 @section VendorScripts {
@@ -53,7 +56,10 @@
                 <button class="sd-tab-btn" data-tab="attendance">Attendance</button>
                 <button class="sd-tab-btn" data-tab="timetable">Timetable</button>
                 <button class="sd-tab-btn" data-tab="homework">Homework</button>
-                <button class="sd-tab-btn" data-tab="exams">Exam Results</button>
+                @if (examsOn)
+                {
+                    <button class="sd-tab-btn" data-tab="exams">Exam Results</button>
+                }
                 @if (canViewFees)
                 {
                     <button class="sd-tab-btn" data-tab="fee">Fee Details</button>
@@ -66,12 +72,15 @@
                 <div class="sd-pane active" id="tab-overview">
                     <div class="row g-2 mb-4" id="ov-metrics"></div>
                     <div class="row g-4">
+                        @if (examsOn)
+                        {
                         <div class="col-12 col-lg-6">
                             <div class="ec-detail-box mb-0">
                                 <div class="ec-detail-title">Subject Performance</div>
                                 <div id="ov-bars" class="mt-2"></div>
                             </div>
                         </div>
+                        }
                         <div class="col-12 col-lg-6">
                             <div class="ec-detail-box mb-3">
                                 <div class="ec-detail-title">Recent Activity</div>
@@ -90,10 +99,13 @@
                        "class average", with letter grades, all generated. The exam module
                        records marks per EXAM, not per term. Exam Results shows the real marks,
                        grade (from the school's Grade Scale) and class rank, exam by exam. *@
+                    @if (examsOn)
+                    {
                     <div class="ec-detail-box mb-4">
                         <div class="ec-detail-title">Exam performance</div>
                         <div id="ac-exams" class="mt-2"></div>
                     </div>
+                    }
                     <div class="ec-detail-box mb-0">
                         <div class="ec-detail-title">Current placement</div>
                         <div id="ac-placement" class="mt-2"></div>
@@ -103,7 +115,7 @@
                 <div class="sd-pane" id="tab-attendance">
                     <div id="att-warn" class="sd-warn d-none mb-3">
                         <i class="bx bx-error me-2"></i>
-                        Attendance is below 75%. Student may not be eligible for exams.
+                        Attendance is below 75%.@(examsOn ? " Student may not be eligible for exams." : "")
                     </div>
                     <div class="row g-2 mb-4" id="att-metrics"></div>
                     <div class="ec-detail-box mb-4">
@@ -159,6 +171,8 @@
                     </div>
                 </div>
 
+                @if (examsOn)
+                {
                 <div class="sd-pane" id="tab-exams">
                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
                         <div class="ec-detail-title mb-0">Exam Results</div>
@@ -179,6 +193,7 @@
                        being filled with invented deltas. The exam picker above already lets
                        the office look at either one. *@
                 </div>
+                }
 
                 <div class="sd-pane" id="tab-fee">
                     <div class="row g-2 mb-4" id="fee-metrics"></div>
@@ -266,7 +281,7 @@
                           <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
                           <div>
                             <div class="ec-section-title">Activity &amp; Money History</div>
-                            <div class="ec-section-subtitle">Admission, exit, promotion, class changes, bus, closed dues and refunds</div>
+                            <div class="ec-section-subtitle">Admission, exit, promotion, class changes, @(transportOn ? "bus, " : "")closed dues and refunds</div>
                           </div>
                         </div>
                       </div>
@@ -519,7 +534,7 @@ function renderOverview(s,d){
     document.getElementById('ov-metrics').innerHTML=
         mc('Attendance', (att&&att.schoolDays) ? att.percent+'%' : '—',
            (att&&att.schoolDays&&att.percent>=75?'bg-label-success text-success':'bg-label-warning text-warning'),'bx-user-check')
-       +mc('Last Exam',  (ex&&ex.options.length) ? examPct(ex.percent) : '—','bg-label-info text-info','bx-book-open')
+       +(ex ? mc('Last Exam', ex.options.length ? examPct(ex.percent) : '—','bg-label-info text-info','bx-book-open') : '')
        // The class's subjects (Subject Management); else the last exam's count.
        +mc('Subjects',   s.subjects!=null ? String(s.subjects) : (ex&&ex.options.length) ? String(ex.subjectCount) : '—','bg-label-primary text-primary','bx-list-check')
        +(CAN_FEES
@@ -529,7 +544,8 @@ function renderOverview(s,d){
     // Subject bars come from the latest published exam's real marks; absent
     // subjects have no percentage, so they are not drawn as a zero-length bar.
     var bars=(ex&&ex.subjects||[]).filter(function(m){ return m.percent!=null; });
-    document.getElementById('ov-bars').innerHTML = bars.length
+    var ovBars=document.getElementById('ov-bars');   // absent when the Exams module is off
+    if(ovBars) ovBars.innerHTML = bars.length
       ? bars.map(function(m){
             var col=m.percent>=85?'#28c76f':m.percent>=70?'#2196f3':m.percent>=55?'#ff9f43':'#ea5455';
             return '<div class="sd-subj-row">'
@@ -578,8 +594,8 @@ function ic(lbl,val){
 function renderAcademic(s,d){
     // Every published exam this student has marks in — the list the Exam Results
     // picker is built from, so the two tabs can never disagree.
-    var ex=d.exams;
-    document.getElementById('ac-exams').innerHTML =
+    var ex=d.exams, acEx=document.getElementById('ac-exams');
+    if(acEx) acEx.innerHTML =
         (ex && ex.options.length)
           ? '<ul class="mb-0 small" style="padding-left:1.1rem;">'
             + ex.options.map(function(o){
@@ -736,6 +752,7 @@ function renderTimetable(d){
 /* ── Tab 5: Exam Results ─────────────────────── */
 function renderExams(s,d){
     var ex=d.exams, sel=document.getElementById('examSel');
+    if(!sel) return;   // the Exams module is off: no tab
 
     if(!ex || !ex.options.length){
         sel.innerHTML='<option>No published results</option>';
@@ -791,7 +808,8 @@ function renderExams(s,d){
 }
 
 // Switching exam re-asks the server rather than caching every exam's marks.
-document.getElementById('examSel').addEventListener('change',function(){
+var examSelEl=document.getElementById('examSel');
+if(examSelEl) examSelEl.addEventListener('change',function(){
     var id=this.value;
     if(!id||isNaN(id)) return;
     $.getJSON(DATA_URL,{ id:STUDENT_ID, examId:id })

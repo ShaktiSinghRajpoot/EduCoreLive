@@ -137,6 +137,24 @@ is no mechanical way to do it; do them one at a time and check each.
 
 ---
 
+## Modules that can be off (Transport, Exams, Inventory, Payroll)
+
+The Super Admin gives modules to a school, and the school can switch a given
+one off. A module that is off must not show up **anywhere** -- not just its
+menu: no field, column, card, tab, link, fee group, call purpose or message.
+Its own controllers are guarded by `[RequiresModule(...)]`; everything else
+asks `ModuleFlags` (read once per request):
+
+```cshtml
+@inject educore.Helpers.ModuleFlags Modules
+@if (await Modules.TransportOn()) { ... }
+```
+
+In a controller, inject `ModuleFlags` (or take `[FromServices] ModuleFlags modules`
+on the action). When hiding a field that the save writes back (salary on Edit
+Staff, permission ids on the Roles matrix), post the old value as a hidden input,
+or the save wipes it. SQL flows use `core.fn_module_on(tenant, school, 'transport')`.
+
 ## Traps in this codebase
 
 These all cost real debugging time. They are still true.

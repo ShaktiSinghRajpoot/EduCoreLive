@@ -151,7 +151,7 @@ namespace educore.Areas.ERP.Controllers
         // The URL carries the uuid; ResolveStaffIdAsync turns it into the internal id and
         // enforces the tenant/school check while doing so. An unknown uuid and another
         // school's uuid both come back as 0, so this cannot be used to probe for real ids.
-        public async Task<IActionResult> StaffProfile(Guid id)
+        public async Task<IActionResult> StaffProfile(Guid id, [FromServices] ModuleFlags modules)
         {
             var staffId = await _publicIds.ResolveAsync(IPublicIdService.Staff, id, TenantId(), SchoolId());
             if (staffId == 0) return RedirectToAction("StaffList");
@@ -167,15 +167,22 @@ namespace educore.Areas.ERP.Controllers
                                          .Select(r => r.RoleName).ToList();
             }
 
+            // Leave and salary belong to the Payroll module: nothing of them when it is off.
+            bool payrollOn = await modules.PayrollOn();
+            ViewBag.PayrollOn = payrollOn;
+
             // HR snapshot: approved leave days this year and requests still pending.
-            var leaves = await _leaveService.GetLeavesAsync(TenantId(), SchoolId(), UserId(), staffId: staffId);
-            var year = Dates.Now.Year.ToString();
-            ViewBag.LeaveTaken = leaves.Where(l => l.Status == "Approved" && (l.FromDate ?? "").StartsWith(year))
-                                       .Sum(l => l.Days).ToString("0.#");
-            ViewBag.LeavePending = leaves.Count(l => l.Status == "Pending").ToString();
+            if (payrollOn)
+            {
+                var leaves = await _leaveService.GetLeavesAsync(TenantId(), SchoolId(), UserId(), staffId: staffId);
+                var year = Dates.Now.Year.ToString();
+                ViewBag.LeaveTaken = leaves.Where(l => l.Status == "Approved" && (l.FromDate ?? "").StartsWith(year))
+                                           .Sum(l => l.Days).ToString("0.#");
+                ViewBag.LeavePending = leaves.Count(l => l.Status == "Pending").ToString();
+            }
 
             // Salary is payroll data: staff.view alone does not show it (payroll.view does).
-            ViewBag.CanSeeSalary = await HasPermissionAttribute.UserHasAsync(this, "payroll.view");
+            ViewBag.CanSeeSalary = payrollOn && await HasPermissionAttribute.UserHasAsync(this, "payroll.view");
             return View(model);
         }
 

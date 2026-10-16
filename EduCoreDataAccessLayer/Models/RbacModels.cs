@@ -41,6 +41,7 @@ namespace EduCoreDataAccessLayer.Models
     /// <summary>One feature row in the permission matrix: View / Manage cells for a single feature.</summary>
     public class MatrixFeatureRow
     {
+        public string Feature { get; set; } = string.Empty;        // key prefix, e.g. "transport"
         public string FeatureLabel { get; set; } = string.Empty;
         public int? ViewId { get; set; }
         public int? ManageId { get; set; }

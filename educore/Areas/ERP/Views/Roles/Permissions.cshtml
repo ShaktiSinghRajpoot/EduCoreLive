@@ -33,7 +33,18 @@
       @Html.AntiForgeryToken()
       <input type="hidden" name="roleId" value="@Model.RoleId" />
 
-      @foreach (var g in Model.Groups)
+      @{
+          // Modules that are off for this school: their rows are not shown, but what
+          // the role already has is posted back unchanged, so saving never drops it.
+          var modulesOff = ViewBag.ModulesOff as HashSet<string> ?? new HashSet<string>();
+      }
+      @foreach (var r in Model.Groups.SelectMany(g => g.Rows).Where(r => modulesOff.Contains(r.Feature)))
+      {
+        if (r.ViewId is int hv && r.ViewGranted) { <input type="hidden" name="permissionIds" value="@hv" /> }
+        if (r.ManageId is int hm && r.ManageGranted) { <input type="hidden" name="permissionIds" value="@hm" /> }
+        foreach (var x in r.Extras.Where(x => x.Granted)) { <input type="hidden" name="permissionIds" value="@x.PermissionId" /> }
+      }
+      @foreach (var g in Model.Groups.Where(g => g.Rows.Any(r => !modulesOff.Contains(r.Feature))))
       {
         <div class="pm-group">
           <div class="pm-group-hdr">
@@ -48,7 +59,7 @@
             <div class="pm-col-hdr">View</div>
             <div class="pm-col-hdr">Manage</div>
           </div>
-          @foreach (var row in g.Rows)
+          @foreach (var row in g.Rows.Where(r => !modulesOff.Contains(r.Feature)))
           {
             <div class="pm-row">
               <div class="pm-feat">@row.FeatureLabel</div>

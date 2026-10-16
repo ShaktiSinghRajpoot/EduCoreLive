@@ -31,10 +31,11 @@ namespace educore.Areas.ERP.Controllers
 
         // ── Mark a day ───────────────────────────────────────────
         [HttpGet]
-        public async Task<IActionResult> Day(string? date)
+        public async Task<IActionResult> Day(string? date, [FromServices] ModuleFlags modules)
         {
             var d = Dates.Norm(date) ?? Dates.Today;
             var sheet = await _att.GetDayAsync(d, TenantId(), SchoolId(), UserId());
+            bool leaveOn = await modules.PayrollOn();   // approved leave belongs to the Payroll module
             return Json(new
             {
                 date = d,
@@ -49,7 +50,7 @@ namespace educore.Areas.ERP.Controllers
                     status = s.Status,
                     remark = s.Remark,
                     marked = s.MarkedAt?.ToString("dd MMM, hh:mm tt"),
-                    leave  = s.LeaveType
+                    leave  = leaveOn ? s.LeaveType : null
                 })
             });
         }

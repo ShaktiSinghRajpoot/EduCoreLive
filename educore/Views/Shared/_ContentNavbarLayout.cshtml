@@ -56,6 +56,17 @@
       }
       <!-- / Navbar -->
 
+      @* The Super Admin opened this school with "Login as School Admin" *@
+      @if (User.FindFirst(educore.Controllers.AccountController.ImpersonatorClaim) != null)
+      {
+        <div class="bg-danger text-white px-3 py-2 d-flex align-items-center justify-content-between flex-wrap gap-2" style="position:sticky;top:0;z-index:1080;">
+          <span class="small fw-semibold"><i class="bx bx-shield-quarter me-1"></i>Super Admin: you are logged in as this school's admin. Everything you do is done as them.</span>
+          <form asp-area="" asp-controller="Account" asp-action="BackToSuperAdmin" method="post" class="m-0">
+            <button type="submit" class="btn btn-sm btn-light"><i class="bx bx-arrow-back me-1"></i>Back to Super Admin</button>
+          </form>
+        </div>
+      }
+
 
       <!-- Content wrapper -->
       <div class="content-wrapper">

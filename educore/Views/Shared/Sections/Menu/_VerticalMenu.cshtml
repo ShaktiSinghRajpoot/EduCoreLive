@@ -85,17 +85,19 @@
     }
     // "My Leave" / "My Payslip" are for anyone with a current staff record here,
     // whatever their role; having the staff record is the permission (cached 5 min).
-    // Leave and salary both belong to the Payroll module.
-    bool gMyStaff = false;
-    if (showPayroll && _tId > 1 && _sId > 0)
+    // Leave and salary both belong to the Payroll module (gMyStaff); My Timetable
+    // does not, so the staff record is read whatever the Payroll switch says.
+    bool hasStaffRecord = false;
+    if (_tId > 1 && _sId > 0)
     {
-        try { gMyStaff = await StaffSelfService.HasStaffRecordAsync(_tId, _sId, _uId); }
+        try { hasStaffRecord = await StaffSelfService.HasStaffRecordAsync(_tId, _sId, _uId); }
         catch { /* the menu must never fail to render */ }
     }
+    bool gMyStaff = showPayroll && hasStaffRecord;
     // My Timetable is for teaching staff (or anyone who has periods); an accountant or
     // clerk has no timetable (cached 5 min).
     bool gMyTimetable = false;
-    if (gMyStaff)
+    if (hasStaffRecord)
     {
         try { gMyTimetable = await StaffSelfService.IsTeachingStaffAsync(_tId, _sId, _uId)
                           || await HomeworkService.TeachesAnyClassAsync(_tId, _sId, _uId); }

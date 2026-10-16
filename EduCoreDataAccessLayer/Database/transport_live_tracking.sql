@@ -485,10 +485,7 @@ BEGIN
      WHERE p_token_hash ~ '^[0-9a-f]{64}$'
        AND s.token_hash = p_token_hash
        AND s.revoked_at IS NULL
-       AND COALESCE((SELECT w.enable_transport FROM core.school_admission_workflow_settings w
-                      WHERE w.tenant_id = s.tenant_id AND w.school_id = s.school_id
-                        AND NOT COALESCE(w.is_deleted, FALSE)
-                      LIMIT 1), TRUE);
+       AND core.fn_module_on(s.tenant_id, s.school_id, 'transport');   -- given and switched on
 
     IF v_route IS NULL THEN
         OPEN p_result FOR

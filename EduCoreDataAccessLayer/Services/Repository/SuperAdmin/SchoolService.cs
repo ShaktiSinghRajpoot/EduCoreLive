@@ -18,6 +18,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
         private const string SpUserEmailCheck = "core.sp_user_email_check";
         private const string SpSchoolArchive = "core.sp_school_archive";
         private const string SpSchoolPurge = "core.sp_school_purge";
+        private const string SpSchoolModules = "core.sp_superadmin_school_modules";
+        private const string SpLoginAs = "core.sp_superadmin_login_as";
 
         public SchoolService(PgExec db)
         {
@@ -261,6 +263,83 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
             // PgExec runs this inside a transaction, so any guard or the proc's
             // completeness check raising rolls the whole delete back.
             await _db.ExecuteProcedureWithCursorsAsync(SpSchoolPurge, parameters);
+        }
+
+        public Task<SchoolModulesModel?> GetSchoolModulesAsync(int schoolId, int actionUserId) =>
+            RunSchoolModulesAsync("Get", new SchoolModulesModel { SchoolId = schoolId }, actionUserId);
+
+        public Task<SchoolModulesModel?> SaveSchoolModulesAsync(SchoolModulesModel model, int actionUserId) =>
+            RunSchoolModulesAsync("Save", model, actionUserId);
+
+        private async Task<SchoolModulesModel?> RunSchoolModulesAsync(string operation, SchoolModulesModel model, int actionUserId)
+        {
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation", operation),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_school_id", model.SchoolId),
+                new NpgsqlParameter("p_allow_transport", model.AllowTransport),
+                new NpgsqlParameter("p_allow_exams", model.AllowExams),
+                new NpgsqlParameter("p_allow_inventory", model.AllowInventory),
+                new NpgsqlParameter("p_allow_payroll", model.AllowPayroll),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "modules_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpSchoolModules, parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                return null;
+
+            var row = ds.Tables[0].Rows[0];
+            return new SchoolModulesModel
+            {
+                SchoolId       = ToInt(row["school_id"], 0),
+                SchoolName     = row["school_name"]?.ToString() ?? string.Empty,
+                AllowTransport = ToBool(row["allow_transport"]),
+                AllowExams     = ToBool(row["allow_exams"]),
+                AllowInventory = ToBool(row["allow_inventory"]),
+                AllowPayroll   = ToBool(row["allow_payroll"])
+            };
+        }
+
+        public async Task<LoginAsTarget?> StartLoginAsAsync(int schoolId, int actionUserId)
+        {
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation", "Start"),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_school_id", schoolId),
+                new NpgsqlParameter("p_log_id", DBNull.Value) { NpgsqlDbType = NpgsqlDbType.Integer },
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "login_as_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpLoginAs, parameters);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                return null;
+
+            var row = ds.Tables[0].Rows[0];
+            return new LoginAsTarget
+            {
+                UserId   = ToInt(row["user_id"], 0),
+                TenantId = ToInt(row["tenant_id"], 0),
+                SchoolId = ToInt(row["school_id"], 0),
+                LogId    = ToInt(row["log_id"], 0)
+            };
+        }
+
+        public async Task EndLoginAsAsync(int logId, int actionUserId)
+        {
+            var parameters = new NpgsqlParameter[]
+            {
+                new NpgsqlParameter("p_operation", "End"),
+                new NpgsqlParameter("p_action_user_id", actionUserId),
+                new NpgsqlParameter("p_school_id", DBNull.Value) { NpgsqlDbType = NpgsqlDbType.Integer },
+                new NpgsqlParameter("p_log_id", logId),
+                new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "login_as_cursor" }
+            };
+            await _db.ExecuteProcedureWithCursorsAsync(SpLoginAs, parameters);
         }
 
         public async Task<SchoolDropdownModel> GetSchoolDropdownsAsync()

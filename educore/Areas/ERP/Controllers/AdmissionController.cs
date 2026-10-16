@@ -474,8 +474,8 @@ namespace educore.Areas.ERP.Controllers
             // bus was assigned and billed for a school that runs no buses (SEC-20).
             bool transportOn = form.TransportRouteId is > 0 && form.TransportStopId is > 0
                 && (await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId)).EnableTransport;
-            if (result.Success && result.StudentId > 0 && form.TransportRouteId is > 0 && form.TransportStopId is > 0 && !transportOn)
-                transportMessage = "Admission saved. The bus was not assigned because the Transport module is turned off.";
+            // (a stale route sent while Transport is off is simply ignored: a school
+            // without the module must not even read its name)
             if (result.Success && result.StudentId > 0 && transportOn)
             {
                 var (busOk, busMsg, _, _) = await _transportService.SaveAssignmentAsync(

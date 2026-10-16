@@ -73,6 +73,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 model.EnableExams     = GetBool(row, "enable_exams", true);
                 model.EnableInventory = GetBool(row, "enable_inventory", true);
                 model.EnablePayroll   = GetBool(row, "enable_payroll", true);
+                model.AllowTransport  = GetBool(row, "allow_transport", true);
+                model.AllowExams      = GetBool(row, "allow_exams", true);
+                model.AllowInventory  = GetBool(row, "allow_inventory", true);
+                model.AllowPayroll    = GetBool(row, "allow_payroll", true);
 
                 if (row.Table.Columns.Contains("registration_number_prefix") && row["registration_number_prefix"] != DBNull.Value)
                     model.RegistrationNumberPrefix = row["registration_number_prefix"].ToString() ?? "REG-";
@@ -135,6 +139,13 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
                 var row = ds.Tables[0].Rows[0];
                 return row["success"] != DBNull.Value && Convert.ToBoolean(row["success"]) ? 1 : 0;
+            }
+            catch (PostgresException pg) when (pg.SqlState == "P0001")
+            {
+                // A business rule (e.g. Transport cannot be turned off while students ride):
+                // the caller shows its text.
+                _logger?.LogWarning(pg, "SaveAdmissionWorkflow refused: {SqlState}", pg.SqlState);
+                throw;
             }
             catch (Exception ex)
             {

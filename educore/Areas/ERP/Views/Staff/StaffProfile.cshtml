@@ -4,6 +4,7 @@
     ViewData["Title"] = "Staff Profile";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     int staffId = Model.StaffId;
+    bool payrollOn = ViewBag.PayrollOn != false;   // salary and leave only with the Payroll module
 
     string Dash(string? v) => string.IsNullOrWhiteSpace(v) ? "—" : v;
     // Aadhaar is shown masked to the last 4 digits (XXXX XXXX 1234); the Edit
@@ -64,12 +65,12 @@
                 class="d-flex align-items-center gap-2"
                 data-ec-confirm="Deactivate this staff member?"
                 data-ec-confirm-name="@Model.FullName"
-                data-ec-confirm-message="They move to the inactive list and their login is switched off. Payroll pays the final month up to the last working day."
+                data-ec-confirm-message="They move to the inactive list and their login is switched off.@(payrollOn ? " Payroll pays the final month up to the last working day." : "")"
                 data-ec-confirm-ok="Deactivate">
             @Html.AntiForgeryToken()
             <input type="hidden" name="id" value="@Model.PublicId" />
             <input type="date" name="lastWorkingDate" class="form-control form-control-sm" style="max-width:155px"
-                   title="Last working day (payroll pays up to this day)"
+                   title="@(payrollOn ? "Last working day (payroll pays up to this day)" : "Last working day")"
                    value="@Dates.Now.ToString("yyyy-MM-dd")" max="@Dates.Now.ToString("yyyy-MM-dd")" />
             <button type="submit" class="btn btn-outline-danger d-flex align-items-center gap-1">
               <i class="bx bx-user-x"></i><span>Deactivate</span>
@@ -123,7 +124,7 @@
         <div class="sp-card">
           <div class="sp-card-hdr">
             <div class="sp-sec-ic"><i class="bx bx-money"></i></div>
-            <div class="sp-sec-title">Payroll &amp; Bank</div>
+            <div class="sp-sec-title">@(payrollOn ? "Payroll & Bank" : "Bank & ID")</div>
           </div>
           <div class="sp-card-body">
             <div class="row">
@@ -177,6 +178,8 @@
           </div>
         </div>
 
+        @if (payrollOn)
+        {
         <div class="sp-card">
           <div class="sp-card-hdr">
             <div class="sp-sec-ic"><i class="bx bx-bar-chart-alt-2"></i></div>
@@ -191,7 +194,10 @@
             </div>
           </div>
         </div>
+        }
 
+        @if (payrollOn)
+        {
         <div class="sp-card">
           <div class="sp-card-hdr">
             <div class="sp-sec-ic"><i class="bx bx-link-external"></i></div>
@@ -220,6 +226,7 @@
             </div>
           </div>
         </div>
+        }
 
       </div>
     </div>

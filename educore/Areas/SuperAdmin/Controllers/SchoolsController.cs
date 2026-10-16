@@ -466,6 +466,38 @@ namespace educore.Areas.SuperAdmin.Controllers
             return RedirectToAction(nameof(SchoolList));
         }
 
+        // ── Modules given to a school ──────────────────────────────────────────
+        // A module not given is hidden everywhere in that school and the School Admin
+        // cannot switch it on (core.sp_superadmin_school_modules).
+        [HttpGet]
+        public async Task<IActionResult> Modules(int id)
+        {
+            var model = await _schoolService.GetSchoolModulesAsync(id, User.Identity.GetUserId());
+            if (model == null)
+            {
+                TempData["Error"] = "School not found.";
+                return RedirectToAction(nameof(SchoolList));
+            }
+            return View(model);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Modules(SchoolModulesModel model)
+        {
+            try
+            {
+                var saved = await _schoolService.SaveSchoolModulesAsync(model, User.Identity.GetUserId());
+                TempData["Success"] = $"Modules saved for {saved?.SchoolName}.";
+                return RedirectToAction(nameof(SchoolList));
+            }
+            catch (Exception ex)
+            {
+                TempData["Error"] = FriendlyError(ex, "modules");
+                return RedirectToAction(nameof(Modules), new { id = model.SchoolId });
+            }
+        }
+
         private void ValidateTenant(SchoolManageModel model)
         {
             if (model.TenantMode == "existing")

@@ -1,5 +1,7 @@
+@inject educore.Helpers.ModuleFlags Modules
 @{
     ViewData["Title"] = "Subject Management";
+    bool examsOn = await Modules.ExamsOn();
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
     var classes = ViewBag.Classes as List<EduCoreDataAccessLayer.Models.ERP.SubjectClassItem>
@@ -29,7 +31,7 @@
                 </div>
                 <div>
                     <h4 class="ec-page-title mb-1">Subject Management</h4>
-                    <div class="ec-page-subtitle">Configure subjects for each class — used in exams, timetable and mark entry</div>
+                    <div class="ec-page-subtitle">Configure subjects for each class — used in @(examsOn ? "exams, timetable and mark entry" : "the timetable and homework")</div>
                 </div>
             </div>
             <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="ClassSection"
@@ -167,7 +169,7 @@
                         </span>
                         <span id="smSaveHintText">
                             <i class="bx bx-info-circle" style="color:var(--ec-primary);"></i>
-                            Changes apply to exam creation, mark entry and timetable for this class.
+                            Changes apply to @(examsOn ? "exam creation, mark entry and timetable" : "the timetable") for this class.
                         </span>
                     </div>
                     <div class="d-flex gap-2">

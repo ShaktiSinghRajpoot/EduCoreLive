@@ -208,6 +208,15 @@
                         <td>
                           <div class="d-flex gap-1 justify-content-end">
                             <a asp-action="Edit" asp-route-id="@item.SchoolId" class="scl-act edit" title="Edit"><i class="bx bx-edit-alt"></i></a>
+                            <a asp-action="Modules" asp-route-id="@item.SchoolId" class="scl-act edit" title="Modules given to this school"><i class="bx bx-grid-alt"></i></a>
+                            @if (item.StatusName == "Active")
+                            {
+                              @* opens the school as its School Admin; the session shows a red "Back to Super Admin" bar *@
+                              <form asp-area="" asp-controller="Account" asp-action="LoginAsSchool" method="post" class="d-inline m-0">
+                                <input type="hidden" name="schoolId" value="@item.SchoolId" />
+                                <button type="submit" class="scl-act edit" title="Login as School Admin"><i class="bx bx-log-in"></i></button>
+                              </form>
+                            }
                             @*
                               The old "Disable" (soft delete) button is gone. It set
                               is_deleted, which hid the school from this list AND from Edit —

@@ -41,5 +41,14 @@ namespace EduCoreDataAccessLayer.Services.Contract.SuperAdmin
         /// There is no undo.
         /// </summary>
         Task PurgeSchoolAsync(int schoolId, int tenantId, int actionUserId, string confirmName);
+
+        /// <summary>Modules given to a school. Save throws (PostgresException) when a
+        /// module cannot be taken away yet, e.g. children still ride the buses.</summary>
+        Task<SchoolModulesModel?> GetSchoolModulesAsync(int schoolId, int actionUserId);
+        Task<SchoolModulesModel?> SaveSchoolModulesAsync(SchoolModulesModel model, int actionUserId);
+
+        /// <summary>"Login as School Admin": the school's admin login, and a log row.</summary>
+        Task<LoginAsTarget?> StartLoginAsAsync(int schoolId, int actionUserId);
+        Task EndLoginAsAsync(int logId, int actionUserId);
     }
 }

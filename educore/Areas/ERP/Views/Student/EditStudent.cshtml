@@ -1,4 +1,5 @@
-﻿@model EduCoreDataAccessLayer.Models.ERP.AdmissionModel
+﻿@inject educore.Helpers.ModuleFlags Modules
+@model EduCoreDataAccessLayer.Models.ERP.AdmissionModel
 @{
     ViewData["Title"] = "Edit Student";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -392,7 +393,7 @@
                     <div class="es-card-body">
                         <p class="mb-2" style="font-size:.85rem;">
                             To record that this student has left, use <strong>Mark as left</strong> in the student list.
-                            It closes their future dues and bus, and makes them eligible for a Transfer Certificate.
+                            It closes their future dues@(await Modules.TransportOn() ? " and bus" : ""), and makes them eligible for a Transfer Certificate.
                         </p>
                         <a class="btn btn-sm btn-outline-danger"
                            href="@Url.Action("StudentList", "Student", new { area = "ERP", Search = Model.AdmissionNo })">

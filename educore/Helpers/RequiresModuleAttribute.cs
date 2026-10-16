@@ -72,7 +72,17 @@ namespace educore.Helpers
                     return;
                 }
 
-                string msg = $"{Label(_module)} is turned off for this school. Enable it in Admission Workflow settings.";
+                bool given = _module switch
+                {
+                    SchoolModule.Transport => settings.AllowTransport,
+                    SchoolModule.Exams     => settings.AllowExams,
+                    SchoolModule.Inventory => settings.AllowInventory,
+                    SchoolModule.Payroll   => settings.AllowPayroll,
+                    _                      => true
+                };
+                string msg = given
+                    ? $"{Label(_module)} is turned off for this school. A School Admin can turn it on in Settings > Modules & Workflow."
+                    : $"{Label(_module)} is not in your school's plan.";
 
                 // An AJAX call cannot follow a redirect usefully -- it would parse the
                 // settings page as its JSON payload -- so it gets the same refusal the
@@ -93,8 +103,9 @@ namespace educore.Helpers
                     controller.TempData["Message"] = msg;
                 }
 
-                context.Result = new RedirectToActionResult(
-                    "WorkflowSettings", "AdmissionWorkflow", new { area = "ERP" });
+                // The dashboard, not the settings page: a teacher or accountant cannot
+                // open the settings page, so sending them there was a dead end.
+                context.Result = new RedirectToActionResult("Index", "Dashboards", new { area = "" });
             }
 
             private static string Label(SchoolModule m) => m switch

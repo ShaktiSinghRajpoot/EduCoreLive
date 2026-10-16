@@ -58,7 +58,17 @@ namespace educore.Areas.ERP.Controllers
                 model.EnableRegistrationFee = false;
             }
 
-            var result = await _admissionWorkflowService.SaveAdmissionWorkflowAsync(model, tenantId, schoolId, actionUserId);
+            int result;
+            try
+            {
+                result = await _admissionWorkflowService.SaveAdmissionWorkflowAsync(model, tenantId, schoolId, actionUserId);
+            }
+            catch (Npgsql.PostgresException pg)
+            {
+                TempData["Result"] = "0";
+                TempData["Message"] = pg.MessageText;
+                return RedirectToAction(nameof(WorkflowSettings));
+            }
 
             TempData["Result"] = result > 0 ? "1" : "0";
             TempData["Message"] = result > 0

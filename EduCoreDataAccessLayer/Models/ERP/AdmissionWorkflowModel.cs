@@ -70,6 +70,16 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public bool EnableInventory { get; set; } = true;
         public bool EnablePayroll   { get; set; } = true;
 
+        /// <summary>
+        /// Modules the Super Admin GAVE this school. A module not given is off
+        /// whatever its switch says (the Enable* values above already include this),
+        /// and the Workflow page shows "not in your plan" instead of a switch.
+        /// </summary>
+        public bool AllowTransport { get; set; } = true;
+        public bool AllowExams     { get; set; } = true;
+        public bool AllowInventory { get; set; } = true;
+        public bool AllowPayroll   { get; set; } = true;
+
         // "Charge recurring fees from" used to live here. It now belongs to the
         // academic year (AcademicYearModel.ChargeFeesFrom), because it decides how a
         // whole session is billed and a school-wide value could be changed halfway

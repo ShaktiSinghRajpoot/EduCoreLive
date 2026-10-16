@@ -1,7 +1,9 @@
+@inject educore.Helpers.ModuleFlags Modules
 @model educore.Models.SchoolManageModel
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Seal & Signature";
+    bool examsOn = await Modules.ExamsOn();
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var canManage = (bool?)ViewBag.CanManage ?? false;   // settings.manage
 }
@@ -30,7 +32,7 @@
         <div class="d-flex align-items-center gap-2">
           <div class="ec-page-icon"><i class="bx bx-pen"></i></div>
           <div><h4 class="ec-page-title mb-1">Seal &amp; Signature</h4>
-            <p class="ec-page-subtitle">Printed on certificates, report cards, circulars, TC and admit cards</p></div>
+            <p class="ec-page-subtitle">Printed on certificates, @(examsOn ? "report cards, " : "")circulars, TC@(examsOn ? " and admit cards" : "")</p></div>
         </div>
       </div>
     </div>

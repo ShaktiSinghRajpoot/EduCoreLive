@@ -28,6 +28,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         // empties its data) when the viewer's role cannot open that module.
         public bool ShowStudents   { get; set; } = true;   // students.view
         public bool ShowStaff      { get; set; } = true;   // staff.view
+        public bool ShowLeave      { get; set; } = true;   // the Payroll & Leave module is on
         public bool ShowAttendance { get; set; } = true;   // attendance.view
         public bool CanAdmit       { get; set; } = true;   // students.manage
         public bool IsDriver       { get; set; }           // drives a bus -> My Bus shortcut

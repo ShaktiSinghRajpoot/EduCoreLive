@@ -97,7 +97,9 @@ BEGIN
       FROM core.student_ledger l
      WHERE l.student_id = p_student_id AND l.tenant_id = p_tenant_id AND l.school_id = p_school_id
        AND l.close_source = 'Exit' AND l.closed_amount > 0
-       AND (l.due_date IS NULL OR l.due_date::date >= date_trunc('month', CURRENT_DATE)::date);
+       AND (l.due_date IS NULL OR l.due_date::date >= date_trunc('month', CURRENT_DATE)::date)
+       -- no bus fees come back when the school's Transport module is off
+       AND (l.fee_head_name <> 'Transport Fee' OR core.fn_module_on(p_tenant_id, p_school_id, 'transport'));
 
     -- The bus assignment the exit ended (the latest one), if it was not
     -- replaced by another since.
@@ -109,7 +111,7 @@ BEGIN
      ORDER BY assignment_id DESC
      LIMIT 1;
 
-    IF v_assign IS NOT NULL AND NOT EXISTS (
+    IF v_assign IS NOT NULL AND core.fn_module_on(p_tenant_id, p_school_id, 'transport') AND NOT EXISTS (
         SELECT 1 FROM core.student_transport
          WHERE student_id = p_student_id AND is_active = TRUE) THEN
         UPDATE core.student_transport

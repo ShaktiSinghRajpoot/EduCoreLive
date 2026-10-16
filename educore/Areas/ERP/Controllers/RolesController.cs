@@ -13,18 +13,34 @@ namespace educore.Areas.ERP.Controllers
     {
         private readonly IRbacService _rbac;
         private readonly IPermissionService _perms;
+        private readonly ModuleFlags _modules;
 
-        public RolesController(IRbacService rbac, IPermissionService perms)
+        public RolesController(IRbacService rbac, IPermissionService perms, ModuleFlags modules)
         {
             _rbac = rbac;
             _perms = perms;
+            _modules = modules;
+        }
+
+        // Permission features of the modules that are off for this school. Their rows
+        // are not shown and their templates are not offered (the grants are kept).
+        private async Task<HashSet<string>> ModulesOffAsync()
+        {
+            var m = await _modules.GetAsync();
+            var off = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!m.EnableTransport) off.Add("transport");
+            if (!m.EnableExams)     off.Add("exams");
+            if (!m.EnableInventory) off.Add("inventory");
+            if (!m.EnablePayroll)   off.Add("payroll");
+            return off;
         }
 
         // ── GET: /ERP/Roles ───────────────────────────────────
         public async Task<IActionResult> Index()
         {
             var roles = await _rbac.GetRolesAsync(TenantId(), SchoolId(), UserId());
-            ViewBag.Templates = RoleTemplates.All;
+            var off = await ModulesOffAsync();
+            ViewBag.Templates = RoleTemplates.All.Where(t => !off.Contains(t.Module ?? "")).ToList();
             return View(roles);
         }
 
@@ -74,6 +90,7 @@ namespace educore.Areas.ERP.Controllers
         {
             var matrix = await _rbac.GetMatrixAsync(id, TenantId(), SchoolId(), UserId());
             if (matrix == null) return RedirectToAction("Index");
+            ViewBag.ModulesOff = await ModulesOffAsync();
             return View(matrix);
         }
 

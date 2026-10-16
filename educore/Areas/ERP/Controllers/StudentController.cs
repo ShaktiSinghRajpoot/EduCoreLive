@@ -325,7 +325,8 @@ namespace educore.Areas.ERP.Controllers
             }));
         }
 
-        public async Task<IActionResult> DashboardData(Guid id, int? month = null, int? year = null, int? examId = null)
+        public async Task<IActionResult> DashboardData(Guid id, int? month = null, int? year = null, int? examId = null,
+                                                       [FromServices] ModuleFlags? modules = null)
         {
             var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
             if (studentId == 0) return Json(new { found = false });
@@ -364,8 +365,11 @@ namespace educore.Areas.ERP.Controllers
 
             // Exams whose RESULTS are published only, and absences are excluded from the
             // totals — see core.sp_exam_result_student. examId null = their latest one.
-            var exam = await _examService.GetStudentResultAsync(
-                studentId, TenantId(), SchoolId(), UserId(), examId);
+            // Not read at all when the Exams module is off for this school.
+            bool examsOn = modules == null || await modules.ExamsOn();
+            var exam = examsOn
+                ? await _examService.GetStudentResultAsync(studentId, TenantId(), SchoolId(), UserId(), examId)
+                : null;
 
             // Subjects the class studies (Subject Management, current session). Only
             // when the class name is unambiguous -- streams can share a class name.
@@ -489,7 +493,7 @@ namespace educore.Areas.ERP.Controllers
                         teacher = e.StaffName
                     })
                 },
-                exams = new
+                exams = exam == null ? null : (object)new
                 {
                     options = exam.Exams.Select(e => new
                     {
@@ -567,12 +571,16 @@ namespace educore.Areas.ERP.Controllers
         // Everything that changed the student's place or money outside a receipt:
         // admission, concession, exit / reactivate, promotion (with the dues
         // carried), class changes, bus assignments, closed dues and refunds.
-        public async Task<IActionResult> History(Guid id)
+        public async Task<IActionResult> History(Guid id, [FromServices] ModuleFlags modules)
         {
             var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
             if (studentId == 0) return Json(Array.Empty<object>());
 
             var items = await _admissionService.GetStudentHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
+            // Transport off: no bus rows ("Transport assigned / ended", bus dues closed).
+            if (!await modules.TransportOn())
+                items = items.Where(h => !(h.Action ?? "").StartsWith("Transport", StringComparison.OrdinalIgnoreCase)
+                                      && !(h.Detail ?? "").StartsWith("Transport Fee", StringComparison.OrdinalIgnoreCase)).ToList();
             return Json(items.Select(h => new
             {
                 when   = h.HappenedAt,

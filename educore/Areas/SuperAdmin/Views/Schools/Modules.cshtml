@@ -1,0 +1,52 @@
+@using educore.Models
+@model SchoolModulesModel
+
+@{
+    ViewData["Title"] = "Modules";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    // One row per module the Super Admin can give or take away.
+    var modules = new[]
+    {
+        (Name: "AllowTransport", Title: "Transport", Desc: "Routes, vehicles, bus assignment and bus fees.", On: Model.AllowTransport),
+        (Name: "AllowExams",     Title: "Examinations", Desc: "Exam schedule, datesheet, marks, results, admit cards and report cards.", On: Model.AllowExams),
+        (Name: "AllowInventory", Title: "Inventory", Desc: "Store items, stock, purchases and sales.", On: Model.AllowInventory),
+        (Name: "AllowPayroll",   Title: "Payroll & Leave", Desc: "Salary, payslips, staff leave and My Payslip / My Leave.", On: Model.AllowPayroll)
+    };
+}
+
+<div>
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h4 class="mb-1">Modules for @Model.SchoolName</h4>
+      <div class="text-muted small">A module that is not given is hidden everywhere in this school, and its School Admin cannot switch it on. Nothing is deleted: giving it back shows the old data again.</div>
+    </div>
+    <a asp-action="SchoolList" class="btn btn-outline-secondary btn-sm"><i class="bx bx-arrow-back me-1"></i>Back to Schools</a>
+  </div>
+
+  <form asp-action="Modules" method="post" class="card">
+    <input type="hidden" asp-for="SchoolId" />
+    <div class="card-body">
+      @foreach (var m in modules)
+      {
+        <div class="d-flex align-items-start justify-content-between gap-3 py-3 border-bottom">
+          <div>
+            <div class="fw-semibold">@m.Title</div>
+            <div class="text-muted small">@m.Desc</div>
+          </div>
+          <div class="form-check form-switch m-0">
+            <input class="form-check-input" type="checkbox" role="switch" id="@m.Name" name="@m.Name" value="true" @(m.On ? "checked" : "") />
+            <input type="hidden" name="@m.Name" value="false" />
+          </div>
+        </div>
+      }
+      <div class="text-muted small mt-3">
+        <i class="bx bx-info-circle me-1"></i>Transport cannot be taken away while students still ride the buses or owe bus fees. The school ends those first.
+      </div>
+    </div>
+    <div class="card-footer d-flex justify-content-end gap-2">
+      <a asp-action="SchoolList" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary"><i class="bx bx-save me-1"></i>Save modules</button>
+    </div>
+  </form>
+</div>
