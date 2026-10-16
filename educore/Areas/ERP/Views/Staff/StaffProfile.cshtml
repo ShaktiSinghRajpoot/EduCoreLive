@@ -113,6 +113,12 @@
               <div class="col-6 col-md-4 sp-field"><label>Joining Date</label><span>@joinDate</span></div>
               <div class="col-6 col-md-4 sp-field"><label>Qualification</label><span>@Dash(Model.Qualification)</span></div>
               <div class="col-6 col-md-4 sp-field mb-0"><label>Experience</label><span>@exp</span></div>
+              @{ var ctOf = ViewBag.ClassTeacherOf as List<EduCoreDataAccessLayer.Models.ERP.MyClassSection> ?? new(); }
+              @if (ctOf.Any())
+              {
+                <div class="col-12 col-md-8 sp-field mb-0 mt-3"><label>Class Teacher of</label>
+                  <span>@string.Join(", ", ctOf.Select(c => c.Label)) (@ctOf[0].SessionName)</span></div>
+              }
               @if (Model.Status == "Inactive")
               {
                 <div class="col-6 col-md-4 sp-field mb-0 mt-3"><label>Last Working Day</label><span>@lastDay</span></div>

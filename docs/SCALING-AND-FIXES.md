@@ -5547,3 +5547,13 @@ New suite `tests/flow_fixes2_tests.sql` (10 checks, rolled back): all pass; the 
   `core.superadmin_login_as_log` (start/end). The school's own first-login password reset is not forced on
   the Super Admin.
 - Tests: `tests/superadmin_modules_tests.sql` (8). Bundle `deploy_2026_10_16a.sql`.
+
+### 2026-10-17 — Class teachers can see their class
+- New read-only `core.sp_class_teacher_of` (`class_teacher_of.sql`) and `IClassTeacherService.GetClassesOfAsync`.
+- Profile menu: "Class Teacher · Class 3-A" under the name (cached 5 min, like the other menu checks).
+- Dashboard: a "Your class" card per section -- students, session, whether today's attendance is marked, and a
+  Mark attendance / Open register button (only with attendance.view) that opens the register on that class
+  (`StudentAttendance?class=..&section=..`).
+- Staff Profile: "Class Teacher of: Class 3-A (2026-27)" in Employment Details.
+- Dashboard: the "Class Strength" list repeated the Class-wise Strength chart (and read "Class Class 1"); removed.
+- Bundle `deploy_2026_10_16b.sql`.

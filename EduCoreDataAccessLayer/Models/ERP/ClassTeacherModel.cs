@@ -19,4 +19,17 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int    StaffId  { get; set; }
         public string FullName { get; set; } = string.Empty;
     }
+    /// <summary>A section someone is the class teacher of, this session.</summary>
+    public class MyClassSection
+    {
+        public int    SectionId    { get; set; }
+        public string ClassName    { get; set; } = string.Empty;
+        public string SectionName  { get; set; } = string.Empty;
+        public string SessionName  { get; set; } = string.Empty;
+        public int    Students     { get; set; }
+        public bool   MarkedToday  { get; set; }   // today's attendance already taken
+
+        /// <summary>e.g. "Class 3-A": the class name as stored, plus the section.</summary>
+        public string Label => ClassName + (string.IsNullOrWhiteSpace(SectionName) ? "" : "-" + SectionName);
+    }
 }

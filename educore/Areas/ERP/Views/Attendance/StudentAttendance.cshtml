@@ -443,6 +443,18 @@ $(document).ready(function () {
 
     render();
     updateSaveBtn();
+
+    // Opened from the dashboard's "Mark attendance" (?class=Class 3&section=A):
+    // pick that class and section so the register opens straight away.
+    var q = new URLSearchParams(location.search), qClass = q.get('class'), qSection = q.get('section');
+    if (qClass && $('#filterClass option').filter(function () { return this.value === qClass; }).length) {
+        $('#filterClass').val(qClass);
+        var $qSec = $('#filterSection').html('<option value="">Select section</option>');
+        $.getJSON(SECTIONS_URL, { "class": qClass }).done(function (list) {
+            $.each(list || [], function (i, s) { $qSec.append($('<option>').val(s).text(s)); });
+            if (qSection && (list || []).indexOf(qSection) >= 0) $qSec.val(qSection).trigger('change');
+        });
+    }
 });
 </script>
 }

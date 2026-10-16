@@ -200,6 +200,35 @@
             </div>
         }
 
+        @* ============ MY CLASS (class teacher) ============ *@
+        @foreach (var mc in Model.MyClasses)
+        {
+        <div class="col-12 dash-animate">
+            <div class="dash-card">
+                <div class="dash-card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="dash-icon soft-orange"><i class="bx bx-chalkboard"></i></span>
+                        <div>
+                            <div class="dash-label">Your class · Class Teacher</div>
+                            <h5 class="mb-0 dash-card-title">@mc.Label</h5>
+                            <small class="dash-sub">@mc.Students student@(mc.Students == 1 ? "" : "s") · @mc.SessionName ·
+                                @if (mc.MarkedToday) { <span class="text-success fw-semibold">today's attendance marked</span> }
+                                else { <span class="text-danger fw-semibold">today's attendance not marked yet</span> }
+                            </small>
+                        </div>
+                    </div>
+                    @if (Model.ShowAttendance)   @* the register needs attendance.view *@
+                    {
+                    <a class="btn @(mc.MarkedToday ? "btn-outline-primary" : "btn-primary")"
+                       href="@Url.Action("StudentAttendance", "Attendance", new { area = "ERP", @class = mc.ClassName, section = mc.SectionName })">
+                        <i class="bx bx-user-check me-1"></i>@(mc.MarkedToday ? "Open register" : "Mark attendance")
+                    </a>
+                    }
+                </div>
+            </div>
+        </div>
+        }
+
         @if (Model.ShowFinance)
         {
         @* ============ COLLECTION TREND + TARGET ============ *@

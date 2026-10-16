@@ -40,7 +40,7 @@ namespace educore.Controllers
         // follows the viewer's permissions: what a role cannot open is removed from the
         // model on the server (not just hidden in the page), and links it cannot follow
         // are not shown. A driver with no other permission sees a greeting and My Bus.
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index([FromServices] IClassTeacherService classTeacher)
         {
             int t = TenantId(), s = SchoolId(), u = UserId();
 
@@ -92,6 +92,9 @@ namespace educore.Controllers
                 model.SessionName = (years.FirstOrDefault(y => y.Selected) ?? years.FirstOrDefault())?.Text;
             }
             catch { model.SessionName = null; }
+
+            // A class teacher sees their class and whether today's register is taken.
+            try { model.MyClasses = await classTeacher.GetClassesOfAsync(t, s, u); } catch { model.MyClasses = new(); }
 
             model.QuickLinks = await BuildQuickLinksAsync(t, s, u, model.IsDriver);
             return View(model);

@@ -34,6 +34,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public bool IsDriver       { get; set; }           // drives a bus -> My Bus shortcut
         public string? SessionName { get; set; }           // the school's current session
         public List<DashboardLink> QuickLinks { get; set; } = new();
+        public List<MyClassSection> MyClasses { get; set; } = new();   // sections the viewer is class teacher of
 
         public List<DashboardTrendPoint>  Trend      { get; set; } = new();
         public List<DashboardClassCount>  Classes    { get; set; } = new();

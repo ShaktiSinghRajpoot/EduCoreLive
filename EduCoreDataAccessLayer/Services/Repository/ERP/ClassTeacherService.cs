@@ -12,12 +12,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
     {
         private readonly PgExec _db;
         private readonly ILogger<ClassTeacherService> _logger;
+        private readonly AppCache _cache;
         private const string Sp = "core.sp_class_teacher_manage";
 
-        public ClassTeacherService(PgExec db, ILogger<ClassTeacherService> logger)
+        public ClassTeacherService(PgExec db, ILogger<ClassTeacherService> logger, AppCache cache)
         {
             _db = db;
             _logger = logger;
+            _cache = cache;
         }
 
         public async Task<List<ClassTeacherSection>> GetGridAsync(
@@ -128,6 +130,47 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             bool acting = row["is_acting"] != DBNull.Value && Convert.ToBoolean(row["is_acting"]);
             string? teacher = row["class_teacher"] == DBNull.Value ? null : row["class_teacher"].ToString();
             return (acting, teacher);
+        }
+
+        public async Task<List<MyClassSection>> GetClassesOfAsync(int tenantId, int schoolId, int userId,
+                                                                  int? staffId = null, bool cached = false)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return new List<MyClassSection>();
+            if (cached)
+                return await _cache.GetOrCreateAsync(AppCache.Key($"class-teacher-of:u{userId}:s{staffId}", tenantId, schoolId),
+                    () => ReadClassesOfAsync(tenantId, schoolId, userId, staffId), TimeSpan.FromMinutes(5));
+            return await ReadClassesOfAsync(tenantId, schoolId, userId, staffId);
+        }
+
+        private async Task<List<MyClassSection>> ReadClassesOfAsync(int tenantId, int schoolId, int userId, int? staffId)
+        {
+            var list = new List<MyClassSection>();
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = userId },
+                new("p_staff_id",       NpgsqlDbType.Integer) { Value = (object?)staffId ?? DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "class_teacher_of_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_class_teacher_of", p);
+            if (ds.Tables.Count == 0) return list;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                list.Add(new MyClassSection
+                {
+                    SectionId   = IntVal(row, "section_id"),
+                    ClassName   = Str(row, "class_name"),
+                    SectionName = Str(row, "section_name"),
+                    SessionName = Str(row, "academic_year_name"),
+                    Students    = IntVal(row, "students"),
+                    MarkedToday = row["marked_today"] != DBNull.Value && Convert.ToBoolean(row["marked_today"])
+                });
+            }
+            return list;
         }
 
         // Fixed positional layout matching sp_class_teacher_manage.

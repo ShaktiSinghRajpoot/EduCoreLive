@@ -30,5 +30,13 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// </summary>
         Task<(bool IsActing, string? ClassTeacher)> IsActingClassTeacherAsync(
             string className, string? section, string date, int tenantId, int schoolId, int userId);
+
+        /// <summary>
+        /// Sections someone is the class teacher of in the current session.
+        /// staffId null = the signed-in user's own staff record. cached = true for the
+        /// profile menu (5 min); the dashboard reads it fresh (today's attendance).
+        /// </summary>
+        Task<List<MyClassSection>> GetClassesOfAsync(int tenantId, int schoolId, int userId,
+                                                     int? staffId = null, bool cached = false);
     }
 }

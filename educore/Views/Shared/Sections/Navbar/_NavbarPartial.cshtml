@@ -1,6 +1,7 @@
 @using System.Security.Claims
 @using EduCoreDataAccessLayer.Helpers
 @inject EduCoreDataAccessLayer.Services.IPermissionService PermissionService
+@inject EduCoreDataAccessLayer.Services.Contract.ERP.IClassTeacherService ClassTeacherService
 
 @{
     // Multi-role "focus" switch: list the user's roles (only relevant when they hold 2+).
@@ -21,6 +22,14 @@
                 ?? User.FindFirst(ClaimTypes.Role)?.Value
                 ?? "";
     var roleName = User.FindFirst("role_name")?.Value ?? "";
+
+    // "Class Teacher · Class 3-A" under the name, for a class teacher (cached 5 min).
+    string myClasses = "";
+    if (_navTId > 1 && _navSId > 0)
+    {
+        try { myClasses = string.Join(", ", (await ClassTeacherService.GetClassesOfAsync(_navTId, _navSId, _navUId, cached: true)).Select(c => c.Label)); }
+        catch { /* the navbar must never fail to render */ }
+    }
 
     string roleLabel = roleCode switch {
         AppRoles.SuperAdmin   => "Super Admin",
@@ -145,6 +154,10 @@
                             @if (!string.Equals(roleLabel, userName.Trim(), StringComparison.OrdinalIgnoreCase))
                             {
                                 <span class="badge bg-label-primary rounded-pill" style="font-size:.65rem;">@roleLabel</span>
+                            }
+                            @if (myClasses != "")
+                            {
+                                <small class="d-block text-muted text-truncate mt-1" title="Class teacher of @myClasses"><i class="bx bx-chalkboard me-1"></i>Class Teacher · @myClasses</small>
                             }
                         </div>
                     </div>

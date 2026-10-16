@@ -151,7 +151,8 @@ namespace educore.Areas.ERP.Controllers
         // The URL carries the uuid; ResolveStaffIdAsync turns it into the internal id and
         // enforces the tenant/school check while doing so. An unknown uuid and another
         // school's uuid both come back as 0, so this cannot be used to probe for real ids.
-        public async Task<IActionResult> StaffProfile(Guid id, [FromServices] ModuleFlags modules)
+        public async Task<IActionResult> StaffProfile(Guid id, [FromServices] ModuleFlags modules,
+                                                      [FromServices] IClassTeacherService classTeacher)
         {
             var staffId = await _publicIds.ResolveAsync(IPublicIdService.Staff, id, TenantId(), SchoolId());
             if (staffId == 0) return RedirectToAction("StaffList");
@@ -183,6 +184,10 @@ namespace educore.Areas.ERP.Controllers
 
             // Salary is payroll data: staff.view alone does not show it (payroll.view does).
             ViewBag.CanSeeSalary = payrollOn && await HasPermissionAttribute.UserHasAsync(this, "payroll.view");
+
+            // "Class teacher of: Class 3-A (2026-27)" -- current session.
+            try { ViewBag.ClassTeacherOf = await classTeacher.GetClassesOfAsync(TenantId(), SchoolId(), UserId(), staffId: model.StaffId); }
+            catch { ViewBag.ClassTeacherOf = new List<EduCoreDataAccessLayer.Models.ERP.MyClassSection>(); }
             return View(model);
         }
 
