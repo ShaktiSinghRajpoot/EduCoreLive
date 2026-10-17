@@ -10,6 +10,11 @@
     // Rotate the accent so a list of rows is not one flat colour.
     string[] accents = { "primary", "info", "success", "warning", "danger", "secondary" };
 
+    // Student attendance card / defaulters link: Attendance Overview (reports.view), else the register.
+    var studentAttUrl = Model.CanOpenOverview
+        ? Url.Action("Index", "AttendanceOverview", new { area = "ERP" })
+        : Url.Action("StudentAttendance", "Attendance", new { area = "ERP" });
+
     // Total collected this month, for the Payment Modes card.
     var modeTotal = Model.Modes.Sum(m => m.Amount);
 
@@ -112,10 +117,10 @@
         @if (Model.ShowAttendance)
         {
         <div class="col-12 col-xxl-4 dash-animate" style="animation-delay:.05s">
-            <div class="dash-card h-100">
+            <div class="dash-card h-100 position-relative">
                 <div class="dash-card-head d-flex justify-content-between align-items-center">
-                    <div><h5 class="dash-card-title">Today's Attendance</h5><small class="dash-sub">Live snapshot</small></div>
-                    <span class="dash-pill soft-green">Live</span>
+                    <div><h5 class="dash-card-title">Student Attendance · Today</h5><small class="dash-sub">Live snapshot</small></div>
+                    <a href="@studentAttUrl" class="dash-pill soft-green stretched-link text-decoration-none">View <i class="bx bx-chevron-right"></i></a>
                 </div>
                 <div class="dash-card-body">
                     @* A class nobody marked is NOT a class that was absent, so the
@@ -227,6 +232,110 @@
                 </div>
             </div>
         </div>
+        }
+
+        @* ============ ATTENDANCE: STAFF TODAY + DEFAULTERS ============ *@
+        @if (Model.ShowStaff)
+        {
+            var stt = Model.StaffToday;
+            <div class="col-12 col-xl-4 dash-animate">
+                <div class="dash-card h-100 position-relative">
+                    <div class="dash-card-head d-flex justify-content-between align-items-center">
+                        <div><h5 class="dash-card-title">Staff Attendance · Today</h5><small class="dash-sub">@stt.Total active staff</small></div>
+                        <a href="@Url.Action("Index", "StaffAttendance", new { area = "ERP" })" class="dash-pill soft-orange stretched-link text-decoration-none">View <i class="bx bx-chevron-right"></i></a>
+                    </div>
+                    <div class="dash-card-body">
+                        @if (stt.Marked == 0 && stt.OnLeave == 0)
+                        {
+                            <div class="text-muted small py-3 text-center">Staff attendance not marked today yet.</div>
+                        }
+                        else
+                        {
+                            <div class="row g-2 text-center">
+                                <div class="col-6"><div class="p-2 rounded" style="background:#dcfce7"><div class="fw-bold fs-5 text-success">@stt.Present</div><small class="dash-sub">Present</small></div></div>
+                                <div class="col-6"><div class="p-2 rounded" style="background:#fee2e2"><div class="fw-bold fs-5 text-danger">@stt.Absent</div><small class="dash-sub">Absent</small></div></div>
+                                <div class="col-6"><div class="p-2 rounded" style="background:#fef3c7"><div class="fw-bold fs-5" style="color:#b45309">@stt.HalfDay</div><small class="dash-sub">Half day</small></div></div>
+                                <div class="col-6"><div class="p-2 rounded" style="background:#e0e7ff"><div class="fw-bold fs-5" style="color:#4338ca">@stt.OnLeave</div><small class="dash-sub">On leave</small></div></div>
+                            </div>
+                        }
+                        @if (stt.Total - stt.Marked > 0)
+                        {
+                            <div class="dash-sub small mt-2">@(stt.Total - stt.Marked) of @stt.Total not marked yet.</div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        @if (Model.ShowAttendance || Model.ShowStaff)
+        {
+            bool stuTab = Model.ShowAttendance;
+            <div class="col-12 @(Model.ShowStaff ? "col-xl-8" : "") dash-animate">
+                <div class="dash-card h-100">
+                    <div class="dash-card-head d-flex flex-column flex-md-row justify-content-between gap-2">
+                        <div><h5 class="dash-card-title">Attendance Defaulters</h5><small class="dash-sub">Students below 75% this session · staff absences this month</small></div>
+                        <div class="btn-group btn-group-sm" role="group">
+                            @if (Model.ShowAttendance)
+                            {
+                                <button type="button" class="btn btn-outline-primary active" data-att-tab="stu">Students (@Model.StudentAttendanceDefaulterCount)</button>
+                            }
+                            @if (Model.ShowStaff)
+                            {
+                                <button type="button" class="btn btn-outline-primary @(stuTab ? "" : "active")" data-att-tab="staff">Staff (@Model.StaffAttendanceDefaulterCount)</button>
+                            }
+                        </div>
+                    </div>
+                    <div class="dash-card-body dash-scroll">
+                        @if (Model.ShowAttendance)
+                        {
+                            <div data-att-pane="stu">
+                                @if (!Model.StudentAttendanceDefaulters.Any())
+                                {
+                                    <div class="text-muted small p-2">No student is below 75% this session (counted after 5 days marked).</div>
+                                }
+                                @foreach (var d in Model.StudentAttendanceDefaulters)
+                                {
+                                    <a class="dash-row text-reset text-decoration-none" href="@Url.Action("Dashboard", "Student", new { area = "ERP", id = d.PublicId })">
+                                        <span class="dash-icon soft-amber" style="width:2.2rem;height:2.2rem;font-size:1rem"><i class="bx bx-user"></i></span>
+                                        <div class="flex-grow-1 min-w-0">
+                                            <h6 class="mb-0 text-truncate">@d.StudentName</h6>
+                                            <small class="text-muted">@d.ClassName@(string.IsNullOrWhiteSpace(d.Section) ? "" : "-" + d.Section) · present @d.Present of @d.Marked days</small>
+                                        </div>
+                                        <strong class="text-danger">@d.Percent.ToString("0.#")%</strong>
+                                    </a>
+                                }
+                                @if (Model.StudentAttendanceDefaulterCount > Model.StudentAttendanceDefaulters.Count)
+                                {
+                                    <div class="dash-sub small p-2">+ @(Model.StudentAttendanceDefaulterCount - Model.StudentAttendanceDefaulters.Count) more — see <a href="@studentAttUrl">Attendance</a>.</div>
+                                }
+                            </div>
+                        }
+                        @if (Model.ShowStaff)
+                        {
+                            <div data-att-pane="staff" class="@(stuTab ? "d-none" : "")">
+                                @if (!Model.StaffAttendanceDefaulters.Any())
+                                {
+                                    <div class="text-muted small p-2">No staff absences this month.</div>
+                                }
+                                @foreach (var d in Model.StaffAttendanceDefaulters)
+                                {
+                                    <a class="dash-row text-reset text-decoration-none" href="@Url.Action("StaffProfile", "Staff", new { area = "ERP", id = d.PublicId })">
+                                        <span class="dash-icon soft-orange" style="width:2.2rem;height:2.2rem;font-size:1rem"><i class="bx bx-id-card"></i></span>
+                                        <div class="flex-grow-1 min-w-0">
+                                            <h6 class="mb-0 text-truncate">@d.FullName</h6>
+                                            <small class="text-muted">@(d.Designation ?? "Staff")@(d.LateDays > 0 ? " · late " + d.LateDays + " day" + (d.LateDays == 1 ? "" : "s") : "")</small>
+                                        </div>
+                                        <strong class="text-danger">@d.AbsentDays.ToString("0.#") day@(d.AbsentDays == 1 ? "" : "s") absent</strong>
+                                    </a>
+                                }
+                                @if (Model.StaffAttendanceDefaulterCount > Model.StaffAttendanceDefaulters.Count)
+                                {
+                                    <div class="dash-sub small p-2">+ @(Model.StaffAttendanceDefaulterCount - Model.StaffAttendanceDefaulters.Count) more — see <a href="@Url.Action("Index", "StaffAttendance", new { area = "ERP" })">Staff Attendance</a>.</div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
         }
 
         @if (Model.ShowFinance)
@@ -586,6 +695,15 @@
 @section PageScripts {
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // Attendance Defaulters: Students / Staff tabs
+            document.querySelectorAll('[data-att-tab]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var tab = btn.getAttribute('data-att-tab');
+                    document.querySelectorAll('[data-att-tab]').forEach(function (b) { b.classList.toggle('active', b === btn); });
+                    document.querySelectorAll('[data-att-pane]').forEach(function (p) { p.classList.toggle('d-none', p.getAttribute('data-att-pane') !== tab); });
+                });
+            });
+
 
             // Real figures, serialized once. Anything the app does not record is not
             // charted — see the removed cards above.

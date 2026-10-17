@@ -93,6 +93,20 @@ namespace educore.Controllers
             }
             catch { model.SessionName = null; }
 
+            // Attendance section: staff today needs staff.view; the student list needs
+            // attendance.view. Nothing is read when neither applies.
+            model.CanOpenOverview = await Can("reports.view");
+            if (model.ShowAttendance || model.ShowStaff)
+            {
+                try { await _dashboardService.FillAttendanceAsync(model, t, s, u); } catch { /* the section stays empty */ }
+                if (!model.ShowAttendance) { model.StudentAttendanceDefaulters.Clear(); model.StudentAttendanceDefaulterCount = 0; }
+                if (!model.ShowStaff)
+                {
+                    model.StaffToday = new DashboardStaffToday();
+                    model.StaffAttendanceDefaulters.Clear(); model.StaffAttendanceDefaulterCount = 0;
+                }
+            }
+
             // A class teacher sees their class and whether today's register is taken.
             try { model.MyClasses = await classTeacher.GetClassesOfAsync(t, s, u); } catch { model.MyClasses = new(); }
 

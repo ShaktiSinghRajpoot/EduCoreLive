@@ -123,6 +123,52 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return result;
         }
 
+        public async Task FillAttendanceAsync(DashboardSummary model, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0) return;
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_threshold",      NpgsqlDbType.Numeric) { Value = 75m },
+                Cur("p_staff_today", "da_staff_today"),
+                Cur("p_student_def", "da_student_def"),
+                Cur("p_staff_def",   "da_staff_def")
+            };
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_dashboard_attendance", p);
+
+            if (Rows(ds, 0) is { Count: > 0 } today)
+            {
+                var r = today[0];
+                model.StaffToday = new DashboardStaffToday
+                {
+                    Total = IntVal(r, "total"), Marked = IntVal(r, "marked"), Present = IntVal(r, "present"),
+                    Absent = IntVal(r, "absent"), HalfDay = IntVal(r, "half_day"), OnLeave = IntVal(r, "on_leave")
+                };
+            }
+            foreach (var r in Rows(ds, 1))
+            {
+                model.StudentAttendanceDefaulterCount = IntVal(r, "total_count");
+                model.StudentAttendanceDefaulters.Add(new DashboardStudentAttendanceDefaulter
+                {
+                    PublicId = GuidVal(r, "public_id"), StudentName = Str(r, "student_name"),
+                    ClassName = Str(r, "class_name"), Section = NullStr(r, "section"),
+                    Marked = IntVal(r, "marked"), Present = IntVal(r, "present"), Percent = DecVal(r, "percent")
+                });
+            }
+            foreach (var r in Rows(ds, 2))
+            {
+                model.StaffAttendanceDefaulterCount = IntVal(r, "total_count");
+                model.StaffAttendanceDefaulters.Add(new DashboardStaffAttendanceDefaulter
+                {
+                    PublicId = GuidVal(r, "public_id"), FullName = Str(r, "full_name"), Designation = NullStr(r, "designation"),
+                    AbsentDays = DecVal(r, "absent_days"), LateDays = IntVal(r, "late_days")
+                });
+            }
+        }
+
         private static NpgsqlParameter Cur(string name, string value) =>
             new(name, NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = value };
 

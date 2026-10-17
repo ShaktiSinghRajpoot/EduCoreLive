@@ -74,8 +74,11 @@ BEGIN
     JOIN core.fee_payments p ON p.payment_id = x.payment_id
     LEFT JOIN core.students  s ON s.student_id = p.student_id
     LEFT JOIN core.enquiries e ON e.enquiry_id = p.enquiry_id
-    WHERE (v_class   IS NULL OR COALESCE(s.class_name, e.class_name) = v_class)
-      AND (v_section IS NULL OR lower(COALESCE(s.section, '')) = lower(v_section));
+    -- the class the child was in on the receipt's date, not after a later promotion
+    LEFT JOIN core.student_enrolment en ON en.student_id = p.student_id
+          AND en.academic_year = core.fn_session_on(p_tenant_id, p_school_id, p.payment_date::date)
+    WHERE (v_class   IS NULL OR COALESCE(en.class_name, s.class_name, e.class_name) = v_class)
+      AND (v_section IS NULL OR lower(COALESCE(en.section, s.section, '')) = lower(v_section));
 
     OPEN p_receipts FOR
     -- A payment belongs to a STUDENT or an ENQUIRY (registration fee taken before
@@ -96,8 +99,8 @@ BEGIN
                          THEN COALESCE(NULLIF(e.registration_number, ''), 'Registration')
                     END,
                     '—')                                          AS admission_no,
-           COALESCE(s.class_name, e.class_name)                   AS class_name,
-           s.section,
+           COALESCE(en.class_name, s.class_name, e.class_name)    AS class_name,
+           COALESCE(en.section, s.section)                        AS section,
            p.reference_no,
            COALESCE(p.concession_total, 0) + COALESCE(p.discount_amount, 0) AS discount_total,
            COALESCE(
@@ -115,6 +118,8 @@ BEGIN
     JOIN core.fee_payments p   ON p.payment_id  = ev.payment_id
     LEFT JOIN core.students  s ON s.student_id  = p.student_id
     LEFT JOIN core.enquiries e ON e.enquiry_id  = p.enquiry_id
+    LEFT JOIN core.student_enrolment en ON en.student_id = p.student_id
+          AND en.academic_year = core.fn_session_on(p_tenant_id, p_school_id, p.payment_date::date)
     ORDER BY ev.line_date, p.payment_id, ev.sgn DESC;
 
     -- By TRUE mode (tender lines). 'To wallet' takes an overpaid surplus back

@@ -61,8 +61,15 @@ BEGIN
           AND (sl.due_date IS NULL OR sl.due_date::date <= CURRENT_DATE)
     ),
     agg AS (
+        -- the class of the session in progress (a child promoted early is still in
+        -- the old one); a child admitted for next session shows that session after
+        -- the class, so "Class 1 (2027-28)" is not mixed with this year's Class 1
         SELECT s.student_id, s.student_name, s.admission_no,
-               s.class_name, s.section, s.roll_no, s.mobile,
+               COALESCE(e.class_name,
+                        s.class_name || CASE WHEN s.academic_year IS DISTINCT FROM core.fn_session_on(p_tenant_id, p_school_id, CURRENT_DATE)
+                                             THEN ' (' || s.academic_year || ')' ELSE '' END) AS class_name,
+               COALESCE(e.section, s.section) AS section,
+               COALESCE(NULLIF(TRIM(e.roll_no), ''), s.roll_no) AS roll_no, s.mobile,
                -- Parent email drives the Email reminder channel (father first, else mother).
                COALESCE(NULLIF(TRIM(s.father_email), ''), NULLIF(TRIM(s.mother_email), '')) AS parent_email,
                CASE WHEN COALESCE(s.is_active, TRUE) THEN 'Active'
@@ -76,15 +83,18 @@ BEGIN
         JOIN core.students s ON s.student_id = d.student_id
         LEFT JOIN core.student_advance adv
                ON adv.student_id = s.student_id AND adv.tenant_id = p_tenant_id AND adv.school_id = p_school_id
+        LEFT JOIN core.student_enrolment e
+               ON e.student_id = s.student_id
+              AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, CURRENT_DATE)
         WHERE s.tenant_id = p_tenant_id
           AND s.school_id = p_school_id
-          AND (p_class IS NULL OR TRIM(p_class) = '' OR s.class_name = p_class)
+          AND (p_class IS NULL OR TRIM(p_class) = '' OR COALESCE(e.class_name, s.class_name) = p_class)
           AND (p_search IS NULL OR TRIM(p_search) = ''
                OR s.student_name        ILIKE '%' || p_search || '%'
                OR s.admission_no        ILIKE '%' || p_search || '%'
                OR COALESCE(s.mobile,'') ILIKE '%' || p_search || '%')
         GROUP BY s.student_id, s.student_name, s.admission_no,
-                 s.class_name, s.section, s.roll_no, s.mobile,
+                 s.class_name, s.section, s.roll_no, s.academic_year, e.class_name, e.section, e.roll_no, s.mobile,
                  s.father_email, s.mother_email, s.is_active, s.status
         HAVING SUM(d.outstanding) - COALESCE(MAX(adv.balance), 0) > 0
     ),

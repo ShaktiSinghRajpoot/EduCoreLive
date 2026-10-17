@@ -100,14 +100,22 @@ CREATE INDEX IF NOT EXISTS idx_student_transport_student ON core.student_transpo
 -- Seats  = total capacity of the route's active vehicles. NULL when no active
 -- vehicle on the route has a capacity set: the route then has no known limit
 -- and assignment is not capped (a school that never registers buses still works).
-CREATE OR REPLACE FUNCTION core.fn_transport_route_riders(p_route_id integer, p_except_student integer DEFAULT NULL)
+-- p_on: count only riders whose bus has started by that date (a child booked
+-- from April does not take a seat in October). NULL = every booked rider, used
+-- where a future rider matters too (removing a vehicle, deleting a route).
+-- The old 2-argument version is dropped: next to this one every short call
+-- would be ambiguous.
+DROP FUNCTION IF EXISTS core.fn_transport_route_riders(integer, integer);
+CREATE OR REPLACE FUNCTION core.fn_transport_route_riders(p_route_id integer, p_except_student integer DEFAULT NULL,
+                                                         p_on date DEFAULT NULL)
 RETURNS integer LANGUAGE sql STABLE AS $fn$
     SELECT COUNT(DISTINCT a.student_id)::integer
     FROM core.student_transport a
     JOIN core.students st ON st.student_id = a.student_id AND st.is_active
     WHERE a.route_id = p_route_id
       AND a.is_active AND NOT COALESCE(a.is_deleted, FALSE)
-      AND a.student_id IS DISTINCT FROM p_except_student;
+      AND a.student_id IS DISTINCT FROM p_except_student
+      AND (p_on IS NULL OR NULLIF(a.start_date::text, '')::date <= p_on);
 $fn$;
 
 CREATE OR REPLACE FUNCTION core.fn_transport_route_seats(p_route_id integer, p_except_vehicle integer DEFAULT NULL)
@@ -151,7 +159,7 @@ BEGIN
                COUNT(s.stop_id) FILTER (WHERE s.is_active)            AS stop_count,
                MIN(s.monthly_fare) FILTER (WHERE s.is_active)         AS min_fare,
                MAX(s.monthly_fare) FILTER (WHERE s.is_active)         AS max_fare,
-               core.fn_transport_route_riders(r.route_id)             AS riders,
+               core.fn_transport_route_riders(r.route_id, NULL, CURRENT_DATE) AS riders,   -- riding today
                core.fn_transport_route_seats(r.route_id)              AS seats
         FROM core.transport_routes r
         LEFT JOIN core.transport_stops s ON s.route_id = r.route_id
@@ -525,7 +533,7 @@ AS $procedure$
 BEGIN
     OPEN p_result FOR
     SELECT r.route_id, r.route_name, s.stop_id, s.stop_name, s.monthly_fare,
-           core.fn_transport_route_riders(r.route_id) AS riders,
+           core.fn_transport_route_riders(r.route_id, NULL, CURRENT_DATE) AS riders,
            core.fn_transport_route_seats(r.route_id)  AS seats
     FROM core.transport_routes r
     JOIN core.transport_stops s ON s.route_id = r.route_id AND s.is_active = TRUE
@@ -638,7 +646,8 @@ BEGIN
         -- Unlimited when no active bus on the route has a capacity set.
         IF NOT v_same_route THEN
             v_seats  := core.fn_transport_route_seats(p_route_id);
-            v_riders := core.fn_transport_route_riders(p_route_id, p_student_id);
+            -- riders already on the bus by the day this one starts
+            v_riders := core.fn_transport_route_riders(p_route_id, p_student_id, COALESCE(p_start_date, CURRENT_DATE));
             IF v_seats IS NOT NULL AND v_riders >= v_seats THEN
                 RAISE EXCEPTION 'Route % is full: % of % seats taken. Add a vehicle or pick another route.',
                     v_route_name, v_riders, v_seats;

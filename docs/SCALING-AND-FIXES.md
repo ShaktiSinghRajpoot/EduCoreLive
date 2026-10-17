@@ -5582,3 +5582,16 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - Not changed (minor): fee due list / collection register class filter uses the present class; bus seat count
   includes riders booked for a later start.
 - Tests: `tests/session_isolation_tests.sql` (12). Bundle `deploy_2026_10_17b.sql`.
+
+### 2026-10-17 — Dashboard attendance section; the two leftovers
+- Dashboard: **Student Attendance · Today** card opens Attendance Overview (reports.view) or the register;
+  new **Staff Attendance · Today** card (present / absent / half day / on leave / not marked) opens Staff
+  Attendance; new **Attendance Defaulters** card with Students (below 75% this session, after 5 days marked)
+  and Staff (absences this month: Absent 1, half day 0.5; late marks shown) tabs, each name opening the profile.
+  New read-only `core.sp_dashboard_attendance` (`dashboard_attendance.sql`), `IDashboardService.FillAttendanceAsync`.
+- Fee Due list: the class of the session in progress; a child admitted for next session shows "Class 1 (2027-28)".
+  Collection register: each receipt under the class the child was in on the receipt's date.
+- Bus seats: `fn_transport_route_riders(route, except, p_on)` -- the Routes page, route dropdown and the
+  "route is full" check count riders whose bus has started (by today / by the new booking's start); removing a
+  vehicle or deleting a route still counts every booked rider.
+- Bundle `deploy_2026_10_17c.sql`.

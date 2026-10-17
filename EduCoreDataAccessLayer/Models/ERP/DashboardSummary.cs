@@ -36,6 +36,14 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public List<DashboardLink> QuickLinks { get; set; } = new();
         public List<MyClassSection> MyClasses { get; set; } = new();   // sections the viewer is class teacher of
 
+        // Attendance section (core.sp_dashboard_attendance)
+        public DashboardStaffToday StaffToday { get; set; } = new();
+        public List<DashboardStudentAttendanceDefaulter> StudentAttendanceDefaulters { get; set; } = new();
+        public int StudentAttendanceDefaulterCount { get; set; }
+        public List<DashboardStaffAttendanceDefaulter> StaffAttendanceDefaulters { get; set; } = new();
+        public int StaffAttendanceDefaulterCount { get; set; }
+        public bool CanOpenOverview { get; set; }   // reports.view: Attendance Overview
+
         public List<DashboardTrendPoint>  Trend      { get; set; } = new();
         public List<DashboardClassCount>  Classes    { get; set; } = new();
         public List<DashboardModeTotal>   Modes      { get; set; } = new();
@@ -48,6 +56,39 @@ namespace EduCoreDataAccessLayer.Models.ERP
 
     public class DashboardTrendPoint { public string Date { get; set; } public decimal Amount { get; set; } }
     public class DashboardClassCount  { public string ClassName { get; set; } = ""; public int Students { get; set; } }
+
+    /// <summary>Staff attendance today.</summary>
+    public class DashboardStaffToday
+    {
+        public int Total   { get; set; }
+        public int Marked  { get; set; }
+        public int Present { get; set; }   // Present + Late
+        public int Absent  { get; set; }
+        public int HalfDay { get; set; }
+        public int OnLeave { get; set; }   // marked Leave, or approved leave and not marked
+    }
+
+    /// <summary>A student below the attendance line this session.</summary>
+    public class DashboardStudentAttendanceDefaulter
+    {
+        public Guid    PublicId    { get; set; }
+        public string  StudentName { get; set; } = "";
+        public string  ClassName   { get; set; } = "";
+        public string? Section     { get; set; }
+        public int     Marked      { get; set; }
+        public int     Present     { get; set; }
+        public decimal Percent     { get; set; }
+    }
+
+    /// <summary>A staff member with absences this month.</summary>
+    public class DashboardStaffAttendanceDefaulter
+    {
+        public Guid    PublicId    { get; set; }
+        public string  FullName    { get; set; } = "";
+        public string? Designation { get; set; }
+        public decimal AbsentDays  { get; set; }   // Absent = 1, Half day = 0.5
+        public int     LateDays    { get; set; }
+    }
     public class DashboardModeTotal   { public string Mode { get; set; } = ""; public decimal Amount { get; set; } }
 
     public class DashboardDefaulter
