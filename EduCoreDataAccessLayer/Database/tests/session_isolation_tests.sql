@@ -18,6 +18,7 @@ BEGIN;
 \ir ../student_data_checks.sql
 \ir ../fee_dashboard.sql
 \ir ../fee_reports.sql
+\ir ../homework.sql
 \o
 
 DO $t$
