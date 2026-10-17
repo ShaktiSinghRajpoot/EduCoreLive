@@ -5607,3 +5607,13 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - **My Attendance** (`/ERP/MyAttendance`, menu + dashboard quick link for anyone with a staff record, not tied to
   Payroll): the same report as the Staff report tab for the signed-in person only -- month picker or date range.
   The staff id comes from the login's own staff record, never from the browser.
+
+### 2026-10-17 — Promotion flow test; Year-End carry only at year end
+- New `tests/promotion_flow_tests.sql` (14, rolled back): promote Class 7-A to 2027-28 mid-session and check
+  register, dashboard, class-teacher card, exam sheet, homework, ID cards (both sessions), rolls, bonafide, fee due
+  list, a second promotion, set-current guard, Year-End. Found: the class-teacher card counted students by their
+  present record (now the session's enrolment).
+- **Year-End Carry / Carry all only from the first day of the session's last month.** On 15 Oct the QA admin had
+  carried 253 lines (Rs 5,24,909) of 2026-27 dues into 2027-28, which took that money out of every 2026-27 report
+  (dashboard, fee dashboard, defaulters by session, Year-End). Write-off stays open all year. The 253 carries were
+  undone with Year-End's own Undo on the QA school. Bundle `deploy_2026_10_17g.sql`.

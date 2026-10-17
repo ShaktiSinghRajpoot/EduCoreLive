@@ -32,6 +32,9 @@ BEGIN
     -- (renamed + deleted, rolled back), so the test starts with no next session.
     UPDATE academic.academic_years SET academic_year_name = 'zz' || academic_year_id, is_deleted = TRUE
      WHERE tenant_id = TN AND school_id = SC AND start_date::date > '2026-04-01';
+    -- Carrying opens in the session's last month: for this run 2026-27 ends this month.
+    UPDATE academic.academic_years SET end_date = to_char((date_trunc('month', CURRENT_DATE) + INTERVAL '1 month - 1 day')::date, 'YYYY-MM-DD')
+     WHERE tenant_id = TN AND school_id = SC AND academic_year_name = Y;
 
     -- 1. no next session yet: carry is refused with a clear reason
     BEGIN

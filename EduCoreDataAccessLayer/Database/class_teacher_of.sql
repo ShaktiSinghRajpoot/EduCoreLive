@@ -45,10 +45,12 @@ BEGIN
            c.class_name,
            sec.section_name,
            y.academic_year_name,
-           (SELECT COUNT(*) FROM core.students st
-             WHERE st.tenant_id = p_tenant_id AND st.school_id = p_school_id AND st.is_active
-               AND st.academic_year = y.academic_year_name
-               AND st.class_name = c.class_name AND COALESCE(st.section, '') = COALESCE(sec.section_name, ''))::int AS students,
+           -- the section's roll for its session (core.student_enrolment): a child
+           -- promoted early still belongs to it until the session ends
+           (SELECT COUNT(*) FROM core.student_enrolment e
+             WHERE e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+               AND e.academic_year = y.academic_year_name AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
+               AND e.class_name = c.class_name AND COALESCE(e.section, '') = COALESCE(sec.section_name, ''))::int AS students,
            EXISTS (SELECT 1 FROM core.student_attendance a
                     WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
                       AND a.academic_year = y.academic_year_name

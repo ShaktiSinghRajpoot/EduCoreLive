@@ -50,7 +50,7 @@ BEGIN
     CLOSE c;
     SELECT COUNT(*) INTO v_n FROM core.student_ledger
      WHERE student_id = 754 AND academic_year = '2026-27' AND lower(frequency) = 'half yearly'
-       AND installment_label LIKE 'Oct 2026%' AND amount_due - amount_paid - concession > 0;
+       AND installment_label LIKE 'Oct 2026%' AND amount_due > 0 AND COALESCE(closed_amount, 0) = 0;   -- paid or not, once
     IF v_n = 1 THEN pass := pass + 1; RAISE NOTICE 'PASS 3 running half-year billed once after the class change';
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 3 % open Oct-Mar half-year lines', v_n; END IF;
 

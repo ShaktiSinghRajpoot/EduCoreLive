@@ -99,6 +99,9 @@ BEGIN
     -- 7. at session end (every line due): carry all, close, changes refused, reopen
     UPDATE core.student_ledger SET due_date = '2026-10-01'
      WHERE tenant_id = T AND school_id = S AND academic_year = '2026-27' AND NULLIF(due_date, '')::date > CURRENT_DATE;
+    -- (carrying opens in the session's last month: for this run 2026-27 ends this month)
+    UPDATE academic.academic_years SET end_date = to_char((date_trunc('month', CURRENT_DATE) + INTERVAL '1 month - 1 day')::date, 'YYYY-MM-DD')
+     WHERE tenant_id = T AND school_id = S AND academic_year_name = '2026-27';
     c := 'c8';  CALL core.sp_fee_year_end_manage('CarryAll', T, S, A, '2026-27', NULL, NULL, NULL, c); CLOSE c;
     c := 'c9';  CALL core.sp_fee_year_end_manage('Close',    T, S, A, '2026-27', NULL, NULL, NULL, c); CLOSE c;
     BEGIN

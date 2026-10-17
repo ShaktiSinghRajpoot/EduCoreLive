@@ -67,6 +67,7 @@ DECLARE
     v_closed timestamptz;        -- when this session's fees were closed (NULL = open)
     v_open   integer := 0;       -- lines still to decide
     v_notdue integer := 0;       -- ... of which not due yet
+    v_last   date;               -- first day of the session's last month: carrying opens then
     r        record;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
@@ -85,7 +86,7 @@ BEGIN
      ORDER BY n.start_date
      LIMIT 1;
 
-    SELECT y.fees_closed_at INTO v_closed
+    SELECT y.fees_closed_at, date_trunc('month', NULLIF(y.end_date, '')::date)::date INTO v_closed, v_last
       FROM academic.academic_years y
      WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id
        AND lower(y.academic_year_name) = v_year AND NOT COALESCE(y.is_deleted, FALSE)
@@ -183,6 +184,13 @@ BEGIN
     END IF;
     IF p_operation IN ('Carry', 'CarryAll') AND v_next IS NULL THEN
         RAISE EXCEPTION 'Create the next session first (School Setup › Sessions): carried dues move into it.';
+    END IF;
+    -- Carrying moves dues into next session's books; it is the year-end step. Done in
+    -- October it put that month's fees under 2027-28, out of every 2026-27 report.
+    -- Write-off stays open all year (waiving a due is an everyday decision).
+    IF p_operation IN ('Carry', 'CarryAll') AND v_last IS NOT NULL AND CURRENT_DATE < v_last THEN
+        RAISE EXCEPTION 'Dues can be carried to the next session from % (the last month of %). Until then collect them, or write them off.',
+            to_char(v_last, 'DD Mon YYYY'), p_academic_year;
     END IF;
 
     -- The lines this call acts on, always inside this school: the session's own
