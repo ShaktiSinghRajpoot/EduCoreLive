@@ -65,7 +65,9 @@ BEGIN
         family varchar, guardian varchar, student_name varchar) ON COMMIT DROP;
     TRUNCATE tmp_fd;
     INSERT INTO tmp_fd
-    SELECT l.ledger_id, l.student_id, s.class_name, COALESCE(s.section, ''), l.fee_head_name,
+    -- each line under the class the child had in THAT line's session
+    -- (core.student_enrolment), not the present one after an early promotion
+    SELECT l.ledger_id, l.student_id, COALESCE(e.class_name, s.class_name), COALESCE(e.section, s.section, ''), l.fee_head_name,
            NULLIF(l.due_date, '')::date,
            l.amount_due - l.concession, l.amount_paid,
            GREATEST(l.amount_due - l.amount_paid - l.concession, 0),
@@ -75,6 +77,9 @@ BEGIN
            COALESCE(NULLIF(trim(s.guardian_name), ''), s.student_name), s.student_name
       FROM core.student_ledger l
       JOIN core.students s ON s.student_id = l.student_id AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id
+      LEFT JOIN core.student_enrolment e
+             ON e.student_id = l.student_id
+            AND e.academic_year = COALESCE(NULLIF(trim(l.academic_year), ''), s.academic_year)
      WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id;
 
     -- money in, last 90 days and this month (fn_fee_money_lines rule)

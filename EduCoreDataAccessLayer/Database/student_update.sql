@@ -240,12 +240,8 @@ BEGIN
     -- attendance register and the ID card sheet are keyed on it.
     IF v_roll IS NOT NULL
        AND (v_roll IS DISTINCT FROM s.roll_no OR v_moved)
-       AND EXISTS (SELECT 1 FROM core.students o
-                    WHERE o.tenant_id = p_tenant_id AND o.school_id = p_school_id
-                      AND o.is_active AND o.student_id <> p_student_id
-                      AND o.academic_year = s.academic_year
-                      AND o.class_name = v_cls
-                      AND COALESCE(o.section, '') = COALESCE(v_sec, '')
+       AND EXISTS (SELECT 1 FROM core.fn_session_rolls(p_tenant_id, p_school_id, s.academic_year, v_cls, v_sec) o
+                    WHERE o.student_id <> p_student_id
                       AND LOWER(TRIM(o.roll_no)) = LOWER(v_roll)) THEN
         RAISE EXCEPTION 'Roll no % is already used in %.', v_roll, v_cls || COALESCE('-' || v_sec, '');
     END IF;

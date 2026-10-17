@@ -5562,3 +5562,23 @@ New suite `tests/flow_fixes2_tests.sql` (10 checks, rolled back): all pass; the 
   2026-27 register and marked present. Found because the new "Your class" card (3 students) disagreed with the
   register (6). Bundle `deploy_2026_10_17a.sql`; flow_fixes2 #12. The three rows saved on 17 Oct stay in the table
   (QA data) but no longer show or count on the register.
+
+### 2026-10-17 — One session's students never show up in another
+Found while checking the class-teacher card: three Nursery-A children promoted on 15 Oct to 2027-28 Class 1
+(promotion is allowed any time) had left Nursery-A's 2026-27 register and appeared on Class 1-A's, and saving
+attendance stamped rows with the student's PRESENT class and session. Rule now, everywhere a class list is built:
+**a child belongs to the class of their enrolment (`core.student_enrolment`) for the session of the date or screen.**
+- New `core.fn_session_on(date)` (session containing the date, else current) and `core.fn_session_rolls`.
+- Attendance: register, save (rows carry the register's class/section/session), roster roll numbers, month
+  register (same register day by day), section dropdown, student attendance % (`fn_attendance_student_days`,
+  so report card and TC too; the page defaults to the session in progress), Attendance Overview.
+- Dashboard: student count and class strength from the session's enrolment; class strength joined classes by
+  name, so every class was counted once per session (doubled with two sessions set up).
+- Roll numbers: admission (check + next roll), Edit Student and Data Checks count rolls of children promoted out
+  early. Certificates: class/session of the session in progress; Bonafide refused before the child's session starts.
+- Fee dashboard and defaulters (with a session) group each line under that session's class. ID Cards default to
+  the current session. Homework: class strength, the section's list, a student's own homework and Done/Not done
+  all follow the section's session.
+- Not changed (minor): fee due list / collection register class filter uses the present class; bus seat count
+  includes riders booked for a later start.
+- Tests: `tests/session_isolation_tests.sql` (12). Bundle `deploy_2026_10_17b.sql`.

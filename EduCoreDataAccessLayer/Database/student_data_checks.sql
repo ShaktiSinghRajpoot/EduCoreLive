@@ -56,10 +56,8 @@ BEGIN
           CROSS JOIN LATERAL (VALUES
             ('no_roll',     NULLIF(trim(COALESCE(s.roll_no, '')), '') IS NULL, NULL::varchar),
             ('dup_roll',    NULLIF(trim(COALESCE(s.roll_no, '')), '') IS NOT NULL AND EXISTS (
-                               SELECT 1 FROM core.students o
-                                WHERE o.tenant_id = s.tenant_id AND o.school_id = s.school_id AND o.student_id <> s.student_id
-                                  AND COALESCE(o.is_active, TRUE) AND o.academic_year = s.academic_year
-                                  AND o.class_name = s.class_name AND lower(COALESCE(o.section, '')) = lower(COALESCE(s.section, ''))
+                               SELECT 1 FROM core.fn_session_rolls(s.tenant_id, s.school_id, s.academic_year, s.class_name, s.section) o
+                                WHERE o.student_id <> s.student_id
                                   AND lower(trim(o.roll_no)) = lower(trim(s.roll_no))), 'Roll ' || s.roll_no),
             ('no_adm',      NULLIF(trim(COALESCE(s.admission_no, '')), '') IS NULL, NULL),
             ('dup_adm',     NULLIF(trim(COALESCE(s.admission_no, '')), '') IS NOT NULL AND EXISTS (
@@ -132,11 +130,18 @@ BEGIN
         -- 'missing' continues after the highest number already used in the section
         SELECT COALESCE(MAX(NULLIF(regexp_replace(COALESCE(s.roll_no, ''), '\D', '', 'g'), '')::int), 0)
           INTO v_next
-          FROM core.students s
-         WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND COALESCE(s.is_active, TRUE)
-           AND s.academic_year = v_year AND s.class_name = trim(p_class)
-           AND lower(COALESCE(s.section, '')) = lower(COALESCE(trim(p_section), ''));
-        IF p_mode = 'all' THEN v_next := 0; END IF;
+          FROM core.fn_session_rolls(p_tenant_id, p_school_id, v_year, p_class, p_section) s;
+        -- 'all' renumbers from 1, after the rolls of children already promoted out
+        -- of this class this session (they keep theirs on its sheets)
+        IF p_mode = 'all' THEN
+            SELECT COALESCE(MAX(NULLIF(regexp_replace(COALESCE(o.roll_no, ''), '\D', '', 'g'), '')::int), 0)
+              INTO v_next
+              FROM core.fn_session_rolls(p_tenant_id, p_school_id, v_year, p_class, p_section) o
+             WHERE NOT EXISTS (SELECT 1 FROM core.students st
+                                WHERE st.student_id = o.student_id AND st.academic_year = v_year
+                                  AND st.class_name = trim(p_class)
+                                  AND lower(COALESCE(st.section, '')) = lower(COALESCE(trim(p_section), '')));
+        END IF;
 
         FOR r IN
             SELECT s.student_id, s.roll_no

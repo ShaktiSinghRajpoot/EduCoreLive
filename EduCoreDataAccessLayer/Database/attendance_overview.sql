@@ -64,16 +64,19 @@ BEGIN
     INSERT INTO tmp_ao_sec
     SELECT x.* FROM (
         SELECT sec.academic_class_section_id, c.class_name, sec.section_name, COALESCE(c.display_order, 0),
-               (SELECT COUNT(*) FROM core.students s
-                 WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND COALESCE(s.is_active, TRUE)
-                   AND s.class_name = c.class_name AND lower(COALESCE(s.section, '')) = lower(sec.section_name)
-                   AND s.academic_year = v_year)::int AS students,
+               -- the section's roll for this session (core.student_enrolment): a child
+               -- promoted early still belongs here until the session ends
+               (SELECT COUNT(*) FROM core.student_enrolment e
+                 WHERE e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+                   AND e.academic_year = v_year AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
+                   AND e.class_name = c.class_name AND lower(COALESCE(e.section, '')) = lower(sec.section_name))::int AS students,
                sec.class_teacher_staff_id, st.full_name,
                -- the day the section's first (active) student was admitted
-               COALESCE((SELECT MIN(NULLIF(s.admission_date, '')::date) FROM core.students s
-                          WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND COALESCE(s.is_active, TRUE)
-                            AND s.class_name = c.class_name AND lower(COALESCE(s.section, '')) = lower(sec.section_name)
-                            AND s.academic_year = v_year), v_start) AS start_on
+               COALESCE((SELECT MIN(NULLIF(s.admission_date, '')::date)
+                           FROM core.student_enrolment e JOIN core.students s ON s.student_id = e.student_id
+                          WHERE e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+                            AND e.academic_year = v_year AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
+                            AND e.class_name = c.class_name AND lower(COALESCE(e.section, '')) = lower(sec.section_name)), v_start) AS start_on
           FROM academic.academic_class_sections sec
           JOIN academic.academic_classes c ON c.academic_class_id = sec.academic_class_id
           LEFT JOIN core.staff st ON st.staff_id = sec.class_teacher_staff_id

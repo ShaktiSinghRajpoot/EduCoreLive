@@ -70,8 +70,13 @@ BEGIN
     -- ── 1. Headline numbers ─────────────────────────────────────────────────
     OPEN p_kpi FOR
     SELECT
-        (SELECT COUNT(*) FROM core.students s
-          WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND s.is_active)::int
+        -- Students on the roll of the session in progress (core.student_enrolment):
+        -- a child admitted for next session does not count yet, a child promoted
+        -- early still counts here until this session ends.
+        (SELECT COUNT(DISTINCT e.student_id) FROM core.student_enrolment e
+          WHERE e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+            AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, CURRENT_DATE)
+            AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut'))::int
             AS students,
 
         (SELECT COUNT(*) FROM core.staff st
@@ -136,15 +141,17 @@ BEGIN
     ORDER BY d;
 
     -- ── 3. Class-wise strength ──────────────────────────────────────────────
+    -- The same roll, per class. The class is joined by its id: matching the name
+    -- found it once per session, so every count doubled once a second session existed.
     OPEN p_classes FOR
-    SELECT s.class_name, COUNT(*)::int AS students
-    FROM core.students s
-    LEFT JOIN academic.academic_classes ac
-           ON ac.tenant_id = s.tenant_id AND ac.school_id = s.school_id
-          AND ac.class_name = s.class_name AND COALESCE(ac.is_deleted, FALSE) = FALSE
-    WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND s.is_active
-    GROUP BY s.class_name, ac.display_order
-    ORDER BY MIN(COALESCE(ac.display_order, 9999)), s.class_name;   -- teaching order
+    SELECT e.class_name, COUNT(DISTINCT e.student_id)::int AS students
+    FROM core.student_enrolment e
+    LEFT JOIN academic.academic_classes ac ON ac.academic_class_id = e.academic_class_id
+    WHERE e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+      AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, CURRENT_DATE)
+      AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
+    GROUP BY e.class_name
+    ORDER BY MIN(COALESCE(ac.display_order, 9999)), e.class_name;   -- teaching order
 
     -- ── 4. Collection by payment mode, this month ───────────────────────────
     OPEN p_modes FOR

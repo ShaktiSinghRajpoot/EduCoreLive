@@ -305,12 +305,10 @@ BEGIN
         END IF;
 
         -- A roll number belongs to one child per class + section + session.
+        -- (core.fn_session_rolls also counts children promoted out of it early)
         IF NULLIF(TRIM(COALESCE(p_roll_no, '')), '') IS NOT NULL AND EXISTS (
-               SELECT 1 FROM core.students o
-                WHERE o.tenant_id = p_tenant_id AND o.school_id = p_school_id AND o.is_active
-                  AND o.academic_year = v_year AND o.class_name = TRIM(p_class_name)
-                  AND COALESCE(o.section, '') = COALESCE(TRIM(p_section), '')
-                  AND LOWER(TRIM(o.roll_no)) = LOWER(TRIM(p_roll_no))) THEN
+               SELECT 1 FROM core.fn_session_rolls(p_tenant_id, p_school_id, v_year, p_class_name, p_section) o
+                WHERE LOWER(TRIM(o.roll_no)) = LOWER(TRIM(p_roll_no))) THEN
             OPEN p_result FOR SELECT 0 AS student_id, 0 AS success,
                 format('Roll no %s is already used in %s.', TRIM(p_roll_no),
                        TRIM(p_class_name) || COALESCE('-' || NULLIF(TRIM(p_section), ''), '')) AS message,
@@ -324,11 +322,8 @@ BEGIN
         v_roll := NULLIF(TRIM(COALESCE(p_roll_no, '')), '');
         IF v_roll IS NULL AND NULLIF(TRIM(COALESCE(p_section, '')), '') IS NOT NULL THEN
             SELECT (COALESCE(MAX(TRIM(o.roll_no)::int), 0) + 1)::text INTO v_roll
-              FROM core.students o
-             WHERE o.tenant_id = p_tenant_id AND o.school_id = p_school_id AND o.is_active
-               AND o.academic_year = v_year AND o.class_name = TRIM(p_class_name)
-               AND COALESCE(o.section, '') = TRIM(p_section)
-               AND TRIM(o.roll_no) ~ '^[0-9]{1,6}$';
+              FROM core.fn_session_rolls(p_tenant_id, p_school_id, v_year, p_class_name, p_section) o
+             WHERE TRIM(o.roll_no) ~ '^[0-9]{1,6}$';
         END IF;
 
         -- Admission number: use supplied value or auto-generate per school+year

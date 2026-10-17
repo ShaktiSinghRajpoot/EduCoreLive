@@ -33,11 +33,15 @@ RETURNS TABLE (day date)
 LANGUAGE sql
 STABLE
 AS $function$
+    -- The class-section they had IN THAT SESSION (core.student_enrolment); the
+    -- present row is next session's class once they are promoted.
     WITH st AS (
-        SELECT s.class_name AS cls, COALESCE(s.section, '') AS sec,
+        SELECT COALESCE(e.class_name, s.class_name) AS cls, COALESCE(e.section, s.section, '') AS sec,
                NULLIF(s.admission_date::text, '')::date AS adm,
-               CASE WHEN s.is_active THEN NULL ELSE NULLIF(s.date_of_leaving::text, '')::date END AS lv
+               CASE WHEN COALESCE(e.status, '') IN ('Left', 'PassedOut') OR (e.status IS NULL AND NOT s.is_active)
+                    THEN NULLIF(s.date_of_leaving::text, '')::date END AS lv
         FROM core.students s
+        LEFT JOIN core.student_enrolment e ON e.student_id = s.student_id AND e.academic_year = p_academic_year
         WHERE s.student_id = p_student_id AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id
     ),
     mine AS (
@@ -70,7 +74,7 @@ CREATE OR REPLACE PROCEDURE core.sp_attendance_student(
     IN    p_school_id      integer,
     IN    p_action_user_id integer,
     IN    p_student_id     integer,
-    IN    p_academic_year  varchar DEFAULT NULL,   -- NULL = the student's current session
+    IN    p_academic_year  varchar DEFAULT NULL,   -- NULL = the session in progress today
     IN    p_month          integer DEFAULT NULL,   -- 1..12, for the day grid; NULL = no grid
     IN    p_year           integer DEFAULT NULL,
     INOUT p_summary        refcursor DEFAULT 'as_summary'::refcursor,
@@ -90,7 +94,13 @@ BEGIN
         RETURN;
     END IF;
 
-    SELECT COALESCE(NULLIF(TRIM(COALESCE(p_academic_year, '')), ''), s.academic_year)
+    -- No session asked for: the one in progress today, if they are enrolled in it
+    -- (a child promoted early still shows this year's attendance), else theirs.
+    SELECT COALESCE(NULLIF(TRIM(COALESCE(p_academic_year, '')), ''),
+                    (SELECT e.academic_year FROM core.student_enrolment e
+                      WHERE e.student_id = s.student_id
+                        AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, CURRENT_DATE)),
+                    s.academic_year)
       INTO v_year
     FROM core.students s
     WHERE s.student_id = p_student_id

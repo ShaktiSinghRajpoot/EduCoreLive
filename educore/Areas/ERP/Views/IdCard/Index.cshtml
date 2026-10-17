@@ -63,7 +63,9 @@
               <option value="">All years</option>
               @foreach (var y in yearList)
               {
-                  <option value="@y.Text">@y.Text</option>
+                  @* the current session by default, so one class sheet never mixes
+                     this year's children with next year's admissions *@
+                  <option value="@y.Text" selected="@y.Selected">@y.Text</option>
               }
             </select>
           </div>

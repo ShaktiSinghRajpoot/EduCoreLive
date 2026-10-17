@@ -74,7 +74,9 @@ BEGIN
       AND LOWER(COALESCE(a.section, '')) = v_sec;
 
     -- Everyone who belonged here during the month, each with the number of this
-    -- class-section's registers they belonged to.
+    -- class-section's registers they belonged to -- decided day by day by the same
+    -- register the teacher marks (core.fn_attendance_register), so a child of
+    -- another session never counts here.
     OPEN p_students FOR
     WITH reg AS (
         SELECT DISTINCT a.attendance_date::date AS d
@@ -83,43 +85,31 @@ BEGIN
           AND a.attendance_date::date BETWEEN v_start AND v_end
           AND LOWER(a.class_name) = v_cls AND LOWER(COALESCE(a.section, '')) = v_sec
     ),
+    onreg AS (
+        SELECT r.d, x.student_id
+        FROM reg r
+        CROSS JOIN LATERAL core.fn_attendance_register(p_tenant_id, p_school_id, p_class, p_section, r.d) x
+    ),
     cand AS (
-        SELECT s.student_id
-        FROM core.students s
-        WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id
-          AND LOWER(s.class_name) = v_cls AND LOWER(COALESCE(s.section, '')) = v_sec
-          AND (NULLIF(s.admission_date, '') IS NULL OR s.admission_date::date <= v_end)
-          AND (s.is_active OR (NULLIF(s.date_of_leaving, '') IS NOT NULL AND s.date_of_leaving::date >= v_start))
+        SELECT student_id FROM onreg
         UNION
-        SELECT a.student_id
-        FROM core.student_attendance a
-        WHERE a.tenant_id = p_tenant_id AND a.school_id = p_school_id
-          AND a.attendance_date::date BETWEEN v_start AND v_end
-          AND LOWER(a.class_name) = v_cls AND LOWER(COALESCE(a.section, '')) = v_sec
+        -- on the register now, even before a day is marked this month
+        SELECT x.student_id
+        FROM core.fn_attendance_register(p_tenant_id, p_school_id, p_class, p_section, LEAST(v_end, CURRENT_DATE)) x
+        WHERE LEAST(v_end, CURRENT_DATE) >= v_start
     )
-    SELECT s.student_id, s.roll_no, s.student_name,
-           (SELECT COUNT(*) FROM reg r
-            WHERE EXISTS (SELECT 1 FROM core.student_attendance o
-                          WHERE o.tenant_id = s.tenant_id AND o.school_id = s.school_id
-                            AND o.student_id = s.student_id
-                            AND o.attendance_date = to_char(r.d, 'YYYY-MM-DD')
-                            AND LOWER(o.class_name) = v_cls AND LOWER(COALESCE(o.section, '')) = v_sec)
-               OR (    LOWER(s.class_name) = v_cls AND LOWER(COALESCE(s.section, '')) = v_sec
-                   AND (NULLIF(s.admission_date, '') IS NULL OR r.d >= s.admission_date::date)
-                   AND (s.is_active OR r.d <= s.date_of_leaving::date)
-                   -- after the last day they were marked anywhere else (moved in)
-                   AND r.d > COALESCE((SELECT MAX(o.attendance_date::date)
-                                       FROM core.student_attendance o
-                                       WHERE o.tenant_id = s.tenant_id AND o.school_id = s.school_id
-                                         AND o.student_id = s.student_id
-                                         AND NOT (LOWER(o.class_name) = v_cls
-                                              AND LOWER(COALESCE(o.section, '')) = v_sec)),
-                                      DATE '1900-01-01'))
-           )::int AS school_days
+    SELECT s.student_id,
+           COALESCE(NULLIF(TRIM(e.roll_no), ''), s.roll_no) AS roll_no,
+           s.student_name,
+           (SELECT COUNT(*) FROM onreg o WHERE o.student_id = s.student_id)::int AS school_days
     FROM cand c
     JOIN core.students s ON s.student_id = c.student_id
+    LEFT JOIN core.student_enrolment e
+           ON e.student_id = s.student_id
+          AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, v_start)
     ORDER BY
-        CASE WHEN s.roll_no ~ '^[0-9]+$' THEN lpad(s.roll_no, 6, '0') ELSE NULL END NULLS LAST,
+        CASE WHEN COALESCE(NULLIF(TRIM(e.roll_no), ''), s.roll_no) ~ '^[0-9]+$'
+             THEN lpad(COALESCE(NULLIF(TRIM(e.roll_no), ''), s.roll_no), 6, '0') ELSE NULL END NULLS LAST,
         s.student_name;
 
     -- Marks taken in THIS class-section, as a day-number + single letter.

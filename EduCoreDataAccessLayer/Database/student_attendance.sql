@@ -67,49 +67,70 @@ BEGIN
         RETURN;
     END IF;
 
+    -- sections with children on the roll of the session in progress (a section
+    -- holding only next session's admissions is not offered)
     OPEN p_result FOR
-    SELECT DISTINCT TRIM(s.section) AS section
-    FROM core.students s
-    WHERE s.tenant_id = p_tenant_id
-      AND s.school_id = p_school_id
-      AND s.is_active = TRUE
-      AND COALESCE(TRIM(s.section), '') <> ''
-      AND (p_class IS NULL OR TRIM(p_class) = '' OR LOWER(s.class_name) = LOWER(TRIM(p_class)))
+    SELECT DISTINCT TRIM(e.section) AS section
+    FROM core.student_enrolment e
+    WHERE e.tenant_id = p_tenant_id
+      AND e.school_id = p_school_id
+      AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, CURRENT_DATE)
+      AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
+      AND COALESCE(TRIM(e.section), '') <> ''
+      AND (p_class IS NULL OR TRIM(p_class) = '' OR LOWER(e.class_name) = LOWER(TRIM(p_class)))
     ORDER BY 1;
 END;
 $procedure$;
 
 
+-- ── the session a date falls in ─────────────────────────────────────────────
+-- The session whose start..end contains the date; when none does (dates not set,
+-- or a gap between sessions) the school's current session.
+CREATE OR REPLACE FUNCTION core.fn_session_on(p_tenant_id integer, p_school_id integer, p_date date)
+RETURNS varchar
+LANGUAGE sql
+STABLE
+AS $function$
+    SELECT COALESCE(
+        (SELECT y.academic_year_name FROM academic.academic_years y
+          WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id AND NOT COALESCE(y.is_deleted, FALSE)
+            AND NULLIF(y.start_date, '')::date <= p_date AND NULLIF(y.end_date, '')::date >= p_date
+          ORDER BY y.is_current DESC LIMIT 1),
+        (SELECT y.academic_year_name FROM academic.academic_years y
+          WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id AND NOT COALESCE(y.is_deleted, FALSE)
+            AND y.is_current LIMIT 1));
+$function$;
+
+
 -- ── who belongs on a class-section's register on one date ───────────────────
 -- Shared by the roster (what the teacher sees) and the save (what it accepts),
--- so the two can never disagree:
---   * students in the class-section now, admitted by that date, and either still
---     active or leaving on/after that date - unless that day's row already puts
---     them in another class-section (they moved later, or were marked there);
+-- so the two can never disagree. It reads core.student_enrolment for the
+-- session the date falls in (core.fn_session_on), not the student's present row:
+--   * a child promoted before the session ends stays on the OLD class's register
+--     until it ends (their old enrolment is kept as 'Promoted');
+--   * a child admitted for next session is on no register until it starts;
+--   * a child who left is on the register up to their leaving day;
+--   * unless that day's row already puts them in another class-section (they
+--     moved later, or were marked there);
 --   * plus anyone whose row for that date is already in this class-section, so a
---     past day can be corrected after a student moved or left;
---   * never a student of a session that has not started on that date: a child
---     admitted in October for next April was on this year's register (and marked
---     present) from the admission day.
+--     past day can be corrected after a student moved or left.
 CREATE OR REPLACE FUNCTION core.fn_attendance_register(
     p_tenant_id integer, p_school_id integer, p_class varchar, p_section varchar, p_date date)
 RETURNS TABLE (student_id integer)
 LANGUAGE sql
 STABLE
 AS $function$
-    SELECT s.student_id
-    FROM core.students s
-    WHERE s.tenant_id = p_tenant_id
-      AND s.school_id = p_school_id
-      AND LOWER(s.class_name)            = LOWER(TRIM(p_class))
-      AND LOWER(COALESCE(s.section, '')) = LOWER(TRIM(COALESCE(p_section, '')))
+    SELECT e.student_id
+    FROM core.student_enrolment e
+    JOIN core.students s ON s.student_id = e.student_id
+    WHERE e.tenant_id = p_tenant_id
+      AND e.school_id = p_school_id
+      AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, p_date)
+      AND LOWER(e.class_name)            = LOWER(TRIM(p_class))
+      AND LOWER(COALESCE(e.section, '')) = LOWER(TRIM(COALESCE(p_section, '')))
       AND (s.admission_date IS NULL OR s.admission_date::date <= p_date)
-      AND (s.is_active
+      AND (COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
            OR (s.date_of_leaving IS NOT NULL AND s.date_of_leaving::date >= p_date))
-      AND NOT EXISTS (SELECT 1 FROM academic.academic_years y
-                       WHERE y.tenant_id = s.tenant_id AND y.school_id = s.school_id
-                         AND y.academic_year_name = s.academic_year AND NOT COALESCE(y.is_deleted, FALSE)
-                         AND NULLIF(y.start_date, '')::date > p_date)
       AND NOT EXISTS (
           SELECT 1 FROM core.student_attendance o
           WHERE o.tenant_id = s.tenant_id AND o.school_id = s.school_id
@@ -125,10 +146,7 @@ AS $function$
       AND a.attendance_date = to_char(p_date, 'YYYY-MM-DD')
       AND LOWER(a.class_name)            = LOWER(TRIM(p_class))
       AND LOWER(COALESCE(a.section, '')) = LOWER(TRIM(COALESCE(p_section, '')))
-      AND NOT EXISTS (SELECT 1 FROM academic.academic_years y
-                       WHERE y.tenant_id = a.tenant_id AND y.school_id = a.school_id
-                         AND y.academic_year_name = a.academic_year AND NOT COALESCE(y.is_deleted, FALSE)
-                         AND NULLIF(y.start_date, '')::date > p_date);
+      AND a.academic_year = core.fn_session_on(p_tenant_id, p_school_id, p_date);
 $function$;
 
 
@@ -151,7 +169,9 @@ BEGIN
 
     OPEN p_result FOR
     SELECT
-        s.student_id, s.roll_no, s.admission_no, s.student_name,
+        s.student_id,
+        COALESCE(NULLIF(TRIM(e.roll_no), ''), s.roll_no) AS roll_no,   -- the roll of THAT session
+        s.admission_no, s.student_name,
         s.guardian_name, s.mobile,     -- for the absentee WhatsApp notification
         a.status  AS status,           -- NULL when not yet marked
         a.remarks AS remarks,
@@ -159,13 +179,17 @@ BEGIN
     FROM core.fn_attendance_register(p_tenant_id, p_school_id, p_class, p_section, p_date) r
     JOIN core.students s
       ON s.student_id = r.student_id
+    LEFT JOIN core.student_enrolment e
+      ON e.student_id = s.student_id
+     AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, p_date)
     LEFT JOIN core.student_attendance a
            ON a.student_id      = s.student_id
           AND a.tenant_id       = s.tenant_id
           AND a.school_id       = s.school_id
           AND a.attendance_date = to_char(p_date, 'YYYY-MM-DD')
     ORDER BY
-        CASE WHEN s.roll_no ~ '^[0-9]+$' THEN lpad(s.roll_no, 6, '0') ELSE NULL END NULLS LAST,
+        CASE WHEN COALESCE(NULLIF(TRIM(e.roll_no), ''), s.roll_no) ~ '^[0-9]+$'
+             THEN lpad(COALESCE(NULLIF(TRIM(e.roll_no), ''), s.roll_no), 6, '0') ELSE NULL END NULLS LAST,
         s.student_name;
 END;
 $procedure$;
@@ -280,13 +304,19 @@ BEGIN
         p_tenant_id, p_school_id, s.student_id, to_char(p_date, 'YYYY-MM-DD'),
         TRIM(i.status),
         NULLIF(TRIM(i.remarks), ''),
-        s.academic_year, s.class_name, s.section,
+        -- the register's class, section and session -- not the student's present
+        -- row, which after an early promotion is already next session's class
+        core.fn_session_on(p_tenant_id, p_school_id, p_date),
+        COALESCE(e.class_name, TRIM(p_class)), COALESCE(e.section, NULLIF(TRIM(p_section), '')),
         p_action_user_id, now()
     FROM jsonb_to_recordset(p_items) AS i("studentId" integer, status text, remarks text)
     JOIN core.students s
       ON s.student_id = i."studentId"
      AND s.tenant_id  = p_tenant_id
      AND s.school_id  = p_school_id
+    LEFT JOIN core.student_enrolment e
+      ON e.student_id = s.student_id
+     AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, p_date)
     ON CONFLICT (tenant_id, school_id, student_id, attendance_date) DO UPDATE
         SET status     = EXCLUDED.status,
             remarks    = EXCLUDED.remarks,

@@ -116,6 +116,10 @@ DECLARE
     v_seq   integer;
     v_no    varchar;
     v_id    integer;
+    v_now   varchar;   -- the session in progress today
+    v_cls   varchar;   -- class / section / session printed on the certificate
+    v_sec   varchar;
+    v_ses   varchar;
 BEGIN
     IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
         RAISE EXCEPTION 'Invalid school scope.';
@@ -154,6 +158,18 @@ BEGIN
             RAISE EXCEPTION 'Write what the certificate is needed for.';
         END IF;
 
+        -- The class they study in NOW: their enrolment for the session in progress.
+        -- A child promoted early is still in the old class until it ends; a child
+        -- admitted for next session does not study here yet.
+        v_now := core.fn_session_on(p_tenant_id, p_school_id, CURRENT_DATE);
+        SELECT e.class_name, e.section, e.academic_year INTO v_cls, v_sec, v_ses
+          FROM core.student_enrolment e
+         WHERE e.student_id = s.student_id AND e.academic_year = v_now;
+        IF v_type = 'Bonafide' AND v_ses IS NULL AND s.academic_year IS DISTINCT FROM v_now THEN
+            RAISE EXCEPTION '% is admitted for session %, which has not started. A bonafide certificate can be issued once it starts.',
+                s.student_name, s.academic_year;
+        END IF;
+
         INSERT INTO core.certificate_counters (tenant_id, school_id, cert_type, year_no, last_seq)
         VALUES (p_tenant_id, p_school_id, v_type, v_year, 1)
         ON CONFLICT (tenant_id, school_id, cert_type, year_no)
@@ -165,8 +181,9 @@ BEGIN
                                        father_name, mother_name, dob, admission_no, admission_date, class_name, section,
                                        academic_year, is_current, date_of_leaving, purpose, conduct, remarks, issued_by)
         VALUES (p_tenant_id, p_school_id, v_no, v_type, s.student_id, s.student_name, s.gender,
-                s.guardian_name, s.mother_name, s.dob, s.admission_no, s.admission_date, s.class_name, s.section,
-                s.academic_year, COALESCE(s.is_active, TRUE), s.date_of_leaving,
+                s.guardian_name, s.mother_name, s.dob, s.admission_no, s.admission_date,
+                COALESCE(v_cls, s.class_name), COALESCE(v_sec, s.section),
+                COALESCE(v_ses, s.academic_year), COALESCE(s.is_active, TRUE), s.date_of_leaving,
                 NULLIF(trim(p_purpose), ''), COALESCE(NULLIF(trim(p_conduct), ''), 'Good'),
                 NULLIF(trim(p_remarks), ''), p_action_user_id)
         RETURNING cert_id INTO v_id;

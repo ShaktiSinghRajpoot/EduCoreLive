@@ -100,10 +100,12 @@ BEGIN
                -- late work is still done work
                (SELECT COUNT(*) FROM academic.homework_status x WHERE x.homework_id = h.homework_id AND x.status IN ('Done', 'Late')) AS done_count,
                (SELECT COUNT(*) FROM academic.homework_status x WHERE x.homework_id = h.homework_id AND x.status = 'NotDone')          AS not_done_count,
-               (SELECT COUNT(*) FROM core.students s
-                 WHERE s.tenant_id = h.tenant_id AND s.school_id = h.school_id AND COALESCE(s.is_active, TRUE)
-                   AND s.class_name = c.class_name AND lower(COALESCE(s.section, '')) = lower(sec.section_name)
-                   AND s.academic_year = y.academic_year_name) AS student_count
+               -- the section's roll for its session (core.student_enrolment): a child
+               -- promoted early still belongs to it until the session ends
+               (SELECT COUNT(*) FROM core.student_enrolment e
+                 WHERE e.tenant_id = h.tenant_id AND e.school_id = h.school_id
+                   AND e.academic_year = y.academic_year_name AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
+                   AND e.class_name = c.class_name AND lower(COALESCE(e.section, '')) = lower(sec.section_name)) AS student_count
           FROM academic.homework h
           JOIN academic.academic_class_sections sec ON sec.academic_class_section_id = h.academic_class_section_id
           JOIN academic.academic_classes c ON c.academic_class_id = sec.academic_class_id
@@ -144,10 +146,15 @@ BEGIN
                to_char(h.assigned_on, 'YYYY-MM-DD') AS assigned_on, to_char(h.due_on, 'YYYY-MM-DD') AS due_on,
                st.full_name AS teacher_name, x.status
           FROM core.students s
-          JOIN academic.academic_classes c ON c.tenant_id = s.tenant_id AND c.school_id = s.school_id AND c.class_name = s.class_name
-          JOIN academic.academic_years y ON y.academic_year_id = c.academic_year_id AND y.academic_year_name = s.academic_year
+          -- the class they are in for the session in progress (a child promoted
+          -- early still gets the old class's homework; one admitted for next
+          -- session gets none yet)
+          JOIN core.student_enrolment e ON e.student_id = s.student_id
+                                       AND e.academic_year = core.fn_session_on(p_tenant_id, p_school_id, CURRENT_DATE)
+          JOIN academic.academic_classes c ON c.tenant_id = s.tenant_id AND c.school_id = s.school_id AND c.class_name = e.class_name
+          JOIN academic.academic_years y ON y.academic_year_id = c.academic_year_id AND y.academic_year_name = e.academic_year
           JOIN academic.academic_class_sections sec ON sec.academic_class_id = c.academic_class_id
-                                                   AND lower(sec.section_name) = lower(COALESCE(s.section, ''))
+                                                   AND lower(sec.section_name) = lower(COALESCE(e.section, ''))
           JOIN academic.homework h ON h.academic_class_section_id = sec.academic_class_section_id AND NOT h.is_deleted
           JOIN academic.school_subjects sj ON sj.subject_id = h.subject_id
           LEFT JOIN core.staff st ON st.staff_id = h.staff_id
@@ -171,17 +178,20 @@ BEGIN
     -- ── Students: the section's students with their status for one piece of homework
     IF p_operation = 'Students' THEN
         OPEN p_result FOR
-        SELECT s.student_id, s.student_name, s.roll_no, s.admission_no, x.status
+        SELECT s.student_id, s.student_name, COALESCE(NULLIF(TRIM(e.roll_no), ''), s.roll_no) AS roll_no, s.admission_no, x.status
           FROM academic.homework h
           JOIN academic.academic_class_sections sec ON sec.academic_class_section_id = h.academic_class_section_id
           JOIN academic.academic_classes c ON c.academic_class_id = sec.academic_class_id
           JOIN academic.academic_years y ON y.academic_year_id = c.academic_year_id
-          JOIN core.students s ON s.tenant_id = h.tenant_id AND s.school_id = h.school_id AND COALESCE(s.is_active, TRUE)
-                              AND s.class_name = c.class_name AND lower(COALESCE(s.section, '')) = lower(sec.section_name)
-                              AND s.academic_year = y.academic_year_name
+          -- the section's roll for its session (see List)
+          JOIN core.student_enrolment e ON e.tenant_id = h.tenant_id AND e.school_id = h.school_id
+                                       AND e.academic_year = y.academic_year_name
+                                       AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
+                                       AND e.class_name = c.class_name AND lower(COALESCE(e.section, '')) = lower(sec.section_name)
+          JOIN core.students s ON s.student_id = e.student_id
           LEFT JOIN academic.homework_status x ON x.homework_id = h.homework_id AND x.student_id = s.student_id
          WHERE h.homework_id = p_id
-         ORDER BY NULLIF(regexp_replace(COALESCE(s.roll_no, ''), '\D', '', 'g'), '')::int NULLS LAST, s.student_name;
+         ORDER BY NULLIF(regexp_replace(COALESCE(NULLIF(TRIM(e.roll_no), ''), s.roll_no, ''), '\D', '', 'g'), '')::int NULLS LAST, s.student_name;
         RETURN;
     END IF;
 
@@ -253,9 +263,18 @@ BEGIN
             IF p_statuses[i] NOT IN ('Done', 'NotDone', 'Late') THEN
                 RAISE EXCEPTION 'Unknown status %.', p_statuses[i];
             END IF;
-            IF NOT EXISTS (SELECT 1 FROM core.students WHERE student_id = p_student_ids[i]
-                            AND tenant_id = p_tenant_id AND school_id = p_school_id) THEN
-                RAISE EXCEPTION 'Student not found.';
+            -- only a child of that homework's section and session
+            IF NOT EXISTS (SELECT 1 FROM academic.homework h
+                             JOIN academic.academic_class_sections sec ON sec.academic_class_section_id = h.academic_class_section_id
+                             JOIN academic.academic_classes c ON c.academic_class_id = sec.academic_class_id
+                             JOIN academic.academic_years y ON y.academic_year_id = c.academic_year_id
+                             JOIN core.student_enrolment e ON e.student_id = p_student_ids[i]
+                                                          AND e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+                                                          AND e.academic_year = y.academic_year_name
+                                                          AND e.class_name = c.class_name
+                                                          AND lower(COALESCE(e.section, '')) = lower(sec.section_name)
+                            WHERE h.homework_id = p_id) THEN
+                RAISE EXCEPTION 'That student is not in this homework''s class.';
             END IF;
             INSERT INTO academic.homework_status (homework_id, student_id, status, checked_by)
             VALUES (p_id, p_student_ids[i], p_statuses[i], p_action_user_id)

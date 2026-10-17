@@ -231,9 +231,9 @@ BEGIN
                s.student_id,
                s.student_name,
                s.admission_no,
-               s.class_name,
-               s.section,
-               s.roll_no,
+               COALESCE(e.class_name, s.class_name) AS class_name,
+               COALESCE(e.section, s.section)       AS section,
+               COALESCE(NULLIF(trim(e.roll_no), ''), s.roll_no) AS roll_no,
                CASE WHEN COALESCE(s.is_active, TRUE) THEN 'Active'
                     ELSE COALESCE(NULLIF(trim(s.status), ''), 'Left') END                          AS student_status,
                COALESCE(SUM(d.outstanding) FILTER (WHERE d.is_due), 0)                             AS total_outstanding,
@@ -244,10 +244,14 @@ BEGIN
         FROM dues d
         JOIN core.students s ON s.student_id = d.student_id
                             AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id
-        WHERE (v_class   IS NULL OR s.class_name = v_class)
-          AND (v_section IS NULL OR lower(COALESCE(s.section, '')) = lower(v_section))
-        GROUP BY s.student_id, s.student_name, s.admission_no, s.class_name, s.section, s.roll_no,
-                 s.is_active, s.status
+        -- with a session chosen, the class they had IN that session (a child
+        -- promoted early still owes this year's fees as a member of the old class)
+        LEFT JOIN core.student_enrolment e ON e.student_id = s.student_id AND v_year IS NOT NULL
+                                          AND lower(e.academic_year) = v_year
+        WHERE (v_class   IS NULL OR COALESCE(e.class_name, s.class_name) = v_class)
+          AND (v_section IS NULL OR lower(COALESCE(e.section, s.section, '')) = lower(v_section))
+        GROUP BY s.student_id, s.student_name, s.admission_no, e.class_name, e.section, e.roll_no,
+                 s.class_name, s.section, s.roll_no, s.is_active, s.status
         HAVING COALESCE(SUM(d.outstanding) FILTER (WHERE d.is_due), 0) > 0
     ),
     registrations AS (
