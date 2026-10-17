@@ -5630,3 +5630,7 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   "Rest of 2026-27" (instalments not due yet) and "2027-28 (from its start)" for a child promoted early.
   An instalment row from another session carries a session badge. Logic: `DueByToday/SameYear/Later/Earlier`
   in `StudentController`.
+- Same split on **Fee › Collect Fees**: `GetStudentDues` sends each due's `session`. The line under "Due now" was
+  "Whole session ₹58,100" and counted next session's fees in. It now reads "Rest of 2026-27 ₹10,600 · 2027-28
+  (from its start) ₹34,100" (plus "Previous session" when old dues are open), measured against the session picked
+  in the filter. A due from another session carries a session badge.

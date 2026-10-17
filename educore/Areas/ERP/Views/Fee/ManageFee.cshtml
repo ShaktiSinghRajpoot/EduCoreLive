@@ -459,15 +459,28 @@ $(function () {
 
         // "Due now" is what has fallen due (overdue + today); the whole session's balance
         // includes months still ahead. One "Total outstanding" mixed the two (QA BUG-108).
-        var total=0, dueNow=0;
-        allDues().forEach(function(d){ total+=d.amount; if(d.overdue || !d.dueDate || d.dueDate<=todayIso()) dueNow+=d.amount; });
+        // What is not due yet is split by session, as on the student profile: the rest of
+        // the selected session, and next session's fees (a child promoted early).
+        // Session names sort as text ("2026-27" < "2027-28").
+        var view=$session.val()||'', dueNow=0, prev=0, rest=0, next=0, nextYear='';
+        allDues().forEach(function(d){
+            var yr=d.session||view;
+            if(yr<view) prev+=d.amount;
+            if(d.overdue || !d.dueDate || d.dueDate<=todayIso()) dueNow+=d.amount;
+            else if(yr>view){ next+=d.amount; nextYear=nextYear||yr; }
+            else rest+=d.amount;
+        });
+        var parts=[];
+        if(prev>0) parts.push('Previous session '+EC.money(prev));
+        if(rest>0) parts.push('Rest of '+view+' '+EC.money(rest));
+        if(next>0) parts.push(nextYear+' (from its start) '+EC.money(next));
         $('#dAvatar').text(initials(currentStudent.name));
         $('#dName').text(currentStudent.name);
         $('#dSub').text(currentStudent.left
             ? currentStudent.admNo + ' · ' + (currentStudent.cls||'') + (currentStudent.sec ? ' - ' + currentStudent.sec : '') + ' · LEFT the school'
             : currentStudent.admNo + ' · ' + $class.val() + ' - ' + $section.val() + ' · Roll ' + (currentStudent.roll||'—'));
         $('#dOutstanding').text(EC.money(dueNow));
-        $('#dSession').text(total>dueNow ? 'Whole session '+EC.money(total) : '');
+        $('#dSession').text(parts.join(' · '));
         $duesEmpty.addClass('d-none'); $duesPane.removeClass('d-none');
         switchView('dues');
         $('.chip').removeClass('active'); $('#scope').text('—');
@@ -498,7 +511,8 @@ $(function () {
         return '<div class="due'+(s?' sel':'')+'" data-id="'+d.id+'">'+
             '<label class="due-main"><input type="checkbox" class="form-check-input due-chk"'+(s?' checked':'')+'>'+
               '<div class="due-info"><div class="due-label">'+EC.esc(d.label)+((deposit||d.refundable)?'<span class="deposit-tag">refundable</span>':'')+'</div>'+
-              '<div class="due-meta">'+(d.overdue?'<span class="overdue">Overdue</span> · ':'')+'Due '+EC.esc(d.dueDate ? EC.date(d.dueDate) : '—')+'</div></div>'+
+              '<div class="due-meta">'+(d.overdue?'<span class="overdue">Overdue</span> · ':'')+'Due '+EC.esc(d.dueDate ? EC.date(d.dueDate) : '—')+
+                (d.session && d.session!==$session.val() ? ' <span class="badge bg-label-info">'+EC.esc(d.session)+'</span>' : '')+'</div></div>'+
               '<div class="due-amt">'+EC.money(d.amount)+'</div></label></div>';
     }
     function renderDues(){
