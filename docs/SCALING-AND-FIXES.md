@@ -5622,3 +5622,11 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   session in progress (class, section, roll, attendance, timetable, subjects, Collect Fee session) and says
   "Promoted to Class 8 – A for 2027-28". The **Student List** shows the session beside the class when it is not
   the current one.
+
+### 2026-10-17 — Student profile: fee due split the way a fee counter keeps it
+- `core.sp_student_dues_get` also returns each line's `academic_year` (bundle `deploy_2026_10_17h.sql`).
+- The profile's fee card is now **Fee Due Now**: only what is owed today (due date reached). It no longer shows one
+  total that mixes next session's fees into this one. The Fee tab adds a line under it with "Previous session",
+  "Rest of 2026-27" (instalments not due yet) and "2027-28 (from its start)" for a child promoted early.
+  An instalment row from another session carries a session badge. Logic: `DueByToday/SameYear/Later/Earlier`
+  in `StudentController`.

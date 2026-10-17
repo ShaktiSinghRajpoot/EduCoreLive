@@ -429,6 +429,7 @@ function buildDetail(api){
 
         // One row per instalment still owing (the ledger's dues list).
         pendingDues: fee.rows || [],
+        feeBuckets: fee,   // dueNow / restSession / nextSession / prevSession
         feeHistory: (api.receipts || []).map(function(r){
             return {date:r.date, amt:r.amount, mode:r.mode, receipt:r.receiptNo,
                     cancelled:r.cancelled, by:r.cancelled ? 'CANCELLED' : (r.collectedBy || '—')};
@@ -464,6 +465,7 @@ function loadDashboard(){
             gender:st.gender, guardian:st.guardian, status:st.status || 'Active', admDate:st.admDate,
             phone:st.mobile, address:st.address,
             feeDue:api.fee ? api.fee.outstanding : null,
+            feeNow:api.fee ? api.fee.dueNow : null,
             feeSt:!api.fee ? null : api.fee.outstanding<=0 ? 'Paid' : (api.fee.totalPaid>0 ? 'Partial' : 'Pending'),
             attend:null, color:'primary', subjects:st.subjects
         };
@@ -539,7 +541,7 @@ function renderOverview(s,d){
        // The class's subjects (Subject Management); else the last exam's count.
        +mc('Subjects',   s.subjects!=null ? String(s.subjects) : (ex&&ex.options.length) ? String(ex.subjectCount) : '—','bg-label-primary text-primary','bx-list-check')
        +(CAN_FEES
-           ? mc('Fee Due', inr(s.feeDue),(s.feeDue>0?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-wallet')
+           ? mc('Fee Due Now', inr(s.feeNow),(s.feeNow>0?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-wallet')
            : mc('Admitted', EC.esc(s.admDate||'—'),'bg-label-info text-info','bx-calendar'));
 
     // Subject bars come from the latest published exam's real marks; absent
@@ -826,14 +828,23 @@ function renderFee(s,d){
     document.getElementById('fee-metrics').innerHTML=
         mc('Total Fee', inr(d.totalFee),'bg-label-primary text-primary','bx-calculator')
        +mc('Paid',      inr(d.totalPaid),'bg-label-success text-success','bx-check-shield')
-       +mc('Balance',   inr(s.feeDue),(s.feeDue>0?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-error-circle')
+       +mc('Due Now',   inr(s.feeNow),(s.feeNow>0?'bg-label-danger text-danger':'bg-label-success text-success'),'bx-error-circle')
        +mc('Receipts',  d.feeHistory.length+' txn','bg-label-info text-info','bx-receipt');
+
+    // What is owed beyond today, one session at a time (as a fee counter keeps it)
+    var fb=d.feeBuckets||{}, parts=[];
+    if(fb.prevSession>0) parts.push('Previous session: <b class="text-danger">'+inr(fb.prevSession)+'</b>');
+    if(fb.restSession>0) parts.push('Rest of '+EC.esc(fb.session||'this session')+': <b>'+inr(fb.restSession)+'</b>');
+    if(fb.nextSession>0) parts.push(EC.esc(fb.nextYear||'Next session')+' (from its start): <b>'+inr(fb.nextSession)+'</b>');
+    document.getElementById('fee-metrics').insertAdjacentHTML('beforeend',
+        parts.length ? '<div class="col-12 small text-muted mt-1">'+parts.join(' &nbsp;·&nbsp; ')+'</div>' : '');
 
     document.getElementById('feeStructBody').innerHTML = d.pendingDues.length
       ? d.pendingDues.map(function(f){
             return '<tr>'
                 +'<td class="fw-bold">'+EC.esc(f.head)+'</td>'
-                +'<td>'+EC.esc(f.installment)+'</td>'
+                +'<td>'+EC.esc(f.installment)
+                    +(f.session && f.session!==(d.feeBuckets||{}).session ? ' <span class="badge bg-label-info">'+EC.esc(f.session)+'</span>' : '')+'</td>'
                 +'<td>'+EC.esc(f.dueDate)+'</td>'
                 +'<td>'+inr(f.due)+'</td>'
                 +'<td class="text-success fw-bold">'+inr(f.paid)+'</td>'

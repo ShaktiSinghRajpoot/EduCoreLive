@@ -476,12 +476,24 @@ namespace educore.Areas.ERP.Controllers
                     closed      = totals.TotalClosed,
                     advance     = totals.AdvanceBalance,
                     outstanding = totals.Outstanding,
+                    // As a fee counter thinks of it (one session at a time):
+                    //   dueNow       what is owed today (due date reached)
+                    //   restSession  later instalments of the session in progress
+                    //   nextSession  next session's fees (after an early promotion)
+                    //   prevSession  older sessions' dues still open (arrears)
+                    dueNow      = dues.Where(d => DueByToday(d.DueDate)).Sum(d => d.Outstanding),
+                    restSession = dues.Where(d => !DueByToday(d.DueDate) && SameYear(d.AcademicYear, viewYear)).Sum(d => d.Outstanding),
+                    nextSession = dues.Where(d => !DueByToday(d.DueDate) && Later(d.AcademicYear, viewYear)).Sum(d => d.Outstanding),
+                    nextYear    = dues.Where(d => !DueByToday(d.DueDate) && Later(d.AcademicYear, viewYear)).Select(d => d.AcademicYear).FirstOrDefault(),
+                    prevSession = dues.Where(d => Earlier(d.AcademicYear, viewYear)).Sum(d => d.Outstanding),
+                    session     = viewYear,
                     rows = dues.Select(d => new
                     {
                         head        = d.FeeHeadName,
                         frequency   = d.Frequency,
                         installment = d.InstallmentLabel ?? "—",
                         dueDate     = string.IsNullOrWhiteSpace(d.DueDate) ? "—" : Dates.Show(d.DueDate, "dd MMM yyyy"),
+                        session     = d.AcademicYear ?? "",
                         due         = d.AmountDue,
                         paid        = d.AmountPaid,
                         outstanding = d.Outstanding
@@ -599,6 +611,17 @@ namespace educore.Areas.ERP.Controllers
         // Everything that changed the student's place or money outside a receipt:
         // admission, concession, exit / reactivate, promotion (with the dues
         // carried), class changes, bus assignments, closed dues and refunds.
+        // Fee buckets for the profile (see DashboardData). Session names sort as text
+        // ("2026-27" < "2027-28"); a line with no session counts as the viewed one.
+        private static bool DueByToday(string? dueDate) =>
+            string.IsNullOrWhiteSpace(dueDate) || string.CompareOrdinal(dueDate.Length >= 10 ? dueDate[..10] : dueDate, Dates.Today) <= 0;
+        private static bool SameYear(string? year, string viewYear) =>
+            string.IsNullOrWhiteSpace(year) || string.Equals(year, viewYear, StringComparison.OrdinalIgnoreCase);
+        private static bool Later(string? year, string viewYear) =>
+            !string.IsNullOrWhiteSpace(year) && string.CompareOrdinal(year, viewYear) > 0;
+        private static bool Earlier(string? year, string viewYear) =>
+            !string.IsNullOrWhiteSpace(year) && string.CompareOrdinal(year, viewYear) < 0;
+
         public async Task<IActionResult> History(Guid id, [FromServices] ModuleFlags modules)
         {
             var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());

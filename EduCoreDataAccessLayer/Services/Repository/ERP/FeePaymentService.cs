@@ -364,7 +364,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         AmountPaid       = DbRead.Dec(reader, cols, "amount_paid"),
                         Concession       = DbRead.Dec(reader, cols, "concession"),
                         Outstanding      = DbRead.Dec(reader, cols, "outstanding"),
-                        IsRefundable     = DbRead.Bool(reader, cols, "is_refundable")
+                        IsRefundable     = DbRead.Bool(reader, cols, "is_refundable"),
+                        AcademicYear     = DbRead.NStr(reader, cols, "academic_year")
                     });
                 }
             });

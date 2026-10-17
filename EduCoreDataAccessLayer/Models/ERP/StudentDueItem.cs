@@ -16,5 +16,6 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal   Concession       { get; set; }
         public decimal   Outstanding      { get; set; }
         public bool      IsRefundable     { get; set; }
+        public string?   AcademicYear     { get; set; }   // the session the line belongs to
     }
 }
