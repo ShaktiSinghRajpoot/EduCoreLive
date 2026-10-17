@@ -468,7 +468,7 @@ $(function () {
             if(yr<view || d.carriedFrom) prev+=d.amount;     // an older session's due, or one carried forward
             if(d.overdue || !d.dueDate || d.dueDate<=todayIso()) dueNow+=d.amount;
             else if(yr>view){ next+=d.amount; nextYear=nextYear||yr; }
-            else rest+=d.amount;
+            else if(yr===view) rest+=d.amount;              // an older session's months ahead count once, under Previous
         });
         var parts=[];
         if(prev>0) parts.push('Previous session '+EC.money(prev));
