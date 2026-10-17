@@ -9,8 +9,9 @@
 --               and an approved leave covering the day; days before joining or
 --               after the last working day say so
 --
--- Attendance % = (present + half days x 0.5) / days marked (a day nobody marked
--- is shown as "not marked", not counted as absent).
+-- Attendance % = (present + half days x 0.5) / days marked present, absent or half
+-- day. Leave (marked or approved) never counts against it, and a day nobody marked
+-- is shown as "not marked", not counted as absent.
 -- Read-only. Re-runnable.
 -- ============================================================================
 CREATE OR REPLACE PROCEDURE core.sp_staff_attendance_history(
@@ -88,9 +89,10 @@ BEGIN
            COUNT(*) FILTER (WHERE status = 'HalfDay')::int                              AS half_day,
            COUNT(*) FILTER (WHERE status = 'Leave' OR (status IS NULL AND leave_type IS NOT NULL AND weight > 0))::int AS on_leave,
            COUNT(*) FILTER (WHERE status IS NULL AND leave_type IS NULL AND weight > 0)::int AS not_marked,
-           CASE WHEN COUNT(status) = 0 THEN 0
+           CASE WHEN COUNT(*) FILTER (WHERE status IN ('Present', 'Late', 'Absent', 'HalfDay')) = 0 THEN 0
                 ELSE ROUND((COUNT(*) FILTER (WHERE status IN ('Present', 'Late'))
-                            + 0.5 * COUNT(*) FILTER (WHERE status = 'HalfDay')) * 100.0 / COUNT(status), 1) END AS percent,
+                            + 0.5 * COUNT(*) FILTER (WHERE status = 'HalfDay')) * 100.0
+                           / COUNT(*) FILTER (WHERE status IN ('Present', 'Late', 'Absent', 'HalfDay')), 1) END AS percent,
            to_char(v_from, 'YYYY-MM-DD') AS from_date, to_char(v_to, 'YYYY-MM-DD') AS to_date
       FROM w;
 
