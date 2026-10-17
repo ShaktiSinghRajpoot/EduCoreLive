@@ -2,6 +2,7 @@
     ViewData["Title"] = "My Attendance";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var me = ViewBag.Me as EduCoreDataAccessLayer.Models.ERP.MyStaffInfo;
+    string? sessionStart = ViewBag.SessionStart as string;   // for "This session"
 }
 
 @section PageStyles {
@@ -28,8 +29,16 @@
     else
     {
         <div class="ec-card mb-3"><div class="ec-card-body d-flex flex-wrap gap-2 align-items-end">
-          <div><label class="form-label mb-1">Month</label><input type="month" id="maMonth" class="form-control form-control-sm"></div>
-          <div class="text-muted small align-self-center">or</div>
+          <div class="btn-group btn-group-sm flex-wrap" role="group">
+            <button type="button" class="btn btn-outline-primary active" data-range="month">This month</button>
+            <button type="button" class="btn btn-outline-primary" data-range="last">Last month</button>
+            <button type="button" class="btn btn-outline-primary" data-range="last3">Last 3 months</button>
+            @if (!string.IsNullOrEmpty(sessionStart))
+            {
+                <button type="button" class="btn btn-outline-primary" data-range="session">This session</button>
+            }
+          </div>
+          <div class="text-muted small align-self-center">or any dates:</div>
           <div><label class="form-label mb-1">From</label><input type="date" id="maFrom" class="form-control form-control-sm"></div>
           <div><label class="form-label mb-1">To</label><input type="date" id="maTo" class="form-control form-control-sm"></div>
           <button id="maShow" class="btn btn-sm btn-primary"><i class="bx bx-search me-1"></i>Show</button>
@@ -48,19 +57,19 @@ $(function () {
     var MARK = { Present: ['P', 's-P'], Absent: ['A', 's-A'], HalfDay: ['H', 's-H'], Late: ['L', 's-L'], Leave: ['LV', 's-V'] };
     var today = EC.today();
 
-    $('#maTo').val(today).attr('max', today);
-    $('#maFrom').val(today.substring(0, 8) + '01').attr('max', today);
-    $('#maMonth').val(today.substring(0, 7)).attr('max', today.substring(0, 7));
+    var SESSION_START = '@(sessionStart ?? "")';
+    var first = EC.dateRange('month');
+    $('#maFrom').val(first.from).attr('max', today);
+    $('#maTo').val(first.to).attr('max', today);
 
-    // picking a month fills the range with that whole month (up to today)
-    $('#maMonth').on('change', function () {
-        var m = this.value; if (!m) return;
-        var parts = m.split('-'), last = new Date(+parts[0], +parts[1], 0).getDate();
-        var end = m + '-' + String(last).padStart(2, '0');
-        $('#maFrom').val(m + '-01');
-        $('#maTo').val(end > today ? today : end);
+    // a quick button fills From / To and loads; typing dates and Show still works
+    $('[data-range]').on('click', function () {
+        var r = EC.dateRange($(this).data('range'), SESSION_START);
+        $('[data-range]').removeClass('active'); $(this).addClass('active');
+        $('#maFrom').val(r.from); $('#maTo').val(r.to);
         load();
     });
+    $('#maFrom, #maTo').on('change', function () { $('[data-range]').removeClass('active'); });
     $('#maShow').on('click', load);
 
     function load() {

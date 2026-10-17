@@ -22,10 +22,13 @@ namespace educore.Areas.ERP.Controllers
             _att = att;
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index([FromServices] ISchoolSettingsService settings)
         {
             ViewBag.CanMark  = await HasPermissionAttribute.UserHasAsync(this, "staff.manage");
             ViewBag.CanCover = await HasPermissionAttribute.UserHasAsync(this, "academics.manage");
+            // the current session's first day, for the Staff report's "This session" button
+            try { ViewBag.SessionStart = (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.StartDate; }
+            catch { ViewBag.SessionStart = null; }
             return View();
         }
 

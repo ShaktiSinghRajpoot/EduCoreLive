@@ -4,6 +4,7 @@
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var canMark  = (bool?)ViewBag.CanMark ?? false;    // staff.manage
     var canCover = (bool?)ViewBag.CanCover ?? false;   // academics.manage
+    string? sessionStart = ViewBag.SessionStart as string;   // Staff report: "This session"
 }
 
 @*
@@ -93,6 +94,15 @@
           <input type="search" id="hSearch" class="form-control form-control-sm mb-1" placeholder="Search name or code">
           <select id="hStaff" class="form-select form-select-sm"><option value="">Choose staff</option></select>
         </div>
+        <div class="align-self-end"><div class="btn-group btn-group-sm flex-wrap" role="group">
+            <button type="button" class="btn btn-outline-primary active" data-hrange="month">This month</button>
+            <button type="button" class="btn btn-outline-primary" data-hrange="last">Last month</button>
+            <button type="button" class="btn btn-outline-primary" data-hrange="last3">Last 3 months</button>
+            @if (!string.IsNullOrEmpty(sessionStart))
+            {
+                <button type="button" class="btn btn-outline-primary" data-hrange="session">This session</button>
+            }
+          </div></div>
         <div><label class="form-label mb-1">From</label><input type="date" id="hFrom" class="form-control form-control-sm"></div>
         <div><label class="form-label mb-1">To</label><input type="date" id="hTo" class="form-control form-control-sm"></div>
         <button id="btnHist" class="btn btn-sm btn-primary align-self-end"><i class="bx bx-search me-1"></i>Show</button>
@@ -153,8 +163,18 @@ $(function () {
 
     // ── Staff report: one person over a date range ─────────────────────
     var histStaff = null;   // [{id, name, code, desg, active}] once loaded
+    var SESSION_START = '@(sessionStart ?? "")';
     $('#hTo').val(todayStr()).attr('max', todayStr());
     $('#hFrom').val(todayStr().substring(0, 8) + '01').attr('max', todayStr());
+
+    // a quick button fills From / To (and shows the report once a staff member is chosen)
+    $('[data-hrange]').on('click', function () {
+        var r = EC.dateRange($(this).data('hrange'), SESSION_START);
+        $('[data-hrange]').removeClass('active'); $(this).addClass('active');
+        $('#hFrom').val(r.from); $('#hTo').val(r.to);
+        if ($('#hStaff').val()) $('#btnHist').trigger('click');
+    });
+    $('#hFrom, #hTo').on('change', function () { $('[data-hrange]').removeClass('active'); });
 
     function loadHistStaff() {
         if (histStaff) return;

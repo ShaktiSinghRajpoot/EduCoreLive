@@ -28,9 +28,12 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index([FromServices] ISchoolSettingsService settings)
         {
             ViewBag.Me = await _self.GetMeAsync(TenantId(), SchoolId(), UserId());
+            // the current session's first day, for the "This session" button
+            try { ViewBag.SessionStart = (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.StartDate; }
+            catch { ViewBag.SessionStart = null; }
             return View();
         }
 

@@ -601,6 +601,29 @@ EC.today = function () {
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
 };
 
+// A ready-made date range as {from, to} ("yyyy-MM-dd"), never past today:
+//   'month'   this month so far        'last'    the whole of last month
+//   'last3'   this month and the two before it, so far
+//   'session' from sessionStart (the current session's first day) to today
+// Used by the quick buttons on Staff report and My Attendance.
+EC.dateRange = function (kind, sessionStart) {
+    var t = EC.today(), y = Number(t.substring(0, 4)), m = Number(t.substring(5, 7));
+    var ymd = function (yy, mm, dd) { return yy + '-' + ('0' + mm).slice(-2) + '-' + ('0' + dd).slice(-2); };
+    var back = function (n) {   // first day of the month n months before this one
+        var mm = m - n, yy = y;
+        while (mm < 1) { mm += 12; yy--; }
+        return ymd(yy, mm, 1);
+    };
+    if (kind === 'last') {
+        var lm = m - 1, ly = y;
+        if (lm < 1) { lm = 12; ly--; }
+        return { from: ymd(ly, lm, 1), to: ymd(ly, lm, new Date(ly, lm, 0).getDate()) };
+    }
+    if (kind === 'last3') return { from: back(2), to: t };
+    if (kind === 'session' && sessionStart) return { from: sessionStart.substring(0, 10), to: t };
+    return { from: back(0), to: t };
+};
+
 // ── Numbers ─────────────────────────────────────────────────────────────
 // Safe Number(): anything unparseable becomes 0, so arithmetic never turns
 // into NaN and prints "₹NaN" on screen.
