@@ -117,10 +117,10 @@
         @if (Model.ShowAttendance)
         {
         <div class="col-12 col-xxl-4 dash-animate" style="animation-delay:.05s">
-            <div class="dash-card h-100 position-relative">
+            <div class="dash-card h-100" data-card-href="@studentAttUrl" style="cursor:pointer">
                 <div class="dash-card-head d-flex justify-content-between align-items-center">
                     <div><h5 class="dash-card-title">Student Attendance · Today</h5><small class="dash-sub">Live snapshot</small></div>
-                    <a href="@studentAttUrl" class="dash-pill soft-green stretched-link text-decoration-none">View <i class="bx bx-chevron-right"></i></a>
+                    <a href="@studentAttUrl" class="dash-pill soft-green text-decoration-none">View <i class="bx bx-chevron-right"></i></a>
                 </div>
                 <div class="dash-card-body">
                     @* A class nobody marked is NOT a class that was absent, so the
@@ -239,10 +239,10 @@
         {
             var stt = Model.StaffToday;
             <div class="col-12 col-xl-4 dash-animate">
-                <div class="dash-card h-100 position-relative">
+                <div class="dash-card h-100" data-card-href="@Url.Action("Index", "StaffAttendance", new { area = "ERP" })" style="cursor:pointer">
                     <div class="dash-card-head d-flex justify-content-between align-items-center">
                         <div><h5 class="dash-card-title">Staff Attendance · Today</h5><small class="dash-sub">@stt.Total active staff</small></div>
-                        <a href="@Url.Action("Index", "StaffAttendance", new { area = "ERP" })" class="dash-pill soft-orange stretched-link text-decoration-none">View <i class="bx bx-chevron-right"></i></a>
+                        <a href="@Url.Action("Index", "StaffAttendance", new { area = "ERP" })" class="dash-pill soft-orange text-decoration-none">View <i class="bx bx-chevron-right"></i></a>
                     </div>
                     <div class="dash-card-body">
                         @if (stt.Marked == 0 && stt.OnLeave == 0)
@@ -695,6 +695,14 @@
 @section PageScripts {
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            // A card with data-card-href opens that page when clicked anywhere on it
+            document.querySelectorAll('[data-card-href]').forEach(function (card) {
+                card.addEventListener('click', function (e) {
+                    if (e.target.closest('a, button')) return;   // its own links work as they are
+                    window.location.href = card.getAttribute('data-card-href');
+                });
+            });
+
             // Attendance Defaulters: Students / Staff tabs
             document.querySelectorAll('[data-att-tab]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
