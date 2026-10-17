@@ -531,8 +531,12 @@ BEGIN
            COALESCE(p.enquiry_id, 0) AS enquiry_id,
            COALESCE(s.student_name, e.student_name, 'Student') AS student_name,
            COALESCE(s.admission_no, '-')                       AS admission_no,
-           COALESCE(s.class_name, e.class_name, '-')           AS class_name,
-           s.section AS section, s.roll_no AS roll_no,
+           -- the class of the session the payment was made in (core.student_enrolment):
+           -- a child promoted early is still in the old class until that session ends
+           COALESCE(en.class_name, s.class_name, e.class_name, '-') AS class_name,
+           COALESCE(en.section, s.section) AS section,
+           COALESCE(NULLIF(trim(en.roll_no), ''), s.roll_no) AS roll_no,
+           CASE WHEN en.student_id IS NOT NULL THEN ses.yr END AS session,   -- only when the child was enrolled in it
            -- Who took it, and when.
            p.created_by,
            core.fn_user_display_name(p.created_by)             AS collected_by,
@@ -552,12 +556,18 @@ BEGIN
     FROM core.fee_payments p
     LEFT JOIN core.students  s ON s.student_id = p.student_id
     LEFT JOIN core.enquiries e ON e.enquiry_id = p.enquiry_id
+    LEFT JOIN LATERAL (SELECT core.fn_session_on(p.tenant_id, p.school_id, p.payment_date::date) AS yr) ses ON TRUE
+    LEFT JOIN core.student_enrolment en ON en.student_id = p.student_id AND en.academic_year = ses.yr
     WHERE p.payment_id = v_payment_id;
 
+    -- each line's session, and where Year-End carried it from (the receipt marks
+    -- a fee of another session, e.g. "Dues of 2025-26")
     OPEN p_lines FOR
-    SELECT fee_head_name, installment_label, amount, concession, line_type
-    FROM core.fee_payment_details
-    WHERE payment_id = v_payment_id
-    ORDER BY detail_id;
+    SELECT d.fee_head_name, d.installment_label, d.amount, d.concession, d.line_type,
+           l.academic_year, l.carried_from
+    FROM core.fee_payment_details d
+    LEFT JOIN core.student_ledger l ON l.ledger_id = d.ledger_id
+    WHERE d.payment_id = v_payment_id
+    ORDER BY d.detail_id;
 END;
 $procedure$;

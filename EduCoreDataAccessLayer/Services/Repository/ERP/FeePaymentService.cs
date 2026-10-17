@@ -1343,6 +1343,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                                 ClassName       = DbRead.Str(reader, cols, "class_name"),
                                 Section         = DbRead.NStr(reader, cols, "section"),
                                 RollNo          = DbRead.NStr(reader, cols, "roll_no"),
+                                Session         = DbRead.NStr(reader, cols, "session"),
                                 DiscountAmount  = DbRead.Dec(reader, cols, "discount_amount"),
                                 DiscountApprovedBy = DbRead.NStr(reader, cols, "discount_approved_by"),
                                 CollectedBy     = DbRead.NStr(reader, cols, "collected_by"),
@@ -1367,7 +1368,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                                 InstallmentLabel = DbRead.NStr(reader, cols, "installment_label"),
                                 Amount           = DbRead.Dec(reader, cols, "amount"),
                                 Concession       = DbRead.Dec(reader, cols, "concession"),
-                                LineType         = DbRead.NStr(reader, cols, "line_type") ?? "Due"
+                                LineType         = DbRead.NStr(reader, cols, "line_type") ?? "Due",
+                                AcademicYear     = DbRead.NStr(reader, cols, "academic_year"),
+                                CarriedFrom      = DbRead.NStr(reader, cols, "carried_from")
                             });
                         }
                     });

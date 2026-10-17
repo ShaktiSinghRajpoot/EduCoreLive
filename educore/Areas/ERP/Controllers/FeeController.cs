@@ -732,7 +732,8 @@ namespace educore.Areas.ERP.Controllers
             // synthesize a single line from the header amount.
             var lines = r.Lines.Select(l => new
             {
-                label      = string.IsNullOrWhiteSpace(l.InstallmentLabel) ? l.FeeHeadName : $"{l.FeeHeadName} — {l.InstallmentLabel}",
+                label      = (string.IsNullOrWhiteSpace(l.InstallmentLabel) ? l.FeeHeadName : $"{l.FeeHeadName} — {l.InstallmentLabel}")
+                             + LineSession(l.AcademicYear, l.CarriedFrom, r.Session),
                 amount     = l.Amount,
                 concession = l.Concession,
                 lineType   = l.LineType
@@ -786,13 +787,18 @@ namespace educore.Areas.ERP.Controllers
                 // "Outstanding 4,35,000" and reasonably panic. A receipt states what
                 // is owed now; the year ahead is a fee structure, not a debt.
                 string today = Dates.Today;
-                decimal outstanding = open
-                    .Where(d => string.IsNullOrWhiteSpace(d.DueDate)
-                             || string.CompareOrdinal(d.DueDate, today) <= 0)
-                    .Sum(d => d.Outstanding);
+                var dueNow = open.Where(d => string.IsNullOrWhiteSpace(d.DueDate)
+                                          || string.CompareOrdinal(d.DueDate, today) <= 0).ToList();
+                decimal outstanding = dueNow.Sum(d => d.Outstanding);
+                // of which an older session's (or carried forward by Year-End), as the
+                // profile and Collect Fees show it
+                decimal previous = dueNow.Where(d => !string.IsNullOrWhiteSpace(d.CarriedFrom)
+                                                  || (!string.IsNullOrWhiteSpace(d.AcademicYear) && !string.IsNullOrWhiteSpace(r.Session)
+                                                      && string.CompareOrdinal(d.AcademicYear, r.Session) < 0))
+                                         .Sum(d => d.Outstanding);
 
                 if (outstanding > 0)
-                    dues = new { outstanding, asOn = today };
+                    dues = new { outstanding, previous, asOn = today };
             }
 
             // The school's chosen print format drives which template renders.
@@ -825,11 +831,23 @@ namespace educore.Areas.ERP.Controllers
                 cancelledBy    = r.CancelledByName,
                 cancelledAt    = r.CancelledAt?.ToString("yyyy-MM-dd HH:mm"),
                 cancelAuthorisedBy = r.CancelAuthorizedBy,
-                student     = new { name = r.StudentName, admNo = r.AdmissionNo, className = r.ClassName, section = r.Section, roll = r.RollNo },
+                student     = new { name = r.StudentName, admNo = r.AdmissionNo, className = r.ClassName, section = r.Section, roll = r.RollNo, session = r.Session },
                 registration,
                 dues,
                 lines
             });
+        }
+
+        // " (2027-28)" after a receipt line of another session, " (Dues of 2025-26)" after
+        // one Year-End carried forward; nothing for a fee of the receipt's own session.
+        private static string LineSession(string? year, string? carriedFrom, string? receiptSession)
+        {
+            if (!string.IsNullOrWhiteSpace(carriedFrom) && !string.Equals(carriedFrom, receiptSession, StringComparison.OrdinalIgnoreCase))
+                return $" (Dues of {carriedFrom})";
+            if (!string.IsNullOrWhiteSpace(year) && !string.IsNullOrWhiteSpace(receiptSession)
+                && !string.Equals(year, receiptSession, StringComparison.OrdinalIgnoreCase))
+                return $" ({year})";
+            return "";
         }
 
         // ── GET: /ERP/Fee/GetSchoolHeader ────────────────────────

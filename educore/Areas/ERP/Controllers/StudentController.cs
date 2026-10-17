@@ -389,13 +389,16 @@ namespace educore.Areas.ERP.Controllers
             // subjects follow that, and the header says where they go next.
             string viewClass = student.ClassName, viewYear = student.AcademicYear;
             string? viewSection = student.Section, viewRoll = student.RollNo, promotedTo = null;
+            // every session the child has been in, newest first (Academic tab: Class history)
+            var classHistory = new List<EduCoreDataAccessLayer.Models.ERP.StudentEnrolmentItem>();
             try
             {
+                classHistory = await _admissionService.GetEnrolmentHistoryAsync(studentId, TenantId(), SchoolId(), UserId());
                 var current = settings == null ? null
                     : (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.AcademicYearName;
                 if (current != null && !string.Equals(current, student.AcademicYear, StringComparison.OrdinalIgnoreCase))
                 {
-                    var now = (await _admissionService.GetEnrolmentHistoryAsync(studentId, TenantId(), SchoolId(), UserId()))
+                    var now = classHistory
                         .FirstOrDefault(e => string.Equals(e.AcademicYear, current, StringComparison.OrdinalIgnoreCase)
                                           && e.Status != "Left" && e.Status != "PassedOut");
                     if (now != null)
@@ -474,6 +477,10 @@ namespace educore.Areas.ERP.Controllers
                     cls       = viewClass,
                     sec       = viewSection ?? "—",
                     promotedTo,   // "Class 8 – A for 2027-28" while the old session runs
+                    classHistory = classHistory.Select(e => new
+                    {
+                        year = e.AcademicYear, cls = e.ClassName, sec = e.Section ?? "", roll = e.RollNo ?? "", status = e.Status
+                    }),
                     gender    = student.Gender ?? "—",
                     dob       = string.IsNullOrWhiteSpace(student.DateOfBirth) ? "—" : Dates.Show(student.DateOfBirth, "dd MMM yyyy"),
                     age,

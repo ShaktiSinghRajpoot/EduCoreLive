@@ -5666,3 +5666,15 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   `core.student_promotion_history`, using the latest move per child. `p_only_my_class` limits it to sections
   whose class teacher in that session is the user. The office (`students.manage`) sees the whole school;
   anyone else sees only their own class.
+
+### 2026-10-17 — Profile Class history; fee receipt follows the session
+- **Student profile › Academic:** "Current placement · 2026-27" names its session, and a new **Class history** box lists
+  every session (newest first) from `GetEnrolmentHistoryAsync`: "Studying now", "Next session" (promoted before
+  this session ended), or Promoted / Kept in same class / Passed out / Left. A child promoted early showed only
+  "Nursery" and looked as if the promotion had not happened.
+- **Fee receipt** (`core.sp_fee_receipt_get`, bundle `deploy_2026_10_17l.sql`; only that proc from
+  `fee_advance.sql`). The class is now the one of the session the payment was made in (`fn_session_on(payment_date)`
+  + `core.student_enrolment`). Before, a child promoted early paying this year's fee got a receipt saying next
+  session's class. The receipt prints "Nursery - A (2026-27)", each line carries its session when it is another
+  one ("Tuition Fee — Apr 2027 (2027-28)", "… (Dues of 2025-26)" for a Year-End carry), and under "Outstanding as
+  on" a line "of which previous session". A registration receipt (no enrolment yet) prints no session.

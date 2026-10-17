@@ -107,8 +107,12 @@
                     </div>
                     }
                     <div class="ec-detail-box mb-0">
-                        <div class="ec-detail-title">Current placement</div>
+                        <div class="ec-detail-title">Current placement <span id="ac-year" class="text-muted"></span></div>
                         <div id="ac-placement" class="mt-2"></div>
+                    </div>
+                    <div class="ec-detail-box mt-4 mb-0 d-none" id="ac-history-box">
+                        <div class="ec-detail-title">Class history</div>
+                        <div id="ac-history" class="mt-2"></div>
                     </div>
                 </div>
 
@@ -467,7 +471,8 @@ function loadDashboard(){
             feeDue:api.fee ? api.fee.outstanding : null,
             feeNow:api.fee ? api.fee.dueNow : null,
             feeSt:!api.fee ? null : api.fee.outstanding<=0 ? 'Paid' : (api.fee.totalPaid>0 ? 'Partial' : 'Pending'),
-            attend:null, color:'primary', subjects:st.subjects
+            attend:null, color:'primary', subjects:st.subjects,
+            year:st.year, classHistory:st.classHistory || []
         };
 
         STUDENT=s; DETAIL=buildDetail(api);
@@ -609,6 +614,24 @@ function renderAcademic(s,d){
 
     document.getElementById('ac-placement').innerHTML =
         ic('Class', s.cls) + ic('Section', s.sec) + ic('Roll No', s.roll);
+    document.getElementById('ac-year').textContent = s.year ? '· ' + s.year : '';
+
+    // One line per session, newest first. The session in progress is "Studying now";
+    // a later one is where the child goes next (promoted before this session ended).
+    var LABEL = { Promoted:'Promoted', Retained:'Kept in same class', PassedOut:'Passed out', Left:'Left the school' };
+    var hist = s.classHistory;
+    document.getElementById('ac-history-box').classList.toggle('d-none', hist.length < 2);
+    document.getElementById('ac-history').innerHTML = '<div class="table-responsive"><table class="table table-sm mb-0"><tbody>'
+        + hist.map(function(e){
+            var tag = e.year === s.year ? '<span class="badge bg-label-success">Studying now</span>'
+                    : e.year > s.year   ? '<span class="badge bg-label-info">Next session</span>'
+                    : '<span class="badge bg-label-secondary">'+EC.esc(LABEL[e.status] || e.status || 'Done')+'</span>';
+            return '<tr><td class="fw-semibold text-nowrap">'+EC.esc(e.year)+'</td>'
+                 + '<td>'+EC.esc(e.cls)+(e.sec ? ' – '+EC.esc(e.sec) : '')+'</td>'
+                 + '<td class="text-muted text-nowrap">'+(e.roll ? 'Roll '+EC.esc(e.roll) : '—')+'</td>'
+                 + '<td class="text-end">'+tag+'</td></tr>';
+        }).join('')
+        + '</tbody></table></div>';
 }
 
 /* ── Tab 3: Attendance ───────────────────────── */

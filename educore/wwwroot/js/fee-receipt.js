@@ -160,6 +160,8 @@
         if (r.dues && r.dues.outstanding > 0) {
             rows += '<div class="rc-kv rc-bal"><span>Outstanding as on ' + EC.esc(fmtDate(r.dues.asOn)) +
                     '</span><b>' + EC.money(r.dues.outstanding) + '</b></div>';
+            if (r.dues.previous > 0)
+                rows += '<div class="rc-kv"><span>of which previous session</span><b>' + EC.money(r.dues.previous) + '</b></div>';
         }
 
         return rows ? '<div class="rc-balance">' + rows + '</div>' : '';
@@ -204,10 +206,15 @@
                'onerror="this.style.display=\'none\'" />';
     }
 
+    // "Nursery - A (2026-27)": the class of the session the payment was made in
+    function classText(stu) {
+        return (stu.className || '-') + (stu.section ? ' - ' + stu.section : '') + (stu.session ? ' (' + stu.session + ')' : '');
+    }
+
     /* ---------- A4: full page, letterhead, School + Parent copy ---------- */
     function renderA4(r, copyLabel) {
         var sch = r.school || {}, stu = r.student || {};
-        var cls = (stu.className || '-') + (stu.section ? ' - ' + stu.section : '');
+        var cls = classText(stu);
         return '' +
         '<div class="rc rc-a4">' +
           '<div class="rc-head">' +
@@ -261,7 +268,7 @@
     /* ---------- A5: compact, two per A4 sheet ---------- */
     function renderA5(r) {
         var sch = r.school || {}, stu = r.student || {};
-        var cls = (stu.className || '-') + (stu.section ? ' - ' + stu.section : '');
+        var cls = classText(stu);
         return '' +
         '<div class="rc rc-a5">' +
           '<div class="rc-head">' +
@@ -298,7 +305,7 @@
     /* ---------- Thermal: 80mm roll ---------- */
     function renderThermal(r) {
         var sch = r.school || {}, stu = r.student || {};
-        var cls = (stu.className || '-') + (stu.section ? ' - ' + stu.section : '');
+        var cls = classText(stu);
         return '' +
         '<div class="rc rc-th">' +
           '<div class="rc-head">' +
@@ -431,7 +438,7 @@
        authorised it and who paid it out. */
     function renderRefund(v) {
         var sch = v.school || {}, stu = v.student || {};
-        var cls = (stu.className || '-') + (stu.section ? ' - ' + stu.section : '');
+        var cls = classText(stu);
         return '' +
         '<div class="rc rc-a5">' +
           '<div class="rc-head">' +

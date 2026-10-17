@@ -356,6 +356,7 @@
         public string    ClassName       { get; set; } = string.Empty;
         public string?   Section         { get; set; }
         public string?   RollNo          { get; set; }
+        public string?   Session         { get; set; }   // session the payment was made in
         /// <summary>Registration-fee discount (registration receipts carry it on the header).</summary>
         public decimal   DiscountAmount  { get; set; }
         public string?   DiscountApprovedBy { get; set; }
@@ -379,5 +380,7 @@
         public decimal Amount           { get; set; }
         public decimal Concession       { get; set; }
         public string  LineType         { get; set; } = "Due";   // Due | Extra
+        public string? AcademicYear     { get; set; }   // the session of the fee paid
+        public string? CarriedFrom      { get; set; }   // Year-End carried it from this session
     }
 }
