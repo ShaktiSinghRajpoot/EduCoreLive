@@ -5557,3 +5557,8 @@ New suite `tests/flow_fixes2_tests.sql` (10 checks, rolled back): all pass; the 
 - Staff Profile: "Class Teacher of: Class 3-A (2026-27)" in Employment Details.
 - Dashboard: the "Class Strength" list repeated the Class-wise Strength chart (and read "Class Class 1"); removed.
 - Bundle `deploy_2026_10_16b.sql`.
+- **Attendance register** (`core.fn_attendance_register`, used by the roster and the save) left in students of a
+  session that has not started on that date: three children admitted in October for 2027-28 were on Class 1-A's
+  2026-27 register and marked present. Found because the new "Your class" card (3 students) disagreed with the
+  register (6). Bundle `deploy_2026_10_17a.sql`; flow_fixes2 #12. The three rows saved on 17 Oct stay in the table
+  (QA data) but no longer show or count on the register.

@@ -12,6 +12,7 @@ BEGIN;
 \ir ../sp_staff_manage.sql
 \ir ../staff_payroll.sql
 \ir ../staff_leave.sql
+\ir ../student_attendance.sql
 \o
 
 DO $t$
@@ -133,6 +134,13 @@ BEGIN
     IF v_num > 0 AND v_n >= v_num AND r.message LIKE '%will be deducted in October 2026%'
     THEN pass := pass + 1; RAISE NOTICE 'PASS 11 Rs % recovered in October: %', v_num, right(r.message, 120);
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 11 deduction %, draft deduct %, msg %', v_num, v_n, r.message; END IF;
+
+    -- 12. a student admitted for next session is not on this session's register
+    --     (703 Myra Dubey: Class 1-A, admitted for 2027-28)
+    v_pid := 703;
+    SELECT COUNT(*) INTO v_n FROM core.fn_attendance_register(T, S, 'Class 1', 'A', CURRENT_DATE) WHERE student_id = v_pid;
+    IF v_n = 0 THEN pass := pass + 1; RAISE NOTICE 'PASS 12 next-session student not on today''s register';
+    ELSE fail := fail + 1; RAISE NOTICE 'FAIL 12 next-session student on today''s register'; END IF;
 
     RAISE NOTICE '== % passed, % failed ==', pass, fail;
 END;

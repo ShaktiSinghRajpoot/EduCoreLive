@@ -87,7 +87,10 @@ $procedure$;
 --     active or leaving on/after that date - unless that day's row already puts
 --     them in another class-section (they moved later, or were marked there);
 --   * plus anyone whose row for that date is already in this class-section, so a
---     past day can be corrected after a student moved or left.
+--     past day can be corrected after a student moved or left;
+--   * never a student of a session that has not started on that date: a child
+--     admitted in October for next April was on this year's register (and marked
+--     present) from the admission day.
 CREATE OR REPLACE FUNCTION core.fn_attendance_register(
     p_tenant_id integer, p_school_id integer, p_class varchar, p_section varchar, p_date date)
 RETURNS TABLE (student_id integer)
@@ -103,6 +106,10 @@ AS $function$
       AND (s.admission_date IS NULL OR s.admission_date::date <= p_date)
       AND (s.is_active
            OR (s.date_of_leaving IS NOT NULL AND s.date_of_leaving::date >= p_date))
+      AND NOT EXISTS (SELECT 1 FROM academic.academic_years y
+                       WHERE y.tenant_id = s.tenant_id AND y.school_id = s.school_id
+                         AND y.academic_year_name = s.academic_year AND NOT COALESCE(y.is_deleted, FALSE)
+                         AND NULLIF(y.start_date, '')::date > p_date)
       AND NOT EXISTS (
           SELECT 1 FROM core.student_attendance o
           WHERE o.tenant_id = s.tenant_id AND o.school_id = s.school_id
@@ -117,7 +124,11 @@ AS $function$
       AND a.school_id = p_school_id
       AND a.attendance_date = to_char(p_date, 'YYYY-MM-DD')
       AND LOWER(a.class_name)            = LOWER(TRIM(p_class))
-      AND LOWER(COALESCE(a.section, '')) = LOWER(TRIM(COALESCE(p_section, '')));
+      AND LOWER(COALESCE(a.section, '')) = LOWER(TRIM(COALESCE(p_section, '')))
+      AND NOT EXISTS (SELECT 1 FROM academic.academic_years y
+                       WHERE y.tenant_id = a.tenant_id AND y.school_id = a.school_id
+                         AND y.academic_year_name = a.academic_year AND NOT COALESCE(y.is_deleted, FALSE)
+                         AND NULLIF(y.start_date, '')::date > p_date);
 $function$;
 
 
