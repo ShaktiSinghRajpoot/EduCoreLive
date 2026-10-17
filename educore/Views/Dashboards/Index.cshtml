@@ -46,7 +46,7 @@
     <div class="row g-4">
 
         @* ============ HERO + LIVE ATTENDANCE ============ *@
-        <div class="col-12 @(Model.ShowAttendance ? "col-xxl-8" : "") dash-animate">
+        <div class="col-12 dash-animate">
             <div class="dash-hero h-100">
                 <div class="dash-hero-body d-flex flex-column h-100">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
@@ -114,46 +114,6 @@
             </div>
         </div>
 
-        @if (Model.ShowAttendance)
-        {
-        <div class="col-12 col-xxl-4 dash-animate" style="animation-delay:.05s">
-            <div class="dash-card h-100" data-card-href="@studentAttUrl" style="cursor:pointer">
-                <div class="dash-card-head d-flex justify-content-between align-items-center">
-                    <div><h5 class="dash-card-title">Student Attendance · Today</h5><small class="dash-sub">Live snapshot</small></div>
-                    <a href="@studentAttUrl" class="dash-pill soft-green text-decoration-none">View <i class="bx bx-chevron-right"></i></a>
-                </div>
-                <div class="dash-card-body">
-                    @* A class nobody marked is NOT a class that was absent, so the
-                       percentage is over students actually marked today. There is no
-                       staff attendance register at all, so that bar is gone. *@
-                    @if (Model.MarkedToday == 0)
-                    {
-                        <div class="text-muted small py-4 text-center">
-                            No attendance marked today yet.
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="row align-items-center">
-                            <div class="col-6"><div id="attendanceGauge"></div></div>
-                            <div class="col-6">
-                                <div class="mb-3">
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <span class="dash-sub"><i class="bx bxs-circle me-1" style="color:#0284c7;font-size:.5rem"></i>Present</span>
-                                        <strong>@Model.PresentToday/@Model.MarkedToday</strong>
-                                    </div>
-                                    <div class="dash-progress"><span style="width:@(Math.Round(Model.PresentToday * 100.0 / Model.MarkedToday))%;background:#0284c7"></span></div>
-                                </div>
-                                <div class="dash-sub small">
-                                    @(Model.Students - Model.MarkedToday) of @Model.Students students not marked yet.
-                                </div>
-                            </div>
-                        </div>
-                    }
-                </div>
-            </div>
-        </div>
-        }
 
         @* ============ PRIMARY KPI CARDS ============ *@
         @{
@@ -164,20 +124,29 @@
                 : (Model.TodayCollection >= Model.YesterdayCollection ? "up from " : "down from ")
                   + Money(Model.YesterdayCollection) + " yesterday";
 
+            // Today's attendance sits on the Students / Staff cards (one card per thing);
+            // clicking them opens the attendance pages.
+            var st = Model.StaffToday;
+            string studentAtt = !Model.ShowAttendance ? ""
+                : Model.MarkedToday == 0 ? "Today: attendance not marked yet"
+                : $"Today: {Model.PresentToday} present · {Model.MarkedToday - Model.PresentToday} absent · {Math.Max(Model.Students - Model.MarkedToday, 0)} not marked";
+            string staffAtt = st.Marked == 0 && st.OnLeave == 0 ? "Today: attendance not marked yet"
+                : $"Today: {st.Present} present · {st.Absent + st.HalfDay} absent · {st.OnLeave} on leave · {Math.Max(st.Total - st.Marked, 0)} not marked";
             var kpis = new[] {
                 new { Label="Total Students", Value=Model.Students.ToString(),
                       Trend=Model.Students == 1 ? "1 active student" : $"{Model.Students} active students",
-                      Soft="soft-green", Icon="bx-group", Spark="sparkStudents", Up=true },
+                      Soft="soft-green", Icon="bx-group", Spark="sparkStudents", Up=true,
+                      Att=studentAtt, Url=Model.ShowAttendance ? studentAttUrl : null },
                 new { Label="Total Staff", Value=Model.Staff.ToString(),
-                      Trend=!Model.ShowLeave ? (Model.Staff == 1 ? "1 active staff member" : $"{Model.Staff} active staff")
-                          : Model.OnLeaveToday == 0 ? "nobody on leave today" : $"{Model.OnLeaveToday} on leave today",
-                      Soft="soft-orange", Icon="bx-id-card", Spark="sparkStaff", Up=Model.OnLeaveToday == 0 },
+                      Trend=Model.Staff == 1 ? "1 active staff member" : $"{Model.Staff} active staff",
+                      Soft="soft-orange", Icon="bx-id-card", Spark="sparkStaff", Up=true,
+                      Att=staffAtt, Url=Url.Action("Index", "StaffAttendance", new { area = "ERP" }) },
                 new { Label="Today's Collection", Value=Money(Model.TodayCollection),
                       Trend=collectionTrend, Soft="soft-blue", Icon="bx-wallet", Spark="sparkCollection",
-                      Up=Model.TodayCollection >= Model.YesterdayCollection },
+                      Up=Model.TodayCollection >= Model.YesterdayCollection, Att="", Url=(string?)null },
                 new { Label="Outstanding Due", Value=Money(Model.Outstanding),
                       Trend=Model.DueStudents == 1 ? "1 student pending" : $"{Model.DueStudents} students pending",
-                      Soft="soft-red", Icon="bx-error-circle", Spark="sparkDue", Up=false },
+                      Soft="soft-red", Icon="bx-error-circle", Spark="sparkDue", Up=false, Att="", Url=(string?)null },
             };
 
             // Each figure needs its module: students, staff, then the two finance ones.
@@ -189,13 +158,17 @@
         {
             var k = kpis[i];
             <div class="col-12 col-sm-6 col-xl-3 dash-animate" style="animation-delay:@($"{0.05 * (i + 2):0.00}".Replace(",", "."))s">
-                <div class="dash-card dash-kpi h-100">
+                <div class="dash-card dash-kpi h-100" data-card-href="@k.Url" style="@(k.Url != null ? "cursor:pointer" : "")">
                     <div class="dash-card-body">
                         <div class="d-flex justify-content-between">
                             <div>
                                 <div class="dash-label mb-2">@k.Label</div>
                                 <div class="dash-value mb-1">@k.Value</div>
                                 <small class="fw-semibold" style="color:@(k.Up ? "#16a34a" : "#dc2626")"><i class="bx @(k.Up ? "bx-trending-up" : "bx-trending-down")"></i> @k.Trend</small>
+                                @if (k.Att != "")
+                                {
+                                    <small class="d-block dash-sub mt-1"><i class="bx bx-user-check me-1"></i>@k.Att</small>
+                                }
                             </div>
                             <span class="dash-icon @k.Soft"><i class="bx @k.Icon"></i></span>
                         </div>
@@ -234,42 +207,11 @@
         </div>
         }
 
-        @* ============ ATTENDANCE: STAFF TODAY + DEFAULTERS ============ *@
-        @if (Model.ShowStaff)
-        {
-            var stt = Model.StaffToday;
-            <div class="col-12 col-xl-4 dash-animate">
-                <div class="dash-card h-100" data-card-href="@Url.Action("Index", "StaffAttendance", new { area = "ERP" })" style="cursor:pointer">
-                    <div class="dash-card-head d-flex justify-content-between align-items-center">
-                        <div><h5 class="dash-card-title">Staff Attendance · Today</h5><small class="dash-sub">@stt.Total active staff</small></div>
-                        <a href="@Url.Action("Index", "StaffAttendance", new { area = "ERP" })" class="dash-pill soft-orange text-decoration-none">View <i class="bx bx-chevron-right"></i></a>
-                    </div>
-                    <div class="dash-card-body">
-                        @if (stt.Marked == 0 && stt.OnLeave == 0)
-                        {
-                            <div class="text-muted small py-3 text-center">Staff attendance not marked today yet.</div>
-                        }
-                        else
-                        {
-                            <div class="row g-2 text-center">
-                                <div class="col-6"><div class="p-2 rounded" style="background:#dcfce7"><div class="fw-bold fs-5 text-success">@stt.Present</div><small class="dash-sub">Present</small></div></div>
-                                <div class="col-6"><div class="p-2 rounded" style="background:#fee2e2"><div class="fw-bold fs-5 text-danger">@stt.Absent</div><small class="dash-sub">Absent</small></div></div>
-                                <div class="col-6"><div class="p-2 rounded" style="background:#fef3c7"><div class="fw-bold fs-5" style="color:#b45309">@stt.HalfDay</div><small class="dash-sub">Half day</small></div></div>
-                                <div class="col-6"><div class="p-2 rounded" style="background:#e0e7ff"><div class="fw-bold fs-5" style="color:#4338ca">@stt.OnLeave</div><small class="dash-sub">On leave</small></div></div>
-                            </div>
-                        }
-                        @if (stt.Total - stt.Marked > 0)
-                        {
-                            <div class="dash-sub small mt-2">@(stt.Total - stt.Marked) of @stt.Total not marked yet.</div>
-                        }
-                    </div>
-                </div>
-            </div>
-        }
+        @* ============ ATTENDANCE DEFAULTERS (today's attendance is on the Students / Staff cards) ============ *@
         @if (Model.ShowAttendance || Model.ShowStaff)
         {
             bool stuTab = Model.ShowAttendance;
-            <div class="col-12 @(Model.ShowStaff ? "col-xl-8" : "") dash-animate">
+            <div class="col-12 dash-animate">
                 <div class="dash-card h-100">
                     <div class="dash-card-head d-flex flex-column flex-md-row justify-content-between gap-2">
                         <div><h5 class="dash-card-title">Attendance Defaulters</h5><small class="dash-sub">Students below 75% this session · staff absences this month</small></div>
@@ -718,8 +660,7 @@
             const DASH = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(new {
                 trend   = Model.Trend.Select(t => new { label = Dates.Show(t.Date, "ddd"), amount = t.Amount }),
                 classes = Model.Classes.Select(c => new { name = c.ClassName, students = c.Students }),
-                modes   = Model.Modes.Select(m => new { name = m.Mode, amount = m.Amount }),
-                attendancePct = Model.MarkedToday == 0 ? 0 : Math.Round(Model.PresentToday * 100.0 / Model.MarkedToday)
+                modes   = Model.Modes.Select(m => new { name = m.Mode, amount = m.Amount })
             }));
 
             const orange = '#ff8a00', green = '#16a34a', red = '#dc2626', amber = '#d97706', blue = '#0284c7';
@@ -741,28 +682,6 @@
             // staff and outstanding totals are not snapshotted anywhere, so their
             // sparklines were pure invention and are gone.
             spark('sparkCollection', blue, DASH.trend.map(function (t) { return t.amount; }));
-
-            // ---- Attendance gauge ----
-            if (document.querySelector('#attendanceGauge')) {
-                new ApexCharts(document.querySelector('#attendanceGauge'), {
-                    chart: { type: 'radialBar', height: 200 },
-                    series: [DASH.attendancePct],
-                    colors: [orange],
-                    plotOptions: {
-                        radialBar: {
-                            hollow: { size: '60%' },
-                            track: { background: '#f0eee9' },
-                            dataLabels: {
-                                name: { offsetY: 22, color: '#8b8175', fontSize: '.8rem' },
-                                value: { offsetY: -14, fontSize: '1.6rem', fontWeight: 800, color: '#2b1b12', formatter: v => v + '%' }
-                            }
-                        }
-                    },
-                    fill: { type: 'gradient', gradient: { shade: 'light', type: 'horizontal', gradientToColors: ['#ffb300'], stops: [0, 100] } },
-                    stroke: { lineCap: 'round' },
-                    labels: ['Present']
-                }).render();
-            }
 
             // ---- Collection trend ----
             if (document.querySelector('#collectionTrendChart')) {
