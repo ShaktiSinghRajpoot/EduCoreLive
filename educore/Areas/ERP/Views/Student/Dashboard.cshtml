@@ -844,7 +844,8 @@ function renderFee(s,d){
             return '<tr>'
                 +'<td class="fw-bold">'+EC.esc(f.head)+'</td>'
                 +'<td>'+EC.esc(f.installment)
-                    +(f.session && f.session!==(d.feeBuckets||{}).session ? ' <span class="badge bg-label-info">'+EC.esc(f.session)+'</span>' : '')+'</td>'
+                    +(f.carriedFrom ? ' <span class="badge bg-label-danger">Dues of '+EC.esc(f.carriedFrom)+'</span>'
+                      : f.session && f.session!==(d.feeBuckets||{}).session ? ' <span class="badge bg-label-info">'+EC.esc(f.session)+'</span>' : '')+'</td>'
                 +'<td>'+EC.esc(f.dueDate)+'</td>'
                 +'<td>'+inr(f.due)+'</td>'
                 +'<td class="text-success fw-bold">'+inr(f.paid)+'</td>'

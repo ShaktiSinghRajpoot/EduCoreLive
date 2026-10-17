@@ -605,7 +605,15 @@ BEGIN
                         SELECT SUM(l.amount_due - l.amount_paid - l.concession)
                         FROM core.student_ledger l
                         WHERE l.student_id = s.student_id
-                    ), 0) AS fee_due
+                    ), 0) AS fee_due,
+                    -- only what has fallen due (due date today or earlier): months still
+                    -- ahead and next session's fees are not owed yet (Promotion's flag)
+                    COALESCE((
+                        SELECT SUM(l.amount_due - l.amount_paid - l.concession)
+                        FROM core.student_ledger l
+                        WHERE l.student_id = s.student_id
+                          AND (l.due_date IS NULL OR l.due_date::date <= CURRENT_DATE)
+                    ), 0) AS fee_due_now
                 FROM core.students s
                 -- Per-session position (core.student_enrolment). students.academic_year
                 -- only holds where a student is NOW, so filtering on it loses everyone

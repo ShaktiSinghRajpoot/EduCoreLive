@@ -17,5 +17,6 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal   Outstanding      { get; set; }
         public bool      IsRefundable     { get; set; }
         public string?   AcademicYear     { get; set; }   // the session the line belongs to
+        public string?   CarriedFrom      { get; set; }   // old session, when Year-End carried it forward
     }
 }

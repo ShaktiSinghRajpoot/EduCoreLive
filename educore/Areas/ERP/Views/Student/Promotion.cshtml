@@ -115,7 +115,7 @@
             <span>
               Promote students who still owe fees
               <span class="d-block text-muted" style="font-size:.75rem;">
-                Untick to hold them back instead. Old dues stay on the student's account
+                "Fee Due Now" counts only fees whose due date has passed. Untick to hold them back instead. Old dues stay on the student's account
                 either way; decide them afterwards on Year-End (carry forward or write off).
               </span>
             </span>
@@ -185,7 +185,7 @@
                 <th style="width:38px;"><input type="checkbox" class="form-check-input" id="selAll" checked></th>
                 <th>Student</th>
                 <th>Roll No</th>
-                <th>Pending Dues</th>
+                <th>Fee Due Now</th>
                 <th>Next Class</th>
                 <th style="width:260px;">Outcome</th>
               </tr>
@@ -533,7 +533,7 @@ function render(){
       +   '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
       +'</div></td>'
       +'<td>'+EC.esc(s.roll||'—')+'</td>'
-      +'<td><span class="pr-due '+(s.due>0?'has':'clear')+'">'+inr(s.due)+'</span></td>'
+      +'<td><span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> '+inr(s.due) : 'Paid up')+'</span></td>'
       +'<td>'+ncTxt+'</td>'
       +'<td>'+seg(s.id, oc)+'</td>'
       +'</tr>';
@@ -552,7 +552,7 @@ function render(){
       +  '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.roll||'—')+' · '+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
       +'</div>'
       +'<div class="pr-mob-meta">'
-      +  '<span class="pr-due '+(s.due>0?'has':'clear')+'">Dues '+inr(s.due)+'</span>'
+      +  '<span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> Fee due '+inr(s.due) : 'Fees paid up')+'</span>'
       +'</div>'
       +'<div class="text-muted small fw-bold mb-2"><i class="bx bx-right-arrow-alt"></i> '+ncTxt+'</div>'
       +seg(s.id, oc, 'ocm')
@@ -796,8 +796,10 @@ document.getElementById('reviewBtn').addEventListener('click', function(){
       tgtY=document.getElementById('tgtYear').value,
       cls=document.getElementById('srcClass').value;
   document.getElementById('confirmFlow').textContent=cls+' · '+srcY+'  →  '+tgtY;
+  var owing=picked().filter(function(s){ return (s.due||0)>0 && outcome[s.id]!=='passout'; });
   document.getElementById('mDues').textContent=
-    document.getElementById('carryDues').checked ? 'Yes, promote them' : 'No, hold them back';
+    (owing.length ? owing.length+' owe '+inr(owing.reduce(function(t,s){ return t+s.due; },0))+' · ' : 'None · ')
+    + (document.getElementById('carryDues').checked ? 'promote them' : 'hold them back');
 
   var dn=duesSkipCount();
   document.getElementById('mDuesCount').textContent=dn;

@@ -156,6 +156,7 @@ DECLARE
     v_to_class    varchar;
     v_to_section  varchar;
     v_dues        numeric(12,2);
+    v_due_now     numeric(12,2);
     v_promoted    integer := 0;
     v_retained    integer := 0;
     v_passed      integer := 0;
@@ -278,10 +279,18 @@ BEGIN
             WHERE l.student_id = s.student_id;
             v_dues := GREATEST(v_dues, 0);
 
+            -- What has fallen due by today. Holding a child back is about fees
+            -- they owe now, not the months still ahead of the session.
+            SELECT COALESCE(SUM(l.amount_due - l.amount_paid - COALESCE(l.concession, 0)), 0)
+            INTO v_due_now
+            FROM core.student_ledger l
+            WHERE l.student_id = s.student_id
+              AND (l.due_date IS NULL OR l.due_date::date <= CURRENT_DATE);
+
             -- The ledger is not year-scoped, so dues follow the student no
             -- matter what. Unticking the box therefore means "do not take the
             -- dues into the new session" -> those students must settle first.
-            IF NOT p_carry_dues AND v_dues > 0 AND v_outcome <> 'PassOut' THEN
+            IF NOT p_carry_dues AND v_due_now > 0 AND v_outcome <> 'PassOut' THEN
                 v_skipped := v_skipped || (s.student_name || ' (pending dues)');
                 CONTINUE;
             END IF;

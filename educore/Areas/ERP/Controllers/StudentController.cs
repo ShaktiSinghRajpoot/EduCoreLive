@@ -181,7 +181,9 @@ namespace educore.Areas.ERP.Controllers
                 roll    = s.RollNo,
                 cls     = s.ClassName,
                 sec     = s.Section,
-                due     = s.FeeDue
+                // what the child owes today; months still ahead and next
+                // session's fees are not dues yet (as at a real fee counter)
+                due     = s.FeeDueNow
             });
             return Json(roster);
         }
@@ -485,7 +487,8 @@ namespace educore.Areas.ERP.Controllers
                     restSession = dues.Where(d => !DueByToday(d.DueDate) && SameYear(d.AcademicYear, viewYear)).Sum(d => d.Outstanding),
                     nextSession = dues.Where(d => !DueByToday(d.DueDate) && Later(d.AcademicYear, viewYear)).Sum(d => d.Outstanding),
                     nextYear    = dues.Where(d => !DueByToday(d.DueDate) && Later(d.AcademicYear, viewYear)).Select(d => d.AcademicYear).FirstOrDefault(),
-                    prevSession = dues.Where(d => Earlier(d.AcademicYear, viewYear)).Sum(d => d.Outstanding),
+                    // an older session's due, or one Year-End carried into this session
+                    prevSession = dues.Where(d => Earlier(d.AcademicYear, viewYear) || !string.IsNullOrWhiteSpace(d.CarriedFrom)).Sum(d => d.Outstanding),
                     session     = viewYear,
                     rows = dues.Select(d => new
                     {
@@ -494,6 +497,7 @@ namespace educore.Areas.ERP.Controllers
                         installment = d.InstallmentLabel ?? "—",
                         dueDate     = string.IsNullOrWhiteSpace(d.DueDate) ? "—" : Dates.Show(d.DueDate, "dd MMM yyyy"),
                         session     = d.AcademicYear ?? "",
+                        carriedFrom = d.CarriedFrom ?? "",
                         due         = d.AmountDue,
                         paid        = d.AmountPaid,
                         outstanding = d.Outstanding

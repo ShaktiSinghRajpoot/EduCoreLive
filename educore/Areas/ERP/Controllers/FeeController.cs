@@ -212,6 +212,7 @@ namespace educore.Areas.ERP.Controllers
                     amount   = d.Outstanding,           // payable now (due − paid − concession)
                     refundable = d.IsRefundable,
                     session  = d.AcademicYear ?? "",      // the page splits what is owed by session
+                    carriedFrom = d.CarriedFrom ?? "",    // Year-End moved it here from this older session
                     overdue  = d.DueDate != null && string.CompareOrdinal(d.DueDate, today) < 0
                 }).ToList();
 

@@ -871,6 +871,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             ApprovalStatus = Has(row, "approval_status") && row["approval_status"] != DBNull.Value ? row["approval_status"].ToString()! : "Approved",
             FeeStatus      = Has(row, "fee_status") && row["fee_status"] != DBNull.Value ? row["fee_status"].ToString()! : "Pending",
             FeeDue         = DecVal(row, "fee_due"),
+            FeeDueNow      = DecVal(row, "fee_due_now"),
             EnquiryId      = Has(row, "enquiry_id") && row["enquiry_id"] != DBNull.Value ? Convert.ToInt32(row["enquiry_id"]) : null,
             PhotoUrl       = NullStr(row, "photo_url")
         };

@@ -119,6 +119,7 @@
         public string    ApprovalStatus { get; set; } = "Approved";
         public string    FeeStatus      { get; set; } = "Pending";
         public decimal   FeeDue         { get; set; }
+        public decimal   FeeDueNow      { get; set; }   // fallen due by today (not months ahead)
         public int?      EnquiryId      { get; set; }
         public string?   PhotoUrl       { get; set; }
 

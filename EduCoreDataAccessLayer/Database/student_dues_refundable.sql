@@ -35,7 +35,8 @@ BEGIN
         concession,
         (amount_due - amount_paid - concession) AS outstanding,
         core.fn_ledger_head_refundable(ledger_id) AS is_refundable,
-        academic_year            -- the student profile splits dues by session
+        academic_year,           -- the student profile splits dues by session
+        carried_from             -- set when Year-End moved the due here from an older session
     FROM core.student_ledger
     WHERE tenant_id  = p_tenant_id
       AND school_id  = p_school_id

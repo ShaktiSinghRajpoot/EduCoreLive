@@ -465,7 +465,7 @@ $(function () {
         var view=$session.val()||'', dueNow=0, prev=0, rest=0, next=0, nextYear='';
         allDues().forEach(function(d){
             var yr=d.session||view;
-            if(yr<view) prev+=d.amount;
+            if(yr<view || d.carriedFrom) prev+=d.amount;     // an older session's due, or one carried forward
             if(d.overdue || !d.dueDate || d.dueDate<=todayIso()) dueNow+=d.amount;
             else if(yr>view){ next+=d.amount; nextYear=nextYear||yr; }
             else rest+=d.amount;
@@ -512,7 +512,8 @@ $(function () {
             '<label class="due-main"><input type="checkbox" class="form-check-input due-chk"'+(s?' checked':'')+'>'+
               '<div class="due-info"><div class="due-label">'+EC.esc(d.label)+((deposit||d.refundable)?'<span class="deposit-tag">refundable</span>':'')+'</div>'+
               '<div class="due-meta">'+(d.overdue?'<span class="overdue">Overdue</span> · ':'')+'Due '+EC.esc(d.dueDate ? EC.date(d.dueDate) : '—')+
-                (d.session && d.session!==$session.val() ? ' <span class="badge bg-label-info">'+EC.esc(d.session)+'</span>' : '')+'</div></div>'+
+                (d.carriedFrom ? ' <span class="badge bg-label-danger">Dues of '+EC.esc(d.carriedFrom)+'</span>'
+                 : d.session && d.session!==$session.val() ? ' <span class="badge bg-label-info">'+EC.esc(d.session)+'</span>' : '')+'</div></div>'+
               '<div class="due-amt">'+EC.money(d.amount)+'</div></label></div>';
     }
     function renderDues(){

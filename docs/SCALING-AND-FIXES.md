@@ -5634,3 +5634,14 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   "Whole session ₹58,100" and counted next session's fees in. It now reads "Rest of 2026-27 ₹10,600 · 2027-28
   (from its start) ₹34,100" (plus "Previous session" when old dues are open), measured against the session picked
   in the filter. A due from another session carries a session badge.
+
+### 2026-10-17 — Carried dues marked; Promotion flags only fees already due
+- `sp_student_dues_get` also returns `carried_from` (bundle `deploy_2026_10_17i.sql`). A due that Year-End carried into
+  the new session shows a red **"Dues of 2025-26"** badge on Collect Fees and on the student profile, and counts
+  under "Previous session" there. Before, it looked like an ordinary line of the new session.
+- **Promotion:** the Pending Dues column summed every open ledger line, including months still ahead and next
+  session's fees, so almost every child showed red. `sp_admission_manage` 'GetStudents' now also returns
+  `fee_due_now` (due date today or earlier). The roster's column is "Fee Due Now" ("Paid up" when 0, a red flag
+  when not), and the confirm box says "N owe ₹X". With "Promote students who still owe fees" unticked,
+  `sp_student_promote` holds back only a child with a due already fallen due. Test:
+  `tests/promotion_dues_flag_tests.sql` (5, rolled back).
