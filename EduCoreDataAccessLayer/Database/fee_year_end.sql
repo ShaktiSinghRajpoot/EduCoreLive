@@ -142,7 +142,10 @@ BEGIN
     -- ── List: the session's open lines, its write-offs, and what it carried forward
     IF p_operation = 'List' THEN
         OPEN p_result FOR
-        SELECT l.ledger_id, l.student_id, s.student_name, s.admission_no, s.class_name, s.section,
+        -- the class the child was in during THIS session (core.student_enrolment):
+        -- a child already promoted has next session's class on the student row
+        SELECT l.ledger_id, l.student_id, s.student_name, s.admission_no,
+               COALESCE(e.class_name, s.class_name) AS class_name, COALESCE(e.section, s.section) AS section,
                s.guardian_name, s.mobile,
                l.fee_head_name, l.installment_label, l.due_date,
                CASE WHEN l.close_source = 'YearEnd' THEN l.closed_amount
@@ -158,12 +161,14 @@ BEGIN
           FROM core.student_ledger l
           JOIN core.students s ON s.student_id = l.student_id
                               AND s.tenant_id = p_tenant_id AND s.school_id = p_school_id
+          LEFT JOIN core.student_enrolment e ON e.student_id = l.student_id AND lower(e.academic_year) = v_year
          WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
            AND (   (lower(COALESCE(NULLIF(trim(l.academic_year), ''), s.academic_year)) = v_year
                     AND (l.amount_due > l.amount_paid + l.concession
                          OR (l.close_source = 'YearEnd' AND l.closed_amount > 0)))
                 OR (lower(l.carried_from) = v_year AND l.amount_due > l.amount_paid + l.concession))
-         ORDER BY s.class_name, s.section, s.student_name, l.student_id, l.due_date NULLS LAST, l.ledger_id;
+         ORDER BY COALESCE(e.class_name, s.class_name), COALESCE(e.section, s.section), s.student_name,
+                  l.student_id, l.due_date NULLS LAST, l.ledger_id;
         RETURN;
     END IF;
 

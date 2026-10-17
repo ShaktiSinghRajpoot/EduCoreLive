@@ -5645,3 +5645,13 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   when not), and the confirm box says "N owe ₹X". With "Promote students who still owe fees" unticked,
   `sp_student_promote` holds back only a child with a due already fallen due. Test:
   `tests/promotion_dues_flag_tests.sql` (5, rolled back).
+
+### 2026-10-17 — Promotion and Year-End tested together, in either order
+- `tests/promotion_year_end_flow_tests.sql` (25 checks, rolled back; the session is made to end today). It covers:
+  promote with dues then Year-End carry; Year-End carry before promoting, then promote (hold-back still counts carried
+  dues); pass out with dues then write-off; and promoting after the session's fees are closed.
+- Fixed from it: the **Year-End list** showed a promoted child's old dues under next session's class (Class 4 for
+  2026-27 dues). `sp_fee_year_end_manage` 'List' now takes the class of that session from `core.student_enrolment`
+  (bundle `deploy_2026_10_17j.sql`).
+- Collect Fees: an older session's months not yet due were counted twice (under Previous session and under Rest of
+  the selected session). Now counted once.
