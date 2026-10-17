@@ -234,6 +234,16 @@
             </a>
         </li>
         }
+        @if (hasStaffRecord)
+        {
+        @* attendance is not part of the Payroll module: anyone with a staff record *@
+        <li class='menu-item @On("MyAttendance")'>
+            <a asp-area="ERP" asp-controller="MyAttendance" asp-action="Index" class="menu-link">
+                <i class="menu-icon icon-base bx bx-user-check ic-hr"></i>
+                <div class="text-truncate">My Attendance</div>
+            </a>
+        </li>
+        }
         @if (gMyStaff)
         {
         <li class='menu-item @On("MyLeave")'>

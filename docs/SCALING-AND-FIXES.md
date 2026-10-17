@@ -5604,3 +5604,6 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   `StaffAttendanceController.History`. Dashboard: today's attendance moved onto the Total Students / Total Staff
   cards (which open the attendance pages); the two separate attendance cards were removed.
 - Bundle `deploy_2026_10_17d.sql`.
+- **My Attendance** (`/ERP/MyAttendance`, menu + dashboard quick link for anyone with a staff record, not tied to
+  Payroll): the same report as the Staff report tab for the signed-in person only -- month picker or date range.
+  The staff id comes from the login's own staff record, never from the browser.

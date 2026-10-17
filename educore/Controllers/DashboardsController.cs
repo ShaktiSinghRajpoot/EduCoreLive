@@ -149,12 +149,13 @@ namespace educore.Controllers
             var links = new List<DashboardLink>();
             if (isDriver)
                 links.Add(new DashboardLink { Label = "My Bus", Icon = "bx-bus", Url = "/ERP/MyBus", Color = "#ff8a00" });
-            // My Leave / My Payslip: for anyone with a current staff record (no permission key).
-            bool isStaff = false;
-            if (payroll)
-            {
-                try { isStaff = await _self.HasStaffRecordAsync(t, s, u); } catch { isStaff = false; }
-            }
+            // My Attendance / My Leave / My Payslip: for anyone with a current staff record
+            // (no permission key). Leave and payslips belong to the Payroll module.
+            bool hasStaff = false;
+            try { hasStaff = await _self.HasStaffRecordAsync(t, s, u); } catch { hasStaff = false; }
+            if (hasStaff)
+                links.Add(new DashboardLink { Label = "My Attendance", Icon = "bx-user-check", Url = "/ERP/MyAttendance", Color = "#0f766e" });
+            bool isStaff = payroll && hasStaff;
             if (isStaff)
             {
                 links.Add(new DashboardLink { Label = "My Leave",   Icon = "bx-calendar-minus", Url = "/ERP/MyLeave",   Color = "#e83e8c" });
