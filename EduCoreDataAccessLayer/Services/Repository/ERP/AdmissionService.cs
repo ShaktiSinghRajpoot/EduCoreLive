@@ -20,6 +20,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private const string SpStudentExit = "core.sp_student_exit";
         private const string SpStudentExitList = "core.sp_student_exit_list";
         private const string SpClassLadder = "core.sp_class_ladder";
+        private const string SpPromotionHistory = "core.sp_promotion_history";
         private const string SpStudentPromote = "core.sp_student_promote";
         private const string SpEnrolmentHistory = "core.sp_student_enrolment_history";
 
@@ -658,6 +659,47 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     rungs.Add(new ClassLadderItem { Name = name!, Order = IntVal(row, "display_order") });
             }
             return rungs;
+        }
+
+        public async Task<List<PromotionHistoryRow>> GetPromotionHistoryAsync(
+            string fromYear, bool onlyMyClass, int tenantId, int schoolId, int actionUserId)
+        {
+            var rows = new List<PromotionHistoryRow>();
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(fromYear)) return rows;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_from_year",      NpgsqlDbType.Varchar) { Value = fromYear.Trim() },
+                new("p_only_my_class",  NpgsqlDbType.Boolean) { Value = onlyMyClass },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "promotion_history_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpPromotionHistory, parameters);
+            if (ds.Tables.Count == 0) return rows;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                rows.Add(new PromotionHistoryRow
+                {
+                    PublicId      = Has(row, "public_id") && row["public_id"] != DBNull.Value ? (Guid)row["public_id"] : Guid.Empty,
+                    StudentName   = Str(row, "student_name"),
+                    AdmissionNo   = NullStr(row, "admission_no"),
+                    FromClass     = Str(row, "from_class"),
+                    FromSection   = NullStr(row, "from_section"),
+                    ToYear        = NullStr(row, "to_year"),
+                    ToClass       = NullStr(row, "to_class"),
+                    ToSection     = NullStr(row, "to_section"),
+                    Outcome       = Str(row, "outcome"),
+                    DuesAtTheTime = DecVal(row, "dues_carried"),
+                    PromotedBy    = NullStr(row, "promoted_by"),
+                    PromotedAt    = Has(row, "promoted_at") && row["promoted_at"] != DBNull.Value ? Convert.ToDateTime(row["promoted_at"]) : null
+                });
+            }
+            return rows;
         }
 
         public async Task<StudentPromotionResult> PromoteStudentsAsync(

@@ -41,6 +41,23 @@
         public string? ToClass  { get; set; }
     }
 
+    /// <summary>One child moved out of a session (Students › Promotion History).</summary>
+    public class PromotionHistoryRow
+    {
+        public Guid      PublicId     { get; set; }
+        public string    StudentName  { get; set; } = string.Empty;
+        public string?   AdmissionNo  { get; set; }
+        public string    FromClass    { get; set; } = string.Empty;
+        public string?   FromSection  { get; set; }
+        public string?   ToYear       { get; set; }
+        public string?   ToClass      { get; set; }
+        public string?   ToSection    { get; set; }
+        public string    Outcome      { get; set; } = string.Empty;   // Promote | Retain | PassOut
+        public decimal   DuesAtTheTime { get; set; }
+        public string?   PromotedBy   { get; set; }
+        public DateTime? PromotedAt   { get; set; }
+    }
+
     public class StudentPromotionResult
     {
         public bool    Success       { get; set; }

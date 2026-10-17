@@ -109,6 +109,44 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
+        // Promotion History: who moved out of a session and how. The office (students.manage)
+        // sees the whole school; anyone else sees only the classes they are class teacher of.
+        public async Task<IActionResult> PromoteHistory()
+        {
+            try { ViewBag.YearList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }
+            catch { ViewBag.YearList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+            ViewBag.WholeSchool = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> PromoteHistoryData(string? fromYear)
+        {
+            if (string.IsNullOrWhiteSpace(fromYear)) return Json(new { success = false, message = "Choose a session." });
+            bool wholeSchool = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
+            bool canViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
+            var rows = await _admissionService.GetPromotionHistoryAsync(fromYear, !wholeSchool, TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                success = true,
+                rows = rows.Select(r => new
+                {
+                    id      = r.PublicId,
+                    name    = r.StudentName,
+                    admNo   = r.AdmissionNo ?? "",
+                    fromCls = r.FromClass,
+                    fromSec = r.FromSection ?? "",
+                    toYear  = r.ToYear ?? "",
+                    toCls   = r.ToClass ?? "",
+                    toSec   = r.ToSection ?? "",
+                    outcome = r.Outcome,
+                    dues    = canViewFees ? r.DuesAtTheTime : (decimal?)null,   // fee figures only to fee users
+                    by      = r.PromotedBy ?? "",
+                    at      = r.PromotedAt?.ToString("dd MMM yyyy, hh:mm tt") ?? ""
+                })
+            });
+        }
+
         // Is the chosen session ready to receive students? Classes and sections
         // are per-session rows, so a new session is empty until its structure is
         // copied forward — promoting into it would strand every student on a

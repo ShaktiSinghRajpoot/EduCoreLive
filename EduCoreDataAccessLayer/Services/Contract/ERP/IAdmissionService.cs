@@ -87,6 +87,11 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<StudentPromotionResult> PromoteStudentsAsync(
             StudentPromotionRequest request, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Who moved out of a session and how (promotion_history.sql).
+        /// onlyMyClass = just the sections the user is class teacher of.</summary>
+        Task<List<PromotionHistoryRow>> GetPromotionHistoryAsync(
+            string fromYear, bool onlyMyClass, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>A student's session-by-session timeline, newest session first.</summary>
         Task<List<StudentEnrolmentItem>> GetEnrolmentHistoryAsync(
             int studentId, int tenantId, int schoolId, int actionUserId);

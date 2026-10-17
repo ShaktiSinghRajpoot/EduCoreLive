@@ -5655,3 +5655,14 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   (bundle `deploy_2026_10_17j.sql`).
 - Collect Fees: an older session's months not yet due were counted twice (under Previous session and under Rest of
   the selected session). Now counted once.
+
+### 2026-10-17 — Students › Promotion History
+- New page `/ERP/Student/PromoteHistory` (menu: Students › Promotion History; action named so the menu's
+  `On("Promotion")` does not light up both items). Pick the session promoted FROM. It shows Total / Promoted /
+  Kept in same class / Passed out (click one to filter), a class-by-class table (click a class to list it), and a
+  list: from class → to class (session), result, fee due at the time (fee users only), done by and when. Each
+  name opens the profile.
+- `core.sp_promotion_history` (`promotion_history.sql`, bundle `deploy_2026_10_17k.sql`) reads
+  `core.student_promotion_history`, using the latest move per child. `p_only_my_class` limits it to sections
+  whose class teacher in that session is the user. The office (`students.manage`) sees the whole school;
+  anyone else sees only their own class.
