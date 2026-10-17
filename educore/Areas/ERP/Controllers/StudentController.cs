@@ -326,7 +326,8 @@ namespace educore.Areas.ERP.Controllers
         }
 
         public async Task<IActionResult> DashboardData(Guid id, int? month = null, int? year = null, int? examId = null,
-                                                       [FromServices] ModuleFlags? modules = null)
+                                                       [FromServices] ModuleFlags? modules = null,
+                                                       [FromServices] ISchoolSettingsService? settings = null)
         {
             var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
             if (studentId == 0) return Json(new { found = false });
@@ -342,6 +343,32 @@ namespace educore.Areas.ERP.Controllers
             // so summing it dropped every fully paid charge from "Total Paid".
             var totals  = await _admissionService.GetStudentFeeTotalsAsync(studentId, TenantId(), SchoolId(), UserId());
 
+            // The class the page is about: the one of the session in progress. A child
+            // promoted before the session ends has their record in next session's class
+            // already, but still studies in the old one -- attendance, timetable and
+            // subjects follow that, and the header says where they go next.
+            string viewClass = student.ClassName, viewYear = student.AcademicYear;
+            string? viewSection = student.Section, viewRoll = student.RollNo, promotedTo = null;
+            try
+            {
+                var current = settings == null ? null
+                    : (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.AcademicYearName;
+                if (current != null && !string.Equals(current, student.AcademicYear, StringComparison.OrdinalIgnoreCase))
+                {
+                    var now = (await _admissionService.GetEnrolmentHistoryAsync(studentId, TenantId(), SchoolId(), UserId()))
+                        .FirstOrDefault(e => string.Equals(e.AcademicYear, current, StringComparison.OrdinalIgnoreCase)
+                                          && e.Status != "Left" && e.Status != "PassedOut");
+                    if (now != null)
+                    {
+                        promotedTo = student.ClassName + (string.IsNullOrWhiteSpace(student.Section) ? "" : " – " + student.Section)
+                                   + " for " + student.AcademicYear;
+                        viewClass = now.ClassName; viewSection = now.Section; viewYear = now.AcademicYear;
+                        viewRoll = string.IsNullOrWhiteSpace(now.RollNo) ? student.RollNo : now.RollNo;
+                    }
+                }
+            }
+            catch { /* the page shows the student's own record */ }
+
             // Fee figures go only to users who may see fees (a Teacher opens this
             // page too). The page hides the Fee tab when fee comes back null.
             bool canViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
@@ -349,15 +376,15 @@ namespace educore.Areas.ERP.Controllers
             // month/year null on the first load: the page picks a month from the list
             // that comes back and asks again, so we do not guess which one it wants.
             var att = await _attendanceService.GetStudentAttendanceAsync(
-                studentId, TenantId(), SchoolId(), UserId(), student.AcademicYear, month, year);
+                studentId, TenantId(), SchoolId(), UserId(), viewYear, month, year);
 
             // The student's timetable IS their section's. Resolve class+section to a
             // section id through the setup, which already lists them for this session —
             // a student whose section has no timetable simply gets an empty week.
             var setup = await _timetableService.GetSetupAsync(TenantId(), SchoolId(), UserId());
             var mySection = setup.Sections.FirstOrDefault(x =>
-                string.Equals(x.ClassName, student.ClassName, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(x.SectionName ?? "", student.Section ?? "", StringComparison.OrdinalIgnoreCase));
+                string.Equals(x.ClassName, viewClass, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(x.SectionName ?? "", viewSection ?? "", StringComparison.OrdinalIgnoreCase));
 
             var grid = mySection == null
                 ? new TimetableGrid()
@@ -374,7 +401,7 @@ namespace educore.Areas.ERP.Controllers
             // Subjects the class studies (Subject Management, current session). Only
             // when the class name is unambiguous -- streams can share a class name.
             var classMatches = (await _subjectService.GetClassesAsync(TenantId(), SchoolId(), UserId()))
-                .Where(c => string.Equals(c.ClassName, student.ClassName, StringComparison.OrdinalIgnoreCase))
+                .Where(c => string.Equals(c.ClassName, viewClass, StringComparison.OrdinalIgnoreCase))
                 .ToList();
             int? classSubjects = classMatches.Count == 1 ? classMatches[0].SubjectCount : null;
 
@@ -402,16 +429,17 @@ namespace educore.Areas.ERP.Controllers
                     leftWhy   = student.LeavingReason,
                     photo     = student.PhotoUrl,
                     name      = student.StudentName,
-                    roll      = student.RollNo ?? "—",
+                    roll      = viewRoll ?? "—",
                     admNo     = student.AdmissionNo ?? "—",
-                    cls       = student.ClassName,
-                    sec       = student.Section ?? "—",
+                    cls       = viewClass,
+                    sec       = viewSection ?? "—",
+                    promotedTo,   // "Class 8 – A for 2027-28" while the old session runs
                     gender    = student.Gender ?? "—",
                     dob       = string.IsNullOrWhiteSpace(student.DateOfBirth) ? "—" : Dates.Show(student.DateOfBirth, "dd MMM yyyy"),
                     age,
                     subjects  = classSubjects,
                     admDate   = string.IsNullOrWhiteSpace(student.AdmissionDate) ? "—" : Dates.Show(student.AdmissionDate, "dd MMM yyyy"),
-                    year      = student.AcademicYear,
+                    year      = viewYear,
                     guardian  = student.GuardianName ?? "—",
                     mother    = student.MotherName ?? "—",
                     mobile    = student.MobileNumber ?? "—",

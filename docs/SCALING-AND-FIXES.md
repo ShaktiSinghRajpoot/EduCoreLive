@@ -5617,3 +5617,8 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   carried 253 lines (Rs 5,24,909) of 2026-27 dues into 2027-28, which took that money out of every 2026-27 report
   (dashboard, fee dashboard, defaulters by session, Year-End). Write-off stays open all year. The 253 carries were
   undone with Year-End's own Undo on the QA school. Bundle `deploy_2026_10_17g.sql`.
+- Real promotion on the QA school (Class 7-A -> Class 8, 2027-28, 17 Oct) checked screen by screen. Fixed after it:
+  the **student profile** read the present record (Class 8, 2027-28: 0 school days); it now uses the class of the
+  session in progress (class, section, roll, attendance, timetable, subjects, Collect Fee session) and says
+  "Promoted to Class 8 – A for 2027-28". The **Student List** shows the session beside the class when it is not
+  the current one.

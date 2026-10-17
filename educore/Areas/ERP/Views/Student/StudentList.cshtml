@@ -36,6 +36,11 @@
     bool canViewFees = ViewBag.CanViewFees == true;
     // Admit / photo / mark-as-left need students.manage; a Teacher only views (QA BUG-059).
     bool canManage = ViewBag.CanManage == true;
+    // A student whose session is not the current one (promoted early, or admitted
+    // for next session) gets the session beside the class, so "Class 8 - A" is not
+    // read as the class they sit in today.
+    string? currentSession = Model.YearList.FirstOrDefault(y => y.Selected)?.Text;
+    bool OtherSession(string? year) => !string.IsNullOrWhiteSpace(year) && currentSession != null && year != currentSession;
     string FeeBadgeClass(string f) => f switch { "Paid" => "b-paid", "Partial" => "b-partial", _ => "b-pending" };
     string StatBadgeClass(string s) => s switch { "Active" => "b-active", "Transfer" => "b-transfer", _ => "b-inactive" };
     (string cls, string ic) GenderMeta(string? g) => g switch
@@ -249,7 +254,8 @@
                         <div><div class="sl-nm">@s.StudentName</div><div class="sl-rl">@roll</div></div>
                       </a>
                     </td>
-                    <td><span class="fw-bold">@s.ClassName</span> <span class="text-muted">– @s.Section</span></td>
+                    <td><span class="fw-bold">@s.ClassName</span> <span class="text-muted">– @s.Section</span>
+                        @if (OtherSession(s.AcademicYear)) { <span class="badge bg-label-info ms-1" title="Session">@s.AcademicYear</span> }</td>
                     <td><span class="sl-gen @gm.cls"><i class="bx @gm.ic"></i>@s.Gender</span></td>
                     <td>@(string.IsNullOrWhiteSpace(s.AdmissionDate) ? "—" : Dates.Show(s.AdmissionDate, "dd MMM yyyy"))</td>
                     <td>@(string.IsNullOrEmpty(s.GuardianName) ? "—" : s.GuardianName)</td>
@@ -308,7 +314,7 @@
                   }
                   <div class="flex-grow-1 sl-mob-id">
                     <div class="sl-nm">@s.StudentName</div>
-                    <div class="sl-rl">@roll · @s.ClassName @s.Section</div>
+                    <div class="sl-rl">@roll · @s.ClassName @s.Section@(OtherSession(s.AcademicYear) ? " · " + s.AcademicYear : "")</div>
                   </div>
                   <span class="sl-bdg @StatBadgeClass(s.Status)">@s.Status</span>
                 </div>
@@ -318,7 +324,7 @@
                   <div class="sl-mob-field"><label>Admitted</label><span>@(string.IsNullOrWhiteSpace(s.AdmissionDate) ? "—" : Dates.Show(s.AdmissionDate, "dd MMM yyyy"))</span></div>
                   <div class="sl-mob-field"><label>Gender</label><span>@s.Gender</span></div>
                   @if (canViewFees) { <div class="sl-mob-field"><label>Fee Status</label><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></div> }
-                  <div class="sl-mob-field"><label>Class</label><span>@s.ClassName @s.Section</span></div>
+                  <div class="sl-mob-field"><label>Class</label><span>@s.ClassName @s.Section@(OtherSession(s.AcademicYear) ? " (" + s.AcademicYear + ")" : "")</span></div>
                 </div>
                 @* The photo button used to exist only in the desktop table, so on a
                    phone there was no way to set a student's picture at all. *@

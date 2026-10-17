@@ -504,7 +504,8 @@ function loadDashboard(){
         }
 
         document.getElementById('sdName').textContent=s.name;
-        document.getElementById('sdMeta').textContent='Roll '+s.roll+' · '+s.cls+' – '+s.sec+' · '+st.admNo;
+        document.getElementById('sdMeta').textContent='Roll '+s.roll+' · '+s.cls+' – '+s.sec+' · '+st.admNo
+            +(st.promotedTo ? ' · Promoted to '+st.promotedTo : '');
         document.getElementById('sdBadges').innerHTML=statB(s.status)+(s.feeSt ? ' '+feeB(s.feeSt) : '');
 
         document.getElementById('sdLoader').classList.add('d-none');
