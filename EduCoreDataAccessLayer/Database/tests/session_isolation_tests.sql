@@ -148,6 +148,13 @@ BEGIN
     IF v_n >= 3 THEN pass := pass + 1; RAISE NOTICE 'PASS 12 fee dashboard, defaulters run; overview Class 1 still has % after promotion', v_n;
     ELSE fail := fail + 1; RAISE NOTICE 'FAIL 12 overview Class 1 = %', v_n; END IF;
 
+    -- 13. a date before the school's first session belongs to no session: nobody on its register
+    IF core.fn_session_on(T, S, DATE '2024-05-10') IS NULL
+       AND NOT EXISTS (SELECT 1 FROM core.fn_attendance_register(T, S, 'Class 1', 'A', DATE '2024-05-10'))
+       AND core.fn_session_on(T, S, DATE '2025-05-10') = '2025-26'
+    THEN pass := pass + 1; RAISE NOTICE 'PASS 13 2024 = no session (empty register), 2025 = 2025-26';
+    ELSE fail := fail + 1; RAISE NOTICE 'FAIL 13 2024 -> %', core.fn_session_on(T, S, DATE '2024-05-10'); END IF;
+
     RAISE NOTICE '== % passed, % failed ==', pass, fail;
 END;
 $t$;

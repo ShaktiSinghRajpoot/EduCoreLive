@@ -84,8 +84,13 @@ $procedure$;
 
 
 -- ── the session a date falls in ─────────────────────────────────────────────
--- The session whose start..end contains the date; when none does (dates not set,
--- or a gap between sessions) the school's current session.
+-- The session whose start..end contains the date. When none does:
+--   * a date from the current session's start on (the school runs past 31 March
+--     before the next session is set up), or a current session with no dates:
+--     the current session;
+--   * an earlier date (before the school's first session, or in a gap): NULL --
+--     no session, so no register, no class list, nothing counted. It used to fall
+--     back to the current session, so a 2024 register could list today's children.
 CREATE OR REPLACE FUNCTION core.fn_session_on(p_tenant_id integer, p_school_id integer, p_date date)
 RETURNS varchar
 LANGUAGE sql
@@ -98,7 +103,9 @@ AS $function$
           ORDER BY y.is_current DESC LIMIT 1),
         (SELECT y.academic_year_name FROM academic.academic_years y
           WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id AND NOT COALESCE(y.is_deleted, FALSE)
-            AND y.is_current LIMIT 1));
+            AND y.is_current
+            AND (NULLIF(y.start_date, '') IS NULL OR p_date >= y.start_date::date)
+          LIMIT 1));
 $function$;
 
 
