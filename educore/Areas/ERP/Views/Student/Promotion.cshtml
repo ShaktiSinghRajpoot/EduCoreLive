@@ -405,7 +405,7 @@ document.getElementById('srcClass').addEventListener('change', function(){
   // The proc reads the next class from the TARGET session. If this class does not
   // exist there, every student in it gets skipped — say so now, not after the run.
   if(classUnknown(cls)){
-    showErr('Class ' + cls + ' is not set up in ' + document.getElementById('srcYear').value +
+    showErr(cls + ' is not set up in ' + document.getElementById('srcYear').value +
             ' or ' + document.getElementById('tgtYear').value +
             '. Every student in it would be skipped. Check Settings → Classes & Sections.');
   } else {
@@ -682,7 +682,7 @@ function checkTargetSession(){
       // per-student "next class" preview against the new ladder.
       var cls=document.getElementById('srcClass').value;
       if(classUnknown(cls)){
-        showErr('Class ' + cls + ' is not set up in ' + document.getElementById('srcYear').value
+        showErr(cls + ' is not set up in ' + document.getElementById('srcYear').value
               + ' or ' + tgtY + '. Every student in it would be skipped.');
       } else {
         clearErr();
@@ -763,7 +763,7 @@ function validate(){
 
   var cls=document.getElementById('srcClass').value;
   if(classUnknown(cls))
-    return 'Class ' + cls + ' is not set up in ' + srcY + ' or ' + tgtY
+    return cls + ' is not set up in ' + srcY + ' or ' + tgtY
          + ', so every student in it would be skipped. Check Settings → Classes & Sections.';
 
   return '';

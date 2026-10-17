@@ -364,7 +364,7 @@
                             <span class="dash-avatar @Soft(accents[Model.Defaulters.IndexOf(d) % accents.Length])">@Initials(d.StudentName)</span>
                             <div class="flex-grow-1 min-w-0">
                                 <h6 class="mb-0 text-truncate">@d.StudentName</h6>
-                                <small class="text-muted">Class @d.ClassName@(string.IsNullOrWhiteSpace(d.Section) ? "" : " – " + d.Section)</small>
+                                <small class="text-muted">@d.ClassName@(string.IsNullOrWhiteSpace(d.Section) ? "" : " – " + d.Section)</small>
                             </div>
                             <div class="text-end">
                                 <div class="fw-bold" style="color:#dc2626">@Money(d.Due)</div>
