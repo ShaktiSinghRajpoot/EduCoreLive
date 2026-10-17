@@ -5595,3 +5595,12 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   "route is full" check count riders whose bus has started (by today / by the new booking's start); removing a
   vehicle or deleting a route still counts every booked rider.
 - Bundle `deploy_2026_10_17c.sql`.
+
+### 2026-10-17 — Staff Attendance: Staff report tab
+- New tab on Staff Attendance: pick a staff member (search box; people who left are listed too) and a date range
+  (default this month, at most a year): working days, present, late, absent, half day, on leave, not marked and
+  attendance % (over the days marked), plus each day with its mark, remark, approved leave, holiday or weekly off.
+- Read-only `core.sp_staff_attendance_history` (`staff_attendance_history.sql`), `IStaffAttendanceService.GetHistoryAsync`,
+  `StaffAttendanceController.History`. Dashboard: today's attendance moved onto the Total Students / Total Staff
+  cards (which open the attendance pages); the two separate attendance cards were removed.
+- Bundle `deploy_2026_10_17d.sql`.

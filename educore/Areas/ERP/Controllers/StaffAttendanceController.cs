@@ -95,6 +95,31 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
+        // ── Staff report: one person over a date range ───────────
+        [HttpGet]
+        public async Task<IActionResult> History(int? staffId, string? from, string? to, [FromServices] ModuleFlags modules)
+        {
+            try
+            {
+                var h = await _att.GetHistoryAsync(staffId, from, to, TenantId(), SchoolId(), UserId());
+                bool leaveOn = await modules.PayrollOn();   // approved leave belongs to the Payroll module
+                return Json(new
+                {
+                    success = true,
+                    staff = h.Staff.Select(s => new { id = s.StaffId, name = s.FullName, code = s.EmployeeCode, desg = s.Designation, active = s.IsActive }),
+                    from = h.From, to = h.To,
+                    summary = new { working = h.WorkingDays, present = h.Present, late = h.Late, absent = h.Absent,
+                                    halfDay = h.HalfDay, onLeave = h.OnLeave, notMarked = h.NotMarked, percent = h.Percent },
+                    days = h.Days.Select(d => new { day = d.Day, wd = d.Weekday, type = d.DayType, employed = d.Employed,
+                                                    s = d.Status, remark = d.Remark, leave = leaveOn ? d.LeaveType : null })
+                });
+            }
+            catch (Npgsql.PostgresException ex)
+            {
+                return Json(new { success = false, message = ex.MessageText });
+            }
+        }
+
         // ── Substitutions ────────────────────────────────────────
         [HttpGet]
         public async Task<IActionResult> Substitutions(string? date)

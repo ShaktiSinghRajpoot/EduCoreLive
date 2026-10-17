@@ -36,6 +36,7 @@
       <button class="on" data-t="mark"><i class="bx bx-check-square me-1"></i>Mark attendance</button>
       <button data-t="month"><i class="bx bx-calendar me-1"></i>Month register</button>
       <button data-t="subs"><i class="bx bx-transfer-alt me-1"></i>Substitutes</button>
+      <button data-t="hist"><i class="bx bx-user-pin me-1"></i>Staff report</button>
     </div>
 
     @* ── Mark ───────────────────────────────────────────── *@
@@ -82,6 +83,21 @@
           </div>
         </div>
       </div></div>
+    </div>
+
+    @* ── Staff report: one person over a date range ─────── *@
+    <div class="sa-pane d-none" id="paneHist">
+      <div class="ec-card mb-3"><div class="ec-card-body sa-tools flex-wrap">
+        <div style="min-width:220px">
+          <label class="form-label mb-1">Staff</label>
+          <input type="search" id="hSearch" class="form-control form-control-sm mb-1" placeholder="Search name or code">
+          <select id="hStaff" class="form-select form-select-sm"><option value="">Choose staff</option></select>
+        </div>
+        <div><label class="form-label mb-1">From</label><input type="date" id="hFrom" class="form-control form-control-sm"></div>
+        <div><label class="form-label mb-1">To</label><input type="date" id="hTo" class="form-control form-control-sm"></div>
+        <button id="btnHist" class="btn btn-sm btn-primary align-self-end"><i class="bx bx-search me-1"></i>Show</button>
+      </div></div>
+      <div id="hResult" class="text-muted small">Choose a staff member and a date range.</div>
     </div>
 
     @* ── Substitutes ────────────────────────────────────── *@
@@ -132,6 +148,69 @@ $(function () {
         if (t === 'mark')  { $('#paneMark').removeClass('d-none'); }
         if (t === 'month') { $('#paneMonth').removeClass('d-none'); loadMonth(); }
         if (t === 'subs')  { $('#paneSubs').removeClass('d-none'); loadSubs(); }
+        if (t === 'hist')  { $('#paneHist').removeClass('d-none'); loadHistStaff(); }
+    });
+
+    // ── Staff report: one person over a date range ─────────────────────
+    var histStaff = null;   // [{id, name, code, desg, active}] once loaded
+    $('#hTo').val(todayStr()).attr('max', todayStr());
+    $('#hFrom').val(todayStr().substring(0, 8) + '01').attr('max', todayStr());
+
+    function loadHistStaff() {
+        if (histStaff) return;
+        $.getJSON('@Url.Action("History", "StaffAttendance", new { area = "ERP" })').done(function (r) {
+            histStaff = (r && r.staff) || [];
+            fillHistStaff('');
+        });
+    }
+
+    function fillHistStaff(q) {
+        q = (q || '').toLowerCase();
+        var keep = $('#hStaff').val();
+        var html = '<option value="">Choose staff</option>';
+        histStaff.forEach(function (s) {
+            var label = s.name + (s.code ? ' (' + s.code + ')' : '') + (s.desg ? ' · ' + s.desg : '') + (s.active ? '' : ' · left');
+            if (q && label.toLowerCase().indexOf(q) < 0) return;
+            html += '<option value="' + s.id + '">' + EC.esc(label) + '</option>';
+        });
+        $('#hStaff').html(html).val(keep);
+    }
+    $('#hSearch').on('input', function () { if (histStaff) fillHistStaff(this.value); });
+
+    var HIST_MARK = { Present: ['P', 's-P'], Absent: ['A', 's-A'], HalfDay: ['H', 's-H'], Late: ['L', 's-L'], Leave: ['LV', 's-V'] };
+
+    $('#btnHist').on('click', function () {
+        var id = $('#hStaff').val();
+        if (!id) { ecToast('warning', 'Choose a staff member.'); return; }
+        $('#hResult').html('<div class="text-muted small p-2">Loading…</div>');
+        $.getJSON('@Url.Action("History", "StaffAttendance", new { area = "ERP" })',
+                  { staffId: id, from: $('#hFrom').val(), to: $('#hTo').val() }).done(function (r) {
+            if (!r || !r.success) { $('#hResult').html(''); ecToast('error', (r && r.message) || 'Could not load the report.'); return; }
+            var m = r.summary;
+            var kpi = function (label, val, color) {
+                return '<div class="col-6 col-md-3 col-xl"><div class="p-2 rounded border text-center"><div class="fw-bold fs-5" style="color:' + color + '">' + val + '</div><div class="small text-muted">' + label + '</div></div></div>';
+            };
+            var head = '<div class="ec-card mb-3"><div class="ec-card-body">'
+                + '<div class="fw-semibold mb-2">' + EC.esc($('#hStaff option:selected').text()) + ' · ' + EC.esc(r.from) + ' to ' + EC.esc(r.to) + '</div>'
+                + '<div class="row g-2">'
+                + kpi('Working days', m.working, '#334155') + kpi('Present', m.present, '#16a34a') + kpi('Late', m.late, '#b45309')
+                + kpi('Absent', m.absent, '#dc2626') + kpi('Half day', m.halfDay, '#b45309') + kpi('On leave', m.onLeave, '#4338ca')
+                + kpi('Not marked', m.notMarked, '#64748b') + kpi('Attendance', m.percent + '%', '#0f766e')
+                + '</div><div class="text-muted small mt-2">Attendance % is over the days marked; a day nobody marked is shown as "not marked".</div>'
+                + '</div></div>';
+            var rows = (r.days || []).map(function (d) {
+                var what;
+                if (!d.employed) what = '<span class="text-muted">Not on staff yet / left</span>';
+                else if (d.s) what = '<b class="' + HIST_MARK[d.s][1] + '">' + HIST_MARK[d.s][0] + '</b> ' + EC.esc(d.s === 'HalfDay' ? 'Half day' : d.s);
+                else if (d.leave) what = '<span style="color:#4338ca">On ' + EC.esc(d.leave) + ' leave</span>';
+                else if (d.type === 'holiday') what = '<span class="text-muted">Holiday</span>';
+                else if (d.type === 'weekly_off') what = '<span class="text-muted">Weekly off</span>';
+                else what = '<span class="text-muted">Not marked</span>';
+                return '<tr><td class="text-nowrap">' + EC.esc(d.day) + '</td><td>' + EC.esc(d.wd) + '</td><td>' + what + '</td><td class="text-muted small">' + EC.esc(d.remark || '') + '</td></tr>';
+            }).join('');
+            $('#hResult').html(head + '<div class="ec-card"><div class="ec-card-body p-0"><div class="table-responsive"><table class="table table-sm mb-0">'
+                + '<thead><tr><th>Date</th><th>Day</th><th>Attendance</th><th>Remark</th></tr></thead><tbody>' + rows + '</tbody></table></div></div></div>');
+        }).fail(function () { $('#hResult').html(''); ecToast('error', 'Could not load the report.'); });
     });
 
     // ── Mark ───────────────────────────────────────────────────────────

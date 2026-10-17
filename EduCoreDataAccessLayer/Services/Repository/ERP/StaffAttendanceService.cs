@@ -28,6 +28,68 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         private static bool InScope(int tenantId, int schoolId) => tenantId > 1 && schoolId > 0;
 
+        public async Task<StaffAttendanceHistory> GetHistoryAsync(int? staffId, string? from, string? to,
+                                                                  int tenantId, int schoolId, int actionUserId)
+        {
+            var h = new StaffAttendanceHistory();
+            if (!InScope(tenantId, schoolId)) return h;
+
+            static object DateOrNull(string? d) =>
+                DateTime.TryParseExact(d, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                                       System.Globalization.DateTimeStyles.None, out var v) ? v : DBNull.Value;
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_staff_id",       NpgsqlDbType.Integer) { Value = (object?)staffId ?? DBNull.Value },
+                new("p_from",           NpgsqlDbType.Date)    { Value = DateOrNull(from) },
+                new("p_to",             NpgsqlDbType.Date)    { Value = DateOrNull(to) },
+                new("p_staff",   NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "sah_staff" },
+                new("p_summary", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "sah_summary" },
+                new("p_days",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "sah_days" }
+            };
+
+            await _db.ExecuteCursorsAsync("core.sp_staff_attendance_history", p,
+                async reader =>
+                {
+                    var c = reader.Columns();
+                    while (await reader.ReadAsync())
+                        h.Staff.Add(new StaffPick
+                        {
+                            StaffId = DbRead.Int(reader, c, "staff_id"), FullName = DbRead.Str(reader, c, "full_name"),
+                            EmployeeCode = DbRead.NStr(reader, c, "employee_code"), Designation = DbRead.NStr(reader, c, "designation"),
+                            IsActive = DbRead.Bool(reader, c, "is_active")
+                        });
+                },
+                async reader =>
+                {
+                    var c = reader.Columns();
+                    if (await reader.ReadAsync())
+                    {
+                        h.WorkingDays = DbRead.Dec(reader, c, "working_days");
+                        h.Present = DbRead.Int(reader, c, "present"); h.Late = DbRead.Int(reader, c, "late");
+                        h.Absent = DbRead.Int(reader, c, "absent"); h.HalfDay = DbRead.Int(reader, c, "half_day");
+                        h.OnLeave = DbRead.Int(reader, c, "on_leave"); h.NotMarked = DbRead.Int(reader, c, "not_marked");
+                        h.Percent = DbRead.Dec(reader, c, "percent");
+                        h.From = DbRead.NStr(reader, c, "from_date"); h.To = DbRead.NStr(reader, c, "to_date");
+                    }
+                },
+                async reader =>
+                {
+                    var c = reader.Columns();
+                    while (await reader.ReadAsync())
+                        h.Days.Add(new StaffHistoryDay
+                        {
+                            Day = DbRead.Str(reader, c, "day"), Weekday = DbRead.Str(reader, c, "weekday"),
+                            DayType = DbRead.Str(reader, c, "day_type"), Employed = DbRead.Bool(reader, c, "employed"),
+                            Status = DbRead.NStr(reader, c, "status"), Remark = DbRead.NStr(reader, c, "remark"),
+                            LeaveType = DbRead.NStr(reader, c, "leave_type")
+                        });
+                });
+            return h;
+        }
+
         // ── Attendance ───────────────────────────────────────────────────────
         public async Task<StaffDaySheet> GetDayAsync(string date, int tenantId, int schoolId, int actionUserId)
         {

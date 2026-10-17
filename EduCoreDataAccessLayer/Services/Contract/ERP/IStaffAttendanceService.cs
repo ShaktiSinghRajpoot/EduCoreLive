@@ -14,6 +14,11 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>month = "yyyy-MM".</summary>
         Task<StaffMonthRegister> GetMonthAsync(string month, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Staff report: the staff list, and (staffId given) one person's days and totals
+        /// over a date range. Throws PostgresException for a bad range.</summary>
+        Task<StaffAttendanceHistory> GetHistoryAsync(int? staffId, string? from, string? to,
+                                                     int tenantId, int schoolId, int actionUserId);
+
         Task<(List<SubstitutionNeed> Needs, List<TeacherLoad> Teachers)> GetSubstitutionDayAsync(
             string date, int tenantId, int schoolId, int actionUserId);
 

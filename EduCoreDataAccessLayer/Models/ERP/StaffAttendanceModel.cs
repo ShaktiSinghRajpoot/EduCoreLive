@@ -62,6 +62,43 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public List<int> Busy       { get; set; } = new();
     }
 
+    /// <summary>Staff Attendance > Staff report: one person over a date range.</summary>
+    public class StaffAttendanceHistory
+    {
+        public List<StaffPick> Staff { get; set; } = new();
+        public string? From { get; set; }
+        public string? To { get; set; }
+        public decimal WorkingDays { get; set; }
+        public int Present  { get; set; }   // Present + Late
+        public int Late     { get; set; }
+        public int Absent   { get; set; }
+        public int HalfDay  { get; set; }
+        public int OnLeave  { get; set; }
+        public int NotMarked { get; set; }
+        public decimal Percent { get; set; } // of the days marked
+        public List<StaffHistoryDay> Days { get; set; } = new();
+    }
+
+    public class StaffPick
+    {
+        public int     StaffId      { get; set; }
+        public string  FullName     { get; set; } = string.Empty;
+        public string? EmployeeCode { get; set; }
+        public string? Designation  { get; set; }
+        public bool    IsActive     { get; set; }
+    }
+
+    public class StaffHistoryDay
+    {
+        public string  Day       { get; set; } = string.Empty;
+        public string  Weekday   { get; set; } = string.Empty;
+        public string  DayType   { get; set; } = string.Empty;   // working | half_day | holiday | weekly_off
+        public bool    Employed  { get; set; }
+        public string? Status    { get; set; }
+        public string? Remark    { get; set; }
+        public string? LeaveType { get; set; }
+    }
+
     /// <summary>A period a teacher covers for someone else (My Timetable).</summary>
     public class MySubstitution
     {
