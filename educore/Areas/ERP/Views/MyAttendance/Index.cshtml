@@ -83,7 +83,7 @@ $(function () {
             var head = '<div class="ec-card mb-3"><div class="ec-card-body">'
                 + '<div class="fw-semibold mb-2">' + EC.esc(r.from) + ' to ' + EC.esc(r.to) + '</div>'
                 + '<div class="row g-2">'
-                + kpi('Attendance', m.percent + '%', '#0f766e') + kpi('Present', m.present, '#16a34a') + kpi('Absent', m.absent, '#dc2626') + kpi('Half day', m.halfDay, '#b45309')
+                + kpi('Attendance', (m.present + m.absent + m.halfDay) ? m.percent + '%' : '—', '#0f766e') + kpi('Present', m.present, '#16a34a') + kpi('Absent', m.absent, '#dc2626') + kpi('Half day', m.halfDay, '#b45309')
                 + kpi('Late', m.late, '#b45309') + kpi('On leave', m.onLeave, '#4338ca') + kpi('Not marked', m.notMarked, '#64748b') + kpi('Working days', m.working, '#334155')
                 + '</div><div class="text-muted small mt-2">Attendance % is over the days marked present, absent or half day; leave never counts against it, and a day nobody marked is shown as "not marked".</div>'
                 + '</div></div>';
