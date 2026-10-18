@@ -5721,3 +5721,16 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - Store staff (`inventory.view`) pick any session/class/section (menu: Inventory). Anyone else sees only the sections
   they are class teacher of this session (menu: Students). `Data` refuses another class.
 - `core.sp_inventory_class_register` (in `inventory_student_sale.sql`, bundle `deploy_2026_10_18c.sql`), 3 cursors.
+
+### 2026-10-18 — Expenses and the Cash Book
+- `expense_cashbook.sql` (bundle `deploy_2026_10_18d.sql`): `core.expense_categories` (default heads created on first use;
+  never deleted, only hidden), `core.expenses` (never edited or deleted: cancelled with a reason), `core.cashbook_opening`
+  (cash + bank on a date), and the permissions `expenses.view` / `expenses.manage` (Finance).
+- `core.fn_school_money` is the one place that turns money into lines, reading where it is already recorded: fee receipts
+  via `fn_fee_money_lines` (real modes only; 'Advance' / 'To wallet' are wallet bookkeeping), fee refunds, salaries paid
+  (`staff_payroll` Paid), store purchase bills, supplier returns, expenses. A cancellation is a reversal on the day it
+  happened (Day Close's rule), so a past month never changes. Book = Cash (mode Cash) or Bank (everything else).
+- `core.sp_cashbook`: opening (opening balance + everything from its date up to the range), lines with running balance,
+  totals by head, month by month. Pages: Finance › Expenses & Cash Book (`ExpenseController`, `IExpenseService`).
+- Test: `tests/expense_cashbook_tests.sql` (17, rolled back): fees in the book = the Day Close money lines, a cancelled
+  expense comes back on its cancel day, a bought / part-returned / cancelled bill nets to 0, opening balances carry.

@@ -189,6 +189,10 @@ BEGIN
      WHERE l.sale_id = sa.sale_id AND sa.school_id = p_school_id;
     DELETE FROM core.inventory_student_sales       WHERE school_id = p_school_id;
     DELETE FROM core.inventory_class_kits          WHERE school_id = p_school_id;
+    -- expenses and the cash book's opening balance (expense_cashbook.sql)
+    DELETE FROM core.expenses                      WHERE school_id = p_school_id;
+    DELETE FROM core.expense_categories            WHERE school_id = p_school_id;
+    DELETE FROM core.cashbook_opening              WHERE school_id = p_school_id;
     DELETE FROM core.student_ledger                WHERE school_id = p_school_id;
     DELETE FROM core.tc_register                   WHERE school_id = p_school_id;
     DELETE FROM core.tc_counters                   WHERE school_id = p_school_id;
