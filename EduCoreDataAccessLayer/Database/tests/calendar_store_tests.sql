@@ -85,12 +85,12 @@ BEGIN
         jsonb_build_array(jsonb_build_object('itemId', v_book, 'qty', 1), jsonb_build_object('itemId', v_shirt, 'qty', 2)));
     SELECT COUNT(*), SUM(amount_due) INTO v_n, v_amt FROM core.student_ledger
      WHERE student_id = 725 AND academic_year = '2027-28' AND frequency = 'One Time' AND due_date = to_char(CURRENT_DATE, 'YYYY-MM-DD')
-       AND installment_label IN ('ZZ Maths Book Class 8', 'ZZ Shirt - 32 × 2');
+       AND ((fee_head_name = 'ZZ Maths Book Class 8' AND installment_label IS NULL) OR (fee_head_name = 'ZZ Shirt' AND installment_label = '32 × 2'));
     PERFORM pg_temp.chk(v_n = 2 AND v_amt = 1250, 'S3 sold: 2 fee lines in 2027-28, due today, Rs 1250', v_txt);
     PERFORM pg_temp.chk((SELECT current_stock FROM core.inventory_items WHERE item_id = v_shirt) = 3
                         AND (SELECT current_stock FROM core.inventory_items WHERE item_id = v_book) = 9, 'S4 stock went down (shirts 5 -> 3, books 10 -> 9)');
-    PERFORM pg_temp.chk((SELECT fee_head_name FROM core.student_ledger WHERE student_id = 725 AND installment_label = 'ZZ Shirt - 32 × 2') = 'Uniform',
-                        'S5 fee head is the item category (Uniform)');
+    PERFORM pg_temp.chk(EXISTS (SELECT 1 FROM core.student_ledger WHERE student_id = 725 AND fee_head_name = 'ZZ Shirt' AND installment_label = '32 × 2'),
+                        'S5 fee line reads like the item: "ZZ Shirt — 32 × 2" (not "Uniform — ZZ Shirt - 32 × 2")');
 
     BEGIN
         v_txt := pg_temp.sale('Sell', 725, '2026-27', NULL, jsonb_build_array(jsonb_build_object('itemId', v_shirt, 'qty', 4)));

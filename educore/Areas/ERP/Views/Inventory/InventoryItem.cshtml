@@ -1,6 +1,6 @@
 ﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
-    ViewData["Title"] = "Inventory Item Master";
+    ViewData["Title"] = "Store";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var classes = ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
                   ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
@@ -20,8 +20,8 @@
             <i class="bx bx-package fs-4"></i>
           </div>
           <div>
-            <h4 class="ec-page-title mb-1">Inventory Item Master</h4>
-            <div class="ec-page-subtitle">Manage uniforms, books, stationery, sports, furniture and lab items.</div>
+            <h4 class="ec-page-title mb-1">Store</h4>
+            <div class="ec-page-subtitle">Everything the school keeps: books, uniform, diary to give to students, and things used in school.</div>
           </div>
         </div>
         <div class="d-flex gap-2 flex-wrap">
@@ -95,7 +95,7 @@
 
           <select class="iv-chip" id="fType">
             <option value="">Type</option>
-            <option>Consumable</option><option>Reusable</option><option>Saleable</option>
+            <option value="Saleable">Given to students</option><option value="Consumable">Used up in school</option><option value="Reusable">School equipment</option>
           </select>
 
           <select class="iv-chip" id="fStock">
@@ -214,9 +214,11 @@
                                     <input type="text" class="form-control" id="itemSubCategory" placeholder="Tie / Belt / Notebook">
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-4">
-                                    <label class="form-label">Item Type</label>
+                                    <label class="form-label">What is it for?</label>
                                     <select class="form-select" id="itemType">
-                                        <option>Consumable</option><option>Reusable</option><option>Saleable</option>
+                                        <option value="Saleable">Given to students (books, uniform, diary)</option>
+                                        <option value="Consumable">Used up in school (chalk, paper, ink)</option>
+                                        <option value="Reusable">School equipment (lab, sports, furniture)</option>
                                     </select>
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-4">
@@ -466,6 +468,8 @@
     var locations = [];  // active store locations, default first
 
     var rows = [];      // everything the server sent, unfiltered
+    // the item type in the words the form uses
+    var TYPE_WORDS = { Saleable: 'Given to students', Consumable: 'Used up in school', Reusable: 'School equipment' };
     var page = 1;
     var sortCol = 'name', sortDir = 1;
 
@@ -511,7 +515,7 @@
             locations = (d || []).filter(function (l) { return l.active; });
             var keep = $('#fLocation').val();
             $('#fLocation').html('<option value="">All locations</option>' + locationOptions(0)).val(keep);
-            $('#openingLocation').html(locationOptions(0));
+            $('#openingLocation').html(locationOptions(0)).toggleClass('d-none', locations.length < 2);
         });
     }
 
@@ -587,6 +591,11 @@
 
         $('#emptyDesk').toggleClass('d-none', list.length > 0);
         $('#emptyMob').toggleClass('d-none', list.length > 0);
+        var none = !rows.length;   // nothing in the store at all, not just nothing matching
+        $('#emptyDesk h6, #emptyMob h6').text(none ? 'Your store is empty' : 'No items found');
+        $('#emptyDesk p, #emptyMob p').text(none
+            ? 'Click "+ Add Item" to add the first one: a diary, tie, belt, uniform (sizes in one go) or a book for a class.'
+            : 'Try adjusting your search or filters.');
         $('#clearBtn').toggleClass('d-none', !(
             $('#ivSearch').val() || $('#fCategory').val() || $('#fType').val() || $('#fStock').val() ||
             $('#fLocation').val()));
@@ -605,7 +614,7 @@
                     (r.subCat ? '<div class="text-muted small">' + EC.esc(r.subCat) + '</div>' : '') + '</td>' +
                 '<td>' + EC.esc(r.sku || '—') + '</td>' +
                 '<td>' + EC.esc(r.category || '—') + '</td>' +
-                '<td>' + EC.esc(r.type) + '</td>' +
+                '<td>' + EC.esc(TYPE_WORDS[r.type] || r.type) + '</td>' +
                 '<td>' + EC.esc(r.unit) + '</td>' +
                 '<td class="fw-semibold">' + EC.num(r.stock) + '</td>' +
                 '<td>' + EC.num(r.minStock) + '</td>' +
@@ -662,7 +671,7 @@
         $('#itemId').val('');
         $('#itemName,#itemCode,#itemSubCategory,#brand,#model,#description').val('');
         $('#itemCategory').val('');
-        $('#itemType').val('Consumable');
+        $('#itemType').val('Saleable');   // most items a small school adds are for students
         $('#unitType').val('Piece');
         $('#openingStock,#minimumStock,#costPrice,#sellingPrice').val('');
         $('#itemStatus').val('Active');

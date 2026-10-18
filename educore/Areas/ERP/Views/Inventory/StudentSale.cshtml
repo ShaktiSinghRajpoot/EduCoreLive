@@ -281,7 +281,9 @@ $(function () {
                      + '<td>' + EC.esc(x.item) + (x.qty !== 1 ? ' × ' + EC.num(x.qty) : '') + '</td>'
                      + '<td class="text-end">' + EC.money(x.amount) + '</td>'
                      + '<td>' + status + '</td>'
-                     + '<td class="text-end">' + (canReturn ? '<button type="button" class="btn btn-sm btn-outline-danger ss-ret" data-id="' + x.lineId + '" data-name="' + EC.esc(x.item) + '">Return</button>' : '') + '</td></tr>';
+                     + '<td class="text-end">' + (canReturn ? '<button type="button" class="btn btn-sm btn-outline-danger ss-ret" data-id="' + x.lineId + '" data-name="' + EC.esc(x.item) + '">Return</button>'
+                          // money and stock must agree: a paid item comes back only after its receipt is cancelled
+                          : (!x.returned && x.paid > 0 ? '<span class="small text-muted">To return: cancel its receipt first</span>' : '')) + '</td></tr>';
             }).join(''));
         }).fail(function () { $('#ssSales').html('<tr><td colspan="6" class="text-muted small p-3">Could not load the sales.</td></tr>'); });
     }

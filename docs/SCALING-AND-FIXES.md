@@ -5761,3 +5761,19 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - `sp_inventory_student_sale` gained `p_item_id` (ops ItemClass / SetItemClass), placed after `p_result` so older callers
   still fit. Old signature dropped (bundle `deploy_2026_10_18f.sql`). `core.inventory_class_kits` is kept but not read.
   Tests: `calendar_store_tests.sql` 20 checks.
+
+### 2026-10-18 — Store walked through from empty (QA school data cleared), fixes
+- QA school store data was cleared (items, purchases, suppliers, movements, sales; open store fee lines closed with
+  "Store reset", the one paid receipt cancelled first). Then the flow was run as a new school on screen: item → supplier
+  (from Purchase's "+") → bill → give to a student → pay part by UPI → return the unpaid item → register / summary /
+  Cash Book. Money and stock agreed at every step.
+- Fixed from it:
+  - A new item defaulted to "Consumable", so an item with a selling price never showed in Student Items. The type is now
+    asked in plain words ("Given to students / Used up in school / School equipment"), and a new item defaults to "Given
+    to students". The list and filter use the same words.
+  - The Store page is called Store. An empty store says how to add the first item.
+  - With one location, Purchase does not ask "Goods go to", and the item form does not ask where the opening stock is
+    kept.
+  - Student Items: a paid item says "To return: cancel its receipt first".
+  - A store fee line reads like the item: head = item name, label = size / quantity ("Uniform — 24", "School Diary × 2"),
+    not "Uniform — Uniform - 24" (bundle `deploy_2026_10_18g.sql`). Lines made earlier keep their wording.

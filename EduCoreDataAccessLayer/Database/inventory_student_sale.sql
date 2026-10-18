@@ -260,11 +260,16 @@ BEGIN
                 p_tenant_id, p_school_id, p_action_user_id, it.item_id, v_loc, 'Issue', -r.qty, it.cost_price,
                 'StudentSale', v_sale, NULL, v_name, 'Sold to student');
 
+            -- the fee line reads like the item: head "Uniform", label "24 × 2" (size
+            -- and quantity), so a receipt says "Uniform — 24" and not "Uniform — Uniform - 24"
             INSERT INTO core.student_ledger
                 (tenant_id, school_id, student_id, fee_head_name, frequency, installment_label,
                  due_date, amount_due, status, academic_year)
-            VALUES (p_tenant_id, p_school_id, p_student_id, it.category, 'One Time',
-                    it.item_name || CASE WHEN r.qty <> 1 THEN ' × ' || trim(to_char(r.qty, 'FM999999990.##')) ELSE '' END,
+            VALUES (p_tenant_id, p_school_id, p_student_id, core.fn_item_base_name(it.item_name), 'One Time',
+                    NULLIF(concat_ws(' ',
+                        CASE WHEN position(' - ' IN it.item_name) > 0
+                             THEN trim(right(it.item_name, position(' - ' IN reverse(it.item_name)) - 1)) END,
+                        CASE WHEN r.qty <> 1 THEN '× ' || trim(to_char(r.qty, 'FM999999990.##')) END), ''),
                     to_char(v_today, 'YYYY-MM-DD'), round(r.qty * it.selling_price, 2), 'Pending', v_year)
             RETURNING ledger_id INTO v_ledger;
 
