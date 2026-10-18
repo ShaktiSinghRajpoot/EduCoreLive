@@ -68,7 +68,7 @@
           <div>
             <label class="form-label mb-1">Class</label>
             <select id="rgClass" class="form-select form-select-sm">
-              <option value="">Choose class</option>
+              <option value="">All classes (overview)</option>
               @foreach (var c in classes)
               {
                   <option value="@c.Text">@c.Text</option>
@@ -106,7 +106,7 @@
     else
     {
         <div class="ec-card"><div class="ec-card-body p-0">
-          <div id="rgBody" class="p-3 text-muted small">@(storeStaff ? "Choose a class." : "Loading…")</div>
+          <div id="rgBody" class="p-3 text-muted small">Loading…</div>
         </div></div>
     }
   </div>
@@ -116,6 +116,7 @@
 <script>
 $(function () {
     var DATA_URL = '@Url.Action("Data", "StoreRegister", new { area = "ERP" })';
+    var OVERVIEW_URL = '@Url.Action("Overview", "StoreRegister", new { area = "ERP" })';
     var SEC_URL  = '@Url.Action("PromotionSections", "Student", new { area = "ERP" })';
     var STORE_STAFF = @(storeStaff ? "true" : "false");
     var data = null;
@@ -131,7 +132,12 @@ $(function () {
     }
 
     function load() {
+        if (!$('#rgBody').length) return;   // a teacher with no class: nothing to load
         var q = pick();
+        var overview = !$('#rgMine').length && !q.cls;   // store staff with no class picked
+        $('#rgSec').prop('disabled', overview);
+        $('#rgMissing').closest('.form-check').toggleClass('d-none', overview);
+        if (overview) { loadOverview(q.year); return; }
         if (!q.year || !q.cls) { $('#rgBody').html('Choose a class.'); return; }
         $('#rgBody').html('Loading…');
         $.getJSON(DATA_URL, q).done(function (r) {
@@ -199,6 +205,45 @@ $(function () {
             + '</tbody><tfoot>' + foot + '</tfoot></table></div>');
     }
 
+    /* Every class-section on one line: how many children hold each item ("2/3"),
+       "—" where the item is not for that class. Click a line to open that class. */
+    function loadOverview(year) {
+        $('#rgBody').html('Loading…');
+        $.getJSON(OVERVIEW_URL, { year: year }).done(function (r) {
+            if (!r || !r.success) { $('#rgBody').html(''); ecToast('error', (r && r.message) || 'Could not load the register.'); return; }
+            $('#rgSubtitle').text('All classes · ' + year + ': how many children have each item — click a class to see them');
+            if (!r.rows.length) { $('#rgBody').html('No children in this session.'); return; }
+            if (!r.columns.length) { $('#rgBody').html('Nothing to show yet: the store has no items for students (Inventory › Store, "Given to students").'); return; }
+            var head = '<tr><th class="rg-name">Class</th>' + r.columns.map(function (c) {
+                return '<th>' + EC.esc(c.name) + '<span class="rg-sub">' + EC.esc(c.category) + '</span></th>';
+            }).join('') + '<th>Have everything</th></tr>';
+            var body = r.rows.map(function (x) {
+                return '<tr class="rg-class" style="cursor:pointer" data-cls="' + EC.esc(x.cls) + '" data-sec="' + EC.esc(x.sec) + '">'
+                     + '<td class="rg-name"><div class="fw-semibold">' + EC.esc(x.cls) + (x.sec ? ' – ' + EC.esc(x.sec) : '') + '</div>'
+                     + '<div class="small text-muted">' + x.students + ' children</div></td>'
+                     + x.counts.map(function (n) {
+                         if (n === null) return '<td class="text-muted">—</td>';
+                         var cls = n === x.students ? 'rg-yes' : (n === 0 ? 'rg-no' : '');
+                         return '<td><span class="' + cls + '" style="font-size:.9rem">' + n + '/' + x.students + '</span></td>';
+                       }).join('')
+                     + '<td><span class="badge ' + (x.complete === x.students ? 'bg-label-success' : 'bg-label-warning') + '">' + x.complete + '/' + x.students + '</span></td></tr>';
+            }).join('');
+            $('#rgBody').html('<div class="rg-wrap"><table class="rg-table"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>');
+        }).fail(function () { ecToast('error', 'Could not load the register.'); });
+    }
+
+    $('#rgBody').on('click', '.rg-class', function () {
+        var cls = $(this).data('cls'), sec = String($(this).data('sec') || '');
+        $('#rgClass').val(cls);
+        $('#rgSec').html('<option value="">All sections</option>');
+        $.getJSON(SEC_URL, { 'class': cls, year: $('#rgYear').val() }).done(function (list) {
+            (list || []).forEach(function (name) {
+                $('#rgSec').append('<option value="' + EC.esc(name) + '">' + EC.esc(name) + '</option>');
+            });
+            $('#rgSec').val(sec);
+        }).always(load);
+    });
+
     function loadSections() {
         var cls = $('#rgClass').val();
         $('#rgSec').html('<option value="">All sections</option>');
@@ -214,7 +259,7 @@ $(function () {
     $('#rgSec, #rgMine').on('change', load);
     $('#rgMissing').on('change', function () { if (data) render(); });
 
-    if ($('#rgMine').length) load();
+    load();   // a teacher: their class; store staff: every class at once
 });
 </script>
 }

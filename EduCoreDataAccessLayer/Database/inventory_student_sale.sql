@@ -522,3 +522,63 @@ BEGIN
                      AND NOT i.is_deleted AND i.item_type = 'Saleable'), 0) AS stock_value;
 END;
 $procedure$;
+
+
+-- ============================================================================
+-- Books & Uniform Register, every class at once (store staff's overview).
+--   cursor 1  every child of the session (enrolment), with class, section and the
+--             class's teaching order
+--   cursor 2  the items: everything the store sells, plus anything given that session
+--             (for_class tells which classes an item is for)
+--   cursor 3  who holds what this session (sold, not returned)
+-- The app adds it up per class-section ("Diary 2/3"). Read-only.
+-- ============================================================================
+CREATE OR REPLACE PROCEDURE core.sp_inventory_register_overview(
+    IN    p_tenant_id      integer,
+    IN    p_school_id      integer,
+    IN    p_action_user_id integer,
+    IN    p_academic_year  varchar,
+    INOUT p_students       refcursor DEFAULT 'overview_students'::refcursor,
+    INOUT p_items          refcursor DEFAULT 'overview_items'::refcursor,
+    INOUT p_held           refcursor DEFAULT 'overview_held'::refcursor)
+LANGUAGE plpgsql
+AS $procedure$
+BEGIN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
+        RAISE EXCEPTION 'Invalid school scope.';
+    END IF;
+
+    OPEN p_students FOR
+    SELECT e.student_id, e.class_name, COALESCE(e.section, '') AS section,
+           COALESCE((SELECT c.display_order FROM academic.academic_classes c
+                       JOIN academic.academic_years y ON y.academic_year_id = c.academic_year_id
+                      WHERE c.tenant_id = p_tenant_id AND c.school_id = p_school_id
+                        AND y.academic_year_name = p_academic_year AND c.class_name = e.class_name
+                        AND NOT COALESCE(c.is_deleted, FALSE)
+                      LIMIT 1), 999) AS class_order
+      FROM core.student_enrolment e
+      JOIN core.students s ON s.student_id = e.student_id
+     WHERE e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+       AND e.academic_year = p_academic_year
+       AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
+       AND COALESCE(s.is_active, TRUE);
+
+    OPEN p_items FOR
+    SELECT i.item_id, i.item_name, COALESCE(NULLIF(trim(i.category), ''), 'Other') AS category, i.for_class
+      FROM core.inventory_items i
+     WHERE i.tenant_id = p_tenant_id AND i.school_id = p_school_id AND NOT i.is_deleted
+       AND ((i.is_active AND i.item_type = 'Saleable')
+            OR EXISTS (SELECT 1 FROM core.inventory_student_sale_lines l
+                         JOIN core.inventory_student_sales sa ON sa.sale_id = l.sale_id
+                        WHERE l.item_id = i.item_id AND sa.academic_year = p_academic_year))
+     ORDER BY 3, i.item_name;
+
+    OPEN p_held FOR
+    SELECT DISTINCT sa.student_id, l.item_id
+      FROM core.inventory_student_sale_lines l
+      JOIN core.inventory_student_sales sa ON sa.sale_id = l.sale_id
+     WHERE sa.tenant_id = p_tenant_id AND sa.school_id = p_school_id
+       AND sa.academic_year = p_academic_year
+       AND l.returned_at IS NULL;
+END;
+$procedure$;

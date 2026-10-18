@@ -74,6 +74,22 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal Unpaid    { get; set; }
     }
 
+    /// <summary>Every class at once (store staff): the session's children, the items, who holds what.</summary>
+    public class StoreRegisterOverview
+    {
+        public List<OverviewStudent> Students { get; set; } = new();
+        public List<SaleItem>        Items    { get; set; } = new();   // ItemId, ItemName, Category, ForClass
+        public HashSet<(int StudentId, int ItemId)> Held { get; set; } = new();
+    }
+
+    public class OverviewStudent
+    {
+        public int    StudentId  { get; set; }
+        public string ClassName  { get; set; } = string.Empty;
+        public string Section    { get; set; } = string.Empty;
+        public int    ClassOrder { get; set; }
+    }
+
     /// <summary>One line of a sale, for the sales list (paid or not, returned or not).</summary>
     public class StudentSaleRow
     {

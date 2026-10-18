@@ -86,6 +86,55 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
+        // Store staff's first view: every class-section of the session on one line each,
+        // with how many children hold each item ("2/3"; "—" when the item is not for that
+        // class) and how many hold everything meant for their class. Sizes share a column.
+        [HttpGet]
+        public async Task<IActionResult> Overview(string? year)
+        {
+            if (!await HasPermissionAttribute.UserHasAsync(this, "inventory.view"))
+                return Json(new { success = false, message = "Choose your class." });
+            if (string.IsNullOrWhiteSpace(year))
+                return Json(new { success = false, message = "Choose the session." });
+
+            var ov = await _sales.GetOverviewAsync(year, TenantId(), SchoolId(), UserId());
+            var sized = ov.Items.Where(i => !string.IsNullOrEmpty(i.ItemName))
+                                .GroupBy(i => BaseName(i.ItemName)).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
+            string ColumnOf(EduCoreDataAccessLayer.Models.ERP.SaleItem i) => sized.Contains(BaseName(i.ItemName)) ? BaseName(i.ItemName) : i.ItemName;
+
+            // columns in the order the items came (category, name)
+            var columns = ov.Items.Select(ColumnOf).Distinct().ToList();
+            var itemsOf = ov.Items.GroupBy(ColumnOf).ToDictionary(g => g.Key, g => g.ToList());
+
+            var rows = ov.Students
+                .GroupBy(s => new { s.ClassName, s.Section, s.ClassOrder })
+                .OrderBy(g => g.Key.ClassOrder).ThenBy(g => g.Key.ClassName).ThenBy(g => g.Key.Section)
+                .Select(g =>
+                {
+                    var kids = g.ToList();
+                    // a column counts for this class when any of its items is for every class or for this one
+                    bool ForThis(string col) => itemsOf[col].Any(i => string.IsNullOrEmpty(i.ForClass) || i.ForClass == g.Key.ClassName);
+                    bool Has(int studentId, string col) => itemsOf[col].Any(i => ov.Held.Contains((studentId, i.ItemId)));
+                    var mine = columns.Where(ForThis).ToList();
+                    return new
+                    {
+                        cls = g.Key.ClassName,
+                        sec = g.Key.Section,
+                        students = kids.Count,
+                        counts = columns.Select(c => ForThis(c) ? kids.Count(k => Has(k.StudentId, c)) : (int?)null),
+                        complete = mine.Count == 0 ? 0 : kids.Count(k => mine.All(c => Has(k.StudentId, c)))
+                    };
+                })
+                .ToList();
+
+            return Json(new
+            {
+                success = true,
+                columns = columns.Select(c => new { name = c, category = itemsOf[c][0].Category }),
+                rows
+            });
+        }
+
         // "Uniform Set - 28" -> "Uniform Set"; a name with no " - " stays as it is.
         private static string BaseName(string name)
         {

@@ -266,6 +266,55 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return await RunAsync(p, null);
         }
 
+        public async Task<StoreRegisterOverview> GetOverviewAsync(string academicYear, int tenantId, int schoolId, int actionUserId)
+        {
+            var ov = new StoreRegisterOverview();
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(academicYear)) return ov;
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_academic_year",  NpgsqlDbType.Varchar) { Value = academicYear.Trim() },
+                new("p_students", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "overview_students" },
+                new("p_items",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "overview_items" },
+                new("p_held",     NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "overview_held" }
+            };
+            await _db.ExecuteCursorsAsync("core.sp_inventory_register_overview", p,
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                        ov.Students.Add(new OverviewStudent
+                        {
+                            StudentId  = DbRead.Int(reader, cols, "student_id"),
+                            ClassName  = DbRead.Str(reader, cols, "class_name"),
+                            Section    = DbRead.Str(reader, cols, "section"),
+                            ClassOrder = DbRead.Int(reader, cols, "class_order")
+                        });
+                },
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                        ov.Items.Add(new SaleItem
+                        {
+                            ItemId   = DbRead.Int(reader, cols, "item_id"),
+                            ItemName = DbRead.Str(reader, cols, "item_name"),
+                            Category = DbRead.Str(reader, cols, "category"),
+                            ForClass = DbRead.NStr(reader, cols, "for_class")
+                        });
+                },
+                async reader =>
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                        ov.Held.Add((DbRead.Int(reader, cols, "student_id"), DbRead.Int(reader, cols, "item_id")));
+                });
+            return ov;
+        }
+
         // [{"itemId":5,"qty":2}, ...] -- the shape the proc reads with jsonb_to_recordset
         private static string ItemsJson(List<SaleLineInput>? items) =>
             JsonSerializer.Serialize((items ?? new List<SaleLineInput>())

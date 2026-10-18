@@ -5777,3 +5777,11 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   - Student Items: a paid item says "To return: cancel its receipt first".
   - A store fee line reads like the item: head = item name, label = size / quantity ("Uniform — 24", "School Diary × 2"),
     not "Uniform — Uniform - 24" (bundle `deploy_2026_10_18g.sql`). Lines made earlier keep their wording.
+
+### 2026-10-18 — Register: every class at once for store staff
+- Store staff (`inventory.view`) open the Books & Uniform Register on **"All classes (overview)"**: one line per class-section
+  of the session, "n/N" children holding each item ("—" where the item is not for that class), and "Have everything" =
+  children holding every item meant for their class. Sizes share a column. Clicking a line opens that class-section's
+  ✓ / ✗ list. Teachers are unchanged: their own class only.
+- `core.sp_inventory_register_overview` (bundle `deploy_2026_10_18h.sql`) returns the session's children, the items and
+  who holds what; `StoreRegisterController.Overview` adds it up.
