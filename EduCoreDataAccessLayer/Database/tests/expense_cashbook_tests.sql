@@ -38,7 +38,7 @@ END $$;
 
 DO $t$
 DECLARE
-    v_cat int; v_txt text; v_id int; r record; r2 record; v_n int; v_m int; v_fees numeric;
+    v_cat int; v_txt text; v_id int; r record; r2 record; v_n int; v_m int; v_fees numeric; v_store numeric;
     v_today date := CURRENT_DATE; v_month date := date_trunc('month', CURRENT_DATE)::date;
 BEGIN
     DELETE FROM core.cashbook_opening WHERE tenant_id = 32 AND school_id = 45;
@@ -68,8 +68,8 @@ BEGIN
     SELECT COALESCE(SUM(amount), 0) INTO v_fees FROM core.fn_fee_money_lines(32, 45, v_month, v_today) WHERE mode NOT IN ('Advance', 'To wallet');
     SELECT * INTO r FROM pg_temp.cb(v_month, v_today);
     SELECT COALESCE(SUM(money_in), 0) AS fin, COALESCE(SUM(money_out), 0) AS fout INTO r2
-      FROM core.fn_school_money(32, 45, v_month, v_today) WHERE category = 'Fees';
-    PERFORM pg_temp.chk(r2.fin - r2.fout = v_fees, 'C1 fees in the book = the Day Close money lines (net)', 'net fees Rs ' || v_fees);
+      FROM core.fn_school_money(32, 45, v_month, v_today) WHERE category IN ('Fees', 'Books & Uniform sales');
+    PERFORM pg_temp.chk(r2.fin - r2.fout = v_fees, 'C1 fees (+ store sales paid with them) = the Day Close money lines', 'net fees Rs ' || v_fees);
     PERFORM pg_temp.chk(r.money_out >= 2500, 'C2 the electricity bill is money out', 'out Rs ' || r.money_out);
     PERFORM pg_temp.chk(r.closing = r.opening + r.money_in - r.money_out AND r.last_balance = r.closing,
                         'C3 closing = opening + in - out, and the last running balance says the same', 'closing Rs ' || r.closing);
@@ -98,6 +98,14 @@ BEGIN
     SELECT (pg_temp.cb(DATE '2026-10-01', v_today, 'Cash')).opening + (pg_temp.cb(DATE '2026-10-01', v_today, 'Bank')).opening INTO v_fees;
     PERFORM pg_temp.chk(v_fees = 15000, 'C10 cash book + bank book open at 10000 + 5000');
 
+    -- books / uniform paid at Collect Fees show as sales, not fees, and the two add up to the receipts
+    SELECT COALESCE(SUM(money_in - money_out), 0) INTO v_fees FROM core.fn_school_money(32, 45, v_month, v_today) WHERE category = 'Books & Uniform sales';
+    SELECT COALESCE(SUM(d.amount), 0) INTO v_store FROM core.fee_payment_details d JOIN core.fee_payments p ON p.payment_id = d.payment_id
+     WHERE p.tenant_id = 32 AND p.school_id = 45 AND NOT COALESCE(p.is_cancelled, FALSE)
+       AND p.payment_date BETWEEN to_char(v_month, 'YYYY-MM-DD') AND to_char(v_today, 'YYYY-MM-DD')
+       AND EXISTS (SELECT 1 FROM core.inventory_student_sale_lines sl WHERE sl.ledger_id = d.ledger_id);
+    PERFORM pg_temp.chk(v_fees = v_store,
+                        'C12 store items paid at Collect Fees are "Books & Uniform sales"', 'Rs ' || v_fees);
     BEGIN v_txt := pg_temp.ex('SetOpening', NULL, v_today + 3, NULL, 1, 1); PERFORM pg_temp.chk(FALSE, 'C11 no opening balance in the future', 'saved');
     EXCEPTION WHEN OTHERS THEN PERFORM pg_temp.chk(TRUE, 'C11 no opening balance in the future', SQLERRM); END;
 

@@ -37,6 +37,17 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal Qty    { get; set; }
     }
 
+    /// <summary>What the store bought and sold of saleable items in a date range (sp_inventory_store_summary).</summary>
+    public class StoreSummary
+    {
+        public decimal Bought     { get; set; }   // purchase bills, less supplier returns
+        public decimal Sold       { get; set; }   // charged to students, not returned
+        public decimal CostOfSold { get; set; }   // those items at the cost they left the shelf at
+        public decimal Collected  { get; set; }   // paid so far of what was sold
+        public decimal Unpaid     { get; set; }
+        public decimal StockValue { get; set; }   // saleable stock on hand now, at cost
+    }
+
     /// <summary>Books & Uniform Register: a class's children, the item columns, and who holds what.</summary>
     public class StoreRegister
     {

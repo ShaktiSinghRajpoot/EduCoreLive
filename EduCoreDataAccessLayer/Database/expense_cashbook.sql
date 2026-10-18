@@ -17,6 +17,8 @@
 --        salaries paid           core.staff_payroll (status Paid, on paid_at)
 --        purchase bills          core.inventory_purchases
 --        expenses                core.expenses
+-- The part of a fee receipt paid against books / uniform sold by the store
+-- (inventory_student_sale.sql) is shown under 'Books & Uniform sales', not 'Fees'.
 -- A cancellation is a REVERSAL on the day it was cancelled (the rule Day Close
 -- uses): the original stays on its own day, so a closed month does not change.
 --
@@ -96,19 +98,35 @@ RETURNS TABLE (line_date date, kind varchar, ref varchar, detail varchar, catego
 LANGUAGE sql
 STABLE
 AS $function$
-    WITH x AS (
-        -- fee receipts and their cancellations, real money only
+    WITH fee AS (
+        -- fee receipts and their cancellations, real money only, per receipt and mode
         SELECT ml.line_date, CASE WHEN ml.entry = 'Cancellation' THEN 'Fee cancelled' ELSE 'Fee receipt' END AS kind,
                p.receipt_no AS ref,
                COALESCE(s.student_name, e.student_name, 'Student') AS detail,
-               'Fees'::varchar AS category, ml.mode,
-               GREATEST(SUM(ml.amount), 0) AS money_in, GREATEST(-SUM(ml.amount), 0) AS money_out
+               ml.mode, SUM(ml.amount) AS amount,
+               -- the share of the receipt paid against books / uniform sold by the store
+               -- (receipt lines whose fee line came from a store sale), so the book
+               -- shows that money as sales, not as fees
+               COALESCE((SELECT SUM(d.amount) FILTER (WHERE EXISTS (SELECT 1 FROM core.inventory_student_sale_lines sl
+                                                                    WHERE sl.ledger_id = d.ledger_id))
+                                / NULLIF(SUM(d.amount), 0)
+                           FROM core.fee_payment_details d WHERE d.payment_id = p.payment_id), 0) AS store_share
           FROM core.fn_fee_money_lines(p_tenant_id, p_school_id, p_from, p_to) ml
           JOIN core.fee_payments p ON p.payment_id = ml.payment_id
           LEFT JOIN core.students  s ON s.student_id = p.student_id
           LEFT JOIN core.enquiries e ON e.enquiry_id = p.enquiry_id
          WHERE ml.mode NOT IN ('Advance', 'To wallet')
-         GROUP BY ml.line_date, ml.entry, p.receipt_no, s.student_name, e.student_name, ml.mode
+         GROUP BY ml.line_date, ml.entry, p.payment_id, p.receipt_no, s.student_name, e.student_name, ml.mode
+    ), fee_split AS (
+        SELECT f.*, round(f.amount * f.store_share, 2) AS store_amount FROM fee f
+    ), x AS (
+        SELECT line_date, kind, ref, detail, 'Fees'::varchar AS category, mode,
+               GREATEST(amount - store_amount, 0) AS money_in, GREATEST(-(amount - store_amount), 0) AS money_out
+          FROM fee_split
+        UNION ALL
+        SELECT line_date, kind, ref, detail, 'Books & Uniform sales'::varchar, mode,
+               GREATEST(store_amount, 0), GREATEST(-store_amount, 0)
+          FROM fee_split WHERE store_amount <> 0
         UNION ALL
         SELECT r.refunded_at::date, 'Refund', r.refund_no, st.student_name, 'Fee refunds',
                COALESCE(NULLIF(trim(r.refund_mode), ''), 'Cash'), 0, r.amount

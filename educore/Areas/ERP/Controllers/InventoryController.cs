@@ -424,8 +424,11 @@ namespace educore.Areas.ERP.Controllers
         // The items leave the store and one fee line per item goes on the child's
         // account, so the parent pays at Collect Fees now or later.
         [HasPermission("inventory.manage")]
-        public async Task<IActionResult> StudentSale([FromServices] IBaseService baseService)
+        public async Task<IActionResult> StudentSale([FromServices] IBaseService baseService, [FromServices] ISchoolSettingsService settings)
         {
+            // the current session's first day, for the summary's "This session" button
+            try { ViewBag.SessionStart = (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.StartDate; }
+            catch { ViewBag.SessionStart = null; }
             ViewBag.Locations = (await _inventory.GetLocationsAsync(TenantId(), SchoolId(), UserId()))
                                 .Where(l => l.IsActive).ToList();
             try { ViewBag.ClassList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
@@ -495,6 +498,18 @@ namespace educore.Areas.ERP.Controllers
         {
             var res = await _sales.ReturnAsync(req?.Id ?? 0, req?.Reason ?? "", TenantId(), SchoolId(), UserId());
             return Json(new { success = res.Success, message = res.Message });
+        }
+
+        // Store summary for a date range: bought, sold, margin, collected, unpaid, stock.
+        [HttpGet]
+        public async Task<IActionResult> StoreSummary(string? from, string? to)
+        {
+            var s = await _sales.GetSummaryAsync(from ?? "", to ?? "", TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                bought = s.Bought, sold = s.Sold, cost = s.CostOfSold, margin = s.Sold - s.CostOfSold,
+                collected = s.Collected, unpaid = s.Unpaid, stock = s.StockValue
+            });
         }
 
         [HttpGet]

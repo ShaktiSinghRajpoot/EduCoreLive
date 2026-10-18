@@ -28,6 +28,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<StoreRegister> GetRegisterAsync(string academicYear, string className, string? section,
                                              int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Bought, sold, cost, collected, unpaid and stock of saleable items between two dates.</summary>
+        Task<StoreSummary> GetSummaryAsync(string from, string to, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>Replace one class's set of items.</summary>
         Task<InventoryResult> SaveKitAsync(string className, List<SaleLineInput> items, int tenantId, int schoolId, int actionUserId);
     }

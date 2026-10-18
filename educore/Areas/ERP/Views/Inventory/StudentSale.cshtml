@@ -5,6 +5,7 @@
                     ?? new List<EduCoreDataAccessLayer.Models.ERP.InventoryLocation>();
     var classes = ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
                   ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+    string? sessionStart = ViewBag.SessionStart as string;   // for the summary's "This session"
 }
 
 @section PageStyles {
@@ -13,6 +14,9 @@
   .ss-qty { width:80px; }
   .ss-cat td { background:var(--bs-tertiary-bg); font-weight:800; font-size:.75rem; text-transform:uppercase; letter-spacing:.03em; }
   .ss-total { font-size:1.4rem; font-weight:900; }
+  .ss-kpi { border:1px solid var(--bs-border-color); border-radius:12px; padding:.6rem .75rem; background:var(--bs-body-bg); height:100%; }
+  .ss-kpi .v { font-size:1.15rem; font-weight:900; line-height:1.1; }
+  .ss-kpi .l { font-size:.68rem; font-weight:700; text-transform:uppercase; color:var(--bs-secondary-color); letter-spacing:.03em; }
 </style>
 }
 
@@ -35,6 +39,23 @@
         </div>
       </div>
     </div>
+
+    <!-- store summary: bought, sold, margin, collected, unpaid, stock -->
+    <div class="ec-card mb-3"><div class="ec-card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div class="fw-semibold">Store summary <span class="text-muted small fw-normal" id="sumRange"></span></div>
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" class="btn btn-outline-primary active" data-sum="month">This month</button>
+          <button type="button" class="btn btn-outline-primary" data-sum="last">Last month</button>
+          @if (!string.IsNullOrEmpty(sessionStart))
+          {
+              <button type="button" class="btn btn-outline-primary" data-sum="session">This session</button>
+          }
+        </div>
+      </div>
+      <div class="row g-2" id="sumCards"></div>
+      <div class="small text-muted mt-2">Sold = what went on the children's fee accounts (returns taken off). Margin = sold − what those items cost. Bought = supplier bills of these items (returns taken off). The money comes in at Collect Fees and shows in the Cash Book as "Books &amp; Uniform sales".</div>
+    </div></div>
 
     <!-- 1. the student -->
     <div class="ec-card mb-3"><div class="ec-card-body">
@@ -348,7 +369,27 @@ $(function () {
           .always(function () { EC.buttonReset($btn); });
     });
 
+    /* ── store summary ── */
+    var SESSION_START = '@(sessionStart ?? "")';
+    function loadSummary(kind) {
+        var r = EC.dateRange(kind, SESSION_START);
+        $('#sumRange').text('· ' + EC.date(r.from) + ' to ' + EC.date(r.to));
+        $.getJSON('@Url.Action("StoreSummary", "Inventory", new { area = "ERP" })', { from: r.from, to: r.to }).done(function (s) {
+            var card = function (label, val, color) {
+                return '<div class="col-6 col-md-4 col-xl-2"><div class="ss-kpi"><div class="v" style="color:' + color + '">' + EC.money(val) + '</div><div class="l">' + label + '</div></div></div>';
+            };
+            $('#sumCards').html(card('Sold', s.sold, '#0f766e') + card('Margin', s.margin, s.margin < 0 ? '#dc2626' : '#16a34a')
+                + card('Collected', s.collected, '#16a34a') + card('Still unpaid', s.unpaid, '#dc2626')
+                + card('Bought', s.bought, '#b45309') + card('Stock on hand (cost)', s.stock, '#334155'));
+        });
+    }
+    $('[data-sum]').on('click', function () {
+        $('[data-sum]').removeClass('active'); $(this).addClass('active');
+        loadSummary($(this).data('sum'));
+    });
+
     loadSales();
+    loadSummary('month');
 });
 </script>
 }

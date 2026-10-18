@@ -211,6 +211,36 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return reg;
         }
 
+        public async Task<StoreSummary> GetSummaryAsync(string from, string to, int tenantId, int schoolId, int actionUserId)
+        {
+            var sum = new StoreSummary();
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to)) return sum;
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_from",           NpgsqlDbType.Unknown) { Value = from },
+                new("p_to",             NpgsqlDbType.Unknown) { Value = to },
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "store_summary_cursor" }
+            };
+            await _db.ExecuteCursorsAsync("core.sp_inventory_store_summary", p, async reader =>
+            {
+                var cols = reader.Columns();
+                if (await reader.ReadAsync())
+                {
+                    sum.Bought     = DbRead.Dec(reader, cols, "bought");
+                    sum.Sold       = DbRead.Dec(reader, cols, "sold");
+                    sum.CostOfSold = DbRead.Dec(reader, cols, "cost_of_sold");
+                    sum.Collected  = DbRead.Dec(reader, cols, "collected");
+                    sum.Unpaid     = DbRead.Dec(reader, cols, "unpaid");
+                    sum.StockValue = DbRead.Dec(reader, cols, "stock_value");
+                }
+            });
+            return sum;
+        }
+
         // [{"itemId":5,"qty":2}, ...] -- the shape the proc reads with jsonb_to_recordset
         private static string ItemsJson(List<SaleLineInput>? items) =>
             JsonSerializer.Serialize((items ?? new List<SaleLineInput>())

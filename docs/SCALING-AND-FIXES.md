@@ -5734,3 +5734,15 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   totals by head, month by month. Pages: Finance › Expenses & Cash Book (`ExpenseController`, `IExpenseService`).
 - Test: `tests/expense_cashbook_tests.sql` (17, rolled back): fees in the book = the Day Close money lines, a cancelled
   expense comes back on its cancel day, a bought / part-returned / cancelled bill nets to 0, opening balances carry.
+
+### 2026-10-18 — Books & uniform money kept apart from fees; store summary
+- `core.fn_school_money` splits each fee receipt by what it paid: the share paid against fee lines that came from a store
+  sale (`inventory_student_sale_lines.ledger_id`) is shown under **"Books & Uniform sales"**, the rest under "Fees". A
+  receipt paid in several modes is split in proportion in each mode, so the total never changes (bundle
+  `deploy_2026_10_18e.sql`).
+- `core.sp_inventory_store_summary` (Inventory › Books & Uniform Sale, "Store summary": this month / last month / this
+  session). It shows **sold** (charged to students, returns off), **margin** (sold − cost at which the items were issued),
+  **collected** / **still unpaid** of those fee lines, **bought** (supplier bills of saleable items, returns off,
+  cancelled bills out), and **stock on hand** at cost.
+- Test: `expense_cashbook_tests.sql` now 18 checks, including "store items paid at Collect Fees are Books & Uniform sales"
+  and "fees + store sales = the Day Close money lines".

@@ -401,3 +401,70 @@ BEGIN
      GROUP BY sa.student_id, l.item_id;
 END;
 $procedure$;
+
+
+-- ============================================================================
+-- Store summary: what the store bought and sold of the items it sells (type
+-- 'Saleable') in a date range, what the children's families have paid of it,
+-- the margin, and the stock still on the shelf. Read-only, one row.
+--   bought      purchase bills of saleable items (cancelled bills left out,
+--               supplier returns taken off)
+--   sold        sales to students not returned (what went on fee accounts)
+--   cost_of_sold  the same items at the cost they were issued at
+--   collected / unpaid  of those fee lines, paid so far / still owed
+--   stock_value saleable stock on hand now, at cost price
+-- ============================================================================
+CREATE OR REPLACE PROCEDURE core.sp_inventory_store_summary(
+    IN    p_tenant_id      integer,
+    IN    p_school_id      integer,
+    IN    p_action_user_id integer,
+    IN    p_from           date,
+    IN    p_to             date,
+    INOUT p_result         refcursor DEFAULT 'store_summary_cursor'::refcursor)
+LANGUAGE plpgsql
+AS $procedure$
+BEGIN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
+        RAISE EXCEPTION 'Invalid school scope.';
+    END IF;
+
+    OPEN p_result FOR
+    WITH sold AS (
+        SELECT l.amount, l.quantity, l.item_id,
+               COALESCE(sl.amount_paid, 0) AS paid,
+               COALESCE(sl.amount_due - sl.amount_paid - sl.concession, 0) AS open_amount,
+               -- the rate the item left the shelf at (its Issue movement), else today's cost price
+               COALESCE((SELECT m.unit_rate FROM core.inventory_stock_ledger m
+                          WHERE m.reference_type = 'StudentSale' AND m.reference_id = sa.sale_id
+                            AND m.item_id = l.item_id AND m.movement_type = 'Issue'
+                          ORDER BY m.movement_id LIMIT 1), i.cost_price) AS unit_cost
+          FROM core.inventory_student_sale_lines l
+          JOIN core.inventory_student_sales sa ON sa.sale_id = l.sale_id
+          JOIN core.inventory_items i ON i.item_id = l.item_id
+          LEFT JOIN core.student_ledger sl ON sl.ledger_id = l.ledger_id
+         WHERE sa.tenant_id = p_tenant_id AND sa.school_id = p_school_id
+           AND sa.sale_date BETWEEN p_from AND p_to
+           AND l.returned_at IS NULL
+    )
+    SELECT
+        COALESCE((SELECT SUM(pi.line_total)
+                    FROM core.inventory_purchase_items pi
+                    JOIN core.inventory_purchases pu ON pu.purchase_id = pi.purchase_id
+                    JOIN core.inventory_items i ON i.item_id = pi.item_id AND i.item_type = 'Saleable'
+                   WHERE pu.tenant_id = p_tenant_id AND pu.school_id = p_school_id AND NOT pu.is_cancelled
+                     AND NULLIF(pu.purchase_date, '')::date BETWEEN p_from AND p_to), 0)
+      - COALESCE((SELECT SUM(rt.amount)
+                    FROM core.inventory_purchase_returns rt
+                    JOIN core.inventory_purchases pu ON pu.purchase_id = rt.purchase_id
+                    JOIN core.inventory_items i ON i.item_id = rt.item_id AND i.item_type = 'Saleable'
+                   WHERE rt.tenant_id = p_tenant_id AND rt.school_id = p_school_id AND NOT pu.is_cancelled
+                     AND NULLIF(pu.purchase_date, '')::date BETWEEN p_from AND p_to), 0) AS bought,
+        COALESCE((SELECT SUM(amount) FROM sold), 0)                       AS sold,
+        COALESCE((SELECT SUM(round(quantity * unit_cost, 2)) FROM sold), 0) AS cost_of_sold,
+        COALESCE((SELECT SUM(paid) FROM sold), 0)                         AS collected,
+        COALESCE((SELECT SUM(open_amount) FROM sold), 0)                  AS unpaid,
+        COALESCE((SELECT SUM(i.current_stock * i.cost_price) FROM core.inventory_items i
+                   WHERE i.tenant_id = p_tenant_id AND i.school_id = p_school_id
+                     AND NOT i.is_deleted AND i.item_type = 'Saleable'), 0) AS stock_value;
+END;
+$procedure$;
