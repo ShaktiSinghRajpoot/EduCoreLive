@@ -161,3 +161,13 @@
 /* modal form controls compact */
 .inventory-item-page .form-control,
 .inventory-item-page .form-select{ border-radius:10px; min-height:40px; font-size:.85rem; font-weight:650; }
+
+/* Phone: two cards per row leave no room for the icon and a full rupee figure
+   (Rs 4,55,890.00 was cut off), so the icon goes and the figure gets smaller. */
+@media (max-width:575.98px){
+    .iv-card{ padding:.75rem .85rem; }
+    .iv-card-ic{ display:none; }
+    .iv-card > div{ min-width:0; }
+    .iv-card-val{ font-size:1.05rem; }
+    .iv-card-lbl{ font-size:.62rem; letter-spacing:.02em; }
+}

@@ -5814,3 +5814,4 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - Bundle `deploy_2026_10_18k.sql`.
 - Follow-up after a full flow test (same day): stock **added by hand** (an Adjustment, or a stock-take that counted more) also has no bill, so 'ListItems' returns `added_qty` and the note reads e.g. "23 no bill (20 opening + 3 added by hand)"; the filter is now **"Came in without a bill"**.
 - A **new purchase needs a supplier** (page + `sp_inventory_purchase_manage` 'Save'); old bills without one stay as they are. No fixed shop → add a supplier called "Local market". Bundle `deploy_2026_10_18l.sql`.
+- Phone check: the note reads "23 came in without a bill (20 opening + 3 added by hand)" and sits on its own line under the card's icons; the Purchase supplier box is no longer squeezed by the + button; Store / Purchase summary cards drop the icon on phones so a full rupee figure fits.

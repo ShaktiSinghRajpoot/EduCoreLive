@@ -78,14 +78,14 @@
                     <div class="col-12 col-md-6 col-lg-3">
                         <label class="form-label">Supplier <span class="text-danger">*</span></label>
                         <div class="d-flex gap-1">
-                          <select class="form-select" id="supplierId">
+                          <select class="form-select flex-grow-1" id="supplierId" style="min-width:0">
                             <option value="">Select Supplier</option>
 @foreach (var s in (List<EduCoreDataAccessLayer.Models.ERP.InventorySupplier>)(ViewBag.Suppliers ?? new List<EduCoreDataAccessLayer.Models.ERP.InventorySupplier>()))
 {
                             <option value="@s.SupplierId">@s.SupplierName</option>
 }
                           </select>
-                          <button type="button" class="btn btn-outline-secondary" id="addSupplierBtn" title="Add supplier">
+                          <button type="button" class="btn btn-icon btn-outline-secondary flex-shrink-0" id="addSupplierBtn" title="Add supplier">
                             <i class="bx bx-plus"></i>
                           </button>
                         </div>

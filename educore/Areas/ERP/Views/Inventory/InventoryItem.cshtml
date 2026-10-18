@@ -588,9 +588,10 @@
     function openingNote(r) {
         var opening = EC.num(r.opening), added = EC.num(r.added);
         if (!(opening + added > 0)) return '';
-        var text = opening && added ? EC.num(opening + added) + ' no bill (' + EC.num(opening) + ' opening + ' + EC.num(added) + ' added by hand)'
-                 : opening ? EC.num(opening) + ' opening (no bill)'
-                 : EC.num(added) + ' added by hand (no bill)';
+        // what CAME IN without a bill, so it can be more than the stock left now
+        var how  = opening && added ? EC.num(opening) + ' opening + ' + EC.num(added) + ' added by hand'
+                 : opening ? 'opening' : 'added by hand';
+        var text = EC.num(opening + added) + ' came in without a bill (' + how + ')';
         return '<div class="small fw-normal text-warning" title="Came in without a supplier bill">' + EC.esc(text) + '</div>';
     }
 
@@ -654,13 +655,13 @@
                     statusBadge(r.status) + '</div>' +
                 '<div class="d-flex justify-content-between align-items-center mt-2">' +
                     '<div class="small text-muted">' + EC.num(r.stock) + ' ' + EC.esc(r.unit) +
-                        ' · min ' + EC.num(r.minStock) + openingNote(r) + '</div>' +
+                        ' · min ' + EC.num(r.minStock) + '</div>' +
                     '<div>' +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '"><i class="bx bx-transfer"></i></button>' +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '"><i class="bx bx-transfer-alt"></i></button>' +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-hist="' + r.id + '"><i class="bx bx-history"></i></button>' +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-edit="' + r.id + '"><i class="bx bx-edit"></i></button>' +
-                    '</div></div></div>';
+                    '</div></div>' + openingNote(r) + '</div>';
         }).join(''));
 
         $('#pgInfo').text('Showing ' + ((page - 1) * per + 1) + '–' +
