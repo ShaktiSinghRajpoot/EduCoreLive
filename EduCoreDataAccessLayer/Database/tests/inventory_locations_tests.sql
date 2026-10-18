@@ -748,7 +748,7 @@ BEGIN
     BEGIN
         c := 'p2'; c2 := 'p2b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE, p_location_id => v_olc,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE, p_location_id => v_olc,
              p_items => jsonb_build_array(jsonb_build_object('itemId', v_tie, 'quantity', 1, 'unitPrice', 1)),
              p_result => c, p_result2 => c2);
         PERFORM pg_temp.chk('PUL-02 bill into another school''s location refused', FALSE, 'accepted');
@@ -1019,7 +1019,7 @@ BEGIN
     BEGIN
         c := 'c4'; c2 := 'c4b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE, p_invoice_no => 'ZZL-FULL-1',
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE, p_invoice_no => 'ZZL-FULL-1',
              p_items => jsonb_build_array(jsonb_build_object('itemId', v_tie, 'quantity', 4, 'unitPrice', 40)),
              p_result => c, p_result2 => c2);
         FETCH c INTO k_ok, k_msg, v_p3;
@@ -1125,10 +1125,11 @@ BEGIN
     v_n := 0; v_dec := 0;
     LOOP FETCH c INTO r; EXIT WHEN NOT FOUND;
         v_n := v_n + 1;
-        IF r.purchase_id <> v_pid THEN v_dec := v_dec + 1; END IF;
+        -- its two bills: ZZL-B-1 and ZZL-FULL-1 (a bill needs a supplier since 18 Oct 2026)
+        IF r.purchase_id <> v_pid AND r.invoice_no <> 'ZZL-FULL-1' THEN v_dec := v_dec + 1; END IF;
     END LOOP;
     PERFORM pg_temp.chk('SUL-07 purchase List for one supplier returns only its bills',
-                        v_n = 1 AND v_dec = 0, format('%s row(s)', v_n));
+                        v_n = 2 AND v_dec = 0, format('%s row(s)', v_n));
 
     -- ══════════════════════════════════════════════════════════════════════
     RAISE NOTICE '';

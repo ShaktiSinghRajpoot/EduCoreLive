@@ -31,6 +31,9 @@
 
         /// Opening stock entered with the item (no supplier, no bill).
         public decimal OpeningQty   { get; set; }
+
+        /// Stock added by hand later (Adjustment / stock-take that counted more): no bill either.
+        public decimal AddedQty     { get; set; }
     }
 
     /// What the Add/Edit item form posts.

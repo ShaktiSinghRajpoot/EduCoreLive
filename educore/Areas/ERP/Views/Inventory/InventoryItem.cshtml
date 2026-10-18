@@ -103,7 +103,7 @@
             <option value="available">Available</option>
             <option value="low">Low Stock</option>
             <option value="out">Out of Stock</option>
-            <option value="opening">Opening stock (no bill)</option>
+            <option value="opening">Came in without a bill</option>
           </select>
 
           <select class="iv-chip" id="perPage" title="Rows per page">
@@ -554,7 +554,7 @@
             if (stk === 'available' && r.status !== 'Available')    return false;
             if (stk === 'low'       && r.status !== 'Low Stock')    return false;
             if (stk === 'out'       && r.status !== 'Out of Stock') return false;
-            if (stk === 'opening'   && !(EC.num(r.opening) > 0))    return false;
+            if (stk === 'opening'   && !(noBill(r) > 0))            return false;
             return true;
         }).sort(function (a, b) {
             var x, y;
@@ -581,12 +581,17 @@
         $('#sumValue').text(EC.money(value));
     }
 
-    // Stock entered as "already in school" when the item was made has no
-    // supplier or bill, so it is shown apart from what came through Purchase.
+    // Stock that came in without a supplier bill: entered as "already in school"
+    // when the item was made, or added by hand later (Adjustment / stock-take).
+    // Shown apart from what came through Purchase.
+    function noBill(r) { return EC.num(r.opening) + EC.num(r.added); }
     function openingNote(r) {
-        if (!(EC.num(r.opening) > 0)) return '';
-        return '<div class="small fw-normal text-warning" title="Entered when the item was added: no supplier, no bill">'
-             + EC.num(r.opening) + ' opening (no bill)</div>';
+        var opening = EC.num(r.opening), added = EC.num(r.added);
+        if (!(opening + added > 0)) return '';
+        var text = opening && added ? EC.num(opening + added) + ' no bill (' + EC.num(opening) + ' opening + ' + EC.num(added) + ' added by hand)'
+                 : opening ? EC.num(opening) + ' opening (no bill)'
+                 : EC.num(added) + ' added by hand (no bill)';
+        return '<div class="small fw-normal text-warning" title="Came in without a supplier bill">' + EC.esc(text) + '</div>';
     }
 
     function render() {

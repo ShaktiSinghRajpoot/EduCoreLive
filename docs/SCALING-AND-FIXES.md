@@ -5812,3 +5812,5 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - Add Item: "Opening Stock" is now **"Stock already in school (before today)"**, with a note that new stock goes through **Purchase** (supplier + bill).
 - `sp_inventory_manage` 'ListItems' returns `opening_qty` (sum of the item's 'Opening' ledger rows). The item list shows "N opening (no bill)" under the stock, the Stock filter has **"Opening stock (no bill)"**, and History labels it the same way.
 - Bundle `deploy_2026_10_18k.sql`.
+- Follow-up after a full flow test (same day): stock **added by hand** (an Adjustment, or a stock-take that counted more) also has no bill, so 'ListItems' returns `added_qty` and the note reads e.g. "23 no bill (20 opening + 3 added by hand)"; the filter is now **"Came in without a bill"**.
+- A **new purchase needs a supplier** (page + `sp_inventory_purchase_manage` 'Save'); old bills without one stay as they are. No fixed shop → add a supplier called "Local market". Bundle `deploy_2026_10_18l.sql`.

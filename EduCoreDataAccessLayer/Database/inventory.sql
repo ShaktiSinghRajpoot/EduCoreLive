@@ -659,7 +659,13 @@ BEGIN
                -- has no supplier and no bill, so the list shows it apart.
                COALESCE((SELECT SUM(l.quantity) FROM core.inventory_stock_ledger l
                           WHERE l.tenant_id = i.tenant_id AND l.school_id = i.school_id
-                            AND l.item_id = i.item_id AND l.movement_type = 'Opening'), 0) AS opening_qty
+                            AND l.item_id = i.item_id AND l.movement_type = 'Opening'), 0) AS opening_qty,
+               -- Stock added by hand later (an Adjustment, or a stock-take that
+               -- counted more): no bill either, so it is shown with the opening.
+               COALESCE((SELECT SUM(l.quantity) FROM core.inventory_stock_ledger l
+                          WHERE l.tenant_id = i.tenant_id AND l.school_id = i.school_id
+                            AND l.item_id = i.item_id AND l.quantity > 0
+                            AND l.movement_type IN ('Adjustment', 'StockTake')), 0) AS added_qty
         FROM core.inventory_items i
         CROSS JOIN LATERAL (
             SELECT CASE WHEN p_location_id IS NULL THEN i.current_stock
@@ -1510,7 +1516,11 @@ BEGIN
         WHERE tenant_id = p_tenant_id AND school_id = p_school_id
           AND supplier_id = p_supplier_id AND is_deleted = FALSE;
 
-        IF p_supplier_id IS NOT NULL AND v_supp IS NULL THEN
+        -- Every new bill names who supplied it (old bills without one stay as they are).
+        IF p_supplier_id IS NULL THEN
+            RAISE EXCEPTION 'Choose the supplier. No fixed shop? Add one called "Local market".';
+        END IF;
+        IF v_supp IS NULL THEN
             RAISE EXCEPTION 'Supplier not found.';
         END IF;
         -- An inactive supplier keeps its old bills but takes no new ones.

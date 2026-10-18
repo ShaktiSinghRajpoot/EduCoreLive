@@ -793,9 +793,7 @@ BEGIN
                             SQLERRM ILIKE 'Bill%already entered%', SQLERRM);
     END;
 
-    -- With no supplier picked (still allowed, rule D-7), the same bill number may
-    -- not repeat among no-supplier bills either. It used to: supplier_id was NULL
-    -- and NULLs never collide in a unique index.
+    -- A new bill must name its supplier (18 Oct 2026; it used to be optional, rule D-7).
     BEGIN
         c := 'e5'; c2 := 'e5b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
@@ -803,19 +801,10 @@ BEGIN
              p_items => jsonb_build_array(jsonb_build_object(
                  'itemId', v_nb, 'quantity', 1, 'unitPrice', 20, 'taxPercent', 0)),
              p_result => c, p_result2 => c2);
-        c := 'e5c'; c2 := 'e5d';
-        CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE, p_invoice_no => 'ZZS-CASH-9',
-             p_items => jsonb_build_array(jsonb_build_object(
-                 'itemId', v_nb, 'quantity', 1, 'unitPrice', 20, 'taxPercent', 0)),
-             p_result => c, p_result2 => c2);
-        SELECT COUNT(*) INTO v_n FROM core.inventory_purchases
-         WHERE tenant_id = c_tenant AND school_id = c_school AND invoice_no = 'ZZS-CASH-9';
-        PERFORM pg_temp.chk('PUR-05 same bill twice with no supplier refused', FALSE,
-                            format('accepted: %s purchases carry ZZS-CASH-9', v_n));
+        PERFORM pg_temp.chk('PUR-05 a bill with no supplier is refused', FALSE, 'it was saved');
     EXCEPTION WHEN OTHERS THEN
-        PERFORM pg_temp.chk('PUR-05 same bill twice with no supplier refused',
-                            SQLERRM ILIKE 'Bill ZZS-CASH-9 from no supplier is already entered%', SQLERRM);
+        PERFORM pg_temp.chk('PUR-05 a bill with no supplier is refused',
+                            SQLERRM ILIKE 'Choose the supplier%', SQLERRM);
     END;
     -- The unique index is the backstop behind the proc's own check.
     BEGIN
@@ -835,7 +824,7 @@ BEGIN
     BEGIN
         c := 'e6'; c2 := 'e6b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
              p_items => jsonb_build_array(
                  jsonb_build_object('itemId', v_ti, 'quantity', 1, 'unitPrice', 40, 'taxPercent', 0),
                  jsonb_build_object('itemId', v_nb, 'quantity', 1, 'unitPrice', 40, 'taxPercent', -18)),
@@ -847,7 +836,7 @@ BEGIN
     BEGIN
         c := 'e7'; c2 := 'e7b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
              p_items => jsonb_build_array(jsonb_build_object(
                  'itemId', v_ti, 'quantity', 1, 'unitPrice', 40, 'taxPercent', 128)),
              p_result => c, p_result2 => c2);
@@ -858,7 +847,7 @@ BEGIN
     BEGIN
         c := 'e8'; c2 := 'e8b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
              p_items => jsonb_build_array(jsonb_build_object(
                  'itemId', v_ti, 'quantity', 1, 'unitPrice', -40, 'taxPercent', 0)),
              p_result => c, p_result2 => c2);
@@ -869,7 +858,7 @@ BEGIN
     BEGIN
         c := 'e9'; c2 := 'e9b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
              p_items => '[{"itemId": null, "quantity": 1, "unitPrice": 1}]'::jsonb,
              p_result => c, p_result2 => c2);
         PERFORM pg_temp.chk('PUR-09 a line with no item refused', FALSE, 'it was accepted');
@@ -879,7 +868,7 @@ BEGIN
     BEGIN
         c := 'e10'; c2 := 'e10b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
              p_items => jsonb_build_array(jsonb_build_object('itemId', v_ti, 'unitPrice', 1)),
              p_result => c, p_result2 => c2);
         PERFORM pg_temp.chk('PUR-10 a line with no quantity refused', FALSE, 'it was accepted');
@@ -889,7 +878,7 @@ BEGIN
     BEGIN
         c := 'e11'; c2 := 'e11b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
              p_items => jsonb_build_object('itemId', v_ti, 'quantity', 1),
              p_result => c, p_result2 => c2);
         PERFORM pg_temp.chk('PUR-11 lines as an object, not an array, refused', FALSE, 'it was accepted');
@@ -910,7 +899,7 @@ BEGIN
     BEGIN
         c := 'e13'; c2 := 'e13b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => NULL,
+             p_supplier_id => v_sup, p_purchase_date => NULL,
              p_items => jsonb_build_array(jsonb_build_object(
                  'itemId', v_ti, 'quantity', 1, 'unitPrice', 1, 'taxPercent', 0)),
              p_result => c, p_result2 => c2);
@@ -922,7 +911,7 @@ BEGIN
     BEGIN
         c := 'e14'; c2 := 'e14b';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
              p_items => jsonb_build_array(jsonb_build_object(
                  'itemId', v_ti, 'quantity', 1000000000, 'unitPrice', 1000000, 'taxPercent', 0)),
              p_result => c, p_result2 => c2);
@@ -977,7 +966,7 @@ BEGIN
     BEGIN
         c := 'e17b'; c2 := 'e17c';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
              p_items => jsonb_build_array(
                  jsonb_build_object('itemId', v_it, 'quantity', 1.005, 'unitPrice', 10, 'taxPercent', 0)),
              p_result => c, p_result2 => c2);
@@ -989,7 +978,7 @@ BEGIN
     BEGIN
         c := 'e17d'; c2 := 'e17e';
         CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-             p_purchase_date => CURRENT_DATE,
+             p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
              p_items => jsonb_build_array(
                  jsonb_build_object('itemId', v_it, 'quantity', 1, 'unitPrice', 10.005, 'taxPercent', 0)),
              p_result => c, p_result2 => c2);
@@ -1011,7 +1000,7 @@ BEGIN
         BEGIN
             c := 'e17g'; c2 := 'e17h';
             CALL core.sp_inventory_purchase_manage('Save', c_tenant, c_school, c_user,
-                 p_purchase_date => CURRENT_DATE,
+                 p_supplier_id => v_sup, p_purchase_date => CURRENT_DATE,
                  p_items => jsonb_build_array(
                      jsonb_build_object('itemId', v_old, 'quantity', 5, 'unitPrice', 50, 'taxPercent', 0)),
                  p_result => c, p_result2 => c2);
