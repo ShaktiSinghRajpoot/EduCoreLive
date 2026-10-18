@@ -1,0 +1,354 @@
+@{
+    ViewData["Title"] = "Books & Uniform Sale";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var locations = ViewBag.Locations as List<EduCoreDataAccessLayer.Models.ERP.InventoryLocation>
+                    ?? new List<EduCoreDataAccessLayer.Models.ERP.InventoryLocation>();
+    var classes = ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                  ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+}
+
+@section PageStyles {
+<style>
+  .ss-pick { cursor:pointer; }
+  .ss-qty { width:80px; }
+  .ss-cat td { background:var(--bs-tertiary-bg); font-weight:800; font-size:.75rem; text-transform:uppercase; letter-spacing:.03em; }
+  .ss-total { font-size:1.4rem; font-weight:900; }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+          <div class="ec-page-title-wrap">
+            <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+              <i class="bx bx-book-bookmark fs-4"></i>
+            </div>
+            <div>
+              <h4 class="ec-page-title mb-1">Books &amp; Uniform Sale</h4>
+              <div class="ec-page-subtitle">Give books, uniform or stationery to a student — the amount goes on their fee account, paid now or later at Collect Fees</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline-primary text-nowrap" id="btnKits"><i class="bx bx-list-check me-1"></i>Class sets</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1. the student -->
+    <div class="ec-card mb-3"><div class="ec-card-body">
+      <div class="d-flex flex-wrap gap-2 align-items-end">
+        <div class="flex-grow-1" style="max-width:420px">
+          <label class="form-label mb-1">Find student</label>
+          <div class="input-group">
+            <input id="ssFind" class="form-control" placeholder="Name, father's name, mobile or adm. no">
+            <button class="btn btn-primary" id="ssFindGo" type="button"><i class="bx bx-search"></i></button>
+          </div>
+        </div>
+        @if (locations.Count > 1)
+        {
+            <div>
+              <label class="form-label mb-1">From store</label>
+              <select id="ssLoc" class="form-select">
+                @foreach (var l in locations)
+                {
+                    <option value="@l.LocationId" selected="@l.IsDefault">@l.LocationName</option>
+                }
+              </select>
+            </div>
+        }
+      </div>
+      <div id="ssResults" class="mt-2 d-none"></div>
+      <div id="ssStudent" class="mt-3 d-none"></div>
+    </div></div>
+
+    <!-- 2. the items -->
+    <div class="ec-card mb-3 d-none" id="ssItemsCard"><div class="ec-card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <div class="fw-semibold" id="ssItemsTitle">Items</div>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-sm btn-outline-primary" id="ssFillKit"><i class="bx bx-list-check me-1"></i>Fill class set</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="ssClear">Clear</button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Item</th><th class="text-end">Price</th><th class="text-end d-none d-sm-table-cell">In stock</th><th class="text-end">Qty</th><th class="text-end">Amount</th></tr></thead>
+          <tbody id="ssItems"></tbody>
+        </table>
+      </div>
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+        <div><span class="text-muted small">Total</span> <span class="ss-total" id="ssTotal">₹0.00</span></div>
+        <button type="button" class="btn btn-primary" id="ssGive"><i class="bx bx-check me-1"></i>Give items &amp; add to fee account</button>
+      </div>
+      <div id="ssDone" class="alert alert-success mt-3 mb-0 d-none"></div>
+    </div></div>
+
+    <!-- 3. sales -->
+    <div class="ec-card mb-0"><div class="ec-card-body p-0">
+      <div class="px-3 pt-3 fw-semibold" id="ssSalesTitle">Latest sales</div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Date</th><th>Student</th><th>Item</th><th class="text-end">Amount</th><th>Status</th><th></th></tr></thead>
+          <tbody id="ssSales"><tr><td colspan="6" class="text-muted small p-3">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div></div>
+
+    @Html.AntiForgeryToken()
+  </div>
+</div>
+
+<!-- Class sets: which items, how many, for each class -->
+<div class="modal fade" id="kitModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content" style="border:0;border-radius:20px;overflow:hidden;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div>
+          <div class="ec-section-title">Class sets</div>
+          <div class="ec-section-subtitle">The books (and anything else) a class needs. Picking a student fills it in.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4">
+        <label class="form-label mb-1">Class</label>
+        <select id="kmClass" class="form-select mb-3">
+          <option value="">Choose a class</option>
+          @foreach (var c in classes)
+          {
+              <option value="@c.Text">@c.Text</option>
+          }
+        </select>
+        <div id="kmItems" class="small text-muted">Choose a class to see its set.</div>
+      </div>
+      <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary px-4" id="kmSave"><i class="bx bx-check me-1"></i>Save set</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    var URL = {
+        search:  '@Url.Action("SaleSearch", "Inventory", new { area = "ERP" })',
+        student: '@Url.Action("SaleStudent", "Inventory", new { area = "ERP" })',
+        items:   '@Url.Action("SaleItems", "Inventory", new { area = "ERP" })',
+        sell:    '@Url.Action("Sell", "Inventory", new { area = "ERP" })',
+        ret:     '@Url.Action("SaleReturn", "Inventory", new { area = "ERP" })',
+        sales:   '@Url.Action("Sales", "Inventory", new { area = "ERP" })',
+        kit:     '@Url.Action("SaveClassKit", "Inventory", new { area = "ERP" })',
+        collect: '@Url.Action("ManageFee", "Fee", new { area = "ERP" })'
+    };
+    var student = null;      // {id, name, admNo, sessions:[{year, cls, sec, current}]}
+    var items = [];          // items for sale, with the chosen class's set in .kit
+    var qty = {};            // itemId -> quantity typed
+
+    function token() { return $('input[name="__RequestVerificationToken"]').val(); }
+    function post(url, data) {
+        return $.ajax({ url: url, type: 'POST', contentType: 'application/json',
+                        headers: { 'RequestVerificationToken': token() }, data: JSON.stringify(data) });
+    }
+    function storeId() { return $('#ssLoc').val() || null; }
+    function session() {
+        var y = $('#ssFor').val();
+        return student ? student.sessions.filter(function (s) { return s.year === y; })[0] : null;
+    }
+
+    /* ── 1. find the student ── */
+    function find() {
+        var q = $('#ssFind').val().trim();
+        if (q.length < 2) { ecToast('warning', 'Type at least 2 letters.'); return; }
+        $.getJSON(URL.search, { q: q }).done(function (list) {
+            list = list || [];
+            if (!list.length) { $('#ssResults').addClass('d-none'); ecToast('error', 'No student found for "' + q + '".'); return; }
+            if (list.length === 1) { pick(list[0].id); return; }
+            $('#ssResults').removeClass('d-none').html('<div class="list-group">' + list.map(function (s) {
+                return '<button type="button" class="list-group-item list-group-item-action ss-pick" data-id="' + s.id + '">'
+                     + '<b>' + EC.esc(s.name) + '</b> <span class="text-muted small">' + EC.esc(s.cls) + (s.sec ? ' – ' + EC.esc(s.sec) : '')
+                     + ' · ' + EC.esc(s.guardian || '—') + ' · ' + EC.esc(s.mobile || '—') + ' · ' + EC.esc(s.admNo) + '</span></button>';
+            }).join('') + '</div>');
+        }).fail(function () { ecToast('error', 'Could not search students.'); });
+    }
+    $('#ssFindGo').on('click', find);
+    $('#ssFind').on('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); find(); } });
+    $('#ssResults').on('click', '.ss-pick', function () { pick(+$(this).data('id')); });
+
+    function pick(id) {
+        $('#ssResults').addClass('d-none');
+        $('#ssDone').addClass('d-none');
+        $.getJSON(URL.student, { id: id }).done(function (r) {
+            if (!r || !r.success) { ecToast('error', (r && r.message) || 'Could not open the student.'); return; }
+            student = r;
+            // a child promoted early can be given next session's books (charged in that session)
+            var opts = r.sessions.map(function (s) {
+                return '<option value="' + EC.esc(s.year) + '"' + (s.current ? ' selected' : '') + '>'
+                     + EC.esc(s.year) + ' · ' + EC.esc(s.cls) + (s.sec ? ' – ' + EC.esc(s.sec) : '') + (s.current ? ' (now)' : ' (next session)') + '</option>';
+            }).join('');
+            $('#ssStudent').removeClass('d-none').html(
+                '<div class="d-flex flex-wrap align-items-end gap-3">'
+              + '<div><div class="fw-bold fs-5">' + EC.esc(r.name) + '</div><div class="text-muted small">' + EC.esc(r.admNo) + '</div></div>'
+              + '<div><label class="form-label mb-1">Items for</label><select id="ssFor" class="form-select form-select-sm">' + opts + '</select></div>'
+              + '</div>');
+            $('#ssFor').on('change', function () { loadItems(true); });
+            loadItems(true);
+            loadSales();
+        }).fail(function () { ecToast('error', 'Could not open the student.'); });
+    }
+
+    /* ── 2. the items ── */
+    function loadItems(fillKit) {
+        var s = session();
+        $.getJSON(URL.items, { cls: s ? s.cls : '', location: storeId() }).done(function (list) {
+            items = list || [];
+            qty = {};
+            if (fillKit) items.forEach(function (i) { if (i.kit > 0) qty[i.id] = i.kit; });
+            $('#ssItemsCard').removeClass('d-none');
+            $('#ssItemsTitle').text('Items' + (s ? ' — set for ' + s.cls + ' (' + s.year + ')' : ''));
+            renderItems();
+        }).fail(function () { ecToast('error', 'Could not load the items.'); });
+    }
+
+    function renderItems() {
+        if (!items.length) {
+            $('#ssItems').html('<tr><td colspan="5" class="text-muted small p-3">Nothing is set up for sale yet. On Inventory › Items &amp; Stock make an item of type "Saleable" with a selling price (one item per uniform size).</td></tr>');
+            $('#ssTotal').text(EC.money(0));
+            return;
+        }
+        var html = '', cat = null;
+        items.forEach(function (i) {
+            if (i.category !== cat) { cat = i.category; html += '<tr class="ss-cat"><td colspan="5">' + EC.esc(cat) + '</td></tr>'; }
+            var q = qty[i.id] || 0;
+            html += '<tr' + (i.stock <= 0 ? ' class="text-muted"' : '') + '><td>' + EC.esc(i.name)
+                  + (i.kit > 0 ? ' <span class="badge bg-label-info">in set</span>' : '') + '</td>'
+                  + '<td class="text-end">' + EC.money(i.price) + '</td>'
+                  + '<td class="text-end d-none d-sm-table-cell">' + EC.num(i.stock) + '</td>'
+                  + '<td class="text-end"><input type="number" min="0" step="1" class="form-control form-control-sm ss-qty ms-auto" data-id="' + i.id + '" value="' + (q || '') + '"'
+                  + (i.stock <= 0 ? ' disabled title="Out of stock"' : '') + '></td>'
+                  + '<td class="text-end" data-amt="' + i.id + '">' + (q ? EC.money(q * i.price) : '—') + '</td></tr>';
+        });
+        $('#ssItems').html(html);
+        total();
+    }
+
+    function total() {
+        var t = 0;
+        items.forEach(function (i) { t += (qty[i.id] || 0) * i.price; });
+        $('#ssTotal').text(EC.money(t));
+        $('#ssGive').prop('disabled', t <= 0);
+        return t;
+    }
+
+    $('#ssItems').on('input', '.ss-qty', function () {
+        var id = +$(this).data('id'), q = Math.max(0, Number(this.value) || 0);
+        var it = items.filter(function (i) { return i.id === id; })[0];
+        if (q) qty[id] = q; else delete qty[id];
+        $('[data-amt="' + id + '"]').text(q ? EC.money(q * it.price) : '—');
+        total();
+    });
+    $('#ssFillKit').on('click', function () { loadItems(true); });
+    $('#ssClear').on('click', function () { qty = {}; renderItems(); });
+    $('#ssLoc').on('change', function () { if (student) loadItems(false); });
+
+    $('#ssGive').on('click', function () {
+        var s = session(), lines = Object.keys(qty).map(function (id) { return { itemId: +id, qty: qty[id] }; });
+        if (!student || !s || !lines.length) return;
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Saving…');
+        post(URL.sell, { studentId: student.id, academicYear: s.year, locationId: storeId(), items: lines })
+            .done(function (r) {
+                if (!r || !r.success) { ecToast('error', (r && r.message) || 'Could not give the items.'); return; }
+                var now = student.sessions.filter(function (x) { return x.current; })[0] || s;
+                $('#ssDone').removeClass('d-none').html(EC.esc(r.message)
+                    + ' <a class="btn btn-sm btn-success ms-2" href="' + URL.collect + '?adm=' + encodeURIComponent(student.admNo)
+                    + '&session=' + encodeURIComponent(now.year) + '"><i class="bx bx-wallet me-1"></i>Collect now</a>');
+                ecToast('success', r.message);
+                loadItems(false);
+                loadSales();
+            })
+            .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not give the items')); })
+            .always(function () { EC.buttonReset($btn); });
+    });
+
+    /* ── 3. sales (this student's, or the latest of everyone) ── */
+    function loadSales() {
+        $.getJSON(URL.sales, { studentId: student ? student.id : null }).done(function (rows) {
+            rows = rows || [];
+            $('#ssSalesTitle').text(student ? 'Sales to ' + student.name : 'Latest sales');
+            if (!rows.length) { $('#ssSales').html('<tr><td colspan="6" class="text-muted small p-3">No sales yet.</td></tr>'); return; }
+            $('#ssSales').html(rows.map(function (x) {
+                var status = x.returned ? '<span class="badge bg-label-secondary" title="' + EC.esc(x.returnReason) + '">Returned</span>'
+                           : x.open <= 0 ? '<span class="badge bg-label-success">Paid</span>'
+                           : x.paid > 0 ? '<span class="badge bg-label-warning">Part paid</span>'
+                           : '<span class="badge bg-label-danger">Unpaid</span>';
+                var canReturn = !x.returned && x.paid <= 0 && x.open > 0;
+                return '<tr><td class="text-nowrap small">' + EC.esc(x.date ? EC.date(x.date) : '') + '</td>'
+                     + '<td><div class="fw-semibold">' + EC.esc(x.name) + '</div><div class="small text-muted">' + EC.esc(x.cls) + ' · ' + EC.esc(x.year) + '</div></td>'
+                     + '<td>' + EC.esc(x.item) + (x.qty !== 1 ? ' × ' + EC.num(x.qty) : '') + '</td>'
+                     + '<td class="text-end">' + EC.money(x.amount) + '</td>'
+                     + '<td>' + status + '</td>'
+                     + '<td class="text-end">' + (canReturn ? '<button type="button" class="btn btn-sm btn-outline-danger ss-ret" data-id="' + x.lineId + '" data-name="' + EC.esc(x.item) + '">Return</button>' : '') + '</td></tr>';
+            }).join(''));
+        }).fail(function () { $('#ssSales').html('<tr><td colspan="6" class="text-muted small p-3">Could not load the sales.</td></tr>'); });
+    }
+
+    $('#ssSales').on('click', '.ss-ret', function () {
+        var id = +$(this).data('id'), name = $(this).data('name');
+        EC.prompt({ title: 'Return this item?', name: name, label: 'Reason', required: true,
+                    placeholder: 'Wrong size / wrong book / not needed', okText: 'Return item' }).then(function (reason) {
+            if (reason === null) return;
+            post(URL.ret, { id: id, reason: reason }).done(function (r) {
+                if (r && r.success) { ecToast('success', r.message); loadSales(); if (student) loadItems(false); }
+                else ecToast('error', (r && r.message) || 'Could not return the item.');
+            }).fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not return the item')); });
+        });
+    });
+
+    /* ── class sets ── */
+    var kitItems = [];
+    $('#btnKits').on('click', function () {
+        var s = session();
+        if (s) $('#kmClass').val(s.cls);
+        loadKit();
+        new bootstrap.Modal(document.getElementById('kitModal')).show();
+    });
+    $('#kmClass').on('change', loadKit);
+
+    function loadKit() {
+        var cls = $('#kmClass').val();
+        if (!cls) { $('#kmItems').html('Choose a class to see its set.'); kitItems = []; return; }
+        $.getJSON(URL.items, { cls: cls, location: storeId() }).done(function (list) {
+            kitItems = list || [];
+            if (!kitItems.length) { $('#kmItems').html('Nothing is set up for sale yet (Inventory › Items &amp; Stock, type "Saleable").'); return; }
+            $('#kmItems').html('<table class="table table-sm mb-0"><thead><tr><th>Item</th><th class="text-end">Qty in set</th></tr></thead><tbody>'
+                + kitItems.map(function (i) {
+                    return '<tr><td>' + EC.esc(i.name) + ' <span class="text-muted small">' + EC.esc(i.category) + '</span></td>'
+                         + '<td class="text-end"><input type="number" min="0" step="1" class="form-control form-control-sm ss-qty ms-auto km-qty" data-id="' + i.id + '" value="' + (i.kit || '') + '"></td></tr>';
+                }).join('') + '</tbody></table>');
+        });
+    }
+
+    $('#kmSave').on('click', function () {
+        var cls = $('#kmClass').val();
+        if (!cls) { ecToast('warning', 'Choose a class.'); return; }
+        var lines = $('.km-qty').map(function () { return { itemId: +$(this).data('id'), qty: Number(this.value) || 0 }; }).get()
+                               .filter(function (l) { return l.qty > 0; });
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Saving…');
+        post(URL.kit, { className: cls, items: lines }).done(function (r) {
+            if (r && r.success) {
+                ecToast('success', r.message);
+                bootstrap.Modal.getInstance(document.getElementById('kitModal')).hide();
+                if (student) loadItems(true);
+            } else ecToast('error', (r && r.message) || 'Could not save the set.');
+        }).fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not save the set')); })
+          .always(function () { EC.buttonReset($btn); });
+    });
+
+    loadSales();
+});
+</script>
+}

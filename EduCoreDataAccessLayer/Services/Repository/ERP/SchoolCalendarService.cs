@@ -16,6 +16,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private readonly PgExec _db;
         private readonly ILogger<SchoolCalendarService> _logger;
         private const string Sp = "academic.sp_school_admin_calendar_manage";
+        private const string SpEvents = "academic.sp_school_events_manage";
 
         public SchoolCalendarService(PgExec db, ILogger<SchoolCalendarService> logger)
         {
@@ -168,11 +169,98 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return await RunWriteAsync(p, "Weekly offs saved.");
         }
 
-        private async Task<SchoolCalendarSaveResult> RunWriteAsync(NpgsqlParameter[] p, string fallbackMessage)
+        public async Task<List<SchoolEvent>> GetEventsAsync(
+            string fromDate, string toDate, int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<SchoolEvent>();
+            if (tenantId <= 1 || schoolId <= 0) return list;
+
+            var p = EventParams("List", tenantId, schoolId, actionUserId);
+            p[7].Value = fromDate;      // p_start_date
+            p[8].Value = toDate;        // p_end_date
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpEvents, p);
+            if (ds.Tables.Count == 0) return list;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+            {
+                list.Add(new SchoolEvent
+                {
+                    Kind      = Str(row, "kind"),
+                    Id        = IntVal(row, "id"),
+                    Title     = Str(row, "title"),
+                    EventType = Str(row, "event_type"),
+                    StartDate = Str(row, "start_date"),
+                    EndDate   = Str(row, "end_date"),
+                    StartTime = NullStr(row, "start_time"),
+                    EndTime   = NullStr(row, "end_time"),
+                    ForWhom   = NullStr(row, "for_whom"),
+                    Notes     = NullStr(row, "notes"),
+                    Status    = NullStr(row, "status")
+                });
+            }
+            return list;
+        }
+
+        public async Task<SchoolCalendarSaveResult> SaveEventAsync(
+            SchoolEvent ev, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || ev == null)
+                return new SchoolCalendarSaveResult { Message = "Invalid school context." };
+
+            var p = EventParams("Save", tenantId, schoolId, actionUserId);
+            p[4].Value  = ev.Id > 0 ? ev.Id : DBNull.Value;
+            p[5].Value  = ev.Title ?? string.Empty;
+            p[6].Value  = ev.EventType ?? "Event";
+            p[7].Value  = string.IsNullOrWhiteSpace(ev.StartDate) ? DBNull.Value : ev.StartDate;
+            p[8].Value  = string.IsNullOrWhiteSpace(ev.EndDate) ? DBNull.Value : ev.EndDate;
+            p[9].Value  = ParseTime(ev.StartTime);
+            p[10].Value = ParseTime(ev.EndTime);
+            p[11].Value = (object?)ev.ForWhom ?? DBNull.Value;
+            p[12].Value = (object?)ev.Notes ?? DBNull.Value;
+
+            return await RunWriteAsync(p, "Event saved.", SpEvents);
+        }
+
+        public async Task<SchoolCalendarSaveResult> DeleteEventAsync(
+            int eventId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || eventId <= 0)
+                return new SchoolCalendarSaveResult { Message = "Invalid event." };
+
+            var p = EventParams("Delete", tenantId, schoolId, actionUserId);
+            p[4].Value = eventId;
+            return await RunWriteAsync(p, "Event removed.", SpEvents);
+        }
+
+        // Fixed positional layout matching sp_school_events_manage.
+        private static NpgsqlParameter[] EventParams(string operation, int tenantId, int schoolId, int actionUserId)
+        {
+            return new NpgsqlParameter[]
+            {
+                new("p_operation",      NpgsqlDbType.Varchar) { Value = operation },
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_event_id",       NpgsqlDbType.Integer) { Value = DBNull.Value },
+                new("p_title",          NpgsqlDbType.Varchar) { Value = DBNull.Value },
+                new("p_event_type",     NpgsqlDbType.Varchar) { Value = DBNull.Value },
+                new("p_start_date",     NpgsqlDbType.Unknown) { Value = DBNull.Value },
+                new("p_end_date",       NpgsqlDbType.Unknown) { Value = DBNull.Value },
+                new("p_start_time",     NpgsqlDbType.Time)    { Value = DBNull.Value },
+                new("p_end_time",       NpgsqlDbType.Time)    { Value = DBNull.Value },
+                new("p_for_whom",       NpgsqlDbType.Varchar) { Value = DBNull.Value },
+                new("p_notes",          NpgsqlDbType.Text)    { Value = DBNull.Value },
+                new("p_result",  NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "school_events_cursor" }
+            };
+        }
+
+        private async Task<SchoolCalendarSaveResult> RunWriteAsync(NpgsqlParameter[] p, string fallbackMessage, string proc = Sp)
         {
             try
             {
-                var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
+                var ds = await _db.ExecuteProcedureWithCursorsAsync(proc, p);
                 if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
                     return new SchoolCalendarSaveResult { Message = "Nothing changed." };
 

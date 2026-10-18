@@ -1,4 +1,5 @@
 ﻿using educore.Helpers;
+using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -15,10 +16,12 @@ namespace educore.Areas.ERP.Controllers
     public class InventoryController : Controller
     {
         private readonly IInventoryService _inventory;
+        private readonly IStudentSaleService _sales;   // books & uniform sold to students
 
-        public InventoryController(IInventoryService inventory)
+        public InventoryController(IInventoryService inventory, IStudentSaleService sales)
         {
             _inventory = inventory;
+            _sales = sales;
         }
 
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -416,6 +419,115 @@ namespace educore.Areas.ERP.Controllers
             var res = await _inventory.ReturnToSupplierAsync(input, TenantId(), SchoolId(), UserId());
             return Json(new { success = res.Success, message = res.Message });
         }
+
+        // ── Books & uniform: sell to a student (inventory_student_sale.sql) ─────
+        // The items leave the store and one fee line per item goes on the child's
+        // account, so the parent pays at Collect Fees now or later.
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> StudentSale([FromServices] IBaseService baseService)
+        {
+            ViewBag.Locations = (await _inventory.GetLocationsAsync(TenantId(), SchoolId(), UserId()))
+                                .Where(l => l.IsActive).ToList();
+            try { ViewBag.ClassList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
+            catch { ViewBag.ClassList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+            return View();
+        }
+
+        // Find a child by name, admission no, father's name or mobile (this session's students).
+        [HttpGet]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> SaleSearch(string? q, [FromServices] IAdmissionService admissions,
+                                                    [FromServices] ISchoolSettingsService settings)
+        {
+            if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 2) return Json(Array.Empty<object>());
+            string? current = null;
+            try { current = (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.AcademicYearName; }
+            catch { /* search every session */ }
+            var (rows, _) = await admissions.GetStudentsAsync(TenantId(), SchoolId(), UserId(),
+                pageNumber: 1, pageSize: 20, search: q.Trim(), filterYear: current, filterStatus: "Active");
+            return Json(rows.Select(s => new
+            {
+                id = s.StudentId, name = s.StudentName, admNo = s.AdmissionNo, cls = s.ClassName, sec = s.Section ?? "",
+                guardian = s.GuardianName ?? "", mobile = s.Mobile ?? ""
+            }));
+        }
+
+        [HttpGet]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> SaleStudent(int id)
+        {
+            var st = await _sales.GetStudentAsync(id, TenantId(), SchoolId(), UserId());
+            if (st == null) return Json(new { success = false, message = "Student not found, or has left the school." });
+            return Json(new
+            {
+                success = true, id = st.StudentId, name = st.StudentName, admNo = st.AdmissionNo ?? "",
+                sessions = st.Sessions.Select(x => new { year = x.AcademicYear, cls = x.ClassName, sec = x.Section ?? "", current = x.IsCurrent })
+            });
+        }
+
+        // Items for sale; with a class, that class's set comes filled in.
+        [HttpGet]
+        public async Task<IActionResult> SaleItems(string? cls, int? location)
+        {
+            var items = await _sales.GetItemsAsync(cls, location, TenantId(), SchoolId(), UserId());
+            return Json(items.Select(i => new
+            {
+                id = i.ItemId, name = i.ItemName, category = i.Category, unit = i.UnitType,
+                price = i.SellingPrice, stock = i.InStock, kit = i.KitQty
+            }));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> Sell([FromBody] SellRequest req)
+        {
+            if (req == null) return Json(new { success = false, message = "Nothing to give." });
+            var res = await _sales.SellAsync(req.StudentId, req.AcademicYear ?? "", req.LocationId,
+                req.Items ?? new List<SaleLineInput>(), TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message, saleId = res.Id, total = res.GrandTotal });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> SaleReturn([FromBody] CancelRequest req)
+        {
+            var res = await _sales.ReturnAsync(req?.Id ?? 0, req?.Reason ?? "", TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message });
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Sales(int? studentId)
+        {
+            var rows = await _sales.GetSalesAsync(studentId, TenantId(), SchoolId(), UserId());
+            return Json(rows.Select(r => new
+            {
+                lineId = r.LineId, saleId = r.SaleId, date = r.SaleDate, studentId = r.StudentId,
+                name = r.StudentName, admNo = r.AdmissionNo ?? "", cls = r.ClassName ?? "", year = r.AcademicYear ?? "",
+                item = r.ItemName, qty = r.Quantity, amount = r.Amount, paid = r.Paid, open = r.OpenAmount,
+                returned = r.Returned, returnReason = r.ReturnReason ?? "", by = r.SoldBy ?? ""
+            }));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> SaveClassKit([FromBody] KitRequest req)
+        {
+            var res = await _sales.SaveKitAsync(req?.ClassName ?? "", req?.Items ?? new List<SaleLineInput>(),
+                TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message });
+        }
+
+        public class SellRequest
+        {
+            public int     StudentId    { get; set; }
+            public string? AcademicYear { get; set; }
+            public int?    LocationId   { get; set; }
+            public List<SaleLineInput>? Items { get; set; }
+        }
+        public class KitRequest { public string? ClassName { get; set; } public List<SaleLineInput>? Items { get; set; } }
 
         // Small request shapes for the JSON posts above.
         public class IdRequest       { public int Id { get; set; } }

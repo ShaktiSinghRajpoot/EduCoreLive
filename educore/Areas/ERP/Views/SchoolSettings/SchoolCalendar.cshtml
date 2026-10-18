@@ -6,11 +6,27 @@
 
 @section PageStyles {
     <link rel="stylesheet" href="~/css/ERP/SchoolSettings/SchoolCalendar.css" asp-append-version="true" />
+    <style>
+        /* events and exams on a day of the month grid */
+        .sc-ev { display:block; font-size:.62rem; font-weight:700; line-height:1.25; padding:1px 4px; margin-top:2px;
+                 border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+        .sc-ev-PTM { background:#ede9fe; color:#5b21b6; }   .sc-ev-Event { background:#dbeafe; color:#1e40af; }
+        .sc-ev-Sports { background:#dcfce7; color:#166534; } .sc-ev-Trip { background:#fef3c7; color:#92400e; }
+        .sc-ev-Meeting { background:#e0f2fe; color:#075985; } .sc-ev-Other { background:#f1f5f9; color:#334155; }
+        .sc-ev-Exam { background:#fee2e2; color:#991b1b; }
+        .sc-ev-more { font-size:.6rem; color:var(--bs-secondary-color); }
+        .sc-l-ev { background:#dbeafe; } .sc-l-exam { background:#fee2e2; }
+        .ev-row { display:flex; gap:.75rem; align-items:flex-start; padding:.6rem 0; border-bottom:1px solid var(--bs-border-color); cursor:pointer; }
+        .ev-row:last-child { border-bottom:0; }
+        .ev-date { min-width:64px; font-weight:800; font-size:.8rem; }
+        .ev-date small { display:block; font-weight:600; color:var(--bs-secondary-color); }
+    </style>
     @if (!canManage)
     {
         @* View-only role (e.g. Teacher): hide the buttons the server would refuse. *@
         <style>
-            #btnSaveWeekly, #btnRange, #dmSave, #dmClear, #rmSave, #rmDelete, .js-del { display: none !important; }
+            #btnSaveWeekly, #btnRange, #dmSave, #dmClear, #rmSave, #rmDelete, .js-del,
+            #btnAddEvent, #emSave, #emDelete, #dmForm, #dmAddEvent { display: none !important; }
         </style>
     }
 }
@@ -28,7 +44,7 @@
             </div>
             <div>
               <h4 class="ec-page-title mb-1">School Calendar</h4>
-              <div class="ec-page-subtitle">Weekly offs and dated holidays — the Smart Bell stays silent on closed days</div>
+              <div class="ec-page-subtitle">Holidays, exams and school events (PTM, functions, trips) in one place — the Smart Bell stays silent on closed days</div>
             </div>
           </div>
           <div class="sc-yearnav">
@@ -97,7 +113,7 @@
                 <span class="ec-section-icon"><i class="bx bx-calendar"></i></span>
                 <div>
                   <div class="ec-section-title" id="monLabel">—</div>
-                  <div class="ec-section-subtitle">Click any date to mark it a holiday, half day, or a working day</div>
+                  <div class="ec-section-subtitle">@(canManage ? "Click a date to mark a holiday or add an event; click an event to open it" : "Click a date or an event to see what is on")</div>
                 </div>
               </div>
               <div class="sc-yearnav">
@@ -115,6 +131,8 @@
               <span><span class="sc-l-dot sc-l-half"></span>Half day</span>
               <span><span class="sc-l-dot sc-l-working"></span>Working override</span>
               <span><span class="sc-l-dot sc-l-off"></span>Weekly off</span>
+              <span><span class="sc-l-dot sc-l-ev"></span>Event</span>
+              <span><span class="sc-l-dot sc-l-exam"></span>Exam</span>
             </div>
           </div>
         </div>
@@ -142,7 +160,94 @@
       </div>
     </div>
 
+    <!-- Events & exams of the year -->
+    <div class="ec-card mt-4 mb-0">
+      <div class="ec-card-header">
+        <div class="d-flex justify-content-between align-items-center gap-2">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-party"></i></span>
+            <div>
+              <div class="ec-section-title">Events &amp; Exams</div>
+              <div class="ec-section-subtitle" id="evSub">—</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary text-nowrap" id="btnAddEvent"><i class="bx bx-plus me-1"></i>Add event</button>
+        </div>
+      </div>
+      <div class="ec-card-body pt-2">
+        <div id="eventList"></div>
+      </div>
+    </div>
+
     @Html.AntiForgeryToken()
+  </div>
+</div>
+
+<!-- Event modal: add / edit (or just read, for view-only staff) -->
+<div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:0;border-radius:20px;overflow:hidden;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-party"></i></span>
+          <div>
+            <div class="ec-section-title" id="emTitle">Add Event</div>
+            <div class="ec-section-subtitle">PTM, annual function, sports day, trip, meeting ...</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4">
+        <div class="row g-3">
+          <div class="col-12 col-sm-8">
+            <label class="form-label sc-modal-lbl">Name</label>
+            <input type="text" class="form-control" id="emName" maxlength="120" placeholder="e.g. PTM - Term 1 / Annual Day">
+          </div>
+          <div class="col-12 col-sm-4">
+            <label class="form-label sc-modal-lbl">Type</label>
+            <select class="form-select" id="emType">
+              <option value="PTM">PTM</option>
+              <option value="Event">Event / Function</option>
+              <option value="Sports">Sports</option>
+              <option value="Trip">Trip</option>
+              <option value="Meeting">Staff meeting</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label sc-modal-lbl">From</label>
+            <input type="date" class="form-control" id="emFrom">
+          </div>
+          <div class="col-6">
+            <label class="form-label sc-modal-lbl">To</label>
+            <input type="date" class="form-control" id="emTo">
+          </div>
+          <div class="col-6">
+            <label class="form-label sc-modal-lbl">Starts at <span class="text-muted">(optional)</span></label>
+            <input type="time" class="form-control" id="emStart">
+          </div>
+          <div class="col-6">
+            <label class="form-label sc-modal-lbl">Ends at <span class="text-muted">(optional)</span></label>
+            <input type="time" class="form-control" id="emEnd">
+          </div>
+          <div class="col-12">
+            <label class="form-label sc-modal-lbl">For <span class="text-muted">(optional)</span></label>
+            <input type="text" class="form-control" id="emFor" maxlength="120" placeholder="Everyone / Class 1-5 parents / all teachers">
+          </div>
+          <div class="col-12">
+            <label class="form-label sc-modal-lbl">Notes <span class="text-muted">(optional)</span></label>
+            <textarea class="form-control" id="emNotes" rows="2" maxlength="1000"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-between gap-2">
+        <button type="button" class="btn btn-outline-danger px-3 d-none" id="emDelete"><i class="bx bx-trash me-1"></i>Remove</button>
+        <div class="d-flex flex-column flex-sm-row gap-2 ms-sm-auto">
+          <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary px-4" id="emSave"><i class="bx bx-check me-1"></i>Save</button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -161,7 +266,9 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="ec-card-body p-3 p-lg-4">
-        <div class="row g-3">
+        <div id="dmOn" class="mb-3"></div>
+        <button type="button" class="btn btn-sm btn-outline-primary mb-3" id="dmAddEvent"><i class="bx bx-plus me-1"></i>Add an event on this day</button>
+        <div class="row g-3" id="dmForm">
           <div class="col-12">
             <label class="form-label sc-modal-lbl">This day is</label>
             <select class="form-select" id="dmType">
@@ -259,6 +366,9 @@ var DELETE_URL ='@Url.Action("DeleteCalendarEntry","SchoolSettings",new{area="ER
 var WEEKLY_URL ='@Url.Action("SaveWeeklyOff","SchoolSettings",new{area="ERP"})';
 var RANGE_URL  ='@Url.Action("SaveCalendarRange","SchoolSettings",new{area="ERP"})';
 var RANGE_DELETE_URL='@Url.Action("DeleteCalendarRange","SchoolSettings",new{area="ERP"})';
+var EVENT_SAVE_URL='@Url.Action("SaveSchoolEvent","SchoolSettings",new{area="ERP"})';
+var EVENT_DELETE_URL='@Url.Action("DeleteSchoolEvent","SchoolSettings",new{area="ERP"})';
+var CAN_MANAGE=@(canManage ? "true" : "false");
 
 var DOW=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 var DOW_SHORT=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -267,6 +377,8 @@ var MONTHS=['January','February','March','April','May','June','July','August','S
 var today=new Date();
 var year=today.getFullYear(), month=today.getMonth();
 var WEEKLY=[0], ENTRIES={}, editDate=null;
+var EVENTS=[], editEvent=null;     // events + exam periods of the year (from the server)
+var TYPE_LABEL={PTM:'PTM', Event:'Event', Sports:'Sports', Trip:'Trip', Meeting:'Staff meeting', Other:'Other', Exam:'Exam'};
 
 function el(id){ return document.getElementById(id); }
 function two(n){ return (n<10?'0':'')+n; }
@@ -290,12 +402,22 @@ function load(){
       WEEKLY=(res && res.weeklyOffDays) || [];
       ENTRIES={};
       ((res && res.entries)||[]).forEach(function(e){ ENTRIES[e.date]=e; });
+      EVENTS=(res && res.events) || [];
       renderAll();
     })
     .fail(function(){ ecToast('error','Could not load the calendar.'); });
 }
 
-function renderAll(){ renderDow(); renderCards(); renderMonth(); renderList(); }
+function renderAll(){ renderDow(); renderCards(); renderMonth(); renderList(); renderEvents(); }
+
+/* events (and exam periods) on one date; keys compare as text (yyyy-MM-dd) */
+function eventsOn(k){ return EVENTS.filter(function(v){ return v.startDate<=k && v.endDate>=k; }); }
+function eventWhen(v){
+  var o=parseKey(v.startDate), t=o.d+' '+MONTHS[o.m].slice(0,3);
+  if(v.endDate!==v.startDate){ var e=parseKey(v.endDate); t+=' – '+e.d+' '+MONTHS[e.m].slice(0,3); }
+  if(v.startTime) t+=' · '+fmt12(v.startTime)+(v.endTime ? ' – '+fmt12(v.endTime) : '');
+  return t;
+}
 
 /* ---------------- weekly offs ---------------- */
 function renderDow(){
@@ -356,12 +478,18 @@ function renderMonth(){
       badge='<span class="sc-cell-tag">Weekly off</span>';
     }
     if(k===todayKey) cls+=' today';
-    cells.push('<div class="'+cls+'" data-k="'+k+'"><span class="sc-cell-day">'+d+'</span>'+badge+'</div>');
+    var on=eventsOn(k), chips=on.slice(0,2).map(function(v){
+      return '<span class="sc-ev sc-ev-'+EC.esc(v.eventType)+'" data-ev="'+EVENTS.indexOf(v)+'" title="'+EC.esc(v.title)+'">'+EC.esc(v.title)+'</span>';
+    }).join('') + (on.length>2 ? '<span class="sc-ev-more">+'+(on.length-2)+' more</span>' : '');
+    cells.push('<div class="'+cls+'" data-k="'+k+'"><span class="sc-cell-day">'+d+'</span>'+badge+chips+'</div>');
   }
 
   el('grid').innerHTML=cells.join('');
   el('grid').querySelectorAll('.sc-cell[data-k]').forEach(function(c){
     c.addEventListener('click',function(){ openModal(this.dataset.k); });
+  });
+  el('grid').querySelectorAll('.sc-ev[data-ev]').forEach(function(c){
+    c.addEventListener('click',function(ev){ ev.stopPropagation(); openEvent(EVENTS[+this.dataset.ev]); });
   });
 }
 
@@ -426,7 +554,7 @@ el('dmType').addEventListener('change', syncEndVisibility);
 function openModal(k){
   editDate=k;
   var e=ENTRIES[k];
-  el('dmTitle').textContent=e?'Edit Day':'Mark Day';
+  el('dmTitle').textContent=!CAN_MANAGE ? 'What is on' : e?'Edit Day':'Mark Day';
   el('dmDate').textContent=longDate(k);
   el('dmType').value=e?e.dayType:'holiday';
   el('dmName').value=e?e.title:'';
@@ -434,6 +562,15 @@ function openModal(k){
   el('dmClear').classList.toggle('d-none', !e);
   el('dmClear').dataset.id=e?e.calendarId:'';
   syncEndVisibility();
+  var on=eventsOn(k);
+  el('dmOn').innerHTML = (!CAN_MANAGE && e ? '<div class="mb-2"><b>'+typeLabel(e.dayType)+'</b>'+(e.title ? ' · '+EC.esc(e.title) : '')+'</div>' : '')
+    + (on.length ? on.map(function(v){
+        return '<span class="sc-ev sc-ev-'+EC.esc(v.eventType)+' mb-1" style="font-size:.78rem;padding:4px 8px" data-ev="'+EVENTS.indexOf(v)+'">'
+             + EC.esc(TYPE_LABEL[v.eventType]||v.eventType)+': '+EC.esc(v.title)+'</span>';
+      }).join('') : (CAN_MANAGE ? '' : '<div class="text-muted small">Nothing on this day.</div>'));
+  el('dmOn').querySelectorAll('[data-ev]').forEach(function(c){
+    c.addEventListener('click',function(){ bootstrap.Modal.getInstance(el('dayModal')).hide(); openEvent(EVENTS[+this.dataset.ev]); });
+  });
   new bootstrap.Modal(el('dayModal')).show();
 }
 
@@ -456,6 +593,11 @@ el('dmSave').addEventListener('click',function(){
       } else ecToast('error',(res&&res.message)||'Save failed.');
     })
     .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); });
+});
+
+el('dmAddEvent').addEventListener('click',function(){
+  bootstrap.Modal.getInstance(el('dayModal')).hide();
+  openEvent(null, editDate);
 });
 
 el('dmClear').addEventListener('click',function(){
@@ -517,6 +659,93 @@ el('rmDelete').addEventListener('click',function(){
           ecToast('info',res.message||'Entries removed.');
           load();
         } else ecToast('error',(res&&res.message)||'Could not remove the entries.');
+      })
+      .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Remove failed')); });
+  });
+});
+
+/* ---------------- events & exams ---------------- */
+function renderEvents(){
+  var list=EVENTS.slice().sort(function(a,b){ return a.startDate<b.startDate ? -1 : a.startDate>b.startDate ? 1 : 0; });
+  var nEv=list.filter(function(v){ return v.kind==='Event'; }).length, nEx=list.length-nEv;
+  el('evSub').textContent = list.length ? nEv+' event(s), '+nEx+' exam(s) in '+year : 'Nothing planned in '+year+' yet';
+  if(!list.length){
+    el('eventList').innerHTML='<div class="sc-empty"><i class="bx bx-party"></i><div>No events or exams in '+year+'.'
+      +(CAN_MANAGE ? '<br>Use "Add event" for a PTM, function or trip. Exams appear here from the Exam Schedule.' : '')+'</div></div>';
+    return;
+  }
+  var todayKey=key(today.getFullYear(),today.getMonth(),today.getDate());
+  el('eventList').innerHTML=list.map(function(v){
+    var past=v.endDate<todayKey;
+    return '<div class="ev-row'+(past?' opacity-50':'')+'" data-ev="'+EVENTS.indexOf(v)+'">'
+      +'<div class="ev-date">'+EC.esc(eventWhen(v).split(' · ')[0])+(v.startTime ? '<small>'+fmt12(v.startTime)+'</small>' : '')+'</div>'
+      +'<div class="flex-grow-1"><div class="fw-semibold">'+EC.esc(v.title)
+      +  (v.kind==='Exam' && v.status && v.status!=='Published' ? ' <span class="text-muted small">('+EC.esc(v.status)+')</span>' : '')+'</div>'
+      +  '<div class="small text-muted">'+EC.esc(v.forWhom || (v.kind==='Exam' ? '' : 'Everyone'))+'</div></div>'
+      +'<span class="sc-ev sc-ev-'+EC.esc(v.eventType)+'" style="font-size:.7rem;padding:2px 8px">'+EC.esc(TYPE_LABEL[v.eventType]||v.eventType)+'</span>'
+      +'</div>';
+  }).join('');
+  el('eventList').querySelectorAll('.ev-row').forEach(function(r){
+    r.addEventListener('click',function(){ openEvent(EVENTS[+this.dataset.ev]); });
+  });
+}
+
+/* An exam is changed on the Exam Schedule, not here: it opens read-only. */
+function openEvent(v, onDate){
+  if(v && v.kind==='Exam'){
+    ecToast('info', v.title+': '+eventWhen(v)+(v.forWhom ? ' · '+v.forWhom : '')+'. Change it on Exams › Exam Schedule.');
+    return;
+  }
+  editEvent=v||null;
+  var d=onDate || key(year,month,1);
+  el('emTitle').textContent=v ? (CAN_MANAGE ? 'Edit Event' : 'Event') : 'Add Event';
+  el('emName').value=v?v.title:'';
+  el('emType').value=v?v.eventType:'PTM';
+  el('emFrom').value=v?v.startDate:d;
+  el('emTo').value=v?v.endDate:d;
+  el('emStart').value=v&&v.startTime?v.startTime:'';
+  el('emEnd').value=v&&v.endTime?v.endTime:'';
+  el('emFor').value=v&&v.forWhom?v.forWhom:'';
+  el('emNotes').value=v&&v.notes?v.notes:'';
+  el('emDelete').classList.toggle('d-none', !v);
+  ['emName','emType','emFrom','emTo','emStart','emEnd','emFor','emNotes'].forEach(function(id){ el(id).disabled=!CAN_MANAGE; });
+  new bootstrap.Modal(el('eventModal')).show();
+}
+
+el('btnAddEvent').addEventListener('click',function(){ openEvent(null); });
+el('emFrom').addEventListener('change',function(){ if(!el('emTo').value || el('emTo').value<this.value) el('emTo').value=this.value; });
+
+el('emSave').addEventListener('click',function(){
+  var name=el('emName').value.trim(), from=el('emFrom').value, to=el('emTo').value||from;
+  if(!name){ ecToast('error','Give the event a name.'); return; }
+  if(!from){ ecToast('error','Pick the date of the event.'); return; }
+  if(to<from){ ecToast('error','The event ends before it starts.'); return; }
+  var $btn=$(this);
+  EC.buttonBusy($btn,'Saving…');
+  post(EVENT_SAVE_URL,{ id:editEvent?editEvent.id:0, title:name, eventType:el('emType').value, startDate:from, endDate:to,
+                        startTime:el('emStart').value||null, endTime:el('emEnd').value||null,
+                        forWhom:el('emFor').value.trim()||null, notes:el('emNotes').value.trim()||null })
+    .done(function(res){
+      if(res && res.success){
+        bootstrap.Modal.getInstance(el('eventModal')).hide();
+        ecToast('success',res.message||'Event saved.');
+        load();
+      } else ecToast('error',(res&&res.message)||'Save failed.');
+    })
+    .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Save failed')); })
+    .always(function(){ EC.buttonReset($btn); });
+});
+
+el('emDelete').addEventListener('click',function(){
+  if(!editEvent) return;
+  var v=editEvent;
+  bootstrap.Modal.getInstance(el('eventModal')).hide();
+  EC.confirm({ title:'Remove this event?', name:v.title+' · '+eventWhen(v), okText:'Remove' }).then(function(ok){
+    if(!ok) return;
+    post(EVENT_DELETE_URL,{ id:v.id })
+      .done(function(res){
+        if(res && res.success){ ecToast('info',res.message||'Event removed.'); load(); }
+        else ecToast('error',(res&&res.message)||'Could not remove the event.');
       })
       .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Remove failed')); });
   });

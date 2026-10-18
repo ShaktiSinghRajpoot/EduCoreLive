@@ -5678,3 +5678,23 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   session's class. The receipt prints "Nursery - A (2026-27)", each line carries its session when it is another
   one ("Tuition Fee — Apr 2027 (2027-28)", "… (Dues of 2025-26)" for a Year-End carry), and under "Outstanding as
   on" a line "of which previous session". A registration receipt (no enrolment yet) prints no session.
+
+### 2026-10-18 — One School Calendar (events + exams); Books & Uniform Sale
+- **School Calendar** (`school_events.sql`, bundle `deploy_2026_10_18a.sql`). New `academic.school_events` (PTM / Event /
+  Sports / Trip / Meeting / Other; date range, optional times, "for whom", notes; soft delete) and
+  `academic.sp_school_events_manage` List / Save / Delete. List also returns the **exam periods** from `academic.exams`
+  while the Exams module is on (exam dates are text columns, so they are cast). The calendar page shows event and exam
+  chips on the month grid, an "Events & Exams" list, and an event dialog; a day click shows what is on. Holidays
+  still decide working days, so events do not touch attendance or the Smart Bell. The page and its data are now
+  `SchoolUserOnly` (every member of staff sees them); changes still need `academics.manage`. The menu item moved from
+  Setup to the common staff items. The dashboard has an **Upcoming** card (next 30 days; a vacation's days in a row
+  show as one line).
+- **Books & Uniform Sale** (`inventory_student_sale.sql`; Inventory › Books & Uniform Sale, `inventory.manage`). Built on
+  Inventory: an item sold is a 'Saleable' item with a selling price (one item per uniform size). A sale issues the
+  stock ('Issue' movement, issued to the student) and adds one fee line per item to `core.student_ledger` (head =
+  item category, 'One Time', due today, in the session chosen: a child promoted early can get next session's books
+  charged in 2027-28). So Collect Fees, receipts, due list and reminders need no change. **Class sets**
+  (`core.inventory_class_kits`) fill in a class's books when a student is picked. A **return** is allowed only while
+  the fee line is unpaid: the line is closed (`fn_ledger_close`, source 'Store') and the stock comes back.
+  `StudentSaleService` / `IStudentSaleService` (new). `school_purge.sql` deletes events, sales and class sets.
+- Tests: `tests/calendar_store_tests.sql` (16 checks, rolled back).

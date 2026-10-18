@@ -207,6 +207,43 @@
         </div>
         }
 
+        @* ============ UPCOMING (School Calendar: events, exams, holidays) ============ *@
+        @if (Model.Upcoming.Any())
+        {
+            <div class="col-12 dash-animate">
+                <div class="dash-card h-100">
+                    <div class="dash-card-head d-flex justify-content-between align-items-center gap-2">
+                        <div><h5 class="dash-card-title">Upcoming</h5><small class="dash-sub">Next 30 days · events, exams and holidays</small></div>
+                        <a class="btn btn-sm btn-outline-primary" href="@Url.Action("SchoolCalendar", "SchoolSettings", new { area = "ERP" })">School Calendar</a>
+                    </div>
+                    <div class="dash-card-body">
+                        @foreach (var e in Model.Upcoming)
+                        {
+                            var start = DateTime.Parse(e.Start);
+                            var end = DateTime.Parse(e.End);
+                            string when = start.ToString("dd MMM") + (end > start ? " – " + end.ToString("dd MMM") : "");
+                            string badge = e.Type switch
+                            {
+                                "Holiday" => "bg-label-danger", "Half day" => "bg-label-warning", "Exam" => "bg-label-danger",
+                                "PTM" => "bg-label-primary", _ => "bg-label-info"
+                            };
+                            <div class="d-flex align-items-center gap-3 py-2 border-bottom">
+                                <div class="fw-bold text-nowrap" style="min-width:110px">@when</div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">@e.Title</div>
+                                    @if (!string.IsNullOrWhiteSpace(e.ForWhom) || !string.IsNullOrWhiteSpace(e.Time))
+                                    {
+                                        <div class="dash-sub small">@(e.Time != null ? DateTime.Parse(e.Time).ToString("h:mm tt") : "")@(e.Time != null && e.ForWhom != null ? " · " : "")@e.ForWhom</div>
+                                    }
+                                </div>
+                                <span class="badge @badge">@(e.Type == "Meeting" ? "Staff meeting" : e.Type)</span>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+
         @* ============ ATTENDANCE DEFAULTERS (today's attendance is on the Students / Staff cards) ============ *@
         @if (Model.ShowAttendance || Model.ShowStaff)
         {

@@ -40,7 +40,41 @@ namespace educore.Controllers
         // follows the viewer's permissions: what a role cannot open is removed from the
         // model on the server (not just hidden in the page), and links it cannot follow
         // are not shown. A driver with no other permission sees a greeting and My Bus.
-        public async Task<IActionResult> Index([FromServices] IClassTeacherService classTeacher)
+        // The next 30 days of the School Calendar for everyone: events and exam periods,
+        // and the holidays / half days. A vacation is one entry per day in the calendar,
+        // so days in a row with the same name are shown as one line ("Diwali 20-25 Oct").
+        private static async Task<List<DashboardUpcoming>> UpcomingAsync(ISchoolCalendarService calendar, int t, int s, int u)
+        {
+            var list = new List<DashboardUpcoming>();
+            try
+            {
+                var from = Dates.Now.Date;
+                var to   = from.AddDays(30);
+                var events = await calendar.GetEventsAsync(from.ToString("yyyy-MM-dd"), to.ToString("yyyy-MM-dd"), t, s, u);
+                list.AddRange(events.Select(e => new DashboardUpcoming
+                {
+                    Start = e.StartDate, End = e.EndDate, Title = e.Title, Type = e.EventType, Time = e.StartTime, ForWhom = e.ForWhom
+                }));
+
+                var days = (await calendar.GetCalendarAsync(from, to, t, s, u)).Entries
+                           .Where(x => x.DayType != "working").OrderBy(x => x.Date).ToList();
+                DashboardUpcoming? run = null;
+                foreach (var d in days)
+                {
+                    string type = d.DayType == "holiday" ? "Holiday" : "Half day";
+                    string title = string.IsNullOrWhiteSpace(d.Title) ? type : d.Title;
+                    bool nextDay = run != null && DateTime.Parse(run.End).AddDays(1).ToString("yyyy-MM-dd") == d.Date;
+                    if (run != null && nextDay && run.Title == title && run.Type == type) { run.End = d.Date; continue; }
+                    run = new DashboardUpcoming { Start = d.Date, End = d.Date, Title = title, Type = type };
+                    list.Add(run);
+                }
+            }
+            catch { /* the dashboard shows without it */ }
+            return list.OrderBy(x => x.Start).ThenBy(x => x.Title).Take(8).ToList();
+        }
+
+        public async Task<IActionResult> Index([FromServices] IClassTeacherService classTeacher,
+                                               [FromServices] ISchoolCalendarService calendar)
         {
             int t = TenantId(), s = SchoolId(), u = UserId();
 
@@ -50,6 +84,7 @@ namespace educore.Controllers
                 return RedirectToAction("SchoolList", "Schools", new { area = "SuperAdmin" });
 
             var model = await _dashboardService.GetSummaryAsync(t, s, u);
+            model.Upcoming = await UpcomingAsync(calendar, t, s, u);
 
             // Fee collections, outstanding dues and the defaulters list are finance data.
             if (!await Can("fees.view"))

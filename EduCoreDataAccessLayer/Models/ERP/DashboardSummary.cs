@@ -41,6 +41,9 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public List<DashboardStudentAttendanceDefaulter> StudentAttendanceDefaulters { get; set; } = new();
         public int StudentAttendanceDefaulterCount { get; set; }
         public List<DashboardStaffAttendanceDefaulter> StaffAttendanceDefaulters { get; set; } = new();
+
+        /// <summary>The next 30 days from the School Calendar: events, exams, holidays.</summary>
+        public List<DashboardUpcoming> Upcoming { get; set; } = new();
         public int StaffAttendanceDefaulterCount { get; set; }
         public bool CanOpenOverview { get; set; }   // reports.view: Attendance Overview
 
@@ -144,5 +147,15 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string  Name   { get; set; } = "";
         public string  Who    { get; set; } = "";   // Student | Staff
         public string? Detail { get; set; }
+    }
+
+    public class DashboardUpcoming
+    {
+        public string  Start   { get; set; } = string.Empty;   // yyyy-MM-dd
+        public string  End     { get; set; } = string.Empty;
+        public string  Title   { get; set; } = string.Empty;
+        public string  Type    { get; set; } = string.Empty;   // PTM | Event | ... | Exam | Holiday | Half day
+        public string? Time    { get; set; }                   // HH:mm
+        public string? ForWhom { get; set; }
     }
 }

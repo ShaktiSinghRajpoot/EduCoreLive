@@ -28,6 +28,23 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public bool    IsWorking  { get; set; } = true;
     }
 
+    /// <summary>One thing on the calendar besides the day type: a school event
+    /// (PTM, function, trip ...) or an exam period from the Exam Schedule.</summary>
+    public class SchoolEvent
+    {
+        public string  Kind      { get; set; } = "Event";   // Event | Exam
+        public int     Id        { get; set; }
+        public string  Title     { get; set; } = string.Empty;
+        public string  EventType { get; set; } = "Event";   // PTM | Event | Sports | Trip | Meeting | Other | Exam
+        public string  StartDate { get; set; } = string.Empty;   // yyyy-MM-dd
+        public string  EndDate   { get; set; } = string.Empty;
+        public string? StartTime { get; set; }               // HH:mm
+        public string? EndTime   { get; set; }
+        public string? ForWhom   { get; set; }               // events: free text; exams: the classes
+        public string? Notes     { get; set; }
+        public string? Status    { get; set; }               // exams only (Draft / Published ...)
+    }
+
     public class SchoolCalendarSaveResult
     {
         public bool   Success { get; set; }

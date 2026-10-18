@@ -1668,8 +1668,10 @@ namespace educore.Areas.ERP.Controllers
         #region School Calendar
         // Working-day calendar: weekly off pattern + dated holiday / half-day /
         // working-day overrides. Feeds the Smart Bell and anything else that needs
-        // to know whether the school is open.
-        [HasPermission("academics.view")]
+        // to know whether the school is open. School events (PTM, functions ...) and
+        // the exam periods sit on the same calendar. Every member of staff can SEE
+        // it; changing anything needs academics.manage.
+        [Authorize(Policy = "SchoolUserOnly")]
         public async Task<IActionResult> SchoolCalendar()
         {
             // Add / edit / delete buttons are shown only with academics.manage
@@ -1679,15 +1681,59 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpGet]
-        [HasPermission("academics.view")]
+        [Authorize(Policy = "SchoolUserOnly")]
         public async Task<IActionResult> SchoolCalendarData(int? year)
         {
             var y    = year is >= 2000 and <= 2100 ? year.Value : Dates.Now.Year;
             var from = new DateTime(y, 1, 1);
             var data = await _schoolCalendarService.GetCalendarAsync(
                 from, from.AddYears(1).AddDays(-1), SmTenant(), SmSchool(), SmUser());
+            var events = await _schoolCalendarService.GetEventsAsync(
+                $"{y}-01-01", $"{y}-12-31", SmTenant(), SmSchool(), SmUser());
 
-            return Json(new { year = y, weeklyOffDays = data.WeeklyOffDays, entries = data.Entries });
+            return Json(new { year = y, weeklyOffDays = data.WeeklyOffDays, entries = data.Entries, events });
+        }
+
+        public class SchoolEventDto
+        {
+            public int     Id        { get; set; }
+            public string  Title     { get; set; } = string.Empty;
+            public string  EventType { get; set; } = "Event";
+            public string  StartDate { get; set; } = string.Empty;   // yyyy-MM-dd
+            public string? EndDate   { get; set; }
+            public string? StartTime { get; set; }                   // HH:mm
+            public string? EndTime   { get; set; }
+            public string? ForWhom   { get; set; }
+            public string? Notes     { get; set; }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> SaveSchoolEvent([FromBody] SchoolEventDto dto)
+        {
+            var result = await _schoolCalendarService.SaveEventAsync(new SchoolEvent
+            {
+                Id        = dto?.Id ?? 0,
+                Title     = dto?.Title ?? string.Empty,
+                EventType = dto?.EventType ?? "Event",
+                StartDate = dto?.StartDate ?? string.Empty,
+                EndDate   = dto?.EndDate,
+                StartTime = dto?.StartTime,
+                EndTime   = dto?.EndTime,
+                ForWhom   = dto?.ForWhom,
+                Notes     = dto?.Notes
+            }, SmTenant(), SmSchool(), SmUser());
+            return Json(new { success = result.Success, message = result.Message });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("academics.manage")]
+        public async Task<IActionResult> DeleteSchoolEvent([FromBody] IdDto dto)
+        {
+            var result = await _schoolCalendarService.DeleteEventAsync(dto?.Id ?? 0, SmTenant(), SmSchool(), SmUser());
+            return Json(new { success = result.Success, message = result.Message });
         }
 
         public class CalendarEntryDto

@@ -32,6 +32,17 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<SchoolCalendarSaveResult> DeleteEntryAsync(
             int calendarId, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Events and exam periods overlapping from..to (yyyy-MM-dd), school_events.sql.</summary>
+        Task<List<SchoolEvent>> GetEventsAsync(
+            string fromDate, string toDate, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Add (Id = 0) or change a school event.</summary>
+        Task<SchoolCalendarSaveResult> SaveEventAsync(
+            SchoolEvent ev, int tenantId, int schoolId, int actionUserId);
+
+        Task<SchoolCalendarSaveResult> DeleteEventAsync(
+            int eventId, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>Replace the weekly off pattern (0 = Sunday … 6 = Saturday).</summary>
         Task<SchoolCalendarSaveResult> SaveWeeklyOffAsync(
             List<int> weeklyOffDays, int tenantId, int schoolId, int actionUserId);

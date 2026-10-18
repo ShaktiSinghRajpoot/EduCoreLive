@@ -172,6 +172,7 @@ BEGIN
     DELETE FROM academic.period_structure          WHERE school_id = p_school_id;
     DELETE FROM academic.school_calendar           WHERE school_id = p_school_id;
     DELETE FROM academic.school_calendar_settings  WHERE school_id = p_school_id;
+    DELETE FROM academic.school_events             WHERE school_id = p_school_id;
     DELETE FROM academic.academic_class_sections   WHERE school_id = p_school_id;
     DELETE FROM academic.academic_classes          WHERE school_id = p_school_id;
     DELETE FROM academic.school_subjects           WHERE school_id = p_school_id;
@@ -183,6 +184,11 @@ BEGIN
     DELETE FROM core.student_transport             WHERE school_id = p_school_id;
     DELETE FROM core.student_advance               WHERE school_id = p_school_id;
     DELETE FROM core.student_fee_plan              WHERE school_id = p_school_id;
+    -- books & uniform sold to students (inventory_student_sale.sql): before the students and items
+    DELETE FROM core.inventory_student_sale_lines l USING core.inventory_student_sales sa
+     WHERE l.sale_id = sa.sale_id AND sa.school_id = p_school_id;
+    DELETE FROM core.inventory_student_sales       WHERE school_id = p_school_id;
+    DELETE FROM core.inventory_class_kits          WHERE school_id = p_school_id;
     DELETE FROM core.student_ledger                WHERE school_id = p_school_id;
     DELETE FROM core.tc_register                   WHERE school_id = p_school_id;
     DELETE FROM core.tc_counters                   WHERE school_id = p_school_id;

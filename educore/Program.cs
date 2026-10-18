@@ -265,6 +265,7 @@ builder.Services.AddScoped<IStudentDataCheckService, StudentDataCheckService>();
 builder.Services.AddScoped<IRoomService, RoomService>();             // School Setup › Rooms
 builder.Services.AddScoped<IFrontOfficeService, FrontOfficeService>(); // Front office: visitors, calls, complaints
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IStudentSaleService, StudentSaleService>();
 
 // The landing dashboard. Every number on it used to be hardcoded in the view.
 builder.Services.AddScoped<IDashboardService, DashboardService>();
