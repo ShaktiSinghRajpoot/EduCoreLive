@@ -112,6 +112,7 @@
 $(function () {
     var DATA_URL = '@Url.Action("Data", "StoreRegister", new { area = "ERP" })';
     var SEC_URL  = '@Url.Action("PromotionSections", "Student", new { area = "ERP" })';
+    var STORE_STAFF = @(storeStaff ? "true" : "false");
     var data = null;
 
     // "Shirt - 28" and "Shirt - 30" are one column "Shirt" (each uniform size is its own
@@ -141,7 +142,9 @@ $(function () {
     function render() {
         if (!data.students.length) { $('#rgBody').html('No children in this class for that session.'); return; }
         if (!data.items.length) {
-            $('#rgBody').html('Nothing to show yet: this class has no set (Inventory › Books &amp; Uniform Sale › Class sets) and nobody in it has been given anything this session.');
+            $('#rgBody').html(STORE_STAFF
+                ? 'Nothing to show yet: this class has no set (Inventory › Books &amp; Uniform Sale › Class sets) and nobody in it has been given anything this session.'
+                : 'Nothing to show yet: the school store has not set the items for this class, and nobody in it has been given anything this session.');
             return;
         }
 
