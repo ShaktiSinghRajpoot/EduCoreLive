@@ -391,7 +391,7 @@
             '.rc-inline{margin-bottom:6px}' +
             '.rc-a5 .rc-lines td{border-bottom:1px dotted #ccc}' +
             '.rc-pay{margin-top:6px}.rc-pay span{color:#666;margin-right:4px}' +
-            '.rc-sign{margin-top:18px;display:flex;justify-content:flex-end}' +
+            '.rc-sign{margin-top:18px;display:flex;justify-content:flex-end;gap:28px}' +
             '.rc-sign-box{text-align:center;font-size:10px;color:#555}' +
             '.rc-line{width:120px;border-top:1px solid #000;margin-bottom:2px}';
         }
