@@ -48,6 +48,11 @@
       </div>
     </div>
 
+    @if (ViewBag.CanGive == true)
+    {
+        <div class="rg-filters">@await Html.PartialAsync("_StudentItemsTabs", "register")</div>
+    }
+
     <div class="ec-card mb-3 rg-filters"><div class="ec-card-body d-flex flex-wrap gap-2 align-items-end">
       @if (storeStaff)
       {
@@ -141,7 +146,7 @@ $(function () {
         if (!data.students.length) { $('#rgBody').html('No children in this class for that session.'); return; }
         if (!data.items.length) {
             $('#rgBody').html(STORE_STAFF
-                ? 'Nothing to show yet: this class has no set (Inventory › Books &amp; Uniform Sale › Class sets) and nobody in it has been given anything this session.'
+                ? 'Nothing to show yet: no item is for this class. In Inventory › Store, an item of type Saleable shows here when it is for "All classes" or for this class.'
                 : 'Nothing to show yet: the school store has not set the items for this class, and nobody in it has been given anything this session.');
             return;
         }

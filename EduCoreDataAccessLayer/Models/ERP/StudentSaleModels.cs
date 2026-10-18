@@ -11,7 +11,8 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string  UnitType     { get; set; } = "Piece";
         public decimal SellingPrice { get; set; }
         public decimal InStock      { get; set; }
-        public decimal KitQty       { get; set; }   // 0 = not in the chosen class's set
+        public decimal KitQty       { get; set; }   // 1 = can be ticked for the class (0 for an item sold in sizes)
+        public string? ForClass     { get; set; }   // null = every class
     }
 
     /// <summary>The child's class in this session and any later one (promoted early).</summary>

@@ -5746,3 +5746,18 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   cancelled bills out), and **stock on hand** at cost.
 - Test: `expense_cashbook_tests.sql` now 18 checks, including "store items paid at Collect Fees are Books & Uniform sales"
   and "fees + store sales = the Day Close money lines".
+
+### 2026-10-18 — Inventory made simple for a small school
+- Menu: Inventory is now three items. **Store** (Items & Stock; Store Locations open from its button), **Purchase**
+  (Suppliers open from its button), **Student Items** (two tabs, `_StudentItemsTabs`: Give items | Register ✓/✗). A user
+  who can see but not give goes straight to the register.
+- No more "Class sets" screen. A saleable item says **which class it is for** on the item itself
+  (`inventory_items.for_class`, NULL = every class; set in the item form). Existing class sets were moved over: an item
+  that was in exactly one class's set is for that class. The sale page lists the class's items unticked (the parent takes
+  what they want; "Tick all (1 each)" fills one of each), and the register's columns are every item for the class plus
+  anything given to its children.
+- **Sizes in one go:** the item form takes "24, 28, 32" and makes one item per size ("Uniform - 24" ...). Sizes share one
+  register column, and are never ticked automatically. `core.fn_item_base_name` is the base-name rule in SQL.
+- `sp_inventory_student_sale` gained `p_item_id` (ops ItemClass / SetItemClass), placed after `p_result` so older callers
+  still fit. Old signature dropped (bundle `deploy_2026_10_18f.sql`). `core.inventory_class_kits` is kept but not read.
+  Tests: `calendar_store_tests.sql` 20 checks.

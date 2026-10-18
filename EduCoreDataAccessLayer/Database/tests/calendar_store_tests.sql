@@ -126,6 +126,37 @@ BEGIN
     LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.item_name LIKE 'ZZ %' THEN v_n := v_n + 1; END IF; END LOOP; CLOSE c;
     PERFORM pg_temp.chk(v_n = 2, 'S11 the sales list shows both lines', v_n || ' lines');
 
+    RAISE NOTICE '';
+    RAISE NOTICE '== Which class an item is for (no class sets) ==';
+    c := 'sc'; CALL core.sp_inventory_student_sale('SetItemClass', 32, 45, 62, p_class => 'Class 8', p_item_id => v_book, p_result => c); CLOSE c;
+    c := 'i3'; v_n := 0;
+    CALL core.sp_inventory_student_sale('Items', 32, 45, 62, p_class => 'Class 3', p_result => c);
+    LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.item_id = v_book THEN v_n := v_n + 1; END IF; END LOOP; CLOSE c;
+    c := 'i8'; v_m := 0;
+    CALL core.sp_inventory_student_sale('Items', 32, 45, 62, p_class => 'Class 8', p_result => c);
+    LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.item_id = v_book AND r.kit_qty = 1 THEN v_m := v_m + 1; END IF; END LOOP; CLOSE c;
+    PERFORM pg_temp.chk(v_n = 0 AND v_m = 1, 'S12 a Class 8 book is offered to Class 8 (ticked), not to Class 3');
+
+    -- a register column appears for every class an item is for, without any set
+    DECLARE a refcursor := 'ra'; b refcursor := 'rb'; d refcursor := 'rd'; v_cols text := '';
+    BEGIN
+        CALL core.sp_inventory_class_register(32, 45, 62, '2026-27', 'Class 5', NULL, a, b, d);
+        LOOP FETCH b INTO r; EXIT WHEN NOT FOUND; v_cols := v_cols || r.item_name || '; '; END LOOP;
+        CLOSE a; CLOSE b; CLOSE d;
+        PERFORM pg_temp.chk(v_cols LIKE '%ZZ Shirt - 32%' AND v_cols NOT LIKE '%ZZ Maths Book Class 8%',
+                            'S13 Class 5 register: the all-class shirt is a column, the Class 8 book is not', v_cols);
+    END;
+
+    -- an item sold in sizes is never ticked for you: the store picks the size
+    INSERT INTO core.inventory_items (tenant_id, school_id, item_name, category, item_type, unit_type, cost_price, selling_price, created_by)
+    VALUES (32, 45, 'ZZ Shirt - 34', 'Uniform', 'Saleable', 'Piece', 250, 400, 62);
+    c := 'iz'; v_n := -1;
+    CALL core.sp_inventory_student_sale('Items', 32, 45, 62, p_class => 'Class 5', p_result => c);
+    LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.item_id = v_shirt THEN v_n := r.kit_qty; END IF; END LOOP; CLOSE c;
+    PERFORM pg_temp.chk(v_n = 0, 'S14 once a second shirt size exists, shirts are not ticked automatically', 'kit ' || v_n);
+    PERFORM pg_temp.chk(core.fn_item_base_name('ZZ Shirt - 34') = 'ZZ Shirt' AND core.fn_item_base_name('School Diary') = 'School Diary',
+                        'S15 base name: "ZZ Shirt - 34" -> "ZZ Shirt", "School Diary" stays');
+
     SELECT COUNT(*) FILTER (WHERE ok), COUNT(*) FILTER (WHERE NOT ok) INTO v_n, v_m FROM _r;
     RAISE NOTICE '';
     RAISE NOTICE '== % passed, % failed ==', v_n, v_m;

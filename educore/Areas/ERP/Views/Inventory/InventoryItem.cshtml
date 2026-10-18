@@ -2,6 +2,8 @@
 @{
     ViewData["Title"] = "Inventory Item Master";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var classes = ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                  ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
 }
 
 @section PageStyles {
@@ -222,6 +224,23 @@
                                     <select class="form-select" id="unitType">
                                         <option>Piece</option><option>Box</option><option>Set</option><option>Kg</option><option>Liter</option>
                                     </select>
+                                </div>
+                                @* Saleable items (books, uniform, diary ...) are given to students: *@
+                                <div class="col-12 col-md-6 col-lg-4 sale-only d-none">
+                                    <label class="form-label">For which class?</label>
+                                    <select class="form-select" id="itemForClass">
+                                        <option value="">All classes</option>
+                                        @foreach (var c in classes)
+                                        {
+                                            <option value="@c.Text">@c.Text</option>
+                                        }
+                                    </select>
+                                    <div class="form-text">It shows in that class's Books &amp; Uniform register.</div>
+                                </div>
+                                <div class="col-12 col-md-6 col-lg-8 sale-only new-only d-none">
+                                    <label class="form-label">Sizes <span class="text-muted">(optional)</span></label>
+                                    <input type="text" class="form-control" id="itemSizes" placeholder="e.g. 24, 28, 32 or S, M, L">
+                                    <div class="form-text">One item is made per size ("Name - 24" ...), each with the opening stock below. The register shows them as one column.</div>
                                 </div>
                             </div>
                         </div>
@@ -631,6 +650,14 @@
     }
 
     // ── Item form ───────────────────────────────────────────────────────────
+    // "For which class?" is for saleable items; "Sizes" only when adding one.
+    function syncSaleFields() {
+        var sale = $('#itemType').val() === 'Saleable';
+        $('.sale-only').toggleClass('d-none', !sale);
+        $('.new-only').toggleClass('d-none', !sale || !!$('#itemId').val());
+    }
+    $('#itemType').on('change', syncSaleFields);
+
     function clearForm() {
         $('#itemId').val('');
         $('#itemName,#itemCode,#itemSubCategory,#brand,#model,#description').val('');
@@ -641,7 +668,10 @@
         $('#itemStatus').val('Active');
         $('#openingWrap').removeClass('d-none');
         $('#openingLocation').html(locationOptions(0));
+        $('#itemForClass').val('');
+        $('#itemSizes').val('');
         $('#itemModalTitle').text('Add Inventory Item');
+        syncSaleFields();
     }
 
     function openEdit(id) {
@@ -669,6 +699,8 @@
                 $('#model').val(d.model);
                 $('#description').val(d.description);
                 $('#itemStatus').val(d.isActive ? 'Active' : 'Inactive');
+                $('#itemForClass').val(d.forClass || '');
+                syncSaleFields();
 
                 // Opening stock is only meaningful when creating. Stock moves
                 // through a movement, so an edit cannot invent inventory.
@@ -710,7 +742,9 @@
             model:        $.trim($('#model').val()),
             description:  $.trim($('#description').val()),
             isActive:     $('#itemStatus').val() === 'Active',
-            locationId:   EC.num($('#openingLocation').val()) || null
+            locationId:   EC.num($('#openingLocation').val()) || null,
+            forClass:     $('#itemType').val() === 'Saleable' ? ($('#itemForClass').val() || null) : null,
+            sizes:        $('#itemId').val() ? null : ($.trim($('#itemSizes').val()) || null)
         })
         .done(function (res) {
             if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not save.'); return; }

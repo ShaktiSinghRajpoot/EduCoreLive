@@ -43,7 +43,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         UnitType     = DbRead.Str(reader, cols, "unit_type"),
                         SellingPrice = DbRead.Dec(reader, cols, "selling_price"),
                         InStock      = DbRead.Dec(reader, cols, "in_stock"),
-                        KitQty       = DbRead.Dec(reader, cols, "kit_qty")
+                        KitQty       = DbRead.Dec(reader, cols, "kit_qty"),
+                        ForClass     = DbRead.NStr(reader, cols, "for_class")
                     });
             });
             return list;
@@ -241,6 +242,30 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return sum;
         }
 
+        public async Task<string?> GetItemClassAsync(int itemId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || itemId <= 0) return null;
+            var p = Params("ItemClass", tenantId, schoolId, actionUserId);
+            p[12].Value = itemId;
+            string? cls = null;
+            await _db.ExecuteCursorsAsync(Sp, p, async reader =>
+            {
+                var cols = reader.Columns();
+                if (await reader.ReadAsync()) cls = DbRead.NStr(reader, cols, "for_class");
+            });
+            return cls;
+        }
+
+        public async Task<InventoryResult> SetItemClassAsync(int itemId, string? className, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || itemId <= 0)
+                return new InventoryResult { Message = "Invalid item." };
+            var p = Params("SetItemClass", tenantId, schoolId, actionUserId);
+            p[6].Value  = string.IsNullOrWhiteSpace(className) ? DBNull.Value : className.Trim();
+            p[12].Value = itemId;
+            return await RunAsync(p, null);
+        }
+
         // [{"itemId":5,"qty":2}, ...] -- the shape the proc reads with jsonb_to_recordset
         private static string ItemsJson(List<SaleLineInput>? items) =>
             JsonSerializer.Serialize((items ?? new List<SaleLineInput>())
@@ -290,7 +315,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_line_id",        NpgsqlDbType.Integer) { Value = DBNull.Value },
                 new("p_reason",         NpgsqlDbType.Varchar) { Value = DBNull.Value },
                 new("p_result", NpgsqlDbType.Refcursor)
-                    { Direction = ParameterDirection.InputOutput, Value = "student_sale_cursor" }
+                    { Direction = ParameterDirection.InputOutput, Value = "student_sale_cursor" },
+                new("p_item_id",        NpgsqlDbType.Integer) { Value = DBNull.Value }   // 12: after p_result, as in the proc
             };
         }
     }

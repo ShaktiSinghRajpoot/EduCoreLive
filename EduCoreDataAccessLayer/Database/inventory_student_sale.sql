@@ -12,9 +12,11 @@
 --     the due list and reminders all see it without knowing about the store.
 --     The fee line's session is the one the items are for: a child promoted
 --     early who buys next year's books in March is charged in 2027-28.
---   * A class set ("Class 3 books") is a list of items with quantities per class
---     (core.inventory_class_kits). Picking a student fills it in; the store can
---     still change any quantity before giving.
+--   * WHICH CLASS an item is for is set on the item itself (inventory_items.for_class:
+--     empty = every class, else one class name). Picking a student ticks one of each
+--     item for their class; an item sold in sizes ("Uniform - 24", "- 28" ...) is not
+--     ticked, the store picks the size. (2026-10-18: this replaced the separate
+--     "class sets" screen; core.inventory_class_kits is kept but no longer read.)
 --   * Return (exchange a size, a wrong book): only while the fee line is unpaid.
 --     The fee line is closed (core.fn_ledger_close, source 'Store') and the items
 --     go back on the shelf ('Return' movement). A paid line must have its receipt
@@ -48,6 +50,30 @@ CREATE TABLE IF NOT EXISTS core.inventory_class_kits (
 ALTER TABLE core.inventory_class_kits DROP CONSTRAINT IF EXISTS chk_inv_kit_qty;
 ALTER TABLE core.inventory_class_kits ADD CONSTRAINT chk_inv_kit_qty CHECK (quantity >= 0);
 
+-- Which class a saleable item is for: NULL = every class.
+ALTER TABLE core.inventory_items ADD COLUMN IF NOT EXISTS for_class varchar(50);
+
+-- Moving from class sets: an item that was in exactly one class's set is for that
+-- class; everything else stays "every class". Only items not yet set are touched.
+UPDATE core.inventory_items i
+   SET for_class = k.class_name
+  FROM (SELECT item_id, MIN(class_name) AS class_name
+          FROM core.inventory_class_kits WHERE quantity > 0
+         GROUP BY item_id HAVING COUNT(DISTINCT class_name) = 1) k
+ WHERE i.item_id = k.item_id AND i.for_class IS NULL;
+
+-- "Uniform - 28" -> "Uniform": the name before the LAST " - " (sizes are separate
+-- items with the size after it). A name without " - " is returned as it is.
+CREATE OR REPLACE FUNCTION core.fn_item_base_name(p_name text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+AS $function$
+    SELECT CASE WHEN position(' - ' IN p_name) > 0
+                THEN trim(left(p_name, length(p_name) - position(' - ' IN reverse(p_name)) - 2))
+                ELSE p_name END;
+$function$;
+
 CREATE TABLE IF NOT EXISTS core.inventory_student_sales (
     sale_id       integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     tenant_id     integer NOT NULL,
@@ -79,6 +105,9 @@ CREATE TABLE IF NOT EXISTS core.inventory_student_sale_lines (
 CREATE INDEX IF NOT EXISTS ix_inv_sale_lines_sale ON core.inventory_student_sale_lines (sale_id);
 
 
+DROP PROCEDURE IF EXISTS core.sp_inventory_student_sale(varchar, integer, integer, integer, integer, varchar, varchar,
+                                                         integer, jsonb, integer, varchar, refcursor);
+
 CREATE OR REPLACE PROCEDURE core.sp_inventory_student_sale(
     IN    p_operation      varchar,
     IN    p_tenant_id      integer,
@@ -91,7 +120,8 @@ CREATE OR REPLACE PROCEDURE core.sp_inventory_student_sale(
     IN    p_items          jsonb   DEFAULT NULL,   -- [{"itemId": 5, "qty": 2}, ...]
     IN    p_line_id        integer DEFAULT NULL,
     IN    p_reason         varchar DEFAULT NULL,
-    INOUT p_result         refcursor DEFAULT 'student_sale_cursor'::refcursor)
+    INOUT p_result         refcursor DEFAULT 'student_sale_cursor'::refcursor,
+    IN    p_item_id        integer DEFAULT NULL)   -- SetItemClass / ItemClass (last, so older callers still fit)
 LANGUAGE plpgsql
 AS $procedure$
 DECLARE
@@ -113,21 +143,42 @@ BEGIN
         RAISE EXCEPTION 'Invalid school scope.';
     END IF;
 
-    -- ── Items: what the store sells, with the class set's quantity when asked
+    -- ── Items: what the store sells. With p_class: only the items for that class
+    --    (or every class), and kit_qty 1 on each one to tick -- not on an item sold
+    --    in sizes, where the store picks the size.
     IF p_operation = 'Items' THEN
         v_loc := COALESCE(p_location_id, core.fn_inventory_default_location(p_tenant_id, p_school_id, p_action_user_id));
         OPEN p_result FOR
         SELECT i.item_id, i.item_name, COALESCE(NULLIF(trim(i.category), ''), 'Other') AS category,
-               i.unit_type, i.selling_price,
+               i.unit_type, i.selling_price, i.for_class,
                COALESCE((SELECT ls.quantity FROM core.inventory_location_stock ls
                           WHERE ls.item_id = i.item_id AND ls.location_id = v_loc), 0) AS in_stock,
-               COALESCE((SELECT k.quantity FROM core.inventory_class_kits k
-                          WHERE k.tenant_id = p_tenant_id AND k.school_id = p_school_id
-                            AND k.item_id = i.item_id AND k.class_name = p_class), 0) AS kit_qty
+               CASE WHEN p_class IS NULL THEN 0
+                    WHEN EXISTS (SELECT 1 FROM core.inventory_items x
+                                  WHERE x.tenant_id = i.tenant_id AND x.school_id = i.school_id AND x.item_id <> i.item_id
+                                    AND NOT x.is_deleted AND x.is_active AND x.item_type = 'Saleable'
+                                    AND core.fn_item_base_name(x.item_name) = core.fn_item_base_name(i.item_name)) THEN 0
+                    ELSE 1 END AS kit_qty
           FROM core.inventory_items i
          WHERE i.tenant_id = p_tenant_id AND i.school_id = p_school_id
            AND NOT i.is_deleted AND i.is_active AND i.item_type = 'Saleable'
+           AND (p_class IS NULL OR i.for_class IS NULL OR i.for_class = p_class)
          ORDER BY 3, i.item_name;
+        RETURN;
+    END IF;
+
+    -- ── Which class an item is for (NULL = every class)
+    IF p_operation = 'ItemClass' THEN
+        OPEN p_result FOR
+        SELECT i.item_id, i.for_class FROM core.inventory_items i
+         WHERE i.item_id = p_item_id AND i.tenant_id = p_tenant_id AND i.school_id = p_school_id;
+        RETURN;
+    END IF;
+    IF p_operation = 'SetItemClass' THEN
+        UPDATE core.inventory_items
+           SET for_class = CASE WHEN NULLIF(trim(p_class), '') IS NULL OR trim(p_class) = 'All' THEN NULL ELSE left(trim(p_class), 50) END
+         WHERE item_id = p_item_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
+        OPEN p_result FOR SELECT TRUE AS success, 'Saved.' AS message;
         RETURN;
     END IF;
 
@@ -329,8 +380,8 @@ $procedure$;
 --
 --   p_academic_year, p_class, p_section  -> one class-section of one session
 --   cursor 1  the children (core.student_enrolment of that session), by roll
---   cursor 2  the columns: the class set's items, plus anything a child of the
---             class was sold that session
+--   cursor 2  the columns: every item the store sells for this class (or for every
+--             class), plus anything a child of the class was sold that session
 --   cursor 3  what each child has: per item, quantity still held (sold minus
 --             returned) and how much of it is unpaid
 -- Who may see which class is decided by the app (store staff: any class; a
@@ -378,9 +429,7 @@ BEGIN
     SELECT i.item_id, i.item_name, COALESCE(NULLIF(trim(i.category), ''), 'Other') AS category
       FROM core.inventory_items i
      WHERE i.tenant_id = p_tenant_id AND i.school_id = p_school_id AND NOT i.is_deleted
-       AND (EXISTS (SELECT 1 FROM core.inventory_class_kits k
-                     WHERE k.tenant_id = p_tenant_id AND k.school_id = p_school_id
-                       AND k.class_name = p_class AND k.item_id = i.item_id AND k.quantity > 0)
+       AND ((i.is_active AND i.item_type = 'Saleable' AND (i.for_class IS NULL OR i.for_class = p_class))
             OR EXISTS (SELECT 1 FROM core.inventory_student_sale_lines l
                          JOIN core.inventory_student_sales sa ON sa.sale_id = l.sale_id
                         WHERE l.item_id = i.item_id AND sa.academic_year = p_academic_year

@@ -54,6 +54,13 @@
 
         /// Where the opening stock goes. Null = the default location.
         public int?    LocationId   { get; set; }
+
+        /// Saleable items: which class it is for (null / "All" = every class).
+        public string? ForClass     { get; set; }
+
+        /// New saleable item only: "24, 28, 32" makes one item per size,
+        /// named "<ItemName> - <size>", each with the opening stock above.
+        public string? Sizes        { get; set; }
     }
 
     // ── Stock movement ──────────────────────────────────────────────────────

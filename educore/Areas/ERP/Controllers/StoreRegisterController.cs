@@ -34,6 +34,7 @@ namespace educore.Areas.ERP.Controllers
         {
             bool storeStaff = await HasPermissionAttribute.UserHasAsync(this, "inventory.view");
             ViewBag.StoreStaff = storeStaff;
+            ViewBag.CanGive = await HasPermissionAttribute.UserHasAsync(this, "inventory.manage");   // the "Give items" tab
             if (storeStaff)
             {
                 try { ViewBag.ClassList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }

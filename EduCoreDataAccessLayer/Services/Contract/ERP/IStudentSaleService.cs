@@ -31,6 +31,10 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Bought, sold, cost, collected, unpaid and stock of saleable items between two dates.</summary>
         Task<StoreSummary> GetSummaryAsync(string from, string to, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Which class a saleable item is for (null = every class).</summary>
+        Task<string?> GetItemClassAsync(int itemId, int tenantId, int schoolId, int actionUserId);
+        Task<InventoryResult> SetItemClassAsync(int itemId, string? className, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>Replace one class's set of items.</summary>
         Task<InventoryResult> SaveKitAsync(string className, List<SaleLineInput> items, int tenantId, int schoolId, int actionUserId);
     }

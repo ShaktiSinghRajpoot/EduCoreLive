@@ -31,7 +31,13 @@ namespace educore.Areas.ERP.Controllers
         // ── Pages ───────────────────────────────────────────────────────────
         // The page's four cards are computed from the item list it already loads,
         // so there is no second source here to disagree with them.
-        public IActionResult InventoryItem() => View();
+        public async Task<IActionResult> InventoryItem([FromServices] IBaseService baseService)
+        {
+            // for "Which class is it for?" on a saleable item
+            try { ViewBag.ClassList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
+            catch { ViewBag.ClassList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+            return View();
+        }
 
         // Store locations (add / rename / deactivate) and the transfer history.
         public IActionResult StoreLocations() => View();
@@ -106,7 +112,8 @@ namespace educore.Areas.ERP.Controllers
                 brand        = item.Brand,
                 model        = item.Model,
                 description  = item.Description,
-                isActive     = item.IsActive
+                isActive     = item.IsActive,
+                forClass     = await _sales.GetItemClassAsync(id, TenantId(), SchoolId(), UserId())   // null = every class
             });
         }
 
@@ -116,8 +123,32 @@ namespace educore.Areas.ERP.Controllers
         public async Task<IActionResult> SaveItem([FromBody] InventoryItemInput input)
         {
             if (input == null) return Json(new { success = false, message = "Nothing to save." });
+            bool saleable = string.Equals(input.ItemType, "Saleable", StringComparison.OrdinalIgnoreCase);
+
+            // A new saleable item in sizes ("24, 28, 32"): one item per size, named
+            // "Uniform - 24" and so on, which the register shows as one "Uniform" column.
+            var sizes = (input.Sizes ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                           .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (saleable && input.ItemId == 0 && sizes.Count > 0)
+            {
+                string baseName = input.ItemName.Trim(), baseSku = (input.Sku ?? "").Trim();
+                int made = 0;
+                foreach (var size in sizes)
+                {
+                    input.ItemName = baseName + " - " + size;
+                    input.Sku = baseSku == "" ? null : baseSku + "-" + size;   // an SKU must stay unique
+                    var r = await _inventory.SaveItemAsync(input, TenantId(), SchoolId(), UserId());
+                    if (!r.Success)
+                        return Json(new { success = false, message = (made > 0 ? made + " size(s) saved, then " : "") + input.ItemName + ": " + r.Message });
+                    await _sales.SetItemClassAsync(r.Id, input.ForClass, TenantId(), SchoolId(), UserId());
+                    made++;
+                }
+                return Json(new { success = true, message = made + " sizes saved: " + baseName + " - " + string.Join(", ", sizes) + "." });
+            }
 
             var res = await _inventory.SaveItemAsync(input, TenantId(), SchoolId(), UserId());
+            if (res.Success && saleable)
+                await _sales.SetItemClassAsync(input.ItemId > 0 ? input.ItemId : res.Id, input.ForClass, TenantId(), SchoolId(), UserId());
             return Json(new { success = res.Success, message = res.Message, id = res.Id });
         }
 
@@ -424,15 +455,13 @@ namespace educore.Areas.ERP.Controllers
         // The items leave the store and one fee line per item goes on the child's
         // account, so the parent pays at Collect Fees now or later.
         [HasPermission("inventory.manage")]
-        public async Task<IActionResult> StudentSale([FromServices] IBaseService baseService, [FromServices] ISchoolSettingsService settings)
+        public async Task<IActionResult> StudentSale([FromServices] ISchoolSettingsService settings)
         {
             // the current session's first day, for the summary's "This session" button
             try { ViewBag.SessionStart = (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.StartDate; }
             catch { ViewBag.SessionStart = null; }
             ViewBag.Locations = (await _inventory.GetLocationsAsync(TenantId(), SchoolId(), UserId()))
                                 .Where(l => l.IsActive).ToList();
-            try { ViewBag.ClassList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
-            catch { ViewBag.ClassList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
             return View();
         }
 
@@ -476,7 +505,7 @@ namespace educore.Areas.ERP.Controllers
             return Json(items.Select(i => new
             {
                 id = i.ItemId, name = i.ItemName, category = i.Category, unit = i.UnitType,
-                price = i.SellingPrice, stock = i.InStock, kit = i.KitQty
+                price = i.SellingPrice, stock = i.InStock, kit = i.KitQty, forClass = i.ForClass
             }));
         }
 
