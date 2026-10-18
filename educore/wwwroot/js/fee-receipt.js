@@ -468,8 +468,68 @@
         '</div>';
     }
 
+    /* ---------- "Items given" slip (books & uniform from the store) ----------
+       Not a receipt: the items went on the child's fee account and the receipt
+       comes when the parent pays at Collect Fees. Same letterhead as a receipt;
+       an 80mm layout for Thermal, a half-page one for A4 / A5. */
+    function renderItemsGiven(v) {
+        var sch = v.school || {}, stu = v.student || {};
+        var cls = classText(stu);
+        var note = 'Added to the child\u2019s fee account. Please pay at the school office; the fee receipt is given when you pay. This slip is not a receipt.';
+        if (v.format === 'Thermal') {
+            return '' +
+            '<div class="rc rc-th">' +
+              '<div class="rc-head">' + logoImg(sch, 'rc-logo') +
+                '<div class="rc-school">' + EC.esc(sch.name || 'School') + '</div>' +
+                (sch.address ? '<div class="rc-addr">' + EC.esc(sch.address) + '</div>' : '') +
+                '<div class="rc-title">ITEMS GIVEN</div>' +
+              '</div>' +
+              '<div class="rc-sep"></div>' +
+              '<div class="rc-kv"><span>Date</span><b>' + fmtDate(v.date) + '</b></div>' +
+              '<div class="rc-kv"><span>Student</span><b>' + EC.esc(stu.name || '-') + '</b></div>' +
+              '<div class="rc-kv"><span>Adm No</span><b>' + EC.esc(stu.admNo || '-') + '</b></div>' +
+              '<div class="rc-kv"><span>Class</span><b>' + EC.esc(cls) + '</b></div>' +
+              '<div class="rc-sep"></div>' +
+              '<table class="rc-lines"><tbody>' + v.lines.map(function (l) {
+                  return '<tr><td>' + EC.esc(l.name) + ' x ' + EC.num(l.qty) + '</td><td class="rc-amt">' + EC.money(l.qty * l.price) + '</td></tr>';
+              }).join('') + '</tbody></table>' +
+              '<div class="rc-sep"></div>' +
+              '<div class="rc-kv rc-tot"><span>TOTAL</span><b>' + EC.money(v.amount) + '</b></div>' +
+              (v.givenBy ? '<div class="rc-kv"><span>Given by</span><b>' + EC.esc(v.givenBy) + '</b></div>' : '') +
+              '<div class="rc-sep"></div>' +
+              '<div class="rc-words">' + note + '</div>' +
+            '</div>';
+        }
+        return '' +
+        '<div class="rc rc-a5">' +
+          '<div class="rc-head">' +
+            '<div class="rc-lettermark">' + logoImg(sch, 'rc-logo') +
+              '<div class="rc-lettertext"><div class="rc-school">' + EC.esc(sch.name || 'School') + '</div>' +
+              (sch.address ? '<div class="rc-addr">' + EC.esc(sch.address) + '</div>' : '') + '</div>' +
+            '</div>' +
+            '<div class="rc-title">ITEMS GIVEN (BOOKS &amp; UNIFORM)</div>' +
+          '</div>' +
+          '<div class="rc-meta">' +
+            '<div><span>Session</span><b>' + EC.esc(stu.session || '-') + '</b></div>' +
+            '<div><span>Date</span><b>' + fmtDate(v.date) + '</b></div>' +
+          '</div>' +
+          '<div class="rc-inline"><b>' + EC.esc(stu.name || '-') + '</b> · ' + EC.esc(stu.admNo || '-') + ' · ' + EC.esc(cls) + '</div>' +
+          '<table class="rc-lines"><tbody>' + v.lines.map(function (l) {
+              return '<tr><td>' + EC.esc(l.name) + ' &times; ' + EC.num(l.qty) + ' @ ' + EC.money(l.price) + '</td>' +
+                     '<td class="rc-amt">' + EC.money(l.qty * l.price) + '</td></tr>';
+          }).join('') + '</tbody>' +
+          '<tfoot><tr><td>Total (on fee account)</td><td class="rc-amt">' + EC.money(v.amount) + '</td></tr></tfoot></table>' +
+          '<div class="rc-words">' + note + '</div>' +
+          '<div class="rc-sign">' +
+            '<div class="rc-sign-box"><div class="rc-line"></div>Given by' + (v.givenBy ? ': ' + EC.esc(v.givenBy) : '') + '</div>' +
+            '<div class="rc-sign-box"><div class="rc-line"></div>Received by (parent)</div>' +
+          '</div>' +
+        '</div>';
+    }
+
     function buildHtml(r) {
         if (r.kind === 'refund') return renderRefund(r);
+        if (r.kind === 'items')  return renderItemsGiven(r);
         var f = r.format || 'A4';
         if (f === 'Thermal') return renderThermal(r);
         if (f === 'A5')      return renderA5(r);
@@ -550,6 +610,21 @@
         $.getJSON('/ERP/Fee/GetSchoolHeader').done(open).fail(function () { open(null); });
     }
 
+    // The "Items given" slip from Student Items: v = { school, format, date, amount,
+    // givenBy, student: {name, admNo, className, section, session}, lines: [{name, qty, price}] }.
+    // Opens in the receipt modal (preview, A4 / A5 / Thermal, Print).
+    function showItemsGiven(v) {
+        if (!v) return;
+        v.kind = 'items';
+        v.receiptNo = 'Items given';   // the print window's title
+        render(v);
+        var el = document.getElementById('ecReceiptModal');
+        if (!el) return;
+        $(el).find('.modal-title').text('Items Given');
+        $(el).find('.modal-dialog').removeClass('modal-lg');
+        if (window.bootstrap) new window.bootstrap.Modal(el).show();
+    }
+
     $(function () {
         $(document).on('click', '#ecReceiptPrintBtn', printCurrent);
     });
@@ -602,6 +677,7 @@
         render(current);
     }
 
-    window.EcReceipt = { show: show, print: print, render: render, preview: preview, setFormat: setFormat, showRefund: showRefund };
+    window.EcReceipt = { show: show, print: print, render: render, preview: preview, setFormat: setFormat, showRefund: showRefund,
+                         showItemsGiven: showItemsGiven };
 
 })(window, jQuery);

@@ -464,15 +464,21 @@ namespace educore.Areas.ERP.Controllers
             catch { ViewBag.SessionStart = null; }
             ViewBag.Locations = (await _inventory.GetLocationsAsync(TenantId(), SchoolId(), UserId()))
                                 .Where(l => l.IsActive).ToList();
-            // for the "Items given" slip the parent takes home
+            // for the "Items given" slip the parent takes home: the same letterhead and
+            // print format as a fee receipt (see FeeController.GetSchoolHeaderAsync)
             try
             {
                 var school = await settings.GetBasicProfileAsync(TenantId(), SchoolId(), UserId());
                 ViewBag.SchoolName    = school?.SchoolName ?? "";
                 ViewBag.SchoolAddress = string.Join(", ", new[] { school?.AddressLine1, school?.City, school?.State }
                                                          .Where(p => !string.IsNullOrWhiteSpace(p)));
+                var logo = school?.LogoUrl;
+                ViewBag.SchoolLogo = string.IsNullOrWhiteSpace(logo) ? ""
+                    : logo.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? logo
+                    : $"{Request.Scheme}://{Request.Host}{(logo.StartsWith('/') ? "" : "/")}{logo}";
+                ViewBag.ReceiptFormat = await settings.GetReceiptFormatAsync(TenantId(), SchoolId(), UserId());
             }
-            catch { ViewBag.SchoolName = ""; ViewBag.SchoolAddress = ""; }
+            catch { ViewBag.SchoolName = ""; ViewBag.SchoolAddress = ""; ViewBag.SchoolLogo = ""; ViewBag.ReceiptFormat = "A4"; }
             return View();
         }
 

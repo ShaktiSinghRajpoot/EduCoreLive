@@ -5818,4 +5818,4 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 
 ### 2026-10-18 — Student Items: "Items given" slip
 - After **Give items**, a **Print slip** button prints a small slip for the parent: school, child, class/session, date, items × qty × rate, total, "added to the fee account, pay at the office, this is not a receipt", given by + parent's signature.
-- Built on the page from what was ticked (total from the server's reply) and printed through a hidden frame, so it works on phones and with pop-up blockers. No DB change. School name/address come from `GetBasicProfileAsync` in `InventoryController.StudentSale`.
+- Same day, reworked: the slip now opens in the **shared receipt modal** (`fee-receipt.js` `EcReceipt.showItemsGiven`, layout `renderItemsGiven`): the receipt's letterhead + logo, the school's receipt format (A4 / A5 / Thermal, switchable), a preview on screen, then Print. The page passes school name/address/logo and the format from `InventoryController.StudentSale` (store staff may not have `fees.view`, so it does not call `Fee/GetSchoolHeader`). No DB change.
