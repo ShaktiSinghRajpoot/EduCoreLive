@@ -666,6 +666,7 @@
         $('.new-only').toggleClass('d-none', !sale || !!$('#itemId').val());
     }
     $('#itemType').on('change', syncSaleFields);
+    syncSaleFields();   // the form opens on "Given to students": show its two fields from the start
 
     function clearForm() {
         $('#itemId').val('');
