@@ -64,13 +64,32 @@ namespace educore.Areas.ERP.Controllers
 
             bool canViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
             var reg = await _sales.GetRegisterAsync(year, cls, sec, TenantId(), SchoolId(), UserId());
+
+            // Sizes are separate items ("Uniform Set - 24", "- 28", "- 32"). When the store
+            // sells more than one item with the same name before the last " - ", they share
+            // one column under that name; an item with no such sibling keeps its full name
+            // ("English Reader - Class 3"). Decided from everything the store sells, so the
+            // column is the same in every class even if only one size was given there.
+            var forSale = await _sales.GetItemsAsync(null, null, TenantId(), SchoolId(), UserId());
+            var sized = forSale.GroupBy(i => BaseName(i.ItemName)).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet();
             return Json(new
             {
                 success = true,
                 students = reg.Students.Select(s => new { id = s.StudentId, name = s.StudentName, admNo = s.AdmissionNo ?? "", sec = s.Section ?? "", roll = s.RollNo ?? "" }),
-                items    = reg.Items.Select(i => new { id = i.ItemId, name = i.ItemName, category = i.Category }),
+                items    = reg.Items.Select(i => new
+                {
+                    id = i.ItemId, name = i.ItemName, category = i.Category,
+                    column = sized.Contains(BaseName(i.ItemName)) ? BaseName(i.ItemName) : i.ItemName
+                }),
                 held     = reg.Held.Select(h => new { s = h.StudentId, i = h.ItemId, qty = h.Quantity, unpaid = canViewFees ? h.Unpaid : (decimal?)null })
             });
+        }
+
+        // "Uniform Set - 28" -> "Uniform Set"; a name with no " - " stays as it is.
+        private static string BaseName(string name)
+        {
+            int i = name.LastIndexOf(" - ", StringComparison.Ordinal);
+            return i > 0 ? name.Substring(0, i).Trim() : name;
         }
 
         private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");

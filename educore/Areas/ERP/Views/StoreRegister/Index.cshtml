@@ -115,11 +115,9 @@ $(function () {
     var STORE_STAFF = @(storeStaff ? "true" : "false");
     var data = null;
 
-    // "Shirt - 28" and "Shirt - 30" are one column "Shirt" (each uniform size is its own
-    // item); the part after the last " - " is shown under the tick. Only when two or
-    // more items share the name: "English Reader - Class 3" alone keeps its full name.
-    function baseName(n) { var m = n.match(/^(.*\S)\s+-\s+([^-]+)$/); return m ? m[1] : n; }
-    function variant(n)  { var m = n.match(/^(.*\S)\s+-\s+([^-]+)$/); return m ? m[2] : ''; }
+    // The server names each item's column: "Uniform Set" for "Uniform Set - 28" when the
+    // store sells several sizes, else the item's own name. The size goes under the tick.
+    function variant(i) { return i.column === i.name ? '' : i.name.substring(i.column.length).replace(/^\s*-\s*/, ''); }
 
     function pick() {
         var mine = $('#rgMine').val();
@@ -148,24 +146,17 @@ $(function () {
             return;
         }
 
-        // columns: one per base name, in the order the server sent (category, name)
-        var cols = [], byBase = {};
+        // columns: one per column name, in the order the server sent (category, name)
+        var cols = [], byCol = {}, itemOf = {};
         data.items.forEach(function (i) {
-            var b = baseName(i.name);
-            if (!byBase[b]) { byBase[b] = { name: b, category: i.category, items: [] }; cols.push(byBase[b]); }
-            byBase[b].items.push(i.id);
-        });
-        var sized = {};      // itemId -> true when its column holds several sizes
-        cols.forEach(function (c) {
-            if (c.items.length > 1) c.items.forEach(function (id) { sized[id] = true; });
-            else c.name = data.items.filter(function (i) { return i.id === c.items[0]; })[0].name;
+            if (!byCol[i.column]) { byCol[i.column] = { name: i.column, category: i.category, items: [] }; cols.push(byCol[i.column]); }
+            byCol[i.column].items.push(i.id);
+            itemOf[i.id] = i;
         });
 
         // what each child holds, per item
         var held = {};
         data.held.forEach(function (h) { (held[h.s] = held[h.s] || {})[h.i] = h; });
-        var nameOf = {};
-        data.items.forEach(function (i) { nameOf[i.id] = i.name; });
 
         var onlyMissing = $('#rgMissing').is(':checked');
         var count = cols.map(function () { return 0; });
@@ -177,7 +168,7 @@ $(function () {
                 if (!got.length) { missing++; return '<td><span class="rg-no">✗</span></td>'; }
                 count[ci]++;
                 var sub = got.map(function (id) {
-                    var v = sized[id] ? variant(nameOf[id]) : '', q = mine[id].qty;
+                    var v = variant(itemOf[id]), q = mine[id].qty;
                     return (v ? v : '') + (q !== 1 ? (v ? ' ' : '') + '×' + EC.num(q) : '');
                 }).filter(Boolean).join(', ');
                 var unpaid = got.reduce(function (t, id) { return t + (mine[id].unpaid || 0); }, 0);
