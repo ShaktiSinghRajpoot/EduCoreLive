@@ -23,6 +23,12 @@
   .rg-no  { color:#dc2626; font-weight:900; font-size:1.05rem; }
   .rg-sub { display:block; font-size:.62rem; color:var(--bs-secondary-color); line-height:1.1; }
   .rg-unpaid { display:block; font-size:.6rem; color:#dc2626; font-weight:700; }
+  /* phone: a narrow name column so more items fit beside it */
+  @@media (max-width:575.98px) {
+    .rg-table th, .rg-table td { padding:.4rem .35rem; }
+    .rg-table .rg-name { max-width:105px; min-width:105px; white-space:normal; font-size:.8rem; }
+    .rg-adm { display:none; }
+  }
   @@media print {
     .layout-menu, .layout-navbar, .rg-filters, .content-footer, .footer { display:none !important; }
     .rg-wrap { max-height:none; overflow:visible; }
@@ -155,7 +161,7 @@ $(function () {
         if (!data.students.length) { $('#rgBody').html('No children in this class for that session.'); return; }
         if (!data.items.length) {
             $('#rgBody').html(STORE_STAFF
-                ? 'Nothing to show yet: no item is for this class. In Inventory › Store, an item of type Saleable shows here when it is for "All classes" or for this class.'
+                ? 'Nothing to show yet: no item is for this class. In Inventory › Store, an item "Given to students" shows here when it is for all classes or for this class.'
                 : 'Nothing to show yet: the school store has not set the items for this class, and nobody in it has been given anything this session.');
             return;
         }
@@ -192,7 +198,7 @@ $(function () {
             if (onlyMissing && !missing) return '';
             shown++;
             return '<tr><td class="rg-name"><div class="fw-semibold">' + EC.esc(s.name) + '</div>'
-                 + '<div class="small text-muted">' + (s.roll ? 'Roll ' + EC.esc(s.roll) + ' · ' : '') + EC.esc(s.admNo) + (s.sec ? ' · ' + EC.esc(s.sec) : '') + '</div></td>'
+                 + '<div class="small text-muted">' + (s.roll ? 'Roll ' + EC.esc(s.roll) : '') + '<span class="rg-adm">' + (s.roll ? ' · ' : '') + EC.esc(s.admNo) + '</span>' + (s.sec ? ' · ' + EC.esc(s.sec) : '') + '</div></td>'
                  + cells.join('')
                  + '<td>' + (missing ? '<span class="badge bg-label-danger">' + missing + ' missing</span>' : '<span class="badge bg-label-success">All</span>') + '</td></tr>';
         }).join('');

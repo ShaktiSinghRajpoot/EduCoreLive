@@ -31,6 +31,14 @@
   .cs-bar { position:sticky; bottom:0; z-index:4; background:var(--bs-body-bg); border-top:2px solid var(--ec-primary, #ff8a00);
             padding:.65rem .9rem; display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; justify-content:space-between; }
   .cs-bar .cs-total { font-size:1.15rem; font-weight:900; }
+  /* phone: a narrow name column (name on two lines, roll only) so 2-3 items fit beside it */
+  @@media (max-width:575.98px) {
+    .cs-table th, .cs-table td { padding:.4rem .35rem; }
+    .cs-table .cs-name { max-width:105px; min-width:105px; white-space:normal; font-size:.8rem; }
+    .cs-table .cs-name .fw-semibold { line-height:1.15; }
+    .cs-adm { display:none; }
+    .cs-size { min-width:58px; padding-left:.35rem; padding-right:1.4rem; }
+  }
 </style>
 }
 
@@ -229,7 +237,7 @@ $(function () {
             if (onlyPending && !pending) return '';
             shown++;
             return '<tr><td class="cs-name"><div class="fw-semibold">' + EC.esc(s.name) + '</div>'
-                 + '<div class="small text-muted">' + (s.roll ? 'Roll ' + EC.esc(s.roll) + ' · ' : '') + EC.esc(s.admNo) + (s.sec ? ' · ' + EC.esc(s.sec) : '') + '</div></td>'
+                 + '<div class="small text-muted">' + (s.roll ? 'Roll ' + EC.esc(s.roll) : '') + '<span class="cs-adm">' + (s.roll ? ' · ' : '') + EC.esc(s.admNo) + '</span>' + (s.sec ? ' · ' + EC.esc(s.sec) : '') + '</div></td>'
                  + cells.join('')
                  + '<td>' + (pending ? '<span class="badge bg-label-danger">' + pending + ' pending</span>' : '<span class="badge bg-label-success">All</span>')
                  + (unpaid > 0 ? '<span class="cs-unpaid">unpaid ' + EC.money(unpaid) + '</span>' : '') + '</td></tr>';

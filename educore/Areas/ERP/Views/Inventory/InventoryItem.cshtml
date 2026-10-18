@@ -130,7 +130,7 @@
             <thead>
               <tr>
                 <th class="iv-sortable" data-col="name">Item <i class="bx bx-sort iv-si" id="si-name"></i></th>
-                <th>SKU</th>
+                <th class="iv-sku">SKU</th>
                 <th>Category</th>
                 <th>Type</th>
                 <th>Unit</th>
@@ -518,6 +518,8 @@
             var keep = $('#fLocation').val();
             $('#fLocation').html('<option value="">All locations</option>' + locationOptions(0)).val(keep);
             $('#openingLocation').html(locationOptions(0)).toggleClass('d-none', locations.length < 2);
+            $('#fLocation').toggleClass('d-none', locations.length < 2);
+            if (rows.length) render();
         });
     }
 
@@ -625,11 +627,17 @@
         }
         $('#pgWrap').removeClass('d-none');
 
+        // most small schools leave SKU empty: then the column is only dashes, so it goes
+        var anySku = rows.some(function (r) { return r.sku; });
+        $('.iv-sku').toggleClass('d-none', !anySku);
+        // moving stock between stores only means something with two or more of them
+        var xfer = locations.length > 1;
+
         var html = slice.map(function (r) {
             return '<tr>' +
                 '<td><div class="fw-semibold">' + EC.esc(r.name) + '</div>' +
                     (r.subCat ? '<div class="text-muted small">' + EC.esc(r.subCat) + '</div>' : '') + '</td>' +
-                '<td>' + EC.esc(r.sku || '—') + '</td>' +
+                (anySku ? '<td>' + EC.esc(r.sku || '—') + '</td>' : '') +
                 '<td>' + EC.esc(r.category || '—') + '</td>' +
                 '<td>' + EC.esc(TYPE_WORDS[r.type] || r.type) + '</td>' +
                 '<td>' + EC.esc(r.unit) + '</td>' +
@@ -638,8 +646,8 @@
                 '<td>' + EC.money(r.value) + '</td>' +
                 '<td>' + statusBadge(r.status) + '</td>' +
                 '<td class="text-end text-nowrap">' +
-                    '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '" title="Stock movement"><i class="bx bx-transfer"></i></button>' +
-                    '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '" title="Transfer to another location"><i class="bx bx-transfer-alt"></i></button>' +
+                    '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '" title="Stock in / out: issue, damage, adjust, stock-take"><i class="bx bx-package"></i></button>' +
+                    (xfer ? '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '" title="Move to another store"><i class="bx bx-transfer-alt"></i></button>' : '') +
                     '<button class="btn btn-sm btn-icon btn-text-secondary" data-hist="' + r.id + '" title="Stock history and locations"><i class="bx bx-history"></i></button>' +
                     '<button class="btn btn-sm btn-icon btn-text-secondary" data-edit="' + r.id + '" title="Edit"><i class="bx bx-edit"></i></button>' +
                     '<button class="btn btn-sm btn-icon btn-text-danger" data-del="' + r.id + '" title="Delete"><i class="bx bx-trash"></i></button>' +
@@ -657,8 +665,8 @@
                     '<div class="small text-muted">' + EC.num(r.stock) + ' ' + EC.esc(r.unit) +
                         ' · min ' + EC.num(r.minStock) + '</div>' +
                     '<div>' +
-                        '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '"><i class="bx bx-transfer"></i></button>' +
-                        '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '"><i class="bx bx-transfer-alt"></i></button>' +
+                        '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '" title="Stock in / out"><i class="bx bx-package"></i></button>' +
+                        (xfer ? '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '" title="Move to another store"><i class="bx bx-transfer-alt"></i></button>' : '') +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-hist="' + r.id + '"><i class="bx bx-history"></i></button>' +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-edit="' + r.id + '"><i class="bx bx-edit"></i></button>' +
                     '</div></div>' + openingNote(r) + '</div>';

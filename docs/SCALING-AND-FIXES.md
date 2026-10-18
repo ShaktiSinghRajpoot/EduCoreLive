@@ -5825,3 +5825,9 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - The bar shows "N items for M children · ₹total"; stock is checked before giving. **Give** calls the existing `Inventory/Sell` once per child (qty 1 per item), then lists who got what with **Collect** and **Slip** (the same Items-given slip) buttons, and reloads the grid.
 - No DB change: the grid reads `StoreRegister/Data` (who has what) and `Inventory/SaleItems` (price, stock). Slip header code moved into `InventoryController.SetSlipHeaderAsync` for both pages.
 
+### 2026-10-19 — Inventory pages tidied (repeated / dead things removed)
+- **Purchase:** removed the "Print Preview" button (it only said "not built yet"), the "Purchase Notes" box (technical, and one line was out of date after suppliers became required), the second "Add Purchase Item" button in the empty list and the "Suppliers" card (the Suppliers button sits above it). Three cards remain.
+- **Store:** the SKU column shows only when some item has an SKU; "Stock in / out" has its own icon (it looked like Transfer); Transfer and the location filter show only with two or more stores.
+- **Sell by class / Register on phones:** a narrow name column (name on two lines, roll only, adm. no hidden) so 2-3 items fit beside it.
+- Old names fixed in page text: "Items & Stock" / "Item Master" -> Store, "type Saleable" -> "Given to students".
+

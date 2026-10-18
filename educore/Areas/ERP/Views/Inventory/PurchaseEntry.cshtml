@@ -29,36 +29,27 @@
                     <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-1" id="historyBtn">
                         <i class="bx bx-history"></i><span>Purchase History</span>
                     </button>
-                    <button type="button" class="btn btn-primary d-flex align-items-center gap-1" id="printBtn">
-                        <i class="bx bx-printer"></i><span>Print Preview</span>
-                    </button>
                 </div>
             </div>
         </div>
 
         <div class="row g-3 mb-4">
-            <div class="col-6 col-xl-3">
+            <div class="col-12 col-sm-4">
                 <div class="iv-card">
                     <div class="iv-card-ic bg-label-primary text-primary"><i class="bx bx-rupee"></i></div>
                     <div><div class="iv-card-val" id="sumToday">—</div><div class="iv-card-lbl">Today's Purchases</div></div>
                 </div>
             </div>
-            <div class="col-6 col-xl-3">
+            <div class="col-6 col-sm-4">
                 <div class="iv-card">
                     <div class="iv-card-ic bg-label-info text-info"><i class="bx bx-receipt"></i></div>
                     <div><div class="iv-card-val" id="sumBills">—</div><div class="iv-card-lbl">Bills This Month</div></div>
                 </div>
             </div>
-            <div class="col-6 col-xl-3">
+            <div class="col-6 col-sm-4">
                 <div class="iv-card">
                     <div class="iv-card-ic bg-label-success text-success"><i class="bx bx-package"></i></div>
                     <div><div class="iv-card-val" id="sumQty">—</div><div class="iv-card-lbl">Quantity Bought This Month</div></div>
-                </div>
-            </div>
-            <div class="col-6 col-xl-3">
-                <div class="iv-card">
-                    <div class="iv-card-ic bg-label-warning text-warning"><i class="bx bx-store"></i></div>
-                    <div><div class="iv-card-val" id="sumSuppliers">—</div><div class="iv-card-lbl">Suppliers</div></div>
                 </div>
             </div>
         </div>
@@ -161,30 +152,7 @@
         </div>
 
         <div class="row g-3">
-            <div class="col-12 col-lg-7">
-                <div class="ec-card h-100 mb-0">
-                    <div class="ec-card-body">
-                        <div class="ec-section-title-wrap d-flex align-items-center gap-2 mb-3">
-                            <div class="ec-section-icon"><i class="bx bx-info-circle"></i></div>
-                            <div>
-                                <div class="ec-section-title">Purchase Notes</div>
-                                <div class="ec-section-subtitle">Inventory stock will increase after purchase save.</div>
-                            </div>
-                        </div>
-                        <div class="ec-detail-box">
-                            <ul class="mb-0 ps-3 small fw-semibold">
-                                <li>Every purchase creates inventory transaction history.</li>
-                                <li>Stock is automatically updated after save.</li>
-                                <li>A bill number can be entered only once per supplier (and once among bills with no supplier).</li>
-                                <li>Quantities and prices take at most 2 decimal places; a bill cannot be dated in the future.</li>
-                                <li>Part of a bill can be returned to the supplier from Purchase History; it leaves the location the bill went into.</li>
-                                <li>Cancelling a bill that has returns takes out only what was not returned.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-12 col-lg-5">
+            <div class="col-12 col-lg-5 ms-auto">
                 <div class="purchase-total-box p-3 h-100">
                     <div class="purchase-total-row"><span>Sub Total</span><strong id="subTotalAmount">₹0.00</strong></div>
                     <div class="purchase-total-row"><span>Total Tax</span><strong id="taxAmount">₹0.00</strong></div>
@@ -404,10 +372,7 @@
     function renderGrid() {
         if (!rows.length) {
             $('#purchaseGridBody').html(
-                '<tr><td colspan="6" class="text-center py-4">' +
-                '<div class="text-muted mb-2">No items added yet.</div>' +
-                '<button type="button" class="btn btn-primary" id="emptyAddRowBtn">' +
-                '<i class="bx bx-plus me-1"></i>Add Purchase Item</button></td></tr>');
+                '<tr><td colspan="6" class="text-center text-muted py-4">No items added yet. Click <b>+ Add Item</b> above for each item on the bill.</td></tr>');
             totals();
             return;
         }
@@ -441,7 +406,7 @@
 
     function addRow() {
         if (!ITEMS.length) {
-            ecToast('warning', 'Add an item in the Item Master first.');
+            ecToast('warning', 'Add the item in Inventory › Store first.');
             return;
         }
         rows.push({ id: ++seq, itemId: 0, qty: 1, price: 0, tax: 0 });
@@ -449,7 +414,7 @@
     }
 
     $(document)
-        .on('click', '#addPurchaseRowBtn, #emptyAddRowBtn', addRow)
+        .on('click', '#addPurchaseRowBtn', addRow)
         .on('click', '[data-drop]', function () {
             var id = EC.num($(this).data('drop'));
             rows = rows.filter(function (r) { return r.id !== id; });
@@ -567,7 +532,6 @@
             $('#sumBills').text(bills);
             $('#sumQty').text(qty);
         });
-        $.get(SUPPLIERS_URL).done(function (list) { $('#sumSuppliers').text((list || []).length); });
     }
 
     // ── History ─────────────────────────────────────────────────────────────
@@ -803,7 +767,6 @@
                     html += '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
                 });
                 $('#supplierId').html(html).val(res.id);
-                $('#sumSuppliers').text((list || []).length);
             });
         })
         .fail(function () { ecToast('error', 'Could not save the supplier.'); })
@@ -811,10 +774,6 @@
     });
 
     // Printing a purchase was never built in the shell and still is not.
-    $('#printBtn').on('click', function () {
-        ecToast('info', 'Purchase printing is not built yet.');
-    });
-
     $('#purchaseDate').val(TODAY);
     renderGrid();
     loadSummary();

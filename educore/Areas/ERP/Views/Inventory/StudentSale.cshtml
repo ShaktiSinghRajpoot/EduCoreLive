@@ -213,7 +213,7 @@ $(function () {
 
     function renderItems() {
         if (!items.length) {
-            $('#ssItems').html('<tr><td colspan="5" class="text-muted small p-3">Nothing to give yet. Use "Add item": type <b>Saleable</b>, a selling price, and which class it is for (sizes in one go).</td></tr>');
+            $('#ssItems').html('<tr><td colspan="5" class="text-muted small p-3">Nothing to give yet. Use "Add item": "What is it for?" = <b>Given to students</b>, a selling price, and which class it is for (sizes in one go).</td></tr>');
             $('#ssTotal').text(EC.money(0));
             return;
         }
