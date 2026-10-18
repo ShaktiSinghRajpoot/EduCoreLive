@@ -654,7 +654,12 @@ BEGIN
                     ELSE 'Available' END         AS stock_status,
                i.is_active,
                (SELECT COUNT(*) FROM core.inventory_location_stock s
-                 WHERE s.item_id = i.item_id AND s.quantity > 0)::int AS locations_held
+                 WHERE s.item_id = i.item_id AND s.quantity > 0)::int AS locations_held,
+               -- Stock entered as "already in school" when the item was made: it
+               -- has no supplier and no bill, so the list shows it apart.
+               COALESCE((SELECT SUM(l.quantity) FROM core.inventory_stock_ledger l
+                          WHERE l.tenant_id = i.tenant_id AND l.school_id = i.school_id
+                            AND l.item_id = i.item_id AND l.movement_type = 'Opening'), 0) AS opening_qty
         FROM core.inventory_items i
         CROSS JOIN LATERAL (
             SELECT CASE WHEN p_location_id IS NULL THEN i.current_stock

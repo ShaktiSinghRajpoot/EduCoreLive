@@ -5807,3 +5807,8 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   - **Super Admin Modules** has a "WhatsApp messages" switch with the month's count.
 - The old "open a WhatsApp chat" buttons stay for schools without it.
 - Tests: `tests/messaging_tests.sql` (9, rolled back).
+
+### 2026-10-18 — Store: opening stock shown apart (no supplier, no bill)
+- Add Item: "Opening Stock" is now **"Stock already in school (before today)"**, with a note that new stock goes through **Purchase** (supplier + bill).
+- `sp_inventory_manage` 'ListItems' returns `opening_qty` (sum of the item's 'Opening' ledger rows). The item list shows "N opening (no bill)" under the stock, the Stock filter has **"Opening stock (no bill)"**, and History labels it the same way.
+- Bundle `deploy_2026_10_18k.sql`.

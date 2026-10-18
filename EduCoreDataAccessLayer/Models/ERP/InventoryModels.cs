@@ -28,6 +28,9 @@
 
         /// How many locations hold some of it.
         public int     LocationsHeld { get; set; }
+
+        /// Opening stock entered with the item (no supplier, no bill).
+        public decimal OpeningQty   { get; set; }
     }
 
     /// What the Add/Edit item form posts.

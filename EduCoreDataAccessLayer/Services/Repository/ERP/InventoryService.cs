@@ -569,7 +569,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             StockValue   = DecVal(r, "stock_value"),
             StockStatus  = Str(r, "stock_status"),
             IsActive     = BoolVal(r, "is_active"),
-            LocationsHeld = IntVal(r, "locations_held")
+            LocationsHeld = IntVal(r, "locations_held"),
+            OpeningQty    = DecVal(r, "opening_qty")
         };
 
         // Positional: the proc's parameter order.

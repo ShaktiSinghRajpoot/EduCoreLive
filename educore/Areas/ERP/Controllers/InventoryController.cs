@@ -85,7 +85,8 @@ namespace educore.Areas.ERP.Controllers
                 value    = r.StockValue,
                 status   = r.StockStatus,
                 active   = r.IsActive,
-                places   = r.LocationsHeld
+                places   = r.LocationsHeld,
+                opening  = r.OpeningQty
             }));
         }
 

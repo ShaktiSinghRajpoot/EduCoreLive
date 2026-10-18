@@ -103,6 +103,7 @@
             <option value="available">Available</option>
             <option value="low">Low Stock</option>
             <option value="out">Out of Stock</option>
+            <option value="opening">Opening stock (no bill)</option>
           </select>
 
           <select class="iv-chip" id="perPage" title="Rows per page">
@@ -260,9 +261,10 @@
 
                             <div class="row g-3">
                                 <div class="col-12 col-md-6 col-lg-3" id="openingWrap">
-                                    <label class="form-label">Opening Stock</label>
+                                    <label class="form-label">Stock already in school (before today)</label>
                                     <input type="number" class="form-control" id="openingStock" min="0" step="0.01" placeholder="0">
                                     <select class="form-select form-select-sm mt-1" id="openingLocation" title="Where the opening stock is kept"></select>
+                                    <div class="form-text">Only what you have now, bought earlier. New stock goes through <b>Purchase</b> (supplier + bill).</div>
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-3">
                                     <label class="form-label">Minimum Stock Alert</label>
@@ -552,6 +554,7 @@
             if (stk === 'available' && r.status !== 'Available')    return false;
             if (stk === 'low'       && r.status !== 'Low Stock')    return false;
             if (stk === 'out'       && r.status !== 'Out of Stock') return false;
+            if (stk === 'opening'   && !(EC.num(r.opening) > 0))    return false;
             return true;
         }).sort(function (a, b) {
             var x, y;
@@ -576,6 +579,14 @@
         $('#sumLow').text(low);
         $('#sumOut').text(out);
         $('#sumValue').text(EC.money(value));
+    }
+
+    // Stock entered as "already in school" when the item was made has no
+    // supplier or bill, so it is shown apart from what came through Purchase.
+    function openingNote(r) {
+        if (!(EC.num(r.opening) > 0)) return '';
+        return '<div class="small fw-normal text-warning" title="Entered when the item was added: no supplier, no bill">'
+             + EC.num(r.opening) + ' opening (no bill)</div>';
     }
 
     function render() {
@@ -616,7 +627,7 @@
                 '<td>' + EC.esc(r.category || '—') + '</td>' +
                 '<td>' + EC.esc(TYPE_WORDS[r.type] || r.type) + '</td>' +
                 '<td>' + EC.esc(r.unit) + '</td>' +
-                '<td class="fw-semibold">' + EC.num(r.stock) + '</td>' +
+                '<td class="fw-semibold">' + EC.num(r.stock) + openingNote(r) + '</td>' +
                 '<td>' + EC.num(r.minStock) + '</td>' +
                 '<td>' + EC.money(r.value) + '</td>' +
                 '<td>' + statusBadge(r.status) + '</td>' +
@@ -638,7 +649,7 @@
                     statusBadge(r.status) + '</div>' +
                 '<div class="d-flex justify-content-between align-items-center mt-2">' +
                     '<div class="small text-muted">' + EC.num(r.stock) + ' ' + EC.esc(r.unit) +
-                        ' · min ' + EC.num(r.minStock) + '</div>' +
+                        ' · min ' + EC.num(r.minStock) + openingNote(r) + '</div>' +
                     '<div>' +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '"><i class="bx bx-transfer"></i></button>' +
                         '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '"><i class="bx bx-transfer-alt"></i></button>' +
@@ -907,7 +918,7 @@
 
     // ── History ─────────────────────────────────────────────────────────────
     var MOVE_LABELS = {
-        Opening: 'Opening stock', Purchase: 'Purchase', PurchaseCancel: 'Purchase cancelled',
+        Opening: 'Opening stock (no bill)', Purchase: 'Purchase', PurchaseCancel: 'Purchase cancelled',
         Issue: 'Issue', Return: 'Return', Damage: 'Damage / lost',
         Adjustment: 'Adjustment', StockTake: 'Stock-take',
         TransferOut: 'Transfer out', TransferIn: 'Transfer in', SupplierReturn: 'Returned to supplier'
