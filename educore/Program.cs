@@ -219,7 +219,11 @@ builder.Services.Configure<SmsSettings>(builder.Configuration.GetSection("Notifi
 builder.Services.Configure<WhatsAppSettings>(builder.Configuration.GetSection("Notifications:WhatsApp"));
 builder.Services.AddSingleton<INotificationChannel, EmailChannel>();
 builder.Services.AddSingleton<INotificationChannel, SmsChannel>();
-builder.Services.AddSingleton<INotificationChannel, WhatsAppChannel>();
+// WhatsApp is also used on its own (approved templates, see SchoolMessenger), so the one
+// instance is registered as itself and as a channel.
+builder.Services.AddHttpClient("whatsapp", c => c.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddSingleton<WhatsAppChannel>();
+builder.Services.AddSingleton<INotificationChannel>(sp => sp.GetRequiredService<WhatsAppChannel>());
 builder.Services.AddSingleton<INotificationService, NotificationService>();
 
 builder.Services.AddScoped<IBaseService, BaseService>();
@@ -267,6 +271,8 @@ builder.Services.AddScoped<IFrontOfficeService, FrontOfficeService>(); // Front 
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IStudentSaleService, StudentSaleService>();
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
+builder.Services.AddScoped<IMessageLogService, MessageLogService>();
+builder.Services.AddScoped<SchoolMessenger>();   // WhatsApp alerts to parents + the message log
 
 // The landing dashboard. Every number on it used to be hardcoded in the view.
 builder.Services.AddScoped<IDashboardService, DashboardService>();

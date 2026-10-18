@@ -71,7 +71,7 @@ namespace educore.Areas.ERP.Controllers
         [HttpPost]
         [HasPermission("fees.manage")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SendReminders([FromBody] SendRemindersRequest req)
+        public async Task<IActionResult> SendReminders([FromBody] SendRemindersRequest req, [FromServices] SchoolMessenger messenger)
         {
             int tenantId = TenantId(), schoolId = SchoolId(), userId = UserId();
 
@@ -99,7 +99,10 @@ namespace educore.Areas.ERP.Controllers
             try { schoolName = (await _schoolSettingsService.GetBasicProfileAsync(tenantId, schoolId, userId))?.SchoolName ?? ""; }
             catch { /* the tag simply resolves to empty */ }
 
-            int delivered = 0, failed = 0;
+            // WhatsApp goes as the approved fee template (WhatsApp's rule for a school writing
+            // first), through SchoolMessenger, which records each message in the message log.
+            bool whatsApp = channels.HasFlag(NotificationChannels.WhatsApp) && await messenger.IsOnAsync(tenantId, schoolId);
+            int delivered = 0, failed = 0, waTest = 0;
             foreach (var s in wanted)
             {
                 var text = FillTokens(req.Message!, s, schoolName);
@@ -119,6 +122,14 @@ namespace educore.Areas.ERP.Controllers
                 try { sent = await _notifications.SendAsync(msg); }
                 catch { sent = NotificationChannels.None; }
 
+                if (whatsApp)
+                {
+                    var wa = await messenger.SendAsync(tenantId, schoolId, userId, SchoolMessenger.FeeDue, s.StudentId, s.StudentName, s.Mobile,
+                        new[] { s.TotalOutstanding.ToString("N2"), s.StudentName, schoolName });
+                    if (wa == "Sent") sent |= NotificationChannels.WhatsApp;
+                    else if (wa == "Test") waTest++;
+                }
+
                 bool any = sent != NotificationChannels.None;
                 string status = !any ? "Failed" : (sent == channels ? "Sent" : "Partial");
                 if (any) delivered++; else failed++;
@@ -135,6 +146,10 @@ namespace educore.Areas.ERP.Controllers
             string summary = delivered > 0
                 ? $"{delivered} reminder(s) sent." + (failed > 0 ? $" {failed} could not be delivered." : "")
                 : "No reminder could be delivered — the selected channel has no provider configured yet.";
+            if (waTest > 0)
+                summary += $" WhatsApp: {waTest} message(s) recorded in test mode (the WhatsApp account is not connected yet) — see Message Log.";
+            else if (channels.HasFlag(NotificationChannels.WhatsApp) && !whatsApp)
+                summary += " WhatsApp is not switched on for this school.";
 
             return Json(new
             {

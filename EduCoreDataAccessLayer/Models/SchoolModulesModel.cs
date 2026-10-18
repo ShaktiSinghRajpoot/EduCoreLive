@@ -12,6 +12,11 @@ namespace educore.Models
         public bool   AllowExams     { get; set; } = true;
         public bool   AllowInventory { get; set; } = true;
         public bool   AllowPayroll   { get; set; } = true;
+
+        /// <summary>WhatsApp messages to parents from the platform's account (off by default:
+        /// every message costs money). Saved in core.school_messaging.</summary>
+        public bool   AllowWhatsApp  { get; set; }
+        public int    WhatsAppSentThisMonth { get; set; }
     }
 
     /// <summary>Who to sign in as when the Super Admin opens a school.</summary>

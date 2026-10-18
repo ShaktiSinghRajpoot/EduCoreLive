@@ -5785,3 +5785,25 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   ✓ / ✗ list. Teachers are unchanged: their own class only.
 - `core.sp_inventory_register_overview` (bundle `deploy_2026_10_18h.sql`) returns the session's children, the items and
   who holds what; `StoreRegisterController.Overview` adds it up.
+
+### 2026-10-18 — WhatsApp alerts to parents (platform account, test mode until connected)
+- One platform WhatsApp Business number (Meta Cloud API). `WhatsAppChannel.SendTemplateAsync` sends approved templates;
+  the settings live in `Notifications:WhatsApp` (Railway variables, never in appsettings). While it is not connected,
+  every message is built and recorded as **Test**. Setup steps: `educore/docs/WHATSAPP-SETUP.md`.
+- `SchoolMessenger` is the one place pages send from: it checks the school's switch, normalises Indian mobiles (91 +
+  10 digits), sends the template and writes **every** message to `core.message_log` (Sent / Failed with the reason /
+  Test / NoPhone).
+- `messaging.sql` (bundles `deploy_2026_10_18i/j.sql`): `core.school_messaging` (Super Admin switch per school, off by
+  default), `fn_whatsapp_on`, `sp_school_messaging` (Super Admin only), `sp_whatsapp_on`, `sp_message_log`
+  (Add / List / Summary). `school_purge.sql` covers both tables.
+- Alerts:
+  - **Attendance** → "Send to all parents" (absent children from the saved register; the class-teacher rule
+    applies).
+  - **Fee Due Reminders** → WhatsApp sends the `fee_reminder` template (WhatsApp does not allow free text when the
+    school writes first).
+  - **Notice Board** → "Send to parents" (the notice's audience, one message per number; staff-only notices are not
+    sent).
+  - **Message Log** page for admins.
+  - **Super Admin Modules** has a "WhatsApp messages" switch with the month's count.
+- The old "open a WhatsApp chat" buttons stay for schools without it.
+- Tests: `tests/messaging_tests.sql` (9, rolled back).

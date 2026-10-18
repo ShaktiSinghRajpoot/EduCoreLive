@@ -186,6 +186,16 @@
             </a>
         </li>
         }
+        @if (Can("notices.manage"))
+        {
+        @* every WhatsApp message to parents (absent alerts, fee reminders, notices) *@
+        <li class='menu-item @On("MessageLog")'>
+            <a asp-area="ERP" asp-controller="MessageLog" asp-action="Index" class="menu-link">
+                <i class="menu-icon icon-base bx bxl-whatsapp ic-dash"></i>
+                <div class="text-truncate">Message Log</div>
+            </a>
+        </li>
+        }
 
         @* Teachers (a class on the timetable, or a class teacher) give homework;
            academics.view sees all of it. Other staff (accountant, clerk) do not. *@

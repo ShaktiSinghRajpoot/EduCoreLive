@@ -1,5 +1,6 @@
 ﻿using educore.Helpers;
 using educore.Services;
+using educore.Services.Notifications;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -53,8 +54,11 @@ namespace educore.Areas.ERP.Controllers
         // The daily marking screen. The class list feeds the selector; sections and
         // the roster load over AJAX as the teacher picks class / section / date.
         [HttpGet]
-        public async Task<IActionResult> StudentAttendance()
+        public async Task<IActionResult> StudentAttendance([FromServices] SchoolMessenger messenger)
         {
+            // WhatsApp alerts straight from the server when the Super Admin switched them on
+            ViewBag.WhatsAppOn = await messenger.IsOnAsync(TenantId(), SchoolId());
+            ViewBag.WhatsAppTest = messenger.TestMode;
             try { ViewBag.ClassList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
             catch { ViewBag.ClassList = new List<SelectListItem>(); }
             ViewBag.Today = Dates.Today;   // the school's clock, not the browser's UTC date
@@ -115,6 +119,51 @@ namespace educore.Areas.ERP.Controllers
                     marked = s.IsMarked
                 })
             });
+        }
+
+        // Absent alert on WhatsApp to the parents of every child marked absent in this class
+        // on this date. Who is absent and their numbers come from the saved register, never
+        // from the browser, so the button cannot be used to message anyone else.
+        [HttpPost]
+        [HasPermission("attendance.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SendAbsentAlerts([FromBody] AttendanceSaveRequest request,
+                                                          [FromServices] SchoolMessenger messenger,
+                                                          [FromServices] ISchoolSettingsService settings)
+        {
+            var d = Dates.Norm(request?.Date);
+            if (d == null || string.IsNullOrWhiteSpace(request!.Class))
+                return Json(new { success = false, message = "Choose the class and date." });
+            if (!await messenger.IsOnAsync(TenantId(), SchoolId()))
+                return Json(new { success = false, message = "WhatsApp is not switched on for this school." });
+            if (!await CanMarkAsync(request.Class, request.Section, d))
+                return Json(new { success = false, message = "You can send alerts only for a class whose attendance you can mark." });
+
+            var roster = await _attendance.GetRosterAsync(request.Class, request.Section, d, TenantId(), SchoolId(), UserId());
+            var absent = roster.Where(s => s.IsMarked && string.Equals(s.Status, "absent", StringComparison.OrdinalIgnoreCase)).ToList();
+            if (absent.Count == 0)
+                return Json(new { success = false, message = "No child is marked absent (save the attendance first)." });
+
+            string schoolName = "";
+            try { schoolName = (await settings.GetBasicProfileAsync(TenantId(), SchoolId(), UserId()))?.SchoolName ?? ""; }
+            catch { /* the template still goes, without the school's name */ }
+            string cls = request.Class + (string.IsNullOrWhiteSpace(request.Section) ? "" : "-" + request.Section);
+            string day = Dates.Show(d, "dd MMM yyyy");
+
+            var counts = new Dictionary<string, int>();
+            foreach (var s in absent)
+            {
+                var status = await messenger.SendAsync(TenantId(), SchoolId(), UserId(), SchoolMessenger.Absent,
+                    s.StudentId, s.GuardianName ?? s.StudentName, s.Mobile, new[] { s.StudentName, cls, day, schoolName });
+                counts[status] = counts.GetValueOrDefault(status) + 1;
+            }
+
+            string Part(string k, string label) => counts.GetValueOrDefault(k) > 0 ? $"{counts[k]} {label}" : "";
+            var msg = string.Join(", ", new[] { Part("Sent", "sent"), Part("Test", "recorded in test mode (WhatsApp account not connected yet)"),
+                                               Part("Failed", "failed"), Part("NoPhone", "with no mobile number") }.Where(x => x != ""));
+            return Json(new { success = counts.GetValueOrDefault("Sent") + counts.GetValueOrDefault("Test") > 0, message = "Absent alerts: " + msg + ".",
+                              sent = counts.GetValueOrDefault("Sent"), test = counts.GetValueOrDefault("Test"),
+                              failed = counts.GetValueOrDefault("Failed"), noPhone = counts.GetValueOrDefault("NoPhone") });
         }
 
         [HttpPost]

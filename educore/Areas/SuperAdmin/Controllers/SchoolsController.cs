@@ -5,6 +5,7 @@ using EduCoreDataAccessLayer.Extensions;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract;
 using EduCoreDataAccessLayer.Services.Contract.SuperAdmin;
+using EduCoreDataAccessLayer.Services.Contract.ERP;   // IMessageLogService (WhatsApp per school)
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -470,7 +471,7 @@ namespace educore.Areas.SuperAdmin.Controllers
         // A module not given is hidden everywhere in that school and the School Admin
         // cannot switch it on (core.sp_superadmin_school_modules).
         [HttpGet]
-        public async Task<IActionResult> Modules(int id)
+        public async Task<IActionResult> Modules(int id, [FromServices] IMessageLogService messaging)
         {
             var model = await _schoolService.GetSchoolModulesAsync(id, User.Identity.GetUserId());
             if (model == null)
@@ -478,16 +479,18 @@ namespace educore.Areas.SuperAdmin.Controllers
                 TempData["Error"] = "School not found.";
                 return RedirectToAction(nameof(SchoolList));
             }
+            (model.AllowWhatsApp, model.WhatsAppSentThisMonth) = await messaging.GetSchoolWhatsAppAsync(id, User.Identity.GetUserId());
             return View(model);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Modules(SchoolModulesModel model)
+        public async Task<IActionResult> Modules(SchoolModulesModel model, [FromServices] IMessageLogService messaging)
         {
             try
             {
                 var saved = await _schoolService.SaveSchoolModulesAsync(model, User.Identity.GetUserId());
+                await messaging.SaveSchoolWhatsAppAsync(model.SchoolId, model.AllowWhatsApp, User.Identity.GetUserId());
                 TempData["Success"] = $"Modules saved for {saved?.SchoolName}.";
                 return RedirectToAction(nameof(SchoolList));
             }

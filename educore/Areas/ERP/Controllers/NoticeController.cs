@@ -1,3 +1,4 @@
+using educore.Services.Notifications;
 using educore.Helpers;
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
@@ -36,9 +37,11 @@ namespace educore.Areas.ERP.Controllers
             _att = att;
         }
 
-        public async Task<IActionResult> Index([FromServices] ModuleFlags modules)
+        public async Task<IActionResult> Index([FromServices] ModuleFlags modules, [FromServices] SchoolMessenger messenger)
         {
             ViewBag.CanManage = await CanManageAsync();
+            ViewBag.WhatsAppOn = await messenger.IsOnAsync(TenantId(), SchoolId());   // "Send on WhatsApp" per notice
+            ViewBag.WhatsAppTest = messenger.TestMode;
             ViewBag.Categories = await modules.ExamsOn() ? Categories : Categories.Where(c => c != "Exam").ToArray();
             return View();
         }
@@ -130,6 +133,50 @@ namespace educore.Areas.ERP.Controllers
         {
             var rows = await _notices.GetSeenByAsync(id, TenantId(), SchoolId(), UserId());
             return Json(rows.Select(r => new { name = r.Name, at = r.ReadAt?.ToString("dd MMM, hh:mm tt") }));
+        }
+
+        // A notice to parents on WhatsApp: the parents of the notice's audience (everyone /
+        // parents = every current student; classes = those classes). A number shared by
+        // brothers and sisters gets the notice once. Staff-only notices are not sent.
+        [HttpPost]
+        [HasPermission("notices.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> SendWhatsApp(int id, [FromServices] SchoolMessenger messenger,
+                                                      [FromServices] IAdmissionService admissions)
+        {
+            if (!await messenger.IsOnAsync(TenantId(), SchoolId()))
+                return Json(new { success = false, message = "WhatsApp is not switched on for this school." });
+            var n = (await _notices.GetAllAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(x => x.Id == id);
+            if (n == null) return Json(new { success = false, message = "Notice not found." });
+            if (n.Audience == "Staff") return Json(new { success = false, message = "This notice is for staff only, so it is not sent to parents." });
+
+            string? current = null;
+            try { current = (await _settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.AcademicYearName; }
+            catch { /* every active student */ }
+            var (students, _) = await admissions.GetStudentsAsync(TenantId(), SchoolId(), UserId(), pageNumber: 1, pageSize: 5000,
+                                                                  filterYear: current, filterStatus: "Active");
+            var classes = (n.ClassNames ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                               .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var to = students.Where(st => n.Audience != "Classes" || classes.Contains(st.ClassName))
+                             .GroupBy(st => WhatsAppChannel.ToWhatsAppNumber(st.Mobile) ?? "none-" + st.StudentId)   // one message per number
+                             .Select(g => g.First()).ToList();
+            if (to.Count == 0) return Json(new { success = false, message = "No parents to send to." });
+
+            string schoolName = "";
+            try { schoolName = (await _settings.GetBasicProfileAsync(TenantId(), SchoolId(), UserId()))?.SchoolName ?? ""; }
+            catch { }
+
+            var counts = new Dictionary<string, int>();
+            foreach (var st in to)
+            {
+                var status = await messenger.SendAsync(TenantId(), SchoolId(), UserId(), SchoolMessenger.Notice,
+                    st.StudentId, st.GuardianName ?? st.StudentName, st.Mobile, new[] { schoolName, n.Title, n.Body });
+                counts[status] = counts.GetValueOrDefault(status) + 1;
+            }
+            string Part(string k, string label) => counts.GetValueOrDefault(k) > 0 ? $"{counts[k]} {label}" : "";
+            var msg = string.Join(", ", new[] { Part("Sent", "sent"), Part("Test", "recorded in test mode (WhatsApp account not connected yet)"),
+                                               Part("Failed", "failed"), Part("NoPhone", "with no mobile number") }.Where(x => x != ""));
+            return Json(new { success = counts.GetValueOrDefault("Sent") + counts.GetValueOrDefault("Test") > 0, message = "Notice on WhatsApp: " + msg + "." });
         }
 
         [HttpPost]

@@ -193,6 +193,9 @@ BEGIN
     DELETE FROM core.expenses                      WHERE school_id = p_school_id;
     DELETE FROM core.expense_categories            WHERE school_id = p_school_id;
     DELETE FROM core.cashbook_opening              WHERE school_id = p_school_id;
+    -- WhatsApp switch and the message record (messaging.sql)
+    DELETE FROM core.message_log                   WHERE school_id = p_school_id;
+    DELETE FROM core.school_messaging              WHERE school_id = p_school_id;
     DELETE FROM core.student_ledger                WHERE school_id = p_school_id;
     DELETE FROM core.tc_register                   WHERE school_id = p_school_id;
     DELETE FROM core.tc_counters                   WHERE school_id = p_school_id;

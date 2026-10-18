@@ -3,6 +3,8 @@
     ViewData["Title"] = "Student Attendance";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var classList = ViewBag.ClassList as List<SelectListItem> ?? new();
+    bool whatsAppOn = ViewBag.WhatsAppOn == true;      // Super Admin switched WhatsApp on for this school
+    bool whatsAppTest = ViewBag.WhatsAppTest == true;  // the platform account is not connected yet
 }
 
 @section PageStyles {
@@ -126,6 +128,12 @@
 
             </div>
             <div class="modal-footer">
+                @if (whatsAppOn)
+                {
+                    @* one click: the server sends the approved WhatsApp template to every absent child's parent *@
+                    <div class="me-auto small text-muted">@(whatsAppTest ? "Test mode: messages are recorded in the Message Log, not sent yet." : "Sent from the school's WhatsApp, one message per parent.")</div>
+                    <button type="button" class="btn btn-success px-4 py-2" id="waSendAll"><i class="bx bxl-whatsapp me-1"></i>Send to all parents</button>
+                }
                 <button type="button" class="btn btn-att-ghost px-4 py-2" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
@@ -423,6 +431,27 @@ $(document).ready(function () {
         notified[id] = true; rememberNotified(id); render(); refreshModal();
     }
     $(document).on('click', '.wa-one', function () { sendWA(Number($(this).data('id'))); });
+
+    // Automatic absent alerts (school has WhatsApp on): the server sends to every absent
+    // child's parent from the saved register and records each message.
+    $('#waSendAll').on('click', function () {
+        var $btn = $(this);
+        EC.buttonBusy($btn, 'Sending…');
+        $.ajax({
+            url: '@Url.Action("SendAbsentAlerts", "Attendance", new { area = "ERP" })',
+            type: 'POST', contentType: 'application/json',
+            headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+            data: JSON.stringify({ date: $('#attendanceDate').val(), "class": $('#filterClass').val(), section: $('#filterSection').val(), items: [] })
+        })
+        .done(function (r) {
+            if (!r || !r.success) { ecToast('error', (r && r.message) || 'Could not send the alerts.'); return; }
+            ecToast('success', r.message);
+            students.filter(function (x) { return status[x.id] === 'absent'; }).forEach(function (x) { notified[x.id] = true; rememberNotified(x.id); });
+            render(); refreshModal();
+        })
+        .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not send the alerts')); })
+        .always(function () { EC.buttonReset($btn); });
+    });
     $(document).on('click', '.wa-modal', function () { sendWA(Number($(this).data('id'))); });
 
     function refreshModal() {

@@ -3,6 +3,8 @@
     ViewData["Title"] = "Notice Board";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var canManage = (bool?)ViewBag.CanManage ?? false;
+    bool whatsAppOn = ViewBag.WhatsAppOn == true;     // Super Admin switched WhatsApp on for this school
+    bool whatsAppTest = ViewBag.WhatsAppTest == true; // the platform account is not connected yet
     var categories = ViewBag.Categories as string[] ?? Array.Empty<string>();
 }
 
@@ -141,6 +143,8 @@ $(function () {
         print:   '@Url.Action("Print","Notice",new{area="ERP"})'
     };
     var CAN_MANAGE = @(canManage ? "true" : "false");   // notices.manage
+    var WA_ON = @(whatsAppOn ? "true" : "false");       // send a notice to parents from the school's WhatsApp
+    var WA_TEST = @(whatsAppTest ? "true" : "false");
 
     var notices = [];
     var cat = '';
@@ -179,6 +183,8 @@ $(function () {
         var acts = '<a class="btn btn-xs ec-btn-soft" target="_blank" href="' + URL.print + '/' + n.id + '"><i class="bx bx-printer me-1"></i>Print</a>'
                  + '<a class="btn btn-xs nb-wa" target="_blank" rel="noopener" href="https://wa.me/?text=' + encodeURIComponent('*' + n.title + '*\n\n' + n.body) + '"><i class="bx bxl-whatsapp me-1"></i>WhatsApp</a>';
         if (CAN_MANAGE) {
+            if (WA_ON && n.audience !== 'Staff')
+                acts += '<button class="btn btn-xs btn-success nb-wa-send" data-id="' + n.id + '" data-title="' + EC.esc(n.title) + '"><i class="bx bxl-whatsapp me-1"></i>Send to parents</button>';
             acts += '<button class="btn btn-xs btn-outline-secondary nb-edit" data-id="' + n.id + '"><i class="bx bx-edit-alt me-1"></i>Edit</button>'
                   + '<button class="btn btn-xs btn-outline-danger nb-del" data-id="' + n.id + '"><i class="bx bx-trash"></i></button>'
                   // staff reads only mean something when the notice is for staff; parents have no login yet
@@ -258,6 +264,21 @@ $(function () {
             })
             .fail(function () { ecToast('error', 'Could not save. Please try again.'); })
             .always(function () { EC.buttonReset($b); });
+    });
+
+    // The school's WhatsApp sends the notice to the parents of its audience (one per number).
+    $('#nbList').on('click', '.nb-wa-send', function () {
+        var id = $(this).data('id'), $btn = $(this);
+        EC.confirm({ title: 'Send this notice to parents on WhatsApp?', name: $(this).data('title'), danger: false, okText: 'Send',
+                     message: WA_TEST ? 'Test mode: the messages are recorded in the Message Log, not sent yet.' : 'Every parent the notice is for gets one message.' })
+          .then(function (ok) {
+              if (!ok) return;
+              EC.buttonBusy($btn, 'Sending…');
+              $.ajax({ url: '@Url.Action("SendWhatsApp", "Notice", new { area = "ERP" })' + '?id=' + id, type: 'POST', headers: { 'RequestVerificationToken': CSRF } })
+                  .done(function (r) { ecToast(r && r.success ? 'success' : 'error', (r && r.message) || 'Could not send.'); })
+                  .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not send')); })
+                  .always(function () { EC.buttonReset($btn); });
+          });
     });
 
     $('#nbList').on('click', '.nb-del', function () {
