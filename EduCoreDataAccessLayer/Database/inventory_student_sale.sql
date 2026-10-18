@@ -41,9 +41,12 @@ CREATE TABLE IF NOT EXISTS core.inventory_class_kits (
     quantity    numeric(14,2) NOT NULL DEFAULT 1,
     updated_by  integer,
     updated_at  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT chk_inv_kit_qty CHECK (quantity > 0),
+    CONSTRAINT chk_inv_kit_qty CHECK (quantity >= 0),     -- 0 = taken out of the set (rows are never deleted)
     CONSTRAINT uq_inv_kit_item UNIQUE (tenant_id, school_id, class_name, item_id)
 );
+-- The first version refused 0 and deleted rows on save; store rows are never hard-deleted.
+ALTER TABLE core.inventory_class_kits DROP CONSTRAINT IF EXISTS chk_inv_kit_qty;
+ALTER TABLE core.inventory_class_kits ADD CONSTRAINT chk_inv_kit_qty CHECK (quantity >= 0);
 
 CREATE TABLE IF NOT EXISTS core.inventory_student_sales (
     sale_id       integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -293,20 +296,24 @@ BEGIN
         RETURN;
     END IF;
 
-    -- ── SaveKit: replace one class's set
+    -- ── SaveKit: replace one class's set. Store rows are never deleted: an item
+    --    taken out of the set keeps its row with quantity 0.
     IF p_operation = 'SaveKit' THEN
         IF NULLIF(trim(p_class), '') IS NULL THEN
             RAISE EXCEPTION 'Choose a class.';
         END IF;
-        DELETE FROM core.inventory_class_kits
-         WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND class_name = trim(p_class);
+        UPDATE core.inventory_class_kits
+           SET quantity = 0, updated_by = p_action_user_id, updated_at = now()
+         WHERE tenant_id = p_tenant_id AND school_id = p_school_id AND class_name = trim(p_class) AND quantity <> 0;
         INSERT INTO core.inventory_class_kits (tenant_id, school_id, class_name, item_id, quantity, updated_by)
         SELECT p_tenant_id, p_school_id, trim(p_class), i.item_id, SUM(x.qty), p_action_user_id
           FROM jsonb_to_recordset(COALESCE(p_items, '[]'::jsonb)) AS x("itemId" integer, qty numeric)
           JOIN core.inventory_items i ON i.item_id = x."itemId" AND i.tenant_id = p_tenant_id AND i.school_id = p_school_id
                                      AND NOT i.is_deleted
          WHERE x.qty > 0
-         GROUP BY i.item_id;
+         GROUP BY i.item_id
+        ON CONFLICT (tenant_id, school_id, class_name, item_id)
+        DO UPDATE SET quantity = EXCLUDED.quantity, updated_by = EXCLUDED.updated_by, updated_at = now();
         GET DIAGNOSTICS v_n = ROW_COUNT;
         OPEN p_result FOR SELECT TRUE AS success, 'Set for ' || trim(p_class) || ' saved: ' || v_n || ' item(s).' AS message;
         RETURN;

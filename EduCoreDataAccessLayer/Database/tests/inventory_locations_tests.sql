@@ -247,11 +247,11 @@ $mig2$;
 -- ════════════════════════════════════════════════════════════════════════════
 DO $suite$
 DECLARE
-    c_tenant CONSTANT integer := 24;
-    c_school CONSTANT integer := 34;
-    c_user   CONSTANT integer := 39;
-    o_tenant CONSTANT integer := 23;   -- the other school
-    o_school CONSTANT integer := 33;
+    c_tenant CONSTANT integer := 32;   -- QA Test School
+    c_school CONSTANT integer := 45;
+    c_user   CONSTANT integer := 62;
+    o_tenant CONSTANT integer := 99001;   -- the other school (exists only inside the rolled-back test)
+    o_school CONSTANT integer := 99001;
 
     c     refcursor;
     c2    refcursor;
@@ -465,7 +465,7 @@ BEGIN
         PERFORM pg_temp.chk('MVL-01 issue at a location that holds none refused', FALSE, 'accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('MVL-01 issue at a location that holds none refused',
-                            SQLERRM ILIKE 'Only 0.00 Piece of ZZL Ball left at Main Store%', SQLERRM);
+                            SQLERRM ~* 'Only 0(.00)? Piece of ZZL Ball left at Main Store.*', SQLERRM);
     END;
 
     c := 'v2';
@@ -540,7 +540,7 @@ BEGIN
         PERFORM pg_temp.chk('TRF-02 more than the source holds refused', FALSE, 'accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('TRF-02 more than the source holds refused',
-                            SQLERRM ILIKE 'Only 10.00 Piece of ZZL Tie left at ZZL Science Lab%', SQLERRM);
+                            SQLERRM ~* 'Only 10(.00)? Piece of ZZL Tie left at ZZL Science Lab.*', SQLERRM);
     END;
     PERFORM pg_temp.chk('TRF-02b ...nothing written',
                         (SELECT COUNT(*) FROM core.inventory_stock_ledger WHERE item_id = v_tie) = v_n
@@ -818,7 +818,7 @@ BEGIN
         PERFORM pg_temp.chk('RET-02 more than bought minus returned refused', FALSE, 'accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('RET-02 more than bought minus returned refused',
-                            SQLERRM ILIKE 'Only 15.00 Piece of ZZL Tie can still be returned%bought 20.00, already returned 5.00%', SQLERRM);
+                            SQLERRM ~* 'Only 15(.00)? Piece of ZZL Tie can still be returned.*bought 20(.00)?, already returned 5(.00)?.*', SQLERRM);
     END;
     BEGIN
         c := 'r3'; c2 := 'r3b';
@@ -830,7 +830,7 @@ BEGIN
         PERFORM pg_temp.chk('RET-03 the same line twice in one request adds up (16 > 15) refused', FALSE, 'accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('RET-03 the same line twice in one request adds up (16 > 15) refused',
-                            SQLERRM ILIKE 'Only 15.00%', SQLERRM);
+                            SQLERRM ~* 'Only 15(.00)?.*', SQLERRM);
     END;
     BEGIN
         c := 'r4'; c2 := 'r4b';
@@ -888,7 +888,7 @@ BEGIN
         PERFORM pg_temp.chk('RET-07 cannot drive the bill''s location below zero', FALSE, 'accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('RET-07 cannot drive the bill''s location below zero',
-                            SQLERRM ILIKE 'Cannot return: only 2.00 Piece of ZZL Ball left at ZZL Science Lab%', SQLERRM);
+                            SQLERRM ~* 'Cannot return: only 2(.00)? Piece of ZZL Ball left at ZZL Science Lab.*', SQLERRM);
     END;
     -- Two tie lines in one request must fit the lab's ties together: lab has
     -- 30, returning 15 + 5 = 20 is fine and is checked per item.
@@ -969,7 +969,7 @@ BEGIN
         PERFORM pg_temp.chk('CWR-01 cancel refused when the remainder is no longer at the location', FALSE, 'accepted');
     EXCEPTION WHEN OTHERS THEN
         PERFORM pg_temp.chk('CWR-01 cancel refused when the remainder is no longer at the location',
-                            SQLERRM ILIKE 'Cannot cancel: only 0.00 Piece of ZZL Ball left, and this purchase brought in 8.00 to ZZL Science Lab%', SQLERRM);
+                            SQLERRM ~* 'Cannot cancel: only 0(.00)? Piece of ZZL Ball left, and this purchase brought in 8(.00)? to ZZL Science Lab.*', SQLERRM);
     END;
     PERFORM pg_temp.chk('CWR-01b ...nothing reversed, bill still live',
                         (SELECT COUNT(*) FROM core.inventory_stock_ledger WHERE reference_id = v_pid

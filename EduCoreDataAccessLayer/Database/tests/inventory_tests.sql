@@ -45,9 +45,9 @@ END $$;
 
 DO $suite$
 DECLARE
-    c_tenant CONSTANT integer := 24;
-    c_school CONSTANT integer := 34;
-    c_user   CONSTANT integer := 39;
+    c_tenant CONSTANT integer := 32;   -- QA Test School
+    c_school CONSTANT integer := 45;
+    c_user   CONSTANT integer := 62;
 
     c     refcursor;
     c2    refcursor;

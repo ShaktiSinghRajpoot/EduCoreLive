@@ -72,11 +72,11 @@ $$;
 
 DO $suite$
 DECLARE
-    c_tenant CONSTANT integer := 24;
-    c_school CONSTANT integer := 34;
-    c_user   CONSTANT integer := 39;
-    o_tenant CONSTANT integer := 23;   -- the other school
-    o_school CONSTANT integer := 33;
+    c_tenant CONSTANT integer := 32;   -- QA Test School
+    c_school CONSTANT integer := 45;
+    c_user   CONSTANT integer := 62;
+    o_tenant CONSTANT integer := 99001;   -- the other school (exists only inside the rolled-back test)
+    o_school CONSTANT integer := 99001;
 
     c     refcursor;
     c2    refcursor;
@@ -1305,7 +1305,7 @@ BEGIN
         EXCEPTION WHEN OTHERS THEN
             -- The message must name the bill's TOTAL for the item (50), not one line.
             PERFORM pg_temp.chk('CAN-11 cancel cannot take a 2-line item below zero',
-                                SQLERRM ILIKE 'Cannot cancel: only 35.00 Piece of ZZS Blazer left, and this purchase brought in 50.00%',
+                                SQLERRM ~* 'Cannot cancel: only 35(\.00)? Piece of ZZS Blazer left, and this purchase brought in 50(\.00)?',
                                 SQLERRM);
         END;
         SELECT current_stock INTO v_dec FROM core.inventory_items WHERE item_id = v_bl;
@@ -1343,7 +1343,7 @@ BEGIN
                             v_first.balance = (SELECT current_stock FROM core.inventory_items WHERE item_id = v_ti),
                             format('balance %s', v_first.balance));
         PERFORM pg_temp.chk('LED-01d ...each row names who made it, with a rate',
-                            v_first.created_by_name = 'Anmol Singh' AND v_first.unit_rate IS NOT NULL,
+                            NULLIF(v_first.created_by_name, '') IS NOT NULL AND v_first.unit_rate IS NOT NULL,
                             format('by "%s" at %s', v_first.created_by_name, v_first.unit_rate));
     END;
 

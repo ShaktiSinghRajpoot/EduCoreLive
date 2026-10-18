@@ -5698,3 +5698,15 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
   the fee line is unpaid: the line is closed (`fn_ledger_close`, source 'Store') and the stock comes back.
   `StudentSaleService` / `IStudentSaleService` (new). `school_purge.sql` deletes events, sales and class sets.
 - Tests: `tests/calendar_store_tests.sql` (16 checks, rolled back).
+
+### 2026-10-18 — Full inventory flow test
+- Database: `inventory_tests` 49/49, `inventory_store_tests` 142/142, `inventory_locations_tests` 111/111, `calendar_store_tests`
+  16/16 (all rolled back on the live QA school). The three older suites pointed at the wiped tenant 24; they now use the
+  QA school (32/45/62) and a made-up "other school" 99001 that exists only inside the test. Stale expectations updated:
+  stock messages print whole numbers ("35", not "35.00"), and the ledger's "who" is any name.
+- Fixed from it: `sp_inventory_student_sale` 'SaveKit' deleted the class set's rows, against the store rule that rows
+  are never hard-deleted (LED-07). An item taken out of a set now keeps its row with quantity 0 (bundle
+  `deploy_2026_10_18b.sql`).
+- On screen (QA school, real data): supplier → purchase (10 @ ₹200, stock 19 → 29) → issue / damage / over-issue refused
+  / stock-take → transfer to Science Lab → sale from the Science Lab → supplier return 2 (over-return refused) → bill
+  cancel (only the 8 not returned come out) → minimum stock → Low Stock. Stock by location and value checked by hand.
