@@ -207,36 +207,54 @@
         </div>
         }
 
-        @* ============ UPCOMING (School Calendar: events, exams, holidays) ============ *@
-        @if (Model.Upcoming.Any())
+        @* ============ UPCOMING + ATTENDANCE DEFAULTERS, side by side ============
+           Each is half the row on a wide screen (one alone takes the whole row), with
+           rows like the Fee Defaulters / Recent Transactions cards below. *@
+        @{
+            bool showUpcoming = Model.Upcoming.Any();
+            bool showAttDef   = Model.ShowAttendance || Model.ShowStaff;
+            string pairCol    = showUpcoming && showAttDef ? "col-12 col-xl-6" : "col-12";
+            DateTime today    = Dates.Now.Date;
+        }
+
+        @if (showUpcoming)
         {
-            <div class="col-12 dash-animate">
+            <div class="@pairCol dash-animate">
                 <div class="dash-card h-100">
                     <div class="dash-card-head d-flex justify-content-between align-items-center gap-2">
                         <div><h5 class="dash-card-title">Upcoming</h5><small class="dash-sub">Next 30 days · events, exams and holidays</small></div>
-                        <a class="btn btn-sm btn-outline-primary" href="@Url.Action("SchoolCalendar", "SchoolSettings", new { area = "ERP" })">School Calendar</a>
+                        <a class="btn btn-sm btn-outline-primary" href="@Url.Action("SchoolCalendar", "SchoolSettings", new { area = "ERP" })">Calendar</a>
                     </div>
-                    <div class="dash-card-body">
+                    <div class="dash-card-body dash-scroll">
                         @foreach (var e in Model.Upcoming)
                         {
                             var start = DateTime.Parse(e.Start);
                             var end = DateTime.Parse(e.End);
-                            string when = start.ToString("dd MMM") + (end > start ? " – " + end.ToString("dd MMM") : "");
-                            string badge = e.Type switch
+                            // One colour per kind, used for the date tile and the label.
+                            string tone = e.Type switch
                             {
-                                "Holiday" => "bg-label-danger", "Half day" => "bg-label-warning", "Exam" => "bg-label-danger",
-                                "PTM" => "bg-label-primary", _ => "bg-label-info"
+                                "Holiday" => "soft-red", "Half day" => "soft-amber", "Exam" => "soft-orange",
+                                "PTM" => "soft-green", "Meeting" => "soft-grey", _ => "soft-blue"
                             };
-                            <div class="d-flex align-items-center gap-3 py-2 border-bottom">
-                                <div class="fw-bold text-nowrap" style="min-width:110px">@when</div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-semibold">@e.Title</div>
-                                    @if (!string.IsNullOrWhiteSpace(e.ForWhom) || !string.IsNullOrWhiteSpace(e.Time))
-                                    {
-                                        <div class="dash-sub small">@(e.Time != null ? DateTime.Parse(e.Time).ToString("h:mm tt") : "")@(e.Time != null && e.ForWhom != null ? " · " : "")@e.ForWhom</div>
-                                    }
+                            string kind = e.Type == "Meeting" ? "Staff meeting" : e.Type;
+                            int days = (start - today).Days;
+                            string whenText = start <= today ? (end > today ? "On now · till " + end.ToString("dd MMM") : "Today")
+                                            : days == 1 ? "Tomorrow" : "In " + days + " days";
+                            string detail = (end > start ? start.ToString("dd MMM") + " – " + end.ToString("dd MMM") + " · " : "")
+                                          + (e.Time != null ? DateTime.Parse(e.Time).ToString("h:mm tt") + " · " : "")
+                                          + (e.ForWhom ?? "");
+                            <div class="dash-row">
+                                <div class="dash-date @tone">
+                                    <b>@start.ToString("dd")</b><span>@start.ToString("MMM")</span>
                                 </div>
-                                <span class="badge @badge">@(e.Type == "Meeting" ? "Staff meeting" : e.Type)</span>
+                                <div class="flex-grow-1 min-w-0">
+                                    <h6 class="mb-0 text-truncate">@e.Title</h6>
+                                    <small class="text-muted d-block text-truncate">@detail.TrimEnd(' ', '·')</small>
+                                </div>
+                                <div class="text-end flex-shrink-0">
+                                    <span class="dash-pill @tone">@kind</span>
+                                    <div class="small text-muted mt-1 text-nowrap">@whenText</div>
+                                </div>
                             </div>
                         }
                     </div>
@@ -244,15 +262,15 @@
             </div>
         }
 
-        @* ============ ATTENDANCE DEFAULTERS (today's attendance is on the Students / Staff cards) ============ *@
-        @if (Model.ShowAttendance || Model.ShowStaff)
+        @* (today's attendance is on the Students / Staff cards above) *@
+        @if (showAttDef)
         {
             bool stuTab = Model.ShowAttendance;
-            <div class="col-12 dash-animate">
+            <div class="@pairCol dash-animate" style="animation-delay:.05s">
                 <div class="dash-card h-100">
-                    <div class="dash-card-head d-flex flex-column flex-md-row justify-content-between gap-2">
-                        <div><h5 class="dash-card-title">Attendance Defaulters</h5><small class="dash-sub">Students below 75% this session · staff absences this month</small></div>
-                        <div class="btn-group btn-group-sm" role="group">
+                    <div class="dash-card-head d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div><h5 class="dash-card-title">Attendance Defaulters</h5><small class="dash-sub">Students below 75% this session · staff absent this month</small></div>
+                        <div class="btn-group btn-group-sm flex-shrink-0" role="group">
                             @if (Model.ShowAttendance)
                             {
                                 <button type="button" class="btn btn-outline-primary active" data-att-tab="stu">Students (@Model.StudentAttendanceDefaulterCount)</button>
@@ -269,17 +287,19 @@
                             <div data-att-pane="stu">
                                 @if (!Model.StudentAttendanceDefaulters.Any())
                                 {
-                                    <div class="text-muted small p-2">No student is below 75% this session (counted after 5 days marked).</div>
+                                    <div class="dash-empty"><i class="bx bx-check-circle"></i>No student is below 75% this session<small>(counted after 5 days marked)</small></div>
                                 }
                                 @foreach (var d in Model.StudentAttendanceDefaulters)
                                 {
+                                    var pct = Math.Max(0, Math.Min(100, (double)d.Percent));
                                     <a class="dash-row text-reset text-decoration-none" href="@Url.Action("Dashboard", "Student", new { area = "ERP", id = d.PublicId })">
-                                        <span class="dash-icon soft-amber" style="width:2.2rem;height:2.2rem;font-size:1rem"><i class="bx bx-user"></i></span>
+                                        <span class="dash-avatar @Soft(accents[Model.StudentAttendanceDefaulters.IndexOf(d) % accents.Length])">@Initials(d.StudentName)</span>
                                         <div class="flex-grow-1 min-w-0">
                                             <h6 class="mb-0 text-truncate">@d.StudentName</h6>
-                                            <small class="text-muted">@d.ClassName@(string.IsNullOrWhiteSpace(d.Section) ? "" : "-" + d.Section) · present @d.Present of @d.Marked days</small>
+                                            <small class="text-muted">@d.ClassName@(string.IsNullOrWhiteSpace(d.Section) ? "" : " – " + d.Section) · present @d.Present of @d.Marked days</small>
+                                            <div class="dash-progress mt-1"><span style="width:@pct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%;background:@(pct < 60 ? "#dc2626" : "#d97706")"></span></div>
                                         </div>
-                                        <strong class="text-danger">@d.Percent.ToString("0.#")%</strong>
+                                        <span class="dash-pill @(pct < 60 ? "soft-red" : "soft-amber") flex-shrink-0">@d.Percent.ToString("0.#")%</span>
                                     </a>
                                 }
                                 @if (Model.StudentAttendanceDefaulterCount > Model.StudentAttendanceDefaulters.Count)
@@ -293,17 +313,17 @@
                             <div data-att-pane="staff" class="@(stuTab ? "d-none" : "")">
                                 @if (!Model.StaffAttendanceDefaulters.Any())
                                 {
-                                    <div class="text-muted small p-2">No staff absences this month.</div>
+                                    <div class="dash-empty"><i class="bx bx-check-circle"></i>No staff absences this month</div>
                                 }
                                 @foreach (var d in Model.StaffAttendanceDefaulters)
                                 {
                                     <a class="dash-row text-reset text-decoration-none" href="@Url.Action("StaffProfile", "Staff", new { area = "ERP", id = d.PublicId })">
-                                        <span class="dash-icon soft-orange" style="width:2.2rem;height:2.2rem;font-size:1rem"><i class="bx bx-id-card"></i></span>
+                                        <span class="dash-avatar @Soft(accents[Model.StaffAttendanceDefaulters.IndexOf(d) % accents.Length])">@Initials(d.FullName)</span>
                                         <div class="flex-grow-1 min-w-0">
                                             <h6 class="mb-0 text-truncate">@d.FullName</h6>
                                             <small class="text-muted">@(d.Designation ?? "Staff")@(d.LateDays > 0 ? " · late " + d.LateDays + " day" + (d.LateDays == 1 ? "" : "s") : "")</small>
                                         </div>
-                                        <strong class="text-danger">@d.AbsentDays.ToString("0.#") day@(d.AbsentDays == 1 ? "" : "s") absent</strong>
+                                        <span class="dash-pill soft-red flex-shrink-0">@d.AbsentDays.ToString("0.#") day@(d.AbsentDays == 1 ? "" : "s") absent</span>
                                     </a>
                                 }
                                 @if (Model.StaffAttendanceDefaulterCount > Model.StaffAttendanceDefaulters.Count)

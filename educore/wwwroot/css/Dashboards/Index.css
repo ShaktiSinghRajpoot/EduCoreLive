@@ -325,3 +325,33 @@
                 max-width: 100%;
             }
         }
+
+
+/* ---- Upcoming: a small calendar tile per event (day over month) ---- */
+.dash-date {
+    width: 2.9rem;
+    height: 2.9rem;
+    border-radius: 12px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    line-height: 1;
+}
+    .dash-date b { font-size: 1.05rem; font-weight: 900; }
+    .dash-date span { font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+
+/* ---- an empty list: a quiet tick instead of a bare sentence ---- */
+.dash-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .25rem;
+    padding: 1.6rem .5rem;
+    color: var(--ec-text-light);
+    font-size: .85rem;
+    text-align: center;
+}
+    .dash-empty i { font-size: 1.8rem; color: #16a34a; }
+    .dash-empty small { font-size: .72rem; }
