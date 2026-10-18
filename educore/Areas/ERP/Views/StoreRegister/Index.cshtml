@@ -120,6 +120,7 @@ $(function () {
     var SEC_URL  = '@Url.Action("PromotionSections", "Student", new { area = "ERP" })';
     var STORE_STAFF = @(storeStaff ? "true" : "false");
     var data = null;
+    var loadNo = 0;   // only the latest load is drawn (a class change loads twice; the first could land last)
 
     // The server names each item's column: "Uniform Set" for "Uniform Set - 28" when the
     // store sells several sizes, else the item's own name. The size goes under the tick.
@@ -140,7 +141,9 @@ $(function () {
         if (overview) { loadOverview(q.year); return; }
         if (!q.year || !q.cls) { $('#rgBody').html('Choose a class.'); return; }
         $('#rgBody').html('Loading…');
+        var mine = ++loadNo;
         $.getJSON(DATA_URL, q).done(function (r) {
+            if (mine !== loadNo) return;
             if (!r || !r.success) { $('#rgBody').html(''); ecToast('error', (r && r.message) || 'Could not load the register.'); return; }
             data = r;
             $('#rgSubtitle').text(q.cls + (q.sec ? ' – ' + q.sec : '') + ' · ' + q.year + ': ✓ has it, ✗ not yet');
@@ -209,7 +212,9 @@ $(function () {
        "—" where the item is not for that class. Click a line to open that class. */
     function loadOverview(year) {
         $('#rgBody').html('Loading…');
+        var mine = ++loadNo;
         $.getJSON(OVERVIEW_URL, { year: year }).done(function (r) {
+            if (mine !== loadNo) return;
             if (!r || !r.success) { $('#rgBody').html(''); ecToast('error', (r && r.message) || 'Could not load the register.'); return; }
             $('#rgSubtitle').text('All classes · ' + year + ': how many children have each item — click a class to see them');
             if (!r.rows.length) { $('#rgBody').html('No children in this session.'); return; }

@@ -140,6 +140,8 @@ $(function () {
     var cols = [];         // [{name, category, items:[itemId]}]
     var picked = {};       // studentId -> {column name -> itemId}
     var slips = {};        // studentId -> the last slip, for its print button
+    var loadNo = 0;        // only the latest load is drawn: changing the class loads twice
+                           // (all sections, then the section) and the first could land last
 
     function token() { return $('input[name="__RequestVerificationToken"]').val(); }
     function q() { return { year: $('#csYear').val(), cls: $('#csClass').val(), sec: $('#csSec').val() || '' }; }
@@ -154,8 +156,10 @@ $(function () {
         $('#csBar').addClass('d-none');
         if (!f.cls) { $('#csBody').html('Choose a class to see its children.'); return; }
         $('#csBody').html('Loading…');
+        var mine = ++loadNo;
         $.when($.getJSON(URL.reg, f), $.getJSON(URL.items, { cls: f.cls, location: $('#csLoc').val() || null }))
             .done(function (a, b) {
+                if (mine !== loadNo) return;   // a newer load is on its way
                 var r = a[0], list = b[0] || [];
                 if (!r || !r.success) { $('#csBody').html(''); ecToast('error', (r && r.message) || 'Could not load the class.'); return; }
                 reg = r;
