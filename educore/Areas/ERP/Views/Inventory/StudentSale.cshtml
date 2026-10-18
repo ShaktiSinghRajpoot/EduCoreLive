@@ -4,6 +4,9 @@
     var locations = ViewBag.Locations as List<EduCoreDataAccessLayer.Models.ERP.InventoryLocation>
                     ?? new List<EduCoreDataAccessLayer.Models.ERP.InventoryLocation>();
     string? sessionStart = ViewBag.SessionStart as string;   // for the summary's "This session"
+    string schoolName    = ViewBag.SchoolName as string ?? "";      // for the "Items given" slip
+    string schoolAddress = ViewBag.SchoolAddress as string ?? "";
+    string givenBy       = User.FindFirst(EduCoreDataAccessLayer.Helpers.Common.SK_UserName)?.Value ?? "";
 }
 
 @section PageStyles {
@@ -247,15 +250,21 @@ $(function () {
     $('#ssGive').on('click', function () {
         var s = session(), lines = Object.keys(qty).map(function (id) { return { itemId: +id, qty: qty[id] }; });
         if (!student || !s || !lines.length) return;
+        // what the slip will show, taken now: the item list reloads after saving
+        var slipLines = items.filter(function (i) { return qty[i.id]; })
+                             .map(function (i) { return { name: i.name, qty: qty[i.id], price: i.price }; });
         var $btn = $(this);
         EC.buttonBusy($btn, 'Saving…');
         post(URL.sell, { studentId: student.id, academicYear: s.year, locationId: storeId(), items: lines })
             .done(function (r) {
                 if (!r || !r.success) { ecToast('error', (r && r.message) || 'Could not give the items.'); return; }
                 var now = student.sessions.filter(function (x) { return x.current; })[0] || s;
+                lastSlip = { student: student.name, admNo: student.admNo, cls: s.cls + (s.sec ? ' – ' + s.sec : ''),
+                             year: s.year, lines: slipLines, total: r.total };
                 $('#ssDone').removeClass('d-none').html(EC.esc(r.message)
                     + ' <a class="btn btn-sm btn-success ms-2" href="' + URL.collect + '?adm=' + encodeURIComponent(student.admNo)
-                    + '&session=' + encodeURIComponent(now.year) + '"><i class="bx bx-wallet me-1"></i>Collect now</a>');
+                    + '&session=' + encodeURIComponent(now.year) + '"><i class="bx bx-wallet me-1"></i>Collect now</a>'
+                    + ' <button type="button" class="btn btn-sm btn-outline-secondary ms-1" id="ssSlip"><i class="bx bx-printer me-1"></i>Print slip</button>');
                 ecToast('success', r.message);
                 loadItems(false);
                 loadSales();
@@ -263,6 +272,49 @@ $(function () {
             .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not give the items')); })
             .always(function () { EC.buttonReset($btn); });
     });
+
+    /* ── "Items given" slip for the parent: what was taken, and that it is on the
+          fee account. Not a receipt -- the receipt comes from Collect Fees. ── */
+    var SCHOOL = { name:    '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(schoolName))',
+                   address: '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(schoolAddress))',
+                   givenBy: '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(givenBy))' };
+    var lastSlip = null;
+
+    function printSlip(d) {
+        var rows = d.lines.map(function (l) {
+            return '<tr><td>' + EC.esc(l.name) + '</td><td class="r">' + EC.num(l.qty) + '</td>'
+                 + '<td class="r">' + EC.money(l.price) + '</td><td class="r">' + EC.money(l.qty * l.price) + '</td></tr>';
+        }).join('');
+        var html = '<!doctype html><html><head><meta charset="utf-8"><title>Items given</title><style>'
+            + 'body{font-family:Arial,sans-serif;font-size:13px;color:#111;margin:16px;max-width:560px}'
+            + 'h1{font-size:17px;margin:0}.sub{color:#555;font-size:12px}'
+            + '.t{font-size:15px;font-weight:bold;margin:12px 0 6px;border-top:1px dashed #999;padding-top:8px}'
+            + 'table{width:100%;border-collapse:collapse;margin-top:6px}td,th{padding:5px 4px;border-bottom:1px solid #ddd;text-align:left}.r{text-align:right}'
+            + '.tot td{font-weight:bold;border-top:2px solid #111;border-bottom:0}'
+            + '.note{margin-top:10px;padding:8px;border:1px solid #999;font-size:12px}'
+            + '.sign{margin-top:36px;display:flex;justify-content:space-between;font-size:12px}'
+            + '</style></head><body>'
+            + '<h1>' + EC.esc(SCHOOL.name) + '</h1>' + (SCHOOL.address ? '<div class="sub">' + EC.esc(SCHOOL.address) + '</div>' : '')
+            + '<div class="t">Items given (books &amp; uniform)</div>'
+            + '<div><b>' + EC.esc(d.student) + '</b> · ' + EC.esc(d.admNo) + '</div>'
+            + '<div class="sub">' + EC.esc(d.cls) + ' · Session ' + EC.esc(d.year) + ' · ' + EC.esc(EC.date(EC.today())) + '</div>'
+            + '<table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead><tbody>' + rows
+            + '<tr class="tot"><td colspan="3">Total</td><td class="r">' + EC.money(d.total) + '</td></tr></tbody></table>'
+            + '<div class="note">This amount has been added to the child&rsquo;s fee account. Please pay at the school office; '
+            + 'the fee receipt is given when you pay. This slip is not a receipt.</div>'
+            + '<div class="sign"><span>Given by: ' + EC.esc(SCHOOL.givenBy) + '</span><span>Parent&rsquo;s signature: ____________</span></div>'
+            + '</body></html>';
+        // a hidden frame, not a pop-up window: phones and pop-up blockers allow it
+        var f = document.createElement('iframe');
+        f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+        document.body.appendChild(f);
+        f.contentDocument.open(); f.contentDocument.write(html); f.contentDocument.close();
+        setTimeout(function () {
+            f.contentWindow.focus(); f.contentWindow.print();
+            setTimeout(function () { f.remove(); }, 1000);
+        }, 300);
+    }
+    $('#ssDone').on('click', '#ssSlip', function () { if (lastSlip) printSlip(lastSlip); });
 
     /* ── 3. sales (this student's, or the latest of everyone) ── */
     function loadSales() {

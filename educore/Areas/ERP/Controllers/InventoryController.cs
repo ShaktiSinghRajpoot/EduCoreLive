@@ -464,6 +464,15 @@ namespace educore.Areas.ERP.Controllers
             catch { ViewBag.SessionStart = null; }
             ViewBag.Locations = (await _inventory.GetLocationsAsync(TenantId(), SchoolId(), UserId()))
                                 .Where(l => l.IsActive).ToList();
+            // for the "Items given" slip the parent takes home
+            try
+            {
+                var school = await settings.GetBasicProfileAsync(TenantId(), SchoolId(), UserId());
+                ViewBag.SchoolName    = school?.SchoolName ?? "";
+                ViewBag.SchoolAddress = string.Join(", ", new[] { school?.AddressLine1, school?.City, school?.State }
+                                                         .Where(p => !string.IsNullOrWhiteSpace(p)));
+            }
+            catch { ViewBag.SchoolName = ""; ViewBag.SchoolAddress = ""; }
             return View();
         }
 
