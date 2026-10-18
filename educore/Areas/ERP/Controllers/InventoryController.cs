@@ -464,8 +464,32 @@ namespace educore.Areas.ERP.Controllers
             catch { ViewBag.SessionStart = null; }
             ViewBag.Locations = (await _inventory.GetLocationsAsync(TenantId(), SchoolId(), UserId()))
                                 .Where(l => l.IsActive).ToList();
-            // for the "Items given" slip the parent takes home: the same letterhead and
-            // print format as a fee receipt (see FeeController.GetSchoolHeaderAsync)
+            await SetSlipHeaderAsync(settings);
+            return View();
+        }
+
+        // Sell by class (/ERP/Inventory/ClassSale): one class-section on screen, each child
+        // with ✓ for what they already have this session and a tick (or a size) for what is
+        // still to give. Ticked items are given child by child with the same Sell as above.
+        // The grid reads StoreRegister/Data (who has what) and SaleItems (price, stock).
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> ClassSale([FromServices] IBaseService baseService,
+                                                   [FromServices] ISchoolSettingsService settings)
+        {
+            try { ViewBag.ClassList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
+            catch { ViewBag.ClassList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+            try { ViewBag.YearList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }
+            catch { ViewBag.YearList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+            ViewBag.Locations = (await _inventory.GetLocationsAsync(TenantId(), SchoolId(), UserId()))
+                                .Where(l => l.IsActive).ToList();
+            await SetSlipHeaderAsync(settings);
+            return View();
+        }
+
+        // For the "Items given" slip the parent takes home: the same letterhead and
+        // print format as a fee receipt (see FeeController.GetSchoolHeaderAsync).
+        private async Task SetSlipHeaderAsync(ISchoolSettingsService settings)
+        {
             try
             {
                 var school = await settings.GetBasicProfileAsync(TenantId(), SchoolId(), UserId());
@@ -479,7 +503,6 @@ namespace educore.Areas.ERP.Controllers
                 ViewBag.ReceiptFormat = await settings.GetReceiptFormatAsync(TenantId(), SchoolId(), UserId());
             }
             catch { ViewBag.SchoolName = ""; ViewBag.SchoolAddress = ""; ViewBag.SchoolLogo = ""; ViewBag.ReceiptFormat = "A4"; }
-            return View();
         }
 
         // Find a child by name, admission no, father's name or mobile (this session's students).

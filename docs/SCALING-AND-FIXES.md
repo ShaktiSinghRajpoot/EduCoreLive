@@ -5819,3 +5819,9 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 ### 2026-10-18 — Student Items: "Items given" slip
 - After **Give items**, a **Print slip** button prints a small slip for the parent: school, child, class/session, date, items × qty × rate, total, "added to the fee account, pay at the office, this is not a receipt", given by + parent's signature.
 - Same day, reworked: the slip now opens in the **shared receipt modal** (`fee-receipt.js` `EcReceipt.showItemsGiven`, layout `renderItemsGiven`): the receipt's letterhead + logo, the school's receipt format (A4 / A5 / Thermal, switchable), a preview on screen, then Print. The page passes school name/address/logo and the format from `InventoryController.StudentSale` (store staff may not have `fees.view`, so it does not call `Fee/GetSchoolHeader`). No DB change.
+
+### 2026-10-19 — Student Items: "Sell by class"
+- New tab **Sell by class** (`Inventory/ClassSale`, inventory.manage): pick session / class / section (and store), search in the class, "only children with something pending". Each child shows ✓ (size, ×qty, unpaid) for what they have this session and a tick box (or a size drop-down for sized items) for what is still pending; a header tick ticks a column for everyone missing it.
+- The bar shows "N items for M children · ₹total"; stock is checked before giving. **Give** calls the existing `Inventory/Sell` once per child (qty 1 per item), then lists who got what with **Collect** and **Slip** (the same Items-given slip) buttons, and reloads the grid.
+- No DB change: the grid reads `StoreRegister/Data` (who has what) and `Inventory/SaleItems` (price, stock). Slip header code moved into `InventoryController.SetSlipHeaderAsync` for both pages.
+

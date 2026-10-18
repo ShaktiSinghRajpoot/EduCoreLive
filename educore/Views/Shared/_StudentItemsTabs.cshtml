@@ -1,10 +1,15 @@
 @model string
 @* Inventory › Student Items: the two pages a store person uses, as tabs.
-   Model: "give" (Inventory/StudentSale) or "register" (StoreRegister). *@
+   Model: "give" (Inventory/StudentSale), "class" (Inventory/ClassSale) or "register" (StoreRegister). *@
 <ul class="nav nav-pills mb-3 gap-2">
   <li class="nav-item">
     <a class="nav-link @(Model == "give" ? "active" : "")" href="@Url.Action("StudentSale", "Inventory", new { area = "ERP" })">
       <i class="bx bx-gift me-1"></i>Give items
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link @(Model == "class" ? "active" : "")" href="@Url.Action("ClassSale", "Inventory", new { area = "ERP" })">
+      <i class="bx bx-group me-1"></i>Sell by class
     </a>
   </li>
   <li class="nav-item">
