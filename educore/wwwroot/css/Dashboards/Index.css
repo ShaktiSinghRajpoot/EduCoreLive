@@ -355,3 +355,6 @@
 }
     .dash-empty i { font-size: 1.8rem; color: #16a34a; }
     .dash-empty small { font-size: .72rem; }
+
+/* a long line in a row never makes the card scroll sideways */
+.dash-scroll { overflow-x: hidden; }

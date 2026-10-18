@@ -223,7 +223,7 @@
                 <div class="dash-card h-100">
                     <div class="dash-card-head d-flex justify-content-between align-items-center gap-2">
                         <div><h5 class="dash-card-title">Upcoming</h5><small class="dash-sub">Next 30 days · events, exams and holidays</small></div>
-                        <a class="btn btn-sm btn-outline-primary" href="@Url.Action("SchoolCalendar", "SchoolSettings", new { area = "ERP" })">Calendar</a>
+                        <a class="btn btn-sm btn-outline-primary flex-shrink-0" style="width:auto" href="@Url.Action("SchoolCalendar", "SchoolSettings", new { area = "ERP" })">Calendar</a>
                     </div>
                     <div class="dash-card-body dash-scroll">
                         @foreach (var e in Model.Upcoming)
@@ -238,7 +238,7 @@
                             };
                             string kind = e.Type == "Meeting" ? "Staff meeting" : e.Type;
                             int days = (start - today).Days;
-                            string whenText = start <= today ? (end > today ? "On now · till " + end.ToString("dd MMM") : "Today")
+                            string whenText = start <= today ? (end > today ? "On now" : "Today")   // the range is already in the line
                                             : days == 1 ? "Tomorrow" : "In " + days + " days";
                             string detail = (end > start ? start.ToString("dd MMM") + " – " + end.ToString("dd MMM") + " · " : "")
                                           + (e.Time != null ? DateTime.Parse(e.Time).ToString("h:mm tt") + " · " : "")
