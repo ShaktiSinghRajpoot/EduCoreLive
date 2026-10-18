@@ -151,6 +151,66 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return await RunAsync(p, null);
         }
 
+        public async Task<StoreRegister> GetRegisterAsync(string academicYear, string className, string? section,
+                                                          int tenantId, int schoolId, int actionUserId)
+        {
+            var reg = new StoreRegister();
+            if (tenantId <= 1 || schoolId <= 0 || string.IsNullOrWhiteSpace(academicYear) || string.IsNullOrWhiteSpace(className))
+                return reg;
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_academic_year",  NpgsqlDbType.Varchar) { Value = academicYear.Trim() },
+                new("p_class",          NpgsqlDbType.Varchar) { Value = className.Trim() },
+                new("p_section",        NpgsqlDbType.Varchar) { Value = string.IsNullOrWhiteSpace(section) ? DBNull.Value : section.Trim() },
+                new("p_students", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "register_students" },
+                new("p_items",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "register_items" },
+                new("p_held",     NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "register_held" }
+            };
+
+            await _db.ExecuteCursorsAsync("core.sp_inventory_class_register", p,
+                async reader =>   // the children
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                        reg.Students.Add(new StoreRegisterStudent
+                        {
+                            StudentId   = DbRead.Int(reader, cols, "student_id"),
+                            StudentName = DbRead.Str(reader, cols, "student_name"),
+                            AdmissionNo = DbRead.NStr(reader, cols, "admission_no"),
+                            Section     = DbRead.NStr(reader, cols, "section"),
+                            RollNo      = DbRead.NStr(reader, cols, "roll_no")
+                        });
+                },
+                async reader =>   // the columns
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                        reg.Items.Add(new SaleItem
+                        {
+                            ItemId   = DbRead.Int(reader, cols, "item_id"),
+                            ItemName = DbRead.Str(reader, cols, "item_name"),
+                            Category = DbRead.Str(reader, cols, "category")
+                        });
+                },
+                async reader =>   // who holds what
+                {
+                    var cols = reader.Columns();
+                    while (await reader.ReadAsync())
+                        reg.Held.Add(new StoreRegisterHeld
+                        {
+                            StudentId = DbRead.Int(reader, cols, "student_id"),
+                            ItemId    = DbRead.Int(reader, cols, "item_id"),
+                            Quantity  = DbRead.Dec(reader, cols, "quantity"),
+                            Unpaid    = DbRead.Dec(reader, cols, "unpaid")
+                        });
+                });
+            return reg;
+        }
+
         // [{"itemId":5,"qty":2}, ...] -- the shape the proc reads with jsonb_to_recordset
         private static string ItemsJson(List<SaleLineInput>? items) =>
             JsonSerializer.Serialize((items ?? new List<SaleLineInput>())

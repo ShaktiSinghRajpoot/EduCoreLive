@@ -322,3 +322,82 @@ BEGIN
     RAISE EXCEPTION 'Unknown operation.';
 END;
 $procedure$;
+
+
+-- ============================================================================
+-- Books & Uniform Register: who in a class has which item (✓ / ✗).
+--
+--   p_academic_year, p_class, p_section  -> one class-section of one session
+--   cursor 1  the children (core.student_enrolment of that session), by roll
+--   cursor 2  the columns: the class set's items, plus anything a child of the
+--             class was sold that session
+--   cursor 3  what each child has: per item, quantity still held (sold minus
+--             returned) and how much of it is unpaid
+-- Who may see which class is decided by the app (store staff: any class; a
+-- class teacher: their own). Read-only.
+-- ============================================================================
+CREATE OR REPLACE PROCEDURE core.sp_inventory_class_register(
+    IN    p_tenant_id      integer,
+    IN    p_school_id      integer,
+    IN    p_action_user_id integer,
+    IN    p_academic_year  varchar,
+    IN    p_class          varchar,
+    IN    p_section        varchar DEFAULT NULL,
+    INOUT p_students       refcursor DEFAULT 'register_students'::refcursor,
+    INOUT p_items          refcursor DEFAULT 'register_items'::refcursor,
+    INOUT p_held           refcursor DEFAULT 'register_held'::refcursor)
+LANGUAGE plpgsql
+AS $procedure$
+BEGIN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
+        RAISE EXCEPTION 'Invalid school scope.';
+    END IF;
+
+    CREATE TEMP TABLE IF NOT EXISTS _reg_kids (student_id integer) ON COMMIT DROP;
+    TRUNCATE _reg_kids;
+    INSERT INTO _reg_kids
+    SELECT e.student_id
+      FROM core.student_enrolment e
+      JOIN core.students s ON s.student_id = e.student_id
+     WHERE e.tenant_id = p_tenant_id AND e.school_id = p_school_id
+       AND e.academic_year = p_academic_year AND e.class_name = p_class
+       AND (NULLIF(trim(p_section), '') IS NULL OR COALESCE(e.section, '') = trim(p_section))
+       AND COALESCE(e.status, '') NOT IN ('Left', 'PassedOut')
+       AND COALESCE(s.is_active, TRUE);
+
+    OPEN p_students FOR
+    SELECT s.student_id, s.student_name, s.admission_no, e.section,
+           COALESCE(NULLIF(trim(e.roll_no), ''), s.roll_no) AS roll_no
+      FROM _reg_kids k
+      JOIN core.students s ON s.student_id = k.student_id
+      JOIN core.student_enrolment e ON e.student_id = k.student_id AND e.academic_year = p_academic_year
+     ORDER BY e.section, NULLIF(regexp_replace(COALESCE(NULLIF(trim(e.roll_no), ''), s.roll_no, ''), '\D', '', 'g'), '')::int NULLS LAST,
+              s.student_name;
+
+    OPEN p_items FOR
+    SELECT i.item_id, i.item_name, COALESCE(NULLIF(trim(i.category), ''), 'Other') AS category
+      FROM core.inventory_items i
+     WHERE i.tenant_id = p_tenant_id AND i.school_id = p_school_id AND NOT i.is_deleted
+       AND (EXISTS (SELECT 1 FROM core.inventory_class_kits k
+                     WHERE k.tenant_id = p_tenant_id AND k.school_id = p_school_id
+                       AND k.class_name = p_class AND k.item_id = i.item_id AND k.quantity > 0)
+            OR EXISTS (SELECT 1 FROM core.inventory_student_sale_lines l
+                         JOIN core.inventory_student_sales sa ON sa.sale_id = l.sale_id
+                        WHERE l.item_id = i.item_id AND sa.academic_year = p_academic_year
+                          AND sa.student_id IN (SELECT student_id FROM _reg_kids)))
+     ORDER BY 3, i.item_name;
+
+    OPEN p_held FOR
+    SELECT sa.student_id, l.item_id,
+           SUM(l.quantity) AS quantity,
+           SUM(COALESCE(sl.amount_due - sl.amount_paid - sl.concession, 0)) AS unpaid
+      FROM core.inventory_student_sale_lines l
+      JOIN core.inventory_student_sales sa ON sa.sale_id = l.sale_id
+      LEFT JOIN core.student_ledger sl ON sl.ledger_id = l.ledger_id
+     WHERE sa.tenant_id = p_tenant_id AND sa.school_id = p_school_id
+       AND sa.academic_year = p_academic_year
+       AND l.returned_at IS NULL
+       AND sa.student_id IN (SELECT student_id FROM _reg_kids)
+     GROUP BY sa.student_id, l.item_id;
+END;
+$procedure$;

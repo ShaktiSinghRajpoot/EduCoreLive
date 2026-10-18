@@ -1,0 +1,216 @@
+@{
+    ViewData["Title"] = "Books & Uniform Register";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    bool storeStaff = ViewBag.StoreStaff == true;
+    var years = ViewBag.YearList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+    var classes = ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                  ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+    var mine = ViewBag.MyClasses as List<EduCoreDataAccessLayer.Models.ERP.MyClassSection>
+               ?? new List<EduCoreDataAccessLayer.Models.ERP.MyClassSection>();
+}
+
+@section PageStyles {
+<style>
+  .rg-wrap { overflow:auto; max-height:70vh; }
+  .rg-table { border-collapse:separate; border-spacing:0; min-width:100%; }
+  .rg-table th, .rg-table td { padding:.45rem .6rem; border-bottom:1px solid var(--bs-border-color); text-align:center; white-space:nowrap; }
+  .rg-table thead th { position:sticky; top:0; background:var(--bs-tertiary-bg); z-index:2; font-size:.75rem; }
+  .rg-table .rg-name { position:sticky; left:0; background:var(--bs-body-bg); text-align:left; z-index:1; }
+  .rg-table thead .rg-name { z-index:3; background:var(--bs-tertiary-bg); }
+  .rg-table tfoot td { position:sticky; bottom:0; background:var(--bs-tertiary-bg); font-weight:800; font-size:.75rem; }
+  .rg-yes { color:#16a34a; font-weight:900; font-size:1.05rem; }
+  .rg-no  { color:#dc2626; font-weight:900; font-size:1.05rem; }
+  .rg-sub { display:block; font-size:.62rem; color:var(--bs-secondary-color); line-height:1.1; }
+  .rg-unpaid { display:block; font-size:.6rem; color:#dc2626; font-weight:700; }
+  @@media print {
+    .layout-menu, .layout-navbar, .rg-filters, .content-footer, .footer { display:none !important; }
+    .rg-wrap { max-height:none; overflow:visible; }
+    .layout-page { padding:0 !important; }
+  }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-check-square fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Books &amp; Uniform Register</h4>
+            <div class="ec-page-subtitle" id="rgSubtitle">Who in the class has each item this session: ✓ has it, ✗ not yet</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ec-card mb-3 rg-filters"><div class="ec-card-body d-flex flex-wrap gap-2 align-items-end">
+      @if (storeStaff)
+      {
+          <div>
+            <label class="form-label mb-1">Session</label>
+            <select id="rgYear" class="form-select form-select-sm">
+              @foreach (var y in years)
+              {
+                  <option value="@y.Text" selected="@y.Selected">@y.Text</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="form-label mb-1">Class</label>
+            <select id="rgClass" class="form-select form-select-sm">
+              <option value="">Choose class</option>
+              @foreach (var c in classes)
+              {
+                  <option value="@c.Text">@c.Text</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label class="form-label mb-1">Section</label>
+            <select id="rgSec" class="form-select form-select-sm"><option value="">All sections</option></select>
+          </div>
+      }
+      else if (mine.Any())
+      {
+          <div>
+            <label class="form-label mb-1">Your class</label>
+            <select id="rgMine" class="form-select form-select-sm">
+              @foreach (var m in mine)
+              {
+                  <option value="@m.SessionName|@m.ClassName|@m.SectionName">@m.ClassName@(string.IsNullOrEmpty(m.SectionName) ? "" : " – " + m.SectionName) (@m.SessionName)</option>
+              }
+            </select>
+          </div>
+      }
+      <div class="form-check ms-1 mb-1">
+        <input class="form-check-input" type="checkbox" id="rgMissing">
+        <label class="form-check-label small" for="rgMissing">Only children missing something</label>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" onclick="window.print()"><i class="bx bx-printer me-1"></i>Print</button>
+    </div></div>
+
+    @if (!storeStaff && !mine.Any())
+    {
+        <div class="ec-card"><div class="ec-card-body text-muted">You are not the class teacher of any class this session, so there is no register to show.</div></div>
+    }
+    else
+    {
+        <div class="ec-card"><div class="ec-card-body p-0">
+          <div id="rgBody" class="p-3 text-muted small">@(storeStaff ? "Choose a class." : "Loading…")</div>
+        </div></div>
+    }
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    var DATA_URL = '@Url.Action("Data", "StoreRegister", new { area = "ERP" })';
+    var SEC_URL  = '@Url.Action("PromotionSections", "Student", new { area = "ERP" })';
+    var data = null;
+
+    // "Shirt - 28" and "Shirt - 30" are one column "Shirt" (each uniform size is its own
+    // item); the part after the last " - " is shown under the tick.
+    function baseName(n) { var m = n.match(/^(.*\S)\s+-\s+([^-]+)$/); return m ? m[1] : n; }
+    function variant(n)  { var m = n.match(/^(.*\S)\s+-\s+([^-]+)$/); return m ? m[2] : ''; }
+
+    function pick() {
+        var mine = $('#rgMine').val();
+        if (mine) { var p = mine.split('|'); return { year: p[0], cls: p[1], sec: p[2] || '' }; }
+        return { year: $('#rgYear').val(), cls: $('#rgClass').val(), sec: $('#rgSec').val() || '' };
+    }
+
+    function load() {
+        var q = pick();
+        if (!q.year || !q.cls) { $('#rgBody').html('Choose a class.'); return; }
+        $('#rgBody').html('Loading…');
+        $.getJSON(DATA_URL, q).done(function (r) {
+            if (!r || !r.success) { $('#rgBody').html(''); ecToast('error', (r && r.message) || 'Could not load the register.'); return; }
+            data = r;
+            $('#rgSubtitle').text(q.cls + (q.sec ? ' – ' + q.sec : '') + ' · ' + q.year + ': ✓ has it, ✗ not yet');
+            render();
+        }).fail(function () { ecToast('error', 'Could not load the register.'); });
+    }
+
+    function render() {
+        if (!data.students.length) { $('#rgBody').html('No children in this class for that session.'); return; }
+        if (!data.items.length) {
+            $('#rgBody').html('Nothing to show yet: this class has no set (Inventory › Books &amp; Uniform Sale › Class sets) and nobody in it has been given anything this session.');
+            return;
+        }
+
+        // columns: one per base name, in the order the server sent (category, name)
+        var cols = [], byBase = {}, itemCol = {};
+        data.items.forEach(function (i) {
+            var b = baseName(i.name);
+            if (!byBase[b]) { byBase[b] = { name: b, category: i.category, items: [] }; cols.push(byBase[b]); }
+            byBase[b].items.push(i.id);
+            itemCol[i.id] = byBase[b];
+        });
+
+        // what each child holds, per item
+        var held = {};
+        data.held.forEach(function (h) { (held[h.s] = held[h.s] || {})[h.i] = h; });
+        var nameOf = {};
+        data.items.forEach(function (i) { nameOf[i.id] = i.name; });
+
+        var onlyMissing = $('#rgMissing').is(':checked');
+        var count = cols.map(function () { return 0; });
+        var shown = 0;
+        var rows = data.students.map(function (s) {
+            var mine = held[s.id] || {}, missing = 0;
+            var cells = cols.map(function (c, ci) {
+                var got = c.items.filter(function (id) { return mine[id] && mine[id].qty > 0; });
+                if (!got.length) { missing++; return '<td><span class="rg-no">✗</span></td>'; }
+                count[ci]++;
+                var sub = got.map(function (id) {
+                    var v = variant(nameOf[id]), q = mine[id].qty;
+                    return (v ? v : '') + (q !== 1 ? (v ? ' ' : '') + '×' + EC.num(q) : '');
+                }).filter(Boolean).join(', ');
+                var unpaid = got.reduce(function (t, id) { return t + (mine[id].unpaid || 0); }, 0);
+                return '<td><span class="rg-yes">✓</span>' + (sub ? '<span class="rg-sub">' + EC.esc(sub) + '</span>' : '')
+                     + (unpaid > 0 ? '<span class="rg-unpaid">unpaid ' + EC.money(unpaid) + '</span>' : '') + '</td>';
+            });
+            if (onlyMissing && !missing) return '';
+            shown++;
+            return '<tr><td class="rg-name"><div class="fw-semibold">' + EC.esc(s.name) + '</div>'
+                 + '<div class="small text-muted">' + (s.roll ? 'Roll ' + EC.esc(s.roll) + ' · ' : '') + EC.esc(s.admNo) + (s.sec ? ' · ' + EC.esc(s.sec) : '') + '</div></td>'
+                 + cells.join('')
+                 + '<td>' + (missing ? '<span class="badge bg-label-danger">' + missing + ' missing</span>' : '<span class="badge bg-label-success">All</span>') + '</td></tr>';
+        }).join('');
+
+        var head = '<tr><th class="rg-name">Student</th>' + cols.map(function (c) {
+            return '<th>' + EC.esc(c.name) + '<span class="rg-sub">' + EC.esc(c.category) + '</span></th>';
+        }).join('') + '<th></th></tr>';
+        var foot = '<tr><td class="rg-name">Have it (of ' + data.students.length + ')</td>'
+                 + count.map(function (n) { return '<td>' + n + '/' + data.students.length + '</td>'; }).join('') + '<td></td></tr>';
+
+        $('#rgBody').html('<div class="rg-wrap"><table class="rg-table"><thead>' + head + '</thead><tbody>'
+            + (shown ? rows : '<tr><td class="rg-name text-muted" colspan="' + (cols.length + 2) + '">Every child has everything.</td></tr>')
+            + '</tbody><tfoot>' + foot + '</tfoot></table></div>');
+    }
+
+    function loadSections() {
+        var cls = $('#rgClass').val();
+        $('#rgSec').html('<option value="">All sections</option>');
+        if (!cls) { load(); return; }
+        $.getJSON(SEC_URL, { 'class': cls, year: $('#rgYear').val() }).done(function (list) {
+            (list || []).forEach(function (name) {   // section names
+                $('#rgSec').append('<option value="' + EC.esc(name) + '">' + EC.esc(name) + '</option>');
+            });
+        }).always(load);
+    }
+
+    $('#rgClass, #rgYear').on('change', loadSections);
+    $('#rgSec, #rgMine').on('change', load);
+    $('#rgMissing').on('change', function () { if (data) render(); });
+
+    if ($('#rgMine').length) load();
+});
+</script>
+}

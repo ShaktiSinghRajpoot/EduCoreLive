@@ -5710,3 +5710,14 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - On screen (QA school, real data): supplier → purchase (10 @ ₹200, stock 19 → 29) → issue / damage / over-issue refused
   / stock-take → transfer to Science Lab → sale from the Science Lab → supplier return 2 (over-return refused) → bill
   cancel (only the 8 not returned come out) → minimum stock → Low Stock. Stock by location and value checked by hand.
+
+### 2026-10-18 — Books & Uniform Register (✓ / ✗ per child)
+- `/ERP/StoreRegister` (`StoreRegisterController`, Inventory module). It shows a class-section's children (enrolment of the
+  session, by roll) down the side and the store's items across the top: the class set's items plus anything a child of the
+  class was given that session. Each cell is ✓ (held this session, not returned) or ✗. Sizes are separate items, so
+  "Shirt - 28" / "Shirt - 30" share one "Shirt" column, with the size under the tick. There is a "missing" count per
+  child, "have it n/N" per column, a "only children missing something" filter, and Print. Unpaid amounts show only with
+  `fees.view`.
+- Store staff (`inventory.view`) pick any session/class/section (menu: Inventory). Anyone else sees only the sections
+  they are class teacher of this session (menu: Students). `Data` refuses another class.
+- `core.sp_inventory_class_register` (in `inventory_student_sale.sql`, bundle `deploy_2026_10_18c.sql`), 3 cursors.

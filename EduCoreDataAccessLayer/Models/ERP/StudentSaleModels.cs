@@ -37,6 +37,31 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal Qty    { get; set; }
     }
 
+    /// <summary>Books & Uniform Register: a class's children, the item columns, and who holds what.</summary>
+    public class StoreRegister
+    {
+        public List<StoreRegisterStudent> Students { get; set; } = new();
+        public List<SaleItem>             Items    { get; set; } = new();   // only ItemId / ItemName / Category filled
+        public List<StoreRegisterHeld>    Held     { get; set; } = new();
+    }
+
+    public class StoreRegisterStudent
+    {
+        public int     StudentId   { get; set; }
+        public string  StudentName { get; set; } = string.Empty;
+        public string? AdmissionNo { get; set; }
+        public string? Section     { get; set; }
+        public string? RollNo      { get; set; }
+    }
+
+    public class StoreRegisterHeld
+    {
+        public int     StudentId { get; set; }
+        public int     ItemId    { get; set; }
+        public decimal Quantity  { get; set; }   // sold minus returned, this session
+        public decimal Unpaid    { get; set; }
+    }
+
     /// <summary>One line of a sale, for the sales list (paid or not, returned or not).</summary>
     public class StudentSaleRow
     {
