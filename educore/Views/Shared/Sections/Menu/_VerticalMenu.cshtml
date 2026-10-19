@@ -253,8 +253,8 @@
         @if (hasStaffRecord)
         {
         @* attendance is not part of the Payroll module: anyone with a staff record *@
-        <li class='menu-item @On("MyAttendance")'>
-            <a asp-area="ERP" asp-controller="MyAttendance" asp-action="Index" class="menu-link">
+        <li class='menu-item @On("/my-attendance")'>
+            <a asp-area="Staff" asp-controller="MyAttendance" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-user-check ic-hr"></i>
                 <div class="text-truncate">My Attendance</div>
             </a>
@@ -262,14 +262,14 @@
         }
         @if (gMyStaff)
         {
-        <li class='menu-item @On("MyLeave")'>
-            <a asp-area="ERP" asp-controller="MyLeave" asp-action="Index" class="menu-link">
+        <li class='menu-item @On("/my-leave")'>
+            <a asp-area="Staff" asp-controller="MyLeave" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-calendar-minus ic-hr"></i>
                 <div class="text-truncate">My Leave</div>
             </a>
         </li>
-        <li class='menu-item @On("MyPayslip")'>
-            <a asp-area="ERP" asp-controller="MyPayslip" asp-action="Index" class="menu-link">
+        <li class='menu-item @On("/my-payslip")'>
+            <a asp-area="Staff" asp-controller="MyPayslip" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-receipt ic-hr"></i>
                 <div class="text-truncate">My Payslip</div>
             </a>
@@ -407,7 +407,7 @@
 
         @if (gDayClose)
         {
-        <li class='menu-item @Open("/fees")'>
+        <li class='menu-item @(IsActive("/fees") && !IsActive("/fees/heads") && !IsActive("/fees/structure") && !IsActive("/fees/feesetup") ? "active open" : "")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-wallet ic-fees"></i>
                 <div class="text-truncate">Fees</div>
@@ -432,14 +432,14 @@
 
         @if (gExpenses)
         {
-        <li class='menu-item @Open("ERP/Expense")'>
+        <li class='menu-item @Open("/accounts")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-book-open ic-fees"></i>
                 <div class="text-truncate">Expenses &amp; Cash Book</div>
             </a>
             <ul class="menu-sub">
-                <li class='menu-item @(IsActive("ERP/Expense") && !IsActive("CashBook") ? "active" : "")'><a asp-area="ERP" asp-controller="Expense" asp-action="Index" class="menu-link"><i class="bx bx-receipt submenu-icon c-red"></i><div class="text-truncate">Expenses</div></a></li>
-                <li class='menu-item @On("CashBook")'><a asp-area="ERP" asp-controller="Expense" asp-action="CashBook" class="menu-link"><i class="bx bx-book-open submenu-icon c-teal"></i><div class="text-truncate">Cash Book</div></a></li>
+                <li class='menu-item @On("/accounts/expenses")'><a asp-area="Accounts" asp-controller="Expense" asp-action="Index" class="menu-link"><i class="bx bx-receipt submenu-icon c-red"></i><div class="text-truncate">Expenses</div></a></li>
+                <li class='menu-item @On("/accounts/cash-book")'><a asp-area="Accounts" asp-controller="Expense" asp-action="CashBook" class="menu-link"><i class="bx bx-book-open submenu-icon c-teal"></i><div class="text-truncate">Cash Book</div></a></li>
             </ul>
         </li>
         }
@@ -452,7 +452,7 @@
 
         @if (gStaff)
         {
-        <li class='menu-item @Open("StaffList","AddStaff","EditStaff","StaffProfile","Staff/Inactive","LeaveManagement","PayrollManagement","StaffAttendance")'>
+        <li class='menu-item @(IsActive("/staff") && !IsActive("/staff/departments") ? "active open" : "")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-group ic-hr"></i>
                 <div class="text-truncate">Staff</div>
@@ -460,17 +460,17 @@
             <ul class="menu-sub">
                 @if (gStaffDir)
                 {
-                <li class='menu-item @On("StaffList")'><a asp-area="ERP" asp-controller="Staff" asp-action="StaffList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Staff Directory</div></a></li>
-                <li class='menu-item @On("Staff/Inactive")'><a asp-area="ERP" asp-controller="Staff" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive Staff</div></a></li>
-                <li class='menu-item @On("StaffAttendance")'><a asp-area="ERP" asp-controller="StaffAttendance" asp-action="Index" class="menu-link"><i class="bx bx-user-check submenu-icon c-green"></i><div class="text-truncate">Staff Attendance</div></a></li>
+                <li class='menu-item @(string.Equals(currentPage.TrimEnd('/'), "/staff", StringComparison.OrdinalIgnoreCase) || IsActive("/staff/profile") || IsActive("/staff/add") || IsActive("/staff/edit") ? "active" : "")'><a asp-area="Staff" asp-controller="Staff" asp-action="StaffList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Staff Directory</div></a></li>
+                <li class='menu-item @On("/staff/inactive")'><a asp-area="Staff" asp-controller="Staff" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive Staff</div></a></li>
+                <li class='menu-item @On("/staff/attendance")'><a asp-area="Staff" asp-controller="StaffAttendance" asp-action="Index" class="menu-link"><i class="bx bx-user-check submenu-icon c-green"></i><div class="text-truncate">Staff Attendance</div></a></li>
                 }
                 @if (showPayroll && gStaffDir)
                 {
-                <li class='menu-item @On("LeaveManagement")'><a asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement" class="menu-link"><i class="bx bx-calendar-minus submenu-icon c-pink"></i><div class="text-truncate">Leave Management</div></a></li>
+                <li class='menu-item @On("/staff/leave")'><a asp-area="Staff" asp-controller="Leave" asp-action="LeaveManagement" class="menu-link"><i class="bx bx-calendar-minus submenu-icon c-pink"></i><div class="text-truncate">Leave Management</div></a></li>
                 }
                 @if (gPayroll)
                 {
-                <li class='menu-item @On("PayrollManagement")'><a asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Payroll &amp; Salary</div></a></li>
+                <li class='menu-item @On("/staff/payroll")'><a asp-area="Staff" asp-controller="Payroll" asp-action="PayrollManagement" class="menu-link"><i class="bx bx-money submenu-icon c-green"></i><div class="text-truncate">Payroll &amp; Salary</div></a></li>
                 }
             </ul>
         </li>
@@ -595,7 +595,7 @@
         @* ---- Users & access ---- *@
         @if (gSetupUsers)
         {
-        <li class='menu-item @Open("Roles","StaffMasters")'>
+        <li class='menu-item @Open("Roles","/staff/departments")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-circle ic-settings"></i>
                 <div class="text-truncate">Users &amp; Access</div>
@@ -607,7 +607,7 @@
                 }
                 @if (Can("staff.view"))
                 {
-                <li class='menu-item @On("StaffMasters")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="StaffMasters" class="menu-link"><i class="bx bx-sitemap submenu-icon c-purple"></i><div class="text-truncate">Departments &amp; Designations</div></a></li>
+                <li class='menu-item @On("/staff/departments")'><a asp-area="Staff" asp-controller="StaffMasters" asp-action="StaffMasters" class="menu-link"><i class="bx bx-sitemap submenu-icon c-purple"></i><div class="text-truncate">Departments &amp; Designations</div></a></li>
                 }
             </ul>
         </li>

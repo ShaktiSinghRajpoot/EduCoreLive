@@ -3,9 +3,9 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Staff.Controllers
 {
-    [Area("ERP")]
+    [Area("Staff")]
     [HasPermission("staff.view")]
     [RequiresModule(SchoolModule.Payroll)]
     public class LeaveController : Controller
@@ -23,6 +23,7 @@ namespace educore.Areas.ERP.Controllers
         private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
         private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
+        [Route("staff/leave")]
         public async Task<IActionResult> LeaveManagement()
         {
             // Everyone still employed: Active AND "On Leave" (long leave such as

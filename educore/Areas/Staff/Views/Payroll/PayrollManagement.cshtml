@@ -214,13 +214,13 @@
 <script>
 $(document).ready(function () {
 
-    var LIST_URL  = '@Url.Action("List","Payroll",new{area="ERP"})';
-    var RUN_URL   = '@Url.Action("RunPayroll","Payroll",new{area="ERP"})';
-    var PAID_URL  = '@Url.Action("MarkPaid","Payroll",new{area="ERP"})';
-    var HIST_URL  = '@Url.Action("History","Payroll",new{area="ERP"})';
-    var ADJ_URL   = '@Url.Action("Adjustments","Payroll",new{area="ERP"})';
-    var ADD_URL   = '@Url.Action("AddAdjustment","Payroll",new{area="ERP"})';
-    var VOID_URL  = '@Url.Action("VoidAdjustment","Payroll",new{area="ERP"})';
+    var LIST_URL  = '@Url.Action("List","Payroll",new{area="Staff"})';
+    var RUN_URL   = '@Url.Action("RunPayroll","Payroll",new{area="Staff"})';
+    var PAID_URL  = '@Url.Action("MarkPaid","Payroll",new{area="Staff"})';
+    var HIST_URL  = '@Url.Action("History","Payroll",new{area="Staff"})';
+    var ADJ_URL   = '@Url.Action("Adjustments","Payroll",new{area="Staff"})';
+    var ADD_URL   = '@Url.Action("AddAdjustment","Payroll",new{area="Staff"})';
+    var VOID_URL  = '@Url.Action("VoidAdjustment","Payroll",new{area="Staff"})';
     function token(){ return $('input[name="__RequestVerificationToken"]').first().val(); }
     function period(){ var v=($('#fMonth').val()||'').split('-'); return { year:+v[0], month:+v[1] }; }
     function ini(n){ return (n||'').split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase(); }

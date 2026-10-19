@@ -173,9 +173,9 @@ namespace educore.Controllers
                 ("Fees",       "bx-wallet",          "/fees/collect",                      "#0284c7", "fees.view",       fees),
                 ("Attendance", "bx-user-check",      "/ERP/Attendance/StudentAttendance",  "#d97706", "attendance.view", attendance),
                 ("Exams",      "bx-file",            "/ERP/Exam/CreateExam",               "#dc2626", "exams.view",      exams),
-                ("Staff",      "bx-id-card",         "/ERP/Staff/StaffList",               "#9333ea", "staff.view",      true),
-                ("Payroll",    "bx-money",           "/ERP/Payroll/PayrollManagement",     "#16a34a", "payroll.view",    payroll),
-                ("Leave",      "bx-calendar-minus",  "/ERP/Leave/LeaveManagement",         "#e83e8c", "staff.view",      payroll),
+                ("Staff",      "bx-id-card",         "/staff",                             "#9333ea", "staff.view",      true),
+                ("Payroll",    "bx-money",           "/staff/payroll",                     "#16a34a", "payroll.view",    payroll),
+                ("Leave",      "bx-calendar-minus",  "/staff/leave",                       "#e83e8c", "staff.view",      payroll),
                 ("Inventory",  "bx-package",         "/inventory/store",                   "#ff5722", "inventory.view",  inventory),
                 ("Transport",  "bx-bus",             "/transport/live",                    "#0ea5e9", "transport.view",  transport),
                 ("Reminders",  "bx-bell",            "/fees/dues",                         "#ff8a00", "fees.view",       fees),
@@ -192,12 +192,12 @@ namespace educore.Controllers
             bool hasStaff = false;
             try { hasStaff = await _self.HasStaffRecordAsync(t, s, u); } catch { hasStaff = false; }
             if (hasStaff)
-                links.Add(new DashboardLink { Label = "My Attendance", Icon = "bx-user-check", Url = "/ERP/MyAttendance", Color = "#0f766e" });
+                links.Add(new DashboardLink { Label = "My Attendance", Icon = "bx-user-check", Url = "/my-attendance", Color = "#0f766e" });
             bool isStaff = payroll && hasStaff;
             if (isStaff)
             {
-                links.Add(new DashboardLink { Label = "My Leave",   Icon = "bx-calendar-minus", Url = "/ERP/MyLeave",   Color = "#e83e8c" });
-                links.Add(new DashboardLink { Label = "My Payslip", Icon = "bx-receipt",        Url = "/ERP/MyPayslip", Color = "#16a34a" });
+                links.Add(new DashboardLink { Label = "My Leave",   Icon = "bx-calendar-minus", Url = "/my-leave",   Color = "#e83e8c" });
+                links.Add(new DashboardLink { Label = "My Payslip", Icon = "bx-receipt",        Url = "/my-payslip", Color = "#16a34a" });
             }
             foreach (var l in all)
                 if (l.On && await Can(l.Key))

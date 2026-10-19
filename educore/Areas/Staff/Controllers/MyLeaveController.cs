@@ -3,10 +3,10 @@ using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Staff.Controllers
 {
     /// <summary>
-    /// "My Leave" (/ERP/MyLeave) -- a member of staff's own leave balance and
+    /// "My Leave" (/my-leave) -- a member of staff's own leave balance and
     /// requests, and applying / cancelling for themselves.
     ///
     /// No permission key on purpose: having a staff record (staff.user_id = this
@@ -19,7 +19,7 @@ namespace educore.Areas.ERP.Controllers
     /// The switch is checked here rather than with [RequiresModule], which
     /// redirects to a settings page a teacher cannot open.
     /// </summary>
-    [Area("ERP")]
+    [Area("Staff")]
     [Authorize(Policy = "SchoolUserOnly")]
     public class MyLeaveController : Controller
     {
@@ -32,7 +32,7 @@ namespace educore.Areas.ERP.Controllers
             _workflow = workflow;
         }
 
-        [HttpGet]
+        [HttpGet("my-leave")]
         public async Task<IActionResult> Index()
         {
             ViewBag.ModuleOff = !await PayrollOnAsync();

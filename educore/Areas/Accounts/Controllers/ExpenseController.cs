@@ -4,14 +4,15 @@ using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Accounts.Controllers
 {
     /// <summary>
-    /// Finance › Expenses (/ERP/Expense) and Finance › Cash Book (/ERP/Expense/CashBook).
+    /// Finance › Expenses (/accounts/expenses) and Finance › Cash Book (/accounts/cash-book).
     /// Seeing them needs expenses.view; adding / cancelling an expense, the categories
     /// and the opening balance need expenses.manage. See expense_cashbook.sql.
     /// </summary>
-    [Area("ERP")]
+    [Area("Accounts")]
+    [RequiresModule(SchoolModule.Accounts)]
     [HasPermission("expenses.view")]
     public class ExpenseController : Controller
     {
@@ -22,6 +23,7 @@ namespace educore.Areas.ERP.Controllers
             _expenses = expenses;
         }
 
+        [Route("accounts/expenses")]
         public async Task<IActionResult> Index()
         {
             ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "expenses.manage");
@@ -29,6 +31,7 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
+        [Route("accounts/cash-book")]
         public async Task<IActionResult> CashBook([FromServices] ISchoolSettingsService settings)
         {
             ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "expenses.manage");

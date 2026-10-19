@@ -4,10 +4,10 @@ using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Staff.Controllers
 {
     /// <summary>
-    /// "My Payslip" (/ERP/MyPayslip) -- a member of staff's own payslips, and a
+    /// "My Payslip" (/my-payslip) -- a member of staff's own payslips, and a
     /// printable view of one.
     ///
     /// No permission key on purpose (same as My Bus / My Leave): the procedure
@@ -16,7 +16,7 @@ namespace educore.Areas.ERP.Controllers
     /// nothing, which this controller shows as "not found". The payment reference
     /// and who paid are never loaded here; the mode and date are.
     /// </summary>
-    [Area("ERP")]
+    [Area("Staff")]
     [Authorize(Policy = "SchoolUserOnly")]
     public class MyPayslipController : Controller
     {
@@ -29,7 +29,7 @@ namespace educore.Areas.ERP.Controllers
             _workflow = workflow;
         }
 
-        [HttpGet]
+        [HttpGet("my-payslip")]
         public async Task<IActionResult> Index()
         {
             ViewBag.ModuleOff = !await PayrollOnAsync();

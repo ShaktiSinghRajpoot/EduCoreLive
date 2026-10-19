@@ -33,7 +33,7 @@
             {
                 <button type="button" class="btn btn-outline-primary text-nowrap" id="btnCats"><i class="bx bx-category me-1"></i>Categories</button>
             }
-            <a class="btn btn-outline-secondary text-nowrap" href="@Url.Action("CashBook", "Expense", new { area = "ERP" })"><i class="bx bx-book-open me-1"></i>Cash Book</a>
+            <a class="btn btn-outline-secondary text-nowrap" href="@Url.Action("CashBook", "Expense", new { area = "Accounts" })"><i class="bx bx-book-open me-1"></i>Cash Book</a>
           </div>
         </div>
       </div>
@@ -117,12 +117,12 @@
 <script>
 $(function () {
     var URL = {
-        cats:   '@Url.Action("Categories", "Expense", new { area = "ERP" })',
-        catSave:'@Url.Action("SaveCategory", "Expense", new { area = "ERP" })',
-        catAct: '@Url.Action("SetCategoryActive", "Expense", new { area = "ERP" })',
-        list:   '@Url.Action("List", "Expense", new { area = "ERP" })',
-        save:   '@Url.Action("Save", "Expense", new { area = "ERP" })',
-        cancel: '@Url.Action("Cancel", "Expense", new { area = "ERP" })'
+        cats:   '@Url.Action("Categories", "Expense", new { area = "Accounts" })',
+        catSave:'@Url.Action("SaveCategory", "Expense", new { area = "Accounts" })',
+        catAct: '@Url.Action("SetCategoryActive", "Expense", new { area = "Accounts" })',
+        list:   '@Url.Action("List", "Expense", new { area = "Accounts" })',
+        save:   '@Url.Action("Save", "Expense", new { area = "Accounts" })',
+        cancel: '@Url.Action("Cancel", "Expense", new { area = "Accounts" })'
     };
     var CAN_MANAGE = @(canManage ? "true" : "false");
     var cats = [];

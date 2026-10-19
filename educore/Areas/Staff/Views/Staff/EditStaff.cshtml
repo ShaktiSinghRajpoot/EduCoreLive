@@ -1,4 +1,4 @@
-﻿@inject educore.Helpers.ModuleFlags Modules
+@inject educore.Helpers.ModuleFlags Modules
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model EduCoreDataAccessLayer.Models.StaffModel
 @{
@@ -23,16 +23,16 @@
           </div>
           <div>
             <div class="es-breadcrumb">
-              <a asp-area="ERP" asp-controller="Staff" asp-action="StaffList">All Staff</a>
+              <a asp-area="Staff" asp-controller="Staff" asp-action="StaffList">All Staff</a>
               <i class="bx bx-chevron-right"></i>
-              <a asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">Profile</a>
+              <a asp-area="Staff" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">Profile</a>
               <i class="bx bx-chevron-right"></i><span>Edit</span>
             </div>
             <h4 class="ec-page-title mb-0">Edit Staff Member</h4>
           </div>
         </div>
         <a class="btn btn-outline-secondary d-flex align-items-center gap-1"
-           asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">
+           asp-area="Staff" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">
           <i class="bx bx-arrow-back"></i><span>Back</span>
         </a>
       </div>
@@ -40,7 +40,7 @@
 
     <div asp-validation-summary="All" class="alert alert-danger" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
 
-    <form asp-area="ERP" asp-controller="Staff" asp-action="EditStaff" method="post" novalidate>
+    <form asp-area="Staff" asp-controller="Staff" asp-action="EditStaff" method="post" novalidate>
       @Html.AntiForgeryToken()
       @* No hidden "id" here: the action's id is the public uuid from the URL. A
          hidden int id used to win model binding (form fields bind before route
@@ -281,7 +281,7 @@
       }
 
       <div class="es-sticky">
-        <a class="btn btn-outline-secondary px-4" asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">Cancel</a>
+        <a class="btn btn-outline-secondary px-4" asp-area="Staff" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">Cancel</a>
         <button type="submit" class="btn btn-primary px-4"><i class="bx bx-check me-1"></i>Save Changes</button>
       </div>
 
@@ -306,7 +306,7 @@
         });
 
         function BindDesignations(dept, keep) {
-            var url = '@Url.Action("GetDesignations", "Staff", new { area = "ERP" })';
+            var url = '@Url.Action("GetDesignations", "Staff", new { area = "Staff" })';
             $.post(url, { department: dept }, function (data) {
                 var found = false;
                 $.each(data, function (i, item) {

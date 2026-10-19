@@ -1,4 +1,4 @@
-﻿using EduCoreDataAccessLayer.Helpers;
+using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models;
 using EduCoreDataAccessLayer.Services;
@@ -7,9 +7,9 @@ using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Staff.Controllers
 {
-    [Area("ERP")]
+    [Area("Staff")]
     [HasPermission("staff.view")]
     public class StaffController : Controller
     {
@@ -40,11 +40,12 @@ namespace educore.Areas.ERP.Controllers
             SessionValidator.Forget(_cache, TenantId(), SchoolId(), uid);
         }
 
-        // ── GET: /ERP/Staff/StaffList ────────────────────────────
+        // ── GET: /staff ────────────────────────────
         // One StaffListItem does it all: bound filters/sort/page in via the query
         // string; the service fills Items + TotalCount. Tenant/school/user come
         // from CLAIMS only (never model-bound). Filter dropdowns are sourced from
         // the staff masters (not the current page) so they stay complete.
+        [Route("staff")]
         public async Task<IActionResult> StaffList(StaffListItem query)
         {
             var dd = await _staffService.GetDropdownsAsync(TenantId(), SchoolId());
@@ -60,8 +61,9 @@ namespace educore.Areas.ERP.Controllers
             return View(query);
         }
 
-        // ── GET: /ERP/Staff/Inactive ─────────────────────────────
+        // ── GET: /staff/inactive ─────────────────────────────
         // Same fat-model list pattern as StaffList, but pinned to status=Inactive.
+        [Route("staff/inactive")]
         public async Task<IActionResult> Inactive(StaffListItem query)
         {
             query.FilterStatus = "Inactive";   // this page only ever shows inactive staff
@@ -112,7 +114,8 @@ namespace educore.Areas.ERP.Controllers
             return RedirectToAction("StaffList");
         }
 
-        // ── GET: /ERP/Staff/AddStaff ─────────────────────────────
+        // ── GET: /staff/add ─────────────────────────────
+        [HttpGet("staff/add")]
         public async Task<IActionResult> AddStaff()
         {
             var model = new StaffModel();
@@ -120,7 +123,7 @@ namespace educore.Areas.ERP.Controllers
             return View(model);
         }
 
-        [HttpPost]
+        [HttpPost("staff/add")]
         [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddStaff(StaffModel model)
@@ -147,10 +150,11 @@ namespace educore.Areas.ERP.Controllers
             return await RedirectToProfileAsync(id);
         }
 
-        // ── GET: /ERP/Staff/StaffProfile/{publicId} ──────────────
+        // ── GET: /staff/profile/{publicId} ──────────────
         // The URL carries the uuid; ResolveStaffIdAsync turns it into the internal id and
         // enforces the tenant/school check while doing so. An unknown uuid and another
         // school's uuid both come back as 0, so this cannot be used to probe for real ids.
+        [Route("staff/profile/{id?}")]
         public async Task<IActionResult> StaffProfile(Guid id, [FromServices] ModuleFlags modules,
                                                       [FromServices] IClassTeacherService classTeacher)
         {
@@ -207,7 +211,8 @@ namespace educore.Areas.ERP.Controllers
             return Json(list);
         }
 
-        // ── GET: /ERP/Staff/EditStaff/{id} ───────────────────────
+        // ── GET: /staff/edit/{id} ───────────────────────
+        [HttpGet("staff/edit/{id?}")]
         public async Task<IActionResult> EditStaff(Guid id)
         {
             var staffId = await _publicIds.ResolveAsync(IPublicIdService.Staff, id, TenantId(), SchoolId());
@@ -229,7 +234,7 @@ namespace educore.Areas.ERP.Controllers
             return View(model);
         }
 
-        [HttpPost]
+        [HttpPost("staff/edit/{id?}")]
         [HasPermission("staff.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditStaff(Guid id, StaffModel model)
@@ -266,7 +271,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // Departments & Designations masters now live under Settings
-        // (Admin/SchoolSettings/StaffMasters).
+        // (/staff/departments).
 
         // Save gives us the internal id; the profile URL needs the uuid, so read the row
         // back for it. One extra proc call on save only — StaffProfile would fetch anyway.

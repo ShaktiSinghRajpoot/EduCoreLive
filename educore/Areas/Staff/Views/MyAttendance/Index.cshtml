@@ -53,7 +53,7 @@
 $(function () {
     if (!document.getElementById('maShow')) return;   // no staff record
 
-    var DATA_URL = '@Url.Action("Data", "MyAttendance", new { area = "ERP" })';
+    var DATA_URL = '@Url.Action("Data", "MyAttendance", new { area = "Staff" })';
     var MARK = { Present: ['P', 's-P'], Absent: ['A', 's-A'], HalfDay: ['H', 's-H'], Late: ['L', 's-L'], Leave: ['LV', 's-V'] };
     var today = EC.today();
 

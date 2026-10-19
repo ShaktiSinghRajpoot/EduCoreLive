@@ -26,9 +26,18 @@ namespace educore.Helpers
             { "FeeDues", "Fees" },
             { "FeeDueReminders", "Fees" },
             { "DayClose", "Fees" },
+            { "Expense", "Accounts" },
+            { "Staff", "Staff" },
+            { "StaffAttendance", "Staff" },
+            { "Leave", "Staff" },
+            { "Payroll", "Staff" },
+            { "MyLeave", "Staff" },
+            { "MyPayslip", "Staff" },
+            { "MyAttendance", "Staff" },
         };
 
         // Pages that got a short address of their own: "Controller/Action" -> new path.
+        // An id after the action is carried over: Staff/StaffProfile/{id} -> /staff/profile/{id}.
         // (Their old long form would not open: an action with its own route answers only there.)
         public static readonly Dictionary<string, string> MovedPages = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -80,6 +89,32 @@ namespace educore.Helpers
             { "SchoolSettings/GetFeeStructureByClass", "/fees/feesetup/getfeestructurebyclass" },
             { "SchoolSettings/SaveFeeStructure", "/fees/feesetup/savefeestructure" },
             { "SchoolSettings/DeleteFeeStructure", "/fees/feesetup/deletefeestructure" },
+            { "Expense", "/accounts/expenses" },
+            { "Expense/Index", "/accounts/expenses" },
+            { "Expense/CashBook", "/accounts/cash-book" },
+            { "Staff", "/staff" },
+            { "Staff/StaffList", "/staff" },
+            { "Staff/Inactive", "/staff/inactive" },
+            { "Staff/AddStaff", "/staff/add" },
+            { "Staff/StaffProfile", "/staff/profile" },
+            { "Staff/EditStaff", "/staff/edit" },
+            { "StaffAttendance", "/staff/attendance" },
+            { "StaffAttendance/Index", "/staff/attendance" },
+            { "Leave", "/staff/leave" },
+            { "Leave/LeaveManagement", "/staff/leave" },
+            { "Payroll", "/staff/payroll" },
+            { "Payroll/PayrollManagement", "/staff/payroll" },
+            { "MyLeave", "/my-leave" },
+            { "MyLeave/Index", "/my-leave" },
+            { "MyPayslip", "/my-payslip" },
+            { "MyPayslip/Index", "/my-payslip" },
+            { "MyAttendance", "/my-attendance" },
+            { "MyAttendance/Index", "/my-attendance" },
+            { "SchoolSettings/StaffMasters", "/staff/departments" },
+            { "SchoolSettings/SaveDepartment", "/staff/staffmasters/savedepartment" },
+            { "SchoolSettings/SaveDesignation", "/staff/staffmasters/savedesignation" },
+            { "SchoolSettings/DeleteMaster", "/staff/staffmasters/deletemaster" },
+            { "SchoolSettings/ToggleMaster", "/staff/staffmasters/togglemaster" },
         };
 
         public static IApplicationBuilder UseLegacyErpRedirect(this IApplicationBuilder app)
@@ -95,9 +130,16 @@ namespace educore.Helpers
                     var controller = slash < 0 ? afterArea : afterArea.Substring(0, slash);
                     var rest = slash < 0 ? "" : afterArea.Substring(slash);
 
+                    // "Staff/StaffProfile/{id}": the page's first two segments, then the rest
+                    var parts = afterArea.TrimEnd('/').Split('/', 3);
+                    var pageKey = parts.Length >= 2 ? parts[0] + "/" + parts[1] : parts[0];
+                    var pageRest = parts.Length == 3 ? "/" + parts[2] : "";
+
                     string? target = null;
                     if (MovedPages.TryGetValue(afterArea.TrimEnd('/'), out var page))
                         target = page;
+                    else if (pageRest != "" && MovedPages.TryGetValue(pageKey, out var pageWithId))
+                        target = pageWithId + pageRest;
                     else if (MovedControllers.TryGetValue(controller, out var area))
                         target = "/" + area.ToLowerInvariant() + "/" + controller.ToLowerInvariant() + rest;
 

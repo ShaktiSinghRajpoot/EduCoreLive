@@ -140,7 +140,7 @@
                 new { Label="Total Staff", Value=Model.Staff.ToString(),
                       Trend=Model.Staff == 1 ? "1 active staff member" : $"{Model.Staff} active staff",
                       Soft="soft-orange", Icon="bx-id-card", Spark="sparkStaff", Up=true,
-                      Att=staffAtt, Url=Url.Action("Index", "StaffAttendance", new { area = "ERP" }) },
+                      Att=staffAtt, Url=Url.Action("Index", "StaffAttendance", new { area = "Staff" }) },
                 new { Label="Today's Collection", Value=Money(Model.TodayCollection),
                       Trend=collectionTrend, Soft="soft-blue", Icon="bx-wallet", Spark="sparkCollection",
                       Up=Model.TodayCollection >= Model.YesterdayCollection, Att="", Url=(string?)null },
@@ -317,7 +317,7 @@
                                 }
                                 @foreach (var d in Model.StaffAttendanceDefaulters)
                                 {
-                                    <a class="dash-row text-reset text-decoration-none" href="@Url.Action("StaffProfile", "Staff", new { area = "ERP", id = d.PublicId })">
+                                    <a class="dash-row text-reset text-decoration-none" href="@Url.Action("StaffProfile", "Staff", new { area = "Staff", id = d.PublicId })">
                                         <span class="dash-avatar @Soft(accents[Model.StaffAttendanceDefaulters.IndexOf(d) % accents.Length])">@Initials(d.FullName)</span>
                                         <div class="flex-grow-1 min-w-0">
                                             <h6 class="mb-0 text-truncate">@d.FullName</h6>
@@ -328,7 +328,7 @@
                                 }
                                 @if (Model.StaffAttendanceDefaulterCount > Model.StaffAttendanceDefaulters.Count)
                                 {
-                                    <div class="dash-sub small p-2">+ @(Model.StaffAttendanceDefaulterCount - Model.StaffAttendanceDefaulters.Count) more — see <a href="@Url.Action("Index", "StaffAttendance", new { area = "ERP" })">Staff Attendance</a>.</div>
+                                    <div class="dash-sub small p-2">+ @(Model.StaffAttendanceDefaulterCount - Model.StaffAttendanceDefaulters.Count) more — see <a href="@Url.Action("Index", "StaffAttendance", new { area = "Staff" })">Staff Attendance</a>.</div>
                                 }
                             </div>
                         }
@@ -539,7 +539,7 @@
                             </div>
                             @* Approve and Reject both just opened the leave page — two buttons
                                that looked like decisions and were navigation. One link now. *@
-                            <a href="/ERP/Leave/LeaveManagement" class="btn btn-sm btn-outline-primary">Review</a>
+                            <a href="/staff/leave" class="btn btn-sm btn-outline-primary">Review</a>
                         </div>
                     }
                 </div>

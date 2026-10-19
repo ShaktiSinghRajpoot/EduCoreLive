@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model EduCoreDataAccessLayer.Models.StaffModel
 @{
     ViewData["Title"] = "Staff Profile";
@@ -36,7 +36,7 @@
   <div class="ec-page-content sp-page">
 
     <div class="sp-breadcrumb">
-      <a asp-area="ERP" asp-controller="Staff" asp-action="StaffList">All Staff</a>
+      <a asp-area="Staff" asp-controller="Staff" asp-action="StaffList">All Staff</a>
       <i class="bx bx-chevron-right"></i><span>Profile</span>
     </div>
 
@@ -56,12 +56,12 @@
       </div>
       <div class="d-flex gap-2">
         <a class="btn btn-primary d-flex align-items-center gap-1"
-           asp-area="ERP" asp-controller="Staff" asp-action="EditStaff" asp-route-id="@Model.PublicId">
+           asp-area="Staff" asp-controller="Staff" asp-action="EditStaff" asp-route-id="@Model.PublicId">
           <i class="bx bx-edit"></i><span>Edit Profile</span>
         </a>
         @if (Model.Status != "Inactive")
         {
-          <form asp-area="ERP" asp-controller="Staff" asp-action="Deactivate" method="post"
+          <form asp-area="Staff" asp-controller="Staff" asp-action="Deactivate" method="post"
                 class="d-flex align-items-center gap-2"
                 data-ec-confirm="Deactivate this staff member?"
                 data-ec-confirm-name="@Model.FullName"
@@ -216,14 +216,14 @@
                  404'd. There is no staff attendance register yet; that is also why
                  payroll works out Loss of Pay from unpaid leave rather than from
                  absences. The link comes back when the register does. *@
-              <a class="sp-link" asp-area="ERP" asp-controller="Leave" asp-action="LeaveManagement">
+              <a class="sp-link" asp-area="Staff" asp-controller="Leave" asp-action="LeaveManagement">
                 <span class="sp-link-ic" style="background:#fce7f3;color:#be185d;"><i class="bx bx-calendar-minus"></i></span>
                 <span class="sp-link-txt"><span class="sp-link-t">Leave History</span><span class="sp-link-s">Requests &amp; balance</span></span>
                 <i class="bx bx-chevron-right sp-link-go"></i>
               </a>
               @if (ViewBag.CanSeeSalary == true)
               {
-              <a class="sp-link" asp-area="ERP" asp-controller="Payroll" asp-action="PayrollManagement">
+              <a class="sp-link" asp-area="Staff" asp-controller="Payroll" asp-action="PayrollManagement">
                 <span class="sp-link-ic" style="background:#dcfce7;color:#16a34a;"><i class="bx bx-money"></i></span>
                 <span class="sp-link-txt"><span class="sp-link-t">Payroll / Payslips</span><span class="sp-link-s">Salary &amp; deductions</span></span>
                 <i class="bx bx-chevron-right sp-link-go"></i>

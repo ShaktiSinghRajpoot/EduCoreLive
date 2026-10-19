@@ -4,17 +4,17 @@ using educore.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Staff.Controllers
 {
     /// <summary>
-    /// "My Attendance" (/ERP/MyAttendance) -- a member of staff's own attendance over
+    /// "My Attendance" (/my-attendance) -- a member of staff's own attendance over
     /// any date range: totals, attendance % and day by day.
     ///
     /// No permission key on purpose (same as My Leave / My Payslip): the staff id is
     /// never taken from the browser, only from the signed-in user's own staff record,
     /// so nobody can open someone else's attendance here.
     /// </summary>
-    [Area("ERP")]
+    [Area("Staff")]
     [Authorize(Policy = "SchoolUserOnly")]
     public class MyAttendanceController : Controller
     {
@@ -27,7 +27,7 @@ namespace educore.Areas.ERP.Controllers
             _att = att;
         }
 
-        [HttpGet]
+        [HttpGet("my-attendance")]
         public async Task<IActionResult> Index([FromServices] ISchoolSettingsService settings)
         {
             ViewBag.Me = await _self.GetMeAsync(TenantId(), SchoolId(), UserId());

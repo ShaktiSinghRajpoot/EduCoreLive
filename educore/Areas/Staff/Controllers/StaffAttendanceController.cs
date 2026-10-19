@@ -4,14 +4,14 @@ using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Staff.Controllers
 {
     /// <summary>
-    /// Staff Attendance (/ERP/StaffAttendance): mark the day, the month register,
+    /// Staff Attendance (/staff/attendance): mark the day, the month register,
     /// and substitute teachers for the periods of anyone absent or on leave.
     /// Seeing it needs staff.view; marking staff.manage; substitutions academics.manage.
     /// </summary>
-    [Area("ERP")]
+    [Area("Staff")]
     [HasPermission("staff.view")]
     public class StaffAttendanceController : Controller
     {
@@ -22,6 +22,7 @@ namespace educore.Areas.ERP.Controllers
             _att = att;
         }
 
+        [Route("staff/attendance")]
         public async Task<IActionResult> Index([FromServices] ISchoolSettingsService settings)
         {
             ViewBag.CanMark  = await HasPermissionAttribute.UserHasAsync(this, "staff.manage");

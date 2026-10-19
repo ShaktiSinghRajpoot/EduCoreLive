@@ -1,4 +1,4 @@
-﻿@{
+@{
     ViewData["Title"] = "Leave Management";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 }
@@ -178,13 +178,13 @@
 <script>
 $(document).ready(function () {
 
-    var LIST_URL    = '@Url.Action("List","Leave",new{area="ERP"})';
-    var APPLY_URL   = '@Url.Action("ApplyLeave","Leave",new{area="ERP"})';
-    var APPROVE_URL = '@Url.Action("Approve","Leave",new{area="ERP"})';
-    var REJECT_URL  = '@Url.Action("Reject","Leave",new{area="ERP"})';
-    var CANCEL_URL  = '@Url.Action("Cancel","Leave",new{area="ERP"})';
-    var DAYS_URL    = '@Url.Action("CountDays","Leave",new{area="ERP"})';
-    var BAL_URL     = '@Url.Action("Balance","Leave",new{area="ERP"})';
+    var LIST_URL    = '@Url.Action("List","Leave",new{area="Staff"})';
+    var APPLY_URL   = '@Url.Action("ApplyLeave","Leave",new{area="Staff"})';
+    var APPROVE_URL = '@Url.Action("Approve","Leave",new{area="Staff"})';
+    var REJECT_URL  = '@Url.Action("Reject","Leave",new{area="Staff"})';
+    var CANCEL_URL  = '@Url.Action("Cancel","Leave",new{area="Staff"})';
+    var DAYS_URL    = '@Url.Action("CountDays","Leave",new{area="Staff"})';
+    var BAL_URL     = '@Url.Action("Balance","Leave",new{area="Staff"})';
     var TODAY       = '@Dates.Now.ToString("yyyy-MM-dd")';   // the school's today, not the browser's UTC one
 
     var TYPE = { Casual:'t-casual', Sick:'t-sick', Earned:'t-earned', Maternity:'t-maternity',

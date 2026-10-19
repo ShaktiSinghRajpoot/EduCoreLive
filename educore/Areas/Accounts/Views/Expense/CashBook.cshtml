@@ -33,7 +33,7 @@
             </div>
           </div>
           <div class="d-flex gap-2 cb-noprint ms-lg-auto">
-            <a class="btn btn-outline-secondary text-nowrap" href="@Url.Action("Index", "Expense", new { area = "ERP" })"><i class="bx bx-receipt me-1"></i>Expenses</a>
+            <a class="btn btn-outline-secondary text-nowrap" href="@Url.Action("Index", "Expense", new { area = "Accounts" })"><i class="bx bx-receipt me-1"></i>Expenses</a>
             <button type="button" class="btn btn-outline-secondary text-nowrap" onclick="window.print()"><i class="bx bx-printer me-1"></i>Print</button>
           </div>
         </div>
@@ -128,8 +128,8 @@
 @section PageScripts {
 <script>
 $(function () {
-    var DATA_URL = '@Url.Action("CashBookData", "Expense", new { area = "ERP" })';
-    var OPEN_URL = '@Url.Action("SetOpening", "Expense", new { area = "ERP" })';
+    var DATA_URL = '@Url.Action("CashBookData", "Expense", new { area = "Accounts" })';
+    var OPEN_URL = '@Url.Action("SetOpening", "Expense", new { area = "Accounts" })';
     var CAN_MANAGE = @(canManage ? "true" : "false");
     var SESSION_START = '@(sessionStart ?? "")';
     var opening = null;      // the saved opening balance, if any

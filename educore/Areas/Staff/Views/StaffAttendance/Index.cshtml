@@ -131,11 +131,11 @@ $(function () {
 
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
     var URL = {
-        day:    '@Url.Action("Day","StaffAttendance",new{area="ERP"})',
-        save:   '@Url.Action("Save","StaffAttendance",new{area="ERP"})',
-        month:  '@Url.Action("Month","StaffAttendance",new{area="ERP"})',
-        subs:   '@Url.Action("Substitutions","StaffAttendance",new{area="ERP"})',
-        assign: '@Url.Action("Assign","StaffAttendance",new{area="ERP"})'
+        day:    '@Url.Action("Day","StaffAttendance",new{area="Staff"})',
+        save:   '@Url.Action("Save","StaffAttendance",new{area="Staff"})',
+        month:  '@Url.Action("Month","StaffAttendance",new{area="Staff"})',
+        subs:   '@Url.Action("Substitutions","StaffAttendance",new{area="Staff"})',
+        assign: '@Url.Action("Assign","StaffAttendance",new{area="Staff"})'
     };
     var CAN_MARK  = @(canMark ? "true" : "false");
     var CAN_COVER = @(canCover ? "true" : "false");
@@ -178,7 +178,7 @@ $(function () {
 
     function loadHistStaff() {
         if (histStaff) return;
-        $.getJSON('@Url.Action("History", "StaffAttendance", new { area = "ERP" })').done(function (r) {
+        $.getJSON('@Url.Action("History", "StaffAttendance", new { area = "Staff" })').done(function (r) {
             histStaff = (r && r.staff) || [];
             fillHistStaff('');
         });
@@ -203,7 +203,7 @@ $(function () {
         var id = $('#hStaff').val();
         if (!id) { ecToast('warning', 'Choose a staff member.'); return; }
         $('#hResult').html('<div class="text-muted small p-2">Loading…</div>');
-        $.getJSON('@Url.Action("History", "StaffAttendance", new { area = "ERP" })',
+        $.getJSON('@Url.Action("History", "StaffAttendance", new { area = "Staff" })',
                   { staffId: id, from: $('#hFrom').val(), to: $('#hTo').val() }).done(function (r) {
             if (!r || !r.success) { $('#hResult').html(''); ecToast('error', (r && r.message) || 'Could not load the report.'); return; }
             var m = r.summary;

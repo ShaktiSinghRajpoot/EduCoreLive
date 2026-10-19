@@ -3,9 +3,9 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Staff.Controllers
 {
-    [Area("ERP")]
+    [Area("Staff")]
     // Salary has its own keys (payroll_permissions.sql): payroll.view to look,
     // payroll.manage for every write. staff.view alone no longer opens payroll.
     [HasPermission("payroll.view")]
@@ -25,6 +25,7 @@ namespace educore.Areas.ERP.Controllers
         private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
         private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
+        [Route("staff/payroll")]
         public async Task<IActionResult> PayrollManagement()
         {
             // The month picker was three hardcoded options. Offer the last twelve

@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @using System.Linq
 @using Microsoft.AspNetCore.Http
 @using Microsoft.AspNetCore.Mvc.Rendering
@@ -51,10 +51,10 @@
           </div>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Staff" asp-action="Inactive">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="Staff" asp-controller="Staff" asp-action="Inactive">
             <i class="bx bx-user-x"></i><span>Inactive Staff</span>
           </a>
-          <a class="btn btn-primary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Staff" asp-action="AddStaff">
+          <a class="btn btn-primary d-flex align-items-center gap-1" asp-area="Staff" asp-controller="Staff" asp-action="AddStaff">
             <i class="bx bx-user-plus"></i><span>Add Staff</span>
           </a>
         </div>
@@ -66,7 +66,7 @@
       @* All filtering/sorting/paging is server-side: this GET form round-trips
          the query string. Omitting Page resets to page 1 on any filter change;
          sort is carried in hidden fields so it survives a filter change. *@
-      <form id="staffFilterForm" method="get" asp-area="ERP" asp-controller="Staff" asp-action="StaffList" class="st-bar mb-3">
+      <form id="staffFilterForm" method="get" asp-area="Staff" asp-controller="Staff" asp-action="StaffList" class="st-bar mb-3">
         <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
         <input type="hidden" name="SortDir" value="@Model.SortDirection" />
 
@@ -99,7 +99,7 @@
         @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.FilterDepartment)
              || !string.IsNullOrEmpty(Model.FilterStaffType) || !string.IsNullOrEmpty(Model.FilterStatus))
         {
-            <a asp-area="ERP" asp-controller="Staff" asp-action="StaffList" class="btn btn-outline-secondary">
+            <a asp-area="Staff" asp-controller="Staff" asp-action="StaffList" class="btn btn-outline-secondary">
               <i class="bx bx-x"></i> Clear
             </a>
         }
@@ -125,7 +125,7 @@
               i++;
               <tr>
                 <td>
-                  <a asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@s.PublicId"
+                  <a asp-area="Staff" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@s.PublicId"
                      class="d-flex align-items-center gap-2 text-decoration-none">
                     <span class="st-av bg-label-@color text-@color">@Initials(s.FullName)</span>
                     <div>
@@ -141,7 +141,7 @@
                 <td>@(string.IsNullOrWhiteSpace(s.Mobile) ? "—" : s.Mobile)</td>
                 <td><span class="st-bdg b-@(status.Replace(" ", ""))">@status</span></td>
                 <td class="text-end">
-                  <a asp-area="ERP" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@s.PublicId"
+                  <a asp-area="Staff" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@s.PublicId"
                      class="btn btn-sm btn-outline-secondary">Profile</a>
                 </td>
               </tr>

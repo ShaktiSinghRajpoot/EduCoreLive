@@ -22,14 +22,14 @@
           </div>
           <div>
             <div class="es-breadcrumb">
-              <a asp-area="ERP" asp-controller="Staff" asp-action="StaffList">All Staff</a>
+              <a asp-area="Staff" asp-controller="Staff" asp-action="StaffList">All Staff</a>
               <i class="bx bx-chevron-right"></i><span>Add Staff</span>
             </div>
             <h4 class="ec-page-title mb-0">Add New Staff Member</h4>
           </div>
         </div>
         <a class="btn btn-outline-secondary d-flex align-items-center gap-1"
-           asp-area="ERP" asp-controller="Staff" asp-action="StaffList">
+           asp-area="Staff" asp-controller="Staff" asp-action="StaffList">
           <i class="bx bx-arrow-back"></i><span>Back</span>
         </a>
       </div>
@@ -37,7 +37,7 @@
 
     <div asp-validation-summary="All" class="alert alert-danger" style="display:@(ViewData.ModelState.IsValid ? "none" : "block")"></div>
 
-    <form asp-area="ERP" asp-controller="Staff" asp-action="AddStaff" method="post" novalidate>
+    <form asp-area="Staff" asp-controller="Staff" asp-action="AddStaff" method="post" novalidate>
       @Html.AntiForgeryToken()
 
       <div class="row g-0">
@@ -226,7 +226,7 @@
           </div>
 
           <div class="es-sticky">
-            <a class="btn btn-outline-secondary px-4" asp-area="ERP" asp-controller="Staff" asp-action="StaffList">Cancel</a>
+            <a class="btn btn-outline-secondary px-4" asp-area="Staff" asp-controller="Staff" asp-action="StaffList">Cancel</a>
             <button type="submit" class="btn btn-primary px-4"><i class="bx bx-check me-1"></i>Save Staff</button>
           </div>
 
@@ -253,7 +253,7 @@
         });
 
         function BindDesignations(dept, keep) {
-            var url = '@Url.Action("GetDesignations", "Staff", new { area = "ERP" })';
+            var url = '@Url.Action("GetDesignations", "Staff", new { area = "Staff" })';
             $.post(url, { department: dept }, function (data) {
                 $.each(data, function (i, item) {
                     // .text, not .html: designation names are typed in by the school.
