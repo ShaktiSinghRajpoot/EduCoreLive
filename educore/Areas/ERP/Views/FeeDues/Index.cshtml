@@ -24,6 +24,12 @@
   .fd-class-row.fd-sel td { background:#fff7e6; }
   .fd-scroll { max-height:19rem; overflow:auto; }
   .fd-card { border:1px solid var(--bs-border-color); border-radius:12px; padding:.7rem .8rem; margin-bottom:.5rem; }
+  /* phones: the two summary tables fit the screen (tighter cells, no "Due" column) */
+  @@media (max-width:575.98px) {
+    .fd-table th, .fd-table td { padding:.35rem .3rem; font-size:.8rem; }
+    .fd-hide-sm { display:none; }
+    .fd-bar { min-width:40px; }
+  }
 </style>
 }
 
@@ -105,8 +111,8 @@
           <div class="fw-semibold mb-1">Month by month</div>
           <div class="small text-muted mb-2">Fees that fell due in each month: billed, collected and still pending</div>
           <div class="fd-scroll"><table class="table table-sm fd-table mb-0">
-            <thead><tr><th>Month</th><th class="text-end">Due</th><th class="text-end">Collected</th><th class="text-end">Pending</th><th class="text-end">Children</th></tr></thead>
-            <tbody id="fdMonths"><tr><td colspan="5" class="text-muted small">Loading…</td></tr></tbody>
+            <thead><tr><th>Month</th><th class="text-end fd-hide-sm">Due</th><th class="text-end">Collected</th><th class="text-end">Pending</th></tr></thead>
+            <tbody id="fdMonths"><tr><td colspan="4" class="text-muted small">Loading…</td></tr></tbody>
           </table></div>
         </div></div>
       </div>
@@ -206,21 +212,23 @@ $(function () {
         var maxP = Math.max.apply(null, data.months.map(function (m) { return m.pending; }).concat([1]));
         $('#fdMonths').html(data.months.length ? data.months.map(function (m) {
             return '<tr><td class="fw-semibold">' + EC.esc(monthName(m.month)) + '</td>'
-                 + '<td class="text-end">' + EC.money(m.due) + '</td>'
+                 + '<td class="text-end fd-hide-sm">' + EC.money(m.due) + '</td>'
                  + '<td class="text-end text-success">' + EC.money(m.collected) + '</td>'
                  + '<td class="text-end"><span class="fw-bold text-danger">' + EC.money(m.pending) + '</span>'
-                 + '<div class="fd-bar ms-auto"><span style="width:' + Math.round(m.pending * 100 / maxP) + '%"></span></div></td>'
-                 + '<td class="text-end">' + m.children + '</td></tr>';
-        }).join('') : '<tr><td colspan="5" class="text-muted small">No fees fell due in this session up to that month.</td></tr>');
+                 + '<div class="fd-bar ms-auto"><span style="width:' + Math.round(m.pending * 100 / maxP) + '%"></span></div>'
+                 + '<div class="small text-muted">' + m.children + ' child' + (m.children === 1 ? '' : 'ren') + '</div></td></tr>';
+        }).join('') : '<tr><td colspan="4" class="text-muted small">No fees fell due in this session up to that month.</td></tr>');
 
         var cls = $('#fdClass').val(), sec = $('#fdSec').val();
-        $('#fdClasses').html(data.classes.length ? data.classes.map(function (c) {
+        // one class picked: a way back to all of them
+        var back = cls ? '<tr class="fd-all-classes" style="cursor:pointer"><td colspan="3" class="small text-primary fw-semibold">← Show all classes</td></tr>' : '';
+        $('#fdClasses').html(back + (data.classes.length ? data.classes.map(function (c) {
             var sel = c.cls === cls && (!sec || c.sec === sec);
             return '<tr class="fd-class-row' + (sel ? ' fd-sel' : '') + '" data-cls="' + EC.esc(c.cls) + '" data-sec="' + EC.esc(c.sec) + '">'
                  + '<td class="fw-semibold">' + EC.esc(c.cls) + (c.sec ? ' – ' + EC.esc(c.sec) : '') + '</td>'
                  + '<td class="text-end">' + c.withDues + ' <span class="text-muted small">of ' + c.children + '</span></td>'
                  + '<td class="text-end ' + (c.pending > 0 ? 'fw-bold text-danger' : 'text-muted') + '">' + EC.money(c.pending) + '</td></tr>';
-        }).join('') : '<tr><td colspan="3" class="text-muted small">No children in this session.</td></tr>');
+        }).join('') : '<tr><td colspan="3" class="text-muted small">No children in this session.</td></tr>'));
     }
 
     function visible() {
@@ -346,6 +354,11 @@ $(function () {
             (list || []).forEach(function (n) { $('#fdSec').append('<option value="' + EC.esc(n) + '">' + EC.esc(n) + '</option>'); });
             $('#fdSec').val(sec);
         }).always(load);
+    });
+    $('#fdClasses').on('click', '.fd-all-classes', function () {
+        $('#fdClass').val('');
+        $('#fdSec').html('<option value="">All sections</option>');
+        load();
     });
     $('.fd-kpi.fd-click').on('click', function () {
         var v = $(this).data('show') + '';
