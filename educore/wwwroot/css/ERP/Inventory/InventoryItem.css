@@ -150,7 +150,7 @@
     .iv-tbl-wrap{ display:none; }
     .iv-mob-list{ display:block; }
     .iv-pg-wrap{ justify-content:center; }
-    .iv-pg-info{ width:100%; text-align:center; }
+    .iv-pg-info{ width:100%; text-align:center; justify-content:center; }   /* it is a flex row now (rows per page + Showing) */
 }
 @media (max-width:575.98px){
     .iv-card{ padding:.85rem 1rem; }
