@@ -14,6 +14,10 @@
   .sd-panel .ec-card-body { padding-top:.5rem; }
   .sd-row { display:flex; align-items:center; gap:.6rem; padding:.5rem 0; border-bottom:1px solid #f4eee7; }
   .sd-row:last-child { border-bottom:0; }
+  /* the text side shrinks (and truncates) so the amount and status stay in view */
+  .sd-row > .flex-grow-1 { min-width:0; }
+  .sd-row > :last-child { flex-shrink:0; }
+  .sd-panel .ec-card-header .btn { white-space:nowrap; flex-shrink:0; }
   .sd-bar { height:.4rem; border-radius:999px; background:#f0eee9; overflow:hidden; margin-top:.25rem; }
   .sd-bar span { display:block; height:100%; border-radius:inherit; }
   .sd-empty { text-align:center; color:var(--ec-text-muted, #8b8fa3); font-size:.85rem; padding:1.4rem .5rem; }
