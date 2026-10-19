@@ -105,9 +105,9 @@ $(function () {
 
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
     var URL = {
-        upload: '@Url.Action("UploadSignature","SchoolSettings",new{area="ERP"})',
-        remove: '@Url.Action("RemoveSignature","SchoolSettings",new{area="ERP"})',
-        name:   '@Url.Action("SaveSignatory","SchoolSettings",new{area="ERP"})'
+        upload: '@Url.Action("UploadSignature","SchoolSettings",new{area="School"})',
+        remove: '@Url.Action("RemoveSignature","SchoolSettings",new{area="School"})',
+        name:   '@Url.Action("SaveSignatory","SchoolSettings",new{area="School"})'
     };
 
     $('.ss-file').on('change', function () {

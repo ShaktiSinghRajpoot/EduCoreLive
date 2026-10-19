@@ -4,13 +4,13 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.School.Controllers
 {
     /// <summary>
-    /// Message Log (/ERP/MessageLog): every WhatsApp message the school's pages tried to send to
+    /// Message Log (/school/message-log): every WhatsApp message the school's pages tried to send to
     /// parents (absent alerts, fee reminders, notices), sent or not, with the reason when not.
     /// </summary>
-    [Area("ERP")]
+    [Area("School")]
     [HasPermission("notices.manage")]
     public class MessageLogController : Controller
     {
@@ -21,6 +21,7 @@ namespace educore.Areas.ERP.Controllers
             _log = log;
         }
 
+        [Route("school/message-log")]
         public async Task<IActionResult> Index([FromServices] SchoolMessenger messenger)
         {
             ViewBag.WhatsAppOn = await messenger.IsOnAsync(TenantId(), SchoolId());

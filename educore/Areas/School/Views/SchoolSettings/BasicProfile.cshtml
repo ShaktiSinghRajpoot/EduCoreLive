@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model educore.Models.SchoolManageModel
 
 @{
@@ -11,7 +11,7 @@
 }
 
 <div class="container-fluid flex-grow-1 container-p-y">
-    <form asp-area="ERP"
+    <form asp-area="School"
           asp-controller="SchoolSettings"
           asp-action="BasicProfile" 
           method="post"
@@ -313,7 +313,7 @@
 
                 <div class="ec-sticky-actions">
                     <div class="d-flex justify-content-end gap-2">
-                        <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="BasicProfile"
+                        <a asp-area="School" asp-controller="SchoolSettings" asp-action="BasicProfile"
                            class="btn btn-outline-secondary">Reset</a>
                         <button type="submit" class="btn btn-primary">
                             <i class="bx bx-save me-1"></i> Save Changes
@@ -413,7 +413,7 @@
                     if (!ok) return;
                     EC.buttonBusy($btn, "Removing…");
                     $.ajax({
-                        url:     '@Url.Action("RemoveLogo", "SchoolSettings", new { area = "ERP" })',
+                        url:     '@Url.Action("RemoveLogo", "SchoolSettings", new { area = "School" })',
                         type:    "POST",
                         headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() }
                     }).done(function (d) {

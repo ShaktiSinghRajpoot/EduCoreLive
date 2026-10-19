@@ -163,7 +163,14 @@ These all cost real debugging time. They are still true.
 was missing, so every `asp-action` / `asp-for` / `asp-append-version` in 48 ERP
 views rendered as a literal HTML attribute and did nothing. Symptom: a link with
 no `href`, or a form whose inputs have no `name` so nothing binds on POST. If a
-new area is added, it needs its own `_ViewImports.cshtml`.
+new area is added, it needs its own `_ViewImports.cshtml`. (Since 19 Oct 2026 the
+old ERP area is split into one area per module -- School, Students, Attendance,
+Academics, Exams, Fees, Accounts, Staff, Transport, Inventory -- and each has one.)
+
+**A link to another module must name its area.** `asp-area="Fees"` /
+`Url.Action("ManageFee", "Fee", new { area = "Fees" })`. Without it the link takes
+the current page's area and points at a controller that is not there. Old
+`/ERP/...` addresses still work: `Helpers/LegacyErpRedirect.cs` forwards them.
 
 **A new `_ViewImports.cshtml` needs an app restart.** Razor runtime compilation
 does not pick it up on its own. Touching the view files forces a recompile.

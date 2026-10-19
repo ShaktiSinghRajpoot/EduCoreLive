@@ -184,8 +184,8 @@
                 <div class="text-truncate">Dashboard</div>
             </a>
         </li>
-        <li class='menu-item @On("ERP/Notice")'>
-            <a asp-area="ERP" asp-controller="Notice" asp-action="Index" class="menu-link">
+        <li class='menu-item @On("/notices")'>
+            <a asp-area="School" asp-controller="Notice" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-broadcast ic-dash"></i>
                 <div class="text-truncate">Notice Board</div>
             </a>
@@ -194,8 +194,8 @@
         @if (Can("notices.manage"))
         {
         @* every WhatsApp message to parents (absent alerts, fee reminders, notices) *@
-        <li class='menu-item @On("MessageLog")'>
-            <a asp-area="ERP" asp-controller="MessageLog" asp-action="Index" class="menu-link">
+        <li class='menu-item @On("/school/message-log")'>
+            <a asp-area="School" asp-controller="MessageLog" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bxl-whatsapp ic-dash"></i>
                 <div class="text-truncate">Message Log</div>
             </a>
@@ -278,8 +278,8 @@
         @if (!isPlatform)
         {
         @* holidays, exams and events: every member of staff sees it, academics.manage edits it *@
-        <li class='menu-item @On("SchoolCalendar")'>
-            <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SchoolCalendar" class="menu-link">
+        <li class='menu-item @On("/school/calendar")'>
+            <a asp-area="School" asp-controller="SchoolSettings" asp-action="SchoolCalendar" class="menu-link">
                 <i class="menu-icon icon-base bx bx-calendar-event ic-hr"></i>
                 <div class="text-truncate">School Calendar</div>
             </a>
@@ -337,7 +337,7 @@
                 }
                 @if (Can("students.manage"))
                 {
-                <li class='menu-item @On("/students/promotion")'><a asp-area="Students" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
+                <li class='menu-item @(IsActive("/students/promotion") && !IsActive("/students/promotion/history") ? "active" : "")'><a asp-area="Students" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
                 }
                 <li class='menu-item @On("/students/promotion/history")'><a asp-area="Students" asp-controller="Student" asp-action="PromoteHistory" class="menu-link"><i class="bx bx-history submenu-icon c-blue"></i><div class="text-truncate">Promotion History</div></a></li>
                 <li class='menu-item @On("/students/left")'><a asp-area="Students" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
@@ -531,7 +531,7 @@
         @* ---- School setup: done once at onboarding ---- *@
         @if (gSetupSchool)
         {
-        <li class='menu-item @Open("BasicProfile","Documents","AcademicYears","WorkflowSettings","SealSignature")'>
+        <li class='menu-item @Open("/school/profile","/school/documents","/school/sessions","/school/modules","/school/seal")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-buildings ic-settings"></i>
                 <div class="text-truncate">School Setup</div>
@@ -539,14 +539,14 @@
             <ul class="menu-sub">
                 @if (Can("settings.view"))
                 {
-                <li class='menu-item @On("BasicProfile")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="BasicProfile" class="menu-link"><i class="bx bx-buildings submenu-icon c-blue"></i><div class="text-truncate">School Profile</div></a></li>
-                <li class='menu-item @On("Documents")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="Documents" class="menu-link"><i class="bx bx-printer submenu-icon c-blue"></i><div class="text-truncate">Documents &amp; Formats</div></a></li>
-                <li class='menu-item @On("SealSignature")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SealSignature" class="menu-link"><i class="bx bx-pen submenu-icon c-purple"></i><div class="text-truncate">Seal &amp; Signature</div></a></li>
-                <li class='menu-item @On("AcademicYears")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AcademicYears" class="menu-link"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Sessions</div></a></li>
+                <li class='menu-item @On("/school/profile")'><a asp-area="School" asp-controller="SchoolSettings" asp-action="BasicProfile" class="menu-link"><i class="bx bx-buildings submenu-icon c-blue"></i><div class="text-truncate">School Profile</div></a></li>
+                <li class='menu-item @On("/school/documents")'><a asp-area="School" asp-controller="SchoolSettings" asp-action="Documents" class="menu-link"><i class="bx bx-printer submenu-icon c-blue"></i><div class="text-truncate">Documents &amp; Formats</div></a></li>
+                <li class='menu-item @On("/school/seal")'><a asp-area="School" asp-controller="SchoolSettings" asp-action="SealSignature" class="menu-link"><i class="bx bx-pen submenu-icon c-purple"></i><div class="text-truncate">Seal &amp; Signature</div></a></li>
+                <li class='menu-item @On("/school/sessions")'><a asp-area="School" asp-controller="SchoolSettings" asp-action="AcademicYears" class="menu-link"><i class="bx bx-calendar submenu-icon c-orange"></i><div class="text-truncate">Sessions</div></a></li>
                 }
                 @if (gWorkflow)
                 {
-                <li class='menu-item @On("WorkflowSettings")'><a asp-area="ERP" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings" class="menu-link"><i class="bx bx-toggle-left submenu-icon c-green"></i><div class="text-truncate">Modules &amp; Workflow</div></a></li>
+                <li class='menu-item @On("/school/modules")'><a asp-area="School" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings" class="menu-link"><i class="bx bx-toggle-left submenu-icon c-green"></i><div class="text-truncate">Modules &amp; Workflow</div></a></li>
                 }
             </ul>
         </li>
@@ -555,20 +555,20 @@
         @* ---- Academic setup: revisited each session ---- *@
         @if (gSetupAcad)
         {
-        <li class='menu-item @Open("ClassSection","SubjectManagement","/academics/periods","/academics/smart-bell","AssignClassTeacher","ERP/Rooms")'>
+        <li class='menu-item @Open("/school/classes","/school/subjects","/academics/periods","/academics/smart-bell","/school/class-teachers","/school/rooms")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-grid-alt ic-academic"></i>
                 <div class="text-truncate">Academic Setup</div>
             </a>
             <ul class="menu-sub">
-                <li class='menu-item @On("ClassSection")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="ClassSection" class="menu-link"><i class="bx bx-grid-alt submenu-icon c-blue"></i><div class="text-truncate">Classes &amp; Sections</div></a></li>
-                <li class='menu-item @On("SubjectManagement")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SubjectManagement" class="menu-link"><i class="bx bx-book-alt submenu-icon c-purple"></i><div class="text-truncate">Subjects</div></a></li>
-                <li class='menu-item @On("AssignClassTeacher")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AssignClassTeacher" class="menu-link"><i class="bx bx-user-voice submenu-icon c-green"></i><div class="text-truncate">Assign Class Teacher</div></a></li>
+                <li class='menu-item @On("/school/classes")'><a asp-area="School" asp-controller="SchoolSettings" asp-action="ClassSection" class="menu-link"><i class="bx bx-grid-alt submenu-icon c-blue"></i><div class="text-truncate">Classes &amp; Sections</div></a></li>
+                <li class='menu-item @On("/school/subjects")'><a asp-area="School" asp-controller="SchoolSettings" asp-action="SubjectManagement" class="menu-link"><i class="bx bx-book-alt submenu-icon c-purple"></i><div class="text-truncate">Subjects</div></a></li>
+                <li class='menu-item @On("/school/class-teachers")'><a asp-area="School" asp-controller="SchoolSettings" asp-action="AssignClassTeacher" class="menu-link"><i class="bx bx-user-voice submenu-icon c-green"></i><div class="text-truncate">Assign Class Teacher</div></a></li>
                 @if (showAcademics)
                 {
                 <li class='menu-item @On("/academics/periods")'><a asp-area="Academics" asp-controller="Timetable" asp-action="PeriodStructure" class="menu-link"><i class="bx bx-time submenu-icon c-teal"></i><div class="text-truncate">Period Structure</div></a></li>
                 }
-                <li class='menu-item @On("ERP/Rooms")'><a asp-area="ERP" asp-controller="Rooms" asp-action="Index" class="menu-link"><i class="bx bx-door-open submenu-icon c-orange"></i><div class="text-truncate">Rooms</div></a></li>
+                <li class='menu-item @On("/school/rooms")'><a asp-area="School" asp-controller="Rooms" asp-action="Index" class="menu-link"><i class="bx bx-door-open submenu-icon c-orange"></i><div class="text-truncate">Rooms</div></a></li>
                 @if (showAcademics)
                 {
                 <li class='menu-item @On("/academics/smart-bell")'><a asp-area="Academics" asp-controller="Timetable" asp-action="SmartBell" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Smart Bell</div></a></li>
@@ -595,7 +595,7 @@
         @* ---- Users & access ---- *@
         @if (gSetupUsers)
         {
-        <li class='menu-item @Open("Roles","/staff/departments")'>
+        <li class='menu-item @Open("/school/roles","/staff/departments")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-circle ic-settings"></i>
                 <div class="text-truncate">Users &amp; Access</div>
@@ -603,7 +603,7 @@
             <ul class="menu-sub">
                 @if (Can("rbac.manage"))
                 {
-                <li class='menu-item @On("Roles")'><a asp-area="ERP" asp-controller="Roles" asp-action="Index" class="menu-link"><i class="bx bx-user-circle submenu-icon c-indigo"></i><div class="text-truncate">Users &amp; Roles</div></a></li>
+                <li class='menu-item @On("/school/roles")'><a asp-area="School" asp-controller="Roles" asp-action="Index" class="menu-link"><i class="bx bx-user-circle submenu-icon c-indigo"></i><div class="text-truncate">Users &amp; Roles</div></a></li>
                 }
                 @if (Can("staff.view"))
                 {

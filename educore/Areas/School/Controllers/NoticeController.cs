@@ -8,15 +8,15 @@ using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.School.Controllers
 {
     /// <summary>
-    /// Notice Board (/ERP/Notice). Every school user reads the live notices here
+    /// Notice Board (/notices). Every school user reads the live notices here
     /// and in the navbar bell; opening the board marks them read. Posting, editing
     /// and deleting need notices.manage (School Admin bypasses). Parents have no
     /// login, so a notice reaches them as a printed circular or a WhatsApp share.
     /// </summary>
-    [Area("ERP")]
+    [Area("School")]
     [Authorize(Policy = "SchoolUserOnly")]
     public class NoticeController : Controller
     {
@@ -37,6 +37,7 @@ namespace educore.Areas.ERP.Controllers
             _att = att;
         }
 
+        [Route("notices")]
         public async Task<IActionResult> Index([FromServices] ModuleFlags modules, [FromServices] SchoolMessenger messenger)
         {
             ViewBag.CanManage = await CanManageAsync();
@@ -46,7 +47,7 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        // ── GET: /ERP/Notice/List ── the board (managers also get expired notices)
+        // ── GET: /school/notice/List ── the board (managers also get expired notices)
         [HttpGet]
         public async Task<IActionResult> List()
         {
@@ -81,7 +82,7 @@ namespace educore.Areas.ERP.Controllers
             }));
         }
 
-        // ── GET: /ERP/Notice/Latest ── navbar bell: newest 5 and the unread count
+        // ── GET: /school/notice/Latest ── navbar bell: newest 5 and the unread count
         [HttpGet]
         public async Task<IActionResult> Latest()
         {
@@ -120,7 +121,7 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
-        // ── GET: /ERP/Notice/Classes ── class names for the "Selected classes" audience
+        // ── GET: /school/notice/Classes ── class names for the "Selected classes" audience
         [HttpGet]
         public async Task<IActionResult> Classes()
         {
@@ -211,7 +212,7 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = ok, message = msg });
         }
 
-        // ── GET: /ERP/Notice/Print/5 ── the notice as a circular on the school letterhead
+        // ── GET: /school/notice/Print/5 ── the notice as a circular on the school letterhead
         [HttpGet]
         public async Task<IActionResult> Print(int id)
         {

@@ -135,12 +135,12 @@ $(function () {
 
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
     var URL = {
-        list:    '@Url.Action("List","Notice",new{area="ERP"})',
-        save:    '@Url.Action("Save","Notice",new{area="ERP"})',
-        del:     '@Url.Action("Delete","Notice",new{area="ERP"})',
-        seen:    '@Url.Action("SeenBy","Notice",new{area="ERP"})',
-        classes: '@Url.Action("Classes","Notice",new{area="ERP"})',
-        print:   '@Url.Action("Print","Notice",new{area="ERP"})'
+        list:    '@Url.Action("List","Notice",new{area="School"})',
+        save:    '@Url.Action("Save","Notice",new{area="School"})',
+        del:     '@Url.Action("Delete","Notice",new{area="School"})',
+        seen:    '@Url.Action("SeenBy","Notice",new{area="School"})',
+        classes: '@Url.Action("Classes","Notice",new{area="School"})',
+        print:   '@Url.Action("Print","Notice",new{area="School"})'
     };
     var CAN_MANAGE = @(canManage ? "true" : "false");   // notices.manage
     var WA_ON = @(whatsAppOn ? "true" : "false");       // send a notice to parents from the school's WhatsApp
@@ -274,7 +274,7 @@ $(function () {
           .then(function (ok) {
               if (!ok) return;
               EC.buttonBusy($btn, 'Sending…');
-              $.ajax({ url: '@Url.Action("SendWhatsApp", "Notice", new { area = "ERP" })' + '?id=' + id, type: 'POST', headers: { 'RequestVerificationToken': CSRF } })
+              $.ajax({ url: '@Url.Action("SendWhatsApp", "Notice", new { area = "School" })' + '?id=' + id, type: 'POST', headers: { 'RequestVerificationToken': CSRF } })
                   .done(function (r) { ecToast(r && r.success ? 'success' : 'error', (r && r.message) || 'Could not send.'); })
                   .fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not send')); })
                   .always(function () { EC.buttonReset($btn); });

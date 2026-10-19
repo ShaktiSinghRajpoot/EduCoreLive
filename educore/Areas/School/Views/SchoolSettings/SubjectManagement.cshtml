@@ -34,7 +34,7 @@
                     <div class="ec-page-subtitle">Configure subjects for each class — used in @(examsOn ? "exams, timetable and mark entry" : "the timetable and homework")</div>
                 </div>
             </div>
-            <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="ClassSection"
+            <a asp-area="School" asp-controller="SchoolSettings" asp-action="ClassSection"
                class="btn btn-outline-secondary d-flex align-items-center gap-1">
                 <i class="bx bx-cog"></i><span class="d-none d-sm-inline">Classes &amp; Sections</span>
             </a>
@@ -225,9 +225,9 @@ $(document).ready(function () {
     // ── State ─────────────────────────────────────────────────────────────────
     // subjectData: { <academic_class_id>: ['Mathematics','English', ...] }
     // Loaded from the server per class, saved back through the subject proc.
-    const LOAD_URL   = '@Url.Action("ClassSubjects","SchoolSettings",new{area="ERP"})';
+    const LOAD_URL   = '@Url.Action("ClassSubjects","SchoolSettings",new{area="School"})';
     const SESSION_ID = @(ViewBag.AcademicYearId ?? 0);
-    const SAVE_URL   = '@Url.Action("SaveClassSubjects","SchoolSettings",new{area="ERP"})';
+    const SAVE_URL   = '@Url.Action("SaveClassSubjects","SchoolSettings",new{area="School"})';
     const subjectData = {};
     let activeClass   = null;   // display name
     let activeId      = 0;      // academic_class_id

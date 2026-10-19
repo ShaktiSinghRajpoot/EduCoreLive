@@ -13,7 +13,7 @@
   <div class="ec-page-shell">
     <div class="ec-page-content">
 
-      <form asp-area="ERP" asp-controller="AdmissionWorkflow" asp-action="SaveWorkflowSettings"
+      <form asp-area="School" asp-controller="AdmissionWorkflow" asp-action="SaveWorkflowSettings"
             method="post" id="awForm">
         @Html.AntiForgeryToken()
 
@@ -210,7 +210,7 @@
                 </div>
               </div>
               <a class="btn btn-outline-primary" style="max-width:210px"
-                 asp-area="ERP" asp-controller="SchoolSettings" asp-action="AcademicYears">
+                 asp-area="School" asp-controller="SchoolSettings" asp-action="AcademicYears">
                 <i class="bx bx-calendar me-1"></i>Academic Years
               </a>
             </div>
@@ -391,7 +391,7 @@
 
         <!-- ── Sticky actions ── -->
         <div class="ec-sticky-actions d-flex flex-column flex-sm-row justify-content-end gap-2">
-          <a asp-area="ERP" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings"
+          <a asp-area="School" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings"
              class="btn btn-outline-secondary">Cancel</a>
           <button type="submit" class="btn btn-primary" @(Model.LoadFailed ? "disabled" : "")>
             <i class="bx bx-save me-1"></i> Save Settings
@@ -489,7 +489,7 @@ $(function () {
     function saveFee(kind, name, amount, $btn) {
         if (!(amount > 0)) { ecToast('error', 'Enter an amount greater than 0.'); return; }
         EC.buttonBusy($btn, 'Saving…');
-        $.ajax({ url: '/ERP/AdmissionWorkflow/SaveSetupFee', type: 'POST', contentType: 'application/json',
+        $.ajax({ url: '/school/admissionworkflow/SaveSetupFee', type: 'POST', contentType: 'application/json',
             headers: { 'RequestVerificationToken': awCsrf },
             data: JSON.stringify({ kind: kind, feeHeadId: 0, name: name, amount: amount }) })
         .done(function (res) {
@@ -508,7 +508,7 @@ $(function () {
         if (!id) return;
         EC.confirm({ title: 'Remove this amount?', okText: 'Remove' }).then(function (ok) {
         if (!ok) return;
-        $.ajax({ url: '/ERP/AdmissionWorkflow/DeleteSetupFee', type: 'POST', contentType: 'application/json',
+        $.ajax({ url: '/school/admissionworkflow/DeleteSetupFee', type: 'POST', contentType: 'application/json',
             headers: { 'RequestVerificationToken': awCsrf },
             data: JSON.stringify({ id: id }) })
         .done(function (res) {

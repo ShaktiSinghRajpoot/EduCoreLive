@@ -269,9 +269,9 @@
 'use strict';
 
 var ACADEMIC_YEAR_ID = @(ViewBag.AcademicYearId ?? 0);
-var URL_SAVE = '@Url.Action("SaveClassSection", "SchoolSettings", new { area = "ERP" })';
-var URL_COPY = '@Url.Action("CopyClassSection", "SchoolSettings", new { area = "ERP" })';
-var URL_COPY_EXTRAS = '@Url.Action("CopySessionSetup", "SchoolSettings", new { area = "ERP" })';
+var URL_SAVE = '@Url.Action("SaveClassSection", "SchoolSettings", new { area = "School" })';
+var URL_COPY = '@Url.Action("CopyClassSection", "SchoolSettings", new { area = "School" })';
+var URL_COPY_EXTRAS = '@Url.Action("CopySessionSetup", "SchoolSettings", new { area = "School" })';
 var seed = @Html.Raw(ViewBag.ClassDataJson ?? "[]");
 
 var nextClassId=100, nextSecId=900;

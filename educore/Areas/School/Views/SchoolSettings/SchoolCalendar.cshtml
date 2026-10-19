@@ -360,14 +360,14 @@
 (function(){
 'use strict';
 
-var DATA_URL   ='@Url.Action("SchoolCalendarData","SchoolSettings",new{area="ERP"})';
-var SAVE_URL   ='@Url.Action("SaveCalendarEntry","SchoolSettings",new{area="ERP"})';
-var DELETE_URL ='@Url.Action("DeleteCalendarEntry","SchoolSettings",new{area="ERP"})';
-var WEEKLY_URL ='@Url.Action("SaveWeeklyOff","SchoolSettings",new{area="ERP"})';
-var RANGE_URL  ='@Url.Action("SaveCalendarRange","SchoolSettings",new{area="ERP"})';
-var RANGE_DELETE_URL='@Url.Action("DeleteCalendarRange","SchoolSettings",new{area="ERP"})';
-var EVENT_SAVE_URL='@Url.Action("SaveSchoolEvent","SchoolSettings",new{area="ERP"})';
-var EVENT_DELETE_URL='@Url.Action("DeleteSchoolEvent","SchoolSettings",new{area="ERP"})';
+var DATA_URL   ='@Url.Action("SchoolCalendarData","SchoolSettings",new{area="School"})';
+var SAVE_URL   ='@Url.Action("SaveCalendarEntry","SchoolSettings",new{area="School"})';
+var DELETE_URL ='@Url.Action("DeleteCalendarEntry","SchoolSettings",new{area="School"})';
+var WEEKLY_URL ='@Url.Action("SaveWeeklyOff","SchoolSettings",new{area="School"})';
+var RANGE_URL  ='@Url.Action("SaveCalendarRange","SchoolSettings",new{area="School"})';
+var RANGE_DELETE_URL='@Url.Action("DeleteCalendarRange","SchoolSettings",new{area="School"})';
+var EVENT_SAVE_URL='@Url.Action("SaveSchoolEvent","SchoolSettings",new{area="School"})';
+var EVENT_DELETE_URL='@Url.Action("DeleteSchoolEvent","SchoolSettings",new{area="School"})';
 var CAN_MANAGE=@(canManage ? "true" : "false");
 
 var DOW=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];

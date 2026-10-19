@@ -102,14 +102,14 @@
                         No notices
                     </div>
                 </div>
-                <a class="d-block text-center small fw-semibold py-2 border-top" href="@Url.Action("Index", "Notice", new { area = "ERP" })">Open Notice Board</a>
+                <a class="d-block text-center small fw-semibold py-2 border-top" href="@Url.Action("Index", "Notice", new { area = "School" })">Open Notice Board</a>
             </div>
         </li>
         <script>
             // Plain JS: jQuery and site.js load after this partial.
             (function () {
                 function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
-                fetch('@Url.Action("Latest", "Notice", new { area = "ERP" })', { credentials: 'same-origin' })
+                fetch('@Url.Action("Latest", "Notice", new { area = "School" })', { credentials: 'same-origin' })
                     .then(function (r) { return r.ok ? r.json() : null; })
                     .then(function (d) {
                         if (!d) return;
@@ -118,7 +118,7 @@
                         if (!d.items || !d.items.length) return;
                         document.getElementById('navBellList').innerHTML = d.items.map(function (n) {
                             // A substitute period links to My Timetable; a notice to the board.
-                            return '<a class="dropdown-item py-2 text-wrap" href="' + esc(n.url || '@Url.Action("Index", "Notice", new { area = "ERP" })') + '">'
+                            return '<a class="dropdown-item py-2 text-wrap" href="' + esc(n.url || '@Url.Action("Index", "Notice", new { area = "School" })') + '">'
                                  + (n.isNew ? '<span class="badge bg-label-success me-1">New</span>' : '')
                                  + '<span class="fw-semibold">' + esc(n.title) + '</span>'
                                  + '<div class="small text-muted">' + esc(n.category) + ' · ' + esc(n.posted) + '</div></a>';

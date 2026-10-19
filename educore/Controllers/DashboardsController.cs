@@ -181,7 +181,7 @@ namespace educore.Controllers
                 ("Reminders",  "bx-bell",            "/fees/dues",                         "#ff8a00", "fees.view",       fees),
                 // Was /ERP/Reports, which does not exist.
                 ("Reports",    "bx-bar-chart-alt-2", "/fees/reports",                      "#009688", "fees.view",       fees),
-                ("Settings",   "bx-cog",             "/ERP/SchoolSettings/BasicProfile",   "#6b7280", "settings.view",   true),
+                ("Settings",   "bx-cog",             "/school/profile",                    "#6b7280", "settings.view",   true),
             };
 
             var links = new List<DashboardLink>();

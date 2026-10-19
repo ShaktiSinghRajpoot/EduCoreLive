@@ -5,9 +5,9 @@ using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.School.Controllers
 {
-    [Area("ERP")]
+    [Area("School")]
     [HasPermission("rbac.manage")]
     public class RolesController : Controller
     {
@@ -39,7 +39,8 @@ namespace educore.Areas.ERP.Controllers
             return off;
         }
 
-        // ── GET: /ERP/Roles ───────────────────────────────────
+        // ── GET: /school/roles ───────────────────────────────────
+        [Route("school/roles")]
         public async Task<IActionResult> Index()
         {
             var roles = await _rbac.GetRolesAsync(TenantId(), SchoolId(), UserId());
@@ -89,7 +90,8 @@ namespace educore.Areas.ERP.Controllers
             return RedirectToAction("Index");
         }
 
-        // ── GET: /ERP/Roles/Permissions/{id} (the matrix) ─────
+        // ── GET: /school/roles/permissions/{id} (the matrix) ─────
+        [Route("school/roles/permissions/{id?}")]
         public async Task<IActionResult> Permissions(int id = 0)
         {
             var matrix = await _rbac.GetMatrixAsync(id, TenantId(), SchoolId(), UserId());

@@ -88,10 +88,10 @@ $(function () {
 
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
     var URL = {
-        data:  '@Url.Action("Data","Rooms",new{area="ERP"})',
-        usage: '@Url.Action("Usage","Rooms",new{area="ERP"})',
-        save:  '@Url.Action("Save","Rooms",new{area="ERP"})',
-        del:   '@Url.Action("Delete","Rooms",new{area="ERP"})'
+        data:  '@Url.Action("Data","Rooms",new{area="School"})',
+        usage: '@Url.Action("Usage","Rooms",new{area="School"})',
+        save:  '@Url.Action("Save","Rooms",new{area="School"})',
+        del:   '@Url.Action("Delete","Rooms",new{area="School"})'
     };
     var CAN_MANAGE = @(canManage ? "true" : "false");
     var DAYS = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

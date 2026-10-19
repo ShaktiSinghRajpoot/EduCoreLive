@@ -419,7 +419,7 @@ namespace educore.Controllers
             {
                 "Super Admin"  => RedirectToAction("SchoolList",   "Schools",        new { area = "SuperAdmin" }),
                 "Tenant Admin" => RedirectToAction("SchoolList",   "Schools",        new { area = "SuperAdmin" }),
-                "School Admin" => RedirectToAction("BasicProfile", "SchoolSettings", new { area = "ERP" }),
+                "School Admin" => RedirectToAction("BasicProfile", "SchoolSettings", new { area = "School" }),
                 _              => RedirectToAction("Index",        "Dashboards",     new { area = "" })
             };
         }

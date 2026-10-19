@@ -1,4 +1,4 @@
-using educore.Areas.ERP.Controllers;   // the timetable / period payload classes still live beside SchoolSettingsController
+using educore.Areas.School.Controllers;   // the timetable / period payload classes still live beside SchoolSettingsController
 using educore.Helpers;
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;

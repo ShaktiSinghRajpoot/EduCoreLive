@@ -23,13 +23,13 @@
             <div class="ec-page-subtitle">Tick what this role can do. <strong>Manage</strong> includes create, edit &amp; delete; it also grants <strong>View</strong>.</div>
           </div>
         </div>
-        <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Roles" asp-action="Index">
+        <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="School" asp-controller="Roles" asp-action="Index">
           <i class="bx bx-arrow-back"></i><span>Back to Roles</span>
         </a>
       </div>
     </div>
 
-    <form asp-area="ERP" asp-controller="Roles" asp-action="SavePermissions" method="post">
+    <form asp-area="School" asp-controller="Roles" asp-action="SavePermissions" method="post">
       @Html.AntiForgeryToken()
       <input type="hidden" name="roleId" value="@Model.RoleId" />
 

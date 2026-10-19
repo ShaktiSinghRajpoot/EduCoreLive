@@ -23,7 +23,7 @@
     var mods = await Modules.GetAsync();
     // a controller that moved out of ERP into its module's area
     string AreaOf(string controller) =>
-        educore.Helpers.LegacyErpRedirect.MovedControllers.TryGetValue(controller, out var area) ? area : "ERP";
+        educore.Helpers.LegacyErpRedirect.MovedControllers.TryGetValue(controller, out var area) ? area : "School";
     bool Off(string group) => (group == "Transport" && !mods.EnableTransport)
                            || (group == "Examinations" && !mods.EnableExams)
                            || (group == "Inventory" && !mods.EnableInventory);

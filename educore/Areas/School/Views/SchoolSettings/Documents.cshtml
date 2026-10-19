@@ -217,7 +217,7 @@
                 var $btn = $(this);
                 EC.buttonBusy($btn, 'Saving…');
                 $.ajax({
-                    url: '@Url.Action("SaveTcFormat", "SchoolSettings", new { area = "ERP" })',
+                    url: '@Url.Action("SaveTcFormat", "SchoolSettings", new { area = "School" })',
                     type: 'POST',
                     contentType: 'application/json',
                     headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
@@ -244,7 +244,7 @@
                 var $btn = $(this);
                 EC.buttonBusy($btn, 'Saving…');
                 $.ajax({
-                    url: '@Url.Action("SaveIdCardFormat", "SchoolSettings", new { area = "ERP" })',
+                    url: '@Url.Action("SaveIdCardFormat", "SchoolSettings", new { area = "School" })',
                     type: 'POST',
                     contentType: 'application/json',
                     headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },

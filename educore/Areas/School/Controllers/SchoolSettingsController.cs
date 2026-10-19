@@ -9,9 +9,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System.Threading.Tasks;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.School.Controllers
 { 
-    [Area("ERP")]
+    [Area("School")]
     //[Authorize(Roles = AppRoles.SchoolAdmin)]
     public class SchoolSettingsController : Controller
     {
@@ -41,7 +41,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         #region BasicProfile
-        [HttpGet]
+        [HttpGet("school/profile")]
         [HasPermission("settings.view")]
         public async Task<IActionResult> BasicProfile()
         {
@@ -59,7 +59,7 @@ namespace educore.Areas.ERP.Controllers
             return View(model);
         }
 
-        [HttpPost]
+        [HttpPost("school/profile")]
         [ValidateAntiForgeryToken]
         [HasPermission("settings.manage")]
         public async Task<IActionResult> BasicProfile(SchoolManageModel model, IFormFile? LogoImageFile)
@@ -224,7 +224,7 @@ namespace educore.Areas.ERP.Controllers
         // ── School Setup › Seal & Signature ─────────────────────────────────────
         // The head of school's signature and the school seal, printed on certificates,
         // report cards, circulars, TC and admit cards (Views/Shared/_HeadSignature).
-        [HttpGet]
+        [HttpGet("school/seal")]
         [HasPermission("settings.view")]
         public async Task<IActionResult> SealSignature()
         {
@@ -366,7 +366,7 @@ namespace educore.Areas.ERP.Controllers
         // Print formats for everything the school hands out (fee receipt today; TC and
         // ID card once those documents exist). The school profile holds identity data —
         // how a document prints belongs here, not there.
-        [HttpGet]
+        [HttpGet("school/documents")]
         [HasPermission("settings.view")]
         public async Task<IActionResult> Documents()
         {
@@ -426,6 +426,7 @@ namespace educore.Areas.ERP.Controllers
             return RedirectToAction("EnquiryCRM", "Enquiry", new { area = "Students" });
         }
         [HasPermission("academics.view")]
+        [Route("school/subjects")]
         public async Task<IActionResult> SubjectManagement(int academicYearId = 0)
         {
             // class_subjects is keyed per session, so the page needs to know which
@@ -492,6 +493,7 @@ namespace educore.Areas.ERP.Controllers
         // page for academic structure (replaces the old AcademicSetup page); it
         // reads/writes through the same academic-setup stored procedure.
         [HasPermission("academics.view")]
+        [Route("school/classes")]
         public async Task<IActionResult> ClassSection(int academicYearId = 0)
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -737,6 +739,7 @@ namespace educore.Areas.ERP.Controllers
         #region AcademicYear
         // Academic Year / Session management — create, edit, set-current, delete.
         [HasPermission("settings.view")]
+        [Route("school/sessions")]
         public async Task<IActionResult> AcademicYears()
         {
             int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
@@ -843,7 +846,7 @@ namespace educore.Areas.ERP.Controllers
         private int SmSchool() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
         private int SmUser()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
-        [HttpGet]
+        [HttpGet("school/class-teachers")]
         [HasPermission("academics.view")]
         public async Task<IActionResult> AssignClassTeacher(int academicYearId = 0)
         {
@@ -875,7 +878,7 @@ namespace educore.Areas.ERP.Controllers
 
         public class AssignClassTeacherDto { public int SectionId { get; set; } public int? StaffId { get; set; } }
 
-        [HttpPost]
+        [HttpPost("school/class-teachers")]
         [ValidateAntiForgeryToken]
         [HasPermission("academics.manage")]
         public async Task<IActionResult> AssignClassTeacher([FromBody] AssignClassTeacherDto dto)
@@ -892,6 +895,7 @@ namespace educore.Areas.ERP.Controllers
         // the exam periods sit on the same calendar. Every member of staff can SEE
         // it; changing anything needs academics.manage.
         [Authorize(Policy = "SchoolUserOnly")]
+        [Route("school/calendar")]
         public async Task<IActionResult> SchoolCalendar()
         {
             // Add / edit / delete buttons are shown only with academics.manage

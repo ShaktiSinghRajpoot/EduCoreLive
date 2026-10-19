@@ -63,7 +63,7 @@
 @section PageScripts {
 <script>
 $(function () {
-    var DATA_URL = '@Url.Action("Data", "MessageLog", new { area = "ERP" })';
+    var DATA_URL = '@Url.Action("Data", "MessageLog", new { area = "School" })';
     var TYPES = { Absent: 'Absent alert', FeeDue: 'Fee reminder', Notice: 'Notice' };
     var BADGE = { Sent: 'bg-label-success', Test: 'bg-label-warning', Failed: 'bg-label-danger', NoPhone: 'bg-label-secondary' };
     var r0 = EC.dateRange('month');

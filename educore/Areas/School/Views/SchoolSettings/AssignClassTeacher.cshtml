@@ -130,10 +130,10 @@
 (function(){
 'use strict';
 
-var GRID_URL   = '@Url.Action("ClassTeacherGrid", "SchoolSettings", new { area = "ERP" })';
+var GRID_URL   = '@Url.Action("ClassTeacherGrid", "SchoolSettings", new { area = "School" })';
 var SESSION_ID = @(ViewBag.AcademicYearId ?? 0);
-var POOL_URL   = '@Url.Action("ClassTeacherPool", "SchoolSettings", new { area = "ERP" })';
-var ASSIGN_URL = '@Url.Action("AssignClassTeacher", "SchoolSettings", new { area = "ERP" })';
+var POOL_URL   = '@Url.Action("ClassTeacherPool", "SchoolSettings", new { area = "School" })';
+var ASSIGN_URL = '@Url.Action("AssignClassTeacher", "SchoolSettings", new { area = "School" })';
 var CAN_MANAGE = @(canManage ? "true" : "false");   // view-only roles see the picker locked
 var TOKEN      = $('input[name="__RequestVerificationToken"]').first().val();
 

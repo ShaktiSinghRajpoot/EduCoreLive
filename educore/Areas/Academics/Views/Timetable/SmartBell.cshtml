@@ -125,7 +125,7 @@
 var SEED=@Html.Raw(ViewBag.BellStateJson ?? "{}");
 var SYNC_URL='@Url.Action("SmartBellState","Timetable",new{area="Academics"})';
 var PERIOD_URL='@Url.Action("PeriodStructure","Timetable",new{area="Academics"})';
-var CAL_URL='@Url.Action("SchoolCalendar","SchoolSettings",new{area="ERP"})';
+var CAL_URL='@Url.Action("SchoolCalendar","SchoolSettings",new{area="School"})';
 
 var SYNC_EVERY_MS=5*60*1000;   // routine drift correction
 var SYNC_MIN_GAP_MS=20*1000;   // don't hammer the endpoint

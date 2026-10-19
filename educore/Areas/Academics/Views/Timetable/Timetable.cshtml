@@ -626,7 +626,7 @@ $(function () {
 <script>
 // Room suggestions from School Setup › Rooms. Typing a new name still works.
 $(function () {
-    $.getJSON('@Url.Action("Names","Rooms",new{area="ERP"})').done(function (names) {
+    $.getJSON('@Url.Action("Names","Rooms",new{area="School"})').done(function (names) {
         $('#mRoomList').html((names || []).map(function (n) { return '<option value="' + EC.esc(n) + '"></option>'; }).join(''));
     });
 });

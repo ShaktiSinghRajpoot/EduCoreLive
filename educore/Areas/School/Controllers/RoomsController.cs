@@ -3,15 +3,15 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.School.Controllers
 {
     /// <summary>
-    /// School Setup › Rooms (/ERP/Rooms): the school's rooms, how many periods a week each
+    /// School Setup › Rooms (/school/rooms): the school's rooms, how many periods a week each
     /// is booked in the timetable, each room's week, and rooms the timetable uses that are
     /// not in the list. Seeing needs academics.view, changing academics.manage (the same
     /// keys as the Timetable, which books the rooms).
     /// </summary>
-    [Area("ERP")]
+    [Area("School")]
     [HasPermission("academics.view")]
     public class RoomsController : Controller
     {
@@ -22,6 +22,7 @@ namespace educore.Areas.ERP.Controllers
             _rooms = rooms;
         }
 
+        [Route("school/rooms")]
         public async Task<IActionResult> Index()
         {
             ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "academics.manage");

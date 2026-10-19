@@ -70,7 +70,7 @@
                   @* School Admin bypasses permission checks, so its 0 granted rows mean "everything". *@
                   <td><span class="rl-count">@(r.RoleCode == "SCHOOL_ADMIN" ? "All permissions" : $"{r.PermissionCount} granted")</span></td>
                   <td class="text-end">
-                    <a class="btn btn-sm btn-outline-primary" asp-area="ERP" asp-controller="Roles" asp-action="Permissions" asp-route-id="@r.RoleId">
+                    <a class="btn btn-sm btn-outline-primary" asp-area="School" asp-controller="Roles" asp-action="Permissions" asp-route-id="@r.RoleId">
                       <i class="bx bx-slider-alt me-1"></i>Permissions
                     </a>
                     @if (!r.IsBuiltin)
@@ -79,7 +79,7 @@
                               onclick="editRole(@r.RoleId, '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(r.RoleName))', '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(r.Description ?? ""))')">
                         <i class="bx bx-edit"></i>
                       </button>
-                      <form asp-area="ERP" asp-controller="Roles" asp-action="Delete" method="post" class="d-inline"
+                      <form asp-area="School" asp-controller="Roles" asp-action="Delete" method="post" class="d-inline"
                             data-ec-confirm="Delete this role?"
                             data-ec-confirm-name="@r.RoleName"
                             data-ec-confirm-message="Users must be reassigned first."
@@ -104,7 +104,7 @@
 <!-- Add / Edit role modal -->
 <div class="modal fade" id="roleModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
-    <form asp-area="ERP" asp-controller="Roles" asp-action="Save" method="post" class="modal-content">
+    <form asp-area="School" asp-controller="Roles" asp-action="Save" method="post" class="modal-content">
       @Html.AntiForgeryToken()
       <input type="hidden" name="RoleId" id="rmRoleId" value="0" />
       <div class="modal-header">

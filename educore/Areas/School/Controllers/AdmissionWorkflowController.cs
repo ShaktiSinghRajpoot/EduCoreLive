@@ -1,4 +1,4 @@
-﻿using EduCoreDataAccessLayer.Helpers;
+using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
@@ -6,9 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.School.Controllers
 {
-    [Area("ERP")]
+    [Area("School")]
     //[Authorize(Roles = AppRoles.SchoolAdmin)]
     [HasPermission("admission_workflow.view")]
     public class AdmissionWorkflowController : Controller
@@ -26,7 +26,7 @@ namespace educore.Areas.ERP.Controllers
 
         #region Workflow Settings
 
-        [HttpGet]
+        [HttpGet("school/modules")]
         public async Task<IActionResult> WorkflowSettings()
         {
             var model = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
