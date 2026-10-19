@@ -107,7 +107,7 @@
                         }
                         @if (Model.ShowFinance)
                         {
-                            <a href="/ERP/FeeDueReminders" class="btn btn-sm btn-outline-light"><i class="bx bx-bell me-1"></i>Send Reminders</a>
+                            <a href="/ERP/FeeDues" class="btn btn-sm btn-outline-light"><i class="bx bx-bell me-1"></i>Send Reminders</a>
                         }
                     </div>
                 </div>
@@ -459,7 +459,7 @@
             <div class="dash-card h-100">
                 <div class="dash-card-head d-flex justify-content-between align-items-center">
                     <div><h5 class="dash-card-title">Top Fee Defaulters</h5><small class="dash-sub">Highest outstanding dues</small></div>
-                    <a href="/ERP/FeeDueReminders" class="btn btn-sm btn-primary">Remind All</a>
+                    <a href="/ERP/FeeDues" class="btn btn-sm btn-primary">Remind All</a>
                 </div>
                 <div class="dash-card-body dash-scroll">
                     @if (!Model.Defaulters.Any())
@@ -476,7 +476,7 @@
                             </div>
                             <div class="text-end">
                                 <div class="fw-bold" style="color:#dc2626">@Money(d.Due)</div>
-                                <a href="/ERP/FeeDueReminders" class="small" style="color:var(--ec-primary)"><i class="bx bx-bell"></i> Remind</a>
+                                <a href="/ERP/FeeDues" class="small" style="color:var(--ec-primary)"><i class="bx bx-bell"></i> Remind</a>
                             </div>
                         </div>
                     }
@@ -640,7 +640,7 @@
                     <div><h5 class="dash-card-title">Student Fee Matrix</h5><small class="dash-sub">Top @Model.Defaulters.Count by outstanding due</small></div>
                     <div class="d-flex flex-column flex-sm-row gap-2 w-100 w-lg-auto">
                         <input type="search" class="form-control dash-search" placeholder="Search student or class...">
-                        <a href="/ERP/FeeDueReminders" class="btn btn-primary"><i class="bx bx-bell me-1"></i>Remind Defaulters</a>
+                        <a href="/ERP/FeeDues" class="btn btn-primary"><i class="bx bx-bell me-1"></i>Remind Defaulters</a>
                     </div>
                 </div>
                 <div class="table-responsive">

@@ -40,6 +40,7 @@ DECLARE
     v_upto  date;
     v_from  date;
     v_start date;
+    v_hold  integer;
     v_class varchar := NULLIF(trim(COALESCE(p_class, '')), '');
     v_sec   varchar := NULLIF(trim(COALESCE(p_section, '')), '');
 BEGIN
@@ -85,7 +86,8 @@ BEGIN
     SELECT l.student_id,
            date_trunc('month', COALESCE(NULLIF(l.due_date, '')::date, v_start))::date AS month,
            l.amount_due, l.amount_paid + l.concession AS settled,
-           GREATEST(l.amount_due - l.amount_paid - l.concession, 0) AS pending
+           GREATEST(l.amount_due - l.amount_paid - l.concession, 0) AS pending,
+           (l.fee_head_name = 'Late Fee') AS is_late   -- money owed, but not a "month pending" of its own
       FROM core.student_ledger l
       JOIN _fmd_kids k ON k.student_id = l.student_id
      WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
@@ -110,12 +112,17 @@ BEGIN
                            AND NOT COALESCE(c.is_deleted, FALSE)), 999),
               k.class_name, k.section;
 
+    -- hold after N months pending (fee_dues_followup.sql; 0 = no hold rule)
+    SELECT hold_after_months INTO v_hold FROM core.fee_dues_settings WHERE tenant_id = p_tenant_id AND school_id = p_school_id;
+    v_hold := COALESCE(v_hold, 3);
+
     OPEN p_students FOR
     WITH pend AS (
         SELECT student_id, SUM(pending) AS pending,
-               COUNT(DISTINCT month) FILTER (WHERE pending > 0)::int AS months_count,
-               string_agg(DISTINCT to_char(month, 'YYYY-MM'), ',') FILTER (WHERE pending > 0) AS months,
-               MIN(month) FILTER (WHERE pending > 0) AS oldest
+               COUNT(DISTINCT month) FILTER (WHERE pending > 0 AND NOT is_late)::int AS months_count,
+               string_agg(DISTINCT to_char(month, 'YYYY-MM'), ',') FILTER (WHERE pending > 0 AND NOT is_late) AS months,
+               MIN(month) FILTER (WHERE pending > 0 AND NOT is_late) AS oldest,
+               SUM(pending) FILTER (WHERE is_late) AS late_fee
           FROM _fmd_lines GROUP BY student_id
         HAVING SUM(pending) > 0
     ), att AS (
@@ -140,10 +147,23 @@ BEGIN
            COALESCE((SELECT MAX(fp.payment_date) FROM core.fee_payments fp
                       WHERE fp.student_id = k.student_id AND NOT COALESCE(fp.is_cancelled, FALSE)), '') AS last_payment,
            COALESCE(a.last_present, '') AS last_present, a.class_days, a.present_days,
-           (k.kid_status = 'Active' AND a.class_days >= 5 AND a.present_days = 0) AS may_have_left
+           (k.kid_status = 'Active' AND a.class_days >= 5 AND a.present_days = 0) AS may_have_left,
+           COALESCE(p.late_fee, 0) AS late_fee,
+           COALESCE((SELECT to_char(MAX(r.sent_at) AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') FROM core.fee_reminder_log r
+                      WHERE r.tenant_id = p_tenant_id AND r.school_id = p_school_id AND r.student_id = k.student_id
+                        AND COALESCE(r.channels_delivered, '') <> ''), '') AS last_reminded,
+           COALESCE(f.note, '') AS followup_note, COALESCE(f.promise_date::text, '') AS promise_date,
+           COALESCE(nc.reason, '') AS no_chase,
+           (v_hold > 0 AND p.months_count >= v_hold AND nc.reason IS NULL) AS on_hold
       FROM pend p
       JOIN _fmd_kids k ON k.student_id = p.student_id
       LEFT JOIN att a ON a.student_id = p.student_id
+      -- the latest open follow-up note, and an active "don't chase"
+      LEFT JOIN LATERAL (SELECT fu.note, fu.promise_date FROM core.fee_followups fu
+                          WHERE fu.tenant_id = p_tenant_id AND fu.school_id = p_school_id AND fu.student_id = k.student_id AND NOT fu.is_done
+                          ORDER BY fu.followup_id DESC LIMIT 1) f ON TRUE
+      LEFT JOIN core.fee_no_chase nc ON nc.tenant_id = p_tenant_id AND nc.school_id = p_school_id AND nc.student_id = k.student_id
+                                    AND nc.is_active AND (nc.until_date IS NULL OR nc.until_date >= CURRENT_DATE)
      ORDER BY p.pending DESC, k.student_name;
 END;
 $procedure$;

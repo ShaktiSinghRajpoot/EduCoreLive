@@ -47,6 +47,49 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int     ClassDays    { get; set; }                   // register taken, last 21 days
         public int     PresentDays  { get; set; }                   // the child present, last 21 days
         public bool    MayHaveLeft  { get; set; }
+        public decimal LateFee      { get; set; }                   // late fee lines still owed
+        public string  LastReminded { get; set; } = string.Empty;   // yyyy-MM-dd, a delivered reminder
+        public string  FollowupNote { get; set; } = string.Empty;   // the latest open note
+        public string  PromiseDate  { get; set; } = string.Empty;
+        public string  NoChase      { get; set; } = string.Empty;   // reason, when the child is not chased
+        public bool    OnHold       { get; set; }                   // past the school's hold rule
+    }
+
+    /// <summary>"Father will pay on the 25th" (fee_dues_followup.sql).</summary>
+    public class FeeFollowup
+    {
+        public int    FollowupId  { get; set; }
+        public string Note        { get; set; } = string.Empty;
+        public string PromiseDate { get; set; } = string.Empty;
+        public bool   IsDone      { get; set; }
+        public string CreatedOn   { get; set; } = string.Empty;
+        public string CreatedBy   { get; set; } = string.Empty;
+    }
+
+    /// <summary>The school's late fee and hold rule.</summary>
+    public class FeeDuesSettings
+    {
+        public decimal LateFeeAmount { get; set; }
+        public int     GraceDays     { get; set; } = 10;
+        public int     HoldMonths    { get; set; } = 3;
+    }
+
+    /// <summary>One late fee line the office is about to add.</summary>
+    public class LateFeeLine
+    {
+        public int     StudentId   { get; set; }
+        public string  StudentName { get; set; } = string.Empty;
+        public string  ClassName   { get; set; } = string.Empty;
+        public string  Section     { get; set; } = string.Empty;
+        public string  Month       { get; set; } = string.Empty;   // yyyy-MM
+        public decimal Amount      { get; set; }
+    }
+
+    public class FeeDuesResult
+    {
+        public bool   Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public int    Count   { get; set; }
     }
 
     /// <summary>One child's attendance in a session, for the "may have left" check.</summary>

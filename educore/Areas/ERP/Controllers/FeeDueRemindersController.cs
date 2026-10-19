@@ -34,33 +34,10 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── GET: /ERP/FeeDueReminders ────────────────────────────
-        // One FeeDueItem does it all: filters/sort/page bind in from the query
-        // string, the service fills Items + TotalCount + SumOutstanding. Tenant/
-        // school/user come from CLAIMS only (never model-bound).
         [HttpGet]
-        public async Task<IActionResult> Index(FeeDueItem query)
-        {
-            // Class filter shares the same source as Admission / Student screens.
-            try
-            {
-                query.ClassList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString());
-            }
-            catch {
-                query.ClassList = new();
-            }
-            await _feePaymentService.GetFeeDueListAsync(query, TenantId(), SchoolId(), UserId());
-
-            var (history, sentToday) = await _feePaymentService.GetFeeReminderHistoryAsync(
-                HistoryTake, TenantId(), SchoolId(), UserId());
-            query.History = history;
-            query.SentToday = sentToday;
-
-            // Drives the {school_name} tag in the composer preview.
-            try { ViewBag.SchoolName = (await _schoolSettingsService.GetBasicProfileAsync(TenantId(), SchoolId(), UserId()))?.SchoolName ?? ""; }
-            catch { ViewBag.SchoolName = ""; }
-
-            return View(query);
-        }
+        // Due Reminders moved into Month-wise Dues (19 Oct 2026): tick children there and
+        // "Send reminder", which posts to SendReminders below. Old links land there.
+        public IActionResult Index() => RedirectToAction("Index", "FeeDues", new { area = "ERP" });
 
         // ── POST: /ERP/FeeDueReminders/SendReminders (AJAX) ──────
         // Sends the composed message to the selected students and RECORDS every
