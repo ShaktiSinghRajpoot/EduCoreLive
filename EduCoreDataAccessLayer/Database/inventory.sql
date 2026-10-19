@@ -667,7 +667,7 @@ BEGIN
                             AND l.item_id = i.item_id AND l.quantity > 0
                             AND l.movement_type IN ('Adjustment', 'StockTake')), 0) AS added_qty,
                -- items given to students: which class it is for ('' = every class)
-               COALESCE(i.for_class, '') AS for_class
+               COALESCE(array_to_string(i.for_class, '|'), '') AS for_class
         FROM core.inventory_items i
         CROSS JOIN LATERAL (
             SELECT CASE WHEN p_location_id IS NULL THEN i.current_stock

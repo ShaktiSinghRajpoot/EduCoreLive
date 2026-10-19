@@ -12,8 +12,8 @@
 --     the due list and reminders all see it without knowing about the store.
 --     The fee line's session is the one the items are for: a child promoted
 --     early who buys next year's books in March is charged in 2027-28.
---   * WHICH CLASS an item is for is set on the item itself (inventory_items.for_class:
---     empty = every class, else one class name). Picking a student ticks one of each
+--   * WHICH CLASS an item is for is set on the item itself (inventory_items.for_class, a list since 19 Oct 2026:
+--     empty = every class, else the class names). Picking a student ticks one of each
 --     item for their class; an item sold in sizes ("Uniform - 24", "- 28" ...) is not
 --     ticked, the store picks the size. (2026-10-18: this replaced the separate
 --     "class sets" screen; core.inventory_class_kits is kept but no longer read.)
@@ -50,13 +50,23 @@ CREATE TABLE IF NOT EXISTS core.inventory_class_kits (
 ALTER TABLE core.inventory_class_kits DROP CONSTRAINT IF EXISTS chk_inv_kit_qty;
 ALTER TABLE core.inventory_class_kits ADD CONSTRAINT chk_inv_kit_qty CHECK (quantity >= 0);
 
--- Which class a saleable item is for: NULL = every class.
-ALTER TABLE core.inventory_items ADD COLUMN IF NOT EXISTS for_class varchar(50);
+-- Which classes a saleable item is for: NULL = every class. A list since 19 Oct 2026
+-- (a senior uniform or a lab coat goes to Class 9, 10 and 11); it was one class before.
+-- The app sends and reads it as one text, the names joined by '|'.
+ALTER TABLE core.inventory_items ADD COLUMN IF NOT EXISTS for_class text[];
+DO $fc$
+BEGIN
+    IF (SELECT data_type FROM information_schema.columns
+         WHERE table_schema = 'core' AND table_name = 'inventory_items' AND column_name = 'for_class') <> 'ARRAY' THEN
+        ALTER TABLE core.inventory_items ALTER COLUMN for_class TYPE text[]
+            USING CASE WHEN NULLIF(trim(for_class), '') IS NULL THEN NULL ELSE ARRAY[trim(for_class)::text] END;
+    END IF;
+END $fc$;
 
 -- Moving from class sets: an item that was in exactly one class's set is for that
 -- class; everything else stays "every class". Only items not yet set are touched.
 UPDATE core.inventory_items i
-   SET for_class = k.class_name
+   SET for_class = ARRAY[k.class_name::text]
   FROM (SELECT item_id, MIN(class_name) AS class_name
           FROM core.inventory_class_kits WHERE quantity > 0
          GROUP BY item_id HAVING COUNT(DISTINCT class_name) = 1) k
@@ -150,7 +160,7 @@ BEGIN
         v_loc := COALESCE(p_location_id, core.fn_inventory_default_location(p_tenant_id, p_school_id, p_action_user_id));
         OPEN p_result FOR
         SELECT i.item_id, i.item_name, COALESCE(NULLIF(trim(i.category), ''), 'Other') AS category,
-               i.unit_type, i.selling_price, i.for_class,
+               i.unit_type, i.selling_price, array_to_string(i.for_class, '|') AS for_class,
                COALESCE((SELECT ls.quantity FROM core.inventory_location_stock ls
                           WHERE ls.item_id = i.item_id AND ls.location_id = v_loc), 0) AS in_stock,
                CASE WHEN p_class IS NULL THEN 0
@@ -162,21 +172,25 @@ BEGIN
           FROM core.inventory_items i
          WHERE i.tenant_id = p_tenant_id AND i.school_id = p_school_id
            AND NOT i.is_deleted AND i.is_active AND i.item_type = 'Saleable'
-           AND (p_class IS NULL OR i.for_class IS NULL OR i.for_class = p_class)
+           AND (p_class IS NULL OR i.for_class IS NULL OR p_class = ANY (i.for_class))
          ORDER BY 3, i.item_name;
         RETURN;
     END IF;
 
-    -- ── Which class an item is for (NULL = every class)
+    -- ── Which classes an item is for (NULL = every class), as 'Class 9|Class 10|Class 11'
     IF p_operation = 'ItemClass' THEN
         OPEN p_result FOR
-        SELECT i.item_id, i.for_class FROM core.inventory_items i
+        SELECT i.item_id, array_to_string(i.for_class, '|') AS for_class FROM core.inventory_items i
          WHERE i.item_id = p_item_id AND i.tenant_id = p_tenant_id AND i.school_id = p_school_id;
         RETURN;
     END IF;
     IF p_operation = 'SetItemClass' THEN
         UPDATE core.inventory_items
-           SET for_class = CASE WHEN NULLIF(trim(p_class), '') IS NULL OR trim(p_class) = 'All' THEN NULL ELSE left(trim(p_class), 50) END
+           -- p_class: the class names joined by '|'; none (or 'All') = every class
+           SET for_class = NULLIF(ARRAY(SELECT left(trim(x), 50)
+                                          FROM unnest(string_to_array(COALESCE(p_class, ''), '|')) WITH ORDINALITY AS u(x, n)
+                                         WHERE trim(x) NOT IN ('', 'All')
+                                         ORDER BY n), '{}'::text[])
          WHERE item_id = p_item_id AND tenant_id = p_tenant_id AND school_id = p_school_id;
         OPEN p_result FOR SELECT TRUE AS success, 'Saved.' AS message;
         RETURN;
@@ -434,7 +448,7 @@ BEGIN
     SELECT i.item_id, i.item_name, COALESCE(NULLIF(trim(i.category), ''), 'Other') AS category
       FROM core.inventory_items i
      WHERE i.tenant_id = p_tenant_id AND i.school_id = p_school_id AND NOT i.is_deleted
-       AND ((i.is_active AND i.item_type = 'Saleable' AND (i.for_class IS NULL OR i.for_class = p_class))
+       AND ((i.is_active AND i.item_type = 'Saleable' AND (i.for_class IS NULL OR p_class = ANY (i.for_class)))
             OR EXISTS (SELECT 1 FROM core.inventory_student_sale_lines l
                          JOIN core.inventory_student_sales sa ON sa.sale_id = l.sale_id
                         WHERE l.item_id = i.item_id AND sa.academic_year = p_academic_year
@@ -564,7 +578,8 @@ BEGIN
        AND COALESCE(s.is_active, TRUE);
 
     OPEN p_items FOR
-    SELECT i.item_id, i.item_name, COALESCE(NULLIF(trim(i.category), ''), 'Other') AS category, i.for_class
+    SELECT i.item_id, i.item_name, COALESCE(NULLIF(trim(i.category), ''), 'Other') AS category,
+           array_to_string(i.for_class, '|') AS for_class
       FROM core.inventory_items i
      WHERE i.tenant_id = p_tenant_id AND i.school_id = p_school_id AND NOT i.is_deleted
        AND ((i.is_active AND i.item_type = 'Saleable')

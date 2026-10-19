@@ -35,7 +35,7 @@
         /// Stock added by hand later (Adjustment / stock-take that counted more): no bill either.
         public decimal AddedQty     { get; set; }
 
-        /// Given to students: the class it is for ("" = every class).
+        /// Given to students: the classes it is for, joined by '|' ("" = every class).
         public string  ForClass     { get; set; } = string.Empty;
     }
 
@@ -64,7 +64,7 @@
         /// Where the opening stock goes. Null = the default location.
         public int?    LocationId   { get; set; }
 
-        /// Saleable items: which class it is for (null / "All" = every class).
+        /// Saleable items: the classes it is for, joined by '|' (null = every class).
         public string? ForClass     { get; set; }
 
         /// New saleable item only: "24, 28, 32" makes one item per size,

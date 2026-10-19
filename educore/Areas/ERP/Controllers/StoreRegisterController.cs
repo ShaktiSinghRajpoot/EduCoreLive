@@ -113,7 +113,8 @@ namespace educore.Areas.ERP.Controllers
                 {
                     var kids = g.ToList();
                     // a column counts for this class when any of its items is for every class or for this one
-                    bool ForThis(string col) => itemsOf[col].Any(i => string.IsNullOrEmpty(i.ForClass) || i.ForClass == g.Key.ClassName);
+                    bool ForThis(string col) => itemsOf[col].Any(i => string.IsNullOrEmpty(i.ForClass)
+                                                                      || i.ForClass.Split('|').Contains(g.Key.ClassName));
                     bool Has(int studentId, string col) => itemsOf[col].Any(i => ov.Held.Contains((studentId, i.ItemId)));
                     var mine = columns.Where(ForThis).ToList();
                     return new

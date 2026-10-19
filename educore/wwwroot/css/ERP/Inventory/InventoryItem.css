@@ -171,3 +171,8 @@
     .iv-card-val{ font-size:1.05rem; }
     .iv-card-lbl{ font-size:.62rem; letter-spacing:.02em; }
 }
+
+/* "For which classes?": a wrap of tick pills */
+.ifc-box{ display:flex; flex-wrap:wrap; gap:.35rem; max-height:150px; overflow-y:auto; padding:.4rem; border:1px solid var(--ec-border, #ececf5); border-radius:10px; }
+.ifc-pill{ display:inline-flex; align-items:center; gap:.3rem; padding:.2rem .55rem; border:1px solid var(--ec-border, #ececf5); border-radius:999px; font-size:.8rem; cursor:pointer; margin:0; }
+.ifc-pill:has(input:checked){ background:#fff7e6; border-color:#ff8a00; font-weight:700; }

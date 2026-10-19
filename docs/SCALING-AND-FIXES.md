@@ -5834,3 +5834,8 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 ### 2026-10-19 — Store list shows which class an item is for
 - `sp_inventory_manage` 'ListItems' returns `for_class` ('' = every class). The Store list shows it under "Given to students" ("Class 1" / "All classes", also on the phone card), and a **For class** filter lists what a child of that class can be given (its own items and the all-class ones). Bundle `deploy_2026_10_19a.sql`.
 
+### 2026-10-19 — An item can be for several classes
+- Real schools sell some items to a group of classes (senior uniform / lab coat for Class 9-12), so `inventory_items.for_class` is now `text[]` (NULL = every class); old single values became one-element lists. Procs match with `p_class = ANY (for_class)` and send the list as one text joined by '|' (`array_to_string`); `SetItemClass` takes 'Class 9|Class 10|Class 11'.
+- Store form: **For which classes?** is a wrap of tick pills (none ticked = all classes). The list, phone card, For class filter, Give items badge and the Register overview read the list.
+- Bundle `deploy_2026_10_19b.sql` (column change + sp_inventory_student_sale, sp_inventory_class_register, sp_inventory_register_overview, sp_inventory_manage).
+

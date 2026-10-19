@@ -237,16 +237,16 @@
                                     </select>
                                 </div>
                                 @* Saleable items (books, uniform, diary ...) are given to students: *@
-                                <div class="col-12 col-md-6 col-lg-4 sale-only d-none">
-                                    <label class="form-label">For which class?</label>
-                                    <select class="form-select" id="itemForClass">
-                                        <option value="">All classes</option>
+                                <div class="col-12 sale-only d-none">
+                                    <label class="form-label">For which classes?</label>
+                                    @* one item, one stock, for a group of classes (senior uniform: 9-12) *@
+                                    <div class="ifc-box" id="itemForClass">
                                         @foreach (var c in classes)
                                         {
-                                            <option value="@c.Text">@c.Text</option>
+                                            <label class="ifc-pill"><input type="checkbox" class="form-check-input ifc-cls" value="@c.Text"> @c.Text</label>
                                         }
-                                    </select>
-                                    <div class="form-text">It shows in that class's Books &amp; Uniform register.</div>
+                                    </div>
+                                    <div class="form-text" id="itemForClassHint">None ticked = <b>all classes</b> (tie, diary). Tick a few for an item only they get: senior uniform for Class 9–12, a book for one class.</div>
                                 </div>
                                 <div class="col-12 col-md-6 col-lg-8 sale-only new-only d-none">
                                     <label class="form-label">Sizes <span class="text-muted">(optional)</span></label>
@@ -563,7 +563,7 @@
             if (cat && r.category !== cat) return false;
             if (typ && r.type !== typ) return false;
             // what a child of that class can be given: items for that class and for every class
-            if (cls && (r.type !== 'Saleable' || (r.forClass && r.forClass !== cls))) return false;
+            if (cls && (r.type !== 'Saleable' || (r.forClass && classList(r.forClass).indexOf(cls) < 0))) return false;
             if (stk === 'available' && r.status !== 'Available')    return false;
             if (stk === 'low'       && r.status !== 'Low Stock')    return false;
             if (stk === 'out'       && r.status !== 'Out of Stock') return false;
@@ -594,10 +594,20 @@
         $('#sumValue').text(EC.money(value));
     }
 
-    // Given to students: the class it is for, under the type
+    // Given to students: the classes it is for ('Class 9|Class 10|Class 11'; '' = every class)
+    function classList(v) { return (v || '').split('|').filter(Boolean); }
+    function classText(v) { var l = classList(v); return l.length ? l.join(', ') : 'All classes'; }
     function classNote(r) {
         if (r.type !== 'Saleable') return '';
-        return '<div class="small ' + (r.forClass ? 'text-primary fw-semibold' : 'text-muted') + '">' + EC.esc(r.forClass || 'All classes') + '</div>';
+        return '<div class="small ' + (r.forClass ? 'text-primary fw-semibold' : 'text-muted') + '">' + EC.esc(classText(r.forClass)) + '</div>';
+    }
+    // the form's class ticks
+    function setForClasses(v) {
+        var l = classList(v);
+        $('.ifc-cls').each(function () { this.checked = l.indexOf(this.value) >= 0; });
+    }
+    function forClasses() {
+        return $('.ifc-cls:checked').map(function () { return this.value; }).get().join('|');
     }
 
     // Stock that came in without a supplier bill: entered as "already in school"
@@ -676,7 +686,7 @@
             return '<div class="iv-mob-card">' +
                 '<div class="d-flex justify-content-between align-items-start gap-2">' +
                     '<div><div class="fw-semibold">' + EC.esc(r.name) + '</div>' +
-                        '<div class="text-muted small">' + EC.esc(r.sku || r.category || '') + (r.type === 'Saleable' ? ' · ' + EC.esc(r.forClass || 'All classes') : '') + '</div></div>' +
+                        '<div class="text-muted small">' + EC.esc(r.sku || r.category || '') + (r.type === 'Saleable' ? ' · ' + EC.esc(classText(r.forClass)) : '') + '</div></div>' +
                     statusBadge(r.status) + '</div>' +
                 '<div class="d-flex justify-content-between align-items-center mt-2">' +
                     '<div class="small text-muted">' + EC.num(r.stock) + ' ' + EC.esc(r.unit) +
@@ -720,7 +730,7 @@
         $('#itemStatus').val('Active');
         $('#openingWrap').removeClass('d-none');
         $('#openingLocation').html(locationOptions(0));
-        $('#itemForClass').val('');
+        setForClasses('');
         $('#itemSizes').val('');
         $('#itemModalTitle').text('Add Inventory Item');
         syncSaleFields();
@@ -751,7 +761,7 @@
                 $('#model').val(d.model);
                 $('#description').val(d.description);
                 $('#itemStatus').val(d.isActive ? 'Active' : 'Inactive');
-                $('#itemForClass').val(d.forClass || '');
+                setForClasses(d.forClass);
                 syncSaleFields();
 
                 // Opening stock is only meaningful when creating. Stock moves
@@ -795,7 +805,7 @@
             description:  $.trim($('#description').val()),
             isActive:     $('#itemStatus').val() === 'Active',
             locationId:   EC.num($('#openingLocation').val()) || null,
-            forClass:     $('#itemType').val() === 'Saleable' ? ($('#itemForClass').val() || null) : null,
+            forClass:     $('#itemType').val() === 'Saleable' ? (forClasses() || null) : null,
             sizes:        $('#itemId').val() ? null : ($.trim($('#itemSizes').val()) || null)
         })
         .done(function (res) {

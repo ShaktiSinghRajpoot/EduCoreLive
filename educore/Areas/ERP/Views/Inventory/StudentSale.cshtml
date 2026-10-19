@@ -222,7 +222,7 @@ $(function () {
             if (i.category !== cat) { cat = i.category; html += '<tr class="ss-cat"><td colspan="5">' + EC.esc(cat) + '</td></tr>'; }
             var q = qty[i.id] || 0;
             html += '<tr' + (i.stock <= 0 ? ' class="text-muted"' : '') + '><td>' + EC.esc(i.name)
-                  + (i.forClass ? ' <span class="badge bg-label-info">' + EC.esc(i.forClass) + '</span>' : '') + '</td>'
+                  + (i.forClass ? ' <span class="badge bg-label-info">' + EC.esc(i.forClass.split('|').join(', ')) + '</span>' : '') + '</td>'
                   + '<td class="text-end">' + EC.money(i.price) + '</td>'
                   + '<td class="text-end d-none d-sm-table-cell">' + EC.num(i.stock) + '</td>'
                   + '<td class="text-end"><input type="number" min="0" step="1" class="form-control form-control-sm ss-qty ms-auto" data-id="' + i.id + '" value="' + (q || '') + '"'
