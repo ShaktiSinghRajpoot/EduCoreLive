@@ -487,10 +487,10 @@ SELECT {T}, {S}, v.g, v.a, v.b, v.p, v.r, v.o, {A} FROM (VALUES {gr}) v(g, a, b,
 # ── staff ──
 emit("""
 -- ── 4. Departments, designations, staff ──
-INSERT INTO config.departments (tenant_id, name, sort_order, created_by)
-SELECT {T}, v.n, v.o, {A} FROM (VALUES {dep}) v(n, o);
-INSERT INTO config.designations (tenant_id, name, staff_type, sort_order, default_department, created_by)
-SELECT {T}, v.n, v.t, v.o, v.d, {A} FROM (VALUES {des}) v(n, t, o, d);
+INSERT INTO config.departments (tenant_id, school_id, name, sort_order, created_by)
+SELECT {T}, {S}, v.n, v.o, {A} FROM (VALUES {dep}) v(n, o);
+INSERT INTO config.designations (tenant_id, school_id, name, staff_type, sort_order, default_department, created_by)
+SELECT {T}, {S}, v.n, v.t, v.o, v.d, {A} FROM (VALUES {des}) v(n, t, o, d);
 INSERT INTO core.staff (tenant_id, school_id, employee_code, full_name, gender, dob, mobile, email, address, staff_type,
                         department, designation, joining_date, qualification, experience_years, status, monthly_salary,
                         bank_account_no, ifsc_code, user_id, created_by)
@@ -1085,7 +1085,12 @@ BEGIN
                                          NULL, h.assigned, h.due, FALSE, NULL, NULL, NULL, r);
         CLOSE r;
         SELECT max(homework_id) INTO v_id FROM academic.homework WHERE school_id = {S} AND academic_class_section_id = h.sec_id;
-        UPDATE academic.homework SET created_at = h.assigned + time '13:40' WHERE homework_id = v_id;
+        -- given by the subject's teacher in that class (from the timetable), else the class teacher
+        UPDATE academic.homework hw SET created_at = h.assigned + time '13:40',
+               staff_id = COALESCE((SELECT t.staff_id FROM academic.timetable t
+                                     WHERE t.academic_class_section_id = h.sec_id AND t.subject_id = h.subject_id LIMIT 1),
+                                   (SELECT class_teacher_staff_id FROM academic.academic_class_sections WHERE academic_class_section_id = h.sec_id))
+         WHERE homework_id = v_id;
         IF h.due < DATE __TODAY__ THEN
             SELECT array_agg(st.student_id), array_agg(CASE WHEN abs(hashtext(st.admission_no || v_id)) % 9 = 0 THEN 'NotDone' ELSE 'Done' END)
               INTO v_ids, v_st

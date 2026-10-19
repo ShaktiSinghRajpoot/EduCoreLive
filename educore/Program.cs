@@ -353,6 +353,9 @@ app.Use(async (context, next) =>
 if (requireHttps)
     app.UseHttpsRedirection();
 
+// Uploads open only for someone signed in to that school (before the static files below).
+educore.Helpers.UploadsGuard.UseUploadsGuard(app);
+
 app.UseStaticFiles();
 
 // Uploaded files (student photos, school logos). They are served from the same
