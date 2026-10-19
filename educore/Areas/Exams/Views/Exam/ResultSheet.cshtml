@@ -27,7 +27,7 @@
                         <div class="ec-page-subtitle">Marks, total, percentage, grade and rank for a class, and publishing the results</div>
                     </div>
                 </div>
-                <a asp-area="ERP" asp-controller="Exam" asp-action="GradeScale"
+                <a asp-area="Exams" asp-controller="Exam" asp-action="GradeScale"
                    class="btn btn-outline-secondary d-flex align-items-center gap-1">
                     <i class="bx bx-award"></i><span class="d-none d-sm-inline">Grade Scale</span>
                 </a>
@@ -38,7 +38,7 @@
         {
             <div class="alert alert-warning rs-no-print" style="border-radius:12px;font-weight:700;">
                 No published exams yet. Publish an exam on the
-                <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam">Exam Schedule</a> page and enter its marks first.
+                <a asp-area="Exams" asp-controller="Exam" asp-action="CreateExam">Exam Schedule</a> page and enter its marks first.
             </div>
         }
 
@@ -139,13 +139,13 @@
 $(document).ready(function () {
 
     var urls = {
-        classes:   '@Url.Action("ExamClasses", "Exam", new { area = "ERP" })',
-        setup:     '@Url.Action("ClassSetup", "Exam", new { area = "ERP" })',
-        status:    '@Url.Action("ResultStatus", "Exam", new { area = "ERP" })',
-        result:    '@Url.Action("ClassResult", "Exam", new { area = "ERP" })',
-        csv:       '@Url.Action("ClassResultCsv", "Exam", new { area = "ERP" })',
-        publish:   '@Url.Action("PublishResults", "Exam", new { area = "ERP" })',
-        unpublish: '@Url.Action("UnpublishResults", "Exam", new { area = "ERP" })'
+        classes:   '@Url.Action("ExamClasses", "Exam", new { area = "Exams" })',
+        setup:     '@Url.Action("ClassSetup", "Exam", new { area = "Exams" })',
+        status:    '@Url.Action("ResultStatus", "Exam", new { area = "Exams" })',
+        result:    '@Url.Action("ClassResult", "Exam", new { area = "Exams" })',
+        csv:       '@Url.Action("ClassResultCsv", "Exam", new { area = "Exams" })',
+        publish:   '@Url.Action("PublishResults", "Exam", new { area = "Exams" })',
+        unpublish: '@Url.Action("UnpublishResults", "Exam", new { area = "Exams" })'
     };
 
     var selExam    = document.getElementById('selExam');

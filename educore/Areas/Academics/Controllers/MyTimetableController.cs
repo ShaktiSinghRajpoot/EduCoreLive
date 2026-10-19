@@ -1,12 +1,13 @@
+using educore.Helpers;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Academics.Controllers
 {
     /// <summary>
-    /// "My Timetable" (/ERP/MyTimetable) -- a teacher's own week, and requesting
+    /// "My Timetable" (/my-timetable) -- a teacher's own week, and requesting
     /// periods. A request stays Pending until an admin approves it on the
     /// Timetable page; only then does it go live.
     ///
@@ -14,7 +15,8 @@ namespace educore.Areas.ERP.Controllers
     /// permission, and the proc resolves the teacher from the logged-in user on
     /// every call. No action takes a staff id from the browser.
     /// </summary>
-    [Area("ERP")]
+    [Area("Academics")]
+    [RequiresModule(SchoolModule.Academics)]
     [Authorize(Policy = "SchoolUserOnly")]
     public class MyTimetableController : Controller
     {
@@ -29,7 +31,7 @@ namespace educore.Areas.ERP.Controllers
             _att = att;
         }
 
-        [HttpGet]
+        [HttpGet("my-timetable")]
         public async Task<IActionResult> Index()
         {
             ViewBag.Me = await _self.GetMeAsync(TenantId(), SchoolId(), UserId());

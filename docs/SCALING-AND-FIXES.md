@@ -5889,3 +5889,7 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - **Departments & Designations** left `SchoolSettingsController`: `Areas/Staff/Controllers/StaffMastersController.cs` (unchanged code), page `/staff/departments`.
 - `LegacyErpRedirect` carries an id over for pages with one: `/ERP/Staff/StaffProfile/{id}` -> `/staff/profile/{id}`. AddStaff / EditStaff have the same route on GET and POST, so the forms post to the short address.
 - Menu: the Fees group no longer opens on the Fee Setup pages (both start with `/fees`), and the Staff group not on `/staff/departments`.
+
+### 2026-10-19 — Module areas, phases 6 and 7: Exams, Academics
+- **Exams**: `Exam`, `AdmitCard`, `ReportCard` to `Areas/Exams`. Pages `/exams/schedule`, `/exams/datesheet`, `/exams/marks`, `/exams/results`, `/exams/grades`, `/exams/admit-cards`, `/exams/report-cards`; print pages keep `/exams/{controller}/print?...`.
+- **Academics**: `Homework`, `MyTimetable` to `Areas/Academics`, both now `[RequiresModule(SchoolModule.Academics)]`. The Timetable + PeriodStructure regions (timetable, school view, teacher requests, periods, Smart Bell) left `SchoolSettingsController` for `Areas/Academics/Controllers/TimetableController.cs` (unchanged code; its payload classes still sit beside SchoolSettingsController). Pages `/academics/timetable`, `/academics/timetable/school`, `/academics/periods`, `/academics/smart-bell`, `/academics/homework`, `/my-timetable`.

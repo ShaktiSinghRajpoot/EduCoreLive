@@ -173,8 +173,8 @@
 (function(){
 'use strict';
 
-var SAVE_URL='@Url.Action("SavePeriodStructure","SchoolSettings",new{area="ERP"})';
-var DEFAULT_URL='@Url.Action("UseDefaultPeriodSchedule","SchoolSettings",new{area="ERP"})';
+var SAVE_URL='@Url.Action("SavePeriodStructure","Timetable",new{area="Academics"})';
+var DEFAULT_URL='@Url.Action("UseDefaultPeriodSchedule","Timetable",new{area="Academics"})';
 var seed=@Html.Raw(ViewBag.PeriodJson ?? "[]");
 var weeklyOffs=@Html.Raw(ViewBag.WeeklyOffJson ?? "[0]");
 

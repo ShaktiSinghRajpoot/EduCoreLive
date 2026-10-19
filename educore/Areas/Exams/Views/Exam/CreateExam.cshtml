@@ -36,7 +36,7 @@
                         </div>
                     </div>
                 </div>
-                <a asp-area="ERP" asp-controller="Exam" asp-action="Datesheet"
+                <a asp-area="Exams" asp-controller="Exam" asp-action="Datesheet"
                    class="btn btn-outline-secondary d-flex align-items-center gap-1">
                     <i class="bx bx-calendar"></i><span class="d-none d-sm-inline">Datesheet</span>
                 </a>
@@ -244,13 +244,13 @@
 $(document).ready(function () {
 
     var urls = {
-        subjects: '@Url.Action("Subjects", "Exam", new { area = "ERP" })',
-        sections: '@Url.Action("ClassSections", "Exam", new { area = "ERP" })',
-        list:     '@Url.Action("ExamList", "Exam", new { area = "ERP" })',
-        exam:     '@Url.Action("Exam", "Exam", new { area = "ERP" })',
-        save:     '@Url.Action("SaveExam", "Exam", new { area = "ERP" })',
-        status:   '@Url.Action("SetExamStatus", "Exam", new { area = "ERP" })',
-        remove:   '@Url.Action("DeleteExam", "Exam", new { area = "ERP" })'
+        subjects: '@Url.Action("Subjects", "Exam", new { area = "Exams" })',
+        sections: '@Url.Action("ClassSections", "Exam", new { area = "Exams" })',
+        list:     '@Url.Action("ExamList", "Exam", new { area = "Exams" })',
+        exam:     '@Url.Action("Exam", "Exam", new { area = "Exams" })',
+        save:     '@Url.Action("SaveExam", "Exam", new { area = "Exams" })',
+        status:   '@Url.Action("SetExamStatus", "Exam", new { area = "Exams" })',
+        remove:   '@Url.Action("DeleteExam", "Exam", new { area = "Exams" })'
     };
 
     var SESSION_ID = @sessionId;
@@ -259,7 +259,7 @@ $(document).ready(function () {
     // Changing the session reloads the page: the class list, subjects and exam
     // list all belong to one session, so a partial refresh would mix them.
     $('#sessionSel').on('change', function () {
-        window.location.href = '@Url.Action("CreateExam", "Exam", new { area = "ERP" })' + '?sessionId=' + EC.num(this.value);
+        window.location.href = '@Url.Action("CreateExam", "Exam", new { area = "Exams" })' + '?sessionId=' + EC.num(this.value);
     });
 
     var editingId = 0;

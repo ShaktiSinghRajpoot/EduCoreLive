@@ -5,16 +5,17 @@ using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Academics.Controllers
 {
     /// <summary>
-    /// Homework (/ERP/Homework). Teachers give homework to a class section and
+    /// Homework (/academics/homework). Teachers give homework to a class section and
     /// tick who did it; anyone with academics.view sees all of it, academics.manage
     /// may change anyone's. A teacher needs no permission key: having a staff
     /// record is enough (like My Timetable), and the procedure only lets them
     /// change their own homework.
     /// </summary>
-    [Area("ERP")]
+    [Area("Academics")]
+    [RequiresModule(SchoolModule.Academics)]
     [Authorize(Policy = "SchoolUserOnly")]
     public class HomeworkController : Controller
     {
@@ -29,6 +30,7 @@ namespace educore.Areas.ERP.Controllers
             _self = self;
         }
 
+        [Route("academics/homework")]
         public async Task<IActionResult> Index()
         {
             if (!await AllowedAsync()) return Forbid();
@@ -45,7 +47,7 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        // ── GET: /ERP/Homework/Sections ── class sections of the current session
+        // ── GET: /academics/homework/sections ── class sections of the current session
         [HttpGet]
         public async Task<IActionResult> Sections(bool mine = false)
         {
@@ -62,7 +64,7 @@ namespace educore.Areas.ERP.Controllers
             return Json(sections.Select(s => new { id = s.SectionId, label = s.Label }));
         }
 
-        // ── GET: /ERP/Homework/Subjects?sectionId= ── the subjects of that section's class
+        // ── GET: /academics/homework/subjects?sectionId= ── the subjects of that section's class
         [HttpGet]
         public async Task<IActionResult> Subjects(int sectionId)
         {
@@ -79,7 +81,7 @@ namespace educore.Areas.ERP.Controllers
             return Json(subjects.Select(s => new { id = s.SubjectId, name = s.SubjectName }));
         }
 
-        // ── GET: /ERP/Homework/Overview ── who is (not) giving homework; reports.view only
+        // ── GET: /academics/homework/overview ── who is (not) giving homework; reports.view only
         [HttpGet]
         [HasPermission("reports.view")]
         public async Task<IActionResult> Overview(string? from, string? to, string? cls)

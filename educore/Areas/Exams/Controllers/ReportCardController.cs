@@ -6,12 +6,12 @@ using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Exams.Controllers
 {
     // Report cards: pick an exam whose RESULTS are published, a class and
     // (optionally) a section, and print one report card per student. The class
     // and section lists come from the admit-card page (same exam / class rules).
-    [Area("ERP")]
+    [Area("Exams")]
     [HasPermission("exams.view")]
     [RequiresModule(SchoolModule.Exams)]
     public class ReportCardController : Controller
@@ -34,7 +34,7 @@ namespace educore.Areas.ERP.Controllers
             _baseService = baseService;
         }
 
-        [HttpGet]
+        [HttpGet("exams/report-cards")]
         public async Task<IActionResult> Index()
         {
             var exams = new List<SelectListItem>();

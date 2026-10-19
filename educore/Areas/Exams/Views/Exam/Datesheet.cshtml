@@ -32,7 +32,7 @@
                         </div>
                     </div>
                 </div>
-                <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam"
+                <a asp-area="Exams" asp-controller="Exam" asp-action="CreateExam"
                    class="btn btn-outline-secondary d-flex align-items-center gap-1">
                     <i class="bx bx-plus"></i><span class="d-none d-sm-inline">Exam Schedule</span>
                 </a>
@@ -43,7 +43,7 @@
         {
             <div class="alert alert-warning" style="border-radius:12px;font-weight:700;">
                 No exams have been published for @(string.IsNullOrWhiteSpace(yearName) ? "this session" : yearName) yet.
-                <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam">Create an exam schedule</a> first.
+                <a asp-area="Exams" asp-controller="Exam" asp-action="CreateExam">Create an exam schedule</a> first.
             </div>
         }
 
@@ -130,12 +130,12 @@
 <script>
 $(document).ready(function () {
 
-    var urlRows    = '@Url.Action("DatesheetRows", "Exam", new { area = "ERP" })';
+    var urlRows    = '@Url.Action("DatesheetRows", "Exam", new { area = "Exams" })';
     var SESSION_ID = @sessionId;
 
     // A session change reloads: the class and exam pickers belong to one session.
     $('#sessionSel').on('change', function () {
-        window.location.href = '@Url.Action("Datesheet", "Exam", new { area = "ERP" })' + '?sessionId=' + EC.num(this.value);
+        window.location.href = '@Url.Action("Datesheet", "Exam", new { area = "Exams" })' + '?sessionId=' + EC.num(this.value);
     });
 
     var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];

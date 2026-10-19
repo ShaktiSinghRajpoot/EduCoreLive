@@ -172,7 +172,7 @@ namespace educore.Controllers
                 ("Admission",  "bx-user-plus",       "/ERP/Admission/Create",              "#16a34a", "students.manage", true),
                 ("Fees",       "bx-wallet",          "/fees/collect",                      "#0284c7", "fees.view",       fees),
                 ("Attendance", "bx-user-check",      "/ERP/Attendance/StudentAttendance",  "#d97706", "attendance.view", attendance),
-                ("Exams",      "bx-file",            "/ERP/Exam/CreateExam",               "#dc2626", "exams.view",      exams),
+                ("Exams",      "bx-file",            "/exams/schedule",                    "#dc2626", "exams.view",      exams),
                 ("Staff",      "bx-id-card",         "/staff",                             "#9333ea", "staff.view",      true),
                 ("Payroll",    "bx-money",           "/staff/payroll",                     "#16a34a", "payroll.view",    payroll),
                 ("Leave",      "bx-calendar-minus",  "/staff/leave",                       "#e83e8c", "staff.view",      payroll),

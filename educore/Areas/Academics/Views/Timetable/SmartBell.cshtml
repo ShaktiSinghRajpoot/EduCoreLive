@@ -123,8 +123,8 @@
 /* Seed = server wall clock + today's calendar status + the schedule. The browser
    clock is never trusted: it only supplies elapsed time between server syncs. */
 var SEED=@Html.Raw(ViewBag.BellStateJson ?? "{}");
-var SYNC_URL='@Url.Action("SmartBellState","SchoolSettings",new{area="ERP"})';
-var PERIOD_URL='@Url.Action("PeriodStructure","SchoolSettings",new{area="ERP"})';
+var SYNC_URL='@Url.Action("SmartBellState","Timetable",new{area="Academics"})';
+var PERIOD_URL='@Url.Action("PeriodStructure","Timetable",new{area="Academics"})';
 var CAL_URL='@Url.Action("SchoolCalendar","SchoolSettings",new{area="ERP"})';
 
 var SYNC_EVERY_MS=5*60*1000;   // routine drift correction

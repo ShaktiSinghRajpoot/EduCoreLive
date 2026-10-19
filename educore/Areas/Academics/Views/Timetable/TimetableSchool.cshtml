@@ -22,7 +22,7 @@
             <div class="ec-page-subtitle">One day, every class. Click a period (or search a teacher) to see that teacher's whole day.</div>
           </div>
         </div>
-        <a class="tt-btn" href="@Url.Action("Timetable", "SchoolSettings", new { area = "ERP", academicYearId = ViewBag.AcademicYearId })">
+        <a class="tt-btn" href="@Url.Action("Timetable", "Timetable", new { area = "Academics", academicYearId = ViewBag.AcademicYearId })">
           <i class="bx bx-edit"></i>Class / Teacher view
         </a>
       </div>
@@ -76,9 +76,9 @@
 $(function () {
     'use strict';
 
-    var DATA_URL    = '@Url.Action("TimetableSchoolData", "SchoolSettings", new { area = "ERP" })';
-    var APPROVE_URL = '@Url.Action("ApproveTimetableRequest", "SchoolSettings", new { area = "ERP" })';
-    var REJECT_URL  = '@Url.Action("RejectTimetableRequest", "SchoolSettings", new { area = "ERP" })';
+    var DATA_URL    = '@Url.Action("TimetableSchoolData", "Timetable", new { area = "Academics" })';
+    var APPROVE_URL = '@Url.Action("ApproveTimetableRequest", "Timetable", new { area = "Academics" })';
+    var REJECT_URL  = '@Url.Action("RejectTimetableRequest", "Timetable", new { area = "Academics" })';
     var SESSION_ID  = @(ViewBag.AcademicYearId ?? 0);
     var CAN_MANAGE  = @(canManage ? "true" : "false");
 

@@ -91,7 +91,7 @@
             $('#rcSection').html('<option value="">All sections</option>');
             if (!examId) { $cls.prop('disabled', true).html('<option value="">Select exam first</option>'); return; }
 
-            $.getJSON('@Url.Action("Classes", "AdmitCard", new { area = "ERP" })', { examId: examId })
+            $.getJSON('@Url.Action("Classes", "AdmitCard", new { area = "Exams" })', { examId: examId })
             .done(function (list) {
                 var html = '<option value="">Select class</option>';
                 $.each(list || [], function (i, c) {
@@ -107,7 +107,7 @@
             $sec.html('<option value="">All sections</option>');
             if (!$(this).val()) return;
 
-            $.getJSON('@Url.Action("Sections", "AdmitCard", new { area = "ERP" })',
+            $.getJSON('@Url.Action("Sections", "AdmitCard", new { area = "Exams" })',
                 { examId: $('#rcExam').val(), classId: $(this).val() })
             .done(function (list) {
                 $.each(list || [], function (i, s) { $sec.append($('<option>').val(s).text(s)); });
@@ -118,7 +118,7 @@
             if (!$('#rcExam').val())  { ecToast('error', 'Choose an exam.'); return; }
             if (!$('#rcClass').val()) { ecToast('error', 'Choose a class.'); return; }
 
-            window.open('@Url.Action("Print", "ReportCard", new { area = "ERP" })'
+            window.open('@Url.Action("Print", "ReportCard", new { area = "Exams" })'
                 + '?examId='  + encodeURIComponent($('#rcExam').val())
                 + '&classId=' + encodeURIComponent($('#rcClass').val())
                 + '&section=' + encodeURIComponent($('#rcSection').val() || ''), '_blank');

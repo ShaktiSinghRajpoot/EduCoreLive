@@ -107,7 +107,7 @@
           <select class="tt-select" id="pickClass"></select>
           <select class="tt-select d-none" id="pickTeacher"></select>
           <button class="tt-btn" id="btnCopy"><i class="bx bx-copy-alt"></i>Copy Mon → Week</button>
-          <a class="tt-btn" href="@Url.Action("TimetableSchool", "SchoolSettings", new { area = "ERP", academicYearId = ViewBag.AcademicYearId })"><i class="bx bx-grid-alt"></i>School view</a>
+          <a class="tt-btn" href="@Url.Action("TimetableSchool", "Timetable", new { area = "Academics", academicYearId = ViewBag.AcademicYearId })"><i class="bx bx-grid-alt"></i>School view</a>
           <span class="tt-hint ms-auto" id="modeHint"><i class="bx bx-info-circle"></i> Click a cell to assign</span>
         </div>
       </div>
@@ -181,13 +181,13 @@
 /* Everything below is loaded from the server: periods come from Period Structure,
    day columns from the School Calendar's weekly offs, sections/subjects/teachers
    from their own masters. The page stores nothing of its own. */
-var SETUP_URL  ='@Url.Action("TimetableSetup","SchoolSettings",new{area="ERP"})';
+var SETUP_URL  ='@Url.Action("TimetableSetup","Timetable",new{area="Academics"})';
 var SESSION_ID = @(ViewBag.AcademicYearId ?? 0);
-var GRID_URL   ='@Url.Action("TimetableGrid","SchoolSettings",new{area="ERP"})';
-var TEACHER_URL='@Url.Action("TimetableTeacherGrid","SchoolSettings",new{area="ERP"})';
-var SAVE_URL   ='@Url.Action("SaveTimetableCell","SchoolSettings",new{area="ERP"})';
-var CLEAR_URL  ='@Url.Action("ClearTimetableCell","SchoolSettings",new{area="ERP"})';
-var COPY_URL   ='@Url.Action("CopyTimetableDay","SchoolSettings",new{area="ERP"})';
+var GRID_URL   ='@Url.Action("TimetableGrid","Timetable",new{area="Academics"})';
+var TEACHER_URL='@Url.Action("TimetableTeacherGrid","Timetable",new{area="Academics"})';
+var SAVE_URL   ='@Url.Action("SaveTimetableCell","Timetable",new{area="Academics"})';
+var CLEAR_URL  ='@Url.Action("ClearTimetableCell","Timetable",new{area="Academics"})';
+var COPY_URL   ='@Url.Action("CopyTimetableDay","Timetable",new{area="Academics"})';
 
 /* Each weekday can run on its own bell schedule (a short Saturday), so periods
    are kept per day: DAY_PERIODS[dayIdx] = [{id:period_seq, name, time, type}].
@@ -569,9 +569,9 @@ loadSetup();
 <script>
 // Teacher requests: list, approve, reject. The card stays hidden when there are none.
 $(function () {
-    var REQ_URL     = '@Url.Action("TimetableRequests", "SchoolSettings", new { area = "ERP" })';
-    var APPROVE_URL = '@Url.Action("ApproveTimetableRequest", "SchoolSettings", new { area = "ERP" })';
-    var REJECT_URL  = '@Url.Action("RejectTimetableRequest", "SchoolSettings", new { area = "ERP" })';
+    var REQ_URL     = '@Url.Action("TimetableRequests", "Timetable", new { area = "Academics" })';
+    var APPROVE_URL = '@Url.Action("ApproveTimetableRequest", "Timetable", new { area = "Academics" })';
+    var REJECT_URL  = '@Url.Action("RejectTimetableRequest", "Timetable", new { area = "Academics" })';
     var DAY_NAMES   = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     function postReq(url, body) {

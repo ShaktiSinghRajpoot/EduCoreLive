@@ -31,7 +31,7 @@
                     </div>
                 </div>
             </div>
-            <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam"
+            <a asp-area="Exams" asp-controller="Exam" asp-action="CreateExam"
                class="btn btn-outline-secondary d-flex align-items-center gap-1">
                 <i class="bx bx-plus"></i><span class="d-none d-sm-inline">Exam Schedule</span>
             </a>
@@ -42,7 +42,7 @@
     {
         <div class="alert alert-warning" style="border-radius:12px;font-weight:700;">
             No published exams yet. Marks can only be entered once an exam is published on the
-            <a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam">Exam Schedule</a> page.
+            <a asp-area="Exams" asp-controller="Exam" asp-action="CreateExam">Exam Schedule</a> page.
         </div>
     }
 
@@ -211,11 +211,11 @@ $(document).ready(function () {
 'use strict';
 
 var urls = {
-    classes: '@Url.Action("ExamClasses", "Exam", new { area = "ERP" })',
-    setup:   '@Url.Action("ClassSetup", "Exam", new { area = "ERP" })',
-    sheet:   '@Url.Action("Sheet", "Exam", new { area = "ERP" })',
-    save:    '@Url.Action("SaveMarks", "Exam", new { area = "ERP" })',
-    reopen:  '@Url.Action("ReopenSheet", "Exam", new { area = "ERP" })'
+    classes: '@Url.Action("ExamClasses", "Exam", new { area = "Exams" })',
+    setup:   '@Url.Action("ClassSetup", "Exam", new { area = "Exams" })',
+    sheet:   '@Url.Action("Sheet", "Exam", new { area = "Exams" })',
+    save:    '@Url.Action("SaveMarks", "Exam", new { area = "Exams" })',
+    reopen:  '@Url.Action("ReopenSheet", "Exam", new { area = "Exams" })'
 };
 
 var CAN_ENTER_MARKS = @(canEnterMarks ? "true" : "false");

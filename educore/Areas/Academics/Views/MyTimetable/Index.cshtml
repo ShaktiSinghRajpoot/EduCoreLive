@@ -119,10 +119,10 @@ $(function () {
     'use strict';
 
     var URL = {
-        data:     '@Url.Action("Data", "MyTimetable", new { area = "ERP" })',
-        subjects: '@Url.Action("Subjects", "MyTimetable", new { area = "ERP" })',
-        request:  '@Url.Action("SendRequest", "MyTimetable", new { area = "ERP" })',
-        cancel:   '@Url.Action("Cancel", "MyTimetable", new { area = "ERP" })'
+        data:     '@Url.Action("Data", "MyTimetable", new { area = "Academics" })',
+        subjects: '@Url.Action("Subjects", "MyTimetable", new { area = "Academics" })',
+        request:  '@Url.Action("SendRequest", "MyTimetable", new { area = "Academics" })',
+        cancel:   '@Url.Action("Cancel", "MyTimetable", new { area = "Academics" })'
     };
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
     var D = null;          // the page data from URL.data

@@ -7,12 +7,12 @@ using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Exams.Controllers
 {
     // Admit cards: pick a published exam, a class and (optionally) a section, and
     // print one card per student with that exam's datesheet. Built live from the
     // student records (the ID card data) and the datesheet; nothing is stored.
-    [Area("ERP")]
+    [Area("Exams")]
     [HasPermission("exams.view")]
     [RequiresModule(SchoolModule.Exams)]
     public class AdmitCardController : Controller
@@ -38,7 +38,7 @@ namespace educore.Areas.ERP.Controllers
         private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
 
         // The chooser. Only PUBLISHED exams: a draft datesheet can still change.
-        [HttpGet]
+        [HttpGet("exams/admit-cards")]
         public async Task<IActionResult> Index()
         {
             var exams = new List<SelectListItem>();

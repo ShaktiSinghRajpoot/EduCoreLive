@@ -206,8 +206,8 @@
            academics.view sees all of it. Other staff (accountant, clerk) do not. *@
         @if (gTeaches || gAcademics)
         {
-        <li class='menu-item @On("ERP/Homework")'>
-            <a asp-area="ERP" asp-controller="Homework" asp-action="Index" class="menu-link">
+        <li class='menu-item @On("/academics/homework")'>
+            <a asp-area="Academics" asp-controller="Homework" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-book-open ic-hr"></i>
                 <div class="text-truncate">Homework</div>
             </a>
@@ -243,8 +243,8 @@
 
         @if (gMyTimetable)
         {
-        <li class='menu-item @On("MyTimetable")'>
-            <a asp-area="ERP" asp-controller="MyTimetable" asp-action="Index" class="menu-link">
+        <li class='menu-item @On("/my-timetable")'>
+            <a asp-area="Academics" asp-controller="MyTimetable" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-time-five ic-hr"></i>
                 <div class="text-truncate">My Timetable</div>
             </a>
@@ -371,19 +371,19 @@
         @* ---- Examinations ---- *@
         @if (gExams)
         {
-        <li class='menu-item @Open("CreateExam","Datesheet","AdmitCard","MarkEntry","ResultSheet","GradeScale","ReportCard")'>
+        <li class='menu-item @Open("/exams")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-file ic-exam"></i>
                 <div class="text-truncate">Examinations</div>
             </a>
             <ul class="menu-sub">
-                <li class='menu-item @On("CreateExam")'><a asp-area="ERP" asp-controller="Exam" asp-action="CreateExam" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-red"></i><div class="text-truncate">Exam Schedule</div></a></li>
-                <li class='menu-item @On("Datesheet")'><a asp-area="ERP" asp-controller="Exam" asp-action="Datesheet" class="menu-link"><i class="bx bx-calendar submenu-icon c-teal"></i><div class="text-truncate">Datesheet</div></a></li>
-                <li class='menu-item @On("AdmitCard")'><a asp-area="ERP" asp-controller="AdmitCard" asp-action="Index" class="menu-link"><i class="bx bx-id-card submenu-icon c-blue"></i><div class="text-truncate">Admit Cards</div></a></li>
-                <li class='menu-item @On("MarkEntry")'><a asp-area="ERP" asp-controller="Exam" asp-action="MarkEntry" class="menu-link"><i class="bx bx-edit submenu-icon c-purple"></i><div class="text-truncate">Marks Entry</div></a></li>
-                <li class='menu-item @On("ResultSheet")'><a asp-area="ERP" asp-controller="Exam" asp-action="ResultSheet" class="menu-link"><i class="bx bx-table submenu-icon c-green"></i><div class="text-truncate">Result Sheet</div></a></li>
-                <li class='menu-item @On("ReportCard")'><a asp-area="ERP" asp-controller="ReportCard" asp-action="Index" class="menu-link"><i class="bx bx-spreadsheet submenu-icon c-blue"></i><div class="text-truncate">Report Cards</div></a></li>
-                <li class='menu-item @On("GradeScale")'><a asp-area="ERP" asp-controller="Exam" asp-action="GradeScale" class="menu-link"><i class="bx bx-award submenu-icon c-orange"></i><div class="text-truncate">Grade Scale</div></a></li>
+                <li class='menu-item @On("/exams/schedule")'><a asp-area="Exams" asp-controller="Exam" asp-action="CreateExam" class="menu-link"><i class="bx bx-calendar-event submenu-icon c-red"></i><div class="text-truncate">Exam Schedule</div></a></li>
+                <li class='menu-item @On("/exams/datesheet")'><a asp-area="Exams" asp-controller="Exam" asp-action="Datesheet" class="menu-link"><i class="bx bx-calendar submenu-icon c-teal"></i><div class="text-truncate">Datesheet</div></a></li>
+                <li class='menu-item @On("/exams/admit-cards")'><a asp-area="Exams" asp-controller="AdmitCard" asp-action="Index" class="menu-link"><i class="bx bx-id-card submenu-icon c-blue"></i><div class="text-truncate">Admit Cards</div></a></li>
+                <li class='menu-item @On("/exams/marks")'><a asp-area="Exams" asp-controller="Exam" asp-action="MarkEntry" class="menu-link"><i class="bx bx-edit submenu-icon c-purple"></i><div class="text-truncate">Marks Entry</div></a></li>
+                <li class='menu-item @On("/exams/results")'><a asp-area="Exams" asp-controller="Exam" asp-action="ResultSheet" class="menu-link"><i class="bx bx-table submenu-icon c-green"></i><div class="text-truncate">Result Sheet</div></a></li>
+                <li class='menu-item @On("/exams/report-cards")'><a asp-area="Exams" asp-controller="ReportCard" asp-action="Index" class="menu-link"><i class="bx bx-spreadsheet submenu-icon c-blue"></i><div class="text-truncate">Report Cards</div></a></li>
+                <li class='menu-item @On("/exams/grades")'><a asp-area="Exams" asp-controller="Exam" asp-action="GradeScale" class="menu-link"><i class="bx bx-award submenu-icon c-orange"></i><div class="text-truncate">Grade Scale</div></a></li>
             </ul>
         </li>
         }
@@ -391,8 +391,8 @@
         @* ---- Timetable: a single screen, so a direct link beats a group of one ---- *@
         @if (gAcademics)
         {
-        <li class='menu-item @On("SchoolSettings/Timetable")'>
-            <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="Timetable" class="menu-link">
+        <li class='menu-item @On("/academics/timetable")'>
+            <a asp-area="Academics" asp-controller="Timetable" asp-action="Timetable" class="menu-link">
                 <i class="menu-icon icon-base bx bx-time-five ic-academic"></i>
                 <div class="text-truncate">Timetable</div>
             </a>
@@ -555,7 +555,7 @@
         @* ---- Academic setup: revisited each session ---- *@
         @if (gSetupAcad)
         {
-        <li class='menu-item @Open("ClassSection","SubjectManagement","PeriodStructure","SmartBell","AssignClassTeacher","ERP/Rooms")'>
+        <li class='menu-item @Open("ClassSection","SubjectManagement","/academics/periods","/academics/smart-bell","AssignClassTeacher","ERP/Rooms")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-grid-alt ic-academic"></i>
                 <div class="text-truncate">Academic Setup</div>
@@ -566,12 +566,12 @@
                 <li class='menu-item @On("AssignClassTeacher")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AssignClassTeacher" class="menu-link"><i class="bx bx-user-voice submenu-icon c-green"></i><div class="text-truncate">Assign Class Teacher</div></a></li>
                 @if (showAcademics)
                 {
-                <li class='menu-item @On("PeriodStructure")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="PeriodStructure" class="menu-link"><i class="bx bx-time submenu-icon c-teal"></i><div class="text-truncate">Period Structure</div></a></li>
+                <li class='menu-item @On("/academics/periods")'><a asp-area="Academics" asp-controller="Timetable" asp-action="PeriodStructure" class="menu-link"><i class="bx bx-time submenu-icon c-teal"></i><div class="text-truncate">Period Structure</div></a></li>
                 }
                 <li class='menu-item @On("ERP/Rooms")'><a asp-area="ERP" asp-controller="Rooms" asp-action="Index" class="menu-link"><i class="bx bx-door-open submenu-icon c-orange"></i><div class="text-truncate">Rooms</div></a></li>
                 @if (showAcademics)
                 {
-                <li class='menu-item @On("SmartBell")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SmartBell" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Smart Bell</div></a></li>
+                <li class='menu-item @On("/academics/smart-bell")'><a asp-area="Academics" asp-controller="Timetable" asp-action="SmartBell" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Smart Bell</div></a></li>
                 }
             </ul>
         </li>

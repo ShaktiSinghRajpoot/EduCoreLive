@@ -22,7 +22,7 @@
                         <div class="ec-page-subtitle">The grade a percentage earns, for every subject and overall result</div>
                     </div>
                 </div>
-                <a asp-area="ERP" asp-controller="Exam" asp-action="ResultSheet"
+                <a asp-area="Exams" asp-controller="Exam" asp-action="ResultSheet"
                    class="btn btn-outline-secondary d-flex align-items-center gap-1">
                     <i class="bx bx-table"></i><span class="d-none d-sm-inline">Result Sheet</span>
                 </a>
@@ -78,9 +78,9 @@
 $(document).ready(function () {
 
     var urls = {
-        data:  '@Url.Action("GradeScaleData", "Exam", new { area = "ERP" })',
-        save:  '@Url.Action("SaveGradeScale", "Exam", new { area = "ERP" })',
-        reset: '@Url.Action("ResetGradeScale", "Exam", new { area = "ERP" })'
+        data:  '@Url.Action("GradeScaleData", "Exam", new { area = "Exams" })',
+        save:  '@Url.Action("SaveGradeScale", "Exam", new { area = "Exams" })',
+        reset: '@Url.Action("ResetGradeScale", "Exam", new { area = "Exams" })'
     };
     var CAN_MANAGE = @(canManage ? "true" : "false");
 

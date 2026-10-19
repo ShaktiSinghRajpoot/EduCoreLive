@@ -187,14 +187,14 @@ $(function () {
 
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
     var URL = {
-        sections: '@Url.Action("Sections","Homework",new{area="ERP"})',
-        subjects: '@Url.Action("Subjects","Homework",new{area="ERP"})',
-        list:     '@Url.Action("List","Homework",new{area="ERP"})',
-        save:     '@Url.Action("Save","Homework",new{area="ERP"})',
-        del:      '@Url.Action("Delete","Homework",new{area="ERP"})',
-        students: '@Url.Action("Students","Homework",new{area="ERP"})',
-        check:    '@Url.Action("Check","Homework",new{area="ERP"})',
-        overview: '@Url.Action("Overview","Homework",new{area="ERP"})'
+        sections: '@Url.Action("Sections","Homework",new{area="Academics"})',
+        subjects: '@Url.Action("Subjects","Homework",new{area="Academics"})',
+        list:     '@Url.Action("List","Homework",new{area="Academics"})',
+        save:     '@Url.Action("Save","Homework",new{area="Academics"})',
+        del:      '@Url.Action("Delete","Homework",new{area="Academics"})',
+        students: '@Url.Action("Students","Homework",new{area="Academics"})',
+        check:    '@Url.Action("Check","Homework",new{area="Academics"})',
+        overview: '@Url.Action("Overview","Homework",new{area="Academics"})'
     };
 
     function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }

@@ -100,7 +100,7 @@ namespace educore.Areas.ERP.Controllers
                         category = "Substitute" + (string.IsNullOrWhiteSpace(x.OriginalName) ? "" : " for " + x.OriginalName),
                         posted   = x.DayLabel,
                         isNew    = true,
-                        url      = Url.Action("Index", "MyTimetable", new { area = "ERP" })
+                        url      = Url.Action("Index", "MyTimetable", new { area = "Academics" })
                     });
             }
             catch { /* no staff record, or the module is off: just the notices */ }

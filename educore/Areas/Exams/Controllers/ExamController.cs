@@ -8,9 +8,9 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using System.Globalization;
 using System.Text;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Exams.Controllers
 {
-    [Area("ERP")]
+    [Area("Exams")]
     [HasPermission("exams.view")]
     [RequiresModule(SchoolModule.Exams)]
     public class ExamController : Controller
@@ -87,7 +87,7 @@ namespace educore.Areas.ERP.Controllers
         // ── Exam Schedule ──
         // An exam is school-wide; each class it covers gets its own datesheet.
 
-        [HttpGet]
+        [HttpGet("exams/schedule")]
         public async Task<IActionResult> CreateExam(int sessionId = 0)
         {
             var sessions = await SessionsAsync();
@@ -246,7 +246,7 @@ namespace educore.Areas.ERP.Controllers
         // -- Datesheet --
         // "What is 1st class sitting, and on which date" — the printable view.
 
-        [HttpGet]
+        [HttpGet("exams/datesheet")]
         public async Task<IActionResult> Datesheet(int sessionId = 0)
         {
             var sessions = await SessionsAsync();
@@ -329,7 +329,7 @@ namespace educore.Areas.ERP.Controllers
                 .ToList();
         }
 
-        [HttpGet]
+        [HttpGet("exams/marks")]
         public async Task<IActionResult> MarkEntry(int examId = 0)
         {
             var groups = await PublishedExamGroupsAsync();
@@ -471,7 +471,7 @@ namespace educore.Areas.ERP.Controllers
         // ── Grade Scale ──
         // The school's grade bands. No saved bands = the CBSE 8-point default.
 
-        [HttpGet]
+        [HttpGet("exams/grades")]
         public async Task<IActionResult> GradeScale()
         {
             ViewBag.CanManage = await _permission.HasPermissionAsync(
@@ -519,7 +519,7 @@ namespace educore.Areas.ERP.Controllers
         // One exam, one class: students x subjects with total, %, grade and rank.
         // Also where an exam's results are published and unpublished.
 
-        [HttpGet]
+        [HttpGet("exams/results")]
         public async Task<IActionResult> ResultSheet(int examId = 0)
         {
             var groups = await PublishedExamGroupsAsync();
