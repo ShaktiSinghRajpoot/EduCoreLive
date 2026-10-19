@@ -12,18 +12,22 @@
 -- their class's attendance WAS taken on at least 5 of those days (so a holiday,
 -- or a class whose register is not kept, raises no flag).
 --
---   core.sp_fee_month_dues            one session, dues up to a month, class / section
+--   core.sp_fee_month_dues            one session, dues from / up to a month, class / section
 --     cursor 1  months    month, due, collected, pending, children
 --     cursor 2  classes   class, section, children, with dues, pending
 --     cursor 3  students  one row per child with something pending (and the flag)
 --   core.sp_student_attendance_brief  one child: month by month, last present, streak
 -- ============================================================================
 
+-- 19 Oct 2026: a "from" month was added; drop the first version so no overload is left behind
+DROP PROCEDURE IF EXISTS core.sp_fee_month_dues(integer, integer, integer, varchar, varchar, varchar, varchar, refcursor, refcursor, refcursor);
+
 CREATE OR REPLACE PROCEDURE core.sp_fee_month_dues(
     IN    p_tenant_id      integer,
     IN    p_school_id      integer,
     IN    p_action_user_id integer,
     IN    p_academic_year  varchar,
+    IN    p_from_month     varchar DEFAULT NULL,   -- 'YYYY-MM': dues falling due from the start of it; empty = from the beginning
     IN    p_upto_month     varchar DEFAULT NULL,   -- 'YYYY-MM': dues falling due up to the end of it; empty = this month
     IN    p_class          varchar DEFAULT NULL,
     IN    p_section        varchar DEFAULT NULL,
@@ -34,6 +38,7 @@ LANGUAGE plpgsql
 AS $procedure$
 DECLARE
     v_upto  date;
+    v_from  date;
     v_start date;
     v_class varchar := NULLIF(trim(COALESCE(p_class, '')), '');
     v_sec   varchar := NULLIF(trim(COALESCE(p_section, '')), '');
@@ -54,6 +59,10 @@ BEGIN
      WHERE y.tenant_id = p_tenant_id AND y.school_id = p_school_id AND y.academic_year_name = p_academic_year
      LIMIT 1;
     v_start := COALESCE(v_start, date_trunc('month', CURRENT_DATE)::date);
+    v_from := COALESCE(to_date(NULLIF(trim(p_from_month), ''), 'YYYY-MM'), DATE '1900-01-01');
+    IF v_from > v_upto THEN
+        RAISE EXCEPTION 'The "from" month is after the "to" month.';
+    END IF;
 
     DROP TABLE IF EXISTS _fmd_kids;
     CREATE TEMP TABLE _fmd_kids ON COMMIT DROP AS
@@ -81,7 +90,7 @@ BEGIN
       JOIN _fmd_kids k ON k.student_id = l.student_id
      WHERE l.tenant_id = p_tenant_id AND l.school_id = p_school_id
        AND l.academic_year = p_academic_year
-       AND COALESCE(NULLIF(l.due_date, '')::date, v_start) <= v_upto;
+       AND COALESCE(NULLIF(l.due_date, '')::date, v_start) BETWEEN v_from AND v_upto;
 
     OPEN p_months FOR
     SELECT to_char(month, 'YYYY-MM') AS month, SUM(amount_due) AS due, SUM(settled) AS collected,

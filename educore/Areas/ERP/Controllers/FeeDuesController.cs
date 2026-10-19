@@ -34,10 +34,12 @@ namespace educore.Areas.ERP.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Data(string? year, string? upto, string? cls, string? sec)
+        public async Task<IActionResult> Data(string? year, string? from, string? upto, string? cls, string? sec)
         {
             if (string.IsNullOrWhiteSpace(year)) return Json(new { success = false, message = "Choose the session." });
-            var d = await _dues.GetAsync(year, upto, cls, sec, TenantId(), SchoolId(), UserId());
+            if (!string.IsNullOrWhiteSpace(from) && !string.IsNullOrWhiteSpace(upto) && string.CompareOrdinal(from, upto) > 0)
+                return Json(new { success = false, message = "The \"from\" month is after the \"to\" month." });
+            var d = await _dues.GetAsync(year, from, upto, cls, sec, TenantId(), SchoolId(), UserId());
             return Json(new
             {
                 success  = true,

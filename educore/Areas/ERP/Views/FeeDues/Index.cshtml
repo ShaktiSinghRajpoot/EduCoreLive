@@ -70,7 +70,7 @@
     <div class="row g-2 mb-3">
       <div class="col-6 col-md-3"><div class="fd-kpi"><div class="v text-danger" id="kPending">—</div><div class="l">Pending</div></div></div>
       <div class="col-6 col-md-3"><div class="fd-kpi"><div class="v" id="kKids">—</div><div class="l">Children with dues</div></div></div>
-      <div class="col-6 col-md-3"><div class="fd-kpi fd-click" data-show="3" title="Show them"><div class="v" style="color:#c2410c" id="kLong">—</div><div class="l">3+ months unpaid</div></div></div>
+      <div class="col-6 col-md-3"><div class="fd-kpi fd-click" data-show="3" title="Show them"><div class="v" style="color:#c2410c" id="kLong">—</div><div class="l">3+ months pending</div></div></div>
       <div class="col-6 col-md-3"><div class="fd-kpi fd-click" data-show="left" title="Show them"><div class="v" style="color:#92400e" id="kLeft">—</div><div class="l">⚠ May have left</div></div></div>
     </div>
 
@@ -102,6 +102,7 @@
         <div class="fw-semibold" id="fdListTitle">Children with dues</div>
         <div class="small text-muted" id="fdCount"></div>
       </div>
+      <div class="px-3 pt-2 d-flex flex-wrap gap-1" id="fdByMonths"></div>
       @* phones: a card per child *@
       <div class="d-md-none p-2" id="fdCards"></div>
       <div class="table-responsive d-none d-md-block">
@@ -130,10 +131,16 @@
           }
         </select>
     </div>
-    <div>
-      <label class="form-label mb-1">Due up to</label>
-      <input type="month" id="fdUpto" class="form-control">
-      <div class="form-text">Fees falling due up to the end of this month.</div>
+    <div class="row g-2">
+      <div class="col-6">
+        <label class="form-label mb-1">From month</label>
+        <input type="month" id="fdFrom" class="form-control">
+      </div>
+      <div class="col-6">
+        <label class="form-label mb-1">To month</label>
+        <input type="month" id="fdUpto" class="form-control">
+      </div>
+      <div class="col-12"><div class="form-text mt-0">Fees that fell due between these months. Leave "From" empty for the whole session so far.</div></div>
     </div>
     <div>
       <label class="form-label mb-1">Class</label>
@@ -153,7 +160,9 @@
       <label class="form-label mb-1">Show</label>
       <select id="fdShow" class="form-select">
         <option value="">Everyone with dues</option>
-        <option value="3">3+ months unpaid</option>
+        <option value="1">1 month pending</option>
+        <option value="2">2 months pending</option>
+        <option value="3">3+ months pending</option>
         <option value="left">May have left (⚠)</option>
       </select>
     </div>
@@ -194,6 +203,7 @@ $(function () {
     var CAN_COLLECT = @(canCollect ? "true" : "false");
     var data = null, loadNo = 0;
     var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var SHOW_WORDS = { '1': '1 month pending', '2': '2 months pending', '3': '3+ months pending', left: 'May have left' };
 
     // "2026-10" -> "Oct 2026" / "Oct"
     function monthName(m, short) {
@@ -209,7 +219,7 @@ $(function () {
         var mine = ++loadNo;
         $('#fdRows').html('<tr><td colspan="7" class="text-muted small p-3">Loading…</td></tr>');
         $('#fdCards').html('<div class="text-muted small p-2">Loading…</div>');
-        $.getJSON(URL.data, { year: $('#fdYear').val(), upto: $('#fdUpto').val(), cls: $('#fdClass').val(), sec: $('#fdSec').val() })
+        $.getJSON(URL.data, { year: $('#fdYear').val(), from: $('#fdFrom').val(), upto: $('#fdUpto').val(), cls: $('#fdClass').val(), sec: $('#fdSec').val() })
             .done(function (r) {
                 if (mine !== loadNo) return;   // a newer load is on its way
                 if (!r || !r.success) { ecToast('error', (r && r.message) || 'Could not load the dues.'); return; }
@@ -223,13 +233,25 @@ $(function () {
 
     // what is applied, as chips in the bar, and how many filters differ from the default
     function renderChips() {
-        var cls = $('#fdClass').val(), sec = $('#fdSec').val(), show = $('#fdShow').val(), upto = $('#fdUpto').val();
+        var cls = $('#fdClass').val(), sec = $('#fdSec').val(), show = $('#fdShow').val(), upto = $('#fdUpto').val(), from = $('#fdFrom').val();
         var chip = function (t) { return '<span class="badge bg-label-primary fw-semibold">' + EC.esc(t) + '</span>'; };
-        var n = (cls ? 1 : 0) + (sec ? 1 : 0) + (show ? 1 : 0) + (upto && upto !== EC.today().slice(0, 7) ? 1 : 0);
-        $('#fdChips').html(chip($('#fdYear').val()) + chip('Due up to ' + monthName(upto))
+        var n = (cls ? 1 : 0) + (sec ? 1 : 0) + (show ? 1 : 0) + (from ? 1 : 0) + (upto && upto !== EC.today().slice(0, 7) ? 1 : 0);
+        $('#fdChips').html(chip($('#fdYear').val())
+            + chip(from ? monthName(from) + ' to ' + monthName(upto) : 'Due up to ' + monthName(upto))
             + chip(cls ? cls + (sec ? ' – ' + sec : '') : 'All classes')
-            + (show ? chip(show === 'left' ? 'May have left' : '3+ months unpaid') : ''));
+            + (show ? chip(SHOW_WORDS[show] || show) : ''));
         $('#fdFilterCount').text(n).toggleClass('d-none', !n);
+    }
+
+    function renderByMonths() {
+        var c = { 1: 0, 2: 0, 3: 0 };
+        data.students.forEach(function (s) { c[Math.min(s.monthsCount, 3)]++; });
+        var show = $('#fdShow').val();
+        var b = function (key, label, n) {
+            return '<button type="button" class="btn btn-sm ' + (show === key ? 'btn-primary' : 'btn-outline-secondary') + ' fd-bym" style="width:auto" data-show="' + key + '">'
+                 + label + ' <b>' + n + '</b></button>';
+        };
+        $('#fdByMonths').html(b('', 'All', data.students.length) + b('1', '1 month', c[1]) + b('2', '2 months', c[2]) + b('3', '3+ months', c[3]));
     }
 
     function renderTop() {
@@ -266,6 +288,8 @@ $(function () {
         var find = ($('#fdFind').val() || '').toLowerCase().trim(), show = $('#fdShow').val();
         $('.fd-kpi.fd-click').each(function () { $(this).toggleClass('fd-on', $(this).data('show') + '' === show); });
         return data.students.filter(function (s) {
+            if (show === '1' && s.monthsCount !== 1) return false;
+            if (show === '2' && s.monthsCount !== 2) return false;
             if (show === '3' && s.monthsCount < 3) return false;
             if (show === 'left' && !s.mayHaveLeft) return false;
             return !find || (s.name + ' ' + s.father + ' ' + s.mobile + ' ' + s.admNo).toLowerCase().indexOf(find) >= 0;
@@ -277,8 +301,11 @@ $(function () {
         return ' <button type="button" class="fd-left fd-att" data-id="' + s.id + '" title="No attendance for 3 weeks while the class register was taken. Click to see.">'
              + '<i class="bx bx-error"></i>May have left</button>';
     }
+    // "3 months pending" (red from 3, amber at 2), then the months themselves
     function monthsChips(s) {
-        return (s.months || '').split(',').filter(Boolean).map(function (m) { return '<span class="fd-mon">' + EC.esc(monthName(m, true)) + '</span>'; }).join('');
+        var n = s.monthsCount, tone = n >= 3 ? 'bg-label-danger' : n === 2 ? 'bg-label-warning' : 'bg-label-secondary';
+        return '<span class="badge ' + tone + ' me-1">' + n + ' month' + (n === 1 ? '' : 's') + ' pending</span>'
+             + (s.months || '').split(',').filter(Boolean).map(function (m) { return '<span class="fd-mon">' + EC.esc(monthName(m, true)) + '</span>'; }).join('');
     }
     function actions(s) {
         var wa = s.mobile ? 'https://wa.me/91' + String(s.mobile).replace(/\D/g, '').slice(-10) + '?text='
@@ -290,9 +317,10 @@ $(function () {
 
     function renderList() {
         renderChips();
+        renderByMonths();
         var list = visible();
         var cls = $('#fdClass').val(), sec = $('#fdSec').val();
-        $('#fdListTitle').text(($('#fdShow').val() === 'left' ? 'May have left' : $('#fdShow').val() === '3' ? '3+ months unpaid' : 'Children with dues')
+        $('#fdListTitle').text((SHOW_WORDS[$('#fdShow').val()] || 'Children with dues')
                                + (cls ? ' · ' + cls + (sec ? ' – ' + sec : '') : ''));
         var total = list.reduce(function (t, s) { return t + s.pending; }, 0);
         $('#fdCount').text(list.length + ' child' + (list.length === 1 ? '' : 'ren') + ' · ' + EC.money(total));
@@ -386,7 +414,7 @@ $(function () {
     }
     $('#fdApply').on('click', function () { closePanel(); load(); });
     $('#fdClear').on('click', function () {
-        $('#fdUpto').val(EC.today().slice(0, 7));
+        $('#fdUpto').val(EC.today().slice(0, 7)); $('#fdFrom').val('');
         $('#fdClass').val(''); $('#fdSec').html('<option value="">All sections</option>'); $('#fdShow').val('');
         closePanel(); load();
     });
@@ -403,6 +431,10 @@ $(function () {
         $('#fdClass').val('');
         $('#fdSec').html('<option value="">All sections</option>');
         load();
+    });
+    $('#fdByMonths').on('click', '.fd-bym', function () {
+        $('#fdShow').val($(this).data('show') + '');
+        renderList();
     });
     $('.fd-kpi.fd-click').on('click', function () {
         var v = $(this).data('show') + '';

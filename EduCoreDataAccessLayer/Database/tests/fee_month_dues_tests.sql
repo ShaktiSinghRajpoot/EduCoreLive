@@ -31,7 +31,7 @@ BEGIN
     END LOOP;
 
     m := 'm'; c := 'c'; s := 's';
-    CALL core.sp_fee_month_dues(32, 45, 62, '2026-27', NULL, NULL, NULL, m, c, s);
+    CALL core.sp_fee_month_dues(32, 45, 62, '2026-27', NULL, NULL, NULL, NULL, m, c, s);
     LOOP FETCH m INTO r; EXIT WHEN NOT FOUND; v_sum_m := v_sum_m + r.pending; END LOOP; CLOSE m;
     LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; v_sum_c := v_sum_c + r.pending; END LOOP; CLOSE c;
     LOOP FETCH s INTO r; EXIT WHEN NOT FOUND;
@@ -47,14 +47,20 @@ BEGIN
 
     -- dues up to a month before every fee fell due: nothing
     m := 'm2'; c := 'c2'; s := 's2';
-    CALL core.sp_fee_month_dues(32, 45, 62, '2026-27', '2026-03', NULL, NULL, m, c, s);
+    CALL core.sp_fee_month_dues(32, 45, 62, '2026-27', NULL, '2026-03', NULL, NULL, m, c, s);
     v_n := 0; LOOP FETCH m INTO r; EXIT WHEN NOT FOUND; v_n := v_n + 1; END LOOP; CLOSE m;
     CLOSE c; CLOSE s;
     PERFORM pg_temp.chk(v_n = 0, 'D4 "due up to" leaves out fees falling due later', v_n || ' month(s)');
 
+    -- from November to December: only those two months
+    m := 'm4'; c := 'c4'; s := 's4';
+    CALL core.sp_fee_month_dues(32, 45, 62, '2026-27', '2026-11', '2026-12', NULL, NULL, m, c, s);
+    v_n := 0; LOOP FETCH m INTO r; EXIT WHEN NOT FOUND; IF r.month NOT IN ('2026-11', '2026-12') THEN v_n := v_n + 1; END IF; END LOOP; CLOSE m; CLOSE c; CLOSE s;
+    PERFORM pg_temp.chk(v_n = 0, 'D7 "from" and "to" keep only the months between them', v_n || ' month(s) outside');
+
     -- one class only
     m := 'm3'; c := 'c3'; s := 's3';
-    CALL core.sp_fee_month_dues(32, 45, 62, '2026-27', NULL, v_cls, v_sec, m, c, s);
+    CALL core.sp_fee_month_dues(32, 45, 62, '2026-27', NULL, NULL, v_cls, v_sec, m, c, s);
     CLOSE m; v_n := 0;
     LOOP FETCH c INTO r; EXIT WHEN NOT FOUND; IF r.class_name <> v_cls THEN v_n := v_n + 1; END IF; END LOOP; CLOSE c;
     CLOSE s;

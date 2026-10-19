@@ -17,7 +17,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             _db = db;
         }
 
-        public async Task<FeeMonthDues> GetAsync(string academicYear, string? uptoMonth, string? className, string? section,
+        public async Task<FeeMonthDues> GetAsync(string academicYear, string? fromMonth, string? uptoMonth, string? className, string? section,
                                                  int tenantId, int schoolId, int actionUserId)
         {
             var res = new FeeMonthDues();
@@ -29,6 +29,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
                 new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
                 new("p_academic_year",  NpgsqlDbType.Varchar) { Value = academicYear.Trim() },
+                new("p_from_month",     NpgsqlDbType.Varchar) { Value = string.IsNullOrWhiteSpace(fromMonth) ? DBNull.Value : fromMonth.Trim() },
                 new("p_upto_month",     NpgsqlDbType.Varchar) { Value = string.IsNullOrWhiteSpace(uptoMonth) ? DBNull.Value : uptoMonth.Trim() },
                 new("p_class",          NpgsqlDbType.Varchar) { Value = string.IsNullOrWhiteSpace(className) ? DBNull.Value : className.Trim() },
                 new("p_section",        NpgsqlDbType.Varchar) { Value = string.IsNullOrWhiteSpace(section) ? DBNull.Value : section.Trim() },
@@ -37,7 +38,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_students", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "fmd_students" }
             };
 
-            await _db.ExecuteCursorsAsync("core.sp_fee_month_dues", p,
+            await _db.ExecuteCursorsAsync("core.sp_fee_month_dues", p,   // RAISE (from after to) reaches the controller
                 async r =>
                 {
                     var cols = r.Columns();
