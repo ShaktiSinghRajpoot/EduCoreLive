@@ -1,0 +1,363 @@
+@{
+    ViewData["Title"] = "Month-wise Dues";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var years = ViewBag.YearList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+    var classes = ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                  ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+    bool canCollect = ViewBag.CanCollect == true;
+}
+
+@section PageStyles {
+<style>
+  .fd-kpi { border:1px solid var(--bs-border-color); border-radius:14px; padding:.75rem .9rem; background:var(--bs-body-bg); height:100%; }
+  .fd-kpi .v { font-size:1.3rem; font-weight:900; line-height:1.1; }
+  .fd-kpi .l { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--bs-secondary-color); }
+  .fd-kpi.fd-click { cursor:pointer; }
+  .fd-kpi.fd-on { border-color:#dc2626; background:#fff5f5; }
+  .fd-bar { height:.35rem; border-radius:999px; background:#f0eee9; overflow:hidden; margin-top:.2rem; min-width:60px; }
+  .fd-bar span { display:block; height:100%; border-radius:inherit; background:#dc2626; }
+  .fd-mon { display:inline-block; padding:.05rem .4rem; margin:0 .15rem .15rem 0; border-radius:999px; background:#fff1f0; color:#b91c1c; font-size:.7rem; font-weight:800; }
+  .fd-left { display:inline-flex; align-items:center; gap:.2rem; border:0; border-radius:999px; padding:.05rem .45rem; background:#fef3c7; color:#92400e; font-size:.68rem; font-weight:800; cursor:pointer; }
+  .fd-table th, .fd-table td { vertical-align:middle; }
+  .fd-class-row { cursor:pointer; }
+  .fd-class-row.fd-sel td { background:#fff7e6; }
+  .fd-scroll { max-height:19rem; overflow:auto; }
+  .fd-card { border:1px solid var(--bs-border-color); border-radius:12px; padding:.7rem .8rem; margin-bottom:.5rem; }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap d-flex align-items-center gap-2">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center"><i class="bx bx-calendar-exclamation fs-4"></i></div>
+          <div>
+            <h4 class="ec-page-title mb-1">Month-wise Dues</h4>
+            <div class="ec-page-subtitle">Fees still unpaid, month by month and class by class. ⚠ marks a child who may have left the school.</div>
+          </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap ec-head-actions">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="FeeDueReminders" asp-action="Index">
+            <i class="bx bx-bell"></i><span>Reminders</span>
+          </a>
+          <button type="button" class="btn btn-primary d-flex align-items-center gap-1" id="fdCsv">
+            <i class="bx bx-download"></i><span>Download</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ec-card mb-3"><div class="ec-card-body d-flex flex-wrap gap-2 align-items-end">
+      <div>
+        <label class="form-label mb-1">Session</label>
+        <select id="fdYear" class="form-select form-select-sm">
+          @foreach (var y in years)
+          {
+              <option value="@y.Text" selected="@y.Selected">@y.Text</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="form-label mb-1" title="Fees falling due up to the end of this month">Due up to</label>
+        <input type="month" id="fdUpto" class="form-control form-control-sm">
+      </div>
+      <div>
+        <label class="form-label mb-1">Class</label>
+        <select id="fdClass" class="form-select form-select-sm">
+          <option value="">All classes</option>
+          @foreach (var c in classes)
+          {
+              <option value="@c.Text">@c.Text</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label class="form-label mb-1">Section</label>
+        <select id="fdSec" class="form-select form-select-sm"><option value="">All sections</option></select>
+      </div>
+      <div>
+        <label class="form-label mb-1">Find</label>
+        <input id="fdFind" class="form-control form-control-sm" placeholder="Name, father, mobile, adm. no">
+      </div>
+      <div>
+        <label class="form-label mb-1">Show</label>
+        <select id="fdShow" class="form-select form-select-sm">
+          <option value="">Everyone with dues</option>
+          <option value="3">3+ months unpaid</option>
+          <option value="left">May have left (⚠)</option>
+        </select>
+      </div>
+    </div></div>
+
+    <div class="row g-2 mb-3">
+      <div class="col-6 col-md-3"><div class="fd-kpi"><div class="v text-danger" id="kPending">—</div><div class="l">Pending</div></div></div>
+      <div class="col-6 col-md-3"><div class="fd-kpi"><div class="v" id="kKids">—</div><div class="l">Children with dues</div></div></div>
+      <div class="col-6 col-md-3"><div class="fd-kpi fd-click" data-show="3" title="Show them"><div class="v" style="color:#c2410c" id="kLong">—</div><div class="l">3+ months unpaid</div></div></div>
+      <div class="col-6 col-md-3"><div class="fd-kpi fd-click" data-show="left" title="Show them"><div class="v" style="color:#92400e" id="kLeft">—</div><div class="l">⚠ May have left</div></div></div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-lg-6">
+        <div class="ec-card h-100 mb-0"><div class="ec-card-body">
+          <div class="fw-semibold mb-1">Month by month</div>
+          <div class="small text-muted mb-2">Fees that fell due in each month: billed, collected and still pending</div>
+          <div class="fd-scroll"><table class="table table-sm fd-table mb-0">
+            <thead><tr><th>Month</th><th class="text-end">Due</th><th class="text-end">Collected</th><th class="text-end">Pending</th><th class="text-end">Children</th></tr></thead>
+            <tbody id="fdMonths"><tr><td colspan="5" class="text-muted small">Loading…</td></tr></tbody>
+          </table></div>
+        </div></div>
+      </div>
+      <div class="col-12 col-lg-6">
+        <div class="ec-card h-100 mb-0"><div class="ec-card-body">
+          <div class="fw-semibold mb-1">Class by class</div>
+          <div class="small text-muted mb-2">Click a class to see its children below</div>
+          <div class="fd-scroll"><table class="table table-sm fd-table mb-0">
+            <thead><tr><th>Class</th><th class="text-end">Owing</th><th class="text-end">Pending</th></tr></thead>
+            <tbody id="fdClasses"><tr><td colspan="3" class="text-muted small">Loading…</td></tr></tbody>
+          </table></div>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="ec-card mb-0"><div class="ec-card-body p-0">
+      <div class="px-3 pt-3 d-flex justify-content-between align-items-center">
+        <div class="fw-semibold" id="fdListTitle">Children with dues</div>
+        <div class="small text-muted" id="fdCount"></div>
+      </div>
+      @* phones: a card per child *@
+      <div class="d-md-none p-2" id="fdCards"></div>
+      <div class="table-responsive d-none d-md-block">
+        <table class="table table-sm fd-table mb-0">
+          <thead><tr><th>Student</th><th>Class</th><th>Father / mobile</th><th>Months unpaid</th><th class="text-end">Pending</th><th>Last paid</th><th class="text-end"></th></tr></thead>
+          <tbody id="fdRows"><tr><td colspan="7" class="text-muted small p-3">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<!-- Attendance of a child who may have left -->
+<div class="modal fade" id="fdAttModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-header">
+        <div><h5 class="modal-title fw-bold" id="fdAttTitle">Attendance</h5><small class="text-muted" id="fdAttSub">—</small></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="fdAttBody">Loading…</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <a class="btn btn-primary" id="fdAttProfile" href="#"><i class="bx bx-user me-1"></i>Open profile</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    var URL = {
+        data:     '@Url.Action("Data", "FeeDues", new { area = "ERP" })',
+        att:      '@Url.Action("Attendance", "FeeDues", new { area = "ERP" })',
+        secs:     '@Url.Action("PromotionSections", "Student", new { area = "ERP" })',
+        profile:  '@Url.Action("Dashboard", "Student", new { area = "ERP" })',
+        collect:  '@Url.Action("ManageFee", "Fee", new { area = "ERP" })'
+    };
+    var CAN_COLLECT = @(canCollect ? "true" : "false");
+    var data = null, loadNo = 0;
+    var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // "2026-10" -> "Oct 2026" / "Oct"
+    function monthName(m, short) {
+        var p = (m || '').split('-');
+        if (p.length < 2) return m || '';
+        return MON[+p[1] - 1] + (short ? '' : ' ' + p[0]);
+    }
+    function profileUrl(s) { return URL.profile + '/' + encodeURIComponent(s.publicId); }
+
+    $('#fdUpto').val(EC.today().slice(0, 7));
+
+    function load() {
+        var mine = ++loadNo;
+        $('#fdRows').html('<tr><td colspan="7" class="text-muted small p-3">Loading…</td></tr>');
+        $('#fdCards').html('<div class="text-muted small p-2">Loading…</div>');
+        $.getJSON(URL.data, { year: $('#fdYear').val(), upto: $('#fdUpto').val(), cls: $('#fdClass').val(), sec: $('#fdSec').val() })
+            .done(function (r) {
+                if (mine !== loadNo) return;   // a newer load is on its way
+                if (!r || !r.success) { ecToast('error', (r && r.message) || 'Could not load the dues.'); return; }
+                data = r;
+                renderTop();
+                renderList();
+            })
+            .fail(function () { ecToast('error', 'Could not load the dues.'); });
+    }
+
+    function renderTop() {
+        var pending = 0, long = 0, left = 0;
+        data.students.forEach(function (s) { pending += s.pending; if (s.monthsCount >= 3) long++; if (s.mayHaveLeft) left++; });
+        $('#kPending').text(EC.money(pending));
+        $('#kKids').text(data.students.length);
+        $('#kLong').text(long);
+        $('#kLeft').text(left);
+
+        var maxP = Math.max.apply(null, data.months.map(function (m) { return m.pending; }).concat([1]));
+        $('#fdMonths').html(data.months.length ? data.months.map(function (m) {
+            return '<tr><td class="fw-semibold">' + EC.esc(monthName(m.month)) + '</td>'
+                 + '<td class="text-end">' + EC.money(m.due) + '</td>'
+                 + '<td class="text-end text-success">' + EC.money(m.collected) + '</td>'
+                 + '<td class="text-end"><span class="fw-bold text-danger">' + EC.money(m.pending) + '</span>'
+                 + '<div class="fd-bar ms-auto"><span style="width:' + Math.round(m.pending * 100 / maxP) + '%"></span></div></td>'
+                 + '<td class="text-end">' + m.children + '</td></tr>';
+        }).join('') : '<tr><td colspan="5" class="text-muted small">No fees fell due in this session up to that month.</td></tr>');
+
+        var cls = $('#fdClass').val(), sec = $('#fdSec').val();
+        $('#fdClasses').html(data.classes.length ? data.classes.map(function (c) {
+            var sel = c.cls === cls && (!sec || c.sec === sec);
+            return '<tr class="fd-class-row' + (sel ? ' fd-sel' : '') + '" data-cls="' + EC.esc(c.cls) + '" data-sec="' + EC.esc(c.sec) + '">'
+                 + '<td class="fw-semibold">' + EC.esc(c.cls) + (c.sec ? ' – ' + EC.esc(c.sec) : '') + '</td>'
+                 + '<td class="text-end">' + c.withDues + ' <span class="text-muted small">of ' + c.children + '</span></td>'
+                 + '<td class="text-end ' + (c.pending > 0 ? 'fw-bold text-danger' : 'text-muted') + '">' + EC.money(c.pending) + '</td></tr>';
+        }).join('') : '<tr><td colspan="3" class="text-muted small">No children in this session.</td></tr>');
+    }
+
+    function visible() {
+        var find = ($('#fdFind').val() || '').toLowerCase().trim(), show = $('#fdShow').val();
+        $('.fd-kpi.fd-click').each(function () { $(this).toggleClass('fd-on', $(this).data('show') + '' === show); });
+        return data.students.filter(function (s) {
+            if (show === '3' && s.monthsCount < 3) return false;
+            if (show === 'left' && !s.mayHaveLeft) return false;
+            return !find || (s.name + ' ' + s.father + ' ' + s.mobile + ' ' + s.admNo).toLowerCase().indexOf(find) >= 0;
+        });
+    }
+
+    function leftFlag(s) {
+        if (!s.mayHaveLeft) return '';
+        return ' <button type="button" class="fd-left fd-att" data-id="' + s.id + '" title="No attendance for 3 weeks while the class register was taken. Click to see.">'
+             + '<i class="bx bx-error"></i>May have left</button>';
+    }
+    function monthsChips(s) {
+        return (s.months || '').split(',').filter(Boolean).map(function (m) { return '<span class="fd-mon">' + EC.esc(monthName(m, true)) + '</span>'; }).join('');
+    }
+    function actions(s) {
+        var wa = s.mobile ? 'https://wa.me/91' + String(s.mobile).replace(/\D/g, '').slice(-10) + '?text='
+               + encodeURIComponent('Dear Parent, fees of ' + EC.money(s.pending) + ' for ' + s.name + ' are pending. Kindly pay at the school office.') : '';
+        return '<a class="btn btn-sm btn-icon btn-text-secondary" href="' + profileUrl(s) + '" title="Open profile"><i class="bx bx-user"></i></a>'
+             + (CAN_COLLECT && s.admNo ? '<a class="btn btn-sm btn-icon btn-text-success" href="' + URL.collect + '?adm=' + encodeURIComponent(s.admNo) + '&session=' + encodeURIComponent($('#fdYear').val()) + '" title="Collect fee"><i class="bx bx-wallet"></i></a>' : '')
+             + (wa ? '<a class="btn btn-sm btn-icon btn-text-success" href="' + wa + '" target="_blank" rel="noopener" title="WhatsApp the parent"><i class="bx bxl-whatsapp"></i></a>' : '');
+    }
+
+    function renderList() {
+        var list = visible();
+        var cls = $('#fdClass').val(), sec = $('#fdSec').val();
+        $('#fdListTitle').text(($('#fdShow').val() === 'left' ? 'May have left' : $('#fdShow').val() === '3' ? '3+ months unpaid' : 'Children with dues')
+                               + (cls ? ' · ' + cls + (sec ? ' – ' + sec : '') : ''));
+        var total = list.reduce(function (t, s) { return t + s.pending; }, 0);
+        $('#fdCount').text(list.length + ' child' + (list.length === 1 ? '' : 'ren') + ' · ' + EC.money(total));
+        if (!list.length) {
+            var msg = data.students.length ? 'Nobody matches.' : 'No unpaid fees up to that month.';
+            $('#fdRows').html('<tr><td colspan="7" class="text-muted small p-3">' + msg + '</td></tr>');
+            $('#fdCards').html('<div class="text-muted small p-2">' + msg + '</div>');
+            return;
+        }
+        $('#fdRows').html(list.map(function (s) {
+            return '<tr><td><a class="fw-semibold text-body" href="' + profileUrl(s) + '">' + EC.esc(s.name) + '</a>' + leftFlag(s)
+                 + (s.status !== 'Active' ? ' <span class="badge bg-label-secondary">' + EC.esc(s.status) + '</span>' : '')
+                 + '<div class="small text-muted">' + EC.esc(s.admNo) + (s.roll ? ' · Roll ' + EC.esc(s.roll) : '') + '</div></td>'
+                 + '<td class="text-nowrap">' + EC.esc(s.cls) + (s.sec ? ' – ' + EC.esc(s.sec) : '') + '</td>'
+                 + '<td>' + EC.esc(s.father || '—') + '<div class="small text-muted">' + EC.esc(s.mobile || '') + '</div></td>'
+                 + '<td>' + monthsChips(s) + '</td>'
+                 + '<td class="text-end fw-bold text-danger text-nowrap">' + EC.money(s.pending) + '</td>'
+                 + '<td class="small text-nowrap">' + (s.lastPaid ? EC.esc(EC.date(s.lastPaid)) : '<span class="text-muted">never</span>') + '</td>'
+                 + '<td class="text-end text-nowrap">' + actions(s) + '</td></tr>';
+        }).join(''));
+        $('#fdCards').html(list.map(function (s) {
+            return '<div class="fd-card"><div class="d-flex justify-content-between align-items-start gap-2">'
+                 + '<div style="min-width:0"><a class="fw-semibold text-body" href="' + profileUrl(s) + '">' + EC.esc(s.name) + '</a>' + leftFlag(s)
+                 + '<div class="small text-muted">' + EC.esc(s.cls) + (s.sec ? ' – ' + EC.esc(s.sec) : '') + ' · ' + EC.esc(s.father || '') + '</div></div>'
+                 + '<div class="text-end text-nowrap fw-bold text-danger">' + EC.money(s.pending) + '</div></div>'
+                 + '<div class="mt-1">' + monthsChips(s) + '</div>'
+                 + '<div class="d-flex justify-content-between align-items-center mt-1"><span class="small text-muted">Last paid: '
+                 + (s.lastPaid ? EC.esc(EC.date(s.lastPaid)) : 'never') + '</span><span>' + actions(s) + '</span></div></div>';
+        }).join(''));
+    }
+
+    // ── "may have left": the child's attendance ──
+    $(document).on('click', '.fd-att', function (e) {
+        e.preventDefault();
+        var id = +$(this).data('id'), s = data.students.filter(function (x) { return x.id === id; })[0];
+        if (!s) return;
+        $('#fdAttTitle').text(s.name);
+        $('#fdAttSub').text(s.cls + (s.sec ? ' – ' + s.sec : '') + ' · ' + s.admNo);
+        $('#fdAttProfile').attr('href', profileUrl(s));
+        $('#fdAttBody').html('Loading…');
+        new bootstrap.Modal(document.getElementById('fdAttModal')).show();
+        $.getJSON(URL.att, { id: id, year: $('#fdYear').val() }).done(function (a) {
+            if (!a || !a.success) { $('#fdAttBody').html('<div class="text-danger">' + EC.esc((a && a.message) || 'Could not load the attendance.') + '</div>'); return; }
+            var rows = a.months.map(function (m) {
+                return '<tr><td>' + EC.esc(monthName(m.month)) + '</td><td class="text-end text-success">' + m.present + '</td>'
+                     + '<td class="text-end text-danger">' + m.absent + '</td><td class="text-end">' + m.leave + '</td></tr>';
+            }).join('');
+            $('#fdAttBody').html(
+                '<div class="alert alert-warning small mb-3"><b>This child may have left the school.</b> No attendance in the last 3 weeks, '
+              + 'while the class register was taken on ' + s.classDays + ' day(s). Call the parents' + (s.mobile ? ' (' + EC.esc(s.mobile) + ')' : '')
+              + '. If the child has left, open the profile to mark them as left / issue a TC, so the fees stop being chased.</div>'
+              + '<div class="row g-2 mb-3 text-center">'
+              + '<div class="col-4"><div class="fd-kpi"><div class="v">' + (a.lastPresent ? EC.esc(EC.date(a.lastPresent)) : 'never') + '</div><div class="l">Last present</div></div></div>'
+              + '<div class="col-4"><div class="fd-kpi"><div class="v text-danger">' + a.streak + '</div><div class="l">Marked days absent since</div></div></div>'
+              + '<div class="col-4"><div class="fd-kpi"><div class="v">' + a.present + ' / ' + a.marked + '</div><div class="l">Present this session</div></div></div></div>'
+              + (rows ? '<table class="table table-sm mb-0"><thead><tr><th>Month</th><th class="text-end">Present</th><th class="text-end">Absent</th><th class="text-end">Leave</th></tr></thead><tbody>' + rows + '</tbody></table>'
+                      : '<div class="text-muted small">No attendance marked for this child this session.</div>'));
+        }).fail(function () { $('#fdAttBody').html('<div class="text-danger">Could not load the attendance.</div>'); });
+    });
+
+    // ── download what is on screen ──
+    $('#fdCsv').on('click', function () {
+        if (!data) return;
+        var q = function (v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+        var lines = [['Student', 'Adm No', 'Class', 'Section', 'Father', 'Mobile', 'Months unpaid', 'Pending', 'Last paid', 'May have left'].join(',')];
+        visible().forEach(function (s) {
+            lines.push([s.name, s.admNo, s.cls, s.sec, s.father, s.mobile,
+                        (s.months || '').split(',').filter(Boolean).map(function (m) { return monthName(m); }).join(' '),
+                        s.pending.toFixed(2), s.lastPaid, s.mayHaveLeft ? 'Yes' : ''].map(q).join(','));
+        });
+        var a = document.createElement('a');
+        a.href = window.URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' }));
+        a.download = 'month-wise-dues-' + $('#fdYear').val() + '-' + ($('#fdUpto').val() || '') + '.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+    });
+
+    // ── filters ──
+    function loadSections() {
+        var cls = $('#fdClass').val();
+        $('#fdSec').html('<option value="">All sections</option>');
+        if (!cls) { load(); return; }
+        $.getJSON(URL.secs, { 'class': cls, year: $('#fdYear').val() }).done(function (list) {
+            (list || []).forEach(function (n) { $('#fdSec').append('<option value="' + EC.esc(n) + '">' + EC.esc(n) + '</option>'); });
+        }).always(load);
+    }
+    $('#fdClasses').on('click', '.fd-class-row', function () {
+        var cls = $(this).data('cls') + '', sec = ($(this).data('sec') || '') + '';
+        $('#fdClass').val(cls);
+        $('#fdSec').html('<option value="">All sections</option>');
+        $.getJSON(URL.secs, { 'class': cls, year: $('#fdYear').val() }).done(function (list) {
+            (list || []).forEach(function (n) { $('#fdSec').append('<option value="' + EC.esc(n) + '">' + EC.esc(n) + '</option>'); });
+            $('#fdSec').val(sec);
+        }).always(load);
+    });
+    $('.fd-kpi.fd-click').on('click', function () {
+        var v = $(this).data('show') + '';
+        $('#fdShow').val($('#fdShow').val() === v ? '' : v);
+        if (data) renderList();
+    });
+    $('#fdYear, #fdClass').on('change', loadSections);
+    $('#fdSec, #fdUpto').on('change', load);
+    $('#fdFind').on('input', function () { if (data) renderList(); });
+    $('#fdShow').on('change', function () { if (data) renderList(); });
+
+    load();
+});
+</script>
+}

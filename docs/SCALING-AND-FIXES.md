@@ -5848,3 +5848,8 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 ### 2026-10-19 — Store Dashboard
 - `Inventory/StoreDashboard` (first item of the Inventory menu): six cards (stock value, low / out, sold this month + margin, unpaid by students, bought this month, owed to suppliers; each opens its page) and four panels (running low, to order this session, children with everything per class, latest sales). No new data: it reads Items, StoreSummary, Suppliers, OrderListData, StoreRegister/Overview and Sales, so the figures match those pages.
 
+### 2026-10-19 — Month-wise Dues (Fees menu)
+- `FeeDues/Index`: session, **due up to** a month, class, section, find, show (everyone / 3+ months unpaid / may have left). Cards: pending, children with dues, 3+ months unpaid, ⚠ may have left. Tables: month by month (due, collected, pending, children) and class by class (click to filter). List / phone cards: months unpaid as chips, pending, last paid, Profile / Collect / WhatsApp; Download (CSV of what is shown).
+- **May have left**: an active child with no Present / Late in the last 21 days while their class register was taken on 5+ of those days. The ⚠ opens their attendance (last present, absent streak, month by month) with advice to call the parents and mark Left / issue a TC.
+- `fee_month_dues.sql`: `sp_fee_month_dues` (a line belongs to its due date's month; no due date = session's first month; outstanding = due - paid - concession), `sp_student_attendance_brief`. Bundle `deploy_2026_10_19d.sql`; tests `tests/fee_month_dues_tests.sql` (6, rolled back).
+
