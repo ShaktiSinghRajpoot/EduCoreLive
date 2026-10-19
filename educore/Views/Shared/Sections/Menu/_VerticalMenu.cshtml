@@ -709,6 +709,17 @@
                     }
                 });
 
+                // A page that sits under a link without being it (/inventory/register under
+                // /inventory): when the server marked the entry the page belongs to, keep that.
+                if (best && pathOf(best) !== here) {
+                    var serverPick = links.filter(function (a) {
+                        var li = a.parentElement;
+                        return li.classList.contains('active') && !li.querySelector(':scope > ul.menu-sub')
+                            && a.closest('ul.menu-inner > li.menu-item') === best.closest('ul.menu-inner > li.menu-item');
+                    });
+                    if (serverPick.length) best = serverPick[0];
+                }
+
                 // 2) Fallback for pages with no menu entry of their own (e.g. an
                 //    Edit screen): match by area/controller (first two path
                 //    segments) — but only if every candidate is in the SAME top
