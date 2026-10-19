@@ -585,7 +585,6 @@ $(function () {
         $('#fdCheckAll').prop('checked', list.length > 0 && list.every(function (s) { return picked[s.id]; }));
         renderSelBar();
     }
-    }
 
     // ── "may have left": the child's attendance ──
     $(document).on('click', '.fd-att', function (e) {
