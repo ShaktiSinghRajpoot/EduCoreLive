@@ -112,9 +112,11 @@
     </div></div>
 
     <!-- 3. sales -->
-    <div class="ec-card mb-0"><div class="ec-card-body p-0">
+    <div class="ec-card mb-0"><div class="ec-card-body p-0" id="ssSalesBox">
       <div class="px-3 pt-3 fw-semibold" id="ssSalesTitle">Latest sales</div>
-      <div class="table-responsive">
+      @* phones: a card per sale, so Change size / Return are not off the edge of the table *@
+      <div class="d-md-none px-2 pt-2" id="ssSalesCards"></div>
+      <div class="table-responsive d-none d-md-block">
         <table class="table table-sm mb-0">
           <thead><tr><th>Date</th><th>Student</th><th>Item</th><th class="text-end">Amount</th><th>Status</th><th></th></tr></thead>
           <tbody id="ssSales"><tr><td colspan="6" class="text-muted small p-3">Loading…</td></tr></tbody>
@@ -330,25 +332,48 @@ $(function () {
             rows = rows || [];
             salesRows = rows;
             $('#ssSalesTitle').text(student ? 'Sales to ' + student.name : 'Latest sales');
-            if (!rows.length) { $('#ssSales').html('<tr><td colspan="6" class="text-muted small p-3">No sales yet.</td></tr>'); return; }
-            $('#ssSales').html(rows.map(function (x) {
+            if (!rows.length) {
+                $('#ssSales').html('<tr><td colspan="6" class="text-muted small p-3">No sales yet.</td></tr>');
+                $('#ssSalesCards').html('<div class="text-muted small p-2">No sales yet.</div>');
+                return;
+            }
+            // status and buttons once per line; the table (computer) and the cards (phone) both use them
+            var parts = rows.map(function (x) {
                 var status = x.returned ? '<span class="badge bg-label-secondary" title="' + EC.esc(x.returnReason) + '">Returned</span>'
                            : x.open <= 0 ? '<span class="badge bg-label-success">Paid</span>'
                            : x.paid > 0 ? '<span class="badge bg-label-warning">Part paid</span>'
                            : '<span class="badge bg-label-danger">Unpaid</span>';
                 var canReturn = !x.returned && x.paid <= 0 && x.open > 0;
                 var canSwap = !x.returned && otherSizes(x).length > 0;
+                var actions = (canSwap ? '<button type="button" class="btn btn-sm btn-outline-primary ss-swap me-1" style="width:auto" data-id="' + x.lineId + '">Change size</button>' : '')
+                     + (canReturn ? '<button type="button" class="btn btn-sm btn-outline-danger ss-ret" style="width:auto" data-id="' + x.lineId + '" data-name="' + EC.esc(x.item) + '">Return</button>'
+                          // money and stock must agree: a paid item comes back only after its receipt is cancelled
+                          : (!x.returned && x.paid > 0 ? '<span class="small text-muted">To return: cancel its receipt first</span>' : ''));
+                return { x: x, status: status, actions: actions };
+            });
+            $('#ssSales').html(parts.map(function (p) {
+                var x = p.x;
                 return '<tr><td class="text-nowrap small">' + EC.esc(x.date ? EC.date(x.date) : '') + '</td>'
                      + '<td><div class="fw-semibold">' + EC.esc(x.name) + '</div><div class="small text-muted">' + EC.esc(x.cls) + ' · ' + EC.esc(x.year) + '</div></td>'
                      + '<td>' + EC.esc(x.item) + (x.qty !== 1 ? ' × ' + EC.num(x.qty) : '') + '</td>'
                      + '<td class="text-end">' + EC.money(x.amount) + '</td>'
-                     + '<td>' + status + '</td>'
-                     + '<td class="text-end text-nowrap">' + (canSwap ? '<button type="button" class="btn btn-sm btn-outline-primary ss-swap me-1" style="width:auto" data-id="' + x.lineId + '">Change size</button>' : '')
-                     + (canReturn ? '<button type="button" class="btn btn-sm btn-outline-danger ss-ret" data-id="' + x.lineId + '" data-name="' + EC.esc(x.item) + '">Return</button>'
-                          // money and stock must agree: a paid item comes back only after its receipt is cancelled
-                          : (!x.returned && x.paid > 0 ? '<span class="small text-muted">To return: cancel its receipt first</span>' : '')) + '</td></tr>';
+                     + '<td>' + p.status + '</td>'
+                     + '<td class="text-end text-nowrap">' + p.actions + '</td></tr>';
             }).join(''));
-        }).fail(function () { $('#ssSales').html('<tr><td colspan="6" class="text-muted small p-3">Could not load the sales.</td></tr>'); });
+            $('#ssSalesCards').html(parts.map(function (p) {
+                var x = p.x;
+                return '<div class="border rounded-3 p-2 mb-2">'
+                     + '<div class="d-flex justify-content-between align-items-start gap-2">'
+                     + '<div><div class="fw-semibold">' + EC.esc(x.item) + (x.qty !== 1 ? ' × ' + EC.num(x.qty) : '') + '</div>'
+                     + '<div class="small text-muted">' + EC.esc(x.name) + ' · ' + EC.esc(x.cls) + ' · ' + EC.esc(x.date ? EC.date(x.date) : '') + '</div></div>'
+                     + '<div class="text-end text-nowrap"><div class="fw-semibold">' + EC.money(x.amount) + '</div>' + p.status + '</div></div>'
+                     + (p.actions ? '<div class="d-flex flex-wrap justify-content-end align-items-center gap-1 mt-2">' + p.actions + '</div>' : '')
+                     + '</div>';
+            }).join(''));
+        }).fail(function () {
+            $('#ssSales').html('<tr><td colspan="6" class="text-muted small p-3">Could not load the sales.</td></tr>');
+            $('#ssSalesCards').html('<div class="text-muted small p-2">Could not load the sales.</div>');
+        });
     }
 
     /* ── Change size: the same item in another size ("Uniform - 28" for "- 32") ── */
@@ -359,7 +384,7 @@ $(function () {
         return items.filter(function (i) { return i.id !== x.itemId && baseName(i.name) === b; });
     }
     var swapLine = null;
-    $('#ssSales').on('click', '.ss-swap', function () {
+    $('#ssSalesBox').on('click', '.ss-swap', function () {
         var id = +$(this).data('id');
         swapLine = salesRows.filter(function (x) { return x.lineId === id; })[0];
         if (!swapLine) return;
@@ -384,7 +409,7 @@ $(function () {
           .always(function () { EC.buttonReset($btn); });
     });
 
-    $('#ssSales').on('click', '.ss-ret', function () {
+    $('#ssSalesBox').on('click', '.ss-ret', function () {
         var id = +$(this).data('id'), name = $(this).data('name');
         EC.prompt({ title: 'Return this item?', name: name, label: 'Reason', required: true,
                     placeholder: 'Wrong size / wrong book / not needed', okText: 'Return item' }).then(function (reason) {

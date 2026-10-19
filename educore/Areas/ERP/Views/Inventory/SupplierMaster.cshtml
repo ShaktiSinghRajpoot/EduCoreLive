@@ -68,6 +68,8 @@
             <tbody id="spBody"></tbody>
           </table>
         </div>
+        @* phones: the table above is hidden (InventoryItem.css), so each supplier is a card *@
+        <div class="iv-mob-list" id="spMob"></div>
       </div>
     </div>
 
@@ -268,8 +270,31 @@
                 $('#resultText').text(rows.length ? rows.length + (rows.length === 1 ? ' supplier' : ' suppliers') : 'No suppliers');
                 if (!rows.length) {
                     EC.listEmpty('#spBody', 'No suppliers found.', 'bx-store');
+                    $('#spMob').html('<div class="text-muted small p-3 text-center">No suppliers found.</div>');
                     return;
                 }
+                $('#spMob').html(rows.map(function (s) {
+                    return '<div class="iv-mob-card' + (s.active ? '' : ' text-muted') + '">' +
+                        '<div class="d-flex justify-content-between align-items-start gap-2">' +
+                            '<div><div class="fw-semibold">' + EC.esc(s.name) + '</div>' +
+                                '<div class="small text-muted">' + EC.esc([s.contact, s.mobile].filter(Boolean).join(' · ') || '—') + '</div></div>' +
+                            (s.active ? '<span class="badge bg-label-success">Active</span>' : '<span class="badge bg-label-secondary">Inactive</span>') +
+                        '</div>' +
+                        '<div class="d-flex justify-content-between small mt-2">' +
+                            '<span>' + EC.num(s.bills) + ' bill(s) · ' + EC.money(s.billed) + '</span>' +
+                            '<span>Due ' + dueCell(s.due) + '</span>' +
+                        '</div>' +
+                        '<div class="d-flex justify-content-end gap-1 mt-2">' +
+                            (s.due > 0 ? '<button class="btn btn-sm btn-icon btn-text-success" data-pay="' + s.id + '" title="Pay the supplier"><i class="bx bx-rupee"></i></button>' : '') +
+                            '<button class="btn btn-sm btn-icon btn-text-secondary" data-pays="' + s.id + '" title="Payments"><i class="bx bx-wallet"></i></button>' +
+                            '<button class="btn btn-sm btn-icon btn-text-secondary" data-bills="' + s.id + '" title="Bills"><i class="bx bx-receipt"></i></button>' +
+                            '<button class="btn btn-sm btn-icon btn-text-secondary" data-edit="' + s.id + '" title="Edit"><i class="bx bx-edit"></i></button>' +
+                            (s.active
+                                ? '<button class="btn btn-sm btn-icon btn-text-warning" data-off="' + s.id + '" title="Deactivate"><i class="bx bx-pause-circle"></i></button>'
+                                : '<button class="btn btn-sm btn-icon btn-text-success" data-on="' + s.id + '" title="Activate"><i class="bx bx-play-circle"></i></button>') +
+                            '<button class="btn btn-sm btn-icon btn-text-danger" data-del="' + s.id + '" title="Remove"><i class="bx bx-trash"></i></button>' +
+                        '</div></div>';
+                }).join(''));
                 $('#spBody').html(rows.map(function (s) {
                     return '<tr' + (s.active ? '' : ' class="text-muted"') + '>' +
                         '<td class="fw-semibold">' + EC.esc(s.name) +

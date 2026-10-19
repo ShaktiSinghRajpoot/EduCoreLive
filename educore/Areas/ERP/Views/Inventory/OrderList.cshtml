@@ -11,6 +11,9 @@
   .ol-table td.ol-item { white-space:normal; min-width:150px; }
   .ol-order { font-size:1.05rem; font-weight:900; color:#c2410c; }
   .ol-ok { color:#16a34a; font-weight:800; }
+  .ol-card { border:1px solid var(--bs-border-color); border-radius:12px; padding:.7rem .8rem; margin-bottom:.5rem; }
+  .ol-card .ol-nums { display:flex; justify-content:space-between; gap:.4rem; margin-top:.45rem; font-size:.78rem; color:var(--bs-secondary-color); }
+  .ol-card .ol-nums b { display:block; font-size:.95rem; color:var(--bs-body-color); }
   @@media print {
     .layout-menu, .layout-navbar, .ol-noprint, .content-footer, .footer { display:none !important; }
     .layout-page { padding:0 !important; }
@@ -61,7 +64,9 @@
     </div></div>
 
     <div class="ec-card mb-0"><div class="ec-card-body p-0">
-      <div class="table-responsive">
+      @* phones: one card per item, so "To order" is not off the edge of a wide table *@
+      <div class="d-md-none p-2" id="olCards"></div>
+      <div class="table-responsive d-none d-md-block">
         <table class="table table-sm align-middle mb-0 ol-table">
           <thead>
             <tr>
@@ -100,8 +105,26 @@ $(function () {
     function render() {
         var only = $('#olOnlyOrder').is(':checked');
         var list = rows.filter(function (x) { return !only || x.order > 0; });
-        if (!rows.length) { $('#olBody').html('<tr><td colspan="7" class="text-muted small p-3">No item is given to students yet (Inventory › Store, "Given to students").</td></tr>'); return; }
-        if (!list.length) { $('#olBody').html('<tr><td colspan="7" class="small p-3 ol-ok">Nothing to order: the stock covers every child who still needs an item.</td></tr>'); return; }
+        if (!rows.length) {
+            $('#olBody').html('<tr><td colspan="7" class="text-muted small p-3">No item is given to students yet (Inventory › Store, "Given to students").</td></tr>');
+            $('#olCards').html('<div class="text-muted small p-2">No item is given to students yet (Inventory › Store, "Given to students").</div>');
+            return;
+        }
+        if (!list.length) {
+            $('#olBody').html('<tr><td colspan="7" class="small p-3 ol-ok">Nothing to order: the stock covers every child who still needs an item.</td></tr>');
+            $('#olCards').html('<div class="small p-2 ol-ok">Nothing to order: the stock covers every child who still needs an item.</div>');
+            return;
+        }
+        $('#olCards').html(list.map(function (x) {
+            return '<div class="ol-card"><div class="d-flex justify-content-between align-items-start gap-2">'
+                 + '<div><div class="fw-semibold">' + EC.esc(x.item) + '</div>'
+                 + '<div class="small text-muted">' + EC.esc(x.classes ? x.classes : 'All classes') + (x.sizes ? ' · ' + EC.esc(x.sizes) : '') + '</div></div>'
+                 + (x.order > 0 ? '<span class="ol-order text-nowrap">Order ' + EC.num(x.order) + '</span>' : '<span class="ol-ok small text-nowrap">Enough</span>')
+                 + '</div><div class="ol-nums">'
+                 + '<span>Children<b>' + EC.num(x.children) + '</b></span><span>Have it<b>' + EC.num(x.have) + '</b></span>'
+                 + '<span>Still need<b>' + EC.num(x.need) + '</b></span><span>In stock<b>' + EC.num(x.stock) + '</b></span>'
+                 + '</div></div>';
+        }).join(''));
         var cat = null, html = '';
         list.forEach(function (x) {
             if (x.category !== cat) { cat = x.category; html += '<tr class="table-light"><td colspan="7" class="small fw-bold text-uppercase">' + EC.esc(cat) + '</td></tr>'; }
