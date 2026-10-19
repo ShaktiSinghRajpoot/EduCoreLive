@@ -23,6 +23,9 @@
                     </div>
                 </div>
                 <div class="header-actions d-flex gap-2 flex-wrap">
+                    <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="OrderList">
+                        <i class="bx bx-list-check"></i><span>Order list</span>
+                    </a>
                     <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="SupplierMaster">
                         <i class="bx bx-store"></i><span>Suppliers</span>
                     </a>
@@ -93,6 +96,8 @@
                         <label class="form-label">Payment Mode</label>
                         <select class="form-select" id="paymentMode">
                             <option>Cash</option><option>Bank Transfer</option><option>UPI</option><option>Cheque</option>
+                            @* bought on credit: owed to the supplier, paid later from Suppliers › Pay *@
+                            <option value="Credit">Credit (pay later)</option>
                         </select>
                     </div>
 @{ var _locs = (List<EduCoreDataAccessLayer.Models.ERP.InventoryLocation>)(ViewBag.Locations ?? new List<EduCoreDataAccessLayer.Models.ERP.InventoryLocation>()); }
@@ -570,6 +575,7 @@
 
     function statusBadge(p) {
         if (p.cancelled) return '<span class="badge bg-label-danger">Cancelled</span>';
+        if (p.mode === 'Credit') return '<span class="badge bg-label-warning" title="Owed to the supplier: pay it from Suppliers">On credit</span>';
         if (EC.num(p.returnedQty) > 0) return '<span class="badge bg-label-warning">Part returned</span>';
         return '<span class="badge bg-label-success">Saved</span>';
     }

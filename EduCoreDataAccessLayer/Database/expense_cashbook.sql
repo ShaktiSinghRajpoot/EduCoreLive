@@ -89,7 +89,10 @@ CREATE TABLE IF NOT EXISTS core.cashbook_opening (
 
 -- Every rupee in or out between two dates, one row per entry.
 --   kind      Fee receipt | Fee cancelled | Refund | Salary | Purchase |
---             Purchase cancelled | Supplier return | Expense | Expense cancelled
+--             Purchase cancelled | Supplier return | Supplier payment |
+--             Supplier payment cancelled | Expense | Expense cancelled
+--   A bill bought on credit (payment mode 'Credit') moves no money: the payments
+--   to the supplier do (inventory_store_extras.sql).
 --   category  expenses: their category; the rest: the kind ("Salary", "Fees" ...)
 --   mode      Cash, UPI, Card, Cheque ... (book = 'Cash' or 'Bank')
 CREATE OR REPLACE FUNCTION core.fn_school_money(p_tenant_id integer, p_school_id integer, p_from date, p_to date)
@@ -148,6 +151,7 @@ AS $function$
                COALESCE(NULLIF(trim(pu.payment_mode), ''), 'Cash'), 0, pu.grand_total
           FROM core.inventory_purchases pu
          WHERE pu.tenant_id = p_tenant_id AND pu.school_id = p_school_id
+           AND COALESCE(pu.payment_mode, '') <> 'Credit'
            AND NULLIF(pu.purchase_date, '')::date BETWEEN p_from AND p_to
         UNION ALL
         SELECT NULLIF(rt.return_date, '')::date, 'Supplier return', COALESCE(NULLIF(pu.invoice_no, ''), 'Bill #' || pu.purchase_id),
@@ -156,6 +160,7 @@ AS $function$
           FROM core.inventory_purchase_returns rt
           JOIN core.inventory_purchases pu ON pu.purchase_id = rt.purchase_id
          WHERE rt.tenant_id = p_tenant_id AND rt.school_id = p_school_id
+           AND COALESCE(pu.payment_mode, '') <> 'Credit'
            AND NULLIF(rt.return_date, '')::date BETWEEN p_from AND p_to
          GROUP BY rt.return_date, pu.purchase_id, pu.invoice_no, pu.supplier_name, pu.payment_mode
         UNION ALL
@@ -167,7 +172,22 @@ AS $function$
                                            WHERE rt.purchase_id = pu.purchase_id), 0), 0
           FROM core.inventory_purchases pu
          WHERE pu.tenant_id = p_tenant_id AND pu.school_id = p_school_id
+           AND COALESCE(pu.payment_mode, '') <> 'Credit'
            AND pu.is_cancelled AND pu.cancelled_at::date BETWEEN p_from AND p_to
+        UNION ALL
+        SELECT sp.pay_date, 'Supplier payment', 'SP-' || sp.payment_id, su.supplier_name, 'Store purchases',
+               sp.payment_mode, 0, sp.amount
+          FROM core.inventory_supplier_payments sp
+          JOIN core.inventory_suppliers su ON su.supplier_id = sp.supplier_id
+         WHERE sp.tenant_id = p_tenant_id AND sp.school_id = p_school_id
+           AND sp.pay_date BETWEEN p_from AND p_to
+        UNION ALL
+        SELECT sp.cancelled_at::date, 'Supplier payment cancelled', 'SP-' || sp.payment_id, su.supplier_name, 'Store purchases',
+               sp.payment_mode, sp.amount, 0
+          FROM core.inventory_supplier_payments sp
+          JOIN core.inventory_suppliers su ON su.supplier_id = sp.supplier_id
+         WHERE sp.tenant_id = p_tenant_id AND sp.school_id = p_school_id
+           AND sp.is_cancelled AND sp.cancelled_at::date BETWEEN p_from AND p_to
         UNION ALL
         SELECT ex.expense_date, 'Expense', 'EXP-' || ex.expense_id, COALESCE(ex.paid_to, ''), c.name, ex.payment_mode, 0, ex.amount
           FROM core.expenses ex

@@ -344,6 +344,84 @@ BEGIN
         RETURN;
     END IF;
 
+    -- ── Exchange: "28 is too small, give 32". The same sale line and fee line move to
+    --    the other size: the first size goes back on the shelf, the new one comes off
+    --    it (two stock movements, so History shows the swap). A paid line keeps its
+    --    payment, so only a size of the same price can be swapped onto it; an unpaid
+    --    line takes the new price.
+    IF p_operation = 'Exchange' THEN
+        SELECT l.line_id, l.item_id, l.quantity, l.amount, l.ledger_id, l.returned_at, sa.sale_id, sa.location_id,
+               i.item_name, st.student_name || ' (' || COALESCE(st.admission_no, '-') || ')' AS who,
+               sl.amount_paid, sl.concession, sl.status AS fee_status, sl.closed_amount
+          INTO r
+          FROM core.inventory_student_sale_lines l
+          JOIN core.inventory_student_sales sa ON sa.sale_id = l.sale_id
+          JOIN core.inventory_items i ON i.item_id = l.item_id
+          JOIN core.students st ON st.student_id = sa.student_id
+          LEFT JOIN core.student_ledger sl ON sl.ledger_id = l.ledger_id
+         WHERE l.line_id = p_line_id AND sa.tenant_id = p_tenant_id AND sa.school_id = p_school_id
+           FOR UPDATE OF l;
+        IF r.line_id IS NULL THEN
+            RAISE EXCEPTION 'Sale line not found.';
+        END IF;
+        IF r.returned_at IS NOT NULL THEN
+            RAISE EXCEPTION '% was returned; give the other size instead.', r.item_name;
+        END IF;
+        IF r.fee_status = 'Closed' OR COALESCE(r.closed_amount, 0) > 0 THEN
+            RAISE EXCEPTION 'The fee line of % is closed, so it cannot be exchanged.', r.item_name;
+        END IF;
+
+        SELECT i.item_id, i.item_name, i.selling_price, i.cost_price, i.unit_type INTO it
+          FROM core.inventory_items i
+         WHERE i.item_id = p_item_id AND i.tenant_id = p_tenant_id AND i.school_id = p_school_id
+           AND NOT i.is_deleted AND i.is_active AND i.item_type = 'Saleable';
+        IF it.item_id IS NULL OR it.item_id = r.item_id
+           OR core.fn_item_base_name(it.item_name) <> core.fn_item_base_name(r.item_name) THEN
+            RAISE EXCEPTION 'Choose another size of %.', core.fn_item_base_name(r.item_name);
+        END IF;
+        IF round(r.quantity * it.selling_price, 2) <> r.amount
+           AND (COALESCE(r.amount_paid, 0) > 0 OR COALESCE(r.concession, 0) > 0) THEN
+            RAISE EXCEPTION '% costs Rs % and % is already paid at Rs %. Cancel that receipt first, or pick a size of the same price.',
+                it.item_name, to_char(round(r.quantity * it.selling_price, 2), 'FM99,99,99,990.00'),
+                r.item_name, to_char(r.amount, 'FM99,99,99,990.00');
+        END IF;
+
+        SELECT COALESCE((SELECT ls.quantity FROM core.inventory_location_stock ls
+                          WHERE ls.item_id = it.item_id AND ls.location_id = r.location_id), 0) INTO v_stock;
+        IF v_stock < r.quantity THEN
+            RAISE EXCEPTION 'Only % % of % left in this store.', trim(to_char(v_stock, 'FM999999990.##')), it.unit_type, it.item_name;
+        END IF;
+
+        PERFORM core.fn_inventory_post_movement(
+            p_tenant_id, p_school_id, p_action_user_id, r.item_id, r.location_id, 'Return', r.quantity, NULL,
+            'StudentSale', p_line_id, NULL, r.who, left('Exchanged for ' || it.item_name, 200));
+        PERFORM core.fn_inventory_post_movement(
+            p_tenant_id, p_school_id, p_action_user_id, it.item_id, r.location_id, 'Issue', -r.quantity, it.cost_price,
+            'StudentSale', r.sale_id, NULL, r.who, left('Exchanged from ' || r.item_name, 200));
+
+        UPDATE core.inventory_student_sale_lines
+           SET item_id = it.item_id, unit_price = it.selling_price, amount = round(r.quantity * it.selling_price, 2)
+         WHERE line_id = p_line_id;
+        UPDATE core.inventory_student_sales sa
+           SET total = (SELECT COALESCE(SUM(l.amount), 0) FROM core.inventory_student_sale_lines l WHERE l.sale_id = sa.sale_id)
+         WHERE sa.sale_id = r.sale_id;
+        IF r.ledger_id IS NOT NULL THEN
+            -- the fee line reads like the new size ("Uniform — 32") and, unpaid, takes its price
+            UPDATE core.student_ledger
+               SET installment_label = NULLIF(concat_ws(' ',
+                       CASE WHEN position(' - ' IN it.item_name) > 0
+                            THEN trim(right(it.item_name, position(' - ' IN reverse(it.item_name)) - 1)) END,
+                       CASE WHEN r.quantity <> 1 THEN '× ' || trim(to_char(r.quantity, 'FM999999990.##')) END), ''),
+                   amount_due = round(r.quantity * it.selling_price, 2),
+                   updated_at = now()
+             WHERE ledger_id = r.ledger_id;
+        END IF;
+
+        OPEN p_result FOR
+        SELECT TRUE AS success, r.item_name || ' exchanged for ' || it.item_name || '.' AS message;
+        RETURN;
+    END IF;
+
     -- ── List: the latest sales, line by line
     IF p_operation = 'List' THEN
         OPEN p_result FOR
@@ -351,6 +429,7 @@ BEGIN
                st.student_name, st.admission_no, sa.class_name, sa.academic_year,
                i.item_name, l.quantity, l.unit_price, l.amount,
                COALESCE(sl.amount_paid, 0) AS paid,
+               l.item_id,
                COALESCE(sl.amount_due - sl.amount_paid - sl.concession, 0) AS open_amount,
                l.returned_at IS NOT NULL AS returned, l.return_reason,
                core.fn_user_display_name(sa.created_by) AS sold_by

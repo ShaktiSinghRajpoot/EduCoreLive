@@ -264,7 +264,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     IsActive      = BoolVal(r, "is_active"),
                     BillCount     = IntVal(r, "bill_count"),
                     TotalBilled   = DecVal(r, "total_billed"),
-                    LastBillDate  = Str(r, "last_bill_date")
+                    LastBillDate  = Str(r, "last_bill_date"),
+                    Due           = DecVal(r, "due")
                 });
             return list;
         }

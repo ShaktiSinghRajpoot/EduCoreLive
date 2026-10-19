@@ -1,0 +1,125 @@
+@{
+    ViewData["Title"] = "Order List";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var years = ViewBag.YearList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+}
+
+@section PageStyles {
+<style>
+  .ol-table th, .ol-table td { white-space:nowrap; vertical-align:middle; }
+  .ol-table td.ol-item { white-space:normal; min-width:150px; }
+  .ol-order { font-size:1.05rem; font-weight:900; color:#c2410c; }
+  .ol-ok { color:#16a34a; font-weight:800; }
+  @@media print {
+    .layout-menu, .layout-navbar, .ol-noprint, .content-footer, .footer { display:none !important; }
+    .layout-page { padding:0 !important; }
+  }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap d-flex align-items-center gap-2">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center"><i class="bx bx-list-check fs-4"></i></div>
+          <div>
+            <h4 class="ec-page-title mb-1">Order List</h4>
+            <div class="ec-page-subtitle" id="olSubtitle">What to order from the supplier for a session: children who still need each item, minus the stock in hand</div>
+          </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap ec-head-actions ol-noprint">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="PurchaseEntry">
+            <i class="bx bx-cart"></i><span>Purchase</span>
+          </a>
+          <button type="button" class="btn btn-primary d-flex align-items-center gap-1" onclick="window.print()">
+            <i class="bx bx-printer"></i><span>Print</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ec-card mb-3 ol-noprint"><div class="ec-card-body d-flex flex-wrap gap-2 align-items-end">
+      <div>
+        <label class="form-label mb-1">Session</label>
+        <select id="olYear" class="form-select form-select-sm">
+          @foreach (var y in years)
+          {
+              <option value="@y.Text" selected="@y.Selected">@y.Text</option>
+          }
+        </select>
+      </div>
+      <div class="form-check ms-1 mb-1">
+        <input class="form-check-input" type="checkbox" id="olOnlyOrder">
+        <label class="form-check-label small" for="olOnlyOrder">Only items to order</label>
+      </div>
+      <div class="small text-muted ms-auto" style="max-width:480px">
+        Counts the children <b>enrolled in that session</b>. For next session, promote the classes (and admit new children) first, so they are counted.
+      </div>
+    </div></div>
+
+    <div class="ec-card mb-0"><div class="ec-card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0 ol-table">
+          <thead>
+            <tr>
+              <th>Item</th><th>For</th>
+              <th class="text-end" title="Children enrolled in the classes the item is for">Children</th>
+              <th class="text-end" title="Already given this session (not returned)">Have it</th>
+              <th class="text-end">Still need</th>
+              <th class="text-end">In stock</th>
+              <th class="text-end">To order</th>
+            </tr>
+          </thead>
+          <tbody id="olBody"><tr><td colspan="7" class="text-muted small p-3">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    var DATA_URL = '@Url.Action("OrderListData", "Inventory", new { area = "ERP" })';
+    var rows = [];
+
+    function load() {
+        var year = $('#olYear').val();
+        $('#olSubtitle').text('What to order for ' + year + ': children who still need each item, minus the stock in hand');
+        $('#olBody').html('<tr><td colspan="7" class="text-muted small p-3">Loading…</td></tr>');
+        $.getJSON(DATA_URL, { year: year }).done(function (r) {
+            if (!r || !r.success) { ecToast('error', (r && r.message) || 'Could not load the list.'); return; }
+            rows = r.rows || [];
+            render();
+        }).fail(function () { ecToast('error', 'Could not load the list.'); });
+    }
+
+    function render() {
+        var only = $('#olOnlyOrder').is(':checked');
+        var list = rows.filter(function (x) { return !only || x.order > 0; });
+        if (!rows.length) { $('#olBody').html('<tr><td colspan="7" class="text-muted small p-3">No item is given to students yet (Inventory › Store, "Given to students").</td></tr>'); return; }
+        if (!list.length) { $('#olBody').html('<tr><td colspan="7" class="small p-3 ol-ok">Nothing to order: the stock covers every child who still needs an item.</td></tr>'); return; }
+        var cat = null, html = '';
+        list.forEach(function (x) {
+            if (x.category !== cat) { cat = x.category; html += '<tr class="table-light"><td colspan="7" class="small fw-bold text-uppercase">' + EC.esc(cat) + '</td></tr>'; }
+            html += '<tr><td class="ol-item"><div class="fw-semibold">' + EC.esc(x.item) + '</div>'
+                  + (x.sizes ? '<div class="small text-muted" title="Stock per size">' + EC.esc(x.sizes) + '</div>' : '') + '</td>'
+                  + '<td class="small">' + EC.esc(x.classes ? x.classes.split('|').join(', ') : 'All classes') + '</td>'
+                  + '<td class="text-end">' + EC.num(x.children) + '</td>'
+                  + '<td class="text-end">' + EC.num(x.have) + '</td>'
+                  + '<td class="text-end fw-semibold">' + EC.num(x.need) + '</td>'
+                  + '<td class="text-end">' + EC.num(x.stock) + ' <span class="text-muted small">' + EC.esc(x.unit) + '</span></td>'
+                  + '<td class="text-end">' + (x.order > 0 ? '<span class="ol-order">' + EC.num(x.order) + '</span>' : '<span class="ol-ok">—</span>') + '</td></tr>';
+        });
+        $('#olBody').html(html);
+    }
+
+    $('#olYear').on('change', load);
+    $('#olOnlyOrder').on('change', render);
+    load();
+});
+</script>
+}

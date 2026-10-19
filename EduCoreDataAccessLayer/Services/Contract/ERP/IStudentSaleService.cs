@@ -21,6 +21,9 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// <summary>Take an unpaid line back: fee line closed, item back in stock.</summary>
         Task<InventoryResult> ReturnAsync(int lineId, string reason, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Swap a sold line to another size of the same item ("28 for 32").</summary>
+        Task<InventoryResult> ExchangeAsync(int lineId, int itemId, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>The latest sales, line by line (one student, or everyone).</summary>
         Task<List<StudentSaleRow>> GetSalesAsync(int? studentId, int tenantId, int schoolId, int actionUserId);
 

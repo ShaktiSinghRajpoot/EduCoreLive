@@ -301,7 +301,8 @@ namespace educore.Areas.ERP.Controllers
                 active  = r.IsActive,
                 bills   = r.BillCount,
                 billed  = r.TotalBilled,
-                lastBill = Dates.Show(r.LastBillDate)
+                lastBill = Dates.Show(r.LastBillDate),
+                due     = r.Due
             }));
         }
 
@@ -590,9 +591,75 @@ namespace educore.Areas.ERP.Controllers
             {
                 lineId = r.LineId, saleId = r.SaleId, date = r.SaleDate, studentId = r.StudentId,
                 name = r.StudentName, admNo = r.AdmissionNo ?? "", cls = r.ClassName ?? "", year = r.AcademicYear ?? "",
-                item = r.ItemName, qty = r.Quantity, amount = r.Amount, paid = r.Paid, open = r.OpenAmount,
+                item = r.ItemName, itemId = r.ItemId, qty = r.Quantity, amount = r.Amount, paid = r.Paid, open = r.OpenAmount,
                 returned = r.Returned, returnReason = r.ReturnReason ?? "", by = r.SoldBy ?? ""
             }));
+        }
+
+        // "28 is too small, give 32": the sold line moves to another size of the same item.
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> ExchangeSize([FromBody] ExchangeRequest req)
+        {
+            var res = await _sales.ExchangeAsync(req?.Id ?? 0, req?.ItemId ?? 0, TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message });
+        }
+
+        // ── Order list (/ERP/Inventory/OrderList): what to order for a session ──
+        public async Task<IActionResult> OrderList([FromServices] IBaseService baseService)
+        {
+            try { ViewBag.YearList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }
+            catch { ViewBag.YearList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+            return View();
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> OrderListData(string? year, [FromServices] IStoreExtrasService extras)
+        {
+            if (string.IsNullOrWhiteSpace(year)) return Json(new { success = false, message = "Choose the session." });
+            var rows = await extras.GetOrderListAsync(year, TenantId(), SchoolId(), UserId());
+            return Json(new
+            {
+                success = true,
+                rows = rows.Select(r => new
+                {
+                    item = r.Item, category = r.Category, unit = r.Unit, classes = r.Classes,
+                    children = r.Children, have = r.Have, need = r.StillNeed, stock = r.InStock, order = r.ToOrder, sizes = r.Sizes
+                })
+            });
+        }
+
+        // ── Supplier payments: credit bills are paid later, in parts ──
+        [HttpGet]
+        public async Task<IActionResult> SupplierPayments(int id, [FromServices] IStoreExtrasService extras)
+        {
+            var rows = await extras.GetSupplierPaymentsAsync(id, TenantId(), SchoolId(), UserId());
+            return Json(rows.Select(r => new
+            {
+                id = r.PaymentId, date = Dates.Show(r.PayDate, "dd MMM yyyy"), amount = r.Amount, mode = r.PaymentMode,
+                reference = r.ReferenceNo, remarks = r.Remarks, cancelled = r.IsCancelled, reason = r.CancelReason, by = r.PaidBy ?? ""
+            }));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> PaySupplier([FromBody] SupplierPayRequest req, [FromServices] IStoreExtrasService extras)
+        {
+            if (req == null) return Json(new { success = false, message = "Nothing to save." });
+            var res = await extras.PaySupplierAsync(req.SupplierId, req.Amount, req.PayDate, req.Mode, req.Reference, req.Remarks,
+                TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [HasPermission("inventory.manage")]
+        public async Task<IActionResult> CancelSupplierPayment([FromBody] CancelRequest req, [FromServices] IStoreExtrasService extras)
+        {
+            var res = await extras.CancelSupplierPaymentAsync(req?.Id ?? 0, req?.Reason ?? "", TenantId(), SchoolId(), UserId());
+            return Json(new { success = res.Success, message = res.Message });
         }
 
         [HttpPost]
@@ -616,6 +683,16 @@ namespace educore.Areas.ERP.Controllers
 
         // Small request shapes for the JSON posts above.
         public class IdRequest       { public int Id { get; set; } }
+        public class ExchangeRequest { public int Id { get; set; } public int ItemId { get; set; } }
+        public class SupplierPayRequest
+        {
+            public int SupplierId { get; set; }
+            public decimal Amount { get; set; }
+            public string? PayDate { get; set; }
+            public string? Mode { get; set; }
+            public string? Reference { get; set; }
+            public string? Remarks { get; set; }
+        }
         public class CancelRequest   { public int Id { get; set; } public string? Reason { get; set; } }
         public class LocationRequest { public int Id { get; set; } public string? Name { get; set; } }
         public class ActiveRequest   { public int Id { get; set; } public bool Active { get; set; } }

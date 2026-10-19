@@ -102,6 +102,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? ClassName    { get; set; }
         public string? AcademicYear { get; set; }
         public string  ItemName     { get; set; } = string.Empty;
+        public int     ItemId       { get; set; }
         public decimal Quantity     { get; set; }
         public decimal Amount       { get; set; }
         public decimal Paid         { get; set; }

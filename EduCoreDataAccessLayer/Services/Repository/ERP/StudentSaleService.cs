@@ -106,6 +106,17 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return await RunAsync(p, null);
         }
 
+        public async Task<InventoryResult> ExchangeAsync(int lineId, int itemId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || lineId <= 0 || itemId <= 0)
+                return new InventoryResult { Message = "Choose the size to give instead." };
+
+            var p = Params("Exchange", tenantId, schoolId, actionUserId);
+            p[9].Value  = lineId;
+            p[12].Value = itemId;
+            return await RunAsync(p, null);
+        }
+
         public async Task<List<StudentSaleRow>> GetSalesAsync(int? studentId, int tenantId, int schoolId, int actionUserId)
         {
             var list = new List<StudentSaleRow>();
@@ -129,6 +140,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         ClassName    = DbRead.NStr(reader, cols, "class_name"),
                         AcademicYear = DbRead.NStr(reader, cols, "academic_year"),
                         ItemName     = DbRead.Str(reader, cols, "item_name"),
+                        ItemId       = DbRead.Int(reader, cols, "item_id"),
                         Quantity     = DbRead.Dec(reader, cols, "quantity"),
                         Amount       = DbRead.Dec(reader, cols, "amount"),
                         Paid         = DbRead.Dec(reader, cols, "paid"),

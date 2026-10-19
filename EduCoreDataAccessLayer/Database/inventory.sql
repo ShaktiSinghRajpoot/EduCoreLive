@@ -1237,7 +1237,9 @@ BEGIN
                (SELECT COALESCE(SUM(p.grand_total), 0) FROM core.inventory_purchases p
                  WHERE p.supplier_id = s.supplier_id AND p.is_cancelled = FALSE) AS total_billed,
                COALESCE((SELECT MAX(p.purchase_date) FROM core.inventory_purchases p
-                 WHERE p.supplier_id = s.supplier_id AND p.is_cancelled = FALSE)::text, '') AS last_bill_date
+                 WHERE p.supplier_id = s.supplier_id AND p.is_cancelled = FALSE)::text, '') AS last_bill_date,
+               -- credit bills not yet paid (inventory_store_extras.sql)
+               core.fn_supplier_due(p_tenant_id, p_school_id, s.supplier_id) AS due
         FROM core.inventory_suppliers s
         WHERE s.tenant_id = p_tenant_id AND s.school_id = p_school_id AND s.is_deleted = FALSE
           AND (NULLIF(TRIM(COALESCE(p_search, '')), '') IS NULL

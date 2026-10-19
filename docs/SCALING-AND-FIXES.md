@@ -5839,3 +5839,9 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - Store form: **For which classes?** is a wrap of tick pills (none ticked = all classes). The list, phone card, For class filter, Give items badge and the Register overview read the list.
 - Bundle `deploy_2026_10_19b.sql` (column change + sp_inventory_student_sale, sp_inventory_class_register, sp_inventory_register_overview, sp_inventory_manage).
 
+### 2026-10-19 — Store: order list, size exchange, supplier dues
+- **Order list** (`Inventory/OrderList`, button on Purchase): per item given to students (sizes on one line with stock per size), the children enrolled in its classes for a session, how many already have it, still need, in stock and **to order**; print. `sp_inventory_order_list`. It counts enrolment, so next session needs promotion / admissions first (the page says so).
+- **Change size** on Give items: a sold line moves to another size of the same item (`sp_inventory_student_sale` 'Exchange'): old size back on the shelf, new one off it (two movements), fee line label and, if unpaid, price follow; a paid line only takes a size of the same price.
+- **Supplier dues**: Purchase payment mode **"Credit (pay later)"** = owed, not money out. `core.inventory_supplier_payments` + `sp_inventory_supplier_pay` (Pay / List / Cancel, never deleted) + `fn_supplier_due`; Suppliers page shows **Due**, **Pay** and **Payments**. Cash Book (`fn_school_money`): credit bills (and their returns / cancels) left out, "Supplier payment" money out, "Supplier payment cancelled" back in on the cancel day.
+- Files: `inventory_store_extras.sql` (new), `inventory_student_sale.sql`, `expense_cashbook.sql`, `inventory.sql` (supplier `due`); bundle `deploy_2026_10_19c.sql`; tests `tests/store_extras_tests.sql` (18, rolled back).
+

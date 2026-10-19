@@ -270,6 +270,7 @@ builder.Services.AddScoped<IRoomService, RoomService>();             // School S
 builder.Services.AddScoped<IFrontOfficeService, FrontOfficeService>(); // Front office: visitors, calls, complaints
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IStudentSaleService, StudentSaleService>();
+builder.Services.AddScoped<IStoreExtrasService, StoreExtrasService>();   // order list, supplier payments
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddScoped<IMessageLogService, MessageLogService>();
 builder.Services.AddScoped<SchoolMessenger>();   // WhatsApp alerts to parents + the message log

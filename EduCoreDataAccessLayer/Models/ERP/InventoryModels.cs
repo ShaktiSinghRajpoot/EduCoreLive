@@ -183,6 +183,9 @@
         public int     BillCount     { get; set; }
         public decimal TotalBilled   { get; set; }
         public string  LastBillDate  { get; set; } = string.Empty;
+
+        /// Credit bills not yet paid (negative = paid ahead).
+        public decimal Due           { get; set; }
     }
 
     // ── Purchases ───────────────────────────────────────────────────────────

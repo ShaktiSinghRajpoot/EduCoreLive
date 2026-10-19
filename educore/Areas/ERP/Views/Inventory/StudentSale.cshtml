@@ -126,6 +126,30 @@
   </div>
 </div>
 
+<!-- Exchange: another size of the same item -->
+<div class="modal fade" id="exModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content rounded-4 border-0">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold">Change size</h5>
+          <small class="text-muted" id="exLabel">—</small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">Give this size instead</label>
+        <select class="form-select" id="exSize"></select>
+        <div class="small text-muted mt-2">The first size goes back on the shelf and the fee line shows the new one. A paid item can only change to a size of the same price.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="exSave"><i class="bx bx-transfer me-1"></i>Change size</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 @await Html.PartialAsync("_FeeReceiptModal")
 
 @section PageScripts {
@@ -138,6 +162,7 @@ $(function () {
         items:   '@Url.Action("SaleItems", "Inventory", new { area = "ERP" })',
         sell:    '@Url.Action("Sell", "Inventory", new { area = "ERP" })',
         ret:     '@Url.Action("SaleReturn", "Inventory", new { area = "ERP" })',
+        exchange:'@Url.Action("ExchangeSize", "Inventory", new { area = "ERP" })',
         sales:   '@Url.Action("Sales", "Inventory", new { area = "ERP" })',
         kit:     '@Url.Action("SaveClassKit", "Inventory", new { area = "ERP" })',
         collect: '@Url.Action("ManageFee", "Fee", new { area = "ERP" })'
@@ -145,6 +170,7 @@ $(function () {
     var student = null;      // {id, name, admNo, sessions:[{year, cls, sec, current}]}
     var items = [];          // items for sale, with the chosen class's set in .kit
     var qty = {};            // itemId -> quantity typed
+    var salesRows = [];      // the sales shown, for "Change size"
 
     function token() { return $('input[name="__RequestVerificationToken"]').val(); }
     function post(url, data) {
@@ -193,13 +219,12 @@ $(function () {
               + '<div><label class="form-label mb-1">Items for</label><select id="ssFor" class="form-select form-select-sm">' + opts + '</select></div>'
               + '</div>');
             $('#ssFor').on('change', function () { loadItems(false); });
-            loadItems(false);
-            loadSales();
+            loadItems(false, true);   // the sales after the items: "Change size" needs the sizes
         }).fail(function () { ecToast('error', 'Could not open the student.'); });
     }
 
     /* ── 2. the items ── */
-    function loadItems(fillKit) {
+    function loadItems(fillKit, thenSales) {
         var s = session();
         $.getJSON(URL.items, { cls: s ? s.cls : '', location: storeId() }).done(function (list) {
             items = list || [];
@@ -208,7 +233,8 @@ $(function () {
             $('#ssItemsCard').removeClass('d-none');
             $('#ssItemsTitle').text('Items' + (s ? ' for ' + s.cls + ' (' + s.year + ') — tick what the parent takes' : ''));
             renderItems();
-        }).fail(function () { ecToast('error', 'Could not load the items.'); });
+        }).fail(function () { ecToast('error', 'Could not load the items.'); })
+          .always(function () { if (thenSales) loadSales(); });
     }
 
     function renderItems() {
@@ -302,6 +328,7 @@ $(function () {
     function loadSales() {
         $.getJSON(URL.sales, { studentId: student ? student.id : null }).done(function (rows) {
             rows = rows || [];
+            salesRows = rows;
             $('#ssSalesTitle').text(student ? 'Sales to ' + student.name : 'Latest sales');
             if (!rows.length) { $('#ssSales').html('<tr><td colspan="6" class="text-muted small p-3">No sales yet.</td></tr>'); return; }
             $('#ssSales').html(rows.map(function (x) {
@@ -310,17 +337,52 @@ $(function () {
                            : x.paid > 0 ? '<span class="badge bg-label-warning">Part paid</span>'
                            : '<span class="badge bg-label-danger">Unpaid</span>';
                 var canReturn = !x.returned && x.paid <= 0 && x.open > 0;
+                var canSwap = !x.returned && otherSizes(x).length > 0;
                 return '<tr><td class="text-nowrap small">' + EC.esc(x.date ? EC.date(x.date) : '') + '</td>'
                      + '<td><div class="fw-semibold">' + EC.esc(x.name) + '</div><div class="small text-muted">' + EC.esc(x.cls) + ' · ' + EC.esc(x.year) + '</div></td>'
                      + '<td>' + EC.esc(x.item) + (x.qty !== 1 ? ' × ' + EC.num(x.qty) : '') + '</td>'
                      + '<td class="text-end">' + EC.money(x.amount) + '</td>'
                      + '<td>' + status + '</td>'
-                     + '<td class="text-end">' + (canReturn ? '<button type="button" class="btn btn-sm btn-outline-danger ss-ret" data-id="' + x.lineId + '" data-name="' + EC.esc(x.item) + '">Return</button>'
+                     + '<td class="text-end text-nowrap">' + (canSwap ? '<button type="button" class="btn btn-sm btn-outline-primary ss-swap me-1" style="width:auto" data-id="' + x.lineId + '">Change size</button>' : '')
+                     + (canReturn ? '<button type="button" class="btn btn-sm btn-outline-danger ss-ret" data-id="' + x.lineId + '" data-name="' + EC.esc(x.item) + '">Return</button>'
                           // money and stock must agree: a paid item comes back only after its receipt is cancelled
                           : (!x.returned && x.paid > 0 ? '<span class="small text-muted">To return: cancel its receipt first</span>' : '')) + '</td></tr>';
             }).join(''));
         }).fail(function () { $('#ssSales').html('<tr><td colspan="6" class="text-muted small p-3">Could not load the sales.</td></tr>'); });
     }
+
+    /* ── Change size: the same item in another size ("Uniform - 28" for "- 32") ── */
+    function baseName(n) { var i = (n || '').lastIndexOf(' - '); return i > 0 ? n.substring(0, i).trim() : n; }
+    function otherSizes(x) {
+        var b = baseName(x.item);
+        if (b === x.item) return [];
+        return items.filter(function (i) { return i.id !== x.itemId && baseName(i.name) === b; });
+    }
+    var swapLine = null;
+    $('#ssSales').on('click', '.ss-swap', function () {
+        var id = +$(this).data('id');
+        swapLine = salesRows.filter(function (x) { return x.lineId === id; })[0];
+        if (!swapLine) return;
+        $('#exLabel').text(swapLine.item + ' · ' + swapLine.name);
+        $('#exSize').html(otherSizes(swapLine).map(function (i) {
+            return '<option value="' + i.id + '"' + (i.stock <= 0 ? ' disabled' : '') + '>' + EC.esc(i.name) + ' · ' + EC.money(i.price)
+                 + (i.stock <= 0 ? ' (out of stock)' : ' · ' + EC.num(i.stock) + ' in stock') + '</option>';
+        }).join(''));
+        $('#exSize option:not(:disabled)').first().prop('selected', true);
+        new bootstrap.Modal(document.getElementById('exModal')).show();
+    });
+    $('#exSave').on('click', function () {
+        var itemId = +$('#exSize').val(), $btn = $(this);
+        if (!swapLine || !itemId) { ecToast('warning', 'Choose the size to give.'); return; }
+        EC.buttonBusy($btn, 'Saving…');
+        post(URL.exchange, { id: swapLine.lineId, itemId: itemId }).done(function (r) {
+            if (!r || !r.success) { ecToast('error', (r && r.message) || 'Could not change the size.'); return; }
+            ecToast('success', r.message);
+            bootstrap.Modal.getInstance(document.getElementById('exModal')).hide();
+            loadSales(); if (student) loadItems(false);
+        }).fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not change the size')); })
+          .always(function () { EC.buttonReset($btn); });
+    });
 
     $('#ssSales').on('click', '.ss-ret', function () {
         var id = +$(this).data('id'), name = $(this).data('name');
