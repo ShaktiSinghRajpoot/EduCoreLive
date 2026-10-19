@@ -353,32 +353,10 @@ app.Use(async (context, next) =>
 if (requireHttps)
     app.UseHttpsRedirection();
 
-// Uploads open only for someone signed in to that school (before the static files below).
-educore.Helpers.UploadsGuard.UseUploadsGuard(app);
-
-app.UseStaticFiles();
-
-// Uploaded files (student photos, school logos). They are served from the same
-// /uploads URL as before, but the folder behind it is configurable: on a
-// container host it points at a MOUNTED VOLUME, because anything inside the
-// published app is replaced on every deploy — which is how every student photo
-// vanished each time the app shipped, leaving the database pointing at files
-// that no longer existed. When Uploads:Root is not set this resolves to
-// wwwroot/uploads, which UseStaticFiles above already covers, so it is skipped
-// rather than serving the same folder twice.
-var uploadRoot = educore.Helpers.UploadPaths.Root(builder.Configuration, builder.Environment);
-if (!string.Equals(
-        Path.TrimEndingDirectorySeparator(Path.GetFullPath(uploadRoot)),
-        Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.Combine(app.Environment.WebRootPath, "uploads"))),
-        StringComparison.OrdinalIgnoreCase))
-{
-    Directory.CreateDirectory(uploadRoot);
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadRoot),
-        RequestPath  = educore.Helpers.UploadPaths.RequestPath
-    });
-}
+// The app's own files (css, js, images). Uploaded files are NOT served here: they
+// need the signed-in user, which is read further down (see the uploads branch below).
+app.UseWhen(c => !c.Request.Path.StartsWithSegments(educore.Helpers.UploadPaths.RequestPath),
+            b => b.UseStaticFiles());
 
 // Old /ERP/{Controller}/... links of pages that moved to their module area.
 educore.Helpers.LegacyErpRedirect.UseLegacyErpRedirect(app);
@@ -391,6 +369,25 @@ app.UseRateLimiter();
 app.UseSession();
 
 app.UseAuthentication();
+
+// Uploaded files (student photos, the school's logo, seal and signature). They open
+// only for someone signed in to that school (Helpers/UploadsGuard.cs), so they are
+// served here, after sign-in is read, not with the app's own static files above.
+// The folder behind /uploads is configurable: on a container host it points at a
+// MOUNTED VOLUME, because anything inside the published app is replaced on every
+// deploy -- which is how every student photo once vanished on each release. When
+// Uploads:Root is not set it is wwwroot/uploads.
+var uploadRoot = educore.Helpers.UploadPaths.Root(builder.Configuration, builder.Environment);
+Directory.CreateDirectory(uploadRoot);
+app.UseWhen(c => c.Request.Path.StartsWithSegments(educore.Helpers.UploadPaths.RequestPath), b =>
+{
+    educore.Helpers.UploadsGuard.UseUploadsGuard(b);
+    b.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadRoot),
+        RequestPath  = educore.Helpers.UploadPaths.RequestPath
+    });
+});
 
 app.Use(async (context, next) =>
 {

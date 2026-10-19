@@ -1,6 +1,4 @@
 using EduCoreDataAccessLayer.Helpers;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace educore.Helpers
 {
@@ -8,8 +6,8 @@ namespace educore.Helpers
     /// Uploaded files (student photos, the school's logo, seal and signature) open only
     /// for someone signed in to THAT school.
     ///
-    /// They are served as static files, which runs before sign-in is read, so anyone
-    /// with a link could open them -- a child's photo, or the principal's signature
+    /// They used to be served with the app's static files, before sign-in is read, so
+    /// anyone with a link could open them -- a child's photo, or the principal's signature
     /// and seal (the two things that make a certificate look real). Every upload sits
     /// under /uploads/{kind}/{tenant}/{school}/..., so the check is: signed in, and the
     /// tenant and school in the path are the user's own. The Super Admin (tenant 1) can
@@ -28,8 +26,8 @@ namespace educore.Helpers
                     return;
                 }
 
-                var auth = await context.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-                var user = auth.Succeeded ? auth.Principal : null;
+                // runs after app.UseAuthentication(), so the signed-in user is already read
+                var user = context.User?.Identity?.IsAuthenticated == true ? context.User : null;
                 var tenant = user?.FindFirst(Common.SK_TenantId)?.Value;
                 var school = user?.FindFirst(Common.SK_SchoolId)?.Value;
 
@@ -42,9 +40,11 @@ namespace educore.Helpers
                 if (!allowed)
                 {
                     context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    // never kept by Cloudflare: a cached "no" would also turn away the right user
+                    context.Response.Headers.CacheControl = "no-store";
                     return;
                 }
-                // a private file: the browser may keep it, a shared cache may not
+                // a private file: the browser may keep it, Cloudflare (a shared cache) may not
                 context.Response.Headers.CacheControl = "private, max-age=3600";
                 await next();
             });
