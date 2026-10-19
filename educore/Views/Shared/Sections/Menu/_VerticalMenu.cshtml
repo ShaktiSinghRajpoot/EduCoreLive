@@ -714,7 +714,10 @@
                             var g = a.closest('ul.menu-inner > li.menu-item');
                             if (g && groups.indexOf(g) === -1) groups.push(g);
                         });
-                        if (cands.length && groups.length === 1) best = cands[0];
+                        // the server already knows which entry a page belongs to (Order
+                        // List -> Purchase, Sell by class -> Student Items): keep its pick
+                        var marked = cands.filter(function (a) { return a.parentElement.classList.contains('active'); });
+                        if (cands.length && groups.length === 1) best = marked[0] || cands[0];
                     }
                 }
 
