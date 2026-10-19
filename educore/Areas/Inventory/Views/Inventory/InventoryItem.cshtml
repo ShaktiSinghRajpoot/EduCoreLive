@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Store";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -25,7 +25,7 @@
           </div>
         </div>
         <div class="d-flex gap-2 flex-wrap ec-head-actions">
-          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="StoreLocations">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="Inventory" asp-controller="Inventory" asp-action="StoreLocations">
             <i class="bx bx-map-pin"></i><span>Store Locations</span>
           </a>
           <button class="btn btn-primary d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#itemModal">
@@ -471,15 +471,15 @@
 (function () {
     'use strict';
 
-    var ITEMS_URL    = '@Url.Action("Items", "Inventory", new { area = "ERP" })';
-    var ITEM_URL     = '@Url.Action("Item", "Inventory", new { area = "ERP" })';
-    var SAVE_URL     = '@Url.Action("SaveItem", "Inventory", new { area = "ERP" })';
-    var DELETE_URL   = '@Url.Action("DeleteItem", "Inventory", new { area = "ERP" })';
-    var MOVE_URL     = '@Url.Action("MoveStock", "Inventory", new { area = "ERP" })';
-    var LEDGER_URL   = '@Url.Action("Ledger", "Inventory", new { area = "ERP" })';
-    var LOCS_URL     = '@Url.Action("Locations", "Inventory", new { area = "ERP" })';
-    var STOCK_URL    = '@Url.Action("ItemStock", "Inventory", new { area = "ERP" })';
-    var TRANSFER_URL = '@Url.Action("TransferStock", "Inventory", new { area = "ERP" })';
+    var ITEMS_URL    = '@Url.Action("Items", "Inventory", new { area = "Inventory" })';
+    var ITEM_URL     = '@Url.Action("Item", "Inventory", new { area = "Inventory" })';
+    var SAVE_URL     = '@Url.Action("SaveItem", "Inventory", new { area = "Inventory" })';
+    var DELETE_URL   = '@Url.Action("DeleteItem", "Inventory", new { area = "Inventory" })';
+    var MOVE_URL     = '@Url.Action("MoveStock", "Inventory", new { area = "Inventory" })';
+    var LEDGER_URL   = '@Url.Action("Ledger", "Inventory", new { area = "Inventory" })';
+    var LOCS_URL     = '@Url.Action("Locations", "Inventory", new { area = "Inventory" })';
+    var STOCK_URL    = '@Url.Action("ItemStock", "Inventory", new { area = "Inventory" })';
+    var TRANSFER_URL = '@Url.Action("TransferStock", "Inventory", new { area = "Inventory" })';
 
     var locations = [];  // active store locations, default first
 

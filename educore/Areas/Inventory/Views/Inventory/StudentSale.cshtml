@@ -38,7 +38,7 @@
               <div class="ec-page-subtitle">Give books, uniform, diary to a student — the amount goes on their fee account, paid now or later at Collect Fees</div>
             </div>
           </div>
-          <a class="btn btn-outline-secondary text-nowrap ms-lg-auto" href="@Url.Action("InventoryItem", "Inventory", new { area = "ERP" })"><i class="bx bx-plus me-1"></i>Add item</a>
+          <a class="btn btn-outline-secondary text-nowrap ms-lg-auto" href="@Url.Action("InventoryItem", "Inventory", new { area = "Inventory" })"><i class="bx bx-plus me-1"></i>Add item</a>
         </div>
       </div>
     </div>
@@ -159,14 +159,14 @@
 <script>
 $(function () {
     var URL = {
-        search:  '@Url.Action("SaleSearch", "Inventory", new { area = "ERP" })',
-        student: '@Url.Action("SaleStudent", "Inventory", new { area = "ERP" })',
-        items:   '@Url.Action("SaleItems", "Inventory", new { area = "ERP" })',
-        sell:    '@Url.Action("Sell", "Inventory", new { area = "ERP" })',
-        ret:     '@Url.Action("SaleReturn", "Inventory", new { area = "ERP" })',
-        exchange:'@Url.Action("ExchangeSize", "Inventory", new { area = "ERP" })',
-        sales:   '@Url.Action("Sales", "Inventory", new { area = "ERP" })',
-        kit:     '@Url.Action("SaveClassKit", "Inventory", new { area = "ERP" })',
+        search:  '@Url.Action("SaleSearch", "Inventory", new { area = "Inventory" })',
+        student: '@Url.Action("SaleStudent", "Inventory", new { area = "Inventory" })',
+        items:   '@Url.Action("SaleItems", "Inventory", new { area = "Inventory" })',
+        sell:    '@Url.Action("Sell", "Inventory", new { area = "Inventory" })',
+        ret:     '@Url.Action("SaleReturn", "Inventory", new { area = "Inventory" })',
+        exchange:'@Url.Action("ExchangeSize", "Inventory", new { area = "Inventory" })',
+        sales:   '@Url.Action("Sales", "Inventory", new { area = "Inventory" })',
+        kit:     '@Url.Action("SaveClassKit", "Inventory", new { area = "Inventory" })',
         collect: '@Url.Action("ManageFee", "Fee", new { area = "ERP" })'
     };
     var student = null;      // {id, name, admNo, sessions:[{year, cls, sec, current}]}
@@ -426,7 +426,7 @@ $(function () {
     function loadSummary(kind) {
         var r = EC.dateRange(kind, SESSION_START);
         $('#sumRange').text('· ' + EC.date(r.from) + ' to ' + EC.date(r.to));
-        $.getJSON('@Url.Action("StoreSummary", "Inventory", new { area = "ERP" })', { from: r.from, to: r.to }).done(function (s) {
+        $.getJSON('@Url.Action("StoreSummary", "Inventory", new { area = "Inventory" })', { from: r.from, to: r.to }).done(function (s) {
             var card = function (label, val, color) {
                 return '<div class="col-6 col-md-4 col-xl-2"><div class="ss-kpi"><div class="v" style="color:' + color + '">' + EC.money(val) + '</div><div class="l">' + label + '</div></div></div>';
             };

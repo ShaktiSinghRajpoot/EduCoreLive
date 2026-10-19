@@ -176,7 +176,7 @@ namespace educore.Controllers
                 ("Staff",      "bx-id-card",         "/ERP/Staff/StaffList",               "#9333ea", "staff.view",      true),
                 ("Payroll",    "bx-money",           "/ERP/Payroll/PayrollManagement",     "#16a34a", "payroll.view",    payroll),
                 ("Leave",      "bx-calendar-minus",  "/ERP/Leave/LeaveManagement",         "#e83e8c", "staff.view",      payroll),
-                ("Inventory",  "bx-package",         "/ERP/Inventory/InventoryItem",       "#ff5722", "inventory.view",  inventory),
+                ("Inventory",  "bx-package",         "/inventory/store",                   "#ff5722", "inventory.view",  inventory),
                 ("Transport",  "bx-bus",             "/ERP/Transport/LiveTracking",        "#0ea5e9", "transport.view",  transport),
                 ("Reminders",  "bx-bell",            "/ERP/FeeDues",               "#ff8a00", "fees.view",       fees),
                 // Was /ERP/Reports, which does not exist.

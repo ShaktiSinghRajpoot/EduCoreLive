@@ -17,6 +17,26 @@ namespace educore.Helpers
         // controller name -> the area it lives in now
         public static readonly Dictionary<string, string> MovedControllers = new(StringComparer.OrdinalIgnoreCase)
         {
+            { "Inventory", "Inventory" },
+            { "StoreRegister", "Inventory" },
+        };
+
+        // Pages that got a short address of their own: "Controller/Action" -> new path.
+        // (Their old long form would not open: an action with its own route answers only there.)
+        public static readonly Dictionary<string, string> MovedPages = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Inventory", "/inventory" },
+            { "Inventory/Index", "/inventory" },
+            { "Inventory/StoreDashboard", "/inventory" },
+            { "Inventory/InventoryItem", "/inventory/store" },
+            { "Inventory/StoreLocations", "/inventory/locations" },
+            { "Inventory/SupplierMaster", "/inventory/suppliers" },
+            { "Inventory/PurchaseEntry", "/inventory/purchase" },
+            { "Inventory/StudentSale", "/inventory/give-items" },
+            { "Inventory/ClassSale", "/inventory/class-items" },
+            { "Inventory/OrderList", "/inventory/order-list" },
+            { "StoreRegister", "/inventory/register" },
+            { "StoreRegister/Index", "/inventory/register" },
         };
 
         public static IApplicationBuilder UseLegacyErpRedirect(this IApplicationBuilder app)
@@ -32,10 +52,15 @@ namespace educore.Helpers
                     var controller = slash < 0 ? afterArea : afterArea.Substring(0, slash);
                     var rest = slash < 0 ? "" : afterArea.Substring(slash);
 
-                    if (MovedControllers.TryGetValue(controller, out var area))
+                    string? target = null;
+                    if (MovedPages.TryGetValue(afterArea.TrimEnd('/'), out var page))
+                        target = page;
+                    else if (MovedControllers.TryGetValue(controller, out var area))
+                        target = "/" + area.ToLowerInvariant() + "/" + controller.ToLowerInvariant() + rest;
+
+                    if (target != null)
                     {
-                        var target = "/" + area.ToLowerInvariant() + "/" + controller.ToLowerInvariant() + rest
-                                   + context.Request.QueryString.Value;
+                        target += context.Request.QueryString.Value;
                         bool isGet = HttpMethods.IsGet(context.Request.Method) || HttpMethods.IsHead(context.Request.Method);
                         context.Response.StatusCode = isGet ? StatusCodes.Status301MovedPermanently
                                                             : StatusCodes.Status308PermanentRedirect;

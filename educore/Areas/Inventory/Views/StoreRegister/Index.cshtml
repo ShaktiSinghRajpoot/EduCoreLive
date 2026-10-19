@@ -121,8 +121,8 @@
 @section PageScripts {
 <script>
 $(function () {
-    var DATA_URL = '@Url.Action("Data", "StoreRegister", new { area = "ERP" })';
-    var OVERVIEW_URL = '@Url.Action("Overview", "StoreRegister", new { area = "ERP" })';
+    var DATA_URL = '@Url.Action("Data", "StoreRegister", new { area = "Inventory" })';
+    var OVERVIEW_URL = '@Url.Action("Overview", "StoreRegister", new { area = "Inventory" })';
     var SEC_URL  = '@Url.Action("PromotionSections", "Student", new { area = "ERP" })';
     var STORE_STAFF = @(storeStaff ? "true" : "false");
     var data = null;

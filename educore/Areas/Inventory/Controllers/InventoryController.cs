@@ -1,13 +1,13 @@
-﻿using educore.Helpers;
+using educore.Helpers;
 using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Inventory.Controllers
 {
-    [Area("ERP")]
+    [Area("Inventory")]
     // Stock / store module. Reading needs inventory.view; every write action
     // below also needs inventory.manage (which implies view). Cancelling a
     // purchase is a write like any other -- there is no separate key for it.
@@ -31,6 +31,7 @@ namespace educore.Areas.ERP.Controllers
         // ── Pages ───────────────────────────────────────────────────────────
         // The page's four cards are computed from the item list it already loads,
         // so there is no second source here to disagree with them.
+        [Route("inventory/store")]
         public async Task<IActionResult> InventoryItem([FromServices] IBaseService baseService)
         {
             // for "Which class is it for?" on a saleable item
@@ -39,9 +40,10 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        // Store dashboard (/ERP/Inventory/StoreDashboard): the store at a glance. The page
+        // Inventory Dashboard (/inventory): the store at a glance. The page
         // reads the endpoints below (Items, StoreSummary, Suppliers, OrderListData,
         // StoreRegister/Overview, Sales), so its figures match the pages they come from.
+        [Route("inventory")]
         public async Task<IActionResult> StoreDashboard([FromServices] ISchoolSettingsService settings)
         {
             try { ViewBag.CurrentYear = (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.AcademicYearName; }
@@ -51,11 +53,14 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // Store locations (add / rename / deactivate) and the transfer history.
+        [Route("inventory/locations")]
         public IActionResult StoreLocations() => View();
 
         // Supplier list / search / add / edit / deactivate / remove.
+        [Route("inventory/suppliers")]
         public IActionResult SupplierMaster() => View();
 
+        [Route("inventory/purchase")]
         public async Task<IActionResult> PurchaseEntry()
         {
             // Both pickers come from the database; the shell had them hardcoded.
@@ -470,6 +475,7 @@ namespace educore.Areas.ERP.Controllers
         // The items leave the store and one fee line per item goes on the child's
         // account, so the parent pays at Collect Fees now or later.
         [HasPermission("inventory.manage")]
+        [Route("inventory/give-items")]
         public async Task<IActionResult> StudentSale([FromServices] ISchoolSettingsService settings)
         {
             // the current session's first day, for the summary's "This session" button
@@ -481,11 +487,12 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        // Sell by class (/ERP/Inventory/ClassSale): one class-section on screen, each child
+        // Sell by class (/inventory/class-items): one class-section on screen, each child
         // with ✓ for what they already have this session and a tick (or a size) for what is
         // still to give. Ticked items are given child by child with the same Sell as above.
         // The grid reads StoreRegister/Data (who has what) and SaleItems (price, stock).
         [HasPermission("inventory.manage")]
+        [Route("inventory/class-items")]
         public async Task<IActionResult> ClassSale([FromServices] IBaseService baseService,
                                                    [FromServices] ISchoolSettingsService settings)
         {
@@ -617,7 +624,8 @@ namespace educore.Areas.ERP.Controllers
             return Json(new { success = res.Success, message = res.Message });
         }
 
-        // ── Order list (/ERP/Inventory/OrderList): what to order for a session ──
+        // ── Order list (/inventory/order-list): what to order for a session ──
+        [Route("inventory/order-list")]
         public async Task<IActionResult> OrderList([FromServices] IBaseService baseService)
         {
             try { ViewBag.YearList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }

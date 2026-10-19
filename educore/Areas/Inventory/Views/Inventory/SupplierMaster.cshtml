@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Suppliers";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -23,7 +23,7 @@
           </div>
         </div>
         <div class="d-flex gap-2 flex-wrap ec-head-actions">
-          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="PurchaseEntry">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="Inventory" asp-controller="Inventory" asp-action="PurchaseEntry">
             <i class="bx bx-cart"></i><span>Purchase Entry</span>
           </a>
           <button class="btn btn-primary d-flex align-items-center gap-1" id="addSupplierBtn">
@@ -225,15 +225,15 @@
 (function () {
     'use strict';
 
-    var LIST_URL      = '@Url.Action("Suppliers", "Inventory", new { area = "ERP" })';
-    var SAVE_URL      = '@Url.Action("SaveSupplier", "Inventory", new { area = "ERP" })';
-    var ACTIVE_URL    = '@Url.Action("SetSupplierActive", "Inventory", new { area = "ERP" })';
-    var DELETE_URL    = '@Url.Action("DeleteSupplier", "Inventory", new { area = "ERP" })';
-    var PURCHASES_URL = '@Url.Action("Purchases", "Inventory", new { area = "ERP" })';
+    var LIST_URL      = '@Url.Action("Suppliers", "Inventory", new { area = "Inventory" })';
+    var SAVE_URL      = '@Url.Action("SaveSupplier", "Inventory", new { area = "Inventory" })';
+    var ACTIVE_URL    = '@Url.Action("SetSupplierActive", "Inventory", new { area = "Inventory" })';
+    var DELETE_URL    = '@Url.Action("DeleteSupplier", "Inventory", new { area = "Inventory" })';
+    var PURCHASES_URL = '@Url.Action("Purchases", "Inventory", new { area = "Inventory" })';
 
-    var PAY_URL       = '@Url.Action("PaySupplier", "Inventory", new { area = "ERP" })';
-    var PAYS_URL      = '@Url.Action("SupplierPayments", "Inventory", new { area = "ERP" })';
-    var PAY_CANCEL_URL = '@Url.Action("CancelSupplierPayment", "Inventory", new { area = "ERP" })';
+    var PAY_URL       = '@Url.Action("PaySupplier", "Inventory", new { area = "Inventory" })';
+    var PAYS_URL      = '@Url.Action("SupplierPayments", "Inventory", new { area = "Inventory" })';
+    var PAY_CANCEL_URL = '@Url.Action("CancelSupplierPayment", "Inventory", new { area = "Inventory" })';
 
     var rows = [];
     var timer = null;

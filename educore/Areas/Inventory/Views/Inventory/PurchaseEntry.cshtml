@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Purchase Entry";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -23,10 +23,10 @@
                     </div>
                 </div>
                 <div class="header-actions d-flex gap-2 flex-wrap">
-                    <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="OrderList">
+                    <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="Inventory" asp-controller="Inventory" asp-action="OrderList">
                         <i class="bx bx-list-check"></i><span>Order list</span>
                     </a>
-                    <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="SupplierMaster">
+                    <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="Inventory" asp-controller="Inventory" asp-action="SupplierMaster">
                         <i class="bx bx-store"></i><span>Suppliers</span>
                     </a>
                     <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-1" id="historyBtn">
@@ -312,13 +312,13 @@
 (function () {
     'use strict';
 
-    var SAVE_URL      = '@Url.Action("SavePurchase", "Inventory", new { area = "ERP" })';
-    var LIST_URL      = '@Url.Action("Purchases", "Inventory", new { area = "ERP" })';
-    var CANCEL_URL    = '@Url.Action("CancelPurchase", "Inventory", new { area = "ERP" })';
-    var SUPPLIER_URL  = '@Url.Action("SaveSupplier", "Inventory", new { area = "ERP" })';
-    var SUPPLIERS_URL = '@Url.Action("Suppliers", "Inventory", new { area = "ERP" })';
-    var DETAIL_URL    = '@Url.Action("Purchase", "Inventory", new { area = "ERP" })';
-    var RETURN_URL    = '@Url.Action("ReturnToSupplier", "Inventory", new { area = "ERP" })';
+    var SAVE_URL      = '@Url.Action("SavePurchase", "Inventory", new { area = "Inventory" })';
+    var LIST_URL      = '@Url.Action("Purchases", "Inventory", new { area = "Inventory" })';
+    var CANCEL_URL    = '@Url.Action("CancelPurchase", "Inventory", new { area = "Inventory" })';
+    var SUPPLIER_URL  = '@Url.Action("SaveSupplier", "Inventory", new { area = "Inventory" })';
+    var SUPPLIERS_URL = '@Url.Action("Suppliers", "Inventory", new { area = "Inventory" })';
+    var DETAIL_URL    = '@Url.Action("Purchase", "Inventory", new { area = "Inventory" })';
+    var RETURN_URL    = '@Url.Action("ReturnToSupplier", "Inventory", new { area = "Inventory" })';
 
     // The item catalog is rendered by the server from the same list the item
     // master shows — the page used to carry its own hardcoded copy.

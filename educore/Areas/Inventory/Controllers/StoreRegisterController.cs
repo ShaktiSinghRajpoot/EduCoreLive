@@ -5,10 +5,10 @@ using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Inventory.Controllers
 {
     /// <summary>
-    /// Books & Uniform Register (/ERP/StoreRegister): a class's children down the side,
+    /// Books & Uniform Register (/inventory/register): a class's children down the side,
     /// the store's items across the top, ✓ for what each child has (this session,
     /// not returned) and ✗ for what they do not.
     ///
@@ -16,7 +16,7 @@ namespace educore.Areas.ERP.Controllers
     /// only the sections they are class teacher of in the current session. Unpaid
     /// amounts go only to users who may see fees.
     /// </summary>
-    [Area("ERP")]
+    [Area("Inventory")]
     [Authorize(Policy = "SchoolUserOnly")]
     [RequiresModule(SchoolModule.Inventory)]
     public class StoreRegisterController : Controller
@@ -30,6 +30,7 @@ namespace educore.Areas.ERP.Controllers
             _classTeacher = classTeacher;
         }
 
+        [Route("inventory/register")]
         public async Task<IActionResult> Index([FromServices] IBaseService baseService, [FromServices] ISchoolSettingsService settings)
         {
             bool storeStaff = await HasPermissionAttribute.UserHasAsync(this, "inventory.view");

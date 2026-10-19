@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @{
     ViewData["Title"] = "Store Locations";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -23,7 +23,7 @@
           </div>
         </div>
         <div class="d-flex gap-2 flex-wrap ec-head-actions">
-          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="ERP" asp-controller="Inventory" asp-action="InventoryItem">
+          <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="Inventory" asp-controller="Inventory" asp-action="InventoryItem">
             <i class="bx bx-box"></i><span>Store</span>
           </a>
           <button class="btn btn-primary d-flex align-items-center gap-1" id="addLocationBtn">
@@ -122,10 +122,10 @@
 (function () {
     'use strict';
 
-    var LOCS_URL      = '@Url.Action("Locations", "Inventory", new { area = "ERP" })';
-    var SAVE_URL      = '@Url.Action("SaveLocation", "Inventory", new { area = "ERP" })';
-    var ACTIVE_URL    = '@Url.Action("SetLocationActive", "Inventory", new { area = "ERP" })';
-    var TRANSFERS_URL = '@Url.Action("Transfers", "Inventory", new { area = "ERP" })';
+    var LOCS_URL      = '@Url.Action("Locations", "Inventory", new { area = "Inventory" })';
+    var SAVE_URL      = '@Url.Action("SaveLocation", "Inventory", new { area = "Inventory" })';
+    var ACTIVE_URL    = '@Url.Action("SetLocationActive", "Inventory", new { area = "Inventory" })';
+    var TRANSFERS_URL = '@Url.Action("Transfers", "Inventory", new { area = "Inventory" })';
 
     var locations = [];
 
