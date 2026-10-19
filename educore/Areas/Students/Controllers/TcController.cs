@@ -1,0 +1,173 @@
+using educore.Helpers;
+using educore.Models;
+using EduCoreDataAccessLayer.Helpers;
+using EduCoreDataAccessLayer.Models.ERP;
+using EduCoreDataAccessLayer.Services.Contract.ERP;
+using Microsoft.AspNetCore.Mvc;
+
+namespace educore.Areas.Students.Controllers
+{
+    // Transfer Certificate: issue, reprint and the register. Sits on the student-exit
+    // flow — only a student who has left (and cleared dues) can be issued a TC.
+    [Area("Students")]
+    [HasPermission("students.view")]
+    public class TcController : Controller
+    {
+        private readonly ITransferCertificateService _tc;
+        private readonly ISchoolSettingsService _settings;
+        private readonly IPublicIdService _publicIds;
+
+        public TcController(ITransferCertificateService tc, ISchoolSettingsService settings, IPublicIdService publicIds)
+        {
+            _tc = tc;
+            _settings = settings;
+            _publicIds = publicIds;
+        }
+
+        private int TenantId() => Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+        private int SchoolId() => Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+        private int UserId()   => Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+
+        // Issue a certificate. The proc holds the dues gate and the one-per-student
+        // rule, so its message is what the office sees.
+        [HttpPost]
+        [HasPermission("students.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Issue([FromBody] TcIssueRequest request)
+        {
+            var result = await _tc.IssueAsync(request, TenantId(), SchoolId(), UserId());
+            return Json(new { success = result.Success, message = result.Message, tcId = result.TcId, tcNo = result.TcNo, tcPublicId = result.PublicId });
+        }
+
+        // The printable certificate. Opening (or refreshing) it marks NOTHING: it
+        // used to count every GET as a print, so a refresh, a link preview or a
+        // view-only user turned the original into a "DUPLICATE". The count moves
+        // only when someone presses Print, through MarkPrinted below. ?print=1
+        // (from Issue & Print) asks the page to run that once on load.
+        [HttpGet]
+        public async Task<IActionResult> Print(Guid id, bool print = false)
+        {
+            var tcId = await _publicIds.ResolveAsync(IPublicIdService.Tc, id, TenantId(), SchoolId());
+            if (tcId == 0) return NotFound();
+
+            var cert = await _tc.GetAsync(tcId, TenantId(), SchoolId(), UserId());
+            if (cert == null) return NotFound();
+
+            var model = await BuildPrintModel(cert, isPreview: false);
+            ViewBag.TcPublicId = id;
+            ViewBag.AutoPrint  = print && !cert.IsVoid;
+            return View("Print", model);
+        }
+
+        // Counts one print. The first is the original; later ones come back as
+        // duplicates and the page stamps DUPLICATE before printing. A voided
+        // certificate is refused. Needs students.manage: a view-only user can read
+        // the certificate but not print an original.
+        [HttpPost]
+        [HasPermission("students.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MarkPrinted(Guid id)
+        {
+            var tcId = await _publicIds.ResolveAsync(IPublicIdService.Tc, id, TenantId(), SchoolId());
+            if (tcId == 0) return Json(new { success = false, message = "Certificate not found." });
+
+            var (ok, message, wasDuplicate) = await _tc.MarkPrintedAsync(tcId, TenantId(), SchoolId(), UserId());
+            return Json(new { success = ok, message, wasDuplicate });
+        }
+
+        // Format preview for the Documents page and the issue modal — sample data, no
+        // record written, never stamps DUPLICATE.
+        [HttpGet]
+        public async Task<IActionResult> Preview(string format = "Standard")
+        {
+            var model = await BuildPrintModel(SampleCertificate(format), isPreview: true);
+            return View("Print", model);
+        }
+
+        // The issued-TC register.
+        [HttpGet("students/tc-register")]
+        public async Task<IActionResult> Register(TcListModel query)
+        {
+            await _tc.GetListAsync(query, TenantId(), SchoolId(), UserId());
+            return View(query);
+        }
+
+        [HttpPost]
+        [HasPermission("students.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Void([FromBody] TcVoidRequest request)
+        {
+            var (success, message) = await _tc.VoidAsync(request, TenantId(), SchoolId(), UserId());
+            return Json(new { success, message });
+        }
+
+        // Loads the school letterhead (name/address/logo) so the print looks real,
+        // and turns a relative logo path into an absolute one — the print popup is
+        // about:blank and cannot resolve a relative URL.
+        private async Task<TcPrintModel> BuildPrintModel(TransferCertificate cert, bool isPreview)
+        {
+            var school = await _settings.GetBasicProfileAsync(TenantId(), SchoolId(), UserId())
+                         ?? new SchoolManageModel { SchoolName = "Your School" };
+
+            return new TcPrintModel
+            {
+                Tc        = cert,
+                School    = school,
+                LogoUrl   = AbsoluteLogo(school.LogoUrl),
+                IsPreview = isPreview
+            };
+        }
+
+        private string? AbsoluteLogo(string? logoUrl)
+        {
+            if (string.IsNullOrWhiteSpace(logoUrl)) return null;
+            if (logoUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)) return logoUrl;
+            var slash = logoUrl.StartsWith('/') ? "" : "/";
+            return $"{Request.Scheme}://{Request.Host}{slash}{logoUrl}";
+        }
+
+        // The session a sample shows: today's April-March session ("2026-27"), so the
+        // preview never shows a year that has gone by. Sample only -- real cards use the student's.
+        private static string SampleSession()
+        {
+            int y = DateTime.Today.Month >= 4 ? DateTime.Today.Year : DateTime.Today.Year - 1;
+            return $"{y}-{(y + 1) % 100:00}";
+        }
+
+        private static TransferCertificate SampleCertificate(string format) => new()
+        {
+            Format        = format is "Board" or "Basic" ? format : "Basic",
+            TcNo          = "TC-0000-0000",
+            IssueDate     = Dates.Today,
+            AdmissionNo   = "ADM-0000-0001",
+            StudentName   = "Aarav Sharma",
+            Gender        = "Male",
+            Dob           = "2013-04-12",
+            FatherName    = "Rajesh Sharma",
+            MotherName    = "Priya Sharma",
+            ClassName     = "Class V",
+            Section        = "A",
+            AcademicYear  = SampleSession(),
+            AdmissionDate = "2021-04-01",
+            DateOfLeaving = Dates.Today,
+            Religion      = "Hindu",
+            Category      = "General",
+            Nationality   = "Indian",
+            Address       = "12, Green Park, New Delhi",
+            UdiseNo       = "1234567890",
+            ReasonForLeaving = "Family relocating to another city",
+            Conduct       = "Good",
+            Result        = "Qualified for promotion to Class VI",
+            Remarks       = "Sample certificate — preview only.",
+            // Board extras
+            ExamResult      = "Annual Examination 2025-26 — Passed",
+            FailedStatus    = "No",
+            SubjectsStudied = "English, Hindi, Mathematics, EVS, Computer",
+            FeesPaidUpto    = "March 2026",
+            WorkingDays     = 220,
+            DaysPresent     = 210,
+            Activities      = "Scouts; School football team",
+            ApplicationDate = Dates.Norm(Dates.Now.Date.AddDays(-2).ToString(Dates.Iso))
+        };
+    }
+}

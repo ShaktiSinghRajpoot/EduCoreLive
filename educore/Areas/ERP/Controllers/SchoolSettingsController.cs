@@ -423,7 +423,7 @@ namespace educore.Areas.ERP.Controllers
         [HasPermission("enquiry.view")]
         public IActionResult EnquiryCRM()
         {
-            return RedirectToAction("EnquiryCRM", "Enquiry");
+            return RedirectToAction("EnquiryCRM", "Enquiry", new { area = "Students" });
         }
         [HasPermission("academics.view")]
         public async Task<IActionResult> SubjectManagement(int academicYearId = 0)

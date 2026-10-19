@@ -166,12 +166,12 @@ namespace educore.Controllers
 
             var all = new (string Label, string Icon, string Url, string Color, string Key, bool On)[]
             {
-                ("Enquiries",  "bx-message-square-detail", "/ERP/Enquiry/EnquiryCRM",      "#e83e8c", "enquiry.view",    true),
-                ("Registrations", "bx-clipboard",    "/ERP/Registration",                  "#d97706", "registration.view", registration),
-                ("Students",   "bx-group",           "/ERP/Student/StudentList",           "#ff8a00", "students.view",   true),
-                ("Admission",  "bx-user-plus",       "/ERP/Admission/Create",              "#16a34a", "students.manage", true),
+                ("Enquiries",  "bx-message-square-detail", "/students/enquiries",                "#e83e8c", "enquiry.view",    true),
+                ("Registrations", "bx-clipboard",    "/students/registrations",            "#d97706", "registration.view", registration),
+                ("Students",   "bx-group",           "/students",                          "#ff8a00", "students.view",   true),
+                ("Admission",  "bx-user-plus",       "/students/admission/new",            "#16a34a", "students.manage", true),
                 ("Fees",       "bx-wallet",          "/fees/collect",                      "#0284c7", "fees.view",       fees),
-                ("Attendance", "bx-user-check",      "/ERP/Attendance/StudentAttendance",  "#d97706", "attendance.view", attendance),
+                ("Attendance", "bx-user-check",      "/attendance/mark",                   "#d97706", "attendance.view", attendance),
                 ("Exams",      "bx-file",            "/exams/schedule",                    "#dc2626", "exams.view",      exams),
                 ("Staff",      "bx-id-card",         "/staff",                             "#9333ea", "staff.view",      true),
                 ("Payroll",    "bx-money",           "/staff/payroll",                     "#16a34a", "payroll.view",    payroll),

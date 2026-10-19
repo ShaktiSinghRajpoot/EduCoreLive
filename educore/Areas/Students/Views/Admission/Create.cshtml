@@ -1,0 +1,1076 @@
+@using System.Linq
+@using Microsoft.AspNetCore.Mvc.Rendering
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "New Admission";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Admission/Create.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell student-admission-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap d-flex align-items-center gap-2">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-id-card fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">New Student Admission</h4>
+            <div class="ec-page-subtitle">Select academic year and class to load the configured fee structure</div>
+          </div>
+        </div>
+        <a asp-area="Students" asp-controller="Student" asp-action="StudentList"
+           class="btn btn-outline-secondary d-flex align-items-center gap-1">
+          <i class="bx bx-arrow-back"></i><span>Back to Students</span>
+        </a>
+      </div>
+    </div>
+
+    <form id="admissionForm" autocomplete="off" novalidate>
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="EnquiryId" id="adm_EnquiryId" value="@(ViewBag.PrefillEnquiryId ?? "")" />
+        <div class="row g-4">
+
+            <div class="col-12 col-lg-7">
+                <div class="ec-card mb-4">
+                    <div class="ec-card-header p-3 p-lg-4">
+                        <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                            <div class="ec-section-icon rounded-4 d-flex align-items-center justify-content-center"><i class="bx bx-user fs-5"></i></div>
+                            <div><div class="ec-section-title">Student Details</div><div class="ec-section-subtitle">Identity and academic placement</div></div>
+                        </div>
+                    </div>
+                    <div class="ec-card-body p-3 p-lg-4 pt-0">
+                        <div class="row g-3">
+                            <div class="col-12 adm-photo-row">
+                                <div class="adm-photo">
+                                    <label for="adm_Photo" class="adm-photo-drop" id="admPhotoDrop" title="Choose a photo">
+                                        <img id="admPhotoPreview" alt="" class="d-none">
+                                        <div class="adm-photo-empty" id="admPhotoEmpty">
+                                            <i class="bx bx-camera"></i>
+                                            <span>Add photo</span>
+                                        </div>
+                                    </label>
+                                    <input type="file" name="photo" id="adm_Photo" accept=".jpg,.jpeg,.png,.webp" class="d-none">
+                                    <button type="button" class="btn btn-sm btn-text-danger d-none" id="admPhotoClear">
+                                        <i class="bx bx-x"></i> Remove
+                                    </button>
+                                    <div class="adm-photo-text">
+                                        <div class="adm-photo-title">Student photo</div>
+                                        <div class="adm-photo-hint">JPG, PNG or WEBP, under 2 MB. Can be added later from the student's profile.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-lg-6">
+                                <label class="form-label required">Student Full Name</label>
+                                <input type="text" name="StudentName" id="adm_StudentName" class="form-control" placeholder="Enter full name" value="@ViewBag.PreStudentName" required>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label required">Gender</label>
+                                @{ var preG = Convert.ToString(ViewBag.PreGender); }
+                                <select name="Gender" id="adm_Gender" class="form-select" required>
+                                    <option value="">Select</option>
+                                    <option selected="@(preG == "Male")">Male</option>
+                                    <option selected="@(preG == "Female")">Female</option>
+                                    <option selected="@(preG == "Other")">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label required">Date of Birth</label>
+                                <input type="date" name="DateOfBirth" class="form-control" value="@(ViewBag.PreDob as string ?? "")" max="@Dates.Today" required>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label required">Academic Year</label>
+                                <select id="academicYearSelect" name="AcademicYear" class="form-select" required>
+                                    <option value="">Select Year</option>
+                                    @foreach (var s in (ViewBag.Sessions as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
+                                    {
+                                        <option value="@s.Text" data-ayid="@s.Value" selected="@(s.Selected || s.Text == Convert.ToString(ViewBag.PreAcademicYear))">@s.Text</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label required">Class</label>
+                                <select id="classSelect" name="ClassName" class="form-select" required>
+                                    <option value="">Select Class</option>
+                                    @foreach (var c in (ViewBag.Classes as IEnumerable<SelectListItem> ?? Enumerable.Empty<SelectListItem>()))
+                                    {
+                                        <option value="@c.Text" selected="@(c.Text == Convert.ToString(ViewBag.PreClassName))">@c.Text</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label required">Section</label>
+                                <select name="Section" id="adm_Section" class="form-select" required>
+                                    <option value="">Select year &amp; class first</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-lg-3">
+                                <label class="form-label">Admission No</label>
+                                <input type="text" name="AdmissionNo" id="adm_AdmissionNo" class="form-control">
+                                <div class="form-text d-none" id="admNoHint"></div>
+                            </div>
+
+
+                            <div class="col-12"><hr class="my-1 opacity-25"></div>
+                            <div class="col-12 col-sm-6 col-md-4">
+                                <label class="form-label">Category</label>
+                                <select name="Category" class="form-select">
+                                    <option value="">Select</option>
+                                    <option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>EWS</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-md-4">
+                                <label class="form-label">Blood Group</label>
+                                <select name="BloodGroup" class="form-select">
+                                    <option value="">Select</option>
+                                    <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+                                    <option>O+</option><option>O-</option><option>AB+</option><option>AB-</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-sm-6 col-md-4">
+                                <label class="form-label">Religion</label>
+                                <input type="text" name="Religion" class="form-control" placeholder="Optional">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Nationality</label>
+                                <input type="text" name="Nationality" class="form-control" placeholder="e.g. Indian">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Mother Tongue</label>
+                                <input type="text" name="MotherTongue" class="form-control" placeholder="Optional">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-card mb-4">
+                    <div class="ec-card-header p-3 p-lg-4">
+                        <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                            <div class="ec-section-icon rounded-4 d-flex align-items-center justify-content-center"><i class="bx bx-id-card fs-5"></i></div>
+                            <div><div class="ec-section-title">Government Identifiers</div><div class="ec-section-subtitle">For board / UDISE+ reporting — all optional at admission</div></div>
+                        </div>
+                    </div>
+                    <div class="ec-card-body p-3 p-lg-4 pt-0">
+                        <div class="kit-meta mb-3">APAAR &amp; UDISE/PEN are usually generated through UDISE+ <em>after</em> admission — capture them here only if the student already has them (e.g. transfers). Per RTE, Aadhaar is never mandatory for admission.</div>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">Aadhaar Number</label>
+                                <input type="text" name="IdProofNo" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" class="form-control" placeholder="12-digit (optional)">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">APAAR ID</label>
+                                <input type="text" name="ApaarId" inputmode="numeric" maxlength="12" pattern="[0-9]{12}" class="form-control" placeholder="12-digit APAAR (optional)">
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <label class="form-label">UDISE / PEN Student ID</label>
+                                <input type="text" name="UdiseStudentId" maxlength="30" class="form-control" placeholder="Permanent Education No (optional)">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-card mb-4">
+                    <div class="ec-card-header p-3 p-lg-4">
+                        <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                            <div class="ec-section-icon rounded-4 d-flex align-items-center justify-content-center"><i class="bx bx-phone fs-5"></i></div>
+                            <div><div class="ec-section-title">Parent &amp; Contact</div><div class="ec-section-subtitle">Guardian communication and address</div></div>
+                        </div>
+                    </div>
+                    <div class="ec-card-body p-3 p-lg-4 pt-0">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label required">Father / Guardian Name</label>
+                                <input type="text" name="GuardianName" id="adm_GuardianName" class="form-control" placeholder="Enter parent name" value="@ViewBag.PreGuardianName" required>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Mother Name</label>
+                                <input type="text" name="MotherName" class="form-control" placeholder="Optional" value="@ViewBag.PreMotherName">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label required">Mobile Number</label>
+                                <input type="tel" name="MobileNumber" id="adm_MobileNumber" maxlength="10" pattern="[0-9]{10}" class="form-control" placeholder="10 digit mobile" value="@ViewBag.PreMobile" required>
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Alternate Mobile</label>
+                                <input type="tel" name="AlternateMobile" maxlength="10" pattern="[0-9]{10}" class="form-control" placeholder="Optional" value="@ViewBag.PreAltMobile">
+                            </div>
+
+                            <div class="col-12"><hr class="my-1 opacity-25"></div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Father Occupation</label>
+                                <input type="text" name="FatherOccupation" class="form-control" placeholder="Optional">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Father Qualification</label>
+                                <input type="text" name="FatherQualification" class="form-control" placeholder="Optional">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Mother Occupation</label>
+                                <input type="text" name="MotherOccupation" class="form-control" placeholder="Optional">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Mother Qualification</label>
+                                <input type="text" name="MotherQualification" class="form-control" placeholder="Optional">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Father Email</label>
+                                <input type="email" name="FatherEmail" class="form-control" placeholder="Optional" value="@ViewBag.PreFatherEmail">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Mother Email</label>
+                                <input type="email" name="MotherEmail" class="form-control" placeholder="Optional">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Annual Family Income (₹)</label>
+                                <input type="number" min="0" step="1" name="AnnualIncome" class="form-control" placeholder="Used for concession / RTE">
+                            </div>
+
+                            <div class="col-12">
+                                <label class="form-label required">Address</label>
+                                <textarea name="Address" class="form-control" rows="3" placeholder="Complete address" required>@ViewBag.PreAddress</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-card mb-4">
+                    <div class="ec-card-header p-3 p-lg-4">
+                        <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                            <div class="ec-section-icon rounded-4 d-flex align-items-center justify-content-center"><i class="bx bx-buildings fs-5"></i></div>
+                            <div><div class="ec-section-title">Previous School</div><div class="ec-section-subtitle">Fill only for transfer / lateral admissions</div></div>
+                        </div>
+                    </div>
+                    <div class="ec-card-body p-3 p-lg-4 pt-0">
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Previous School Name</label>
+                                <input type="text" name="PrevSchoolName" class="form-control" placeholder="Optional" value="@ViewBag.PrePrevSchool">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Board</label>
+                                <input type="text" name="PrevBoard" class="form-control" placeholder="e.g. CBSE / ICSE / State">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">Last Class Attended</label>
+                                <input type="text" name="PrevClass" class="form-control" placeholder="Optional" value="@ViewBag.PrePrevClass">
+                            </div>
+                            <div class="col-12 col-md-6">
+                                <label class="form-label">TC Number</label>
+                                <input type="text" name="PrevTcNo" class="form-control" placeholder="Transfer Certificate no">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ec-card mb-4 mb-lg-0">
+                    <div class="ec-card-header p-3 p-lg-4">
+                        <div class="ec-section-title-wrap d-flex align-items-center gap-3">
+                            <div class="ec-section-icon rounded-4 d-flex align-items-center justify-content-center"><i class="bx bx-folder-open fs-5"></i></div>
+                            <div><div class="ec-section-title">Documents</div><div class="ec-section-subtitle">Tick what's collected at admission</div></div>
+                        </div>
+                    </div>
+                    <div class="ec-card-body p-3 p-lg-4 pt-0">
+                        <div class="kit-meta mb-2">File upload &amp; storage is a separate step — this records the collection checklist for now.</div>
+                        <div class="row g-2" id="docChecklist">
+                            <div class="col-12 col-md-6"><label class="fee-check-row" style="cursor:pointer;"><div class="d-flex gap-2 align-items-center"><input type="checkbox" class="form-check-input doc-chk" value="Birth Certificate"><div class="fw-bold" style="color:var(--ec-heading)">Birth Certificate</div></div></label></div>
+                            <div class="col-12 col-md-6"><label class="fee-check-row" style="cursor:pointer;"><div class="d-flex gap-2 align-items-center"><input type="checkbox" class="form-check-input doc-chk" value="Aadhaar Card"><div class="fw-bold" style="color:var(--ec-heading)">Aadhaar Card</div></div></label></div>
+                            <div class="col-12 col-md-6"><label class="fee-check-row" style="cursor:pointer;"><div class="d-flex gap-2 align-items-center"><input type="checkbox" class="form-check-input doc-chk" value="Transfer Certificate"><div class="fw-bold" style="color:var(--ec-heading)">Transfer Certificate</div></div></label></div>
+                            <div class="col-12 col-md-6"><label class="fee-check-row" style="cursor:pointer;"><div class="d-flex gap-2 align-items-center"><input type="checkbox" class="form-check-input doc-chk" value="Previous Marksheet"><div class="fw-bold" style="color:var(--ec-heading)">Previous Marksheet</div></div></label></div>
+                            <div class="col-12 col-md-6"><label class="fee-check-row" style="cursor:pointer;"><div class="d-flex gap-2 align-items-center"><input type="checkbox" class="form-check-input doc-chk" value="Passport Photos"><div class="fw-bold" style="color:var(--ec-heading)">Passport Photos</div></div></label></div>
+                            <div class="col-12 col-md-6"><label class="fee-check-row" style="cursor:pointer;"><div class="d-flex gap-2 align-items-center"><input type="checkbox" class="form-check-input doc-chk" value="Address Proof"><div class="fw-bold" style="color:var(--ec-heading)">Address Proof</div></div></label></div>
+                        </div>
+                        <input type="hidden" name="DocumentsJson" id="documentsJson">
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-lg-5">
+                <div class="ec-sidebar fee-preview-sidebar p-3 p-lg-4">
+                    <div class="ec-profile-box mb-4">
+                        <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                            <div>
+                                <div class="ec-profile-subtitle">Collect at Admission</div>
+                                <div class="fee-total" id="annualTotalText">₹0.00</div>
+                                <div class="kit-meta mt-1" id="annualRefText">One-time charges due now</div>
+                            </div>
+                            <div class="ec-avatar rounded-4 d-flex align-items-center justify-content-center">
+                                <i class="bx bx-wallet fs-4"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-explainer">
+                        <div class="t"><i class="bx bx-info-circle"></i>How admission &amp; fees work</div>
+                        <div class="d">Admission creates the student record and sets up the full fee schedule. <strong>One-time charges are collected now</strong>; monthly &amp; yearly fees are billed later from the Fee module on their due dates — not paid upfront here.</div>
+                    </div>
+
+                    <div id="feeContent">
+                        <div class="fee-empty">
+                            <i class="bx bx-wallet"></i>
+                            <h6>Select Academic Year &amp; Class</h6>
+                            <p class="mb-2">The configured fee structure will appear here.</p>
+                            <ul class="adm-steps">
+                                <li><i class="bx bx-check-circle"></i><span>One-time charges shown as <strong>due now</strong></span></li>
+                                <li><i class="bx bx-check-circle"></i><span>Monthly &amp; yearly fees scheduled for later</span></li>
+                                <li><i class="bx bx-check-circle"></i><span>Apply concession on one-time fees</span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div id="concessionPanel" class="d-none">
+                        <div class="fee-group-title">Concession / Discount</div>
+                        <div class="fee-summary">
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label">Type</label>
+                                    <select id="discountType" name="DiscountType" class="form-select">
+                                        <option value="fixed">Fixed Amount</option>
+                                        <option value="percentage">Percentage</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label">Value</label>
+                                    <input type="number" id="discountValue" name="DiscountValue" class="form-control" value="0" min="0">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Apply To</label>
+                                    <select id="discountApplyTo" name="DiscountApplyTo" class="form-select">
+                                        <option value="payToday">Pay Today Only</option>
+                                        <option value="annual">Fees for Rest of Session</option>
+                                    </select>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Reason</label>
+                                    <input type="text" id="discountReason" name="DiscountReason" class="form-control" placeholder="Required if discount is applied">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @if (ViewBag.CollectFeeAtAdmission == true)
+                    {
+                    <div id="collectNowPanel" class="mt-2">
+                        <div class="fee-group-title d-flex align-items-center justify-content-between">
+                            <span><i class="bx bx-wallet me-1"></i>Collect Fee Now</span>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" id="collectFeeNow" name="CollectFeeNow" value="true" checked>
+                            </div>
+                        </div>
+                        <div class="fee-summary" id="collectNowFields">
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label">Amount to Collect</label>
+                                    <input type="number" min="0" step="1" id="paymentAmount" name="PaymentAmount" class="form-control" placeholder="0">
+                                    <div class="form-text" id="payBalanceHint"></div>
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label">Mode</label>
+                                    <select id="paymentMode" name="PaymentMode" class="form-select">
+                                        <option>Cash</option><option>UPI</option><option>Card</option>
+                                        <option>Cheque</option><option>Demand Draft</option><option>Bank Transfer</option>
+                                    </select>
+                                </div>
+                                <div class="col-12" id="paymentRefRow">
+                                    <label class="form-label">Reference No</label>
+                                    <input type="text" id="paymentReference" name="PaymentReference" class="form-control" placeholder="Txn / cheque / UPI ref (optional)">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Remarks</label>
+                                    <input type="text" id="paymentRemarks" name="PaymentRemarks" class="form-control" placeholder="Optional">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    }
+
+                    @if (ViewBag.EnableTransport == true)
+                    {
+                    <!-- ── Transport (optional) ── -->
+                    <div id="transportPanel" class="mt-2">
+                        <div class="fee-group-title d-flex align-items-center justify-content-between">
+                            <span><i class="bx bx-bus me-1"></i>School Transport</span>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" id="usesTransport" checked="@(ViewBag.PreTransport is true)">
+                            </div>
+                        </div>
+                        <div class="fee-summary d-none" id="transportFields">
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label">Route</label>
+                                    <select id="transportRoute" class="form-select"><option value="">Select Route</option></select>
+                                </div>
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label">Stop</label>
+                                    <select id="transportStop" class="form-select" disabled><option value="">Select route first</option></select>
+                                </div>
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center justify-content-between px-1">
+                                        <span class="text-muted" style="font-size:.8rem">Monthly bus fee (billed with monthly dues)</span>
+                                        <strong id="transportFare" style="color:#ff8a00">₹0.00</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" id="transportRouteId" name="TransportRouteId" />
+                    <input type="hidden" id="transportStopId" name="TransportStopId" />
+                    }
+
+                    <input type="hidden" id="ledgerJson" name="LedgerPreviewJson" />
+                </div>
+            </div>
+        </div>
+
+        <div class="ec-card mt-4">
+            <div class="adm-actions d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+                <div class="admission-footer-hint">
+                    Saving creates the student record and initialises fee ledger rows.
+                </div>
+                <div class="d-flex flex-column flex-sm-row gap-2">
+                    <a asp-area="Students" asp-controller="Student" asp-action="StudentList"
+                       class="btn btn-outline-secondary px-4">Cancel</a>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <i class="bx bx-check me-1"></i>Save Admission
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+  </div>
+</div>
+
+@await Html.PartialAsync("_FeeReceiptModal")
+
+@section PageScripts {
+<script src="~/js/fee-receipt.js" asp-append-version="true"></script>
+<script>
+/* =========================================================
+   NEW ADMISSION (dedicated page)
+   - loads fee structure + sections from master (AJAX)
+   - posts the form via AJAX, then returns to the student list
+========================================================= */
+$(function () {
+    'use strict';
+
+    var $year       = $('#academicYearSelect');
+    var $class      = $('#classSelect');
+    var $section    = $('#adm_Section');
+    // The Admission Date field was removed from this form; the database dates
+    // an admission on the day it is entered. The fee preview still needs that
+    // date to know how many months to bill, so it uses the server's today —
+    // the same value sp_admission_manage will fall back to.
+    var ADMISSION_DATE = '@Dates.Today';
+    var $feeBox     = $('#feeContent');
+    var $annual     = $('#annualTotalText');
+    var $annualRef  = $('#annualRefText');
+    var $concession = $('#concessionPanel');
+    var $discType   = $('#discountType');
+    var $discValue  = $('#discountValue');
+    var $discApply  = $('#discountApplyTo');
+    var $discReason = $('#discountReason');
+    var $ledger     = $('#ledgerJson');
+    var $form       = $('#admissionForm');
+    var payTodayMax = 0;   // max cash collectable at admission = amount due now
+    // registration fee still unpaid on the enquiry: carried onto the student, due today
+    var regDue = @(((decimal?)ViewBag.PreRegBalance ?? 0m).ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+    // Set when an enquiry is being converted. Held here rather than read back
+    // off the dropdown, because the dropdown is emptied while its options load.
+    var prefillClass = '@(Convert.ToString(ViewBag.PreClassName) ?? "")';
+
+    // What the counter would give next. Shown in the box, but sent blank unless
+    // the clerk changes it — see the submit handler.
+    var suggestedNo  = '';
+
+    var URL_FEES     = '@Url.Action("GetFeeStructure", "Admission", new { area = "Students" })';
+    var URL_SECTIONS = '@Url.Action("GetSections", "Admission", new { area = "Students" })';
+    var URL_CLASSES  = '@Url.Action("GetClasses", "Admission", new { area = "Students" })';
+    var URL_NEXTADM  = '@Url.Action("NextAdmissionNo", "Admission", new { area = "Students" })';
+    var URL_SAVE     = '@Url.Action("SaveAdmission", "Admission", new { area = "Students" })';
+    var URL_LIST     = '@Url.Action("StudentList", "Student", new { area = "Students" })';
+
+    var fees = [];   // fee rows for the selected class + year
+
+    /* ── admission number: warn when a typed one leaves the house format ──
+       Manual entry stays, because a school arriving with its own existing
+       numbers needs it. But every number in this database came from the
+       generator, so one typed by hand is far more likely to be a slip than a
+       deliberate choice — say so while it can still be corrected, rather than
+       leaving one odd number sitting among thousands. The server normalises
+       case and spacing either way, so ADM-2026-1 and adm-2026-1 cannot become
+       two different students. */
+    var HOUSE_FORMAT = /^ADM-\d{4}-\d{4}$/;
+
+    $('#adm_AdmissionNo').on('input blur', function () {
+        var $hint = $('#admNoHint');
+        var typed = $.trim(this.value).toUpperCase().replace(/\s+/g, ' ');
+
+        // Nothing to say while the box holds the number we put there, or is
+        // empty — a hint under every admission is just noise.
+        if (!typed || typed === suggestedNo || HOUSE_FORMAT.test(typed)) {
+            $hint.addClass('d-none').removeClass('text-warning').text('');
+            return;
+        }
+
+        // Only speaks up for a number that has been changed to something the
+        // school does not use, and shows exactly what will be stored.
+        $hint.removeClass('d-none').addClass('text-warning')
+             .text('Not the usual format (ADM-YYYY-NNNN). Will be saved as "'
+                   + typed + '".');
+    });
+
+    /* ── admission number: show what is coming, without promising it ──
+       The counter is per school AND per session, so this follows the year.
+       It goes in the PLACEHOLDER, not the value: the box staying empty is what
+       tells the server to generate one, and a filled-in number would look
+       reserved when it is not — two clerks with the form open see the same one
+       and whoever saves first takes it. */
+    function loadNextAdmissionNo() {
+        var $adm = $('#adm_AdmissionNo');
+        var year = $year.val();
+        if (!year) { suggestedNo = ''; $adm.val(''); return; }
+
+        $.getJSON(URL_NEXTADM, { academicYear: year })
+            .done(function (res) {
+                if (res && res.success && res.admissionNo) {
+                    // Filled in, as asked. Remembered so the submit handler can
+                    // tell an untouched number from one the clerk typed.
+                    suggestedNo = res.admissionNo;
+                    $adm.val(suggestedNo);
+                } else {
+                    suggestedNo = '';
+                    $adm.val('');
+                }
+            })
+            .fail(function () { suggestedNo = ''; });
+    }
+
+    /* ── classes: belong to a session ─────────────────────────────
+       The list rendered on load comes from every session the school has ever
+       run, so it could offer a class the chosen year does not have — and then
+       the section list came back empty with nothing explaining why. Reload it
+       for the selected year, keeping the current pick when that year has it. */
+    function loadClasses() {
+        var ayid = $year.find('option:selected').data('ayid');
+        if (!ayid) {
+            $class.html('<option value="">Select year first</option>');
+            loadSections();
+            return;
+        }
+        // Prefer the enquiry's class on the first load, then whatever the user
+        // has picked since.
+        var keep = prefillClass || $class.val();
+        prefillClass = '';
+        $class.html('<option value="">Loading…</option>');
+
+        $.getJSON(URL_CLASSES, { academicYearId: ayid })
+            .done(function (res) {
+                var list = (res && res.classes) || [];
+                if (!list.length) {
+                    $class.html('<option value="">No classes set up for this year</option>');
+                } else {
+                    var html = '<option value="">Select Class</option>';
+                    list.forEach(function (c) {
+                        html += '<option value="' + EC.esc(c) + '"' +
+                                (c === keep ? ' selected' : '') + '>' + EC.esc(c) + '</option>';
+                    });
+                    $class.html(html);
+
+                    // An enquiry can name a class the chosen session does not run
+                    // — it was raised for a different year, or the ladder changed
+                    // since. Say so, rather than leaving the clerk to notice that
+                    // the class they expected quietly did not carry over.
+                    if (keep && list.indexOf(keep) < 0) {
+                        ecToast('warning', 'The enquiry asked for ' + keep +
+                                ', which is not a class in ' + ($year.val() || 'this year') +
+                                '. Please choose the class.');
+                    }
+                }
+            })
+            .fail(function () {
+                $class.html('<option value="">Could not load classes</option>');
+            })
+            .always(function () {
+                // The class may have just been restored from the enquiry, so the
+                // sections for it have to be fetched now rather than on a change
+                // the user never makes.
+                loadSections();
+            });
+    }
+
+    /* ── sections: configured per class + year in Academic Setup ── */
+    function loadSections() {
+        var ayid = $year.find('option:selected').data('ayid');
+        var cls = $class.val();
+
+        if (!ayid || !cls) {
+            $section.html('<option value="">Select year &amp; class first</option>');
+            return;
+        }
+        $section.html('<option value="">Loading…</option>');
+        $.getJSON(URL_SECTIONS, { academicYearId: ayid, className: cls })
+            .done(function (res) {
+                var secs = (res && res.sections) || [];
+                if (!secs.length) {
+                    $section.html('<option value="">No sections configured</option>');
+                    return;
+                }
+                var html = '<option value="">Select Section</option>';
+                $.each(secs, function (_, s) { html += '<option value="' + s + '">' + s + '</option>'; });
+                $section.html(html);
+            })
+            .fail(function () { $section.html('<option value="">Select Section</option>'); });
+    }
+
+    /* ── fee preview ─────────────────────────────────── */
+    function showEmptyFees() {
+        fees = [];
+        $annual.text('₹0.00');
+        $annualRef.text('One-time charges due now');
+        $concession.addClass('d-none');
+        $ledger.val('');
+        $feeBox.html('<div class="fee-empty"><i class="bx bx-wallet"></i><h6>Select Academic Year &amp; Class</h6>' +
+            '<p class="mb-2">The configured fee structure will appear here.</p>' +
+            '<ul class="adm-steps">' +
+            '<li><i class="bx bx-check-circle"></i><span>One-time charges shown as <strong>due now</strong></span></li>' +
+            '<li><i class="bx bx-check-circle"></i><span>Monthly &amp; yearly fees scheduled for later</span></li>' +
+            '<li><i class="bx bx-check-circle"></i><span>Apply concession on one-time fees</span></li>' +
+            '</ul></div>');
+    }
+
+    function loadFees() {
+        var yr = $year.val(), cls = $class.val();
+        if (!yr || !cls) { showEmptyFees(); return; }
+
+        $feeBox.html('<div class="fee-empty"><i class="bx bx-loader-circle bx-spin"></i><h6>Loading fee structure…</h6></div>');
+        $.getJSON(URL_FEES, { className: cls, academicYear: yr })
+            .done(function (res) {
+                if (!res || !res.success || !res.fees || !res.fees.length) {
+                    fees = [];
+                    $annual.text('₹0.00');
+                    $annualRef.text('One-time charges due now');
+                    $concession.addClass('d-none');
+                    $ledger.val('');
+                    $feeBox.html('<div class="fee-empty"><i class="bx bx-error-circle"></i><h6>No Fee Structure</h6><p class="mb-0">' + ((res && res.message) || 'Configure fee structure for this class first.') + '</p></div>');
+                    return;
+                }
+                fees = $.map(res.fees, function (f) {
+                    return {
+                        id: f.feeHeadId, name: f.feeHeadName, group: f.group,
+                        cycle: f.frequency, stage: f.stage,
+                        amount: Number(f.amount || 0),
+                        // How many times this head bills in the session for someone
+                        // joining today (server-side, same rule as the ledger).
+                        instalments: Number(f.instalments || 1),
+                        dueNow: Number(f.dueNow || 0),
+                        refundable: f.isRefundable === true,
+                        mandatory: f.mandatory !== false, selected: true
+                    };
+                });
+                $concession.removeClass('d-none');
+                renderFees();
+            })
+            .fail(function () {
+                fees = [];
+                $ledger.val('');
+                $feeBox.html('<div class="fee-empty"><i class="bx bx-error-circle"></i><h6>Error</h6><p class="mb-0">Could not load fee structure. Please try again.</p></div>');
+            });
+    }
+
+    /* ── discount + summary ──────────────────────────── */
+    function discountOn(base) {
+        var v = Number($discValue.val() || 0);
+        if (v <= 0) return 0;
+        if ($discType.val() === 'percentage') return Math.round((base * Math.min(v, 100)) / 100);
+        return Math.min(v, base);
+    }
+
+    function renderFees() {
+        if (!fees.length) { showEmptyFees(); return; }
+
+        // Render a single fee line. One-time rows are "due now"; recurring rows
+        // are shown muted because they are scheduled, not collected at admission.
+        function rowHtml(fee, idx, muted) {
+            var per = fee.cycle === 'Monthly' ? '/mo'
+                : fee.cycle === 'Quarterly' ? '/qtr'
+                : fee.cycle === 'Half Yearly' ? '/half-yr'
+                : (fee.stage === 'Yearly' ? '/yr' : '');
+            var amt = '<strong>' + EC.money(fee.amount) + per + '</strong>';
+            var sub = fee.cycle + (!muted ? ' · due now'
+                    : fee.dueNow > 0 ? ' · first ' + (fee.dueNow > 1 ? fee.dueNow + ' instalments' : 'instalment') + ' due now'
+                    : ' · billed later');
+            if (!fee.mandatory) {
+                return '<div class="fee-check-row"><div class="d-flex gap-2">' +
+                    '<input class="form-check-input optional-fee-checkbox" type="checkbox" data-index="' + idx + '" ' + (fee.selected ? 'checked' : '') + '>' +
+                    '<div><div class="fw-bold" style="color:var(--ec-heading)">' + fee.name + '</div><small>' + sub + '</small></div>' +
+                    '</div>' + amt + '</div>';
+            }
+            if (!fee.selected) return '';
+            return '<div class="fee-row"' + (muted ? ' style="opacity:.72;"' : '') + '><div><div class="fw-bold" style="color:var(--ec-heading)">' + fee.name + '</div><small>' + sub + '</small></div>' + amt + '</div>';
+        }
+
+        var oneTimeRows = '', recurringRows = '';
+        $.each(fees, function (idx, fee) {
+            if (fee.stage === 'Admission') oneTimeRows += rowHtml(fee, idx, false);
+            else recurringRows += rowHtml(fee, idx, true);
+        });
+
+        var html = '';
+        if (oneTimeRows) {
+            html += '<div><div class="fee-group-title"><i class="bx bx-time-five me-1"></i>Due Now — One-Time</div>' +
+                '<div class="kit-meta mb-2" style="margin-top:-.35rem;">Collected at admission.</div>' +
+                oneTimeRows + '</div>';
+        }
+        if (recurringRows) {
+            html += '<div><div class="fee-group-title"><i class="bx bx-calendar me-1"></i>Scheduled — Billed Later</div>' +
+                '<div class="kit-meta mb-2" style="margin-top:-.35rem;">Set up as the fee schedule. The first instalment is due on the joining day and is collected now; the rest each cycle from the Fee module.</div>' +
+                recurringRows + '</div>';
+        }
+
+        var payNow = 0, firstDue = 0, monthly = 0, quarterly = 0, halfYearly = 0, yearly = 0, annual = 0;
+        // Discountable base excludes refundable deposits (Caution Money) — a discount
+        // applies to income heads only, never to a deposit the school returns.
+        var discountableNow = 0, discountableAnnual = 0;
+        $.each(fees, function (_, f) {
+            if (!f.selected) return;
+            // What the session will really bill: a student joining in October
+            // pays six monthly instalments, not twelve.
+            var annualAmt = f.stage === 'Admission' ? f.amount : f.amount * (f.instalments || 1);
+            annual += annualAmt;
+            if (!f.refundable) discountableAnnual += annualAmt;
+            if (f.stage === 'Admission') { payNow += f.amount; if (!f.refundable) discountableNow += f.amount; }
+            else if (f.stage === 'Monthly') monthly += f.amount;
+            else if (f.stage === 'Quarterly') quarterly += f.amount;
+            else if (f.stage === 'HalfYearly') halfYearly += f.amount;
+            else if (f.stage === 'Yearly') yearly += f.amount;
+            // the first instalment(s) of a recurring fee fall due on the joining day
+            if (f.stage !== 'Admission') firstDue += f.amount * (f.dueNow || 0);
+        });
+
+        var applyTo = $discApply.val();
+        var disc = discountOn(applyTo === 'annual' ? discountableAnnual : discountableNow);
+        // Pay-today = one-time school fees − concession (if applied here). Store add-ons
+        // are NOT charged at admission (sold separately at the store), so they never
+        // contribute to the amount collected.
+        var payToday = payNow + firstDue + regDue - (applyTo === 'payToday' ? disc : 0);
+        var estAnnual = annual - (applyTo === 'annual' ? disc : 0);
+
+        var summary = '<div class="fee-summary">' +
+            '<div class="fee-group-title" style="margin:0 0 .5rem;">Due at Admission</div>' +
+            '<div class="summary-line"><span>One-Time Fees</span><strong>' + EC.money(payNow) + '</strong></div>' +
+            (firstDue > 0 ? '<div class="summary-line"><span>First instalments (due on joining)</span><strong>' + EC.money(firstDue) + '</strong></div>' : '') +
+            (regDue > 0 ? '<div class="summary-line"><span>Registration fee (unpaid)</span><strong>' + EC.money(regDue) + '</strong></div>' : '');
+        if (applyTo === 'payToday' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + EC.money(disc) + '</strong></div>';
+        summary += '<hr class="opacity-25"><div class="summary-line"><span style="color:var(--ec-heading);font-weight:950;">Collect at Admission</span><strong style="color:var(--ec-primary);">' + EC.money(payToday) + '</strong></div>';
+        summary += '<div class="fee-group-title" style="margin:1rem 0 .5rem;">Scheduled — Billed Later</div>' +
+            '<div class="summary-line"><span>Monthly</span><strong>' + EC.money(monthly) + '/mo</strong></div>';
+        if (quarterly > 0) summary += '<div class="summary-line"><span>Quarterly</span><strong>' + EC.money(quarterly) + '/qtr</strong></div>';
+        if (halfYearly > 0) summary += '<div class="summary-line"><span>Half-Yearly</span><strong>' + EC.money(halfYearly) + '/half-yr</strong></div>';
+        summary += '<div class="summary-line"><span>Yearly</span><strong>' + EC.money(yearly) + '/yr</strong></div>';
+        if (applyTo === 'annual' && disc > 0) summary += '<div class="summary-line"><span>Concession</span><strong>- ' + EC.money(disc) + '</strong></div>';
+        summary += '<div class="summary-line"><span title="Admission fees plus the instalments left in this session (pro-rated by joining month)">Fees for Rest of Session</span><strong>' + EC.money(estAnnual) + '</strong></div>' +
+            '</div>';
+        html += summary;
+
+        $annual.text(EC.money(payToday));
+        $annualRef.text('Fees for rest of session ' + EC.money(estAnnual) + ' · one-time + instalments left this session');
+        $feeBox.html(html);
+
+        // Cap collection at the amount due now (no advance/prepay at admission — that's
+        // the Fee counter's job). Default "Amount to Collect" to Pay Today until edited.
+        payTodayMax = Math.round(payToday);
+        if ($('#paymentAmount').length) {
+            $('#paymentAmount').attr('max', payTodayMax);
+            if (!window._payEdited) $('#paymentAmount').val(payTodayMax);
+            payUpdateHint();
+        }
+
+        $ledger.val(JSON.stringify({
+            academicYear: $year.val(),
+            className: $class.val(),
+            admissionDate: ADMISSION_DATE,
+            selectedFees: $.map(fees, function (f) {
+                return f.selected
+                    ? { feeHeadId: f.id, feeHeadName: f.name, frequency: f.cycle, amount: f.amount, mandatory: f.mandatory }
+                    : null;
+            }),
+            concession: {
+                type: $discType.val(), value: Number($discValue.val() || 0),
+                applyTo: applyTo, calculatedAmount: disc, reason: $discReason.val() || ''
+            },
+            summary: { payToday: payToday, monthlyRecurring: monthly, quarterlyScheduled: quarterly, halfYearlyScheduled: halfYearly, yearlyScheduled: yearly, estimatedAnnual: estAnnual }
+        }));
+    }
+
+    /* ── events ──────────────────────────────────────── */
+    $year.on('change',  function () { loadFees(); loadClasses(); loadNextAdmissionNo(); });
+    $class.on('change', function () { loadFees(); loadSections(); });
+    $discType.add($discApply).on('change', renderFees);
+    $discValue.add($discReason).on('input', renderFees);
+    $feeBox.on('change', '.optional-fee-checkbox', function () {
+        fees[Number($(this).data('index'))].selected = this.checked;
+        renderFees();
+    });
+
+    /* ── Collect Now (only present when the school enables it) ── */
+    /* Part payment is allowed here -- say what will still be due, at the counter,
+       while the parent is standing there. It used to be silent, and the balance
+       only turned up later on the fee screen. */
+    function payUpdateHint() {
+        var $h = $('#payBalanceHint');
+        if (!$h.length) return;
+        var take = Number($('#paymentAmount').val());
+        if (isNaN(take)) take = payTodayMax;
+        var left = Math.round((payTodayMax - take) * 100) / 100;
+        if (payTodayMax <= 0)   $h.text('');
+        else if (take <= 0)     $h.html('<span class="text-warning-emphasis">Nothing collected now — ' + EC.money(payTodayMax) + ' stays due.</span>');
+        // Only the admission-day charges are known here; after saving, the receipt and the
+        // message give the whole amount due as on today (it can include this month's fees).
+        else if (left > 0.005)  $h.html('<span class="text-warning-emphasis">Part payment — <strong>' + EC.money(left) + '</strong> of the admission-day charges will still be due. The receipt shows everything due as on today.</span>');
+        else                    $h.text('Clears everything due at admission.');
+    }
+    $('#paymentAmount').on('input', function () { window._payEdited = true; payUpdateHint(); });
+    // Block overpay: at admission you can collect at most the amount due now. Advance
+    // / prepay must go through the Fee counter (ManageFee). Clamp back on blur + warn.
+    $('#paymentAmount').on('change', function () {
+        var v = Number($(this).val() || 0);
+        if (payTodayMax > 0 && v > payTodayMax) {
+            $(this).val(payTodayMax);
+            ecToast('warning', 'Amount cannot exceed ' + EC.money(payTodayMax) + ' (due now). For advance / prepay use the Fee counter.');
+        }
+    });
+    $('#collectFeeNow').on('change', function () {
+        $('#collectNowFields').toggle(this.checked);
+    });
+    $('#paymentMode').on('change', function () {
+        // Reference is only meaningful for non-cash modes.
+        $('#paymentRefRow').toggle($(this).val() !== 'Cash');
+    }).trigger('change');
+
+    /* ── transport (optional) ── only wired when the school runs buses ── */
+    @if (ViewBag.EnableTransport == true)
+    {
+    <text>
+    var transportRoutes = [];
+    $.getJSON('@Url.Action("GetTransportRoutes","Admission",new{area="Students"})', function (r) {
+        transportRoutes = r || [];
+        var h = '<option value="">Select Route</option>';
+        transportRoutes.forEach(function (x) { h += '<option value="' + x.routeId + '">' + x.routeName + '</option>'; });
+        $('#transportRoute').html(h);
+    });
+    function transMoney(n) { return '₹' + Math.round(Number(n || 0)).toLocaleString('en-IN'); }
+    function clearTransport() {
+        $('#transportRoute').val(''); $('#transportStop').prop('disabled', true).html('<option value="">Select route first</option>');
+        $('#transportFare').text('₹0.00'); $('#transportRouteId').val(''); $('#transportStopId').val('');
+    }
+    $('#usesTransport').on('change', function () {
+        $('#transportFields').toggleClass('d-none', !this.checked);
+        if (!this.checked) clearTransport();
+    });
+    $('#transportRoute').on('change', function () {
+        var r = transportRoutes.find(function (x) { return x.routeId === Number($('#transportRoute').val()); });
+        $('#transportRouteId').val(r ? r.routeId : '');
+        $('#transportStopId').val(''); $('#transportFare').text('₹0.00');
+        if (!r) { $('#transportStop').prop('disabled', true).html('<option value="">Select route first</option>'); return; }
+        var h = '<option value="">Select Stop</option>';
+        r.stops.forEach(function (s) { h += '<option value="' + s.stopId + '" data-fare="' + s.fare + '">' + s.stopName + ' — ' + transMoney(s.fare) + '</option>'; });
+        $('#transportStop').html(h).prop('disabled', false);
+    });
+    $('#transportStop').on('change', function () {
+        var fare = Number($(this).find(':selected').data('fare')) || 0;
+        $('#transportFare').text(transMoney(fare));
+        $('#transportStopId').val($(this).val() || '');
+    });
+    </text>
+    }
+
+    /* ── photo: preview, size check, remove, drag-and-drop ──────────────
+       The file rides along in the form's existing FormData, so there is no
+       separate upload step — the picture is filed once the student has an id. */
+    var $photoInput = $('#adm_Photo'), $photoImg = $('#admPhotoPreview'),
+        $photoEmpty = $('#admPhotoEmpty'), $photoClear = $('#admPhotoClear');
+
+    function showPhoto(file) {
+        // Same limits the server applies, checked here so the office is told
+        // before they fill in the rest of the form rather than after saving.
+        var ok = ['image/jpeg', 'image/png', 'image/webp'];
+        if (ok.indexOf(file.type) < 0) {
+            ecToast('warning', 'Choose a JPG, PNG or WEBP image.');
+            $photoInput.val(''); return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            ecToast('warning', 'That image is over 2 MB. Please choose a smaller one.');
+            $photoInput.val(''); return;
+        }
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            $photoImg.attr('src', e.target.result).removeClass('d-none');
+            $photoEmpty.addClass('d-none');
+            $photoClear.removeClass('d-none');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    $photoInput.on('change', function () {
+        if (this.files && this.files[0]) showPhoto(this.files[0]);
+    });
+
+    $photoClear.on('click', function () {
+        $photoInput.val('');
+        $photoImg.attr('src', '').addClass('d-none');
+        $photoEmpty.removeClass('d-none');
+        $(this).addClass('d-none');
+    });
+
+    $('#admPhotoDrop')
+        .on('dragover', function (e) { e.preventDefault(); $(this).addClass('dragover'); })
+        .on('dragleave drop', function () { $(this).removeClass('dragover'); })
+        .on('drop', function (e) {
+            e.preventDefault();
+            var f = e.originalEvent.dataTransfer.files;
+            if (f && f[0]) { $photoInput[0].files = e.originalEvent.dataTransfer.files; showPhoto(f[0]); }
+        });
+
+    /* ── submit (AJAX) ───────────────────────────────── */
+    $form.on('submit', function (e) {
+        e.preventDefault();
+        if (!this.checkValidity()) {
+            $form.addClass('was-validated');
+            // A red border is no use on a form this long: the empty field is
+            // usually off screen, so pressing Save appeared to do nothing at all.
+            // Scroll to the first one, focus it, and say which field by name.
+            var el = this.querySelector(':invalid');
+            if (el) {
+                var label = $(el).closest('[class*="col-"]').find('.form-label').first()
+                                 .clone().children().remove().end().text().trim();
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(function () { el.focus(); }, 300);
+                ecToast('warning', label ? (label + ' is required.')
+                                         : 'Please fill the highlighted field.');
+            }
+            return;
+        }
+        if (Number($discValue.val() || 0) > 0 && !$.trim($discReason.val())) {
+            $discReason.focus();
+            ecToast('error', 'Please enter a concession reason.');
+            return;
+        }
+        if (!$ledger.val()) {
+            if (!$year.val() || !$class.val()) {
+                ecToast('error', 'Please select Academic Year and Class.');
+            } else {
+                ecToast('error', 'No fee structure is configured for ' + $class.val() + ' (' + $year.val() + '). Set it up under School Settings → Fee Structure first.');
+            }
+            return;
+        }
+        // Overpay guard: collect at most the amount due now (advance/prepay → Fee counter).
+        if ($('#collectFeeNow').is(':checked') && payTodayMax > 0 &&
+            Number($('#paymentAmount').val() || 0) > payTodayMax) {
+            $('#paymentAmount').focus();
+            ecToast('error', 'Amount to collect cannot exceed ' + EC.money(payTodayMax) + ' (due now). For advance / prepay use the Fee counter.');
+            return;
+        }
+
+        // The admission number is shown filled in, but it is still only what
+        // the counter WOULD give. Untouched, it is sent blank so the database
+        // allocates at save time; two clerks with the form open therefore get
+        // consecutive numbers instead of the second being told theirs is taken.
+        // A number the clerk actually changed is sent as typed.
+        var $admNo = $('#adm_AdmissionNo');
+        if (suggestedNo && $.trim($admNo.val()) === suggestedNo) $admNo.val('');
+
+        // Documents checklist → [{name, status}] for every listed document.
+        $('#documentsJson').val(JSON.stringify($('.doc-chk').map(function () {
+            return { name: $(this).val(), status: this.checked ? 'Collected' : 'Pending' };
+        }).get()));
+
+        // Deliberately not reset on success — the page redirects, so the button
+        // should stay busy to block a second submit.
+        var $btn = $form.find('button[type="submit"]');
+        EC.buttonBusy($btn, 'Saving…');
+
+        $.ajax({
+            url: URL_SAVE,
+            type: 'POST',
+            data: new FormData(this),
+            processData: false,
+            contentType: false,
+            headers: { 'RequestVerificationToken': $form.find('input[name="__RequestVerificationToken"]').val() }
+        })
+        .done(function (res) {
+            if (res && res.success) {
+                var msg = 'Admission ' + (res.admissionNo || '') + ' saved.';
+
+                // If a fee was collected, show the printable receipt; go to the
+                // student list once the user closes it. Otherwise redirect.
+                var goOn = function () {
+                    if (res.receiptNo && window.EcReceipt) {
+                        var modalEl = document.getElementById('ecReceiptModal');
+                        if (modalEl) modalEl.addEventListener('hidden.bs.modal', function () { window.location.href = URL_LIST; }, { once: true });
+                        EcReceipt.show(res.receiptNo);
+                    } else {
+                        setTimeout(function () { window.location.href = URL_LIST; }, 900);
+                    }
+                };
+
+                // The server reports what happened to the money and the bus.
+                // A failed receipt or bus assignment used to be reported and never
+                // shown, so the cashier saw "saved" with cash in hand and no receipt.
+                // A problem must be read, so it holds the page until acknowledged.
+                var problems = [];
+                if (res.feeFailed && res.feeMessage) problems.push(res.feeMessage);
+                if (res.transportMessage) problems.push(res.transportMessage);
+
+                if (problems.length) {
+                    EC.confirm({
+                        title:   msg + ' Please read:',
+                        danger:  false,
+                        icon:    'bx-error',
+                        message: problems.join(' '),
+                        okText:  'OK, understood'
+                    }).then(goOn);
+                } else {
+                    // Receipt number and any balance still due, e.g. a part payment.
+                    ecToast('success', res.feeMessage ? msg + ' ' + res.feeMessage : msg);
+                    goOn();
+                }
+            } else {
+                ecToast('error', (res && res.message) || 'Unable to save admission.');
+                EC.buttonReset($btn);
+            }
+        })
+        .fail(function (xhr) {
+            ecToast('error', xhr && xhr.status === 403
+                ? 'You do not have permission to admit students.'
+                : 'Something went wrong while saving.');
+            EC.buttonReset($btn);
+        });
+    });
+
+    if (typeof toastr !== 'undefined') {
+    }
+
+    showEmptyFees();
+
+    /* ── prefill from a converted enquiry ──────────────
+       Fields are already filled server-side (normal binding); here we only
+       fire the dependent loads for the pre-selected year + class. */
+@if (ViewBag.PrefillEnquiryId != null)
+{
+    <text>
+    (function () {
+        if ($class.val() && $year.val()) { loadFees(); }
+        // The switch may be on from the enquiry; show the fields it reveals.
+        if ($('#usesTransport').is(':checked')) $('#transportFields').removeClass('d-none');
+    })();
+    </text>
+}
+    if ($year.val()) { loadClasses(); loadNextAdmissionNo(); }
+});
+</script>
+}

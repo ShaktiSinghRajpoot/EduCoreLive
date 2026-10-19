@@ -12,8 +12,8 @@
 
     // Student attendance card / defaulters link: Attendance Overview (reports.view), else the register.
     var studentAttUrl = Model.CanOpenOverview
-        ? Url.Action("Index", "AttendanceOverview", new { area = "ERP" })
-        : Url.Action("StudentAttendance", "Attendance", new { area = "ERP" });
+        ? Url.Action("Index", "AttendanceOverview", new { area = "Attendance" })
+        : Url.Action("StudentAttendance", "Attendance", new { area = "Attendance" });
 
     // Total collected this month, for the Payment Modes card.
     var modeTotal = Model.Modes.Sum(m => m.Amount);
@@ -95,7 +95,7 @@
                         }
                         @if (Model.CanAdmit)
                         {
-                            <a href="/ERP/Admission/Create" class="btn btn-sm btn-light text-dark fw-semibold"><i class="bx bx-user-plus me-1"></i>New Admission</a>
+                            <a href="/students/admission/new" class="btn btn-sm btn-light text-dark fw-semibold"><i class="bx bx-user-plus me-1"></i>New Admission</a>
                         }
                         @if (Model.ShowFinance)
                         {
@@ -103,7 +103,7 @@
                         }
                         @if (Model.ShowAttendance)
                         {
-                            <a href="/ERP/Attendance/StudentAttendance" class="btn btn-sm btn-outline-light"><i class="bx bx-user-check me-1"></i>Mark Attendance</a>
+                            <a href="/attendance/mark" class="btn btn-sm btn-outline-light"><i class="bx bx-user-check me-1"></i>Mark Attendance</a>
                         }
                         @if (Model.ShowFinance)
                         {
@@ -198,7 +198,7 @@
                     @if (Model.ShowAttendance)   @* the register needs attendance.view *@
                     {
                     <a class="btn @(mc.MarkedToday ? "btn-outline-primary" : "btn-primary")"
-                       href="@Url.Action("StudentAttendance", "Attendance", new { area = "ERP", @class = mc.ClassName, section = mc.SectionName })">
+                       href="@Url.Action("StudentAttendance", "Attendance", new { area = "Attendance", @class = mc.ClassName, section = mc.SectionName })">
                         <i class="bx bx-user-check me-1"></i>@(mc.MarkedToday ? "Open register" : "Mark attendance")
                     </a>
                     }
@@ -292,7 +292,7 @@
                                 @foreach (var d in Model.StudentAttendanceDefaulters)
                                 {
                                     var pct = Math.Max(0, Math.Min(100, (double)d.Percent));
-                                    <a class="dash-row text-reset text-decoration-none" href="@Url.Action("Dashboard", "Student", new { area = "ERP", id = d.PublicId })">
+                                    <a class="dash-row text-reset text-decoration-none" href="@Url.Action("Dashboard", "Student", new { area = "Students", id = d.PublicId })">
                                         <span class="dash-avatar @Soft(accents[Model.StudentAttendanceDefaulters.IndexOf(d) % accents.Length])">@Initials(d.StudentName)</span>
                                         <div class="flex-grow-1 min-w-0">
                                             <h6 class="mb-0 text-truncate">@d.StudentName</h6>
@@ -662,7 +662,7 @@
                                             <span class="dash-avatar @Soft(accents[Model.Defaulters.IndexOf(r) % accents.Length])">@Initials(r.StudentName)</span>
                                             <div>
                                                 <h6 class="mb-0">
-                                                    <a asp-area="ERP" asp-controller="Student" asp-action="Dashboard" asp-route-id="@r.PublicId"
+                                                    <a asp-area="Students" asp-controller="Student" asp-action="Dashboard" asp-route-id="@r.PublicId"
                                                        class="text-reset text-decoration-none">@r.StudentName</a>
                                                 </h6>
                                                 <small class="text-muted">Student</small>

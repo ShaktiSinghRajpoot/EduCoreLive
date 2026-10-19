@@ -1,0 +1,278 @@
+@model educore.Models.TcPrintModel
+@{
+    Layout = null;
+    var tc = Model.Tc;
+    var sc = Model.School;
+    var board = tc.IsBoard;
+
+    var addr = string.Join(", ", new[] { sc.AddressLine1, sc.AddressLine2, sc.City, sc.District, sc.State, sc.Pincode }
+        .Where(p => !string.IsNullOrWhiteSpace(p)));
+
+    string D(string? d) => string.IsNullOrWhiteSpace(d) ? "—" : Dates.Show(d);
+    string V(string? s)   => string.IsNullOrWhiteSpace(s) ? "—" : s;
+    string N(int? n)      => n?.ToString() ?? "—";
+
+    // The certificate particulars, in order. The Board template adds the fields
+    // CBSE / ICSE / State boards ask for; Basic keeps the common set, which still
+    // has the DOB in words, attendance and fees paid up to that every Indian TC
+    // carries (QA BUG-085).
+    var rows = new List<(string Label, string Value)>
+    {
+        ("Admission No.",       V(tc.AdmissionNo)),
+        ("Student's Name",      V(tc.StudentName)),
+        ("Father's Name",       V(tc.FatherName)),
+        ("Mother's Name",       V(tc.MotherName)),
+        ("Date of Birth (fig.)", D(tc.Dob)),
+        ("Date of Birth (words)", Dates.Parse(tc.Dob) is { } dobDate ? DobInWords(dobDate) : "—")
+    };
+    rows.Add(("Gender",              V(tc.Gender)));
+    rows.Add(("Nationality",         V(tc.Nationality)));
+    rows.Add(("Religion / Category", $"{V(tc.Religion)} / {V(tc.Category)}"));
+    if (board)
+    {
+        rows.Add(("UDISE / PEN No.",  V(tc.UdiseNo)));
+    }
+    rows.Add(("Date of Admission",   D(tc.AdmissionDate)));
+    rows.Add(("Class Last Studied",  tc.ClassDisplay));
+    rows.Add(("Academic Year",       V(tc.AcademicYear)));
+    if (board)
+    {
+        rows.Add(("Last Exam & Result",       V(tc.ExamResult)));
+        rows.Add(("Whether Failed Before",    V(tc.FailedStatus)));
+        rows.Add(("Subjects Studied",         V(tc.SubjectsStudied)));
+    }
+    rows.Add(("Qualified for Promotion", V(tc.Result)));
+    rows.Add(("Fees Paid Up To",          V(tc.FeesPaidUpto)));
+    rows.Add(("Total Working Days",       N(tc.WorkingDays)));
+    rows.Add(("Days Present",             N(tc.DaysPresent)));
+    if (board)
+    {
+        rows.Add(("Games / Co-curricular",    V(tc.Activities)));
+    }
+    rows.Add(("Date of Leaving",     D(tc.DateOfLeaving)));
+    rows.Add(("Reason for Leaving",  V(tc.ReasonForLeaving)));
+    rows.Add(("General Conduct",     V(tc.Conduct)));
+    if (board)
+    {
+        rows.Add(("Date of Application", D(tc.ApplicationDate)));
+    }
+    rows.Add(("Date of Issue",       D(tc.IssueDate)));
+}
+@functions {
+    static readonly string[] Ones = { "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+        "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen" };
+    static readonly string[] Tens = { "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety" };
+    static readonly string[] DayOrd = { "", "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth",
+        "Ninth", "Tenth", "Eleventh", "Twelfth", "Thirteenth", "Fourteenth", "Fifteenth", "Sixteenth", "Seventeenth",
+        "Eighteenth", "Nineteenth", "Twentieth", "Twenty-First", "Twenty-Second", "Twenty-Third", "Twenty-Fourth",
+        "Twenty-Fifth", "Twenty-Sixth", "Twenty-Seventh", "Twenty-Eighth", "Twenty-Ninth", "Thirtieth", "Thirty-First" };
+
+    static string TwoDigits(int n) => n < 20 ? Ones[n] : (Tens[n / 10] + (n % 10 > 0 ? " " + Ones[n % 10] : ""));
+
+    static string YearWords(int y)
+    {
+        if (y >= 2000) { int r = y - 2000; return "Two Thousand" + (r > 0 ? " " + TwoDigits(r) : ""); }
+        return TwoDigits(y / 100) + " " + TwoDigits(y % 100);   // 19xx → "Nineteen Ninety Nine"
+    }
+
+    // "Twelfth April, Two Thousand Thirteen"
+    static string DobInWords(DateTime d) =>
+        $"{DayOrd[d.Day]} {d:MMMM}, {YearWords(d.Year)}";
+}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>@tc.TcNo — Transfer Certificate</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color: #111; background: #f4f4f4; }
+
+        .tc-sheet { background: #fff; width: 210mm; min-height: 297mm; margin: 16px auto;
+                    padding: 18mm 16mm; position: relative; }
+
+        .tc-head { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .tc-head .tc-logo { max-height: 22mm; max-width: 40mm; object-fit: contain; margin-bottom: 6px; }
+        .tc-school { font-size: 24px; font-weight: 700; letter-spacing: .3px; }
+        .tc-addr { font-size: 12px; color: #444; margin-top: 2px; }
+        .tc-affil { font-size: 11px; color: #666; margin-top: 2px; }
+
+        .tc-title { text-align: center; font-size: 16px; font-weight: 700; letter-spacing: 3px;
+                    margin: 16px 0 4px; text-decoration: underline; }
+        .tc-sub { text-align: center; font-size: 11px; color: #666; margin-bottom: 10px; }
+
+        .tc-meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 12px; }
+        .tc-meta b { font-weight: 700; }
+
+        .tc-rows { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .tc-rows td { padding: 6px 4px; vertical-align: top; border-bottom: 1px dotted #ccc; }
+        .tc-sn    { width: 26px; color: #666; }
+        .tc-label { width: 36%; color: #555; }
+        .tc-val   { font-weight: 600; }
+
+        .tc-remarks { margin-top: 12px; font-size: 12px; }
+        .tc-remarks span { color: #555; }
+
+        .tc-sign { margin-top: 40px; display: flex; justify-content: space-between; }
+        .tc-sign-box { text-align: center; font-size: 11px; color: #444; }
+        .tc-line { width: 150px; border-top: 1px solid #000; margin-bottom: 3px; }
+
+        .tc-foot { margin-top: 16px; text-align: center; font-size: 10px; color: #888; }
+
+        .tc-dup { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg);
+                  font-size: 90px; font-weight: 800; color: rgba(200,0,0,.10); letter-spacing: 8px;
+                  pointer-events: none; user-select: none; }
+
+        /* Until the Print button has counted the print, a browser Ctrl+P prints
+           this mark instead of a clean original. */
+        .tc-unprinted { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg);
+                        font-size: 46px; font-weight: 800; color: rgba(0,0,0,.10); letter-spacing: 4px;
+                        text-align: center; pointer-events: none; user-select: none; }
+        .tc-void { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg);
+                   font-size: 120px; font-weight: 900; color: rgba(200,0,0,.22); letter-spacing: 10px;
+                   pointer-events: none; user-select: none; }
+        .tc-msg { color: #b00020; font-size: 13px; margin-top: 6px; }
+
+        .tc-toolbar { text-align: center; padding: 10px; }
+        .tc-toolbar button { padding: 8px 18px; font-size: 14px; cursor: pointer; }
+
+        @@media print {
+            body { background: #fff; }
+            .tc-toolbar { display: none; }
+            .tc-sheet { margin: 0; width: auto; box-shadow: none; }
+            @@page { size: A4; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="tc-toolbar">
+        @if (Model.IsPreview)
+        {
+            <button type="button" onclick="window.print()">Print this preview</button>
+        }
+        else if (tc.IsVoid)
+        {
+            @* A voided certificate is never printed; the proc refuses it too. *@
+            <div class="tc-msg">This certificate was voided@(string.IsNullOrWhiteSpace(tc.VoidReason) ? "" : " — " + tc.VoidReason) and cannot be printed.</div>
+        }
+        else
+        {
+            @Html.AntiForgeryToken()
+            <button type="button" id="tcPrintBtn">Print this certificate</button>
+            <div class="tc-msg" id="tcPrintMsg"></div>
+        }
+    </div>
+
+    <div class="tc-sheet">
+
+        @if (!Model.IsPreview && tc.IsVoid)
+        {
+            <div class="tc-void">VOID</div>
+        }
+        else if (!Model.IsPreview)
+        {
+            <div class="tc-dup" id="tcDup" style="@(Model.ShowDuplicate ? "" : "display:none")">DUPLICATE</div>
+            <div class="tc-unprinted" id="tcUnprinted">NOT AN ORIGINAL<br />use the Print button</div>
+        }
+
+        <div class="tc-head">
+            @if (!string.IsNullOrWhiteSpace(Model.LogoUrl))
+            {
+                <img class="tc-logo" src="@Model.LogoUrl" alt="" onerror="this.style.display='none'" />
+            }
+            <div class="tc-school">@V(sc.SchoolName)</div>
+            @if (!string.IsNullOrWhiteSpace(addr))
+            {
+                <div class="tc-addr">@addr</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(sc.AffiliationNumber))
+            {
+                <div class="tc-affil">Affiliation No: @sc.AffiliationNumber</div>
+            }
+        </div>
+
+        <div class="tc-title">TRANSFER CERTIFICATE</div>
+        @if (board)
+        {
+            <div class="tc-sub">(Board Format)</div>
+        }
+
+        <div class="tc-meta">
+            <div>TC No: <b>@tc.TcNo</b></div>
+            <div>Date: <b>@D(tc.IssueDate)</b></div>
+        </div>
+
+        <table class="tc-rows">
+            @for (int i = 0; i < rows.Count; i++)
+            {
+                <tr>
+                    <td class="tc-sn">@(i + 1).</td>
+                    <td class="tc-label">@rows[i].Label</td>
+                    <td class="tc-val">@rows[i].Value</td>
+                </tr>
+            }
+        </table>
+
+        @if (!string.IsNullOrWhiteSpace(tc.Remarks))
+        {
+            <div class="tc-remarks"><span>Remarks:</span> @tc.Remarks</div>
+        }
+
+        <div class="tc-sign">
+            <div class="tc-sign-box"><div class="tc-line"></div>Class Teacher</div>
+            <div class="tc-sign-box"><div class="tc-line"></div>Checked By</div>
+            <div class="tc-sign-box">@await Html.PartialAsync("_HeadSignature", sc, new ViewDataDictionary(ViewData) { ["Part"] = "images" })<div class="tc-line"></div>@await Html.PartialAsync("_HeadSignature", sc, new ViewDataDictionary(ViewData) { ["Part"] = "label" })</div>
+        </div>
+
+        <div class="tc-foot">
+            This is a system-generated certificate. Any alteration renders it invalid.
+        </div>
+    </div>
+
+    @if (!Model.IsPreview && !tc.IsVoid)
+    {
+        <script>
+            // Plain JS: this page has no layout, so no jQuery and no EC helpers.
+            // Print = count it on the server first (first one is the original,
+            // later ones come back as duplicates), then open the print dialog.
+            (function () {
+                var markUrl = '@Url.Action("MarkPrinted", "Tc", new { area = "Students", id = ViewBag.TcPublicId })';
+                var btn = document.getElementById('tcPrintBtn');
+                var msg = document.getElementById('tcPrintMsg');
+
+                function markAndPrint() {
+                    btn.disabled = true;
+                    msg.textContent = '';
+                    var fd = new FormData();
+                    fd.append('__RequestVerificationToken',
+                        document.querySelector('input[name="__RequestVerificationToken"]').value);
+                    fetch(markUrl, { method: 'POST', body: fd })
+                        .then(function (r) { return r.ok ? r.json() : { success: false, message: 'You are not allowed to print certificates.' }; })
+                        .then(function (res) {
+                            btn.disabled = false;
+                            if (!res || !res.success) { msg.textContent = (res && res.message) || 'Could not print.'; return; }
+                            document.getElementById('tcUnprinted').style.display = 'none';
+                            if (res.wasDuplicate) document.getElementById('tcDup').style.display = '';
+                            window.print();
+                        })
+                        .catch(function () { btn.disabled = false; msg.textContent = 'Could not reach the server.'; });
+                }
+
+                btn.addEventListener('click', markAndPrint);
+
+                @if (ViewBag.AutoPrint == true)
+                {
+                    <text>
+                    // From "Issue & Print": print once, then drop ?print=1 so a
+                    // refresh only shows the certificate.
+                    if (window.history && history.replaceState)
+                        history.replaceState(null, '', location.pathname + '?id=@ViewBag.TcPublicId');
+                    window.addEventListener('load', markAndPrint);
+                    </text>
+                }
+            })();
+        </script>
+    }
+</body>
+</html>

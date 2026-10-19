@@ -134,7 +134,7 @@ $(function () {
         reg:     '@Url.Action("Data", "StoreRegister", new { area = "Inventory" })',
         items:   '@Url.Action("SaleItems", "Inventory", new { area = "Inventory" })',
         sell:    '@Url.Action("Sell", "Inventory", new { area = "Inventory" })',
-        secs:    '@Url.Action("PromotionSections", "Student", new { area = "ERP" })',
+        secs:    '@Url.Action("PromotionSections", "Student", new { area = "Students" })',
         collect: '@Url.Action("ManageFee", "Fee", new { area = "Fees" })'
     };
     var SCHOOL = { name:    '@Html.Raw(System.Text.Encodings.Web.JavaScriptEncoder.Default.Encode(schoolName))',

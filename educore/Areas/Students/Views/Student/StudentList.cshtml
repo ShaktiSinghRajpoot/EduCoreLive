@@ -1,0 +1,632 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@using System.Linq
+@using Microsoft.AspNetCore.Http
+@using Microsoft.AspNetCore.Mvc.Rendering
+@using Microsoft.AspNetCore.Mvc.ViewFeatures
+@model EduCoreDataAccessLayer.Models.ERP.StudentListModel
+@{
+    ViewData["Title"] = "All Students";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    var colors = new[] { "primary", "info", "success", "warning", "danger", "secondary" };
+
+    // Sort header link: preserves filters, drops Page (back to page 1), toggles
+    // direction when the same column is clicked again. Server-side + whitelisted.
+    string SortUrl(string col)
+    {
+        var q = Context.Request.Query
+            .Where(k => !new[] { "SortColumn", "SortDir", "Page" }.Contains(k.Key, StringComparer.OrdinalIgnoreCase))
+            .ToDictionary(k => k.Key, k => k.Value.ToString());
+        q["SortColumn"] = col;
+        q["SortDir"] = (string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase) && !Model.Desc) ? "desc" : "asc";
+        return Context.Request.Path + QueryString.Create(q);
+    }
+    string SortIcon(string col)
+    {
+        if (!string.Equals(Model.SortColumn, col, StringComparison.OrdinalIgnoreCase)) return "bx bx-sort ec-si";
+        return "bx " + (Model.Desc ? "bx-sort-down" : "bx-sort-up") + " ec-si ec-si-on";
+    }
+
+    string Initials(string n)
+    {
+        var parts = (n ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 0 ? "?" : string.Concat(parts.Take(2).Select(p => char.ToUpper(p[0])));
+    }
+    // Fee status is shown only to users with fees.view (the controller blanks it otherwise).
+    bool canViewFees = ViewBag.CanViewFees == true;
+    // Admit / photo / mark-as-left need students.manage; a Teacher only views (QA BUG-059).
+    bool canManage = ViewBag.CanManage == true;
+    // A student whose session is not the current one (promoted early, or admitted
+    // for next session) gets the session beside the class, so "Class 8 - A" is not
+    // read as the class they sit in today.
+    string? currentSession = Model.YearList.FirstOrDefault(y => y.Selected)?.Text;
+    bool OtherSession(string? year) => !string.IsNullOrWhiteSpace(year) && currentSession != null && year != currentSession;
+    string FeeBadgeClass(string f) => f switch { "Paid" => "b-paid", "Partial" => "b-partial", _ => "b-pending" };
+    string StatBadgeClass(string s) => s switch { "Active" => "b-active", "Transfer" => "b-transfer", _ => "b-inactive" };
+    (string cls, string ic) GenderMeta(string? g) => g switch
+    {
+        "Male" => ("gm", "bx-male"),
+        "Female" => ("gf", "bx-female"),
+        _ => ("go", "bx-user")
+    };
+
+    bool Sel(string? a, string? b) => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Student/StudentList.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap d-flex align-items-center gap-2">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-id-card fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">All Students</h4>
+            <div class="ec-page-subtitle">Click a student row or View Dashboard to open the full student panel</div>
+          </div>
+        </div>
+        @if (ViewBag.RegistrationRequired == true)
+        {
+            @* Registration is mandatory before admission — direct admission is
+               blocked, so route users to the Enquiry → Registration flow instead. *@
+            <a asp-area="Students" asp-controller="Enquiry" asp-action="EnquiryCRM"
+               class="btn btn-primary d-flex align-items-center gap-1">
+              <i class="bx bx-user-plus"></i><span>New Enquiry</span>
+            </a>
+        }
+        else if (canManage)
+        {
+            <a asp-area="Students" asp-controller="Admission" asp-action="Create"
+               class="btn btn-primary d-flex align-items-center gap-1">
+              <i class="bx bx-user-plus"></i><span>New Admission</span>
+            </a>
+        }
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4 sl-sum-section">
+      <div class="col-6 col-lg-3">
+        <div class="sl-card">
+          <div class="sl-card-ic bg-label-primary text-primary"><i class="bx bx-group"></i></div>
+          <div><div class="sl-card-val">@Model.TotalCount</div><div class="sl-card-lbl">Total Students</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sl-card">
+          <div class="sl-card-ic bg-label-info text-info"><i class="bx bx-male"></i></div>
+          <div><div class="sl-card-val">@Model.MaleCount</div><div class="sl-card-lbl">Male</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sl-card">
+          <div class="sl-card-ic bg-label-danger" style="color:#e83e8c;"><i class="bx bx-female"></i></div>
+          <div><div class="sl-card-val">@Model.FemaleCount</div><div class="sl-card-lbl">Female</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="sl-card">
+          <div class="sl-card-ic bg-label-success text-success"><i class="bx bx-user-check"></i></div>
+          <div><div class="sl-card-val">@Model.ActiveCount</div><div class="sl-card-lbl">Active</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ec-card mb-0">
+
+      <div class="ec-card-header">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-list-ul"></i></span>
+            <div>
+              <div class="ec-section-title">Student Records</div>
+              <div class="ec-section-subtitle">
+                @if (Model.TotalCount > 0)
+                {
+                    <text>Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount students</text>
+                }
+                else
+                {
+                    <text>No students found</text>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+
+        @* All filtering/sorting/paging is server-side: this GET form round-trips
+           the query string. Omitting Page here means any filter change resets to
+           page 1. Sort is carried in hidden fields so it survives a filter change. *@
+        <form id="slFilterForm" method="get" asp-area="Students" asp-controller="Student" asp-action="StudentList" class="sl-fbar">
+          <input type="hidden" name="SortColumn" value="@Model.SortColumn" />
+          <input type="hidden" name="SortDir" value="@Model.SortDirection" />
+
+          <div class="sl-srch-wrap">
+            <i class="bx bx-search sl-srch-ic"></i>
+            <input type="search" class="sl-srch-inp" name="Search" value="@Model.Search"
+                   placeholder="Search name, adm no, guardian, mobile…">
+          </div>
+
+          <div class="sl-fbar-div"></div>
+
+          <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterClass) ? "" : "active-filter")"
+                  name="FilterClass">
+            <option value="">Class</option>
+            @foreach (var c in Model.ClassList)
+            {
+                <option value="@c.Text" selected="@Sel(c.Text, Model.FilterClass)">@c.Text</option>
+            }
+          </select>
+
+          <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterGender) ? "" : "active-filter")"
+                  name="FilterGender">
+            <option value="">Gender</option>
+            <option value="Male" selected="@Sel("Male", Model.FilterGender)">Male</option>
+            <option value="Female" selected="@Sel("Female", Model.FilterGender)">Female</option>
+            <option value="Other" selected="@Sel("Other", Model.FilterGender)">Other</option>
+          </select>
+
+          @if (canViewFees)
+          {
+          <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterFee) ? "" : "active-filter")"
+                  name="FilterFee">
+            <option value="">Fee</option>
+            <option value="Paid" selected="@Sel("Paid", Model.FilterFee)">Paid</option>
+            <option value="Partial" selected="@Sel("Partial", Model.FilterFee)">Partial</option>
+            <option value="Pending" selected="@Sel("Pending", Model.FilterFee)">Pending</option>
+          </select>
+          }
+
+          <select class="sl-chip @(string.IsNullOrEmpty(Model.FilterYear) ? "" : "active-filter")"
+                  name="FilterYear">
+            <option value="">Year</option>
+            @foreach (var y in Model.YearList)
+            {
+                <option value="@y.Text" selected="@Sel(y.Text, Model.FilterYear)">@y.Text</option>
+            }
+          </select>
+
+          <button type="submit" class="btn btn-sm btn-primary"><i class="bx bx-search me-1"></i>Search</button>
+
+          @if (!string.IsNullOrEmpty(Model.Search) || !string.IsNullOrEmpty(Model.FilterClass)
+               || !string.IsNullOrEmpty(Model.FilterGender) || !string.IsNullOrEmpty(Model.FilterFee)
+               || !string.IsNullOrEmpty(Model.FilterYear))
+          {
+              <a asp-area="Students" asp-controller="Student" asp-action="StudentList" class="sl-clear-btn" title="Clear all filters">
+                <i class="bx bx-x"></i>Clear
+              </a>
+          }
+
+          <div class="ms-auto d-flex gap-1 align-items-center">
+            <button type="button" class="sl-export-btn xl" id="btnExcel" title="Export to Excel">
+              <i class="bx bx-spreadsheet"></i>
+            </button>
+            <button type="button" class="sl-export-btn pdf" id="btnPdf" title="Export to PDF">
+              <i class="bxs-file-pdf bx"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="ec-card-body pt-2">
+
+        <div class="ec-list-tbl-wrap">
+          <table class="table ec-list-tbl align-middle mb-0">
+            <thead>
+              <tr>
+                <th><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("name")">
+                  Student <i class="@SortIcon("name")"></i></a></th>
+                <th><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("class")">
+                  Class &amp; Section <i class="@SortIcon("class")"></i></a></th>
+                <th>Gender</th>
+                <th><a class="ec-sortable text-reset text-decoration-none" href="@SortUrl("admdate")">
+                  Admission Date <i class="@SortIcon("admdate")"></i></a></th>
+                <th>Parent / Guardian</th>
+                <th>Contact</th>
+                @if (canViewFees) { <th>Fee Status</th> }
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach (var s in Model.Items)
+              {
+                  var color = colors[s.StudentId % colors.Length];
+                  var roll = string.IsNullOrEmpty(s.RollNo) ? s.AdmissionNo : s.RollNo;
+                  var gm = GenderMeta(s.Gender);
+                  var dashUrl = Url.Action("Dashboard", "Student", new { area = "Students", id = s.PublicId });
+                  <tr>
+                    <td>
+                      <a href="@dashUrl" class="d-flex align-items-center gap-2 text-decoration-none" style="cursor:pointer;">
+                        @if (!string.IsNullOrWhiteSpace(s.PhotoUrl))
+                        {
+                            <img src="@s.PhotoUrl" class="sl-av" style="object-fit:cover;padding:0;" alt="" />
+                        }
+                        else
+                        {
+                            <span class="sl-av bg-label-@color text-@color">@Initials(s.StudentName)</span>
+                        }
+                        <div><div class="sl-nm">@s.StudentName</div><div class="sl-rl">@roll</div></div>
+                      </a>
+                    </td>
+                    <td><span class="fw-bold">@s.ClassName</span> <span class="text-muted">– @s.Section</span>
+                        @if (OtherSession(s.AcademicYear)) { <span class="badge bg-label-info ms-1" title="Session">@s.AcademicYear</span> }</td>
+                    <td><span class="sl-gen @gm.cls"><i class="bx @gm.ic"></i>@s.Gender</span></td>
+                    <td>@(string.IsNullOrWhiteSpace(s.AdmissionDate) ? "—" : Dates.Show(s.AdmissionDate, "dd MMM yyyy"))</td>
+                    <td>@(string.IsNullOrEmpty(s.GuardianName) ? "—" : s.GuardianName)</td>
+                    <td>@(string.IsNullOrEmpty(s.Mobile) ? "—" : s.Mobile)</td>
+                    @if (canViewFees) { <td><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></td> }
+                    <td><span class="sl-bdg @StatBadgeClass(s.Status)">@s.Status</span></td>
+                    <td>
+                      <div class="d-inline-flex gap-1 align-items-center">
+                        <a href="@dashUrl" class="sl-view-btn"><i class="bx bx-layout"></i>Dashboard</a>
+                        @if (canManage)
+                        {
+                        <button type="button" class="btn btn-sm btn-icon btn-outline-secondary btn-photo"
+                                title="Upload photo" data-id="@s.PublicId" data-name="@s.StudentName">
+                          <i class="bx bx-camera"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-exit"
+                                title="Mark as left" data-id="@s.StudentId" data-name="@s.StudentName" data-due="@s.FeeDue">
+                          <i class="bx bx-user-x"></i>
+                        </button>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+              }
+            </tbody>
+          </table>
+
+          @if (Model.Items.Count == 0)
+          {
+              <div class="sl-empty">
+                <div class="sl-empty-ic"><i class="bx bx-search-alt"></i></div>
+                <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No students found</h6>
+                <p class="text-muted small mb-3">Try adjusting your search or filters.</p>
+                <a asp-area="Students" asp-controller="Student" asp-action="StudentList" class="btn btn-sm btn-outline-primary">
+                  <i class="bx bx-filter-alt me-1"></i>Clear All Filters
+                </a>
+              </div>
+          }
+        </div>
+
+        <div class="sl-mob-list">
+          @foreach (var s in Model.Items)
+          {
+              var color = colors[s.StudentId % colors.Length];
+              var roll = string.IsNullOrEmpty(s.RollNo) ? s.AdmissionNo : s.RollNo;
+              var dashUrl = Url.Action("Dashboard", "Student", new { area = "Students", id = s.PublicId });
+              <div class="sl-mob-card">
+                <div class="sl-mob-top">
+                  @if (!string.IsNullOrWhiteSpace(s.PhotoUrl))
+                  {
+                      <img src="@s.PhotoUrl" class="sl-mob-av" style="object-fit:cover;padding:0;" alt="" />
+                  }
+                  else
+                  {
+                      <span class="sl-mob-av bg-label-@color text-@color">@Initials(s.StudentName)</span>
+                  }
+                  <div class="flex-grow-1 sl-mob-id">
+                    <div class="sl-nm">@s.StudentName</div>
+                    <div class="sl-rl">@roll · @s.ClassName @s.Section@(OtherSession(s.AcademicYear) ? " · " + s.AcademicYear : "")</div>
+                  </div>
+                  <span class="sl-bdg @StatBadgeClass(s.Status)">@s.Status</span>
+                </div>
+                <div class="sl-mob-grid">
+                  <div class="sl-mob-field"><label>Guardian</label><span>@(string.IsNullOrEmpty(s.GuardianName) ? "—" : s.GuardianName)</span></div>
+                  <div class="sl-mob-field"><label>Contact</label><span>@(string.IsNullOrEmpty(s.Mobile) ? "—" : s.Mobile)</span></div>
+                  <div class="sl-mob-field"><label>Admitted</label><span>@(string.IsNullOrWhiteSpace(s.AdmissionDate) ? "—" : Dates.Show(s.AdmissionDate, "dd MMM yyyy"))</span></div>
+                  <div class="sl-mob-field"><label>Gender</label><span>@s.Gender</span></div>
+                  @if (canViewFees) { <div class="sl-mob-field"><label>Fee Status</label><span class="sl-bdg @FeeBadgeClass(s.FeeStatus)">@s.FeeStatus</span></div> }
+                  <div class="sl-mob-field"><label>Class</label><span>@s.ClassName @s.Section@(OtherSession(s.AcademicYear) ? " (" + s.AcademicYear + ")" : "")</span></div>
+                </div>
+                @* The photo button used to exist only in the desktop table, so on a
+                   phone there was no way to set a student's picture at all. *@
+                <div class="sl-mob-actions">
+                  <a href="@dashUrl" class="btn btn-sm btn-primary flex-grow-1"><i class="bx bx-layout me-1"></i>View Dashboard</a>
+                  @if (canManage)
+                  {
+                  <button type="button" class="btn btn-sm btn-outline-secondary btn-photo flex-shrink-0"
+                          title="Upload photo" aria-label="Upload photo"
+                          data-id="@s.PublicId" data-name="@s.StudentName">
+                    <i class="bx bx-camera"></i>
+                  </button>
+                  }
+                </div>
+              </div>
+          }
+          @if (Model.Items.Count == 0)
+          {
+              <div class="sl-empty">
+                <div class="sl-empty-ic"><i class="bx bx-search-alt"></i></div>
+                <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No students found</h6>
+                <p class="text-muted small mb-3">Try adjusting filters.</p>
+              </div>
+          }
+        </div>
+
+        <div class="sl-pg-wrap">
+          <div class="sl-pg-info d-flex align-items-center gap-2">
+            <partial name="_PageSize" model="Model" view-data='@(new ViewDataDictionary(ViewData) { { "FormId", "slFilterForm" } })' />
+            @if (Model.TotalCount > 0)
+            {
+                <span class="ms-1">Showing @Model.FirstRow–@Model.LastRow of @Model.TotalCount students</span>
+            }
+          </div>
+          <partial name="_Pager" model="Model" />
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@* Marking a student as left is what makes them eligible for a Transfer
+   Certificate, so the reason and date are captured here rather than guessed. *@
+<div class="modal fade" id="exitModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:18px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Mark student as left</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Marking <strong id="exitName">—</strong> as left. Their fees, receipts and history are kept.</p>
+        @* Shown before confirming, so the office settles fees first (QA BUG-080). *@
+        <div class="alert alert-warning py-2 small d-none" id="exitDues"></div>
+        <div class="mb-3">
+          <label class="form-label">How did they leave?</label>
+          <select class="form-select" id="exitStatus">
+            <option value="Transfer">Transferred to another school</option>
+            <option value="Passout">Passed out (completed final class)</option>
+            <option value="Withdrawn">Withdrawn by parents</option>
+            <option value="Struck Off">Struck off by the school</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Date of leaving</label>
+          <input type="date" class="form-control" id="exitDate" />
+        </div>
+        <div class="mb-0">
+          <label class="form-label">Reason <span class="text-muted">(optional)</span></label>
+          <input type="text" class="form-control" id="exitReason" maxlength="300" placeholder="e.g. Father transferred to Pune" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="exitConfirm">Mark as left</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@* Student photo — shows on the directory avatar and the ID card. *@
+<div class="modal fade" id="photoModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:18px;">
+      <div class="modal-header">
+        <h5 class="modal-title">Upload photo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="mb-3">Photo for <strong id="photoName">—</strong>. JPG, PNG or WEBP, up to 2 MB.</p>
+        <img id="photoPreview" src="" alt="" style="display:none;width:120px;height:150px;object-fit:cover;border:1px solid #ccc;border-radius:8px;margin-bottom:4px;" />
+        @* Shows "5.2 MB → 180 KB" so the user can see the shot was accepted. *@
+        <div id="photoSize" class="text-muted small mb-2"></div>
+
+        @* "Take photo" opens the phone camera directly (capture attribute). It is
+           a SEPARATE input from the file picker on purpose: adding capture to the
+           picker would take the gallery option away. Hidden on desktop, where
+           capture is ignored and the button would just duplicate the picker. *@
+        <button type="button" class="btn btn-outline-primary w-100 mb-2 d-md-none" id="photoTake">
+          <i class="bx bx-camera me-1"></i>Take photo
+        </button>
+        <input type="file" id="photoCamera" accept="image/*" capture="environment" class="d-none" />
+
+        @* accept is image/* rather than a jpg/png/webp list: an iPhone gallery
+           holds HEIC, which the narrow list greyed out. Compression re-encodes
+           whatever is picked to JPEG before it reaches the server. *@
+        <input type="file" class="form-control" id="photoFile" accept="image/*" />
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="photoUpload">Upload</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+(function(){
+'use strict';
+/* Listing/filtering/paging is server-side. This block only handles the two
+   export buttons: Excel pulls the CURRENT filtered set from the JSON endpoint,
+   PDF uses the browser print dialog. */
+var EXPORT_URL='@Url.Action("GetStudentsData","Admission",new{area="Students"})';
+var CAN_FEES=@(canViewFees ? "true" : "false");   // fees.view -- else no Fee column in the export
+var MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function fmtDate(d){if(!d)return'';var x=new Date(d);if(isNaN(x))return d;return String(x.getDate()).padStart(2,'0')+' '+MO[x.getMonth()]+' '+x.getFullYear();}
+function val(n){var el=document.querySelector('[name="'+n+'"]');return el?el.value:'';}
+
+document.getElementById('btnExcel').addEventListener('click',function(){
+  var qs='?pageSize=10000&page=1'
+    +'&search='+encodeURIComponent(val('Search'))
+    +'&className='+encodeURIComponent(val('FilterClass'))
+    +'&gender='+encodeURIComponent(val('FilterGender'))
+    +'&year='+encodeURIComponent(val('FilterYear'))
+    // The export must be the list on screen: it used to drop the Fee filter.
+    +'&fee='+encodeURIComponent(val('FilterFee'));
+  $.ajax({
+    url:     EXPORT_URL+qs,
+    type:    'GET',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+    .done(function(res){
+      var rows=(res&&res.success&&res.rows)?res.rows:[];
+      var hdr=['Adm No','Roll','Name','Class','Sec','Gender','Adm Date','Guardian','Phone','Fee','Status'];
+      var body=rows.map(function(s){return[s.admissionNo,s.rollNo||'',s.studentName,s.className,s.section||'',s.gender||'',fmtDate(s.admissionDate),s.guardianName||'',s.mobile||'',s.feeStatus||'',s.status||''];});
+      if(!CAN_FEES){ hdr.splice(9,1); body.forEach(function(r){ r.splice(9,1); }); }
+      // A cell that starts with = + - @@ (or a tab / CR) is run as a formula by
+      // Excel. Prefix it with ' so a name like "=HYPERLINK(...)" stays text.
+      function cell(c){
+        var v=String(c==null?'':c);
+        if(/^[=+\-@@\t\r]/.test(v)) v="'"+v;
+        return '"'+v.replace(/"/g,'""')+'"';
+      }
+      var csv='﻿'+[hdr].concat(body).map(function(r){return r.map(cell).join(',');}).join('\r\n');
+      var a=document.createElement('a');
+      a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+      a.download='students_'+EC.today()+'.csv';
+      a.click();
+      ecToast('success',body.length+' students exported.');
+    })
+    .fail(function(){ecToast('error','Export failed.');});
+});
+document.getElementById('btnPdf').addEventListener('click',function(){window.print();});
+
+})();
+</script>
+
+<script>
+    $(function () {
+        var exitId = null;
+
+        $('.btn-exit').on('click', function () {
+            exitId = $(this).data('id');
+            $('#exitName').text($(this).data('name'));
+            $('#exitDate').val(EC.today());
+            $('#exitReason').val('');
+            var due = Number($(this).data('due')) || 0;
+            $('#exitDues').toggleClass('d-none', due <= 0).html(due > 0
+                ? 'Fees still on the account: <b>' + EC.money(due) + '</b> (including later months). Fees due after the leaving date are closed '
+                  + 'automatically; collect what is owed up to that date in Collect Fees (left students can be found there) before issuing a TC. '
+                  + 'A refundable deposit is returned from Collect Fees › Refund.'
+                : '');
+            new bootstrap.Modal(document.getElementById('exitModal')).show();
+        });
+
+        $('#exitConfirm').on('click', function () {
+            // Not reset on success — the page reloads.
+            var $btn = $(this);
+            EC.buttonBusy($btn, 'Saving…');
+            $.ajax({
+                url: '@Url.Action("Exit", "Student", new { area = "Students" })',
+                type: 'POST',
+                contentType: 'application/json',
+                headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+                data: JSON.stringify({
+                    studentId: exitId,
+                    status: $('#exitStatus').val(),
+                    dateOfLeaving: $('#exitDate').val(),
+                    reason: $('#exitReason').val()
+                })
+            })
+            .done(function (res) {
+                if (res && res.success) {
+                    ecToast('success', res.message);
+                    // Dues do not block the exit, but the office needs to know.
+                    if (res.outstanding > 0) {
+                        ecToast('warning', 'Outstanding dues of ' + EC.money(res.outstanding) + ' remain.');
+                    }
+                    setTimeout(function () { location.reload(); }, 1200);
+                } else {
+                    ecToast('error', (res && res.message) || 'Could not mark as left.');
+                    EC.buttonReset($btn);
+                }
+            })
+            .fail(function () {
+                ecToast('error', 'Something went wrong.');
+                EC.buttonReset($btn);
+            });
+        });
+
+        // ── Upload photo ──
+        var photoId = null;
+        var photoModal = new bootstrap.Modal(document.getElementById('photoModal'));
+
+        // The image can come from either input (file picker or camera), so hold
+        // the chosen File here instead of reading one input at upload time.
+        var photoFile = null;
+
+        $('.btn-photo').on('click', function () {
+            photoId = $(this).data('id');
+            $('#photoName').text($(this).data('name'));
+            $('#photoFile').val('');
+            $('#photoCamera').val('');
+            photoFile = null;
+            $('#photoPreview').hide().attr('src', '');
+            $('#photoSize').text('');
+            $('#photoUpload').prop('disabled', false);
+            photoModal.show();
+        });
+
+        $('#photoTake').on('click', function () { $('#photoCamera').trigger('click'); });
+
+        // Show the picked image before uploading. Whichever input fired last wins,
+        // and the other is cleared so a stale pick can never be uploaded.
+        //
+        // Camera shots are 5-12 MB against a 2 MB server cap, so shrink first —
+        // EC.compressImage also re-encodes iPhone HEIC to JPEG, which the server
+        // would otherwise reject outright on extension.
+        $('#photoFile, #photoCamera').on('change', function () {
+            var f = this.files && this.files[0];
+            $(this.id === 'photoFile' ? '#photoCamera' : '#photoFile').val('');
+
+            if (!f) { photoFile = null; $('#photoPreview').hide(); $('#photoSize').text(''); return; }
+
+            var original = f.size;
+            $('#photoSize').text('Preparing…');
+            $('#photoUpload').prop('disabled', true);
+
+            EC.compressImage(f).then(function (small) {
+                photoFile = small;
+                $('#photoPreview').attr('src', URL.createObjectURL(small)).show();
+                $('#photoSize').text(small.size < original
+                    ? EC.fileSize(original) + ' → ' + EC.fileSize(small.size)
+                    : EC.fileSize(small.size));
+                $('#photoUpload').prop('disabled', false);
+            });
+        });
+
+        $('#photoUpload').on('click', function () {
+            if (!photoFile) { ecToast('error', 'Choose an image.'); return; }
+
+            var fd = new FormData();
+            fd.append('publicId', photoId);
+            fd.append('photo', photoFile);
+            fd.append('__RequestVerificationToken', $('input[name="__RequestVerificationToken"]').first().val());
+
+            // Not reset on success — the page reloads.
+            var $btn = $(this);
+            EC.buttonBusy($btn, 'Uploading…');
+            $.ajax({
+                url: '@Url.Action("UploadPhoto", "Student", new { area = "Students" })',
+                type: 'POST',
+                data: fd,
+                processData: false,
+                contentType: false
+            })
+            .done(function (res) {
+                if (res && res.success) {
+                    ecToast('success', res.message || 'Photo updated.');
+                    setTimeout(function () { location.reload(); }, 800);
+                } else {
+                    ecToast('error', (res && res.message) || 'Could not upload.');
+                    EC.buttonReset($btn);
+                }
+            })
+            .fail(function () { ecToast('error', 'Something went wrong.'); EC.buttonReset($btn); });
+        });
+    });
+</script>
+}

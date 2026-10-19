@@ -207,7 +207,7 @@
             // Preview is a server-rendered sample page — just open it in a new tab.
             $('#tcFormatPreview').on('click', function () {
                 var fmt = $('.tc-fmt:checked').val() || 'Basic';
-                window.open('@Url.Action("Preview", "Tc", new { area = "ERP" })?format=' + fmt, '_blank');
+                window.open('@Url.Action("Preview", "Tc", new { area = "Students" })?format=' + fmt, '_blank');
             });
 
             $('#tcFormatSave').on('click', function () {
@@ -234,7 +234,7 @@
             // ── Student ID Card ──
             $('#idFormatPreview').on('click', function () {
                 var fmt = $('.id-fmt:checked').val() || 'Portrait';
-                window.open('@Url.Action("Preview", "IdCard", new { area = "ERP" })?format=' + fmt, '_blank');
+                window.open('@Url.Action("Preview", "IdCard", new { area = "Students" })?format=' + fmt, '_blank');
             });
 
             $('#idFormatSave').on('click', function () {

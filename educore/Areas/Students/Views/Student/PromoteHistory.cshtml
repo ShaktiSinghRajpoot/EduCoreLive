@@ -1,0 +1,184 @@
+@{
+    ViewData["Title"] = "Promotion History";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    bool wholeSchool = ViewBag.WholeSchool == true;
+    var years = ViewBag.YearList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+}
+
+@section PageStyles {
+<style>
+  .ph-kpi { cursor:pointer; border:1px solid var(--bs-border-color); border-radius:12px; padding:.75rem; text-align:center; background:var(--bs-body-bg); }
+  .ph-kpi.active { border-color:var(--bs-primary); box-shadow:0 0 0 2px rgba(var(--bs-primary-rgb),.15); }
+  .ph-kpi .v { font-size:1.4rem; font-weight:900; line-height:1.1; }
+  .ph-kpi .l { font-size:.72rem; font-weight:700; text-transform:uppercase; color:var(--bs-secondary-color); letter-spacing:.03em; }
+  .ph-cls tr { cursor:pointer; }
+  .ph-cls tr.active td { background:rgba(var(--bs-primary-rgb),.08); }
+</style>
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-history fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Promotion History</h4>
+            <div class="ec-page-subtitle">
+              @(wholeSchool ? "Who was promoted, kept in the same class or passed out at the end of a session"
+                            : "Your class: who was promoted, kept in the same class or passed out")
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ec-card mb-3"><div class="ec-card-body d-flex flex-wrap gap-2 align-items-end">
+      <div>
+        <label class="form-label mb-1">Promoted from session</label>
+        <select id="phYear" class="form-select form-select-sm" style="min-width:160px">
+          @foreach (var y in years)
+          {
+              <option value="@y.Text" selected="@y.Selected">@y.Text</option>
+          }
+        </select>
+      </div>
+      <div class="flex-grow-1" style="max-width:280px">
+        <label class="form-label mb-1">Search</label>
+        <input id="phSearch" class="form-control form-control-sm" placeholder="Name or admission no.">
+      </div>
+      @if (!wholeSchool)
+      {
+          <div class="text-muted small align-self-center">Only the classes you are class teacher of are shown.</div>
+      }
+    </div></div>
+
+    <div id="phBody"><div class="text-muted small p-2">Loading…</div></div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+$(function () {
+    var DATA_URL    = '@Url.Action("PromoteHistoryData", "Student", new { area = "Students" })';
+    var PROFILE_URL = '@Url.Action("Dashboard", "Student", new { area = "Students" })';
+    var OUTCOMES = {
+        Promote: { label: 'Promoted',            cls: 'bg-label-success', color: '#16a34a' },
+        Retain:  { label: 'Kept in same class',  cls: 'bg-label-warning', color: '#b45309' },
+        PassOut: { label: 'Passed out',          cls: 'bg-label-info',    color: '#0e7490' }
+    };
+
+    var rows = [];               // everything for the chosen session
+    var pickOutcome = '';        // '' = all
+    var pickClass = '';          // '' = all classes
+
+    function clsName(cls, sec) { return EC.esc(cls) + (sec ? ' – ' + EC.esc(sec) : ''); }
+
+    function load() {
+        pickOutcome = ''; pickClass = '';
+        $('#phBody').html('<div class="text-muted small p-2">Loading…</div>');
+        $.getJSON(DATA_URL, { fromYear: $('#phYear').val() }).done(function (r) {
+            if (!r || !r.success) { $('#phBody').html(''); ecToast('error', (r && r.message) || 'Could not load the history.'); return; }
+            rows = r.rows || [];
+            render();
+        }).fail(function () { $('#phBody').html(''); ecToast('error', 'Could not load the history.'); });
+    }
+
+    function render() {
+        if (!rows.length) {
+            $('#phBody').html('<div class="ec-card"><div class="ec-card-body text-center text-muted py-5">'
+                + '<i class="bx bx-history fs-1 d-block mb-2"></i>Nobody has been promoted out of ' + EC.esc($('#phYear').val()) + ' yet.</div></div>');
+            return;
+        }
+
+        // the four numbers at the top (click one to list only those children)
+        var count = { Promote: 0, Retain: 0, PassOut: 0 };
+        rows.forEach(function (x) { if (count[x.outcome] !== undefined) count[x.outcome]++; });
+        var kpi = function (key, label, val, color) {
+            return '<div class="col-6 col-md-3"><div class="ph-kpi' + (pickOutcome === key ? ' active' : '') + '" data-outcome="' + key + '">'
+                 + '<div class="v" style="color:' + color + '">' + val + '</div><div class="l">' + label + '</div></div></div>';
+        };
+        var html = '<div class="row g-2 mb-3">'
+            + kpi('', 'Total', rows.length, '#334155')
+            + kpi('Promote', OUTCOMES.Promote.label, count.Promote, OUTCOMES.Promote.color)
+            + kpi('Retain', OUTCOMES.Retain.label, count.Retain, OUTCOMES.Retain.color)
+            + kpi('PassOut', OUTCOMES.PassOut.label, count.PassOut, OUTCOMES.PassOut.color)
+            + '</div>';
+
+        // class by class (rows come sorted in teaching order)
+        var classes = [], byClass = {};
+        rows.forEach(function (x) {
+            var k = x.fromCls + '|' + x.fromSec;
+            if (!byClass[k]) { byClass[k] = { key: k, cls: x.fromCls, sec: x.fromSec, Promote: 0, Retain: 0, PassOut: 0, total: 0 }; classes.push(byClass[k]); }
+            byClass[k][x.outcome] = (byClass[k][x.outcome] || 0) + 1;
+            byClass[k].total++;
+        });
+        html += '<div class="ec-card mb-3"><div class="ec-card-body p-0"><div class="px-3 pt-3 fw-semibold">Class by class <span class="text-muted small fw-normal">— click a class to list its children</span></div>'
+            + '<div class="table-responsive"><table class="table table-sm mb-0 ph-cls"><thead><tr><th>Class</th><th class="text-end">Promoted</th><th class="text-end">Kept back</th><th class="text-end">Passed out</th><th class="text-end">Total</th></tr></thead><tbody>'
+            + classes.map(function (c) {
+                return '<tr data-class="' + EC.esc(c.key) + '"' + (pickClass === c.key ? ' class="active"' : '') + '><td class="fw-semibold">' + clsName(c.cls, c.sec) + '</td>'
+                     + '<td class="text-end">' + c.Promote + '</td><td class="text-end">' + c.Retain + '</td><td class="text-end">' + c.PassOut + '</td><td class="text-end fw-bold">' + c.total + '</td></tr>';
+            }).join('')
+            + '</tbody></table></div></div></div>';
+
+        html += '<div class="ec-card"><div class="ec-card-body p-0"><div class="px-3 pt-3 fw-semibold" id="phListTitle"></div><div class="table-responsive"><table class="table table-sm mb-0">'
+            + '<thead><tr><th>Student</th><th class="d-none d-md-table-cell">From</th><th class="d-none d-md-table-cell">To</th><th>Result</th>'
+            + (rows[0].dues !== null ? '<th class="text-end d-none d-md-table-cell">Fee due then</th>' : '')
+            + '<th class="d-none d-lg-table-cell">Done by</th></tr></thead><tbody id="phList"></tbody></table></div></div></div>';
+
+        $('#phBody').html(html);
+        renderList();
+    }
+
+    function renderList() {
+        var q = ($('#phSearch').val() || '').trim().toLowerCase();
+        var list = rows.filter(function (x) {
+            return (!pickOutcome || x.outcome === pickOutcome)
+                && (!pickClass || (x.fromCls + '|' + x.fromSec) === pickClass)
+                && (!q || x.name.toLowerCase().indexOf(q) >= 0 || x.admNo.toLowerCase().indexOf(q) >= 0);
+        });
+        var showDues = rows.length && rows[0].dues !== null;
+        var title = (pickOutcome ? OUTCOMES[pickOutcome].label : 'All children')
+                  + (pickClass ? ' · ' + clsName(pickClass.split('|')[0], pickClass.split('|')[1]) : '')
+                  + ' <span class="text-muted small fw-normal">(' + list.length + ')</span>';
+        $('#phListTitle').html(title);
+
+        $('#phList').html(list.length ? list.map(function (x) {
+            var o = OUTCOMES[x.outcome] || { label: x.outcome, cls: 'bg-label-secondary' };
+            var to = x.outcome === 'PassOut' ? 'Left the school' : clsName(x.toCls, x.toSec) + ' (' + EC.esc(x.toYear) + ')';
+            return '<tr>'
+                + '<td><a href="' + PROFILE_URL + '/' + x.id + '" class="fw-semibold">' + EC.esc(x.name) + '</a>'
+                +   '<div class="small text-muted">' + EC.esc(x.admNo) + '</div>'
+                +   '<div class="small text-muted d-md-none">' + clsName(x.fromCls, x.fromSec) + ' → ' + to + '</div></td>'
+                + '<td class="d-none d-md-table-cell">' + clsName(x.fromCls, x.fromSec) + '</td>'
+                + '<td class="d-none d-md-table-cell">' + to + '</td>'
+                + '<td><span class="badge ' + o.cls + '">' + o.label + '</span></td>'
+                + (showDues ? '<td class="text-end d-none d-md-table-cell ' + (x.dues > 0 ? 'text-danger fw-semibold' : 'text-muted') + '">' + (x.dues > 0 ? EC.money(x.dues) : '—') + '</td>' : '')
+                + '<td class="d-none d-lg-table-cell small">' + EC.esc(x.by || '—') + '<div class="text-muted">' + EC.esc(x.at) + '</div></td>'
+                + '</tr>';
+        }).join('') : '<tr><td colspan="6" class="text-center text-muted py-4">No child matches.</td></tr>');
+    }
+
+    $('#phBody').on('click', '.ph-kpi', function () {
+        pickOutcome = $(this).data('outcome') || '';
+        $('.ph-kpi').removeClass('active'); $(this).addClass('active');
+        renderList();
+    });
+    $('#phBody').on('click', '.ph-cls tbody tr', function () {
+        var k = $(this).data('class');
+        pickClass = (pickClass === k) ? '' : k;          // click again to show every class
+        $('.ph-cls tbody tr').removeClass('active');
+        if (pickClass) $(this).addClass('active');
+        renderList();
+    });
+    $('#phSearch').on('input', renderList);
+    $('#phYear').on('change', load);
+
+    load();
+});
+</script>
+}

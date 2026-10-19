@@ -1,0 +1,910 @@
+@inject educore.Helpers.ModuleFlags Modules
+@using System.Linq
+@{
+    ViewData["Title"] = "Promote Students";
+    bool examsOn = await Modules.ExamsOn();
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+
+    // Teaching order with each class's display_order. The page compares orders
+    // across two sessions the same way the promotion proc does, so names alone
+    // would not be enough.
+    var _ladder = ViewBag.ClassLadder as List<EduCoreDataAccessLayer.Models.ERP.ClassLadderItem>
+                  ?? new List<EduCoreDataAccessLayer.Models.ERP.ClassLadderItem>();
+    var _classOrderJson = System.Text.Json.JsonSerializer.Serialize(
+        _ladder.Select(c => new { name = c.Name, order = c.Order }));
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Student/Promotion.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <!-- Header -->
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="ec-page-title-wrap">
+          <div class="ec-page-icon rounded-4 d-flex align-items-center justify-content-center">
+            <i class="bx bx-up-arrow-circle fs-4"></i>
+          </div>
+          <div>
+            <h4 class="ec-page-title mb-1">Promote Students</h4>
+            <div class="ec-page-subtitle">Move a class to the next academic session in one bulk operation</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    @await Html.PartialAsync("_SessionSteps", 3)
+
+    <!-- Source → Target flow -->
+    <div class="ec-card mb-4">
+      <div class="ec-card-body">
+        <div class="pr-flow">
+
+          <div class="pr-flow-box">
+            <div class="pr-flow-lbl"><i class="bx bx-log-out-circle"></i>From (Current)</div>
+            <div class="pr-field">
+              <label>Academic Year</label>
+              <select class="pr-sel" id="srcYear">
+                @foreach (var y in ViewBag.YearList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@y.Text" selected="@y.Selected">@y.Text</option>
+                }
+              </select>
+            </div>
+            <div class="pr-field">
+              <label>Class</label>
+              <select class="pr-sel" id="srcClass">
+                <option value="">Select class</option>
+                @foreach (var c in ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@c.Text">@c.Text</option>
+                }
+              </select>
+            </div>
+            <div class="pr-field">
+              <label>Section</label>
+              <select class="pr-sel" id="srcSection">
+                <option value="">All sections</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pr-arrow"><i class="bx bx-right-arrow-alt"></i></div>
+
+          <div class="pr-flow-box is-target">
+            <div class="pr-flow-lbl t"><i class="bx bx-log-in-circle"></i>To (Promote into)</div>
+            <div class="pr-field">
+              <label>Academic Year</label>
+              <select class="pr-sel" id="tgtYear">
+                @foreach (var y in ViewBag.YearList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@y.Text">@y.Text</option>
+                }
+              </select>
+            </div>
+            <div class="pr-field">
+              <label>Class</label>
+              <select class="pr-sel" id="tgtClass" disabled>
+                <option value="">Auto (next class)</option>
+              </select>
+            </div>
+            <div class="pr-field">
+              <label>Section</label>
+              <select class="pr-sel" id="tgtSection">
+                <option value="keep">Keep same section</option>
+              </select>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Classes and sections belong to one session, so a session that has not
+             been set up yet cannot receive anyone. Say so here rather than letting
+             the write fail at the very last step. -->
+        <div class="alert alert-warning d-flex d-none align-items-start gap-2 mt-3 mb-0" id="tgtNotReady">
+          <i class="bx bx-error-circle fs-5"></i>
+          <div class="small flex-grow-1" id="tgtNotReadyText"></div>
+        </div>
+
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mt-3">
+          <label class="pr-opt mb-0">
+            <input type="checkbox" class="form-check-input mt-0" id="carryDues" checked>
+            <span>
+              Promote students who still owe fees
+              <span class="d-block text-muted" style="font-size:.75rem;">
+                "Fee Due Now" counts only fees whose due date has passed. Untick to hold them back instead. Old dues stay on the student's account
+                either way; decide them afterwards on Year-End (carry forward or write off).
+              </span>
+            </span>
+          </label>
+          <button class="btn btn-primary d-flex align-items-center justify-content-center gap-1" id="loadBtn">
+            <i class="bx bx-list-ul"></i><span>Load Students</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="row g-3 mb-4" id="sumSection" style="display:none;">
+      <div class="col-6 col-lg-3">
+        <div class="pr-card">
+          <div class="pr-card-ic bg-label-primary text-primary"><i class="bx bx-group"></i></div>
+          <div><div class="pr-card-val" id="cTotal">0</div><div class="pr-card-lbl">In Class</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="pr-card">
+          <div class="pr-card-ic bg-label-success text-success"><i class="bx bx-up-arrow-circle"></i></div>
+          <div><div class="pr-card-val" id="cPromote">0</div><div class="pr-card-lbl">To Promote</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="pr-card">
+          <div class="pr-card-ic bg-label-warning text-warning"><i class="bx bx-revision"></i></div>
+          <div><div class="pr-card-val" id="cRetain">0</div><div class="pr-card-lbl">To Retain</div></div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="pr-card">
+          <div class="pr-card-ic bg-label-info text-info"><i class="bx bx-graduation"></i></div>
+          <div><div class="pr-card-val" id="cPassout">0</div><div class="pr-card-lbl">To Pass Out</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Roster -->
+    <div class="ec-card mb-0" id="rosterCard" style="display:none;">
+      <div class="ec-card-header">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+          <div class="ec-section-title-wrap">
+            <span class="ec-section-icon"><i class="bx bx-list-check"></i></span>
+            <div>
+              <div class="ec-section-title">Student Roster</div>
+              <div class="ec-section-subtitle" id="rosterSub">—</div>
+            </div>
+          </div>
+          <div class="pr-bulk">
+            <span class="text-muted small fw-bold me-1">Mark all:</span>
+            <button class="pr-bulk-btn" data-all="promote"><i class="bx bx-check-circle"></i>Promote</button>
+            <button class="pr-bulk-btn" data-all="retain"><i class="bx bx-revision"></i>Retain</button>
+            <button class="pr-bulk-btn" data-all="passout"><i class="bx bx-graduation"></i>Pass Out</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ec-card-body pt-2">
+
+        <!-- Desktop table -->
+        <div class="pr-tbl-wrap">
+          <table class="table pr-tbl align-middle mb-0">
+            <thead>
+              <tr>
+                <th style="width:38px;"><input type="checkbox" class="form-check-input" id="selAll" checked></th>
+                <th>Student</th>
+                <th>Roll No</th>
+                <th>Fee Due Now</th>
+                <th>Next Class</th>
+                <th style="width:260px;">Outcome</th>
+              </tr>
+            </thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Mobile cards -->
+        <div class="pr-mob" id="mobList"></div>
+
+        <!-- Empty -->
+        <div class="pr-empty d-none" id="emptyState">
+          <div class="pr-empty-ic"><i class="bx bx-user-x"></i></div>
+          <h6 class="fw-bold mb-1" style="color:var(--ec-text-dark);">No students in this class</h6>
+          <p class="text-muted small mb-0">Pick a different class/section and load again.</p>
+        </div>
+
+        <!-- Why the promotion cannot run yet. Inline rather than a toast: the old
+             code toasted from inside the confirm modal, so the message appeared
+             behind it and the modal just sat there looking broken. -->
+        <div class="alert alert-warning d-flex d-none align-items-start gap-2 mb-3" id="promoteError" style="border-radius:12px;font-size:.85rem;">
+          <i class="bx bx-error-circle fs-5"></i><span id="promoteErrorText"></span>
+        </div>
+
+        <!-- Actions -->
+        <div class="pr-actions">
+          <div class="hint"><i class="bx bx-info-circle me-1"></i>Review outcomes, then preview before committing. This action updates student records.</div>
+          <div class="d-flex flex-column flex-sm-row gap-2">
+            <button class="btn btn-outline-secondary px-4" id="resetBtn"><i class="bx bx-reset me-1"></i>Reset</button>
+            <button class="btn btn-primary px-4" id="reviewBtn">
+              <i class="bx bx-up-arrow-circle me-1"></i>Review &amp; Promote
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Result of the last run. The proc names everyone it could not move, and the
+         office has to act on that list — a 3.5s toast was the wrong place for it. -->
+    <div class="ec-card mb-4" id="resultCard" style="display:none;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-check-circle"></i></span>
+          <div>
+            <div class="ec-section-title">Promotion Result</div>
+            <div class="ec-section-subtitle" id="resultSummary">—</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="resultClose">
+          <i class="bx bx-x me-1"></i>Dismiss
+        </button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4 pt-0" id="resultSkipWrap" style="display:none;">
+        <div class="fw-bold mb-2" style="font-size:.9rem;">
+          <i class="bx bx-error-circle me-1 text-warning"></i>
+          <span id="resultSkipCount">0</span> student(s) were not moved
+        </div>
+        <ul class="mb-0 small" id="resultSkipList" style="padding-left:1.1rem;"></ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+<!-- Confirm modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border:0;border-radius:20px;overflow:hidden;">
+      <div class="ec-card-header d-flex align-items-center justify-content-between p-3 p-lg-4">
+        <div class="ec-section-title-wrap">
+          <span class="ec-section-icon"><i class="bx bx-shield-quarter"></i></span>
+          <div>
+            <div class="ec-section-title">Confirm Promotion</div>
+            <div class="ec-section-subtitle" id="confirmFlow">—</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="ec-card-body p-3 p-lg-4">
+        <div class="pr-sum-line"><span class="pr-chip promote"><i class="bx bx-up-arrow-circle"></i>Promote</span><span class="v" id="mPromote">0</span></div>
+        <div class="pr-sum-line"><span class="pr-chip retain"><i class="bx bx-revision"></i>Retain in class</span><span class="v" id="mRetain">0</span></div>
+        <div class="pr-sum-line"><span class="pr-chip passout"><i class="bx bx-graduation"></i>Pass out / Graduate</span><span class="v" id="mPassout">0</span></div>
+        <div class="pr-sum-line"><span><i class="bx bx-wallet me-1"></i>Students who owe fees</span><span class="v" id="mDues">—</span></div>
+        <div class="alert alert-danger d-flex d-none align-items-start gap-2 mt-3 mb-0" id="mDuesWarn" style="border-radius:12px;font-size:.82rem;">
+          <i class="bx bx-wallet fs-5"></i>
+          <span><strong id="mDuesCount">0</strong> selected student(s) have pending dues and will be <strong>held back</strong>
+                (not promoted). Tick "Promote students who still owe fees" to move them anyway, or settle the dues first.</span>
+        </div>
+        <div class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0" style="border-radius:12px;font-size:.82rem;">
+          <i class="bx bx-error-circle fs-5"></i>
+          <span>This will move the selected students into the new academic session.@(examsOn ? " Make sure exam results are finalised first." : "")</span>
+        </div>
+      </div>
+      <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
+        <button type="button" class="btn btn-outline-secondary px-4" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary px-4" id="commitBtn"><i class="bx bx-check me-1"></i>Confirm &amp; Promote</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+@section PageScripts {
+<script>
+(function(){
+'use strict';
+
+/* ── Class ladders. LADDER is the TARGET session's, because that is the one the
+      proc reads the next class from. SRC_LADDER is the source session's and fills
+      the Class dropdown, so it only ever offers classes that session really has. ── */
+var LADDER=@Html.Raw(_classOrderJson);      // TARGET session: [{name, order}]
+var SRC_LADDER=LADDER.slice();               // SOURCE session: same shape
+
+function names(ladder){ return ladder.map(function(x){ return x.name; }); }
+function orderOf(ladder, c){
+  for(var i=0;i<ladder.length;i++) if(ladder[i].name===c) return ladder[i].order;
+  return null;
+}
+
+/* Three different answers, and they must stay separate:
+     a class name  -> the next class up
+     null          -> this IS the final class (Pass Out is correct)
+     undefined     -> the class does not exist in the target session at all
+   Returning null for the last two together is what used to mark a whole class
+   as "Pass out / Graduate" when the target session simply had not been set up. */
+/* The same computation core.sp_student_promote does:
+     1. take the class's display_order from the SOURCE session (falling back to
+        the target, exactly like the proc's COALESCE),
+     2. move to the first class in the TARGET session with a HIGHER order.
+   Comparing orders, not list positions, is the whole point — the two sessions
+   can hold different classes, so index i+1 would be wrong. */
+function nextClass(c){
+  var o=orderOf(SRC_LADDER, c);
+  if(o===null) o=orderOf(LADDER, c);
+  if(o===null) return undefined;              // in neither session
+
+  for(var i=0;i<LADDER.length;i++) if(LADDER[i].order>o) return LADDER[i].name;
+  return null;                                 // nothing higher = final class
+}
+/* Two different situations, and only one of them is an error:
+
+     in NEITHER ladder  -> the proc cannot find a display_order for it at all and
+                           skips every student ("class X is not in the session
+                           setup"). Worth blocking on.
+
+     in the source but not the target -> perfectly normal. The proc takes the
+                           order from the SOURCE session and moves the student to
+                           the first higher class that exists in the target, so
+                           1st -> 2nd works even when the target has only 2nd. We
+                           cannot compute that here (display_order is not exposed
+                           to the page), so say the target decides — do not guess,
+                           and do not block. */
+function classUnknown(c){ return !!c && orderOf(LADDER,c)===null && orderOf(SRC_LADDER,c)===null; }
+
+/* Where the student lands, section included. "keep" means the proc uses the
+   student's own section (COALESCE(v_sec, s.section)) — and it SKIPS anyone whose
+   section does not exist in the new class, so showing it is worth doing. */
+function targetSection(s){
+  var v=document.getElementById('tgtSection').value;
+  return (!v || v==='keep') ? (s.sec||'') : v;
+}
+function targetLabel(s, nc){
+  var sec=targetSection(s);
+  return sec ? nc+' – '+sec : nc;
+}
+
+var SEC_URL='@Url.Action("PromotionSections","Student",new{area="Students"})';
+var CLASSES_URL='@Url.Action("PromotionClasses","Student",new{area="Students"})';
+var ROSTER_URL='@Url.Action("PromotionRoster","Student",new{area="Students"})';
+var PROMOTE_URL='@Url.Action("Promote","Student",new{area="Students"})';
+var CHECK_URL='@Url.Action("PromotionSessionCheck","Student",new{area="Students"})';
+
+/* Set by the session check below: false blocks the commit. */
+var targetReady=true;
+var PALETTE=['primary','info','success','warning','danger','secondary'];
+
+var roster=[];          // currently loaded students (from the server)
+var outcome={};         // id -> 'promote' | 'retain' | 'passout'
+var unpicked={};        // id -> true when the office unticked that student
+
+/* ── Helpers ─────────────────────────────────── */
+function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
+function inr(n){ return n>0 ? '₹'+n.toLocaleString('en-IN') : '₹0.00'; }
+
+/* ── Section dropdowns cascade from the chosen class ── */
+function fillSelect(sel, list, firstLabel, firstVal){
+  sel.innerHTML='';
+  var o0=document.createElement('option'); o0.value=firstVal; o0.textContent=firstLabel; sel.appendChild(o0);
+  (list||[]).forEach(function(x){ var o=document.createElement('option'); o.value=x; o.textContent=x; sel.appendChild(o); });
+}
+/* ── Class list for the SOURCE session ────────
+   Refilled whenever the source session changes, so the dropdown can only offer
+   classes that session actually has. Keeps the current pick if it survives. */
+function loadSourceClasses(){
+  var yr=document.getElementById('srcYear').value,
+      sel=document.getElementById('srcClass'),
+      keep=sel.value;
+
+  return $.getJSON(CLASSES_URL, { year:yr }).done(function(list){
+    SRC_LADDER=list||[];
+    fillSelect(sel, names(SRC_LADDER), 'Select class', '');
+    if(keep && orderOf(SRC_LADDER, keep)!==null) sel.value=keep;
+    sel.dispatchEvent(new Event('change'));
+  });
+}
+
+document.getElementById('srcClass').addEventListener('change', function(){
+  var cls=this.value, nc=nextClass(cls);
+  if(!cls){
+    fillSelect(document.getElementById('srcSection'), [], 'All sections', '');
+    fillSelect(document.getElementById('tgtSection'), [], 'Keep same section', 'keep');
+    return;
+  }
+  // The proc reads the next class from the TARGET session. If this class does not
+  // exist there, every student in it gets skipped — say so now, not after the run.
+  if(classUnknown(cls)){
+    showErr(cls + ' is not set up in ' + document.getElementById('srcYear').value +
+            ' or ' + document.getElementById('tgtYear').value +
+            '. Every student in it would be skipped. Check Settings → Classes & Sections.');
+  } else {
+    clearErr();
+  }
+
+  // Sections come from each session's class setup, so an empty section (a new
+  // 6-C) is offered as a target too.
+  $.getJSON(SEC_URL, { 'class':cls, year:document.getElementById('srcYear').value }).done(function(list){
+    fillSelect(document.getElementById('srcSection'), list, 'All sections', '');
+  });
+  // Target sections come from the next class (blank on the final class).
+  if(nc){ $.getJSON(SEC_URL, { 'class':nc, year:document.getElementById('tgtYear').value }).done(function(list){ fillSelect(document.getElementById('tgtSection'), list, 'Keep same section', 'keep'); }); }
+  else  { fillSelect(document.getElementById('tgtSection'), [], 'Keep same section', 'keep'); }
+});
+
+/* ── Default outcome: graduate the final class, otherwise promote.
+      (Retain-by-result needs the exam module, which isn't wired yet.) ── */
+function defaultOutcome(s){
+  // undefined (class not in the target session) must NOT become Pass Out.
+  return nextClass(s.cls)===null ? 'passout' : 'promote';
+}
+
+/* ── Load button ─────────────────────────────── */
+document.getElementById('loadBtn').addEventListener('click', function(){
+  var cls=document.getElementById('srcClass').value,
+      sec=document.getElementById('srcSection').value,
+      yr =document.getElementById('srcYear').value;
+  if(!cls){ ecToast('warning','Please select a class first.'); return; }
+
+  var btn=this; btn.disabled=true;
+  $.getJSON(ROSTER_URL, { 'class':cls, section:sec, year:yr })
+  .done(function(list){
+    roster=(list||[]).map(function(s,i){
+      return {id:s.id, name:s.name, roll:s.roll||'', cls:s.cls, sec:s.sec||'', due:s.due||0, color:PALETTE[i%PALETTE.length]};
+    });
+    outcome={}; targetClass={}; unpicked={};
+    roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
+
+    document.getElementById('sumSection').style.display='';
+    document.getElementById('rosterCard').style.display='';
+    document.getElementById('selAll').checked=true;
+
+    var nc=nextClass(cls);
+    document.getElementById('rosterSub').textContent=
+      roster.length+' student'+(roster.length!==1?'s':'')+' in '+cls+(sec?' – '+sec:'')+
+      (nc ? (' → promoting to '+nc)
+          : nc===null ? ' (final class)'
+          : ' — this class is not set up in either session');
+
+    render();
+    if(roster.length) document.getElementById('rosterCard').scrollIntoView({behavior:'smooth',block:'nearest'});
+  })
+  .fail(function(){ ecToast('error','Could not load students for this class.'); })
+  .always(function(){ btn.disabled=false; });
+});
+
+/* ── Per-student target class ─────────────────
+   Normally the target is the next rung up. The office sometimes needs to move one
+   student further (1st -> 3rd), so the Next Class cell becomes a picker offering
+   every class in the TARGET session ABOVE their current one. Empty = auto.
+   Only ever moves a student UP: going down is a correction, not a promotion, and
+   belongs on that student's own page rather than in a bulk run. */
+var targetClass={};
+
+function classChoices(s){
+  var o=orderOf(SRC_LADDER, s.cls);
+  if(o===null) o=orderOf(LADDER, s.cls);
+  if(o===null) return [];
+  return LADDER.filter(function(x){ return x.order>o; });
+}
+
+function classPicker(s, nc){
+  var opts=classChoices(s);
+  // Nothing above them, or nothing to choose between — keep it as plain text.
+  if(opts.length<2) return '<span class="fw-bold">'+EC.esc(targetLabel(s, nc))+'</span>';
+
+  var picked=targetClass[s.id]||'';
+  var html='<select class="pr-sel pr-nc" data-id="'+s.id+'" style="min-width:120px;">'
+         + '<option value=""'+(picked?'':' selected')+'>Next ('+EC.esc(nc)+')</option>';
+  opts.forEach(function(x){
+    if(x.name===nc) return;               // already offered as the default above
+    html+='<option value="'+EC.esc(x.name)+'"'+(picked===x.name?' selected':'')+'>'+EC.esc(x.name)+'</option>';
+  });
+  return html+'</select>';
+}
+
+/* ── Outcome segmented control markup ────────── */
+// pfx keeps the desktop ('oc') and mobile ('ocm') copies in separate radio
+// groups. With one shared name the hidden mobile radio took the checked state
+// and the desktop toggle never showed the choice.
+function seg(id, val, pfx){
+  pfx = pfx || 'oc';
+  function r(o,lbl){
+    var checked = val===o ? 'checked' : '';
+    return '<input type="radio" class="o-'+o+'" name="'+pfx+id+'" id="'+pfx+id+'_'+o+'" value="'+o+'" '+checked+'>'+
+           '<label for="'+pfx+id+'_'+o+'">'+lbl+'</label>';
+  }
+  return '<div class="pr-seg" data-id="'+id+'">'+r('promote','Promote')+r('retain','Retain')+r('passout','Pass Out')+'</div>';
+}
+
+/* ── Render desktop + mobile ─────────────────── */
+function render(){
+  var tb=document.getElementById('tblBody'),
+      mob=document.getElementById('mobList'),
+      empty=document.getElementById('emptyState');
+
+  if(!roster.length){
+    tb.innerHTML=''; mob.innerHTML=''; empty.classList.remove('d-none');
+    updateCounts(); return;
+  }
+  empty.classList.add('d-none');
+
+  tb.innerHTML=roster.map(function(s){
+    var nc=nextClass(s.cls), oc=outcome[s.id];
+    var ncTxt = oc==='passout' ? '<span class="text-info fw-bold">Graduate</span>'
+              : oc==='retain'  ? '<span class="text-muted">Stays in '+EC.esc(s.cls)+'</span>'
+              : nc ? classPicker(s, nc)
+              : nc===null ? '<span class="text-muted">—</span>'
+              : '<span class="text-danger fw-bold" title="Not set up in either session">Not set up</span>';
+    return '<tr class="'+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
+      +'<td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input pr-pick" data-id="'+s.id+'"'+(isPicked(s.id)?' checked':'')+'></td>'
+      +'<td><div class="d-flex align-items-center gap-2">'
+      +   '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
+      +   '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
+      +'</div></td>'
+      +'<td>'+EC.esc(s.roll||'—')+'</td>'
+      +'<td><span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> '+inr(s.due) : 'Paid up')+'</span></td>'
+      +'<td>'+ncTxt+'</td>'
+      +'<td>'+seg(s.id, oc)+'</td>'
+      +'</tr>';
+  }).join('');
+
+  mob.innerHTML=roster.map(function(s){
+    var nc=nextClass(s.cls), oc=outcome[s.id];
+    var ncTxt = oc==='passout' ? 'Graduate'
+              : oc==='retain'  ? 'Stays in '+EC.esc(s.cls)
+              : nc ? classPicker(s, nc)
+              : nc===null ? '—' : 'Not set up';
+    return '<div class="pr-mob-card '+(oc==='retain'?'row-retain':oc==='passout'?'row-passout':'')+'" data-row="'+s.id+'">'
+      +'<div class="pr-mob-top">'
+      +  '<input type="checkbox" class="form-check-input pr-pick-m mt-0" data-id="'+s.id+'"'+(isPicked(s.id)?' checked':'')+'>'
+      +  '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
+      +  '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.roll||'—')+' · '+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
+      +'</div>'
+      +'<div class="pr-mob-meta">'
+      +  '<span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> Fee due '+inr(s.due) : 'Fees paid up')+'</span>'
+      +'</div>'
+      +'<div class="text-muted small fw-bold mb-2"><i class="bx bx-right-arrow-alt"></i> '+ncTxt+'</div>'
+      +seg(s.id, oc, 'ocm')
+      +'</div>';
+  }).join('');
+
+  bindSegs();
+  updateCounts();
+}
+
+/* ── Outcome change ──────────────────────────── */
+function bindSegs(){
+  document.querySelectorAll('.pr-seg input[type=radio]').forEach(function(r){
+    r.addEventListener('change', function(){
+      var id=parseInt(this.closest('.pr-seg').dataset.id,10);
+      outcome[id]=this.value;
+      // A chosen class only means anything for a promotion.
+      if(this.value!=='promote') delete targetClass[id];
+      render();
+    });
+  });
+  // Desktop and mobile each draw a checkbox per student. Unticking either one
+  // records it in `unpicked` and mirrors the other copy, so a hidden ticked copy
+  // can no longer send a student the office meant to leave out.
+  document.querySelectorAll('.pr-pick, .pr-pick-m').forEach(function(c){
+    c.addEventListener('change', function(){
+      var id=this.dataset.id, on=this.checked;
+      if(on) delete unpicked[id]; else unpicked[id]=true;
+      document.querySelectorAll('.pr-pick[data-id="'+id+'"], .pr-pick-m[data-id="'+id+'"]')
+        .forEach(function(x){ x.checked=on; });
+      updateCounts();
+    });
+  });
+  // No re-render here: the select already shows what was picked, and redrawing
+  // would drop the user's focus mid-scroll on a long roster.
+  document.querySelectorAll('.pr-nc').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      var id=parseInt(this.dataset.id,10);
+      if(this.value) targetClass[id]=this.value; else delete targetClass[id];
+    });
+  });
+}
+
+/* ── Counts ──────────────────────────────────── */
+function isPicked(id){ return !unpicked[id]; }
+function picked(){
+  return roster.filter(function(s){ return isPicked(s.id); });
+}
+function updateCounts(){
+  var sel=picked();
+  var p=0,r=0,g=0;
+  sel.forEach(function(s){ var o=outcome[s.id]; if(o==='promote')p++; else if(o==='retain')r++; else g++; });
+  document.getElementById('cTotal').textContent=roster.length;
+  document.getElementById('cPromote').textContent=p;
+  document.getElementById('cRetain').textContent=r;
+  document.getElementById('cPassout').textContent=g;
+  document.getElementById('mPromote').textContent=p;
+  document.getElementById('mRetain').textContent=r;
+  document.getElementById('mPassout').textContent=g;
+}
+
+/* ── Bulk buttons ────────────────────────────── */
+document.querySelectorAll('.pr-bulk-btn[data-all]').forEach(function(b){
+  b.addEventListener('click', function(){
+    var v=this.dataset.all;
+    roster.forEach(function(s){
+      // never auto-promote a final-class student
+      outcome[s.id] = (v==='promote' && nextClass(s.cls)===null) ? 'passout' : v;
+    });
+    render();
+  });
+});
+
+/* ── Select all ──────────────────────────────── */
+document.getElementById('selAll').addEventListener('change', function(){
+  var on=this.checked;
+  unpicked={};
+  if(!on) roster.forEach(function(s){ unpicked[s.id]=true; });
+  document.querySelectorAll('.pr-pick, .pr-pick-m').forEach(function(c){ c.checked=on; });
+  updateCounts();
+});
+
+// The target section is part of the per-student preview, so redraw on change.
+document.getElementById('tgtSection').addEventListener('change', function(){
+  if(roster.length) render();
+});
+
+/* ── "Promote students who owe fees" toggle ───
+   It does not move money — the fee ledger is not year-scoped, so dues follow the
+   student either way. Unticking it makes the proc HOLD BACK anyone who still
+   owes, which is the only thing this flag actually controls. */
+document.getElementById('carryDues').addEventListener('change', function(){
+  document.getElementById('mDues').textContent = this.checked ? 'Yes, promote them' : 'No, hold them back';
+});
+
+/* ── Reset ───────────────────────────────────── */
+document.getElementById('resetBtn').addEventListener('click', function(){
+  roster=[]; outcome={}; targetClass={}; unpicked={};
+  document.getElementById('sumSection').style.display='none';
+  document.getElementById('rosterCard').style.display='none';
+  document.getElementById('srcClass').value='';
+  document.getElementById('srcSection').value='';
+  ecToast('info','Cleared. Select a class to start again.');
+});
+
+/* ── Is the target session set up? ────────────
+   Classes/sections are per-session rows, so promoting into a session that has
+   none writes students onto classes that do not exist. Check up front, and take
+   the ladder from the TARGET session so the "next class" preview matches what
+   the proc will actually do. */
+function checkTargetSession(){
+  var tgtY=document.getElementById('tgtYear').value,
+      banner=document.getElementById('tgtNotReady'),
+      text=document.getElementById('tgtNotReadyText'),
+      reviewBtn=document.getElementById('reviewBtn');
+
+  if(!tgtY){ targetReady=false; return; }
+
+  $.getJSON(CHECK_URL, { year:tgtY }).done(function(res){
+    targetReady = !!(res && res.ready);
+
+    if(targetReady){
+      banner.classList.add('d-none');
+      reviewBtn.removeAttribute('disabled');
+      if(res.ladder && res.ladder.length){ LADDER=res.ladder; }
+      // The reachable classes just changed — re-evaluate the picked one and the
+      // per-student "next class" preview against the new ladder.
+      var cls=document.getElementById('srcClass').value;
+      if(classUnknown(cls)){
+        showErr(cls + ' is not set up in ' + document.getElementById('srcYear').value
+              + ' or ' + tgtY + '. Every student in it would be skipped.');
+      } else {
+        clearErr();
+      }
+      if(roster.length) render();
+      return;
+    }
+
+    var msg='Session '+tgtY+' has no classes or sections yet, so nobody can be promoted into it. ';
+    msg += (res && res.canCopy)
+      ? 'Open Settings → Classes &amp; Sections, pick '+tgtY+', and copy the structure from '+res.sourceYearName+'.'
+      : 'Set up its classes and sections first under Settings → Classes &amp; Sections.';
+    text.innerHTML=msg;
+    banner.classList.remove('d-none');
+    reviewBtn.setAttribute('disabled','disabled');
+  });
+}
+document.getElementById('tgtYear').addEventListener('change', checkTargetSession);
+
+/* ── Pick a sensible target session on load ───
+   Both selects are built from the same list, and the current session is ordered
+   first, so without this BOTH default to the current year — a combination that is
+   always invalid. Pick the first session that is not the source; if there is no
+   such session, the school has to create one before it can promote at all. */
+function initTargetYear(){
+  var src=document.getElementById('srcYear'),
+      tgt=document.getElementById('tgtYear'),
+      other=null, i;
+
+  // The session right after the source ("2026-27" -> "2027-28": the smallest name
+  // above it). The list is newest-first by id, so "first other" could be an older one.
+  for(i=0;i<tgt.options.length;i++){
+    var v=tgt.options[i].value;
+    if(v>src.value && (other===null || v<other)) other=v;
+  }
+  // No later session: fall back to the first one that is not the source.
+  for(i=0;other===null && i<tgt.options.length;i++){
+    if(tgt.options[i].value!==src.value){ other=tgt.options[i].value; }
+  }
+
+  if(other===null){
+    targetReady=false;
+    document.getElementById('reviewBtn').setAttribute('disabled','disabled');
+    document.getElementById('tgtNotReadyText').textContent =
+      'This school has only one academic session (' + src.value + '), so there is nowhere to promote students into. '
+      + 'Create the next session first under Settings → Academic Year, then set up its classes and sections.';
+    document.getElementById('tgtNotReady').classList.remove('d-none');
+    return;
+  }
+
+  tgt.value=other;
+  checkTargetSession();
+}
+initTargetYear();
+document.getElementById('srcYear').addEventListener('change', function(){
+  if(document.getElementById('srcYear').value===document.getElementById('tgtYear').value) initTargetYear();
+
+  // Classes belong to a session, so the list and any loaded roster are now stale.
+  roster=[]; outcome={}; targetClass={}; unpicked={};
+  document.getElementById('sumSection').style.display='none';
+  document.getElementById('rosterCard').style.display='none';
+  loadSourceClasses();
+});
+loadSourceClasses();
+
+/* ── Can this run at all? ─────────────────────
+   Every reason the promotion cannot proceed, in one place, checked BEFORE the
+   confirm modal opens. Returns '' when it is safe to go. */
+function validate(){
+  var srcY=document.getElementById('srcYear').value,
+      tgtY=document.getElementById('tgtYear').value;
+
+  if(!roster.length)      return 'Load a class first — there are no students on screen.';
+  if(!picked().length)    return 'No students are selected. Tick at least one, or use Select all.';
+  if(!tgtY)               return 'Choose the academic session to promote into.';
+  if(srcY===tgtY)         return 'The new session must be different from the current one. Right now both say ' + srcY + '.';
+  if(!targetReady)        return 'Session ' + tgtY + ' has no classes or sections yet, so nobody can be moved into it.';
+
+  var cls=document.getElementById('srcClass').value;
+  if(classUnknown(cls))
+    return cls + ' is not set up in ' + srcY + ' or ' + tgtY
+         + ', so every student in it would be skipped. Check Settings → Classes & Sections.';
+
+  return '';
+}
+
+function showErr(msg){
+  document.getElementById('promoteErrorText').textContent=msg;
+  document.getElementById('promoteError').classList.remove('d-none');
+}
+function clearErr(){ document.getElementById('promoteError').classList.add('d-none'); }
+
+/* Unticking the fees box makes the proc hold back anyone who owes money (a
+   pass-out is exempt). Count them here so the confirm modal can say so instead of
+   the office finding out from the skipped list afterwards. */
+function duesSkipCount(){
+  if(document.getElementById('carryDues').checked) return 0;
+  return picked().filter(function(s){
+    return (s.due||0) > 0 && outcome[s.id] !== 'passout';
+  }).length;
+}
+
+/* ── Review modal fill ───────────────────────── */
+document.getElementById('reviewBtn').addEventListener('click', function(){
+  var err=validate();
+  if(err){ showErr(err); return; }
+  clearErr();
+
+  updateCounts();
+  var srcY=document.getElementById('srcYear').value,
+      tgtY=document.getElementById('tgtYear').value,
+      cls=document.getElementById('srcClass').value;
+  document.getElementById('confirmFlow').textContent=cls+' · '+srcY+'  →  '+tgtY;
+  var owing=picked().filter(function(s){ return (s.due||0)>0 && outcome[s.id]!=='passout'; });
+  document.getElementById('mDues').textContent=
+    (owing.length ? owing.length+' owe '+inr(owing.reduce(function(t,s){ return t+s.due; },0))+' · ' : 'None · ')
+    + (document.getElementById('carryDues').checked ? 'promote them' : 'hold them back');
+
+  var dn=duesSkipCount();
+  document.getElementById('mDuesCount').textContent=dn;
+  // d-flex beats an inline display:none, so the box is hidden with the d-none class
+  document.getElementById('mDuesWarn').classList.toggle('d-none', dn === 0);
+
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).show();
+});
+
+document.getElementById('resultClose').addEventListener('click', function(){
+  document.getElementById('resultCard').style.display='none';
+});
+
+/* ── Result panel ─────────────────────────────
+   skipped_detail arrives '; '-joined from the proc; split it so each name is its
+   own line the office can work through. */
+function showResult(res){
+  document.getElementById('resultSummary').textContent =
+    res.promoted+' promoted · '+res.retained+' retained · '+res.passedOut+' passed out · '+res.skipped+' skipped';
+
+  var wrap=document.getElementById('resultSkipWrap'),
+      list=document.getElementById('resultSkipList');
+
+  if(res.skipped>0 && res.skippedDetail){
+    document.getElementById('resultSkipCount').textContent=res.skipped;
+    list.innerHTML = res.skippedDetail.split('; ').map(function(n){
+      return '<li>'+EC.esc(n)+'</li>';
+    }).join('');
+    wrap.style.display='';
+  } else {
+    wrap.style.display='none';
+  }
+
+  var card=document.getElementById('resultCard');
+  card.style.display='';
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+/* ── Commit ──────────────────────────────────── */
+document.getElementById('commitBtn').addEventListener('click', function(){
+  // Backstop: the Review button already blocked this, but the selection can change
+  // while the modal is open (it does not cover the roster).
+  var err=validate();
+  if(err){
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();
+    showErr(err);
+    return;
+  }
+
+  var sel=picked(),
+      srcY=document.getElementById('srcYear').value,
+      tgtY=document.getElementById('tgtYear').value;
+
+  var btn=this;
+  EC.buttonBusy(btn,'Promoting…');
+  $.ajax({
+    url: PROMOTE_URL,
+    type: 'POST',
+    contentType: 'application/json',
+    headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+    data: JSON.stringify({
+      sourceYear:    srcY,
+      targetYear:    tgtY,
+      targetSection: document.getElementById('tgtSection').value,
+      carryDues:     document.getElementById('carryDues').checked,
+      students:      sel.map(function(s){
+        return { studentId:s.id, outcome:outcome[s.id], toClass:targetClass[s.id]||null };
+      })
+    })
+  })
+  .done(function(res){
+    // A refused run (dues gate, session not set up, nothing matched) comes back
+    // success=false with the proc's own wording — keep it on screen, not in a toast.
+    if(!res || !res.success){
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();
+      showErr((res && res.message) || 'Could not promote.');
+      return;
+    }
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();
+    clearErr();
+    ecToast('success', res.message);
+    showResult(res);
+
+    // The students have moved to the new session, so this roster is stale.
+    roster=[]; outcome={}; targetClass={}; unpicked={};
+    document.getElementById('sumSection').style.display='none';
+    document.getElementById('rosterCard').style.display='none';
+  })
+  .fail(function(xhr){
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();
+    // Say what actually went wrong. 'Something went wrong.' sent people to us with
+    // nothing to go on; the status code at least separates "signed out" from "bug".
+    var code = xhr ? xhr.status : 0;
+    var msg;
+    if(code===400)      msg='The page has gone stale (security token expired). Reload and try again.';
+    else if(code===401) msg='Your session has expired. Sign in again.';
+    else if(code===403) msg='You do not have permission to promote students.';
+    else if(code)       msg='The server returned an error (HTTP '+code+'). Nothing was changed.';
+    else                msg='Could not reach the server. Nothing was changed.';
+    showErr(msg);
+  })
+  .always(function(){ EC.buttonReset(btn); });
+});
+
+})();
+</script>
+}

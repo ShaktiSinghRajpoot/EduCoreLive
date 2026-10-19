@@ -1,0 +1,159 @@
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    ViewData["Title"] = "Data Checks";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var canManage = (bool?)ViewBag.CanManage ?? false;   // students.manage
+}
+
+@*
+   Students › Data Checks (core.sp_student_data_checks): what is missing or wrong in
+   the active students of the session. Each check lists its students with a link to
+   Edit Student; "Assign roll numbers" numbers one section in name order.
+*@
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/ERP/Insights.css" asp-append-version="true" />
+}
+
+<div class="ec-page-shell in-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-check-shield"></i></div>
+          <div><h4 class="ec-page-title mb-1">Data Checks</h4>
+            <p class="ec-page-subtitle">Missing or wrong student details that spoil lists, cards and reports</p></div>
+        </div>
+        <a href="@Url.Action("StudentList","Student",new{area="Students"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-group me-1"></i>Students</a>
+      </div>
+    </div>
+
+    <div class="in-kpis k3 mb-3" id="dcKpis"></div>
+
+    <div class="row g-3">
+      <div class="col-12 col-lg-5">
+        <div class="in-card">
+          <h6 class="in-h">Checks</h6>
+          <div class="in-sub">Active students of the current session · tap a check to list its students</div>
+          <div id="dcChecks"></div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-7">
+        <div class="in-card">
+          <h6 class="in-h" id="dcListH">Pick a check</h6>
+          <div class="in-sub" id="dcListHint"></div>
+          <div class="in-scroll" style="max-height:520px" id="dcList"><div class="in-muted">Tap a check on the left.</div></div>
+        </div>
+      </div>
+    </div>
+
+    @if (canManage)
+    {
+    <div class="in-card mt-3 mb-4" style="height:auto">
+      <h6 class="in-h">Assign roll numbers</h6>
+      <div class="in-sub">Numbers one section in alphabetical order of name. "Only missing" keeps every existing number and continues after the highest one.</div>
+      <div class="d-flex flex-wrap gap-2 align-items-end">
+        <div><label class="form-label mb-1">Class</label><select id="rClass" class="form-select form-select-sm"><option value="">Choose</option></select></div>
+        <div><label class="form-label mb-1">Section</label><select id="rSection" class="form-select form-select-sm"><option value="">—</option></select></div>
+        <div><label class="form-label mb-1">Numbering</label>
+          <select id="rMode" class="form-select form-select-sm"><option value="missing">Only students without a number</option><option value="all">Renumber the whole section 1, 2, 3…</option></select></div>
+        <button id="btnRolls" class="btn btn-sm btn-primary"><i class="bx bx-sort-a-z me-1"></i>Assign</button>
+      </div>
+    </div>
+    }
+
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+$(function () {
+    'use strict';
+
+    var CSRF = $('input[name="__RequestVerificationToken"]').val();
+    var URL = {
+        summary:  '@Url.Action("Summary","DataChecks",new{area="Students"})',
+        list:     '@Url.Action("List","DataChecks",new{area="Students"})',
+        classes:  '@Url.Action("Classes","DataChecks",new{area="Students"})',
+        sections: '@Url.Action("Sections","IdCard",new{area="Students"})',
+        rolls:    '@Url.Action("AssignRolls","DataChecks",new{area="Students"})',
+        edit:     '@Url.Action("EditStudent","Student",new{area="Students"})',
+        dash:     '@Url.Action("Dashboard","Student",new{area="Students"})'
+    };
+    var CHECKS = [], current = '';
+
+    function kpi(label, value, sub, cls) {
+        return '<div class="in-kpi ' + (cls || '') + '"><div class="l">' + EC.esc(label) + '</div><div class="v">' + value + '</div><div class="s">' + EC.esc(sub) + '</div></div>';
+    }
+
+    function loadSummary() {
+        $.getJSON(URL.summary).done(function (rows) {
+            CHECKS = rows || [];
+            var total = CHECKS.length ? CHECKS[0].total : 0, fixes = 0, students = 0;
+            CHECKS.forEach(function (c) { if (c.severity === 'fix') { fixes += c.students > 0 ? 1 : 0; students += c.students; } });
+            var clean = CHECKS.filter(function (c) { return c.severity === 'fix' && c.students === 0; }).length;
+            $('#dcKpis').html(
+                kpi('Students checked', total, 'active, this session', 'main')
+              + kpi('Checks failing', fixes, 'of ' + CHECKS.filter(function (c) { return c.severity === 'fix'; }).length + ' that matter', fixes ? 'warn' : 'good')
+              + kpi('Problems to fix', students, clean + ' check(s) fully clean', students ? 'warn' : 'good'));
+            $('#dcChecks').html(CHECKS.map(function (c) {
+                var bad = c.students > 0, tone = !bad ? 't3' : c.severity === 'fix' ? 't0' : 't1';
+                return '<div class="in-row dc-check' + (current === c.issue ? ' border-warning' : '') + '" data-k="' + EC.esc(c.issue) + '" style="cursor:pointer">'
+                     + '<div><b>' + EC.esc(c.label) + '</b><small>' + EC.esc(c.hint) + '</small></div>'
+                     + '<span class="in-tag ' + tone + '">' + (bad ? c.students : '✓') + '</span></div>';
+            }).join(''));
+        }).fail(function () { ecToast('error', 'Could not run the checks.'); });
+    }
+
+    $('#dcChecks').on('click', '.dc-check', function () {
+        current = $(this).data('k');
+        var c = CHECKS.filter(function (x) { return x.issue === current; })[0] || {};
+        $('#dcListH').text(c.label || ''); $('#dcListHint').text(c.hint || '');
+        $('#dcChecks .dc-check').removeClass('border-warning'); $(this).addClass('border-warning');
+        $('#dcList').html('<div class="in-muted">Loading...</div>');
+        $.getJSON(URL.list, { check: current }).done(function (rows) {
+            $('#dcList').html((rows || []).length ? rows.map(function (s) {
+                return '<div class="in-row"><div><b>' + EC.esc(s.student_name) + '</b><small>' + EC.esc((s.class_name || '') + (s.section ? ' – ' + s.section : ''))
+                     + (s.roll_no ? ' · Roll ' + EC.esc(s.roll_no) : '') + (s.admission_no ? ' · ' + EC.esc(s.admission_no) : '')
+                     + (s.detail ? ' · <span class="text-danger">' + EC.esc(s.detail) + '</span>' : '') + '</small></div>'
+                     + '<div class="d-flex gap-1"><a class="btn btn-xs btn-sm btn-outline-secondary" href="' + URL.dash + '/' + s.public_id + '">View</a>'
+                     + '<a class="btn btn-sm btn-primary" href="' + URL.edit + '/' + s.public_id + '">Fix</a></div></div>';
+            }).join('') : '<div class="text-success fw-semibold"><i class="bx bx-check-circle me-1"></i>No student fails this check.</div>');
+        });
+    });
+
+    // ── roll numbers ───────────────────────────────────────────────────
+    $.getJSON(URL.classes).done(function (list) {
+        $('#rClass').append((list || []).map(function (c) { return '<option>' + EC.esc(c) + '</option>'; }).join(''));
+    });
+    $('#rClass').on('change', function () {
+        $('#rSection').html('<option value="">—</option>');
+        if (!this.value) return;
+        $.getJSON(URL.sections, { 'class': this.value }).done(function (list) {
+            $('#rSection').html((list || []).map(function (s) { return '<option>' + EC.esc(s) + '</option>'; }).join('') || '<option value="">—</option>');
+        });
+    });
+    $('#btnRolls').on('click', function () {
+        if (!$('#rClass').val()) { ecToast('error', 'Choose a class.'); return; }
+        var all = $('#rMode').val() === 'all', $b = $(this);
+        var go = function () {
+            EC.buttonBusy($b);
+            $.ajax({ url: URL.rolls, type: 'POST', contentType: 'application/json', headers: { 'RequestVerificationToken': CSRF },
+                     data: JSON.stringify({ className: $('#rClass').val(), section: $('#rSection').val(), mode: $('#rMode').val() }) })
+                .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) { loadSummary(); if (current) $('#dcChecks .dc-check[data-k="' + current + '"]').click(); } })
+                .fail(function () { ecToast('error', 'Could not save. Please try again.'); })
+                .always(function () { EC.buttonReset($b); });
+        };
+        if (!all) { go(); return; }
+        EC.confirm({ title: 'Renumber the whole section?', name: $('#rClass').val() + ' ' + $('#rSection').val(), danger: false, okText: 'Renumber',
+                     message: 'Every student gets a new roll number in name order. Printed ID / admit cards will show old numbers.' })
+          .then(function (ok) { if (ok) go(); });
+    });
+
+    loadSummary();
+});
+</script>
+}

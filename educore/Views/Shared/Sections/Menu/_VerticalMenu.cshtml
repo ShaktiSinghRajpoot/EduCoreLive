@@ -295,7 +295,7 @@
         @* ---- Admissions: the funnel, in the order it happens ---- *@
         @if (gAdmissions)
         {
-        <li class='menu-item @Open("EnquiryCRM","Registration","Admission/Create","FrontOffice")'>
+        <li class='menu-item @Open("/students/enquiries","/students/registrations","/students/admission/new","/students/front-office")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-buildings ic-front"></i>
                 <div class="text-truncate">Admissions</div>
@@ -303,18 +303,18 @@
             <ul class="menu-sub">
                 @if (Can("enquiry.view"))
                 {
-                <li class='menu-item @On("EnquiryCRM")'><a asp-area="ERP" asp-controller="Enquiry" asp-action="EnquiryCRM" class="menu-link"><i class="bx bx-message-square-detail submenu-icon c-pink"></i><div class="text-truncate">Enquiries</div><span class="ec-badge ec-badge-hot">CRM</span></a></li>
-                <li class='menu-item @On("FrontOffice")'><a asp-area="ERP" asp-controller="FrontOffice" asp-action="Index" class="menu-link"><i class="bx bx-buildings submenu-icon c-teal"></i><div class="text-truncate">Front Office</div></a></li>
+                <li class='menu-item @On("/students/enquiries")'><a asp-area="Students" asp-controller="Enquiry" asp-action="EnquiryCRM" class="menu-link"><i class="bx bx-message-square-detail submenu-icon c-pink"></i><div class="text-truncate">Enquiries</div><span class="ec-badge ec-badge-hot">CRM</span></a></li>
+                <li class='menu-item @On("/students/front-office")'><a asp-area="Students" asp-controller="FrontOffice" asp-action="Index" class="menu-link"><i class="bx bx-buildings submenu-icon c-teal"></i><div class="text-truncate">Front Office</div></a></li>
                 }
                 @if (showRegistration && Can("registration.view"))
                 {
-                <li class='menu-item @On("Registration")'><a asp-area="ERP" asp-controller="Registration" asp-action="Index" class="menu-link"><i class="bx bx-clipboard submenu-icon c-orange"></i><div class="text-truncate">Registrations</div></a></li>
+                <li class='menu-item @On("/students/registrations")'><a asp-area="Students" asp-controller="Registration" asp-action="Index" class="menu-link"><i class="bx bx-clipboard submenu-icon c-orange"></i><div class="text-truncate">Registrations</div></a></li>
                 }
                 @* Admitting writes a student (students.manage); a view-only role used to see
                    this link and then could not save the form. *@
                 @if (Can("students.manage"))
                 {
-                <li class='menu-item @On("Admission/Create")'><a asp-area="ERP" asp-controller="Admission" asp-action="Create" class="menu-link"><i class="bx bx-user-plus submenu-icon c-green"></i><div class="text-truncate">New Admission</div></a></li>
+                <li class='menu-item @On("/students/admission/new")'><a asp-area="Students" asp-controller="Admission" asp-action="Create" class="menu-link"><i class="bx bx-user-plus submenu-icon c-green"></i><div class="text-truncate">New Admission</div></a></li>
                 }
             </ul>
         </li>
@@ -323,13 +323,13 @@
         @* ---- Students ---- *@
         @if (gStudents)
         {
-        <li class='menu-item @Open("StudentList","EditStudent","Promotion","Student/Inactive","Tc/Register","IdCard","ERP/Certificate","DataChecks")'>
+        <li class='menu-item @(IsActive("/students") && !IsActive("/students/enquiries") && !IsActive("/students/registrations") && !IsActive("/students/admission") && !IsActive("/students/front-office") ? "active open" : "")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-plus ic-students"></i>
                 <div class="text-truncate">Students</div>
             </a>
             <ul class="menu-sub">
-                <li class='menu-item @On("StudentList")'><a asp-area="ERP" asp-controller="Student" asp-action="StudentList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Student Directory</div></a></li>
+                <li class='menu-item @(string.Equals(currentPage.TrimEnd('/'), "/students", StringComparison.OrdinalIgnoreCase) || IsActive("/students/profile") || IsActive("/students/edit") ? "active" : "")'><a asp-area="Students" asp-controller="Student" asp-action="StudentList" class="menu-link"><i class="bx bx-group submenu-icon c-blue"></i><div class="text-truncate">Student Directory</div></a></li>
                 @if (showInventory && !Can("inventory.view"))
                 {
                 @* class teachers: who in my class has the books / uniform (store staff find it under Inventory) *@
@@ -337,14 +337,14 @@
                 }
                 @if (Can("students.manage"))
                 {
-                <li class='menu-item @On("Promotion")'><a asp-area="ERP" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
+                <li class='menu-item @On("/students/promotion")'><a asp-area="Students" asp-controller="Student" asp-action="Promotion" class="menu-link"><i class="bx bx-up-arrow-circle submenu-icon c-orange"></i><div class="text-truncate">Promote Students</div></a></li>
                 }
-                <li class='menu-item @On("PromoteHistory")'><a asp-area="ERP" asp-controller="Student" asp-action="PromoteHistory" class="menu-link"><i class="bx bx-history submenu-icon c-blue"></i><div class="text-truncate">Promotion History</div></a></li>
-                <li class='menu-item @On("Student/Inactive")'><a asp-area="ERP" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
-                <li class='menu-item @On("Tc/Register")'><a asp-area="ERP" asp-controller="Tc" asp-action="Register" class="menu-link"><i class="bx bx-award submenu-icon c-teal"></i><div class="text-truncate">TC Register</div></a></li>
-                <li class='menu-item @On("ERP/Certificate")'><a asp-area="ERP" asp-controller="Certificate" asp-action="Index" class="menu-link"><i class="bx bx-certification submenu-icon c-orange"></i><div class="text-truncate">Certificates</div></a></li>
-                <li class='menu-item @On("IdCard")'><a asp-area="ERP" asp-controller="IdCard" asp-action="Index" class="menu-link"><i class="bx bx-id-card submenu-icon c-purple"></i><div class="text-truncate">ID Cards</div></a></li>
-                <li class='menu-item @On("DataChecks")'><a asp-area="ERP" asp-controller="DataChecks" asp-action="Index" class="menu-link"><i class="bx bx-check-shield submenu-icon c-green"></i><div class="text-truncate">Data Checks</div></a></li>
+                <li class='menu-item @On("/students/promotion/history")'><a asp-area="Students" asp-controller="Student" asp-action="PromoteHistory" class="menu-link"><i class="bx bx-history submenu-icon c-blue"></i><div class="text-truncate">Promotion History</div></a></li>
+                <li class='menu-item @On("/students/left")'><a asp-area="Students" asp-controller="Student" asp-action="Inactive" class="menu-link"><i class="bx bx-user-x submenu-icon c-red"></i><div class="text-truncate">Inactive / Left</div></a></li>
+                <li class='menu-item @On("/students/tc-register")'><a asp-area="Students" asp-controller="Tc" asp-action="Register" class="menu-link"><i class="bx bx-award submenu-icon c-teal"></i><div class="text-truncate">TC Register</div></a></li>
+                <li class='menu-item @On("/students/certificates")'><a asp-area="Students" asp-controller="Certificate" asp-action="Index" class="menu-link"><i class="bx bx-certification submenu-icon c-orange"></i><div class="text-truncate">Certificates</div></a></li>
+                <li class='menu-item @On("/students/id-cards")'><a asp-area="Students" asp-controller="IdCard" asp-action="Index" class="menu-link"><i class="bx bx-id-card submenu-icon c-purple"></i><div class="text-truncate">ID Cards</div></a></li>
+                <li class='menu-item @On("/students/data-checks")'><a asp-area="Students" asp-controller="DataChecks" asp-action="Index" class="menu-link"><i class="bx bx-check-shield submenu-icon c-green"></i><div class="text-truncate">Data Checks</div></a></li>
             </ul>
         </li>
         }
@@ -352,17 +352,17 @@
         @* ---- Attendance ---- *@
         @if (gAttendance)
         {
-        <li class='menu-item @Open("StudentAttendance","AttendanceReport","AttendanceOverview")'>
+        <li class='menu-item @Open("/attendance/")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-user-check ic-att"></i>
                 <div class="text-truncate">Attendance</div>
             </a>
             <ul class="menu-sub">
-                <li class='menu-item @On("StudentAttendance")'><a asp-area="ERP" asp-controller="Attendance" asp-action="StudentAttendance" class="menu-link"><i class="bx bx-user-check submenu-icon c-green"></i><div class="text-truncate">Mark Attendance</div></a></li>
-                <li class='menu-item @On("AttendanceReport")'><a asp-area="ERP" asp-controller="Attendance" asp-action="AttendanceReport" class="menu-link"><i class="bx bx-bar-chart submenu-icon c-purple"></i><div class="text-truncate">Attendance Reports</div></a></li>
+                <li class='menu-item @On("/attendance/mark")'><a asp-area="Attendance" asp-controller="Attendance" asp-action="StudentAttendance" class="menu-link"><i class="bx bx-user-check submenu-icon c-green"></i><div class="text-truncate">Mark Attendance</div></a></li>
+                <li class='menu-item @On("/attendance/register")'><a asp-area="Attendance" asp-controller="Attendance" asp-action="AttendanceReport" class="menu-link"><i class="bx bx-bar-chart submenu-icon c-purple"></i><div class="text-truncate">Attendance Reports</div></a></li>
                 @if (Can("reports.view"))
                 {
-                <li class='menu-item @On("AttendanceOverview")'><a asp-area="ERP" asp-controller="AttendanceOverview" asp-action="Index" class="menu-link"><i class="bx bx-pie-chart-alt-2 submenu-icon c-orange"></i><div class="text-truncate">Overview</div></a></li>
+                <li class='menu-item @On("/attendance/overview")'><a asp-area="Attendance" asp-controller="AttendanceOverview" asp-action="Index" class="menu-link"><i class="bx bx-pie-chart-alt-2 submenu-icon c-orange"></i><div class="text-truncate">Overview</div></a></li>
                 }
             </ul>
         </li>
