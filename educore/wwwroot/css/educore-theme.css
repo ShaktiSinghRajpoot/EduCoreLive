@@ -688,6 +688,13 @@ textarea.form-control {
     .ec-page-header-inner > * { max-width: 100%; min-width: 0; }
     .ec-page-header-inner .d-flex { flex-wrap: wrap; }
 
+    /* ...except the icon + title row: wrapping it dropped the title under the
+     * icon on every page (the long subtitle made the text block full width).
+     * The icon stays beside the title and only the text wraps. */
+    .ec-page-header-inner .ec-page-title-wrap { flex-wrap: nowrap; align-items: flex-start !important; width: 100%; }
+    .ec-page-title-wrap > div:last-child { min-width: 0; flex: 1 1 auto; }
+    .ec-page-header-inner .ec-page-icon { width: 40px; height: 40px; border-radius: 12px; }
+
     /* Full-width buttons on phones.
      *
      * A lone Save/Submit does read better full width, so that stays the

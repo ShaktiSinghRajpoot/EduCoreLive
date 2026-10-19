@@ -38,8 +38,10 @@
     position: fixed; top: 0; left: 0; width: 0; height: 3px;
     background: var(--ec-primary, var(--bs-primary, #ff8a00)); z-index: 99999;
     opacity: 1; pointer-events: none; border-radius: 0 2px 2px 0;
-}
-
+}
+
+
+
 /* The link or menu item that was just clicked, while its page is on its way.
    pointer-events is what stops the second, impatient click. */
 .ec-nav-busy { opacity: .55; pointer-events: none; }
@@ -124,3 +126,12 @@ body.modal-open { padding-right: 0 !important; }
  * gets whitened by its own frosted layer.
  */
 body.modal-open .layout-content-navbar .layout-navbar { z-index: 11 !important; }
+
+/* Page header with two or more buttons (Store, Suppliers, Store Locations): on a
+   phone they share one row at equal width, instead of stacking at two widths. */
+@media (max-width: 575.98px) {
+    .ec-head-actions { width: 100% !important; align-self: stretch; flex-wrap: nowrap !important; }
+    .ec-head-actions > .btn { flex: 1 1 0; min-width: 0; width: auto !important; flex-wrap: nowrap !important;
+                              justify-content: center; white-space: nowrap; padding-left: .6rem !important;
+                              padding-right: .6rem !important; font-size: .85rem; }
+}
