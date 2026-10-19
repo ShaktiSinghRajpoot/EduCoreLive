@@ -174,7 +174,7 @@
     $('#imImport').on('click', async function () {
         var todo = checkedRows.filter(function (r) { return !r.errors.length && !r.result; });
         if (!todo.length) return;
-        var ok = await EC.confirm({ title: 'Import ' + todo.length + ' rows?', message: 'Rows with problems are left out. This cannot be undone from here.', okText: 'Import' });
+        var ok = await EC.confirm({ title: 'Import ' + todo.length + ' rows?', message: 'Rows with problems are left out. This cannot be undone from here.', okText: 'Import', danger: false, icon: 'bx-upload' });
         if (!ok) return;
         var $b = $(this); EC.buttonBusy($b, 'Importing…');
         $('#imProgress').removeClass('d-none');
