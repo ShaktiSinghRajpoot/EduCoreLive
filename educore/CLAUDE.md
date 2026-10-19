@@ -41,7 +41,7 @@ There is **no test project** in this repo — do not invent test commands.
 ## Architecture (the big picture)
 
 ### Request → service → stored proc
-Controllers (in `educore/Controllers` and per-area `educore/Areas/{Admin,SuperAdmin,ERP}/Controllers`) depend on **service interfaces** and never touch the database directly. Each service:
+Controllers (in `educore/Controllers` and per-area `educore/Areas/{Area}/Controllers`, see *Module areas* below) depend on **service interfaces** and never touch the database directly. Each service:
 
 1. Builds an `NpgsqlParameter[]` (named `p_*` params + one or more `Refcursor` OUT params).
 2. Calls **`PgExec`** (`EduCoreDataAccessLayer/Infrastructure/PgExec.cs`) to execute the proc inside a transaction and `FETCH` each refcursor.
