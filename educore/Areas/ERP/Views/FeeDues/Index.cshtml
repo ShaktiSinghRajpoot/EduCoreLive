@@ -56,46 +56,14 @@
       </div>
     </div>
 
-    <div class="ec-card mb-3"><div class="ec-card-body d-flex flex-wrap gap-2 align-items-end">
-      <div>
-        <label class="form-label mb-1">Session</label>
-        <select id="fdYear" class="form-select form-select-sm">
-          @foreach (var y in years)
-          {
-              <option value="@y.Text" selected="@y.Selected">@y.Text</option>
-          }
-        </select>
-      </div>
-      <div>
-        <label class="form-label mb-1" title="Fees falling due up to the end of this month">Due up to</label>
-        <input type="month" id="fdUpto" class="form-control form-control-sm">
-      </div>
-      <div>
-        <label class="form-label mb-1">Class</label>
-        <select id="fdClass" class="form-select form-select-sm">
-          <option value="">All classes</option>
-          @foreach (var c in classes)
-          {
-              <option value="@c.Text">@c.Text</option>
-          }
-        </select>
-      </div>
-      <div>
-        <label class="form-label mb-1">Section</label>
-        <select id="fdSec" class="form-select form-select-sm"><option value="">All sections</option></select>
-      </div>
-      <div>
-        <label class="form-label mb-1">Find</label>
-        <input id="fdFind" class="form-control form-control-sm" placeholder="Name, father, mobile, adm. no">
-      </div>
-      <div>
-        <label class="form-label mb-1">Show</label>
-        <select id="fdShow" class="form-select form-select-sm">
-          <option value="">Everyone with dues</option>
-          <option value="3">3+ months unpaid</option>
-          <option value="left">May have left (⚠)</option>
-        </select>
-      </div>
+    @* one tidy bar: Filters (opens the side panel), what is applied, and a quick Find *@
+    <div class="ec-card mb-3"><div class="ec-card-body d-flex flex-wrap gap-2 align-items-center py-2">
+      <button type="button" class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1" style="width:auto"
+              data-bs-toggle="offcanvas" data-bs-target="#fdFilters" aria-controls="fdFilters">
+        <i class="bx bx-filter-alt"></i><span>Filters</span><span class="badge bg-primary rounded-pill d-none" id="fdFilterCount">0</span>
+      </button>
+      <div class="d-flex flex-wrap gap-1 flex-grow-1" id="fdChips"></div>
+      <input id="fdFind" class="form-control form-control-sm" style="max-width:240px" placeholder="Find: name, father, mobile, adm. no">
     </div></div>
 
     <div class="row g-2 mb-3">
@@ -142,6 +110,56 @@
         </table>
       </div>
     </div></div>
+  </div>
+</div>
+
+<!-- Filters: a side panel, so the page stays tidy -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="fdFilters" aria-labelledby="fdFiltersTitle" style="max-width:340px">
+  <div class="offcanvas-header border-bottom">
+    <h5 class="offcanvas-title fw-bold" id="fdFiltersTitle"><i class="bx bx-filter-alt me-1"></i>Filters</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body d-flex flex-column gap-3">
+    <div>
+      <label class="form-label mb-1">Session</label>
+      <select id="fdYear" class="form-select">
+          @foreach (var y in years)
+          {
+              <option value="@y.Text" selected="@y.Selected">@y.Text</option>
+          }
+        </select>
+    </div>
+    <div>
+      <label class="form-label mb-1">Due up to</label>
+      <input type="month" id="fdUpto" class="form-control">
+      <div class="form-text">Fees falling due up to the end of this month.</div>
+    </div>
+    <div>
+      <label class="form-label mb-1">Class</label>
+      <select id="fdClass" class="form-select">
+          <option value="">All classes</option>
+          @foreach (var c in classes)
+          {
+              <option value="@c.Text">@c.Text</option>
+          }
+        </select>
+    </div>
+    <div>
+      <label class="form-label mb-1">Section</label>
+      <select id="fdSec" class="form-select"><option value="">All sections</option></select>
+    </div>
+    <div>
+      <label class="form-label mb-1">Show</label>
+      <select id="fdShow" class="form-select">
+        <option value="">Everyone with dues</option>
+        <option value="3">3+ months unpaid</option>
+        <option value="left">May have left (⚠)</option>
+      </select>
+    </div>
+  </div>
+  <div class="border-top p-3 d-flex gap-2">
+    <button type="button" class="btn btn-outline-secondary flex-fill" id="fdClear">Clear</button>
+    <button type="button" class="btn btn-primary flex-fill" id="fdApply"><i class="bx bx-check me-1"></i>Apply</button>
   </div>
 </div>
 
@@ -195,10 +213,22 @@ $(function () {
                 if (mine !== loadNo) return;   // a newer load is on its way
                 if (!r || !r.success) { ecToast('error', (r && r.message) || 'Could not load the dues.'); return; }
                 data = r;
+                renderChips();
                 renderTop();
                 renderList();
             })
             .fail(function () { ecToast('error', 'Could not load the dues.'); });
+    }
+
+    // what is applied, as chips in the bar, and how many filters differ from the default
+    function renderChips() {
+        var cls = $('#fdClass').val(), sec = $('#fdSec').val(), show = $('#fdShow').val(), upto = $('#fdUpto').val();
+        var chip = function (t) { return '<span class="badge bg-label-primary fw-semibold">' + EC.esc(t) + '</span>'; };
+        var n = (cls ? 1 : 0) + (sec ? 1 : 0) + (show ? 1 : 0) + (upto && upto !== EC.today().slice(0, 7) ? 1 : 0);
+        $('#fdChips').html(chip($('#fdYear').val()) + chip('Due up to ' + monthName(upto))
+            + chip(cls ? cls + (sec ? ' – ' + sec : '') : 'All classes')
+            + (show ? chip(show === 'left' ? 'May have left' : '3+ months unpaid') : ''));
+        $('#fdFilterCount').text(n).toggleClass('d-none', !n);
     }
 
     function renderTop() {
@@ -258,6 +288,7 @@ $(function () {
     }
 
     function renderList() {
+        renderChips();
         var list = visible();
         var cls = $('#fdClass').val(), sec = $('#fdSec').val();
         $('#fdListTitle').text(($('#fdShow').val() === 'left' ? 'May have left' : $('#fdShow').val() === '3' ? '3+ months unpaid' : 'Children with dues')
@@ -338,14 +369,26 @@ $(function () {
     });
 
     // ── filters ──
+    // the section list follows the class (in the panel; Apply loads)
     function loadSections() {
         var cls = $('#fdClass').val();
         $('#fdSec').html('<option value="">All sections</option>');
-        if (!cls) { load(); return; }
+        if (!cls) return;
         $.getJSON(URL.secs, { 'class': cls, year: $('#fdYear').val() }).done(function (list) {
             (list || []).forEach(function (n) { $('#fdSec').append('<option value="' + EC.esc(n) + '">' + EC.esc(n) + '</option>'); });
-        }).always(load);
+        });
     }
+    function closePanel() {
+        var el = document.getElementById('fdFilters');
+        var oc = bootstrap.Offcanvas.getInstance(el);
+        if (oc) oc.hide();
+    }
+    $('#fdApply').on('click', function () { closePanel(); load(); });
+    $('#fdClear').on('click', function () {
+        $('#fdUpto').val(EC.today().slice(0, 7));
+        $('#fdClass').val(''); $('#fdSec').html('<option value="">All sections</option>'); $('#fdShow').val('');
+        closePanel(); load();
+    });
     $('#fdClasses').on('click', '.fd-class-row', function () {
         var cls = $(this).data('cls') + '', sec = ($(this).data('sec') || '') + '';
         $('#fdClass').val(cls);
@@ -366,9 +409,7 @@ $(function () {
         if (data) renderList();
     });
     $('#fdYear, #fdClass').on('change', loadSections);
-    $('#fdSec, #fdUpto').on('change', load);
     $('#fdFind').on('input', function () { if (data) renderList(); });
-    $('#fdShow').on('change', function () { if (data) renderList(); });
 
     load();
 });
