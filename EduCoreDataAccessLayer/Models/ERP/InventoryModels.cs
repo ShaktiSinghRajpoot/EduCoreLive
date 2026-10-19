@@ -34,6 +34,9 @@
 
         /// Stock added by hand later (Adjustment / stock-take that counted more): no bill either.
         public decimal AddedQty     { get; set; }
+
+        /// Given to students: the class it is for ("" = every class).
+        public string  ForClass     { get; set; } = string.Empty;
     }
 
     /// What the Add/Edit item form posts.

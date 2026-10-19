@@ -5831,3 +5831,6 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - **Sell by class / Register on phones:** a narrow name column (name on two lines, roll only, adm. no hidden) so 2-3 items fit beside it.
 - Old names fixed in page text: "Items & Stock" / "Item Master" -> Store, "type Saleable" -> "Given to students".
 
+### 2026-10-19 — Store list shows which class an item is for
+- `sp_inventory_manage` 'ListItems' returns `for_class` ('' = every class). The Store list shows it under "Given to students" ("Class 1" / "All classes", also on the phone card), and a **For class** filter lists what a child of that class can be given (its own items and the all-class ones). Bundle `deploy_2026_10_19a.sql`.
+

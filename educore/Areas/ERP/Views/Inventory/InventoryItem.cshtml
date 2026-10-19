@@ -98,6 +98,14 @@
             <option value="Saleable">Given to students</option><option value="Consumable">Used up in school</option><option value="Reusable">School equipment</option>
           </select>
 
+          <select class="iv-chip" id="fClass" title="Items a child of this class can be given (its own and the all-class ones)">
+            <option value="">For class</option>
+            @foreach (var c in classes)
+            {
+                <option value="@c.Text">@c.Text</option>
+            }
+          </select>
+
           <select class="iv-chip" id="fStock">
             <option value="">Stock</option>
             <option value="available">Available</option>
@@ -548,11 +556,14 @@
         var cat  = $('#fCategory').val();
         var typ  = $('#fType').val();
         var stk  = $('#fStock').val();
+        var cls  = $('#fClass').val();
 
         return rows.filter(function (r) {
             if (q && (r.name + ' ' + r.sku + ' ' + r.category + ' ' + r.subCat).toLowerCase().indexOf(q) < 0) return false;
             if (cat && r.category !== cat) return false;
             if (typ && r.type !== typ) return false;
+            // what a child of that class can be given: items for that class and for every class
+            if (cls && (r.type !== 'Saleable' || (r.forClass && r.forClass !== cls))) return false;
             if (stk === 'available' && r.status !== 'Available')    return false;
             if (stk === 'low'       && r.status !== 'Low Stock')    return false;
             if (stk === 'out'       && r.status !== 'Out of Stock') return false;
@@ -581,6 +592,12 @@
         $('#sumLow').text(low);
         $('#sumOut').text(out);
         $('#sumValue').text(EC.money(value));
+    }
+
+    // Given to students: the class it is for, under the type
+    function classNote(r) {
+        if (r.type !== 'Saleable') return '';
+        return '<div class="small ' + (r.forClass ? 'text-primary fw-semibold' : 'text-muted') + '">' + EC.esc(r.forClass || 'All classes') + '</div>';
     }
 
     // Stock that came in without a supplier bill: entered as "already in school"
@@ -616,7 +633,7 @@
             ? 'Click "+ Add Item" to add the first one: a diary, tie, belt, uniform (sizes in one go) or a book for a class.'
             : 'Try adjusting your search or filters.');
         $('#clearBtn').toggleClass('d-none', !(
-            $('#ivSearch').val() || $('#fCategory').val() || $('#fType').val() || $('#fStock').val() ||
+            $('#ivSearch').val() || $('#fCategory').val() || $('#fType').val() || $('#fClass').val() || $('#fStock').val() ||
             $('#fLocation').val()));
 
         if (!list.length) {
@@ -639,7 +656,7 @@
                     (r.subCat ? '<div class="text-muted small">' + EC.esc(r.subCat) + '</div>' : '') + '</td>' +
                 (anySku ? '<td>' + EC.esc(r.sku || '—') + '</td>' : '') +
                 '<td>' + EC.esc(r.category || '—') + '</td>' +
-                '<td>' + EC.esc(TYPE_WORDS[r.type] || r.type) + '</td>' +
+                '<td>' + EC.esc(TYPE_WORDS[r.type] || r.type) + classNote(r) + '</td>' +
                 '<td>' + EC.esc(r.unit) + '</td>' +
                 '<td class="fw-semibold">' + EC.num(r.stock) + openingNote(r) + '</td>' +
                 '<td>' + EC.num(r.minStock) + '</td>' +
@@ -659,7 +676,7 @@
             return '<div class="iv-mob-card">' +
                 '<div class="d-flex justify-content-between align-items-start gap-2">' +
                     '<div><div class="fw-semibold">' + EC.esc(r.name) + '</div>' +
-                        '<div class="text-muted small">' + EC.esc(r.sku || r.category || '') + '</div></div>' +
+                        '<div class="text-muted small">' + EC.esc(r.sku || r.category || '') + (r.type === 'Saleable' ? ' · ' + EC.esc(r.forClass || 'All classes') : '') + '</div></div>' +
                     statusBadge(r.status) + '</div>' +
                 '<div class="d-flex justify-content-between align-items-center mt-2">' +
                     '<div class="small text-muted">' + EC.num(r.stock) + ' ' + EC.esc(r.unit) +
@@ -1020,13 +1037,13 @@
         .on('click', '[data-page]', function () { page = EC.num($(this).data('page')); render(); });
 
     $('#ivSearch').on('input', function () { page = 1; render(); });
-    $('#fCategory,#fType,#fStock,#perPage').on('change', function () { page = 1; render(); });
+    $('#fCategory,#fType,#fClass,#fStock,#perPage').on('change', function () { page = 1; render(); });
     // A location changes the figures themselves, so it reloads from the server.
     $('#fLocation').on('change', load);
 
     $('#clearBtn').on('click', function () {
         var hadLocation = !!$('#fLocation').val();
-        $('#ivSearch,#fCategory,#fType,#fStock,#fLocation').val('');
+        $('#ivSearch,#fCategory,#fType,#fClass,#fStock,#fLocation').val('');
         page = 1;
         if (hadLocation) load(); else render();
     });

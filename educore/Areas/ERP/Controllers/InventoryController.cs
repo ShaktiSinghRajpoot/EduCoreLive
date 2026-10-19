@@ -87,7 +87,8 @@ namespace educore.Areas.ERP.Controllers
                 active   = r.IsActive,
                 places   = r.LocationsHeld,
                 opening  = r.OpeningQty,
-                added    = r.AddedQty
+                added    = r.AddedQty,
+                forClass = r.ForClass
             }));
         }
 

@@ -665,7 +665,9 @@ BEGIN
                COALESCE((SELECT SUM(l.quantity) FROM core.inventory_stock_ledger l
                           WHERE l.tenant_id = i.tenant_id AND l.school_id = i.school_id
                             AND l.item_id = i.item_id AND l.quantity > 0
-                            AND l.movement_type IN ('Adjustment', 'StockTake')), 0) AS added_qty
+                            AND l.movement_type IN ('Adjustment', 'StockTake')), 0) AS added_qty,
+               -- items given to students: which class it is for ('' = every class)
+               COALESCE(i.for_class, '') AS for_class
         FROM core.inventory_items i
         CROSS JOIN LATERAL (
             SELECT CASE WHEN p_location_id IS NULL THEN i.current_stock
