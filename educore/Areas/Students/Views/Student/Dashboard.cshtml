@@ -4,10 +4,14 @@
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     Guid studentPublicId = ViewBag.StudentPublicId ?? Guid.Empty;
     bool canManage   = ViewBag.CanManage == true;     // students.manage: Edit
-    bool canViewFees = ViewBag.CanViewFees == true;   // fees.view: Fee tab, fee figures
-    bool canCollect  = ViewBag.CanCollect == true;    // fees.collect: Collect Fee button
-    bool examsOn     = await Modules.ExamsOn();       // no exam tab / cards when the module is off
-    bool transportOn = await Modules.TransportOn();
+    // A module that is off (or not in the school's plan) leaves nothing of itself here.
+    bool feesOn       = await Modules.FeesOn();
+    bool canViewFees  = ViewBag.CanViewFees == true && feesOn;   // fees.view: Fee tab, fee figures
+    bool canCollect   = ViewBag.CanCollect == true && feesOn;    // fees.collect: Collect Fee button
+    bool examsOn      = await Modules.ExamsOn();       // no exam tab / cards when the module is off
+    bool transportOn  = await Modules.TransportOn();
+    bool attendanceOn = await Modules.AttendanceOn();  // Attendance tab and card
+    bool academicsOn  = await Modules.AcademicsOn();   // Timetable and Homework tabs
 }
 
 @section VendorScripts {
@@ -53,9 +57,15 @@
             <nav class="sd-tab-nav" id="sdTabNav">
                 <button class="sd-tab-btn active" data-tab="overview">Overview</button>
                 <button class="sd-tab-btn" data-tab="academic">Academic</button>
-                <button class="sd-tab-btn" data-tab="attendance">Attendance</button>
-                <button class="sd-tab-btn" data-tab="timetable">Timetable</button>
-                <button class="sd-tab-btn" data-tab="homework">Homework</button>
+                @if (attendanceOn)
+                {
+                    <button class="sd-tab-btn" data-tab="attendance">Attendance</button>
+                }
+                @if (academicsOn)
+                {
+                    <button class="sd-tab-btn" data-tab="timetable">Timetable</button>
+                    <button class="sd-tab-btn" data-tab="homework">Homework</button>
+                }
                 @if (examsOn)
                 {
                     <button class="sd-tab-btn" data-tab="exams">Exam Results</button>
@@ -336,7 +346,8 @@ var ENROL_HISTORY_URL = '@Url.Action("EnrolmentHistory","Student",new{area="Stud
 var STUDENT_HISTORY_URL = '@Url.Action("History","Student",new{area="Students"})';
 var DATA_URL          = '@Url.Action("DashboardData","Student",new{area="Students"})';
 var COLLECT_URL       = '@Url.Action("ManageFee","Fee",new{area="Fees"})';
-var CAN_FEES          = @(canViewFees ? "true" : "false");   // fees.view
+var CAN_FEES          = @(canViewFees ? "true" : "false");   // fees.view and the Fees module
+var ATT_ON            = @(attendanceOn ? "true" : "false");  // the Attendance module
 var charts = {};
 
 /* ── Helpers ─────────────────────────────────── */
@@ -540,8 +551,8 @@ function renderOverview(s,d){
     // Class rank lives on the Exam Results tab: it comes from the published
     // result (core.sp_exam_result_student). It used to show rand(1,40) here.
     document.getElementById('ov-metrics').innerHTML=
-        mc('Attendance', (att&&att.schoolDays) ? att.percent+'%' : '—',
-           (att&&att.schoolDays&&att.percent>=75?'bg-label-success text-success':'bg-label-warning text-warning'),'bx-user-check')
+        (ATT_ON ? mc('Attendance', (att&&att.schoolDays) ? att.percent+'%' : '—',
+           (att&&att.schoolDays&&att.percent>=75?'bg-label-success text-success':'bg-label-warning text-warning'),'bx-user-check') : '')
        +(ex ? mc('Last Exam', ex.options.length ? examPct(ex.percent) : '—','bg-label-info text-info','bx-book-open') : '')
        // The class's subjects (Subject Management); else the last exam's count.
        +mc('Subjects',   s.subjects!=null ? String(s.subjects) : (ex&&ex.options.length) ? String(ex.subjectCount) : '—','bg-label-primary text-primary','bx-list-check')

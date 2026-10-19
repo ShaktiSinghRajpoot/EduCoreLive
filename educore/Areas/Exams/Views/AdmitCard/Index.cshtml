@@ -1,5 +1,7 @@
 @using Microsoft.AspNetCore.Mvc.Rendering
+@inject educore.Helpers.ModuleFlags Modules
 @{
+    bool feesOn = await Modules.FeesOn();
     ViewData["Title"] = "Admit Cards";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var exams = ViewBag.Exams as List<SelectListItem> ?? new();
@@ -73,10 +75,13 @@
           </div>
         </div>
 
+        @if (feesOn)
+        {
         <div class="form-check mt-3">
           <input class="form-check-input" type="checkbox" id="acHoldDues" />
           <label class="form-check-label" for="acHoldDues">Hold cards of students with fees due (they are listed instead, to hand over once paid)</label>
         </div>
+        }
 
         <div class="mt-3 d-flex gap-2 flex-wrap">
           <button type="button" class="btn btn-primary" id="acOpen">

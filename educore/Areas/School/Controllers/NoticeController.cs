@@ -43,7 +43,8 @@ namespace educore.Areas.School.Controllers
             ViewBag.CanManage = await CanManageAsync();
             ViewBag.WhatsAppOn = await messenger.IsOnAsync(TenantId(), SchoolId());   // "Send on WhatsApp" per notice
             ViewBag.WhatsAppTest = messenger.TestMode;
-            ViewBag.Categories = await modules.ExamsOn() ? Categories : Categories.Where(c => c != "Exam").ToArray();
+            bool examsOn = await modules.ExamsOn(), feesOn = await modules.FeesOn();
+            ViewBag.Categories = Categories.Where(c => (c != "Exam" || examsOn) && (c != "Fee" || feesOn)).ToArray();
             return View();
         }
 

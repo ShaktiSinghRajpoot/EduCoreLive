@@ -5902,3 +5902,8 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - `SchoolSettings` (what is left of it: profile, seal, documents, sessions, classes, subjects, class teachers, calendar), `AdmissionWorkflow`, `Roles`, `Notice`, `MessageLog`, `Rooms` to `Areas/School` (next to `Receipt`). Pages `/school/profile`, `/school/seal`, `/school/documents`, `/school/sessions`, `/school/classes`, `/school/subjects`, `/school/class-teachers`, `/school/calendar`, `/school/modules` (Modules & Workflow), `/school/roles`, `/school/roles/permissions/{id}`, `/school/rooms`, `/school/message-log`, `/notices`.
 - `Areas/ERP` is deleted. Areas now: School, Students, Attendance, Academics, Exams, Fees, Accounts, Staff, Transport, Inventory, SuperAdmin. Every old `/ERP/...` address still forwards through `LegacyErpRedirect` (keep it: old links live on in WhatsApp messages, bookmarks and printed QR codes); an `/ERP/` address of something that never existed is a 404 as before.
 - `docs/FRONTEND-CONVENTIONS.md`: a link to another module must name its area.
+
+### 2026-10-19 — A module that is off leaves nothing on the shared pages
+- Student profile: no Fee tab / fee card / Collect Fee without Fees, no Attendance tab or card without Attendance, no Timetable / Homework tabs without Academics (Exams and Transport already did this). Student list: no fee column or filter without Fees.
+- Admission form: no "collect fee now" without Fees (the save also ignores it). Admit cards: no "hold cards of students with fees due" without Fees. Notices: no "Fee" category without Fees (as "Exam" without Exams). Rooms: no Timetable button without Academics.
+- CLAUDE.md: new "Module areas" section.

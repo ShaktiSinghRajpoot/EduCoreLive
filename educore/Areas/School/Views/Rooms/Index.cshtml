@@ -1,8 +1,10 @@
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@inject educore.Helpers.ModuleFlags Modules
 @{
     ViewData["Title"] = "Rooms";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var canManage = (bool?)ViewBag.CanManage ?? false;   // academics.manage
+    bool academicsOn = await Modules.AcademicsOn();
 }
 
 @*
@@ -36,7 +38,10 @@
             <p class="ec-page-subtitle">Classrooms, labs and halls · how busy each one is in the timetable</p></div>
         </div>
         <div class="d-flex gap-2">
+          @if (academicsOn)
+          {
           <a href="@Url.Action("Timetable","Timetable",new{area="Academics"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-time-five me-1"></i>Timetable</a>
+          }
           @if (canManage)
           {
               <button id="btnNew" class="btn btn-sm btn-primary"><i class="bx bx-plus me-1"></i>Add room</button>

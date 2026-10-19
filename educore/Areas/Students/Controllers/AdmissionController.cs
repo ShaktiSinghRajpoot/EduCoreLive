@@ -394,7 +394,7 @@ namespace educore.Areas.Students.Controllers
             if (result.Success && result.StudentId > 0)
             {
                 var workflow   = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
-                var payAmount  = (form.CollectFeeNow && workflow.CollectFeeAtAdmission) ? (form.PaymentAmount ?? 0m) : 0m;
+                var payAmount  = (form.CollectFeeNow && workflow.CollectFeeAtAdmission && workflow.EnableFees) ? (form.PaymentAmount ?? 0m) : 0m;
 
                 // A concession above the approval limit is recorded on the admission
                 // as Pending Approval (sp_admission_manage) and NOT written onto the
@@ -886,7 +886,7 @@ namespace educore.Areas.Students.Controllers
             // deposit (and every other charge) is now a Fee Head pulled via the fee
             // structure, so no amount is read from the workflow settings here.
             var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
-            ViewBag.CollectFeeAtAdmission = workflow.CollectFeeAtAdmission;
+            ViewBag.CollectFeeAtAdmission = workflow.CollectFeeAtAdmission && workflow.EnableFees;
             // Hide the admission Transport panel for schools that don't run buses.
             ViewBag.EnableTransport = workflow.EnableTransport;
         }

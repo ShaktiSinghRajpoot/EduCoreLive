@@ -54,6 +54,14 @@ Controllers (in `educore/Controllers` and per-area `educore/Areas/{Admin,SuperAd
 
 When reading from a reader, use the helpers in **`Helpers/DbRead.cs`** (`DbRead.Int/Dec/Str/NStr/Bool/Date`, plus `reader.Columns()`), which tolerate missing/NULL columns.
 
+### Module areas (one MVC area per module)
+The school pages live in one area per module (the old single `ERP` area was split on 19 Oct 2026):
+**School** (profile, sessions, classes, calendar, Modules & Workflow, roles, notices, receipts) and **Students** are the base; **Attendance, Academics, Exams, Fees, Accounts, Staff, Transport, Inventory** can be sold separately; **SuperAdmin** is the platform.
+- A sellable module's controllers carry `[RequiresModule(SchoolModule.X)]` (`Helpers/RequiresModuleAttribute.cs`). It is on only when the Super Admin gave it (`allow_*`) **and** the school switched it on (`enable_*`, `core.school_admission_workflow_settings`). A module that is off appears **nowhere**: menu, dashboard and other modules' pages check `Helpers/ModuleFlags.cs` (`FeesOn()`, `AttendanceOn()`, …). Receipts (`School/Receipt`) and the staff directory stay usable without Fees / Staff.
+- Pages have short attribute routes (`/fees/dues`, `/students/profile/{id}`); a GET/POST pair needs the same route on both. AJAX endpoints stay `/{area}/{controller}/{action}`.
+- **A link to another module must name its area** (`new { area = "Fees" }` / `asp-area="Fees"`); without it the link takes the current page's area and breaks.
+- Old `/ERP/...` addresses forward through `Helpers/LegacyErpRedirect.cs` (301, 308 for POST). Keep it, and add an entry when a page moves.
+
 ### Services: Contract + Repository
 Interfaces live in `EduCoreDataAccessLayer/Services/Contract/**`, implementations in `Services/Repository/**` (`Admin/`, `SuperAdmin/`). All are registered **`Scoped`** in `Program.cs`; `PgExec`, `NpgsqlDataSource`, and `AppCache` are **`Singleton`**.
 

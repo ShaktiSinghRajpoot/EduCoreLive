@@ -76,7 +76,7 @@ namespace educore.Areas.Students.Controllers
 
             // Fee status is fee data: a teacher with students.view only must not see it,
             // filter by it, or receive it in the page.
-            bool canViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
+            bool canViewFees = workflow.EnableFees && await HasPermissionAttribute.UserHasAsync(this, "fees.view");
             ViewBag.CanViewFees = canViewFees;
             ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
             if (!canViewFees) query.FilterFee = null;
