@@ -38,7 +38,7 @@ namespace educore.Helpers
             },
             new RoleTemplate { Name = "Store Keeper", Keys = new[] { "inventory.view", "inventory.manage" }, Module = "inventory" },
             new RoleTemplate { Name = "HR / Office", Keys = new[] { "staff.view", "staff.manage", "payroll.view", "payroll.manage" } },
-            new RoleTemplate { Name = "Cashier", Keys = new[] { "fees.view", "fees.collect" } },
+            new RoleTemplate { Name = "Cashier", Keys = new[] { "fees.view", "fees.collect" }, Module = "fees" },
             new RoleTemplate
             {
                 Name = "Teacher-like",

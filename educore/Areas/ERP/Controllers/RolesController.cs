@@ -32,6 +32,10 @@ namespace educore.Areas.ERP.Controllers
             if (!m.EnableExams)     off.Add("exams");
             if (!m.EnableInventory) off.Add("inventory");
             if (!m.EnablePayroll)   off.Add("payroll");
+            if (!m.EnableAttendance) off.Add("attendance");
+            if (!m.EnableAcademics) off.Add("academics");
+            if (!m.EnableFees)      off.Add("fees");
+            if (!m.EnableAccounts)  off.Add("expenses");
             return off;
         }
 

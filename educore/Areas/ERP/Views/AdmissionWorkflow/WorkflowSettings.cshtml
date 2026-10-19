@@ -289,7 +289,7 @@
 
             <div class="aw-row">
               <div class="flex-grow-1">
-                <div class="aw-row-title">Payroll &amp; Leave</div>
+                <div class="aw-row-title">Staff Module (Payroll &amp; Leave)</div>
                 <div class="aw-row-desc">@(Model.AllowPayroll
                     ? "Turn off to hide Payroll & Salary and Leave Management under Staff. The staff directory stays visible either way."
                     : "Staff salary and payslips, leave requests and approvals.")</div>
@@ -298,6 +298,86 @@
               {
                 <div class="form-check form-switch aw-switch m-0">
                   <input class="form-check-input" type="checkbox" id="EnablePayroll" asp-for="EnablePayroll" />
+                </div>
+              }
+              else
+              {
+                @* not given by the Super Admin: no switch, nothing of the module anywhere else *@
+                <span class="badge bg-label-secondary text-wrap text-start" style="max-width:12rem;">Not in your plan. Contact SmartSchoolWala to add it.</span>
+              }
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Attendance Module</div>
+                <div class="aw-row-desc">@(Model.AllowAttendance
+                    ? "Turn off to hide student attendance (marking, overview, absent alerts). Attendance already marked is kept."
+                    : "Daily student attendance, attendance overview and absent alerts to parents.")</div>
+              </div>
+              @if (Model.AllowAttendance)
+              {
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="EnableAttendance" asp-for="EnableAttendance" />
+                </div>
+              }
+              else
+              {
+                @* not given by the Super Admin: no switch, nothing of the module anywhere else *@
+                <span class="badge bg-label-secondary text-wrap text-start" style="max-width:12rem;">Not in your plan. Contact SmartSchoolWala to add it.</span>
+              }
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Academics Module</div>
+                <div class="aw-row-desc">@(Model.AllowAcademics
+                    ? "Turn off to hide Timetable, Smart Bell and Homework. Timetables and homework already saved are kept."
+                    : "Class timetable, periods and Smart Bell, homework.")</div>
+              </div>
+              @if (Model.AllowAcademics)
+              {
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="EnableAcademics" asp-for="EnableAcademics" />
+                </div>
+              }
+              else
+              {
+                @* not given by the Super Admin: no switch, nothing of the module anywhere else *@
+                <span class="badge bg-label-secondary text-wrap text-start" style="max-width:12rem;">Not in your plan. Contact SmartSchoolWala to add it.</span>
+              }
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Fees Module</div>
+                <div class="aw-row-desc">@(Model.AllowFees
+                    ? "Turn off to hide fee collection, fee reports, month-wise dues and fee settings. Fees already billed and paid are kept."
+                    : "Fee heads and structure, fee collection and receipts, dues and reminders, fee reports.")</div>
+              </div>
+              @if (Model.AllowFees)
+              {
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="EnableFees" asp-for="EnableFees" />
+                </div>
+              }
+              else
+              {
+                @* not given by the Super Admin: no switch, nothing of the module anywhere else *@
+                <span class="badge bg-label-secondary text-wrap text-start" style="max-width:12rem;">Not in your plan. Contact SmartSchoolWala to add it.</span>
+              }
+            </div>
+
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Accounts Module</div>
+                <div class="aw-row-desc">@(Model.AllowAccounts
+                    ? "Turn off to hide Expenses and the Cash Book."
+                    : "School expenses and the cash book.")</div>
+              </div>
+              @if (Model.AllowAccounts)
+              {
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="EnableAccounts" asp-for="EnableAccounts" />
                 </div>
               }
               else

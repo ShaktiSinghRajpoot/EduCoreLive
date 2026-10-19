@@ -69,6 +69,10 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public bool EnableExams     { get; set; } = true;
         public bool EnableInventory { get; set; } = true;
         public bool EnablePayroll   { get; set; } = true;
+        public bool EnableAttendance { get; set; } = true;
+        public bool EnableAcademics  { get; set; } = true;
+        public bool EnableFees       { get; set; } = true;
+        public bool EnableAccounts   { get; set; } = true;
 
         /// <summary>
         /// Modules the Super Admin GAVE this school. A module not given is off
@@ -79,6 +83,10 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public bool AllowExams     { get; set; } = true;
         public bool AllowInventory { get; set; } = true;
         public bool AllowPayroll   { get; set; } = true;
+        public bool AllowAttendance { get; set; } = true;
+        public bool AllowAcademics  { get; set; } = true;
+        public bool AllowFees       { get; set; } = true;
+        public bool AllowAccounts   { get; set; } = true;
 
         // "Charge recurring fees from" used to live here. It now belongs to the
         // academic year (AcademicYearModel.ChargeFeesFrom), because it decides how a

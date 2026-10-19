@@ -1,4 +1,4 @@
-﻿using educore.Models;
+using educore.Models;
 using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Services.Contract.SuperAdmin;
 using Microsoft.Extensions.Configuration;
@@ -282,6 +282,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 new NpgsqlParameter("p_allow_exams", model.AllowExams),
                 new NpgsqlParameter("p_allow_inventory", model.AllowInventory),
                 new NpgsqlParameter("p_allow_payroll", model.AllowPayroll),
+                new NpgsqlParameter("p_allow_attendance", model.AllowAttendance),
+                new NpgsqlParameter("p_allow_academics", model.AllowAcademics),
+                new NpgsqlParameter("p_allow_fees", model.AllowFees),
+                new NpgsqlParameter("p_allow_accounts", model.AllowAccounts),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor)
                     { Direction = ParameterDirection.InputOutput, Value = "modules_cursor" }
             };
@@ -298,7 +302,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 AllowTransport = ToBool(row["allow_transport"]),
                 AllowExams     = ToBool(row["allow_exams"]),
                 AllowInventory = ToBool(row["allow_inventory"]),
-                AllowPayroll   = ToBool(row["allow_payroll"])
+                AllowPayroll   = ToBool(row["allow_payroll"]),
+                AllowAttendance = ToBool(row["allow_attendance"]),
+                AllowAcademics = ToBool(row["allow_academics"]),
+                AllowFees      = ToBool(row["allow_fees"]),
+                AllowAccounts  = ToBool(row["allow_accounts"])
             };
         }
 

@@ -1,4 +1,4 @@
-﻿using EduCoreDataAccessLayer.Infrastructure;
+using EduCoreDataAccessLayer.Infrastructure;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.Extensions.Configuration;
@@ -48,6 +48,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_enable_exams", DBNull.Value),
                 new NpgsqlParameter("p_enable_inventory", DBNull.Value),
                 new NpgsqlParameter("p_enable_payroll", DBNull.Value),
+                new NpgsqlParameter("p_enable_attendance", DBNull.Value),
+                new NpgsqlParameter("p_enable_academics", DBNull.Value),
+                new NpgsqlParameter("p_enable_fees", DBNull.Value),
+                new NpgsqlParameter("p_enable_accounts", DBNull.Value),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
             };
 
@@ -77,6 +81,14 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 model.AllowExams      = GetBool(row, "allow_exams", true);
                 model.AllowInventory  = GetBool(row, "allow_inventory", true);
                 model.AllowPayroll    = GetBool(row, "allow_payroll", true);
+                model.EnableAttendance = GetBool(row, "enable_attendance", true);
+                model.EnableAcademics  = GetBool(row, "enable_academics", true);
+                model.EnableFees       = GetBool(row, "enable_fees", true);
+                model.EnableAccounts   = GetBool(row, "enable_accounts", true);
+                model.AllowAttendance  = GetBool(row, "allow_attendance", true);
+                model.AllowAcademics   = GetBool(row, "allow_academics", true);
+                model.AllowFees        = GetBool(row, "allow_fees", true);
+                model.AllowAccounts    = GetBool(row, "allow_accounts", true);
 
                 if (row.Table.Columns.Contains("registration_number_prefix") && row["registration_number_prefix"] != DBNull.Value)
                     model.RegistrationNumberPrefix = row["registration_number_prefix"].ToString() ?? "REG-";
@@ -126,6 +138,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new NpgsqlParameter("p_enable_exams", model.EnableExams),
                 new NpgsqlParameter("p_enable_inventory", model.EnableInventory),
                 new NpgsqlParameter("p_enable_payroll", model.EnablePayroll),
+                new NpgsqlParameter("p_enable_attendance", model.EnableAttendance),
+                new NpgsqlParameter("p_enable_academics", model.EnableAcademics),
+                new NpgsqlParameter("p_enable_fees", model.EnableFees),
+                new NpgsqlParameter("p_enable_accounts", model.EnableAccounts),
                 new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "admission_workflow_save_cursor" }
             };
 

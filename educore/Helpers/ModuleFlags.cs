@@ -52,6 +52,10 @@ namespace educore.Helpers
         public async Task<bool> ExamsOn()     => (await GetAsync()).EnableExams;
         public async Task<bool> InventoryOn() => (await GetAsync()).EnableInventory;
         public async Task<bool> PayrollOn()   => (await GetAsync()).EnablePayroll;
+        public async Task<bool> AttendanceOn() => (await GetAsync()).EnableAttendance;
+        public async Task<bool> AcademicsOn()  => (await GetAsync()).EnableAcademics;
+        public async Task<bool> FeesOn()       => (await GetAsync()).EnableFees;
+        public async Task<bool> AccountsOn()   => (await GetAsync()).EnableAccounts;
 
         private static int ClaimInt(System.Security.Claims.ClaimsPrincipal? u, string type) =>
             int.TryParse(u?.FindFirst(type)?.Value, out var v) ? v : 0;

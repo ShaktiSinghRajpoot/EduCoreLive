@@ -56,6 +56,9 @@ if (builder.Environment.IsDevelopment())
 
 builder.Services.AddRazorPages();
 
+// Links come out as /fees/dues instead of /Fees/FeeDues (incoming URLs are matched either way).
+builder.Services.AddRouting(options => options.LowercaseUrls = true);
+
 // WHY: the antiforgery cookie follows the same Security:RequireHttps switch as the auth and
 // session cookies -- Secure-only with HTTPS, SameAsRequest on plain-HTTP hosting.
 builder.Services.AddAntiforgery(options =>
@@ -372,6 +375,9 @@ if (!string.Equals(
         RequestPath  = educore.Helpers.UploadPaths.RequestPath
     });
 }
+
+// Old /ERP/{Controller}/... links of pages that moved to their module area.
+educore.Helpers.LegacyErpRedirect.UseLegacyErpRedirect(app);
 
 app.UseRouting();
 

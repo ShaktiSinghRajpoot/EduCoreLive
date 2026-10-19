@@ -1,4 +1,4 @@
-﻿@using EduCoreDataAccessLayer.Helpers
+@using EduCoreDataAccessLayer.Helpers
 @using EduCoreDataAccessLayer.Services.Contract.ERP
 @using System.Security.Claims
 @inject IAdmissionWorkflowService AdmissionWorkflowService
@@ -23,6 +23,7 @@
     // guessing what it needs. Defaults to visible if the scope or settings cannot
     // be resolved (matches pre-toggle behaviour).
     bool showTransport = true, showExams = true, showInventory = true, showPayroll = true;
+    bool showAttendance = true, showAcademics = true, showFees = true, showAccounts = true;
     bool showRegistration = true;
     if (_tId > 1 && _sId > 0)
     {
@@ -34,6 +35,10 @@
             showExams     = _mods.EnableExams;
             showInventory = _mods.EnableInventory;
             showPayroll   = _mods.EnablePayroll;
+            showAttendance = _mods.EnableAttendance;
+            showAcademics = _mods.EnableAcademics;
+            showFees      = _mods.EnableFees;
+            showAccounts  = _mods.EnableAccounts;
         }
         catch { /* leave everything visible */ }
     }
@@ -60,16 +65,16 @@
     // none of them, and used to get an empty "Admissions" heading.
     bool gAdmissions  = Can("enquiry.view") || (showRegistration && Can("registration.view")) || Can("students.manage");
     bool gStudents    = Can("students.view");
-    bool gAttendance  = Can("attendance.view");
+    bool gAttendance  = showAttendance && Can("attendance.view");
     bool gExams       = showExams && Can("exams.view");
-    bool gAcademics   = Can("academics.view");
+    bool gAcademics   = showAcademics && Can("academics.view");
     bool secAcademic  = gAdmissions || gStudents || gAttendance || gExams || gAcademics;
 
-    bool gFees        = Can("fees.view");
+    bool gFees        = showFees && Can("fees.view");
     // The front desk takes registration fees (fees.collect) without seeing the fee
     // pages; they still close their own cash counter (QA BUG-099).
-    bool gDayClose    = gFees || Can("fees.collect");
-    bool gExpenses    = Can("expenses.view");   // expenses + cash book
+    bool gDayClose    = gFees || (showFees && Can("fees.collect"));
+    bool gExpenses    = showAccounts && Can("expenses.view");   // expenses + cash book
     bool secFinance   = gDayClose || gExpenses;
 
     bool gStaffDir    = Can("staff.view");
@@ -98,7 +103,7 @@
     // My Timetable is for teaching staff (or anyone who has periods); an accountant or
     // clerk has no timetable (cached 5 min).
     bool gMyTimetable = false;
-    if (hasStaffRecord)
+    if (hasStaffRecord && showAcademics)
     {
         try { gMyTimetable = await StaffSelfService.IsTeachingStaffAsync(_tId, _sId, _uId)
                           || await HomeworkService.TeachesAnyClassAsync(_tId, _sId, _uId); }
@@ -106,7 +111,7 @@
     }
     // Homework is for people who teach a class -- not every staff record (cached 5 min).
     bool gTeaches = false;
-    if (_tId > 1 && _sId > 0 && !gAcademics)
+    if (_tId > 1 && _sId > 0 && showAcademics && !gAcademics)
     {
         try { gTeaches = await HomeworkService.TeachesAnyClassAsync(_tId, _sId, _uId); }
         catch { /* the menu must never fail to render */ }
@@ -119,8 +124,8 @@
     // the setup it can actually reach.
     bool gWorkflow    = Can("admission_workflow.view");
     bool gSetupSchool = Can("settings.view") || gWorkflow;   // profile, formats, session, workflow
-    bool gSetupAcad   = Can("academics.view");               // classes, subjects, periods, calendar
-    bool gSetupFees   = Can("fees.view");                    // fee heads & structure
+    bool gSetupAcad   = Can("academics.view");               // classes, subjects (+ periods, Smart Bell with Academics)
+    bool gSetupFees   = showFees && Can("fees.view");        // fee heads & structure
     bool gSetupUsers  = Can("rbac.manage") || Can("staff.view");
     bool secAdmin     = gSetupSchool || gSetupAcad || gSetupFees || gSetupUsers;
 
@@ -559,9 +564,15 @@
                 <li class='menu-item @On("ClassSection")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="ClassSection" class="menu-link"><i class="bx bx-grid-alt submenu-icon c-blue"></i><div class="text-truncate">Classes &amp; Sections</div></a></li>
                 <li class='menu-item @On("SubjectManagement")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SubjectManagement" class="menu-link"><i class="bx bx-book-alt submenu-icon c-purple"></i><div class="text-truncate">Subjects</div></a></li>
                 <li class='menu-item @On("AssignClassTeacher")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="AssignClassTeacher" class="menu-link"><i class="bx bx-user-voice submenu-icon c-green"></i><div class="text-truncate">Assign Class Teacher</div></a></li>
+                @if (showAcademics)
+                {
                 <li class='menu-item @On("PeriodStructure")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="PeriodStructure" class="menu-link"><i class="bx bx-time submenu-icon c-teal"></i><div class="text-truncate">Period Structure</div></a></li>
+                }
                 <li class='menu-item @On("ERP/Rooms")'><a asp-area="ERP" asp-controller="Rooms" asp-action="Index" class="menu-link"><i class="bx bx-door-open submenu-icon c-orange"></i><div class="text-truncate">Rooms</div></a></li>
+                @if (showAcademics)
+                {
                 <li class='menu-item @On("SmartBell")'><a asp-area="ERP" asp-controller="SchoolSettings" asp-action="SmartBell" class="menu-link"><i class="bx bx-bell submenu-icon c-orange"></i><div class="text-truncate">Smart Bell</div></a></li>
+                }
             </ul>
         </li>
         }

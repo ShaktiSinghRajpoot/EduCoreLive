@@ -5,13 +5,17 @@ using Microsoft.AspNetCore.Mvc.Filters;
 
 namespace educore.Helpers
 {
-    /// <summary>The optional modules a school can switch off in Admission Workflow settings.</summary>
+    /// <summary>The optional modules a school can be given (Super Admin) and switch off (Modules &amp; Workflow).</summary>
     public enum SchoolModule
     {
         Transport,
         Exams,
         Inventory,
-        Payroll
+        Payroll,     // shown as "Staff": payroll, leave, staff attendance
+        Attendance,
+        Academics,
+        Fees,
+        Accounts
     }
 
     /// <summary>
@@ -63,6 +67,10 @@ namespace educore.Helpers
                     SchoolModule.Exams     => settings.EnableExams,
                     SchoolModule.Inventory => settings.EnableInventory,
                     SchoolModule.Payroll   => settings.EnablePayroll,
+                    SchoolModule.Attendance => settings.EnableAttendance,
+                    SchoolModule.Academics => settings.EnableAcademics,
+                    SchoolModule.Fees      => settings.EnableFees,
+                    SchoolModule.Accounts  => settings.EnableAccounts,
                     _                      => true
                 };
 
@@ -78,6 +86,10 @@ namespace educore.Helpers
                     SchoolModule.Exams     => settings.AllowExams,
                     SchoolModule.Inventory => settings.AllowInventory,
                     SchoolModule.Payroll   => settings.AllowPayroll,
+                    SchoolModule.Attendance => settings.AllowAttendance,
+                    SchoolModule.Academics => settings.AllowAcademics,
+                    SchoolModule.Fees      => settings.AllowFees,
+                    SchoolModule.Accounts  => settings.AllowAccounts,
                     _                      => true
                 };
                 string msg = given
@@ -113,7 +125,11 @@ namespace educore.Helpers
                 SchoolModule.Transport => "Transport module",
                 SchoolModule.Exams     => "Exams module",
                 SchoolModule.Inventory => "Inventory module",
-                SchoolModule.Payroll   => "Payroll module",
+                SchoolModule.Payroll   => "Staff module",
+                SchoolModule.Attendance => "Attendance module",
+                SchoolModule.Academics => "Academics module",
+                SchoolModule.Fees      => "Fees module",
+                SchoolModule.Accounts  => "Accounts module",
                 _                      => "This module"
             };
 

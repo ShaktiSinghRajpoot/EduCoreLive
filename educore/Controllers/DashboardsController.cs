@@ -1,4 +1,4 @@
-﻿using EduCoreDataAccessLayer.Helpers;
+using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using educore.Services;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
@@ -86,8 +86,11 @@ namespace educore.Controllers
             var model = await _dashboardService.GetSummaryAsync(t, s, u);
             model.Upcoming = await UpcomingAsync(calendar, t, s, u);
 
+            // A module that is off (or was not given) leaves nothing of itself here.
+            var mods = await _modules.GetAsync();
+
             // Fee collections, outstanding dues and the defaulters list are finance data.
-            if (!await Can("fees.view"))
+            if (!mods.EnableFees || !await Can("fees.view"))
             {
                 model.ShowFinance = false;
                 model.TodayCollection = 0;
@@ -104,7 +107,7 @@ namespace educore.Controllers
             bool canStaff    = await Can("staff.view");
             model.ShowStudents   = canStudents;
             model.ShowStaff      = canStaff;
-            model.ShowAttendance = await Can("attendance.view");
+            model.ShowAttendance = mods.EnableAttendance && await Can("attendance.view");
             model.CanAdmit       = await Can("students.manage");
 
             if (!canStudents) { model.Students = 0; model.Classes.Clear(); }
@@ -113,9 +116,7 @@ namespace educore.Controllers
             // Birthdays name students and staff: each kind needs its own module.
             model.Birthdays.RemoveAll(b => (b.Who == "Student" && !canStudents) || (b.Who != "Student" && !canStaff));
 
-            // Leave lives in the Payroll module, the bus in Transport: a module that is
-            // off leaves nothing of itself on the dashboard.
-            var mods = await _modules.GetAsync();
+            // Leave lives in the Staff (payroll) module, the bus in Transport.
             if (!mods.EnablePayroll) { model.ShowLeave = false; model.OnLeaveToday = 0; model.Approvals.Clear(); }
 
             try { model.IsDriver = mods.EnableTransport && await _tracking.IsDriverAsync(t, s, u); } catch { model.IsDriver = false; }
@@ -153,11 +154,13 @@ namespace educore.Controllers
         private async Task<List<DashboardLink>> BuildQuickLinksAsync(int t, int s, int u, bool isDriver)
         {
             bool exams = true, inventory = true, payroll = true, transport = true, registration = true;
+            bool attendance = true, fees = true;
             try
             {
                 var mods = await _workflow.GetAdmissionWorkflowAsync(t, s, u);
                 exams = mods.EnableExams; inventory = mods.EnableInventory; payroll = mods.EnablePayroll;
                 transport = mods.EnableTransport; registration = mods.EnableRegistration;
+                attendance = mods.EnableAttendance; fees = mods.EnableFees;
             }
             catch { /* show the tiles; the pages themselves still refuse a switched-off module */ }
 
@@ -167,17 +170,17 @@ namespace educore.Controllers
                 ("Registrations", "bx-clipboard",    "/ERP/Registration",                  "#d97706", "registration.view", registration),
                 ("Students",   "bx-group",           "/ERP/Student/StudentList",           "#ff8a00", "students.view",   true),
                 ("Admission",  "bx-user-plus",       "/ERP/Admission/Create",              "#16a34a", "students.manage", true),
-                ("Fees",       "bx-wallet",          "/ERP/Fee/ManageFee",                 "#0284c7", "fees.view",       true),
-                ("Attendance", "bx-user-check",      "/ERP/Attendance/StudentAttendance",  "#d97706", "attendance.view", true),
+                ("Fees",       "bx-wallet",          "/ERP/Fee/ManageFee",                 "#0284c7", "fees.view",       fees),
+                ("Attendance", "bx-user-check",      "/ERP/Attendance/StudentAttendance",  "#d97706", "attendance.view", attendance),
                 ("Exams",      "bx-file",            "/ERP/Exam/CreateExam",               "#dc2626", "exams.view",      exams),
                 ("Staff",      "bx-id-card",         "/ERP/Staff/StaffList",               "#9333ea", "staff.view",      true),
                 ("Payroll",    "bx-money",           "/ERP/Payroll/PayrollManagement",     "#16a34a", "payroll.view",    payroll),
                 ("Leave",      "bx-calendar-minus",  "/ERP/Leave/LeaveManagement",         "#e83e8c", "staff.view",      payroll),
                 ("Inventory",  "bx-package",         "/ERP/Inventory/InventoryItem",       "#ff5722", "inventory.view",  inventory),
                 ("Transport",  "bx-bus",             "/ERP/Transport/LiveTracking",        "#0ea5e9", "transport.view",  transport),
-                ("Reminders",  "bx-bell",            "/ERP/FeeDues",               "#ff8a00", "fees.view",       true),
+                ("Reminders",  "bx-bell",            "/ERP/FeeDues",               "#ff8a00", "fees.view",       fees),
                 // Was /ERP/Reports, which does not exist.
-                ("Reports",    "bx-bar-chart-alt-2", "/ERP/Fee/Reports",                   "#009688", "fees.view",       true),
+                ("Reports",    "bx-bar-chart-alt-2", "/ERP/Fee/Reports",                   "#009688", "fees.view",       fees),
                 ("Settings",   "bx-cog",             "/ERP/SchoolSettings/BasicProfile",   "#6b7280", "settings.view",   true),
             };
 
