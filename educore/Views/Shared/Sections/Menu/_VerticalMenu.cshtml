@@ -491,14 +491,15 @@
 
         @if (gInventory)
         {
-        <li class='menu-item @Open("InventoryItem","PurchaseEntry","StoreLocations","SupplierMaster","OrderList","StudentSale","ClassSale","StoreRegister")'>
+        <li class='menu-item @Open("StoreDashboard","InventoryItem","PurchaseEntry","StoreLocations","SupplierMaster","OrderList","StudentSale","ClassSale","StoreRegister")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-package ic-inv"></i>
                 <div class="text-truncate">Inventory</div>
             </a>
             <ul class="menu-sub">
-                @* Three things only. Store Locations open from Store, Suppliers from Purchase,
-                   the Register is the second tab of Student Items. *@
+                @* A dashboard and three pages. Store Locations open from Store, Suppliers from
+                   Purchase, the Register is a tab of Student Items. *@
+                <li class='menu-item @On("StoreDashboard")'><a asp-area="ERP" asp-controller="Inventory" asp-action="StoreDashboard" class="menu-link"><i class="bx bx-grid-alt submenu-icon c-blue"></i><div class="text-truncate">Dashboard</div></a></li>
                 <li class='menu-item @(IsActive("InventoryItem") || IsActive("StoreLocations") ? "active" : "")'><a asp-area="ERP" asp-controller="Inventory" asp-action="InventoryItem" class="menu-link"><i class="bx bx-box submenu-icon c-orange"></i><div class="text-truncate">Store</div></a></li>
                 <li class='menu-item @(IsActive("PurchaseEntry") || IsActive("SupplierMaster") || IsActive("OrderList") ? "active" : "")'><a asp-area="ERP" asp-controller="Inventory" asp-action="PurchaseEntry" class="menu-link"><i class="bx bx-cart submenu-icon c-green"></i><div class="text-truncate">Purchase</div></a></li>
                 <li class='menu-item @(IsActive("StudentSale") || IsActive("ClassSale") || IsActive("StoreRegister") ? "active" : "")'>

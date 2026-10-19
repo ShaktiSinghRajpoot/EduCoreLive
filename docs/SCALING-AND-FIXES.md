@@ -5845,3 +5845,6 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - **Supplier dues**: Purchase payment mode **"Credit (pay later)"** = owed, not money out. `core.inventory_supplier_payments` + `sp_inventory_supplier_pay` (Pay / List / Cancel, never deleted) + `fn_supplier_due`; Suppliers page shows **Due**, **Pay** and **Payments**. Cash Book (`fn_school_money`): credit bills (and their returns / cancels) left out, "Supplier payment" money out, "Supplier payment cancelled" back in on the cancel day.
 - Files: `inventory_store_extras.sql` (new), `inventory_student_sale.sql`, `expense_cashbook.sql`, `inventory.sql` (supplier `due`); bundle `deploy_2026_10_19c.sql`; tests `tests/store_extras_tests.sql` (18, rolled back).
 
+### 2026-10-19 — Store Dashboard
+- `Inventory/StoreDashboard` (first item of the Inventory menu): six cards (stock value, low / out, sold this month + margin, unpaid by students, bought this month, owed to suppliers; each opens its page) and four panels (running low, to order this session, children with everything per class, latest sales). No new data: it reads Items, StoreSummary, Suppliers, OrderListData, StoreRegister/Overview and Sales, so the figures match those pages.
+

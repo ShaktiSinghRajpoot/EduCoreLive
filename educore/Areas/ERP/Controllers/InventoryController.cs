@@ -39,6 +39,17 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
+        // Store dashboard (/ERP/Inventory/StoreDashboard): the store at a glance. The page
+        // reads the endpoints below (Items, StoreSummary, Suppliers, OrderListData,
+        // StoreRegister/Overview, Sales), so its figures match the pages they come from.
+        public async Task<IActionResult> StoreDashboard([FromServices] ISchoolSettingsService settings)
+        {
+            try { ViewBag.CurrentYear = (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.AcademicYearName; }
+            catch { ViewBag.CurrentYear = null; }
+            ViewBag.CanGive = await HasPermissionAttribute.UserHasAsync(this, "inventory.manage");
+            return View();
+        }
+
         // Store locations (add / rename / deactivate) and the transfer history.
         public IActionResult StoreLocations() => View();
 
