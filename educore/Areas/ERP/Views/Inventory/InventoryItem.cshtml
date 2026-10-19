@@ -642,8 +642,16 @@
         // what CAME IN without a bill, so it can be more than the stock left now
         var how  = opening && added ? EC.num(opening) + ' opening + ' + EC.num(added) + ' added by hand'
                  : opening ? 'opening' : 'added by hand';
-        var text = EC.num(opening + added) + ' came in without a bill (' + how + ')';
-        return '<div class="small fw-normal text-warning" title="Came in without a supplier bill">' + EC.esc(text) + '</div>';
+        var text = EC.num(opening + added) + ' came in without a bill (' + how + '). New stock should come through Purchase, with the supplier and bill.';
+        // a small tag under the stock; the message opens in a little popup on click
+        return '<div><button type="button" class="iv-nobill" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="top"'
+             + ' data-bs-title="No supplier bill" data-bs-content="' + EC.esc(text) + '">'
+             + '<i class="bx bx-error-circle"></i>No bill</button></div>';
+    }
+
+    // the "No bill" tags are new on every draw, so their popups are made after it
+    function initNoBill() {
+        document.querySelectorAll('.iv-nobill').forEach(function (el) { bootstrap.Popover.getOrCreateInstance(el); });
     }
 
     function render() {
@@ -713,6 +721,7 @@
                         actionMenu(r, xfer) +
                     '</div></div>' + openingNote(r) + '</div>';
         }).join(''));
+        initNoBill();
 
         $('#pgInfo').text('Showing ' + ((page - 1) * per + 1) + '–' +
                           Math.min(page * per, list.length) + ' of ' + list.length);
