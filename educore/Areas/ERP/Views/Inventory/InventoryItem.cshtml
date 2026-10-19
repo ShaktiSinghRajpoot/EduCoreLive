@@ -594,6 +594,28 @@
         $('#sumValue').text(EC.money(value));
     }
 
+    // One "⋮" button per item; its menu holds every action, with words, so the row
+    // stays clean. The menu floats over the page (fixed), so the scrolling table
+    // cannot cut it off. The buttons keep their data-* names: the wiring below is
+    // unchanged.
+    function actionMenu(r, xfer) {
+        var item = function (attr, icon, text, cls) {
+            return '<li><button type="button" class="dropdown-item d-flex align-items-center gap-2' + (cls || '') + '" ' + attr + '="' + r.id + '">'
+                 + '<i class="bx ' + icon + '"></i>' + text + '</button></li>';
+        };
+        return '<div class="dropdown d-inline-block">'
+             + '<button type="button" class="btn btn-sm btn-icon btn-text-secondary rounded-pill" data-bs-toggle="dropdown" '
+             + 'data-bs-popper-config="{&quot;strategy&quot;:&quot;fixed&quot;}" aria-expanded="false" title="Actions"><i class="bx bx-dots-vertical-rounded fs-5"></i></button>'
+             + '<ul class="dropdown-menu dropdown-menu-end shadow-sm py-1" style="min-width:210px;font-size:.85rem">'
+             + item('data-move', 'bx-package', 'Stock in / out')
+             + (xfer ? item('data-xfer', 'bx-transfer-alt', 'Move to another store') : '')
+             + item('data-hist', 'bx-history', 'Stock history')
+             + item('data-edit', 'bx-edit', 'Edit item')
+             + '<li><hr class="dropdown-divider my-1"></li>'
+             + item('data-del', 'bx-trash', 'Delete', ' text-danger')
+             + '</ul></div>';
+    }
+
     // Given to students: the classes it is for ('Class 9|Class 10|Class 11'; '' = every class)
     function classList(v) { return (v || '').split('|').filter(Boolean); }
     function classText(v) { var l = classList(v); return l.length ? l.join(', ') : 'All classes'; }
@@ -673,11 +695,7 @@
                 '<td>' + EC.money(r.value) + '</td>' +
                 '<td>' + statusBadge(r.status) + '</td>' +
                 '<td class="text-end text-nowrap">' +
-                    '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '" title="Stock in / out: issue, damage, adjust, stock-take"><i class="bx bx-package"></i></button>' +
-                    (xfer ? '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '" title="Move to another store"><i class="bx bx-transfer-alt"></i></button>' : '') +
-                    '<button class="btn btn-sm btn-icon btn-text-secondary" data-hist="' + r.id + '" title="Stock history and locations"><i class="bx bx-history"></i></button>' +
-                    '<button class="btn btn-sm btn-icon btn-text-secondary" data-edit="' + r.id + '" title="Edit"><i class="bx bx-edit"></i></button>' +
-                    '<button class="btn btn-sm btn-icon btn-text-danger" data-del="' + r.id + '" title="Delete"><i class="bx bx-trash"></i></button>' +
+                    actionMenu(r, xfer) +
                 '</td></tr>';
         }).join('');
         $('#itemTableBody').html(html);
@@ -692,10 +710,7 @@
                     '<div class="small text-muted">' + EC.num(r.stock) + ' ' + EC.esc(r.unit) +
                         ' · min ' + EC.num(r.minStock) + '</div>' +
                     '<div>' +
-                        '<button class="btn btn-sm btn-icon btn-text-secondary" data-move="' + r.id + '" title="Stock in / out"><i class="bx bx-package"></i></button>' +
-                        (xfer ? '<button class="btn btn-sm btn-icon btn-text-secondary" data-xfer="' + r.id + '" title="Move to another store"><i class="bx bx-transfer-alt"></i></button>' : '') +
-                        '<button class="btn btn-sm btn-icon btn-text-secondary" data-hist="' + r.id + '"><i class="bx bx-history"></i></button>' +
-                        '<button class="btn btn-sm btn-icon btn-text-secondary" data-edit="' + r.id + '"><i class="bx bx-edit"></i></button>' +
+                        actionMenu(r, xfer) +
                     '</div></div>' + openingNote(r) + '</div>';
         }).join(''));
 
