@@ -47,7 +47,7 @@
                     </div>
                 </div>
 
-                <a asp-controller="SchoolSettings" asp-action="FeeStructure" class="btn btn-outline-secondary fee-action-btn">
+                <a asp-controller="FeeSetup" asp-action="FeeStructure" class="btn btn-outline-secondary fee-action-btn">
                     <i class="bx bx-wallet me-1"></i>
                     Fee Structure
                 </a>
@@ -144,7 +144,7 @@
 
                     <div class="ec-card-body">
                         <form asp-action="SaveFeeHead"
-                              asp-controller="SchoolSettings"
+                              asp-controller="FeeSetup"
                               method="post"
                               id="feeHeadForm">
 
@@ -474,7 +474,7 @@
                                                charging a head that already has money against it --
                                                the delete refusal tells the user to do exactly this. *@
                                             <form asp-action="ToggleFeeHeadStatus"
-                                                  asp-controller="SchoolSettings"
+                                                  asp-controller="FeeSetup"
                                                   method="post"
                                                   class="d-inline">
 
@@ -491,7 +491,7 @@
                                             </form>
 
                                             <form asp-action="DeleteFeeHead"
-                                                  asp-controller="SchoolSettings"
+                                                  asp-controller="FeeSetup"
                                                   method="post"
                                                   class="d-inline"
                                                   data-ec-confirm="Delete this fee head? Its unpaid dues are removed from every student, it is taken off every class fee structure, and a structure left with no heads is retired. A head with money collected against it cannot be deleted — mark it inactive instead."
@@ -600,7 +600,7 @@
             $(document).on('click', '.edit-fee-head', function () {
                 let id = $(this).data('id');
 
-                $.get('/ERP/SchoolSettings/GetFeeHeadById?id=' + id, function (response) {
+                $.get('@Url.Action("GetFeeHeadById", "FeeSetup", new { area = "Fees" })?id=' + id, function (response) {
                     if (response.success) {
                         $('#FeeHeadId').val(response.data.feeHeadId);
                         $('#FeeHeadName').val(response.data.feeHeadName);

@@ -7,9 +7,10 @@ using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Fees.Controllers
 {
-    [Area("ERP")]
+    [Area("Fees")]
+    [RequiresModule(SchoolModule.Fees)]
     //[Authorize(Roles = AppRoles.SchoolAdmin)]
     [HasPermission("fees.view")]
     public class FeeDueRemindersController : Controller
@@ -33,13 +34,13 @@ namespace educore.Areas.ERP.Controllers
             _schoolSettingsService = schoolSettingsService;
         }
 
-        // ── GET: /ERP/FeeDueReminders ────────────────────────────
+        // ── GET: /fees/feeduereminders ────────────────────────────
         [HttpGet]
         // Due Reminders moved into Month-wise Dues (19 Oct 2026): tick children there and
         // "Send reminder", which posts to SendReminders below. Old links land there.
-        public IActionResult Index() => RedirectToAction("Index", "FeeDues", new { area = "ERP" });
+        public IActionResult Index() => RedirectToAction("Index", "FeeDues", new { area = "Fees" });
 
-        // ── POST: /ERP/FeeDueReminders/SendReminders (AJAX) ──────
+        // ── POST: /fees/feeduereminders/SendReminders (AJAX) ──────
         // Sends the composed message to the selected students and RECORDS every
         // attempt. The amount + recipient come from the server's own due list —
         // never from the client — so a tampered payload can't change what is owed
@@ -147,7 +148,7 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
-        // ── GET: /ERP/FeeDueReminders/Export ─────────────────────
+        // ── GET: /fees/feeduereminders/Export ─────────────────────
         // CSV of the CURRENT filter (not just the visible page).
         [HttpGet]
         public async Task<IActionResult> Export(FeeDueItem query)

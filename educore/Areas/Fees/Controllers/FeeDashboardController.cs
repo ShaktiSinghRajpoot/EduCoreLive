@@ -3,15 +3,16 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Fees.Controllers
 {
     /// <summary>
-    /// Fee › Fee Dashboard (/ERP/FeeDashboard): where the money stands, collection by
+    /// Fee › Fee Dashboard (/fees): where the money stands, collection by
     /// month / day / mode / staff, classes and class teachers to chase, class x fee head,
     /// families owing most and how they pay, doubtful dues, money given away and billing
     /// checks. Read-only, one call (core.sp_fee_dashboard). Same permission as Fee Reports.
     /// </summary>
-    [Area("ERP")]
+    [Area("Fees")]
+    [RequiresModule(SchoolModule.Fees)]
     [HasPermission("fees.view")]
     public class FeeDashboardController : Controller
     {
@@ -22,6 +23,7 @@ namespace educore.Areas.ERP.Controllers
             _reports = reports;
         }
 
+        [Route("fees")]
         public IActionResult Index() => View();
 
         [HttpGet]

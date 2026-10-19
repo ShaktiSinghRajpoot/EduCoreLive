@@ -189,7 +189,7 @@
                 var $btn = $(this);
                 EC.buttonBusy($btn, 'Saving…');
                 $.ajax({
-                    url: '@Url.Action("SaveReceiptFormat", "Fee", new { area = "ERP" })',
+                    url: '@Url.Action("SaveReceiptFormat", "Receipt", new { area = "School" })',
                     type: 'POST',
                     contentType: 'application/json',
                     headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },

@@ -4,15 +4,16 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Fees.Controllers
 {
     /// <summary>
-    /// Month-wise Dues (/ERP/FeeDues): what is still unpaid month by month, class by
+    /// Month-wise Dues (/fees/dues): what is still unpaid month by month, class by
     /// class and child by child, with a warning on children who look like they have
     /// left the school (no attendance for three weeks while their class's register
     /// was kept). fee_month_dues.sql.
     /// </summary>
-    [Area("ERP")]
+    [Area("Fees")]
+    [RequiresModule(SchoolModule.Fees)]
     [HasPermission("fees.view")]
     public class FeeDuesController : Controller
     {
@@ -23,6 +24,7 @@ namespace educore.Areas.ERP.Controllers
             _dues = dues;
         }
 
+        [Route("fees/dues")]
         public async Task<IActionResult> Index([FromServices] IBaseService baseService, [FromServices] ISchoolSettingsService settings)
         {
             // the reminder letter's letterhead (the same header a fee receipt prints)

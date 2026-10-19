@@ -39,7 +39,7 @@
                     </div>
                 </div>
 
-                <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeHead" class="btn btn-outline-secondary fee-action-btn">
+                <a asp-area="Fees" asp-controller="FeeSetup" asp-action="FeeHead" class="btn btn-outline-secondary fee-action-btn">
                     <i class="bx bx-category me-1"></i>
                     Fee Head Master
                 </a>
@@ -84,8 +84,8 @@
             </div>
         }
 
-        <form asp-area="ERP"
-              asp-controller="SchoolSettings"
+        <form asp-area="Fees"
+              asp-controller="FeeSetup"
               asp-action="SaveFeeStructure"
               method="post"
               id="feeStructureForm">
@@ -255,7 +255,7 @@
                                     <i class="bx bx-info-circle me-1"></i>
                                     <strong>No active fee heads.</strong>
                                     Create them in
-                                    <a asp-area="ERP" asp-controller="SchoolSettings" asp-action="FeeHead">Fee Head Master</a>
+                                    <a asp-area="Fees" asp-controller="FeeSetup" asp-action="FeeHead">Fee Head Master</a>
                                     before building a fee structure.
                                 </div>
                             }
@@ -593,7 +593,7 @@
 
                                         @* The delete action existed with no way to reach it. Admitted
                                            students keep their dues -- ledgers are frozen at admission. *@
-                                        <form asp-area="ERP" asp-controller="SchoolSettings" asp-action="DeleteFeeStructure"
+                                        <form asp-area="Fees" asp-controller="FeeSetup" asp-action="DeleteFeeStructure"
                                               method="post" class="d-inline"
                                               data-ec-confirm="Delete this class fee structure? New admissions to this class will have no fee structure until you save one again. Students already admitted keep their dues."
                                               data-ec-confirm-name="@($"{item.ClassName} — {item.AcademicYear}")"
@@ -618,7 +618,7 @@
 
 @section PageScripts {
     @{
-        var getByClassUrl = Url.Action("GetFeeStructureByClass", "SchoolSettings", new { area = "ERP" });
+        var getByClassUrl = Url.Action("GetFeeStructureByClass", "FeeSetup", new { area = "Fees" });
     }
     <script>
         var GET_BY_CLASS_URL = '@getByClassUrl';
@@ -1003,12 +1003,12 @@
               .then(function (ok) {
                   if (!ok) return;
                   EC.buttonBusy($b, 'Copying…');
-                  $.ajax({ url: '@Url.Action("CopyFeeStructure", "SchoolSettings", new { area = "ERP" })', type: 'POST',
+                  $.ajax({ url: '@Url.Action("CopyFeeStructure", "FeeSetup", new { area = "Fees" })', type: 'POST',
                            headers: { 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
                            data: { fromYear: from, toYear: to, increasePercent: pct } })
                     .done(function (r) {
                         ecToast(r.success ? 'success' : 'error', r.message);
-                        if (r.success) location.href = '@Url.Action("FeeStructure", "SchoolSettings", new { area = "ERP" })?academicYear=' + encodeURIComponent(to);
+                        if (r.success) location.href = '@Url.Action("FeeStructure", "FeeSetup", new { area = "Fees" })?academicYear=' + encodeURIComponent(to);
                         else EC.buttonReset($b);
                     })
                     .fail(function () { ecToast('error', 'Could not copy. Please try again.'); EC.buttonReset($b); });

@@ -21,6 +21,11 @@ namespace educore.Helpers
             { "StoreRegister", "Inventory" },
             { "Transport", "Transport" },
             { "MyBus", "Transport" },
+            { "Fee", "Fees" },
+            { "FeeDashboard", "Fees" },
+            { "FeeDues", "Fees" },
+            { "FeeDueReminders", "Fees" },
+            { "DayClose", "Fees" },
         };
 
         // Pages that got a short address of their own: "Controller/Action" -> new path.
@@ -48,6 +53,33 @@ namespace educore.Helpers
             { "Transport/TripHistory", "/transport/trips" },
             { "MyBus", "/my-bus" },
             { "MyBus/Index", "/my-bus" },
+            { "FeeDashboard", "/fees" },
+            { "FeeDashboard/Index", "/fees" },
+            { "Fee/ManageFee", "/fees/collect" },
+            { "Fee/Reports", "/fees/reports" },
+            { "Fee/YearEnd", "/fees/year-end" },
+            { "FeeDues", "/fees/dues" },
+            { "FeeDues/Index", "/fees/dues" },
+            { "FeeDueReminders", "/fees/dues" },
+            { "FeeDueReminders/Index", "/fees/dues" },
+            { "DayClose", "/fees/day-close" },
+            { "DayClose/Index", "/fees/day-close" },
+            // receipts left Fee for the always-on Receipt controller
+            { "Fee/GetReceipt", "/school/receipt/getreceipt" },
+            { "Fee/GetSchoolHeader", "/school/receipt/getschoolheader" },
+            { "Fee/CancelReceipt", "/school/receipt/cancelreceipt" },
+            { "Fee/SaveReceiptFormat", "/school/receipt/savereceiptformat" },
+            // fee heads and structure left SchoolSettings (which is still in ERP)
+            { "SchoolSettings/FeeHead", "/fees/heads" },
+            { "SchoolSettings/FeeStructure", "/fees/structure" },
+            { "SchoolSettings/SaveFeeHead", "/fees/feesetup/savefeehead" },
+            { "SchoolSettings/GetFeeHeadById", "/fees/feesetup/getfeeheadbyid" },
+            { "SchoolSettings/DeleteFeeHead", "/fees/feesetup/deletefeehead" },
+            { "SchoolSettings/ToggleFeeHeadStatus", "/fees/feesetup/togglefeeheadstatus" },
+            { "SchoolSettings/CopyFeeStructure", "/fees/feesetup/copyfeestructure" },
+            { "SchoolSettings/GetFeeStructureByClass", "/fees/feesetup/getfeestructurebyclass" },
+            { "SchoolSettings/SaveFeeStructure", "/fees/feesetup/savefeestructure" },
+            { "SchoolSettings/DeleteFeeStructure", "/fees/feesetup/deletefeestructure" },
         };
 
         public static IApplicationBuilder UseLegacyErpRedirect(this IApplicationBuilder app)

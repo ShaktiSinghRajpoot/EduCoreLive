@@ -2,7 +2,7 @@
    Reusable fee-receipt modal. Drop @await Html.PartialAsync("_FeeReceiptModal")
    onto any page and call EcReceipt.show(receiptNo) (see ~/js/fee-receipt.js).
    Works for student fee, admission and registration receipts alike — the
-   server endpoint (/ERP/Fee/GetReceipt) resolves the payer.
+   server endpoint (/school/receipt/getreceipt) resolves the payer.
 *@
 <div class="modal fade" id="ecReceiptModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">

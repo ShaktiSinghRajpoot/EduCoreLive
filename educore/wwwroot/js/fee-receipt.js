@@ -3,7 +3,7 @@
 
    Requires the _FeeReceiptModal partial on the page (#ecReceiptModal,
    #ecReceiptPaper, #ecReceiptPrintBtn). Fetches the authoritative receipt from
-   /ERP/Fee/GetReceipt and renders it in the school's chosen PRINT FORMAT:
+   /school/receipt/getreceipt and renders it in the school's chosen PRINT FORMAT:
 
      A4      full page + letterhead, School / Parent copy   (office record)
      A5      compact half page, two fit on one A4 sheet     (daily counter)
@@ -17,7 +17,7 @@
 (function (window, $) {
     'use strict';
 
-    var ENDPOINT = '/ERP/Fee/GetReceipt';
+    var ENDPOINT = '/school/receipt/getreceipt';
 
 
     function fmtDate(d) {
@@ -607,7 +607,7 @@
             $(el).find('.modal-dialog').removeClass('modal-lg');
             if (window.bootstrap) new window.bootstrap.Modal(el).show();
         }
-        $.getJSON('/ERP/Fee/GetSchoolHeader').done(open).fail(function () { open(null); });
+        $.getJSON('/school/receipt/getschoolheader').done(open).fail(function () { open(null); });
     }
 
     // The "Items given" slip from Student Items: v = { school, format, date, amount,

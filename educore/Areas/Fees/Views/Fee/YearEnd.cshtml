@@ -36,7 +36,7 @@
                   <option value="@s.Text" selected="@s.Selected">@s.Text</option>
               }
             </select></div>
-          <a href="@Url.Action("Reports","Fee",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-bar-chart-alt-2 me-1"></i>Reports</a>
+          <a href="@Url.Action("Reports","Fee",new{area="Fees"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-bar-chart-alt-2 me-1"></i>Reports</a>
         </div>
       </div>
     </div>
@@ -94,8 +94,8 @@ $(function () {
     'use strict';
 
     var CSRF = $('input[name="__RequestVerificationToken"]').val();
-    var URL = { lines:'@Url.Action("GetYearEndLines","Fee",new{area="ERP"})', act:'@Url.Action("YearEndAction","Fee",new{area="ERP"})',
-                status:'@Url.Action("GetYearEndStatus","Fee",new{area="ERP"})' };
+    var URL = { lines:'@Url.Action("GetYearEndLines","Fee",new{area="Fees"})', act:'@Url.Action("YearEndAction","Fee",new{area="Fees"})',
+                status:'@Url.Action("GetYearEndStatus","Fee",new{area="Fees"})' };
     var CAN_MANAGE = @(canManage ? "true" : "false");     // fees.manage: carry
     var CAN_WRITEOFF = @(canWriteOff ? "true" : "false"); // fees.writeoff: write off
     var PAGE = 40;

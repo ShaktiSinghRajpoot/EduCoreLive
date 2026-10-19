@@ -167,7 +167,7 @@ $(function () {
         exchange:'@Url.Action("ExchangeSize", "Inventory", new { area = "Inventory" })',
         sales:   '@Url.Action("Sales", "Inventory", new { area = "Inventory" })',
         kit:     '@Url.Action("SaveClassKit", "Inventory", new { area = "Inventory" })',
-        collect: '@Url.Action("ManageFee", "Fee", new { area = "ERP" })'
+        collect: '@Url.Action("ManageFee", "Fee", new { area = "Fees" })'
     };
     var student = null;      // {id, name, admNo, sessions:[{year, cls, sec, current}]}
     var items = [];          // items for sale, with the chosen class's set in .kit

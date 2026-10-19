@@ -1,4 +1,4 @@
-﻿@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
 @model EduCoreDataAccessLayer.Models.ERP.RegistrationPageModel
 @inject educore.Helpers.ModuleFlags Modules
 @{
@@ -592,7 +592,7 @@ $(function () {
             okText:   'Cancel receipt'
         }).then(function(reason){
             if (reason === null) return;
-            $.ajax({ url:'/ERP/Fee/CancelReceipt', type:'POST', contentType:'application/json',
+            $.ajax({ url:'@Url.Action("CancelReceipt", "Receipt", new { area = "School" })', type:'POST', contentType:'application/json',
                 headers:{ 'RequestVerificationToken':csrf },
                 data: JSON.stringify({ receiptNo: rcp, reason: reason }) })
             .done(function(res){

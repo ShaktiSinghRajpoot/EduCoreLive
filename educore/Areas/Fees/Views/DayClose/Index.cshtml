@@ -34,7 +34,7 @@
           <div><label class="form-label mb-1">Date</label><input type="date" id="dDate" class="form-control form-control-sm"></div>
           @if (ViewBag.CanCounter == true)
           {
-          <a href="@Url.Action("ManageFee","Fee",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-wallet me-1"></i>Counter</a>
+          <a href="@Url.Action("ManageFee","Fee",new{area="Fees"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-wallet me-1"></i>Counter</a>
           }
           <button id="btnPrint" class="btn btn-sm ec-btn-soft"><i class="bx bx-printer me-1"></i>Print</button>
         </div>
@@ -139,7 +139,7 @@ $(function () {
     'use strict';
 
     var CSRF=$('input[name="__RequestVerificationToken"]').val();
-    var URL={ get:'@Url.Action("GetDayCollection","DayClose",new{area="ERP"})', close:'@Url.Action("CloseDay","DayClose",new{area="ERP"})', reopen:'@Url.Action("ReopenDay","DayClose",new{area="ERP"})', counters:'@Url.Action("GetClosedCounters","DayClose",new{area="ERP"})' };
+    var URL={ get:'@Url.Action("GetDayCollection","DayClose",new{area="Fees"})', close:'@Url.Action("CloseDay","DayClose",new{area="Fees"})', reopen:'@Url.Action("ReopenDay","DayClose",new{area="Fees"})', counters:'@Url.Action("GetClosedCounters","DayClose",new{area="Fees"})' };
     var expected=0;
     var CAN_REOPEN = @(canReopen ? "true" : "false");   // fees.reopen
 

@@ -30,7 +30,7 @@
           <div class="ec-page-icon"><i class="bx bx-bar-chart-alt-2"></i></div>
           <div><h4 class="ec-page-title mb-1">Fee Reports</h4><p class="ec-page-subtitle">Collection register and outstanding defaulters</p></div>
         </div>
-        <a href="@Url.Action("ManageFee","Fee",new{area="ERP"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-wallet me-1"></i>Counter</a>
+        <a href="@Url.Action("ManageFee","Fee",new{area="Fees"})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-wallet me-1"></i>Counter</a>
       </div>
     </div>
 
@@ -194,7 +194,7 @@ $(function () {
         var body=rows.map(function(r){ return r.map(function(c){ return '"'+String(c==null?'':c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
         var a=document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(body); a.download=name; a.click();
     }
-    var URL={ reg:'@Url.Action("GetCollectionRegister","Fee",new{area="ERP"})', def:'@Url.Action("GetDefaulters","Fee",new{area="ERP"})', classes:'@Url.Action("GetClasses","Fee",new{area="ERP"})', audit:'@Url.Action("GetConcessionCancelRegister","Fee",new{area="ERP"})' };
+    var URL={ reg:'@Url.Action("GetCollectionRegister","Fee",new{area="Fees"})', def:'@Url.Action("GetDefaulters","Fee",new{area="Fees"})', classes:'@Url.Action("GetClasses","Fee",new{area="Fees"})', audit:'@Url.Action("GetConcessionCancelRegister","Fee",new{area="Fees"})' };
 
     // tabs
     $('.view-tab').on('click', function(){ var v=$(this).data('v'); $('.view-tab').removeClass('active'); $(this).addClass('active');

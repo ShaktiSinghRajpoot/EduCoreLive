@@ -507,7 +507,7 @@ namespace educore.Areas.Inventory.Controllers
         }
 
         // For the "Items given" slip the parent takes home: the same letterhead and
-        // print format as a fee receipt (see FeeController.GetSchoolHeaderAsync).
+        // print format as a fee receipt (see ReceiptController.GetSchoolHeaderAsync).
         private async Task SetSlipHeaderAsync(ISchoolSettingsService settings)
         {
             try

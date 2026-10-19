@@ -352,20 +352,20 @@
 <script>
 $(function () {
     var URL = {
-        data:     '@Url.Action("Data", "FeeDues", new { area = "ERP" })',
-        att:      '@Url.Action("Attendance", "FeeDues", new { area = "ERP" })',
+        data:     '@Url.Action("Data", "FeeDues", new { area = "Fees" })',
+        att:      '@Url.Action("Attendance", "FeeDues", new { area = "Fees" })',
         secs:     '@Url.Action("PromotionSections", "Student", new { area = "ERP" })',
         profile:  '@Url.Action("Dashboard", "Student", new { area = "ERP" })',
-        collect:  '@Url.Action("ManageFee", "Fee", new { area = "ERP" })',
-        remind:   '@Url.Action("SendReminders", "FeeDueReminders", new { area = "ERP" })',
-        notes:    '@Url.Action("Followups", "FeeDues", new { area = "ERP" })',
-        addNote:  '@Url.Action("AddFollowup", "FeeDues", new { area = "ERP" })',
-        noteDone: '@Url.Action("FollowupDone", "FeeDues", new { area = "ERP" })',
-        noChase:  '@Url.Action("NoChase", "FeeDues", new { area = "ERP" })',
-        settings: '@Url.Action("Settings", "FeeDues", new { area = "ERP" })',
-        saveSet:  '@Url.Action("SaveSettings", "FeeDues", new { area = "ERP" })',
-        latePrev: '@Url.Action("LateFeePreview", "FeeDues", new { area = "ERP" })',
-        lateDo:   '@Url.Action("LateFeeApply", "FeeDues", new { area = "ERP" })'
+        collect:  '@Url.Action("ManageFee", "Fee", new { area = "Fees" })',
+        remind:   '@Url.Action("SendReminders", "FeeDueReminders", new { area = "Fees" })',
+        notes:    '@Url.Action("Followups", "FeeDues", new { area = "Fees" })',
+        addNote:  '@Url.Action("AddFollowup", "FeeDues", new { area = "Fees" })',
+        noteDone: '@Url.Action("FollowupDone", "FeeDues", new { area = "Fees" })',
+        noChase:  '@Url.Action("NoChase", "FeeDues", new { area = "Fees" })',
+        settings: '@Url.Action("Settings", "FeeDues", new { area = "Fees" })',
+        saveSet:  '@Url.Action("SaveSettings", "FeeDues", new { area = "Fees" })',
+        latePrev: '@Url.Action("LateFeePreview", "FeeDues", new { area = "Fees" })',
+        lateDo:   '@Url.Action("LateFeeApply", "FeeDues", new { area = "Fees" })'
     };
     var CAN_COLLECT = @(canCollect ? "true" : "false");
     var CAN_MANAGE  = @(canManage ? "true" : "false");

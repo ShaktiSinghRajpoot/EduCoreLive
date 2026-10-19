@@ -170,7 +170,7 @@ namespace educore.Controllers
                 ("Registrations", "bx-clipboard",    "/ERP/Registration",                  "#d97706", "registration.view", registration),
                 ("Students",   "bx-group",           "/ERP/Student/StudentList",           "#ff8a00", "students.view",   true),
                 ("Admission",  "bx-user-plus",       "/ERP/Admission/Create",              "#16a34a", "students.manage", true),
-                ("Fees",       "bx-wallet",          "/ERP/Fee/ManageFee",                 "#0284c7", "fees.view",       fees),
+                ("Fees",       "bx-wallet",          "/fees/collect",                      "#0284c7", "fees.view",       fees),
                 ("Attendance", "bx-user-check",      "/ERP/Attendance/StudentAttendance",  "#d97706", "attendance.view", attendance),
                 ("Exams",      "bx-file",            "/ERP/Exam/CreateExam",               "#dc2626", "exams.view",      exams),
                 ("Staff",      "bx-id-card",         "/ERP/Staff/StaffList",               "#9333ea", "staff.view",      true),
@@ -178,9 +178,9 @@ namespace educore.Controllers
                 ("Leave",      "bx-calendar-minus",  "/ERP/Leave/LeaveManagement",         "#e83e8c", "staff.view",      payroll),
                 ("Inventory",  "bx-package",         "/inventory/store",                   "#ff5722", "inventory.view",  inventory),
                 ("Transport",  "bx-bus",             "/transport/live",                    "#0ea5e9", "transport.view",  transport),
-                ("Reminders",  "bx-bell",            "/ERP/FeeDues",               "#ff8a00", "fees.view",       fees),
+                ("Reminders",  "bx-bell",            "/fees/dues",                         "#ff8a00", "fees.view",       fees),
                 // Was /ERP/Reports, which does not exist.
-                ("Reports",    "bx-bar-chart-alt-2", "/ERP/Fee/Reports",                   "#009688", "fees.view",       fees),
+                ("Reports",    "bx-bar-chart-alt-2", "/fees/reports",                      "#009688", "fees.view",       fees),
                 ("Settings",   "bx-cog",             "/ERP/SchoolSettings/BasicProfile",   "#6b7280", "settings.view",   true),
             };
 

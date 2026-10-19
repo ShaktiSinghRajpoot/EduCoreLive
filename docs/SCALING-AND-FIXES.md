@@ -5876,3 +5876,9 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - `TransportController` + `MyBusController` and views moved to `Areas/Transport`. Pages: `/transport/routes`, `/transport/vehicles`, `/transport/assign`, `/transport/live`, `/transport/trips`, and the driver's `/my-bus`; old `/ERP/Transport/...` and `/ERP/MyBus` redirect.
 - Menu marks Transport items by the new paths. The Roadmap page's "Now available" links pick the controller's area from `LegacyErpRedirect.MovedControllers`, so later phases need no change there.
 - Menu script: a page under a menu link (`/inventory/register` under `/inventory`) keeps the entry the server marked instead of highlighting the parent link.
+
+### 2026-10-19 — Module areas, phase 3: Fees
+- `Fee`, `FeeDashboard`, `FeeDues`, `FeeDueReminders`, `DayClose` controllers and views moved to `Areas/Fees`, all `[RequiresModule(SchoolModule.Fees)]`. Pages: `/fees` (Fee Dashboard), `/fees/collect`, `/fees/dues`, `/fees/day-close`, `/fees/reports`, `/fees/year-end`.
+- **Fee setup** left the `SchoolSettingsController` god class: the FeeHead + FeeStructure regions are now `Areas/Fees/Controllers/FeeSetupController.cs` (unchanged code), views in `Areas/Fees/Views/FeeSetup`; pages `/fees/heads`, `/fees/structure`.
+- **Receipts are not Fees**: `GetReceipt`, `GetSchoolHeader`, `CancelReceipt`, `SaveReceiptFormat` moved from FeeController to an always-on `Areas/School/Controllers/ReceiptController.cs` (same permissions), because Admission, Registration, Enquiry, the student profile and School Documents print / cancel receipts and must work without the Fees module. `fee-receipt.js` calls `/school/receipt/getreceipt`. This is the first piece of the School (core) area.
+- Old `/ERP/Fee...`, `/ERP/DayClose`, `/ERP/SchoolSettings/FeeHead|FeeStructure|SaveFeeHead|...` and the receipt endpoints redirect (`LegacyErpRedirect.MovedPages`).

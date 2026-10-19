@@ -3,15 +3,16 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Fees.Controllers
 {
     /// <summary>
-    /// Fees › Day Close (/ERP/DayClose): each cashier counts the cash they took in a day
+    /// Fees › Day Close (/fees/day-close): each cashier counts the cash they took in a day
     /// and closes their own counter. Open to everyone with fees.collect -- the fee
     /// counter AND the front desk that takes registration fees (QA BUG-099). Re-opening
     /// and the all-counters list need fees.reopen.
     /// </summary>
-    [Area("ERP")]
+    [Area("Fees")]
+    [RequiresModule(SchoolModule.Fees)]
     [HasPermission("fees.collect")]
     public class DayCloseController : Controller
     {
@@ -22,6 +23,7 @@ namespace educore.Areas.ERP.Controllers
             _feePaymentService = feePaymentService;
         }
 
+        [Route("fees/day-close")]
         public async Task<IActionResult> Index()
         {
             // The Re-open button shows only with fees.reopen (ReopenDay enforces it too).
@@ -31,7 +33,7 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        // ── GET: /ERP/DayClose/GetDayCollection ───────────────────────
+        // ── GET: /fees/dayclose/GetDayCollection ───────────────────────
         // The logged-in cashier's collection for a day, mode-wise, for reconciliation.
         [HttpGet]
         public async Task<IActionResult> GetDayCollection(string? date = null)
@@ -72,7 +74,7 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
-        // ── POST: /ERP/DayClose/ReopenDay ─────────────────────────────
+        // ── POST: /fees/dayclose/ReopenDay ─────────────────────────────
         // Re-opens a closed day so a correction can be made and the day closed
         // again. A reason is required; the earlier count stays in the close history
         // and is never overwritten. Needs its own fees.reopen key so a school can
@@ -101,7 +103,7 @@ namespace educore.Areas.ERP.Controllers
             public int?    CashierId { get; set; }
         }
 
-        // ── GET: /ERP/DayClose/GetClosedCounters ──────────────────────
+        // ── GET: /fees/dayclose/GetClosedCounters ──────────────────────
         // Every counter closed on a date, for the admin's re-open list on Day Close.
         [HttpGet]
         [HasPermission("fees.reopen")]
@@ -124,7 +126,7 @@ namespace educore.Areas.ERP.Controllers
             }));
         }
 
-        // ── POST: /ERP/DayClose/CloseDay ──────────────────────────────
+        // ── POST: /fees/dayclose/CloseDay ──────────────────────────────
         // Anyone who takes cash closes their own counter (class-level fees.collect).
         [HttpPost]
         [ValidateAntiForgeryToken]

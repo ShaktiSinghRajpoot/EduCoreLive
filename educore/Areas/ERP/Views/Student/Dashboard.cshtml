@@ -1,4 +1,4 @@
-﻿@inject educore.Helpers.ModuleFlags Modules
+@inject educore.Helpers.ModuleFlags Modules
 @{
     ViewData["Title"] = "Student Dashboard";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
@@ -335,7 +335,7 @@ var STUDENT_ID = '@studentPublicId';   // uuid, so quoted
 var ENROL_HISTORY_URL = '@Url.Action("EnrolmentHistory","Student",new{area="ERP"})';
 var STUDENT_HISTORY_URL = '@Url.Action("History","Student",new{area="ERP"})';
 var DATA_URL          = '@Url.Action("DashboardData","Student",new{area="ERP"})';
-var COLLECT_URL       = '@Url.Action("ManageFee","Fee",new{area="ERP"})';
+var COLLECT_URL       = '@Url.Action("ManageFee","Fee",new{area="Fees"})';
 var CAN_FEES          = @(canViewFees ? "true" : "false");   // fees.view
 var charts = {};
 

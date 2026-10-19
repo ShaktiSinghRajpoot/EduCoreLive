@@ -8,9 +8,9 @@
     var steps = new[]
     {
         (No: 1, Title: "New session",   Hint: "Session, classes & sections", Area: "ERP", Controller: "SchoolSettings", Action: "AcademicYears"),
-        (No: 2, Title: "Fee structure", Hint: "Copy last year's fees",       Area: "ERP", Controller: "SchoolSettings", Action: "FeeStructure"),
+        (No: 2, Title: "Fee structure", Hint: "Copy last year's fees",       Area: "Fees", Controller: "FeeSetup", Action: "FeeStructure"),
         (No: 3, Title: "Promotion",     Hint: "Move students up",            Area: "ERP", Controller: "Student",        Action: "Promotion"),
-        (No: 4, Title: "Year-End",      Hint: "Old dues: carry / write off", Area: "ERP", Controller: "Fee",            Action: "YearEnd"),
+        (No: 4, Title: "Year-End",      Hint: "Old dues: carry / write off", Area: "Fees", Controller: "Fee",            Action: "YearEnd"),
         (No: 5, Title: "Make it current", Hint: "Set the new session current", Area: "ERP", Controller: "SchoolSettings", Action: "AcademicYears")
     };
 }
