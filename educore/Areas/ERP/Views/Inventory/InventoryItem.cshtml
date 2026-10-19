@@ -114,11 +114,6 @@
             <option value="opening">Came in without a bill</option>
           </select>
 
-          <select class="iv-chip" id="perPage" title="Rows per page">
-            <option value="10">10</option>
-            <option value="25">25</option>
-            <option value="50">50</option>
-          </select>
 
           <button class="iv-clear-btn d-none" id="clearBtn" title="Clear all filters">
             <i class="bx bx-x"></i>Clear
@@ -165,9 +160,20 @@
           <p class="text-muted small mb-0">Try adjusting filters.</p>
         </div>
 
+        @* the same footer as Student List: rows per page + "Showing", then the shared ec-pager *@
         <div class="iv-pg-wrap" id="pgWrap">
-          <div class="iv-pg-info" id="pgInfo">—</div>
-          <div class="d-flex gap-1 flex-wrap justify-content-end" id="pgBtns"></div>
+          <div class="iv-pg-info d-flex align-items-center gap-2">
+            <span id="perPageWrap" class="d-inline-flex align-items-center gap-2">
+              <label class="mb-0 text-muted" for="perPage" style="white-space:nowrap;font-size:.81rem">Rows per page</label>
+              <select class="form-select form-select-sm" id="perPage" style="width:auto">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+            </span>
+            <span id="pgInfo">—</span>
+          </div>
+          <nav class="ec-pager" id="pgBtns" aria-label="Pagination"></nav>
         </div>
 
       </div>
@@ -724,14 +730,23 @@
         initNoBill();
 
         $('#pgInfo').text('Showing ' + ((page - 1) * per + 1) + '–' +
-                          Math.min(page * per, list.length) + ' of ' + list.length);
+                          Math.min(page * per, list.length) + ' of ' + list.length + (list.length === 1 ? ' item' : ' items'));
 
-        var btns = '';
-        for (var i = 1; i <= pages; i++) {
-            btns += '<button class="btn btn-sm ' + (i === page ? 'btn-primary' : 'btn-outline-secondary') +
-                    '" data-page="' + i + '">' + i + '</button>';
+        // like _Pager.cshtml: ‹ 1 … (2 either side of this page) … last ›; nothing to page through, no pager
+        var btn = function (n, label, cls) {
+            return '<button type="button" class="ec-pager-btn ' + (cls || '') + '" data-page="' + n + '">' + label + '</button>';
+        };
+        var from = Math.max(1, page - 2), to = Math.min(pages, page + 2), btns = '';
+        if (pages > 1) {
+            btns += btn(page - 1, '<i class="bx bx-chevron-left"></i>', page === 1 ? 'disabled' : '');
+            if (from > 1) btns += btn(1, '1') + (from > 2 ? '<span class="ec-pager-gap">…</span>' : '');
+            for (var i = from; i <= to; i++) btns += btn(i, i, i === page ? 'active' : '');
+            if (to < pages) btns += (to < pages - 1 ? '<span class="ec-pager-gap">…</span>' : '') + btn(pages, pages);
+            btns += btn(page + 1, '<i class="bx bx-chevron-right"></i>', page === pages ? 'disabled' : '');
         }
         $('#pgBtns').html(btns);
+        // a "Rows per page" box next to a handful of items is noise (Student List hides it the same way)
+        $('#perPageWrap').toggleClass('d-none', list.length <= 10);
     }
 
     // ── Item form ───────────────────────────────────────────────────────────
