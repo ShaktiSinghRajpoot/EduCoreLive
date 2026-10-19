@@ -233,8 +233,8 @@
 
         @if (gMyBus)
         {
-        <li class='menu-item @On("MyBus")'>
-            <a asp-area="ERP" asp-controller="MyBus" asp-action="Index" class="menu-link">
+        <li class='menu-item @On("/my-bus")'>
+            <a asp-area="Transport" asp-controller="MyBus" asp-action="Index" class="menu-link">
                 <i class="menu-icon icon-base bx bx-bus ic-bus"></i>
                 <div class="text-truncate">My Bus</div>
             </a>
@@ -479,17 +479,17 @@
         @* ---- Transport (hidden when the school turns the module off) ---- *@
         @if (gTransport)
         {
-        <li class='menu-item @Open("Routes","Vehicles","Assign","LiveTracking","TripHistory")'>
+        <li class='menu-item @Open("/transport/")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-bus ic-bus"></i>
                 <div class="text-truncate">Transport</div>
             </a>
             <ul class="menu-sub">
-                <li class='menu-item @On("Routes")'><a asp-area="ERP" asp-controller="Transport" asp-action="Routes" class="menu-link"><i class="bx bx-map submenu-icon c-blue"></i><div class="text-truncate">Routes</div></a></li>
-                <li class='menu-item @On("Vehicles")'><a asp-area="ERP" asp-controller="Transport" asp-action="Vehicles" class="menu-link"><i class="bx bx-car submenu-icon c-purple"></i><div class="text-truncate">Vehicles &amp; Drivers</div></a></li>
-                <li class='menu-item @On("Assign")'><a asp-area="ERP" asp-controller="Transport" asp-action="Assign" class="menu-link"><i class="bx bx-link submenu-icon c-green"></i><div class="text-truncate">Assign Transport</div></a></li>
-                <li class='menu-item @On("LiveTracking")'><a asp-area="ERP" asp-controller="Transport" asp-action="LiveTracking" class="menu-link"><i class="bx bx-current-location submenu-icon c-orange"></i><div class="text-truncate">Live Tracking</div></a></li>
-                <li class='menu-item @On("TripHistory")'><a asp-area="ERP" asp-controller="Transport" asp-action="TripHistory" class="menu-link"><i class="bx bx-history submenu-icon c-blue"></i><div class="text-truncate">Trip History</div></a></li>
+                <li class='menu-item @On("/transport/routes")'><a asp-area="Transport" asp-controller="Transport" asp-action="Routes" class="menu-link"><i class="bx bx-map submenu-icon c-blue"></i><div class="text-truncate">Routes</div></a></li>
+                <li class='menu-item @On("/transport/vehicles")'><a asp-area="Transport" asp-controller="Transport" asp-action="Vehicles" class="menu-link"><i class="bx bx-car submenu-icon c-purple"></i><div class="text-truncate">Vehicles &amp; Drivers</div></a></li>
+                <li class='menu-item @On("/transport/assign")'><a asp-area="Transport" asp-controller="Transport" asp-action="Assign" class="menu-link"><i class="bx bx-link submenu-icon c-green"></i><div class="text-truncate">Assign Transport</div></a></li>
+                <li class='menu-item @On("/transport/live")'><a asp-area="Transport" asp-controller="Transport" asp-action="LiveTracking" class="menu-link"><i class="bx bx-current-location submenu-icon c-orange"></i><div class="text-truncate">Live Tracking</div></a></li>
+                <li class='menu-item @On("/transport/trips")'><a asp-area="Transport" asp-controller="Transport" asp-action="TripHistory" class="menu-link"><i class="bx bx-history submenu-icon c-blue"></i><div class="text-truncate">Trip History</div></a></li>
             </ul>
         </li>
         }

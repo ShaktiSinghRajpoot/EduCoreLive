@@ -1,13 +1,13 @@
-﻿using educore.Services;
+using educore.Services;
 using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Models.ERP;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using educore.Helpers;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Transport.Controllers
 {
-    [Area("ERP")]
+    [Area("Transport")]
     [HasPermission("transport.view")]
     [RequiresModule(SchoolModule.Transport)]
     public class TransportController : Controller
@@ -33,7 +33,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── Pages ────────────────────────────────────────────────
-        [HttpGet]
+        [HttpGet("transport/routes")]
         public async Task<IActionResult> Routes()
         {
             ViewBag.Routes = await _transportService.GetRoutesAsync(TenantId(), SchoolId(), UserId());
@@ -43,7 +43,7 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        [HttpGet]
+        [HttpGet("transport/vehicles")]
         public async Task<IActionResult> Vehicles()
         {
             ViewBag.Vehicles = await _transportService.GetVehiclesAsync(TenantId(), SchoolId(), UserId());
@@ -52,7 +52,7 @@ namespace educore.Areas.ERP.Controllers
             return View();
         }
 
-        [HttpGet]
+        [HttpGet("transport/assign")]
         public IActionResult Assign() => View();
 
         // ── Routes API ───────────────────────────────────────────
@@ -206,7 +206,7 @@ namespace educore.Areas.ERP.Controllers
         }
 
         // ── Live tracking (transport_live_tracking.sql) ──────────
-        [HttpGet]
+        [HttpGet("transport/live")]
         public IActionResult LiveTracking() => View();
 
         [HttpGet]
@@ -226,7 +226,7 @@ namespace educore.Areas.ERP.Controllers
             });
         }
 
-        [HttpGet]
+        [HttpGet("transport/trips")]
         public async Task<IActionResult> TripHistory()
         {
             ViewBag.Vehicles = await _transportService.GetVehiclesAsync(TenantId(), SchoolId(), UserId());

@@ -4,10 +4,10 @@ using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace educore.Areas.ERP.Controllers
+namespace educore.Areas.Transport.Controllers
 {
     /// <summary>
-    /// "My Bus" -- the driver's phone page (/ERP/MyBus). It starts and ends a trip
+    /// "My Bus" -- the driver's phone page (/my-bus). It starts and ends a trip
     /// and posts the phone's GPS position while the trip runs.
     ///
     /// No permission key on purpose: being the assigned driver of an active bus
@@ -20,7 +20,7 @@ namespace educore.Areas.ERP.Controllers
     /// [RequiresModule]: that attribute redirects to the workflow settings page,
     /// which a driver cannot open.
     /// </summary>
-    [Area("ERP")]
+    [Area("Transport")]
     [Authorize(Policy = "SchoolUserOnly")]
     public class MyBusController : Controller
     {
@@ -33,7 +33,7 @@ namespace educore.Areas.ERP.Controllers
             _workflow = workflow;
         }
 
-        [HttpGet]
+        [HttpGet("my-bus")]
         public async Task<IActionResult> Index()
         {
             // Transport off for this school: nothing of it is shown, the driver goes home.

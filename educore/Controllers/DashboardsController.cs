@@ -177,7 +177,7 @@ namespace educore.Controllers
                 ("Payroll",    "bx-money",           "/ERP/Payroll/PayrollManagement",     "#16a34a", "payroll.view",    payroll),
                 ("Leave",      "bx-calendar-minus",  "/ERP/Leave/LeaveManagement",         "#e83e8c", "staff.view",      payroll),
                 ("Inventory",  "bx-package",         "/inventory/store",                   "#ff5722", "inventory.view",  inventory),
-                ("Transport",  "bx-bus",             "/ERP/Transport/LiveTracking",        "#0ea5e9", "transport.view",  transport),
+                ("Transport",  "bx-bus",             "/transport/live",                    "#0ea5e9", "transport.view",  transport),
                 ("Reminders",  "bx-bell",            "/ERP/FeeDues",               "#ff8a00", "fees.view",       fees),
                 // Was /ERP/Reports, which does not exist.
                 ("Reports",    "bx-bar-chart-alt-2", "/ERP/Fee/Reports",                   "#009688", "fees.view",       fees),
@@ -186,7 +186,7 @@ namespace educore.Controllers
 
             var links = new List<DashboardLink>();
             if (isDriver)
-                links.Add(new DashboardLink { Label = "My Bus", Icon = "bx-bus", Url = "/ERP/MyBus", Color = "#ff8a00" });
+                links.Add(new DashboardLink { Label = "My Bus", Icon = "bx-bus", Url = "/my-bus", Color = "#ff8a00" });
             // My Attendance / My Leave / My Payslip: for anyone with a current staff record
             // (no permission key). Leave and payslips belong to the Payroll module.
             bool hasStaff = false;

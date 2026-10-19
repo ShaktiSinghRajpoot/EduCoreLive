@@ -21,6 +21,9 @@
     };
     // A module that is off for this school is not mentioned at all.
     var mods = await Modules.GetAsync();
+    // a controller that moved out of ERP into its module's area
+    string AreaOf(string controller) =>
+        educore.Helpers.LegacyErpRedirect.MovedControllers.TryGetValue(controller, out var area) ? area : "ERP";
     bool Off(string group) => (group == "Transport" && !mods.EnableTransport)
                            || (group == "Examinations" && !mods.EnableExams)
                            || (group == "Inventory" && !mods.EnableInventory);
@@ -101,7 +104,7 @@
                         <i class="bx @x.Icon"></i><span>@x.Group</span>
                         <span class="badge bg-label-success ms-auto">Available</span>
                     </div>
-                    <a asp-area="ERP" asp-controller="@x.Controller" asp-action="@x.Action" class="fw-bold">@x.Item <i class="bx bx-right-arrow-alt"></i></a>
+                    <a asp-area="@AreaOf(x.Controller)" asp-controller="@x.Controller" asp-action="@x.Action" class="fw-bold">@x.Item <i class="bx bx-right-arrow-alt"></i></a>
                 </div>
             }
         </div>

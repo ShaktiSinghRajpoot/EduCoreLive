@@ -5871,3 +5871,8 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - `InventoryController` + `StoreRegisterController` and their views moved to `Areas/Inventory` (own `_ViewImports`). Pages have short addresses: `/inventory` (Inventory Dashboard), `/inventory/store`, `/inventory/locations`, `/inventory/suppliers`, `/inventory/purchase`, `/inventory/give-items`, `/inventory/class-items`, `/inventory/order-list`, `/inventory/register`; AJAX stays `/inventory/{controller}/{action}`.
 - An action with its own `[Route]` answers only there, so `LegacyErpRedirect.MovedPages` maps the old page URLs one by one (`/ERP/Inventory/InventoryItem` -> `/inventory/store`); other `/ERP/Inventory/...` calls go by `MovedControllers`.
 - The menu marks Inventory items by the new paths. The CSS stays in `wwwroot/css/ERP/Inventory`.
+
+### 2026-10-19 — Module areas, phase 2: Transport
+- `TransportController` + `MyBusController` and views moved to `Areas/Transport`. Pages: `/transport/routes`, `/transport/vehicles`, `/transport/assign`, `/transport/live`, `/transport/trips`, and the driver's `/my-bus`; old `/ERP/Transport/...` and `/ERP/MyBus` redirect.
+- Menu marks Transport items by the new paths. The Roadmap page's "Now available" links pick the controller's area from `LegacyErpRedirect.MovedControllers`, so later phases need no change there.
+- Menu script: a page under a menu link (`/inventory/register` under `/inventory`) keeps the entry the server marked instead of highlighting the parent link.

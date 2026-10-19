@@ -19,6 +19,8 @@ namespace educore.Helpers
         {
             { "Inventory", "Inventory" },
             { "StoreRegister", "Inventory" },
+            { "Transport", "Transport" },
+            { "MyBus", "Transport" },
         };
 
         // Pages that got a short address of their own: "Controller/Action" -> new path.
@@ -37,6 +39,15 @@ namespace educore.Helpers
             { "Inventory/OrderList", "/inventory/order-list" },
             { "StoreRegister", "/inventory/register" },
             { "StoreRegister/Index", "/inventory/register" },
+            { "Transport", "/transport/live" },
+            { "Transport/Index", "/transport/live" },
+            { "Transport/Routes", "/transport/routes" },
+            { "Transport/Vehicles", "/transport/vehicles" },
+            { "Transport/Assign", "/transport/assign" },
+            { "Transport/LiveTracking", "/transport/live" },
+            { "Transport/TripHistory", "/transport/trips" },
+            { "MyBus", "/my-bus" },
+            { "MyBus/Index", "/my-bus" },
         };
 
         public static IApplicationBuilder UseLegacyErpRedirect(this IApplicationBuilder app)
