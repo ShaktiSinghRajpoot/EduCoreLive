@@ -531,7 +531,7 @@
         @* ---- School setup: done once at onboarding ---- *@
         @if (gSetupSchool)
         {
-        <li class='menu-item @Open("/school/profile","/school/documents","/school/sessions","/school/modules","/school/seal")'>
+        <li class='menu-item @Open("/school/profile","/school/documents","/school/sessions","/school/modules","/school/seal","/school/import")'>
             <a href="javascript:void(0);" class="menu-link menu-toggle">
                 <i class="menu-icon icon-base bx bx-buildings ic-settings"></i>
                 <div class="text-truncate">School Setup</div>
@@ -547,6 +547,10 @@
                 @if (gWorkflow)
                 {
                 <li class='menu-item @On("/school/modules")'><a asp-area="School" asp-controller="AdmissionWorkflow" asp-action="WorkflowSettings" class="menu-link"><i class="bx bx-toggle-left submenu-icon c-green"></i><div class="text-truncate">Modules &amp; Workflow</div></a></li>
+                }
+                @if (Can("settings.manage"))
+                {
+                <li class='menu-item @On("/school/import")'><a asp-area="School" asp-controller="Import" asp-action="Index" class="menu-link"><i class="bx bx-import submenu-icon c-blue"></i><div class="text-truncate">Import Data</div></a></li>
                 }
             </ul>
         </li>

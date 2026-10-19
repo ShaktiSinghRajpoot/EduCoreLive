@@ -1,0 +1,206 @@
+@{
+    ViewData["Title"] = "Import Data";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    var session = ViewBag.Session as string;
+}
+
+@*
+   School Setup › Import Data (ImportController). A new school's students, staff
+   and old dues from Excel: template -> fill -> save as CSV -> upload -> check
+   -> import the good rows. Nothing is saved before Import is pressed.
+*@
+
+@section PageStyles {
+    <style>
+        .im-steps{ display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.6rem; }
+        .im-step{ border:1px solid var(--ec-border);border-radius:12px;padding:.7rem .85rem;background:#fff;font-size:.85rem; }
+        .im-step b{ display:block;color:var(--ec-text-dark); }
+        .im-cols{ font-size:.78rem; }
+        .im-cols span{ display:inline-block;border:1px solid var(--ec-border);border-radius:20px;padding:.1rem .55rem;margin:.15rem .2rem .15rem 0;background:#fafafa; }
+        .im-cols span.req{ border-color:#f5c2a3;background:#fff4ec; }
+        .im-table{ font-size:.8rem; }
+        .im-table td{ white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis; }
+        .im-table td.err{ white-space:normal;color:#b42318;min-width:220px; }
+        .im-table tr.bad td{ background:#fff6f5; }
+        .im-table tr.done td{ background:#f3fbf6; }
+    </style>
+}
+
+<div class="ec-page-shell in-page">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-import"></i></div>
+          <div><h4 class="ec-page-title mb-1">Import Data</h4>
+            <p class="ec-page-subtitle">Bring the school's students, staff and old dues in from Excel@(session != null ? " · session " + session : "")</p></div>
+        </div>
+      </div>
+    </div>
+
+    @if (session == null)
+    {
+        <div class="alert alert-warning">Set up the current session and its classes first (School › Sessions, Academic Setup › Classes), then import.</div>
+    }
+
+    <ul class="nav nav-pills mb-3 gap-2" id="imTabs">
+      <li class="nav-item"><button class="nav-link active" data-kind="students"><i class="bx bx-group me-1"></i>Students</button></li>
+      <li class="nav-item"><button class="nav-link" data-kind="staff"><i class="bx bx-id-card me-1"></i>Staff</button></li>
+      <li class="nav-item"><button class="nav-link" data-kind="dues"><i class="bx bx-wallet me-1"></i>Previous dues</button></li>
+    </ul>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="im-steps mb-3">
+          <div class="im-step"><b>1. Download the template</b><a id="imTemplate" href="#" class="btn btn-sm btn-outline-primary mt-2"><i class="bx bx-download me-1"></i>Template</a></div>
+          <div class="im-step"><b>2. Fill it in Excel</b>One row per <span id="imWhat">student</span>. Keep the first line (the column names) as it is.</div>
+          <div class="im-step"><b>3. Save as "CSV UTF-8"</b>File › Save As › CSV UTF-8 (comma delimited).</div>
+          <div class="im-step"><b>4. Upload and check</b>
+            <div class="d-flex gap-2 mt-2">
+              <input type="file" id="imFile" accept=".csv" class="form-control form-control-sm" />
+              <button id="imCheck" class="btn btn-sm btn-primary" style="width:auto"><i class="bx bx-check-shield me-1"></i>Check</button>
+            </div>
+          </div>
+        </div>
+        <div class="im-cols" id="imCols"></div>
+        <div class="small text-muted mt-2" id="imNote"></div>
+      </div>
+    </div>
+
+    <div class="card d-none" id="imResult">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+          <div id="imSummary" class="fw-semibold"></div>
+          <div class="d-flex gap-2">
+            <label class="form-check-label small d-flex align-items-center gap-1"><input type="checkbox" class="form-check-input m-0" id="imOnlyBad" /> Only rows with problems</label>
+            <button id="imImport" class="btn btn-sm btn-success" style="width:auto"><i class="bx bx-upload me-1"></i>Import</button>
+          </div>
+        </div>
+        <div class="progress mb-2 d-none" id="imProgress" style="height:8px"><div class="progress-bar bg-success" style="width:0%"></div></div>
+        <div class="table-responsive" style="max-height:60vh">
+          <table class="table table-sm im-table mb-0"><thead id="imHead"></thead><tbody id="imBody"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+@Html.AntiForgeryToken()
+
+@section PageScripts {
+<script>
+(function () {
+    var CSRF = $('input[name="__RequestVerificationToken"]').val();
+    var URL = { template: '@Url.Action("Template", "Import", new { area = "School" })',
+                check: '@Url.Action("Check", "Import", new { area = "School" })',
+                save: '@Url.Action("Save", "Import", new { area = "School" })' };
+    var COLUMNS = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.Columns));
+    var WHAT = { students: 'student', staff: 'member of staff', dues: 'student who still owes money' };
+    var NOTE = {
+        students: 'Each student is admitted with the fee structure of their class, from the admission date (a date before this session bills from the session start). "Old Student = Yes" skips the admission fee and deposit.',
+        staff: 'Logins are not created here. Give a login from the staff member\'s profile when they need one.',
+        dues: 'Import the students first. Each amount becomes one "Previous Dues" line on the child, collected at Collect Fees like any other due. A child gets it only once.'
+    };
+    var kind = 'students', checkedRows = [], keys = [], columns = [];
+
+    function showKind() {
+        $('#imTemplate').attr('href', URL.template + '?kind=' + kind);
+        $('#imWhat').text(WHAT[kind]);
+        $('#imNote').text(NOTE[kind]);
+        $('#imCols').html('<span class="me-1 text-muted">Columns:</span>' + COLUMNS[kind].map(function (c) {
+            return '<span class="' + (c.Required ? 'req' : '') + '" title="' + EC.esc(c.Hint || '') + '">' + EC.esc(c.Name) + (c.Required ? ' *' : '') + '</span>';
+        }).join(''));
+        $('#imResult').addClass('d-none');
+        $('#imFile').val('');
+        checkedRows = [];
+    }
+
+    $('#imTabs').on('click', '.nav-link', function () {
+        $('#imTabs .nav-link').removeClass('active');
+        $(this).addClass('active');
+        kind = $(this).data('kind');
+        showKind();
+    });
+
+    function render() {
+        var onlyBad = $('#imOnlyBad').is(':checked');
+        $('#imHead').html('<tr><th>Line</th><th>Status</th>' + columns.map(function (c) { return '<th>' + EC.esc(c) + '</th>'; }).join('') + '</tr>');
+        var shown = checkedRows.filter(function (r) { return !onlyBad || r.errors.length; });
+        if (!shown.length) { EC.listEmpty('#imBody', onlyBad ? 'No row has a problem.' : 'No rows.', 'bx-check-circle'); return; }
+        $('#imBody').html(shown.map(function (r) {
+            var status = r.result ? (r.result.success ? '<span class="text-success">✓ ' + EC.esc(r.result.message) + '</span>'
+                                                      : '<span class="text-danger">✗ ' + EC.esc(r.result.message) + '</span>')
+                       : r.errors.length ? '' : '<span class="text-success">OK</span>';
+            return '<tr class="' + (r.result ? (r.result.success ? 'done' : 'bad') : r.errors.length ? 'bad' : '') + '">'
+                 + '<td>' + r.line + '</td>'
+                 + (r.errors.length && !r.result ? '<td class="err">' + EC.esc(r.errors.join(' ')) + '</td>' : '<td class="' + (r.result && !r.result.success ? 'err' : '') + '">' + status + '</td>')
+                 + keys.map(function (k) { return '<td>' + EC.esc(r.cells[k] || '') + '</td>'; }).join('') + '</tr>';
+        }).join(''));
+    }
+
+    function summary() {
+        var good = checkedRows.filter(function (r) { return !r.errors.length; }).length;
+        var done = checkedRows.filter(function (r) { return r.result && r.result.success; }).length;
+        var failed = checkedRows.filter(function (r) { return r.result && !r.result.success; }).length;
+        var txt = checkedRows.length + ' rows · ' + good + ' ready · ' + (checkedRows.length - good) + ' with problems';
+        if (done || failed) txt += ' · imported ' + done + (failed ? ', ' + failed + ' refused' : '');
+        $('#imSummary').text(txt);
+        $('#imImport').prop('disabled', !checkedRows.some(function (r) { return !r.errors.length && !r.result; }));
+    }
+
+    $('#imOnlyBad').on('change', render);
+
+    $('#imCheck').on('click', function () {
+        var f = $('#imFile')[0].files[0];
+        if (!f) { ecToast('error', 'Choose the CSV file first.'); return; }
+        var fd = new FormData();
+        fd.append('kind', kind);
+        fd.append('file', f);
+        var $b = $(this); EC.buttonBusy($b, 'Checking…');
+        $.ajax({ url: URL.check, type: 'POST', data: fd, processData: false, contentType: false, headers: { 'RequestVerificationToken': CSRF } })
+            .done(function (d) {
+                if (!d.success) { ecToast('error', d.message || 'Could not read the file.'); return; }
+                columns = d.columns; keys = d.keys; checkedRows = d.rows;
+                $('#imResult').removeClass('d-none');
+                summary(); render();
+            })
+            .fail(function () { ecToast('error', 'Could not check the file. Please retry.'); })
+            .always(function () { EC.buttonReset($b); });
+    });
+
+    // the good rows go in batches of 20, so a long file shows its progress
+    $('#imImport').on('click', async function () {
+        var todo = checkedRows.filter(function (r) { return !r.errors.length && !r.result; });
+        if (!todo.length) return;
+        var ok = await EC.confirm({ title: 'Import ' + todo.length + ' rows?', message: 'Rows with problems are left out. This cannot be undone from here.', okText: 'Import' });
+        if (!ok) return;
+        var $b = $(this); EC.buttonBusy($b, 'Importing…');
+        $('#imProgress').removeClass('d-none');
+        for (var i = 0; i < todo.length; i += 20) {
+            var batch = todo.slice(i, i + 20);
+            try {
+                var d = await $.ajax({ url: URL.save, type: 'POST', contentType: 'application/json', headers: { 'RequestVerificationToken': CSRF },
+                                       data: JSON.stringify({ kind: kind, rows: batch.map(function (r) { return { line: r.line, cells: r.cells }; }) }) });
+                if (!d.success) { ecToast('error', d.message || 'Import stopped.'); break; }
+                d.results.forEach(function (x) {
+                    var row = checkedRows.find(function (r) { return r.line === x.line; });
+                    if (row) row.result = x;
+                });
+            } catch (e) {
+                ecToast('error', 'Import stopped (connection). Press Import again to continue with the rest.');
+                break;
+            }
+            $('#imProgress .progress-bar').css('width', Math.round(100 * Math.min(i + 20, todo.length) / todo.length) + '%');
+            summary(); render();
+        }
+        EC.buttonReset($b);
+        summary();
+        ecToast('success', 'Import finished. Check the rows marked ✗.');
+    });
+
+    showKind();
+})();
+</script>
+}
