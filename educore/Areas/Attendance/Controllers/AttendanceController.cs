@@ -101,6 +101,9 @@ namespace educore.Areas.Attendance.Controllers
                 DateTime.ParseExact(d, Dates.Iso, System.Globalization.CultureInfo.InvariantCulture),
                 TenantId(), SchoolId(), UserId());
 
+            // parents' numbers only for a class the user teaches (office staff: all)
+            bool phoneOk = ContactAccess.CanSee(await ContactAccess.AllowedSectionsAsync(this), @class, section);
+
             return Json(new
             {
                 canMark = cannotMark == null,
@@ -114,7 +117,7 @@ namespace educore.Areas.Attendance.Controllers
                     name   = s.StudentName,
                     roll   = s.RollNo,
                     parent = s.GuardianName,
-                    phone  = s.Mobile,
+                    phone  = phoneOk ? s.Mobile : ContactAccess.Mask(s.Mobile),
                     // "" = not marked yet; otherwise present | absent | late | leave as stored.
                     status = string.IsNullOrWhiteSpace(s.Status) ? "" : s.Status.ToLowerInvariant(),
                     marked = s.IsMarked

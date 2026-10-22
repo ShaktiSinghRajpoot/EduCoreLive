@@ -187,6 +187,12 @@ namespace educore.Areas.School.Controllers
             if (rows.Count == 0 || rows.Count > 50)
                 return Json(new { success = false, message = "Send between 1 and 50 rows." });
 
+            // old dues are money owed: settings.manage alone may not add them
+            if (kind == "dues" && !await HasPermissionAttribute.UserHasAsync(this, "fees.manage"))
+                return Json(new { success = false, message = "Importing dues needs the fees.manage permission." });
+            // salary and bank columns are kept only for someone with payroll.manage
+            bool payOk = kind == "staff" && await HasPermissionAttribute.UserHasAsync(this, "payroll.manage");
+
             var ctx = await ContextAsync(kind);
             var results = new List<object>();
             foreach (var row in rows)
@@ -201,7 +207,7 @@ namespace educore.Areas.School.Controllers
                 }
                 var (ok, message) = kind switch
                 {
-                    "staff" => await SaveStaffAsync(cells, ctx),
+                    "staff" => await SaveStaffAsync(cells, ctx, payOk),
                     "dues" => await _import.AddOpeningDueAsync(V(cells, "Admission No"), Money(V(cells, "Amount")) ?? 0,
                                                                V(cells, "Note"), V(cells, "From Session"), TenantId(), SchoolId(), UserId()),
                     _ => await SaveStudentAsync(cells, ctx)
@@ -343,7 +349,7 @@ namespace educore.Areas.School.Controllers
             return (res.Success, res.Success ? $"{model.StudentName} admitted ({res.AdmissionNo})." : res.Message);
         }
 
-        private async Task<(bool, string)> SaveStaffAsync(Dictionary<string, string> r, Context ctx)
+        private async Task<(bool, string)> SaveStaffAsync(Dictionary<string, string> r, Context ctx, bool payOk)
         {
             var des = ctx.Designations[V(r, "Designation")];
             var model = new StaffModel
@@ -359,10 +365,10 @@ namespace educore.Areas.School.Controllers
                 JoiningDate = Date(V(r, "Joining Date")),
                 Qualification = NullIf(V(r, "Qualification")),
                 ExperienceYears = int.TryParse(V(r, "Experience Years"), out var y) ? y : null,
-                MonthlySalary = Money(V(r, "Monthly Salary")),
-                BankAccountNo = NullIf(V(r, "Bank Account No")),
-                IfscCode = NullIf(V(r, "IFSC")),
-                Pan = NullIf(V(r, "PAN")),
+                MonthlySalary = payOk ? Money(V(r, "Monthly Salary")) : null,
+                BankAccountNo = payOk ? NullIf(V(r, "Bank Account No")) : null,
+                IfscCode = payOk ? NullIf(V(r, "IFSC")) : null,
+                Pan = payOk ? NullIf(V(r, "PAN")) : null,
                 Aadhaar = NullIf(V(r, "Aadhaar No")),
                 Status = "Active",
                 CreateLogin = false

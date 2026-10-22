@@ -58,6 +58,21 @@ namespace educore.Areas.School.Controllers
                 model.EnableRegistrationFee = false;
             }
 
+            // Switching a module on or off stays with the School Admin: anyone else keeps
+            // the school's current switches, whatever the form sent.
+            if (!await HasPermissionAttribute.UserIsAdminAsync(this))
+            {
+                var current = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, actionUserId);
+                model.EnableTransport  = current.EnableTransport;
+                model.EnableExams      = current.EnableExams;
+                model.EnableInventory  = current.EnableInventory;
+                model.EnablePayroll    = current.EnablePayroll;
+                model.EnableAttendance = current.EnableAttendance;
+                model.EnableAcademics  = current.EnableAcademics;
+                model.EnableFees       = current.EnableFees;
+                model.EnableAccounts   = current.EnableAccounts;
+            }
+
             int result;
             try
             {

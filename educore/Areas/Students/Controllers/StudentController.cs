@@ -84,6 +84,11 @@ namespace educore.Areas.Students.Controllers
             await _admissionService.GetStudentListPageAsync(query, TenantId(), SchoolId(), UserId());
             if (!canViewFees)
                 foreach (var s in query.Items) { s.FeeStatus = ""; s.FeeDue = 0; s.AnnualTotal = 0; }
+
+            // a teacher sees parents' numbers only for the classes they teach
+            var allowed = await ContactAccess.AllowedSectionsAsync(this);
+            foreach (var s in query.Items)
+                if (!ContactAccess.CanSee(allowed, s.ClassName, s.Section)) s.Mobile = ContactAccess.Mask(s.Mobile);
             return View(query);
         }
 
@@ -215,6 +220,8 @@ namespace educore.Areas.Students.Controllers
                 filterYear: string.IsNullOrWhiteSpace(year) ? null : year,
                 filterStatus: "Active");
 
+            // dues are fee data: without fees.view the column is sent empty
+            bool seeFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
             var roster = items.Select(s => new
             {
                 id      = s.StudentId,
@@ -224,7 +231,7 @@ namespace educore.Areas.Students.Controllers
                 sec     = s.Section,
                 // what the child owes today; months still ahead and next
                 // session's fees are not dues yet (as at a real fee counter)
-                due     = s.FeeDueNow
+                due     = seeFees ? s.FeeDueNow : (decimal?)null
             });
             return Json(roster);
         }
@@ -421,6 +428,9 @@ namespace educore.Areas.Students.Controllers
             // page too). The page hides the Fee tab when fee comes back null.
             bool canViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
 
+            // Parents' numbers, e-mail and address: a teacher sees them only for a class they teach.
+            bool contactsOk = ContactAccess.CanSee(await ContactAccess.AllowedSectionsAsync(this), viewClass, viewSection);
+
             // month/year null on the first load: the page picks a month from the list
             // that comes back and asks again, so we do not guess which one it wants.
             var att = await _attendanceService.GetStudentAttendanceAsync(
@@ -494,9 +504,10 @@ namespace educore.Areas.Students.Controllers
                     year      = viewYear,
                     guardian  = student.GuardianName ?? "—",
                     mother    = student.MotherName ?? "—",
-                    mobile    = student.MobileNumber ?? "—",
-                    altMobile = student.AlternateMobile ?? "—",
-                    address   = student.Address ?? "—",
+                    mobile    = (contactsOk ? student.MobileNumber : ContactAccess.Mask(student.MobileNumber)) ?? "—",
+                    altMobile = (contactsOk ? student.AlternateMobile : ContactAccess.Mask(student.AlternateMobile)) ?? "—",
+                    address   = (contactsOk ? student.Address : null) ?? "—",
+                    contactsHidden = !contactsOk,
                     blood     = student.BloodGroup ?? "—",
                     religion  = student.Religion ?? "—",
                     category  = student.Category ?? "—",
@@ -511,10 +522,10 @@ namespace educore.Areas.Students.Controllers
                     udise     = student.UdiseStudentId ?? "—",
                     fatherOcc  = student.FatherOccupation ?? "—",
                     fatherQual = student.FatherQualification ?? "—",
-                    fatherEmail = student.FatherEmail ?? "—",
+                    fatherEmail = (contactsOk ? student.FatherEmail : null) ?? "—",
                     motherOcc  = student.MotherOccupation ?? "—",
                     motherQual = student.MotherQualification ?? "—",
-                    motherEmail = student.MotherEmail ?? "—",
+                    motherEmail = (contactsOk ? student.MotherEmail : null) ?? "—",
                     income    = student.AnnualIncome
                 },
                 fee = !canViewFees ? null : (object)new

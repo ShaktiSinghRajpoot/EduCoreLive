@@ -557,6 +557,9 @@ namespace educore.Areas.Exams.Controllers
         {
             var sheet = await _results.GetClassResultAsync(examId, classId, section, TenantId(), SchoolId(), UserId());
             if (sheet == null) return Json(new { success = false, message = "Could not load the result for that class." });
+            // before publishing, only the exam manager sees the result (ranks and fails included)
+            if (sheet.ResultsStatus != "Published" && !await HasPermissionAttribute.UserHasAsync(this, "exams.manage"))
+                return Json(new { success = false, message = "The results are not published yet." });
 
             return Json(new
             {
@@ -604,6 +607,8 @@ namespace educore.Areas.Exams.Controllers
         {
             var sheet = await _results.GetClassResultAsync(examId, classId, section, TenantId(), SchoolId(), UserId());
             if (sheet == null) return NotFound();
+            if (sheet.ResultsStatus != "Published" && !await HasPermissionAttribute.UserHasAsync(this, "exams.manage"))
+                return NotFound();
 
             var sb = new StringBuilder();
             var head = new List<string> { "Roll No", "Admission No", "Student", "Section" };

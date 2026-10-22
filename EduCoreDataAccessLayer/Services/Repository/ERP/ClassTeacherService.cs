@@ -142,6 +142,37 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return await ReadClassesOfAsync(tenantId, schoolId, userId, staffId);
         }
 
+        public async Task<HashSet<string>> GetTaughtSectionsAsync(int tenantId, int schoolId, int userId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || userId <= 0) return new HashSet<string>();
+            return await _cache.GetOrCreateAsync(AppCache.Key($"taught-sections:u{userId}", tenantId, schoolId),
+                () => ReadTaughtSectionsAsync(tenantId, schoolId, userId), TimeSpan.FromMinutes(5));
+        }
+
+        private async Task<HashSet<string>> ReadTaughtSectionsAsync(int tenantId, int schoolId, int userId)
+        {
+            var set = new HashSet<string>();
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = userId },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "my_sections_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_my_class_sections", p);
+            if (ds.Tables.Count == 0) return set;
+
+            foreach (DataRow row in ds.Tables[0].Rows)
+                set.Add(SectionKey(Str(row, "class_name"), Str(row, "section_name")));
+            return set;
+        }
+
+        /// <summary>"class|section", trimmed and lower case, so names match however they were typed.</summary>
+        public static string SectionKey(string? className, string? section) =>
+            (className ?? "").Trim().ToLowerInvariant() + "|" + (section ?? "").Trim().ToLowerInvariant();
+
         private async Task<List<MyClassSection>> ReadClassesOfAsync(int tenantId, int schoolId, int userId, int? staffId)
         {
             var list = new List<MyClassSection>();

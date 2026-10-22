@@ -39,6 +39,10 @@ namespace educore.Areas.School.Controllers
             return off;
         }
 
+        // rbac.manage lets a user see the roles, but changing them stays with the School
+        // Admin: whoever can edit roles could give their own role every permission.
+        private const string OnlyAdmin = "Only a School Admin can change roles and their permissions.";
+
         // ── GET: /school/roles ───────────────────────────────────
         [Route("school/roles")]
         public async Task<IActionResult> Index()
@@ -55,6 +59,11 @@ namespace educore.Areas.School.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Save(RoleModel model, string? templateName)
         {
+            if (!await HasPermissionAttribute.UserIsAdminAsync(this))
+            {
+                TempData["ErrorMessage"] = OnlyAdmin;
+                return RedirectToAction("Index");
+            }
             if (string.IsNullOrWhiteSpace(model.RoleName))
             {
                 TempData["ErrorMessage"] = "Role name is required.";
@@ -85,6 +94,11 @@ namespace educore.Areas.School.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Delete(int id)
         {
+            if (!await HasPermissionAttribute.UserIsAdminAsync(this))
+            {
+                TempData["ErrorMessage"] = OnlyAdmin;
+                return RedirectToAction("Index");
+            }
             var (ok, message) = await _rbac.DeleteRoleAsync(id, TenantId(), SchoolId(), UserId());
             TempData[ok > 0 ? "SuccessMessage" : "ErrorMessage"] = ok > 0 ? "Role deleted." : message;
             return RedirectToAction("Index");
@@ -105,6 +119,11 @@ namespace educore.Areas.School.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SavePermissions(int roleId, int[] permissionIds)
         {
+            if (!await HasPermissionAttribute.UserIsAdminAsync(this))
+            {
+                TempData["ErrorMessage"] = OnlyAdmin;
+                return RedirectToAction("Index");
+            }
             var (ok, message) = await _rbac.SavePermissionsAsync(
                 roleId, permissionIds ?? Array.Empty<int>(), TenantId(), SchoolId(), UserId());
 

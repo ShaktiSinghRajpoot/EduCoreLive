@@ -119,6 +119,7 @@ namespace educore.Areas.Staff.Controllers
         public async Task<IActionResult> AddStaff()
         {
             var model = new StaffModel();
+            await SetPayFlagsAsync();
             await FillDropdownsAsync(model);
             return View(model);
         }
@@ -128,6 +129,14 @@ namespace educore.Areas.Staff.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> AddStaff(StaffModel model)
         {
+            // salary and bank details are saved only by someone with payroll.manage
+            if (!await SetPayFlagsAsync())
+            {
+                model.MonthlySalary = null;
+                model.BankAccountNo = null;
+                model.IfscCode = null;
+                model.Pan = null;
+            }
             ValidateLogin(model);
             ValidateDetails(model);
             if (!ModelState.IsValid)
@@ -187,7 +196,9 @@ namespace educore.Areas.Staff.Controllers
             }
 
             // Salary is payroll data: staff.view alone does not show it (payroll.view does).
-            ViewBag.CanSeeSalary = payrollOn && await HasPermissionAttribute.UserHasAsync(this, "payroll.view");
+            // Bank account, IFSC and PAN are the same kind of private data.
+            ViewBag.CanSeePay = await HasPermissionAttribute.UserHasAsync(this, "payroll.view");
+            ViewBag.CanSeeSalary = payrollOn && ViewBag.CanSeePay;
 
             // "Class teacher of: Class 3-A (2026-27)" -- current session.
             try { ViewBag.ClassTeacherOf = await classTeacher.GetClassesOfAsync(TenantId(), SchoolId(), UserId(), staffId: model.StaffId); }
@@ -230,6 +241,16 @@ namespace educore.Areas.Staff.Controllers
                 model.Aadhaar = digits.Length < 4 ? "XXXX XXXX XXXX" : "XXXX XXXX " + digits[^4..];
             }
 
+            // Salary, bank account, IFSC and PAN are payroll data: payroll.view to see them.
+            await SetPayFlagsAsync();
+            if (ViewBag.CanSeePay != true)
+            {
+                model.MonthlySalary = null;
+                model.BankAccountNo = null;
+                model.IfscCode = null;
+                model.Pan = null;
+            }
+
             await FillDropdownsAsync(model);
             return View(model);
         }
@@ -243,6 +264,18 @@ namespace educore.Areas.Staff.Controllers
             if (staffId == 0) return RedirectToAction("StaffList");
 
             model.StaffId = staffId;
+
+            // The save writes every column, so without payroll.manage the salary and bank
+            // details are put back from the saved row -- whatever the form sent.
+            if (!await SetPayFlagsAsync())
+            {
+                var saved = await _staffService.GetStaffByIdAsync(staffId, TenantId(), SchoolId(), UserId());
+                if (saved == null) return RedirectToAction("StaffList");
+                model.MonthlySalary = saved.MonthlySalary;
+                model.BankAccountNo = saved.BankAccountNo;
+                model.IfscCode = saved.IfscCode;
+                model.Pan = saved.Pan;
+            }
             ValidateLogin(model);
             ValidateDetails(model);
             if (!ModelState.IsValid)
@@ -284,6 +317,15 @@ namespace educore.Areas.Staff.Controllers
         }
 
         // ── helpers ──────────────────────────────────────────────
+        // Sets ViewBag.CanSeePay / CanEditPay for the staff forms and returns CanEditPay.
+        private async Task<bool> SetPayFlagsAsync()
+        {
+            bool canEdit = await HasPermissionAttribute.UserHasAsync(this, "payroll.manage");
+            ViewBag.CanEditPay = canEdit;
+            ViewBag.CanSeePay = canEdit || await HasPermissionAttribute.UserHasAsync(this, "payroll.view");
+            return canEdit;
+        }
+
         // Fill the model's dropdown sources (CRM-style Model.XList) so the view
         // binds them with asp-items — no ViewBag, no JSON serialize.
         private async Task FillDropdownsAsync(StaffModel model)

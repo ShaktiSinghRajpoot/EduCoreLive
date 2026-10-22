@@ -221,7 +221,7 @@ namespace educore.Areas.School.Controllers
         // The school picks how receipts print: A4 (letterhead) / A5 (compact) /
         // Thermal (80mm counter roll). Stored per school, applied to every receipt.
         [HttpPost]
-        [HasPermission("fees.manage")]
+        [HasPermission("settings.manage")]   // a school-wide setting, not a cashier's choice
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SaveReceiptFormat([FromBody] ReceiptFormatRequest req)
         {

@@ -71,6 +71,25 @@ namespace educore.Helpers
                 permissionKey, activeRoleId);
         }
 
+        /// <summary>
+        /// True only for a School Admin (or Super Admin) -- not for a role that merely
+        /// holds many permissions. Used where a power must stay with the admin, e.g.
+        /// editing roles or switching modules: a clerk given rbac.manage must not be
+        /// able to give themselves everything.
+        /// </summary>
+        public static async Task<bool> UserIsAdminAsync(Controller controller)
+        {
+            var ctx   = controller.HttpContext;
+            var perms = ctx.RequestServices.GetRequiredService<IPermissionService>();
+            int activeRoleId = ctx.Session.GetInt32(Common.SK_ActiveRoleId) ?? 0;
+            var (isAdmin, _) = await perms.GetUserAccessAsync(
+                ClaimInt(ctx.User, Common.SK_TenantId),
+                ClaimInt(ctx.User, Common.SK_SchoolId),
+                ClaimInt(ctx.User, Common.SK_UserId),
+                activeRoleId);
+            return isAdmin;
+        }
+
         private static int ClaimInt(System.Security.Claims.ClaimsPrincipal u, string type) =>
             int.TryParse(u.FindFirst(type)?.Value, out var v) ? v : 0;
     }

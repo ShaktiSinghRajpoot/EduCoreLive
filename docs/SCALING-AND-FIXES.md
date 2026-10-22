@@ -5919,3 +5919,13 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - **Homework** (`homework_owner_fix.sql`): a login without a staff record owns no homework (NULL matched NULL, so any office login could edit or delete office-given homework). Managers still can.
 - **Uploads** (`Helpers/UploadsGuard.cs`, before the static files in `Program.cs`): `/uploads/{kind}/{tenant}/{school}/...` opens only for a user signed in to that school (Super Admin: any); anything else is a 404. Photos, logo, seal and signature were reachable by anyone with the link.
 - Bundle `deploy_2026_10_19i.sql`.
+
+### 2026-10-22 — Permission review inside a school
+- **What stays with the School Admin** (`staff_access_guards.sql`, `core.sp_staff_manage`): resetting a School Admin's password, changing a School Admin's roles, and giving anyone a role that holds `rbac.manage`, `settings.manage`, `staff.manage`, `payroll.manage` or `admission_workflow.manage`. Before, staff.manage alone could reset the principal's password and sign in as them. Roles: `rbac.manage` still opens the Roles pages, but Save / Delete / the permission matrix save need the School Admin (`HasPermissionAttribute.UserIsAdminAsync`). Modules & Workflow: the module switches are saved only for the School Admin; anyone else keeps the school's current switches.
+- **Salary, bank account, IFSC, PAN**: shown with `payroll.view` (staff profile, Edit Staff), saved only with `payroll.manage` (Edit keeps the stored values, Add and Import leave them empty).
+- **Fee data on other pages needs `fees.view`**: dues on the Promotion roster (shown as "—"), "hold cards of students with fees due" on Admit Cards, the school's whole-day takings on Day Close. Previous-dues import needs `fees.manage`.
+- **Exam results before publishing** (class result and its CSV) need `exams.manage`.
+- **Parents' contacts** (mobile, alternate mobile, e-mail, address): a teacher sees them only for the classes they teach -- a timetable period or class teacher (`core.sp_my_class_sections`, `student_contact_scope.sql`; `Helpers/ContactAccess.cs`); for other students the number is masked (XXXXXX3210). Admin, `students.manage` and staff who teach nothing (front desk, accounts) see all as before. Student profile, student list + its export, attendance roster.
+- Smaller: receipt format is `settings.manage` (was the cashier's `fees.manage`), "Seen by" on a notice is `notices.manage`.
+- Demo school: the TEACHER role's `exams.marks` grant put back (an earlier test had switched it off).
+- Bundle `deploy_2026_10_22a.sql`.

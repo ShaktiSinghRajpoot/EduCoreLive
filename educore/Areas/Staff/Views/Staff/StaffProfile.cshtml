@@ -139,9 +139,12 @@
               <div class="col-6 col-md-4 sp-field"><label>Monthly Salary</label><span>@(Model.MonthlySalary.HasValue ? "₹" + Money.Inr(Model.MonthlySalary.Value) : "—")</span></div>
               }
               <div class="col-6 col-md-4 sp-field"><label>Alt Mobile</label><span>@Dash(Model.AltMobile)</span></div>
+              @if (ViewBag.CanSeePay == true)
+              {
               <div class="col-6 col-md-4 sp-field"><label>PAN</label><span>@Dash(Model.Pan)</span></div>
               <div class="col-6 col-md-4 sp-field"><label>Bank A/C No</label><span>@Dash(Model.BankAccountNo)</span></div>
               <div class="col-6 col-md-4 sp-field"><label>IFSC</label><span>@Dash(Model.IfscCode)</span></div>
+              }
               <div class="col-6 col-md-4 sp-field mb-0"><label>Aadhaar</label><span>@MaskAadhaar(Model.Aadhaar)</span></div>
             </div>
           </div>

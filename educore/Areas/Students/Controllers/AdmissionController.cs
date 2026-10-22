@@ -526,6 +526,9 @@ namespace educore.Areas.Students.Controllers
 
             int totalPages = totalCount > 0 ? (int)Math.Ceiling((double)totalCount / pageSize) : 1;
 
+            // a teacher sees parents' numbers only for the classes they teach
+            var allowed = await ContactAccess.AllowedSectionsAsync(this);
+
             return Json(new
             {
                 success = true,
@@ -545,7 +548,7 @@ namespace educore.Areas.Students.Controllers
                     academicYear = s.AcademicYear,
                     admissionDate = s.AdmissionDate,
                     guardianName = s.GuardianName,
-                    mobile       = s.Mobile,
+                    mobile       = ContactAccess.CanSee(allowed, s.ClassName, s.Section) ? s.Mobile : ContactAccess.Mask(s.Mobile),
                     annualTotal  = canViewFees ? s.AnnualTotal : 0,
                     status       = s.Status,
                     approvalStatus = s.ApprovalStatus,

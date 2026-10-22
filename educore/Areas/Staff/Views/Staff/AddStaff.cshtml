@@ -161,6 +161,9 @@
             </div>
             <div class="es-card-body">
               <div class="row g-3">
+                @* salary and bank details are entered only with payroll.manage *@
+                @if (ViewBag.CanEditPay == true)
+                {
                 @if (payrollOn)
                 {
                 <div class="col-12 col-md-4">
@@ -180,6 +183,7 @@
                   <label class="es-label">PAN</label>
                   <input asp-for="Pan" class="form-control" placeholder="ABCDE1234F">
                 </div>
+                }
                 <div class="col-12 col-md-4">
                   <label class="es-label">Aadhaar No</label>
                   <input asp-for="Aadhaar" maxlength="12" class="form-control" placeholder="12 digit Aadhaar">

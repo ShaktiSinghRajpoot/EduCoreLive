@@ -440,7 +440,7 @@ document.getElementById('loadBtn').addEventListener('click', function(){
   $.getJSON(ROSTER_URL, { 'class':cls, section:sec, year:yr })
   .done(function(list){
     roster=(list||[]).map(function(s,i){
-      return {id:s.id, name:s.name, roll:s.roll||'', cls:s.cls, sec:s.sec||'', due:s.due||0, color:PALETTE[i%PALETTE.length]};
+      return {id:s.id, name:s.name, roll:s.roll||'', cls:s.cls, sec:s.sec||'', due:(s.due == null ? null : s.due), color:PALETTE[i%PALETTE.length]};
     });
     outcome={}; targetClass={}; unpicked={};
     roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
@@ -533,7 +533,7 @@ function render(){
       +   '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
       +'</div></td>'
       +'<td>'+EC.esc(s.roll||'—')+'</td>'
-      +'<td><span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> '+inr(s.due) : 'Paid up')+'</span></td>'
+      +'<td>'+(s.due == null ? '—' : '<span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> '+inr(s.due) : 'Paid up')+'</span>')+'</td>'
       +'<td>'+ncTxt+'</td>'
       +'<td>'+seg(s.id, oc)+'</td>'
       +'</tr>';
@@ -552,7 +552,7 @@ function render(){
       +  '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.roll||'—')+' · '+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
       +'</div>'
       +'<div class="pr-mob-meta">'
-      +  '<span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> Fee due '+inr(s.due) : 'Fees paid up')+'</span>'
+      +  (s.due == null ? '' : '<span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> Fee due '+inr(s.due) : 'Fees paid up')+'</span>')
       +'</div>'
       +'<div class="text-muted small fw-bold mb-2"><i class="bx bx-right-arrow-alt"></i> '+ncTxt+'</div>'
       +seg(s.id, oc, 'ocm')

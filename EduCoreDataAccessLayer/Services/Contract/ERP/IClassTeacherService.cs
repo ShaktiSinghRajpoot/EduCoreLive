@@ -38,5 +38,12 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         /// </summary>
         Task<List<MyClassSection>> GetClassesOfAsync(int tenantId, int schoolId, int userId,
                                                      int? staffId = null, bool cached = false);
+
+        /// <summary>
+        /// The class-sections this user teaches in the current session (a timetable period
+        /// or class teacher), as "class|section" in lower case. Empty = teaches nothing.
+        /// Cached 5 min (student_contact_scope.sql).
+        /// </summary>
+        Task<HashSet<string>> GetTaughtSectionsAsync(int tenantId, int schoolId, int userId);
     }
 }

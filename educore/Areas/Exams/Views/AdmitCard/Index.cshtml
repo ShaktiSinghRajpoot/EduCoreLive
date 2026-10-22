@@ -75,7 +75,7 @@
           </div>
         </div>
 
-        @if (feesOn)
+        @if (feesOn && ViewBag.CanSeeFees == true)
         {
         <div class="form-check mt-3">
           <input class="form-check-input" type="checkbox" id="acHoldDues" />

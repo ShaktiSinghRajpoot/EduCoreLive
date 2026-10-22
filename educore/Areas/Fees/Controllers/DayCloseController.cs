@@ -40,6 +40,8 @@ namespace educore.Areas.Fees.Controllers
         {
             var d = Dates.Norm(date);
             var day = await _feePaymentService.GetDayCollectionAsync(d, TenantId(), SchoolId(), UserId());
+            // the whole school's takings are for fee staff; a cashier sees their own counter
+            bool seeSchool = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
             return Json(new
             {
                 date           = day.Date,
@@ -58,8 +60,8 @@ namespace educore.Areas.Fees.Controllers
                 closedAt       = day.ClosedAt?.ToString("dd MMM yyyy, hh:mm tt"),
                 reopenedAt     = day.ReopenedAt?.ToString("dd MMM yyyy, hh:mm tt"),
                 reopenReason   = day.ReopenReason,
-                schoolCollected = day.SchoolCollected,
-                schoolReceipts  = day.SchoolReceipts,
+                schoolCollected = seeSchool ? day.SchoolCollected : (decimal?)null,
+                schoolReceipts  = seeSchool ? day.SchoolReceipts : (int?)null,
                 modes          = day.Modes.Select(m => new { mode = m.Mode, amount = m.Amount, count = m.Count }),
                 history        = day.History.Select(h => new
                 {

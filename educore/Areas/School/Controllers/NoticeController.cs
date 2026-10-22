@@ -130,7 +130,9 @@ namespace educore.Areas.School.Controllers
             return Json(items.Select(x => x.Text).Where(t => !string.IsNullOrWhiteSpace(t)).Distinct().ToList());
         }
 
+        // who read a notice is for the people who post notices
         [HttpGet]
+        [HasPermission("notices.manage")]
         public async Task<IActionResult> SeenBy(int id)
         {
             var rows = await _notices.GetSeenByAsync(id, TenantId(), SchoolId(), UserId());

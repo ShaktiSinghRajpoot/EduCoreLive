@@ -46,10 +46,12 @@ namespace educore.Areas.Exams.Controllers
             List<SelectListItem> sessions;
             try
             {
-                sessions = await _baseService.GetSelectListAsync(
-                    "config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
+                sessions = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString());
             }
-            catch { sessions = new List<SelectListItem>(); }
+            catch
+            {
+                sessions = new List<SelectListItem>(); 
+            }
 
             foreach (var sn in sessions)
             {
@@ -66,6 +68,7 @@ namespace educore.Areas.Exams.Controllers
             }
 
             ViewBag.Exams = exams;
+            ViewBag.CanSeeFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
             return View();
         }
 
@@ -97,9 +100,7 @@ namespace educore.Areas.Exams.Controllers
         private async Task<List<string>> ExamSectionsAsync(int examId, int classId)
         {
             var exam = await _exam.GetExamAsync(examId, TenantId(), SchoolId(), UserId());
-            return exam?.Classes.FirstOrDefault(c => c.AcademicClassId == classId)?.Sections
-                       .Select(x => x.Trim()).ToList()
-                   ?? new List<string>();
+            return exam?.Classes.FirstOrDefault(c => c.AcademicClassId == classId)?.Sections.Select(x => x.Trim()).ToList() ?? new List<string>();
         }
 
         // The print sheet.
@@ -132,6 +133,10 @@ namespace educore.Areas.Exams.Controllers
                 .ThenBy(s => int.TryParse(s.RollNo, out var n) ? n : int.MaxValue)
                 .ThenBy(s => s.StudentName)
                 .ToList();
+
+            // who owes fees (and how much) is fee data: holding needs fees.view
+            if (holdDues && !await HasPermissionAttribute.UserHasAsync(this, "fees.view"))
+                holdDues = false;
 
             var held = new List<AdmitCardHeld>();
             if (holdDues && students.Count > 0)
