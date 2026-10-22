@@ -2,7 +2,7 @@
   "name": "SmartSchoolWala.com",
   "short_name": "SmartSchoolWala",
   "description": "SmartSchoolWala.com is a next-generation School ERP platform to manage, automate and empower every school.",
-  "start_url": "/",
+  "start_url": "/Account/Login",
   "scope": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",

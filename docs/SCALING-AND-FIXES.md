@@ -5929,3 +5929,9 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - Smaller: receipt format is `settings.manage` (was the cashier's `fees.manage`), "Seen by" on a notice is `notices.manage`.
 - Demo school: the TEACHER role's `exams.marks` grant put back (an earlier test had switched it off).
 - Bundle `deploy_2026_10_22a.sql`.
+
+### 2026-10-22 — Public website at "/"
+- `smartschoolwala.com/` is now the product website (`Controllers/SiteController.cs`, `Views/Site/Index.cshtml`, `wwwroot/css/site/home.css`; stands alone, no Bootstrap or app layout). Its Login buttons open `/account/login`. A signed-in user who opens "/" goes to the dashboard, as before.
+- The default route is now `{controller}/{action=Index}/{id?}`: with `{controller=Account}/{action=Login}` every generated link to the login page came out as "/", which is the website now.
+- Contact details at the top of the view are placeholders until the owner gives the real WhatsApp number and e-mail; while the number is empty, "Book a free demo" opens an e-mail.
+- `manifest.json` `start_url` is `/Account/Login`, so the installed phone app opens the portal, not the website.

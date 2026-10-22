@@ -440,9 +440,11 @@ app.MapControllerRoute(
     pattern: "{area:exists}/{controller=Dashboards}/{action=Index}/{id?}"
 );
 
+// "/" is the public website (SiteController), so the controller has no default here:
+// with {controller=Account}/{action=Login} every link to the login page came out as "/".
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Account}/{action=Login}/{id?}"
+    pattern: "{controller}/{action=Index}/{id?}"
 );
 
 app.MapRazorPages();

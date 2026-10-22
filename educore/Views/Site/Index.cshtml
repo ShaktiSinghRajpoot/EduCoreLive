@@ -1,0 +1,271 @@
+@{
+    Layout = null;
+
+    // Contact details shown on the website. PLACEHOLDERS until the owner gives the real
+    // ones: put the WhatsApp number with country code and no + or spaces (e.g. 919876543210).
+    // While it is empty, "Book a free demo" opens an e-mail instead of WhatsApp.
+    const string WhatsApp = "";
+    const string PhoneShown = "+91 XXXXX XXXXX";
+    const string Email = "hello@smartschoolwala.com";
+
+    string demoText = "Hello SmartSchoolWala, I would like a free demo for my school.\nSchool name: \nCity: \nNumber of students: ";
+    string demoLink = WhatsApp.Length > 0
+        ? "https://wa.me/" + WhatsApp + "?text=" + Uri.EscapeDataString(demoText)
+        : "mailto:" + Email + "?subject=" + Uri.EscapeDataString("Free demo for my school") + "&body=" + Uri.EscapeDataString(demoText);
+    string loginUrl = Url.Action("Login", "Account", new { area = "" })!;
+    int year = DateTime.Now.Year;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SmartSchoolWala.com | School ERP for Indian schools</title>
+    <meta name="description" content="SmartSchoolWala.com runs your whole school in one place: admissions, fees and receipts, attendance with WhatsApp alerts, exams and report cards, timetable, staff and salary, transport and the school store." />
+    <meta property="og:title" content="SmartSchoolWala.com | School ERP for Indian schools" />
+    <meta property="og:description" content="Admissions, fees, attendance, exams, staff, transport and store: one simple system for your whole school." />
+    <meta property="og:image" content="@($"{Context.Request.Scheme}://{Context.Request.Host}/img/brand/ssw-stacked.png")" />
+    <meta name="theme-color" content="#FF8A00" />
+    <link rel="icon" type="image/x-icon" href="~/img/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="~/icons/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/vendor/fonts/iconify-icons.css" />
+    <link rel="stylesheet" href="~/css/site/home.css" asp-append-version="true" />
+</head>
+<body>
+
+<!-- ───────────── Top bar ───────────── -->
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a href="/" class="nav-logo" aria-label="SmartSchoolWala.com home">
+      <img src="~/img/brand/ssw-horizontal.png" alt="SmartSchoolWala.com" />
+    </a>
+    <nav class="nav-links" id="navLinks">
+      <a href="#modules">Modules</a>
+      <a href="#why">Why us</a>
+      <a href="#switch">Getting started</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contact">Contact</a>
+      <a href="@loginUrl" class="nav-login-m">Login</a>
+    </nav>
+    <div class="nav-cta">
+      <a href="@loginUrl" class="btn btn-ghost"><i class="bx bx-lock-alt"></i>Login</a>
+      <a href="@demoLink" class="btn btn-primary" target="_blank" rel="noopener">Book a free demo</a>
+      <button class="nav-burger" id="navBurger" aria-label="Open menu"><i class="bx bx-menu"></i></button>
+    </div>
+  </div>
+</header>
+
+<!-- ───────────── Hero ───────────── -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="wrap hero-in">
+    <div class="hero-text">
+      <span class="pill"><span class="dot"></span>School ERP made for Indian schools</span>
+      <h1>Your whole school.<br /><span class="grad">One smart system.</span></h1>
+      <p class="lead">Admissions, fees and receipts, attendance with WhatsApp alerts, exams and report cards, timetable, staff salary, transport and the school store. Everything your office, teachers and principal need, on the computer and on the phone.</p>
+      <div class="hero-btns">
+        <a href="@demoLink" class="btn btn-primary btn-lg" target="_blank" rel="noopener">Book a free demo<i class="bx bx-right-arrow-alt"></i></a>
+        <a href="#modules" class="btn btn-light btn-lg">See what it does</a>
+      </div>
+      <ul class="hero-ticks">
+        <li><i class="bx bx-check"></i>Your data brought in from Excel</li>
+        <li><i class="bx bx-check"></i>Staff trained by us</li>
+        <li><i class="bx bx-check"></i>Works on any phone</li>
+      </ul>
+    </div>
+
+    @* Product picture, drawn in HTML so it stays sharp at every size. Figures are
+       sample data, not customer numbers. *@
+    <div class="hero-art" aria-hidden="true">
+      <div class="app">
+        <div class="app-bar"><span></span><span></span><span></span><em>smartschoolwala.com</em></div>
+        <div class="app-body">
+          <aside class="app-side">
+            <img src="~/img/brand/ssw-icon.svg" alt="" />
+            <span class="on"><i class="bx bx-grid-alt"></i></span><i class="bx bx-group"></i><i class="bx bx-wallet"></i>
+            <i class="bx bx-calendar-check"></i><i class="bx bx-medal"></i><i class="bx bx-bus"></i>
+          </aside>
+          <div class="app-main">
+            <div class="app-hi">Good morning, Principal <small>Today at a glance</small></div>
+            <div class="app-kpis">
+              <div class="kpi"><small>Students</small><b>1,240</b><span class="up">+38 this session</span></div>
+              <div class="kpi"><small>Present today</small><b>96.4%</b><span class="up">1,195 marked</span></div>
+              <div class="kpi"><small>Fees today</small><b>₹1,86,400</b><span class="up">74 receipts</span></div>
+            </div>
+            <div class="app-chart">
+              <div class="chart-h"><b>Fee collection</b><small>Apr – Oct</small></div>
+              <div class="bars">
+                <i style="height:62%"></i><i style="height:48%"></i><i style="height:55%"></i><i style="height:70%"></i>
+                <i style="height:58%"></i><i style="height:76%"></i><i class="hl" style="height:88%"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="float f-wa">
+        <span class="f-ic wa"><i class="bx bxl-whatsapp"></i></span>
+        <div><b>Absent alert sent</b><small>Parents of 12 students informed</small></div>
+      </div>
+      <div class="float f-rc">
+        <span class="f-ic or"><i class="bx bx-receipt"></i></span>
+        <div><b>Receipt #2418</b><small>₹ 8,200 · Class 5-A · Paid</small></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap"><div class="strip">
+    <div><i class="bx bx-rupee"></i>Fees in ₹ with A4, A5 and thermal receipts</div>
+    <div><i class="bx bxl-whatsapp"></i>WhatsApp alerts to parents</div>
+    <div><i class="bx bx-mobile-alt"></i>Install on phone like an app</div>
+    <div><i class="bx bx-shield-quarter"></i>Each school's data kept separate</div>
+  </div></div>
+</section>
+
+<!-- ───────────── Modules ───────────── -->
+<section class="sec" id="modules">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Modules</span>
+      <h2>Everything a school runs on, in one place</h2>
+      <p>Take only what your school needs. Switch a module on when you are ready for it; one you do not use never gets in the way.</p>
+    </div>
+    <div class="mods">
+      <article class="mod"><span class="mi c1"><i class="bx bx-user-plus"></i></span><h3>Admissions</h3><p>Enquiry, follow-ups, registration and admission in one flow. Admission form, documents, ID cards.</p></article>
+      <article class="mod"><span class="mi c2"><i class="bx bx-wallet"></i></span><h3>Fees &amp; receipts</h3><p>Fee structure per class, collect at the counter, instant receipts, concessions, month-wise dues, day close.</p></article>
+      <article class="mod"><span class="mi c3"><i class="bx bx-calendar-check"></i></span><h3>Attendance</h3><p>Class teachers mark in seconds on the phone. Absent students' parents get a WhatsApp alert.</p></article>
+      <article class="mod"><span class="mi c4"><i class="bx bx-medal"></i></span><h3>Exams &amp; results</h3><p>Datesheet, admit cards, marks entry by subject teacher, grades, ranks and printable report cards.</p></article>
+      <article class="mod"><span class="mi c5"><i class="bx bx-time-five"></i></span><h3>Timetable &amp; homework</h3><p>Clash-free timetable, substitutes for absent teachers, the school bell, and homework with who-did-it.</p></article>
+      <article class="mod"><span class="mi c6"><i class="bx bx-group"></i></span><h3>Staff &amp; salary</h3><p>Staff records, staff attendance, leave, monthly salary and payslips that staff can open themselves.</p></article>
+      <article class="mod"><span class="mi c7"><i class="bx bx-bus"></i></span><h3>Transport</h3><p>Routes, stops, vehicles and riders, with transport fee added to the child's fees automatically.</p></article>
+      <article class="mod"><span class="mi c8"><i class="bx bx-package"></i></span><h3>School store</h3><p>Books, uniform and stationery: purchase, stock, issue to students and sale with receipts.</p></article>
+      <article class="mod"><span class="mi c9"><i class="bx bx-line-chart"></i></span><h3>Accounts</h3><p>Expenses by category and a cash book, next to your fee collection, so the day's money adds up.</p></article>
+      <article class="mod"><span class="mi c10"><i class="bx bx-certification"></i></span><h3>Certificates &amp; TC</h3><p>Transfer certificates, bonafide and character certificates printed with the school's seal and signature.</p></article>
+      <article class="mod"><span class="mi c11"><i class="bx bx-bell"></i></span><h3>Notices &amp; calendar</h3><p>Notice board for staff and parents, holidays and events on the school calendar.</p></article>
+      <article class="mod"><span class="mi c12"><i class="bx bx-lock-alt"></i></span><h3>Roles &amp; permissions</h3><p>Principal, accountant, teacher, front desk: each sees only what their job needs.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Why us ───────────── -->
+<section class="sec sec-dark" id="why">
+  <div class="wrap why">
+    <div class="why-text">
+      <span class="kicker kicker-l">Why SmartSchoolWala</span>
+      <h2>Built the way a real school office works</h2>
+      <p>We sat with school offices before writing a line: how fees are actually collected at the counter, how a class teacher marks attendance between periods, how results go out. The software follows that, so your staff do not have to change how they work.</p>
+      <a href="@demoLink" class="btn btn-primary btn-lg" target="_blank" rel="noopener">See it on your own data<i class="bx bx-right-arrow-alt"></i></a>
+    </div>
+    <div class="why-grid">
+      <div class="why-card"><i class="bx bx-mobile-alt"></i><h3>Phone first</h3><p>Teachers mark attendance and enter marks from their phone. Install it on the home screen like an app.</p></div>
+      <div class="why-card"><i class="bx bxl-whatsapp"></i><h3>Parents stay informed</h3><p>Absent alerts, fee reminders and notices reach parents on WhatsApp.</p></div>
+      <div class="why-card"><i class="bx bx-shield-quarter"></i><h3>Safe and private</h3><p>Each school's data is kept apart, student photos open only for your staff, and every role sees only its part.</p></div>
+      <div class="why-card"><i class="bx bx-receipt"></i><h3>Money that adds up</h3><p>Every receipt is numbered, cancellations need a reason, and the day close shows what each counter collected.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Getting started ───────────── -->
+<section class="sec" id="switch">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Getting started</span>
+      <h2>From your registers to live in days, not months</h2>
+      <p>No need to type in every student again. We bring your existing data over and stay with you until your office is comfortable.</p>
+    </div>
+    <ol class="steps">
+      <li><span>1</span><h3>Free demo</h3><p>We show you the system with a sample school, on a call or at your school.</p></li>
+      <li><span>2</span><h3>Your data comes in</h3><p>Students, staff and old dues are imported from Excel and checked row by row.</p></li>
+      <li><span>3</span><h3>Setup &amp; training</h3><p>Classes, fee structure and timetable set up together; your staff are trained.</p></li>
+      <li><span>4</span><h3>Go live</h3><p>Start collecting fees and marking attendance. We are a call away when you need us.</p></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ───────────── FAQ ───────────── -->
+<section class="sec sec-soft" id="faq">
+  <div class="wrap faq-wrap">
+    <div class="sec-head left">
+      <span class="kicker">FAQ</span>
+      <h2>Questions schools ask us</h2>
+      <p>Anything else? Ask us on the demo call.</p>
+    </div>
+    <div class="faq">
+      <details><summary>How much does it cost?<i class="bx bx-chevron-down"></i></summary><p>The price depends on the number of students and the modules your school takes. Book a free demo and we will send you a quote for your school.</p></details>
+      <details><summary>Do we need to install anything?<i class="bx bx-chevron-down"></i></summary><p>No. It opens in the browser on any computer or phone. On a phone you can add it to the home screen and use it like an app.</p></details>
+      <details><summary>We already have our data in Excel. Do we type it again?<i class="bx bx-chevron-down"></i></summary><p>No. Students, staff and previous dues are imported from Excel. Every row is checked first, and nothing is saved until you confirm.</p></details>
+      <details><summary>Can a teacher see fees or salaries?<i class="bx bx-chevron-down"></i></summary><p>Only if you allow it. Every role has its own permissions: a teacher sees their classes, the accountant sees fees, and salary stays with whoever you choose.</p></details>
+      <details><summary>Is our data safe?<i class="bx bx-chevron-down"></i></summary><p>Each school's data is kept separate from every other school's. Sign-in is by password, photos and documents open only for your signed-in staff, and every receipt records who collected it.</p></details>
+      <details><summary>Can we start with only fees and add the rest later?<i class="bx bx-chevron-down"></i></summary><p>Yes. Modules are switched on per school, so you can begin with what you need most and add others whenever you are ready.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Call to action + contact ───────────── -->
+<section class="sec" id="contact">
+  <div class="wrap">
+    <div class="cta">
+      <div class="cta-glow"></div>
+      <div class="cta-text">
+        <h2>See SmartSchoolWala on a free demo</h2>
+        <p>Tell us your school's name and city. We will set up a time that suits your office.</p>
+      </div>
+      <div class="cta-btns">
+        <a href="@demoLink" class="btn btn-white btn-lg" target="_blank" rel="noopener"><i class="bx @(WhatsApp.Length > 0 ? "bxl-whatsapp" : "bx-envelope")"></i>Book a free demo</a>
+        <a href="@loginUrl" class="btn btn-outline-w btn-lg">Already a customer? Login</a>
+      </div>
+    </div>
+    <div class="contact">
+      <div><span class="ci"><i class="bx bx-phone"></i></span><span><small>Call or WhatsApp</small>@PhoneShown</span></div>
+      <div><span class="ci"><i class="bx bx-envelope"></i></span><span><small>E-mail</small><a href="mailto:@Email">@Email</a></span></div>
+      <div><span class="ci"><i class="bx bx-lock-alt"></i></span><span><small>School portal</small><a href="@loginUrl">Login to your school</a></span></div>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <img src="~/img/brand/ssw-horizontal.png" alt="SmartSchoolWala.com" />
+    <span>© @year SmartSchoolWala.com · School ERP for Indian schools</span>
+    <a href="@loginUrl">Login</a>
+  </div>
+</footer>
+
+<script>
+(function () {
+    var nav = document.getElementById('nav');
+    var links = document.getElementById('navLinks');
+    var burger = document.getElementById('navBurger');
+
+    // the bar gets a shadow once the page is scrolled
+    function onScroll() { nav.classList.toggle('scrolled', window.scrollY > 8); }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    // phone menu
+    burger.addEventListener('click', function () {
+        var open = links.classList.toggle('open');
+        burger.innerHTML = open ? '<i class="bx bx-x"></i>' : '<i class="bx bx-menu"></i>';
+    });
+    links.addEventListener('click', function (e) {
+        if (e.target.tagName === 'A') { links.classList.remove('open'); burger.innerHTML = '<i class="bx bx-menu"></i>'; }
+    });
+
+    // sections fade in as they come into view
+    if ('IntersectionObserver' in window) {
+        var seen = new IntersectionObserver(function (entries) {
+            entries.forEach(function (en) {
+                if (en.isIntersecting) { en.target.classList.add('in'); seen.unobserve(en.target); }
+            });
+        }, { threshold: 0.12 });
+        document.querySelectorAll('.mod, .why-card, .steps li, .faq details, .sec-head').forEach(function (el) {
+            el.classList.add('reveal');
+            seen.observe(el);
+        });
+    }
+})();
+</script>
+</body>
+</html>
