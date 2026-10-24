@@ -1,0 +1,89 @@
+@model List<EduCoreDataAccessLayer.Models.WebsiteEnquiry>
+@{
+    ViewData["Title"] = "Website Enquiries";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    string? status = ViewBag.Status as string;
+    var statuses = (string[])ViewBag.Statuses;
+    string Badge(string s) => s switch { "New" => "bg-label-danger", "Contacted" => "bg-label-warning", "Demo done" => "bg-label-info", _ => "bg-label-secondary" };
+}
+
+@*
+   Platform > Website Enquiries (EnquiriesController). "Book a free demo" forms from the
+   public website. Call the school, then set the status and a note.
+*@
+
+<div class="ec-page-shell">
+  <div class="ec-page-content">
+
+    <div class="ec-page-header">
+      <div class="ec-page-header-inner">
+        <div class="d-flex align-items-center gap-2">
+          <div class="ec-page-icon"><i class="bx bx-envelope"></i></div>
+          <div>
+            <h4 class="ec-page-title mb-1">Website Enquiries</h4>
+            <p class="ec-page-subtitle">Schools that asked for a demo on smartschoolwala.com</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ul class="nav nav-pills mb-3 gap-2 flex-wrap">
+      <li class="nav-item"><a class="nav-link @(status == null ? "active" : "")" asp-action="Index">All</a></li>
+      @foreach (var s in statuses)
+      {
+        <li class="nav-item"><a class="nav-link @(status == s ? "active" : "")" asp-action="Index" asp-route-status="@s">@s</a></li>
+      }
+    </ul>
+
+    @if (Model.Count == 0)
+    {
+      <div class="card"><div class="card-body text-center text-muted py-5">
+        <i class="bx bx-envelope fs-1 d-block mb-2"></i>No enquiries @(status == null ? "yet" : "marked " + status).
+      </div></div>
+    }
+
+    @foreach (var e in Model)
+    {
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="d-flex justify-content-between flex-wrap gap-2">
+            <div>
+              <h5 class="mb-1">@e.SchoolName @if (!string.IsNullOrWhiteSpace(e.City)) { <small class="text-muted">· @e.City</small> }</h5>
+              <div class="text-muted small">@e.CreatedAt @if (!string.IsNullOrWhiteSpace(e.Students)) { <span>· @e.Students students</span> }</div>
+            </div>
+            <span class="badge @Badge(e.Status) align-self-start">@e.Status</span>
+          </div>
+
+          <div class="row g-2 mt-2 small">
+            <div class="col-md-4"><span class="text-muted">Contact:</span> <b>@e.ContactName</b>@(string.IsNullOrWhiteSpace(e.Designation) ? "" : " (" + e.Designation + ")")</div>
+            <div class="col-md-4"><span class="text-muted">Phone:</span>
+              <a href="tel:+91@(e.Phone)"><b>@e.Phone</b></a>
+              <a href="https://wa.me/91@(e.Phone)" target="_blank" rel="noopener" class="ms-1 text-success" title="WhatsApp"><i class="bx bxl-whatsapp"></i></a>
+            </div>
+            <div class="col-md-4"><span class="text-muted">E-mail:</span> @if (!string.IsNullOrWhiteSpace(e.Email)) { <a href="mailto:@e.Email">@e.Email</a> } else { <span>—</span> }</div>
+            @if (!string.IsNullOrWhiteSpace(e.Message))
+            {
+              <div class="col-12"><span class="text-muted">Message:</span> @e.Message</div>
+            }
+          </div>
+
+          <form asp-action="SetStatus" method="post" class="d-flex flex-wrap gap-2 align-items-center mt-3">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@e.EnquiryId" />
+            <input type="hidden" name="filter" value="@status" />
+            <select name="status" class="form-select form-select-sm" style="width:auto">
+              @foreach (var s in statuses)
+              {
+                <option value="@s" selected="@(s == e.Status)">@s</option>
+              }
+            </select>
+            <input name="note" value="@e.Note" maxlength="500" class="form-control form-control-sm" style="flex:1;min-width:200px" placeholder="Note (e.g. demo on Monday 11 am)" />
+            <button class="btn btn-sm btn-primary" style="width:auto">Save</button>
+            @if (!string.IsNullOrWhiteSpace(e.UpdatedAt)) { <small class="text-muted">updated @e.UpdatedAt</small> }
+          </form>
+        </div>
+      </div>
+    }
+
+  </div>
+</div>

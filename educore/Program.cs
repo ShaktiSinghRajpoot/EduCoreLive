@@ -158,6 +158,18 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             }));
 
+    // WHY: the public website's demo form (POST /enquiry) needs no login, so it is throttled
+    // per IP: 5 sends per 10 minutes is plenty for a person and stops a bot filling the list.
+    options.AddPolicy("enquiry", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0
+            }));
+
     // WHY: return a clean 429; the status-code-pages middleware re-executes to /Account/Error.
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
@@ -235,6 +247,7 @@ builder.Services.AddScoped<IGeoService, GeoService>();
 builder.Services.AddScoped<ILoginService, LoginService>();
 builder.Services.AddScoped<ISchoolSettingsService, SchoolSettingsService>();
 builder.Services.AddScoped<ISchoolService, SchoolService>();
+builder.Services.AddScoped<IWebsiteEnquiryService, WebsiteEnquiryService>();
 builder.Services.AddScoped<IEnquiryService, EnquiryService>();
 builder.Services.AddScoped<IAdmissionService, AdmissionService>();
 builder.Services.AddScoped<ITransferCertificateService, TransferCertificateService>();

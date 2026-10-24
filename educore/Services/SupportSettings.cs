@@ -3,7 +3,7 @@ namespace educore.Services
     /// <summary>
     /// Platform support contact details, bound from the "Support" configuration section.
     ///
-    /// Shown on Account/SchoolUnavailable — the page a user lands on when their
+    /// Shown on the public website (Views/Site/Index) and on Account/SchoolUnavailable — the page a user lands on when their
     /// credentials are correct but the school's status (Inactive / Suspended /
     /// Closed / Pending) blocks sign-in. Being told "your school is suspended" with
     /// no way to reach anyone is a dead end, so the page carries real contacts.
@@ -13,8 +13,14 @@ namespace educore.Services
     /// </summary>
     public class SupportSettings
     {
+        /// <summary>The person to ask for (the public website's contact block).</summary>
+        public string Name { get; set; } = string.Empty;
+
         public string Email { get; set; } = string.Empty;
         public string Phone { get; set; } = string.Empty;
+
+        /// <summary>Country code + number, no + or spaces (e.g. 919876543210), for wa.me links.</summary>
+        public string WhatsApp { get; set; } = string.Empty;
 
         /// <summary>e.g. "Mon–Sat, 9:00 AM – 6:00 PM IST". Shown under the phone number.</summary>
         public string Hours { get; set; } = string.Empty;

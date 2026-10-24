@@ -1,40 +1,112 @@
 // Public website (Views/Site/Index.cshtml).
-// GSAP + ScrollTrigger run the scroll effects; the 3D hero is in assemble3d.js.
-// GSAP comes from a CDN; if one is missing its part is skipped and the page stays fully readable.
+// GSAP + ScrollTrigger run only the hero assembly (setUpAssembly). Everything else is plain:
+// the phone menu, a fade-in as blocks come into view, and the demo form.
+// GSAP comes from a CDN; if it is missing the hero simply shows the finished laptop.
 (function () {
     var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var finePointer = window.matchMedia('(pointer: fine)').matches;
     var isDesktop = window.matchMedia('(min-width: 961px)').matches;
     var hasGsap = !!(window.gsap && window.ScrollTrigger);
 
     setUpNav();
-    setUpReelPlayback();
+    setUpEnquiryForm();
     if (reduceMotion) {
-        return;   // no 3D, no scroll effects: the CSS already shows everything
+        return;   // no motion: the CSS already shows everything
     }
-    setUpCursorGlow();
-    setUpTilt();
-    setUpMagnetButtons();
+    setUpReveal();
     if (hasGsap) {
         gsap.registerPlugin(ScrollTrigger);
-        setUpScrollAnimations();
+        // a phone's address bar showing/hiding must not re-measure the hero mid-scroll
+        ScrollTrigger.config({ ignoreMobileResize: true });
+        setUpAssembly();
     }
 
-    // ───────────── top bar + phone menu + progress bar ─────────────
+    // ───────────── hero: the loose pieces fly into the laptop as you scroll ─────────────
+    // Each piece (.pc) sits in its final place on the laptop screen. At the top of the page
+    // it is moved away to a spot on the screen given by data-at ("x%,y%" of the window),
+    // tilted by data-r degrees, and shows its loose object (.obj). Scrolling brings it back
+    // to its place, where the object fades into the dashboard tile (.tile).
+    function setUpAssembly() {
+        var build = document.getElementById('build');
+        var lap = document.getElementById('lap');
+        var stage = build.querySelector('.build-stage');
+        var pieces = Array.prototype.slice.call(build.querySelectorAll('.pc'));
+        document.documentElement.classList.add('assembling');
+
+        // how far a piece must move from its place to sit at its starting spot. Measured with the
+        // piece and the laptop un-moved (as they are once assembled), then put back as they were.
+        function offset(piece, axis) {
+            var at = piece.getAttribute('data-at').split(',');
+            var pieceWas = piece.style.transform, lapWas = lap.style.transform;
+            piece.style.transform = 'none';
+            lap.style.transform = 'none';
+            var box = piece.getBoundingClientRect();
+            var area = stage.getBoundingClientRect();   // the stage is the size of the window
+            piece.style.transform = pieceWas;
+            lap.style.transform = lapWas;
+            if (axis === 'x') return area.width * Number(at[0]) / 100 - (box.left - area.left + box.width / 2);
+            return area.height * Number(at[1]) / 100 - (box.top - area.top + box.height / 2);
+        }
+
+        var tl = gsap.timeline({
+            defaults: { ease: 'power2.inOut' },
+            scrollTrigger: {
+                // scrub: true = the pieces follow the scrollbar exactly. A smoothing delay left pieces
+                // half-way on a fast scroll while the captions had already moved on.
+                trigger: build, start: 'top top', end: 'bottom bottom', scrub: true, invalidateOnRefresh: true,
+                onUpdate: function (st) { showCaptions(st.progress); }
+            }
+        });
+
+        // the laptop comes up from a tilt and switches on
+        tl.fromTo(lap, { rotateX: 30, scale: 0.8, transformPerspective: 1400 }, { rotateX: 0, scale: 1, duration: 0.2 }, 0);
+        tl.to('.scr-off', { opacity: 0, duration: 0.08 }, 0.12);
+
+        // the pieces, one after another
+        pieces.forEach(function (piece, i) {
+            var start = 0.2 + i * 0.055;
+            // functions so the distances are measured again when the window is resized;
+            // the laptop is at its final size here, because a fromTo starts from the end state
+            tl.fromTo(piece,
+                {
+                    x: function () { return offset(piece, 'x'); },
+                    y: function () { return offset(piece, 'y'); },
+                    rotation: Number(piece.getAttribute('data-r') || 0)
+                },
+                { x: 0, y: 0, rotation: 0, duration: 0.22 }, start);
+            var obj = piece.querySelector('.obj');
+            var tile = piece.querySelector('.tile');
+            if (tile) {
+                tl.fromTo(obj, { opacity: 1 }, { opacity: 0, duration: 0.05, ease: 'none' }, start + 0.17);
+                tl.fromTo(tile, { opacity: 0 }, { opacity: 1, duration: 0.05, ease: 'none' }, start + 0.17);
+            }
+        });
+
+        // the finished laptop moves aside for the last caption (up on a phone, right on a computer)
+        tl.to(lap, isDesktop
+            ? { x: function () { return window.innerWidth * 0.2; }, scale: 0.9, duration: 0.12 }
+            : { y: function () { return -window.innerHeight * 0.06; }, scale: 0.92, duration: 0.12 }, 0.8);
+        tl.to({}, { duration: 0.08 });   // a short rest at the end before the page moves on
+
+        // captions fade in and out over their data-from..data-to part of the scroll
+        var caps = Array.prototype.slice.call(build.querySelectorAll('.cap'));
+        function showCaptions(p) {
+            caps.forEach(function (cap) {
+                var from = Number(cap.getAttribute('data-from'));
+                var to = Number(cap.getAttribute('data-to'));
+                var fade = 0.04;
+                var o = Math.min(1, Math.max(0, (p - from) / fade), Math.max(0, (to - p) / fade));
+                if (from === 0 && p < fade) o = 1;   // the first caption shows at once
+                cap.style.opacity = o;
+                cap.classList.toggle('on', o > 0.5);
+            });
+        }
+        showCaptions(0);
+    }
+
+    // ───────────── top bar: phone menu ─────────────
     function setUpNav() {
-        var nav = document.getElementById('nav');
         var links = document.getElementById('navLinks');
         var burger = document.getElementById('navBurger');
-        var progress = document.getElementById('progress');
-
-        function onScroll() {
-            nav.classList.toggle('scrolled', window.scrollY > 8);
-            var max = document.documentElement.scrollHeight - window.innerHeight;
-            progress.style.transform = 'scaleX(' + (max > 0 ? window.scrollY / max : 0) + ')';
-        }
-        window.addEventListener('scroll', onScroll, { passive: true });
-        onScroll();
-
         burger.addEventListener('click', function () {
             var open = links.classList.toggle('open');
             burger.innerHTML = open ? '<i class="bx bx-x"></i>' : '<i class="bx bx-menu"></i>';
@@ -47,136 +119,66 @@
         });
     }
 
-    // ───────────── reels animate only while they are on screen ─────────────
-    function setUpReelPlayback() {
-        var reels = document.querySelectorAll('[data-reel]');
-        if (!('IntersectionObserver' in window)) {
-            reels.forEach(function (r) { r.classList.add('play'); });
-            return;
-        }
+    // ───────────── blocks fade up as they come into view ─────────────
+    function setUpReveal() {
+        if (!('IntersectionObserver' in window)) return;
         var watcher = new IntersectionObserver(function (entries) {
-            entries.forEach(function (en) { en.target.classList.toggle('play', en.isIntersecting); });
-        }, { threshold: 0.35 });
-        reels.forEach(function (r) { watcher.observe(r); });
-    }
-
-    // ───────────── a soft light that follows the mouse ─────────────
-    function setUpCursorGlow() {
-        var glow = document.getElementById('cursorGlow');
-        if (!finePointer) return;
-        var x = 0, y = 0, gx = 0, gy = 0;
-        window.addEventListener('pointermove', function (e) {
-            x = e.clientX;
-            y = e.clientY;
-            glow.classList.add('on');
-        }, { passive: true });
-        function follow() {
-            gx += (x - gx) * 0.12;
-            gy += (y - gy) * 0.12;
-            glow.style.transform = 'translate(' + gx + 'px,' + gy + 'px)';
-            requestAnimationFrame(follow);
-        }
-        follow();
-    }
-
-    // ───────────── cards lean towards the mouse ─────────────
-    function setUpTilt() {
-        if (!finePointer) return;
-        document.querySelectorAll('.tilt').forEach(function (card) {
-            card.addEventListener('pointermove', function (e) {
-                var box = card.getBoundingClientRect();
-                var px = (e.clientX - box.left) / box.width;
-                var py = (e.clientY - box.top) / box.height;
-                var strength = card.classList.contains('cta') ? 4 : 10;
-                card.style.transform = 'perspective(900px) rotateX(' + ((0.5 - py) * strength) + 'deg) rotateY(' + ((px - 0.5) * strength) + 'deg) translateZ(0)';
-                card.style.setProperty('--mx', (px * 100) + '%');
-                card.style.setProperty('--my', (py * 100) + '%');
-            });
-            card.addEventListener('pointerleave', function () {
-                card.style.transition = 'transform .5s ease';
-                card.style.transform = '';
-                setTimeout(function () { card.style.transition = ''; }, 500);
-            });
-        });
-    }
-
-    // ───────────── main buttons pull a little towards the mouse ─────────────
-    function setUpMagnetButtons() {
-        if (!finePointer) return;
-        document.querySelectorAll('.magnet').forEach(function (btn) {
-            btn.addEventListener('pointermove', function (e) {
-                var box = btn.getBoundingClientRect();
-                var dx = e.clientX - (box.left + box.width / 2);
-                var dy = e.clientY - (box.top + box.height / 2);
-                btn.style.transform = 'translate(' + (dx * 0.25) + 'px,' + (dy * 0.35) + 'px)';
-            });
-            btn.addEventListener('pointerleave', function () { btn.style.transform = ''; });
-        });
-    }
-
-    // ───────────── scroll effects (GSAP) ─────────────
-    function setUpScrollAnimations() {
-        // everything marked data-up fades up as it comes into view
-        document.querySelectorAll('[data-up]').forEach(function (el) {
-            gsap.from(el, {
-                y: 50, opacity: 0, duration: 0.9, ease: 'power3.out', clearProps: 'transform',
-                scrollTrigger: { trigger: el, start: 'top 88%' }
-            });
-        });
-
-        // module cards fly in with a 3D flip, one after another
-        gsap.from('.mod', {
-            y: 80, rotateX: -35, opacity: 0, duration: 0.9, ease: 'power3.out', stagger: 0.06, transformPerspective: 900, clearProps: 'transform',
-            scrollTrigger: { trigger: '.mods', start: 'top 85%' }
-        });
-
-        // numbers count up
-        document.querySelectorAll('[data-count]').forEach(function (el) {
-            var target = Number(el.getAttribute('data-count'));
-            var counter = { value: 0 };
-            gsap.to(counter, {
-                value: target, duration: 1.6, ease: 'power2.out',
-                scrollTrigger: { trigger: el, start: 'top 90%' },
-                onUpdate: function () { el.textContent = Math.round(counter.value); }
-            });
-        });
-
-        // the big "why" sentence lights up word by word
-        var say = document.getElementById('bigSay');
-        var words = say.textContent.trim().split(/\s+/);
-        say.innerHTML = words.map(function (w) { return '<span class="wd">' + w + '</span>'; }).join(' ');
-        gsap.to('#bigSay .wd', {
-            opacity: 1, ease: 'none', stagger: 0.1,
-            scrollTrigger: { trigger: say, start: 'top 80%', end: 'bottom 45%', scrub: true }
-        });
-
-        // the line between the four steps fills as you scroll
-        gsap.fromTo('#stepsFill', { scaleX: 0 }, {
-            scaleX: 1, ease: 'none',
-            scrollTrigger: { trigger: '.steps-wrap', start: 'top 75%', end: 'bottom 60%', scrub: true }
-        });
-
-        // big footer word slides in from the side
-        gsap.from('.foot-word', { xPercent: -15, opacity: 0, ease: 'none', scrollTrigger: { trigger: '.foot', start: 'top bottom', end: 'bottom bottom', scrub: true } });
-
-        // reels: on a computer the section is pinned and the row of reels slides sideways
-        // while you scroll down. On a phone the row is a normal swipe list (see CSS).
-        if (isDesktop) {
-            var track = document.getElementById('reelsTrack');
-            var slideDistance = function () { return Math.max(track.scrollWidth - window.innerWidth + 48, 0); };
-            gsap.to(track, {
-                x: function () { return -slideDistance(); },
-                ease: 'none',
-                scrollTrigger: {
-                    trigger: '#reels', start: 'top top',
-                    end: function () { return '+=' + slideDistance(); },
-                    pin: true, scrub: 1, invalidateOnRefresh: true
+            entries.forEach(function (en) {
+                if (en.isIntersecting) {
+                    en.target.classList.add('in');
+                    watcher.unobserve(en.target);
                 }
             });
+        }, { threshold: 0.12 });
+        document.querySelectorAll('[data-up]').forEach(function (el) {
+            el.classList.add('reveal');
+            watcher.observe(el);
+        });
+    }
+
+    // ───────────── the demo form: sent without leaving the page ─────────────
+    // Saved by SiteController.Enquiry; the Super Admin sees it under Website Enquiries.
+    function setUpEnquiryForm() {
+        var form = document.getElementById('enqForm');
+        var btn = document.getElementById('enqBtn');
+        var msg = document.getElementById('enqMsg');
+
+        function show(text, ok) {
+            msg.textContent = text;
+            msg.className = 'enq-msg ' + (ok ? 'ok' : 'err');
         }
-        gsap.from('.reel', {
-            y: 120, rotateY: -25, opacity: 0, duration: 1, ease: 'power3.out', stagger: 0.1, transformPerspective: 1000, clearProps: 'transform',
-            scrollTrigger: { trigger: '#reels', start: 'top 70%' }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            // the three required fields, checked here so the visitor gets a clear message
+            var bad = null;
+            ['Name', 'School', 'Phone'].forEach(function (n) {
+                var input = form.elements[n];
+                var empty = input.value.trim() === '';
+                var phoneWrong = n === 'Phone' && !empty && input.value.replace(/\D/g, '').slice(-10).length < 10;
+                input.classList.toggle('bad', empty || phoneWrong);
+                if ((empty || phoneWrong) && !bad) bad = input;
+            });
+            if (bad) {
+                show(bad.name === 'Phone' && bad.value.trim() !== '' ? 'Please enter a 10-digit mobile number.' : 'Please fill in your name, school name and mobile number.', false);
+                bad.focus();
+                return;
+            }
+
+            btn.disabled = true;
+            show('Sending…', true);
+            fetch(form.action, { method: 'POST', body: new FormData(form) })
+                .then(function (r) {
+                    if (r.status === 429) return { success: false, message: 'Too many tries. Please wait a few minutes or call us.' };
+                    return r.json();
+                })
+                .then(function (d) {
+                    show(d.message || (d.success ? 'Thank you.' : 'Could not send. Please call us.'), d.success);
+                    if (d.success) form.reset();
+                })
+                .catch(function () { show('Could not send. Please check your internet or call us.', false); })
+                .then(function () { btn.disabled = false; });
         });
     }
 })();
