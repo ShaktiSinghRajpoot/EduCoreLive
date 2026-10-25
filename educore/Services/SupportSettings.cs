@@ -28,6 +28,17 @@ namespace educore.Services
         /// <summary>Optional website/helpdesk URL. Hidden when blank.</summary>
         public string Website { get; set; } = string.Empty;
 
+        /// <summary>
+        /// The public website's address without a trailing slash, for the canonical link
+        /// and sitemap.xml. It is Website, so Google always gets smartschoolwala.com even
+        /// when the page is opened on the Railway address; when Website is blank, the
+        /// address the request came in on.
+        /// </summary>
+        public string PublicUrl(HttpRequest request) =>
+            string.IsNullOrWhiteSpace(Website)
+                ? $"{request.Scheme}://{request.Host}"
+                : Website.TrimEnd('/');
+
         /// <summary>Falls back so the page never renders an empty contact block.</summary>
         public bool HasAnyContact =>
             !string.IsNullOrWhiteSpace(Email) ||

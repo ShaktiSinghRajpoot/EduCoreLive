@@ -10,17 +10,97 @@
     string telLink = "tel:" + new string((support.Phone ?? "").Where(c => char.IsDigit(c) || c == '+').ToArray());
     string loginUrl = Url.Action("Login", "Account", new { area = "" })!;
     int year = DateTime.Now.Year;
+    string siteUrl = support.PublicUrl(Context.Request);
+
+    string pageTitle = "School ERP Software for Indian Schools | SmartSchoolWala";
+    string pageDescription = "SmartSchoolWala is school ERP and school management software for Indian schools: admissions, fee management and receipts, attendance with WhatsApp alerts, exams, staff salary and transport. Book a free demo.";
+
+    // The FAQ section and its FAQPage structured data are both built from this list,
+    // so what Google reads is always what the visitor sees.
+    var faqs = new[]
+    {
+        (Q: "How much does it cost?", A: "The price depends on the number of students and the modules your school takes. Book a free demo and we will send a quote for your school."),
+        (Q: "Do we need to install anything?", A: "No. It opens in the browser on any computer or phone. On a phone it can be added to the home screen and used like an app."),
+        (Q: "We already have our data in Excel. Do we type it again?", A: "No. Students, staff and previous dues are imported from Excel. Every row is checked first, and nothing is saved until you confirm."),
+        (Q: "Can a teacher see fees or salaries?", A: "Only if you allow it. Every role has its own permissions: a teacher sees their classes, the accountant sees fees, and salary stays with whoever you choose."),
+        (Q: "Is our data safe?", A: "Each school's data is kept separate from every other school's. Photos and documents open only for your signed-in staff, and every receipt records who collected it."),
+        (Q: "Can we start with only fees and add the rest later?", A: "Yes. Modules are switched on per school, so you can begin with what you need most and add others whenever you are ready.")
+    };
+
+    // Structured data (schema.org JSON-LD) for search engines: the site's name, the company
+    // and its contact, the product, and the FAQ. Only facts that are true and shown on the
+    // page go in here -- no price and no ratings until there are real ones.
+    // System.Text.Json escapes < and >, so the text cannot break out of the <script> tag.
+    var org = new Dictionary<string, object>
+    {
+        ["@type"] = "Organization",
+        ["@id"] = siteUrl + "/#organization",
+        ["name"] = "SmartSchoolWala",
+        ["url"] = siteUrl + "/",
+        ["logo"] = siteUrl + "/img/brand/ssw-stacked.png",
+        ["contactPoint"] = new Dictionary<string, object>
+        {
+            ["@type"] = "ContactPoint",
+            ["contactType"] = "sales",
+            ["telephone"] = support.Phone ?? "",
+            ["email"] = support.Email ?? "",
+            ["areaServed"] = "IN"
+        }
+    };
+    var webSite = new Dictionary<string, object>
+    {
+        ["@type"] = "WebSite",
+        ["@id"] = siteUrl + "/#website",
+        ["name"] = "SmartSchoolWala",
+        ["url"] = siteUrl + "/",
+        ["publisher"] = new Dictionary<string, object> { ["@id"] = siteUrl + "/#organization" }
+    };
+    var app = new Dictionary<string, object>
+    {
+        ["@type"] = "SoftwareApplication",
+        ["name"] = "SmartSchoolWala",
+        ["url"] = siteUrl + "/",
+        ["description"] = pageDescription,
+        ["applicationCategory"] = "BusinessApplication",
+        ["applicationSubCategory"] = "School ERP and school management software",
+        ["operatingSystem"] = "Web browser, Android, iOS",
+        ["featureList"] = new[] { "Admissions", "Fee management and receipts", "Attendance with WhatsApp alerts", "Exams and report cards", "Timetable and homework", "Staff and salary", "Transport", "School store", "Accounts", "Certificates and TC" },
+        ["provider"] = new Dictionary<string, object> { ["@id"] = siteUrl + "/#organization" }
+    };
+    var faqPage = new Dictionary<string, object>
+    {
+        ["@type"] = "FAQPage",
+        ["mainEntity"] = faqs.Select(f => new Dictionary<string, object>
+        {
+            ["@type"] = "Question",
+            ["name"] = f.Q,
+            ["acceptedAnswer"] = new Dictionary<string, object> { ["@type"] = "Answer", ["text"] = f.A }
+        }).ToArray()
+    };
+    string jsonLd = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@graph"] = new object[] { org, webSite, app, faqPage }
+    });
 }
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SmartSchoolWala.com | School management software for Indian schools</title>
-    <meta name="description" content="SmartSchoolWala runs your whole school in one place: admissions, fees and receipts, attendance with WhatsApp alerts, exams and report cards, timetable, staff salary, transport and the school store. Book a free demo." />
-    <meta property="og:title" content="SmartSchoolWala.com | School management software for Indian schools" />
-    <meta property="og:description" content="Fees, attendance, exams, staff and more: one simple system for your whole school. Book a free demo." />
-    <meta property="og:image" content="@($"{Context.Request.Scheme}://{Context.Request.Host}/img/brand/ssw-stacked.png")" />
+    <title>@pageTitle</title>
+    <meta name="description" content="@pageDescription" />
+    <link rel="canonical" href="@siteUrl/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="SmartSchoolWala" />
+    <meta property="og:locale" content="en_IN" />
+    <meta property="og:url" content="@siteUrl/" />
+    <meta property="og:title" content="@pageTitle" />
+    <meta property="og:description" content="Fees, attendance, exams, staff and more: one simple school ERP for your whole school. Book a free demo." />
+    <meta property="og:image" content="@siteUrl/img/brand/ssw-stacked.png" />
+    <meta name="twitter:card" content="summary" />
+    @* written raw: Razor's tag helpers would encode the "+" in the type as &#x2B; *@
+    @Html.Raw("<script type=\"application/ld+json\">" + jsonLd + "</script>")
     <meta name="theme-color" content="#0B0705" />
     <link rel="icon" type="image/x-icon" href="~/img/favicon/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="~/icons/apple-touch-icon.png" />
@@ -136,8 +216,8 @@
 
     <div class="cap cap-final" data-from="0.8" data-to="9">
       <span class="pill"><span class="dot"></span>SmartSchoolWala.com</span>
-      <h1 class="hero-h">Your whole school.<br /><span class="grad">One smart system.</span></h1>
-      <p class="lead">Admissions, fees and receipts, attendance with WhatsApp alerts, exams and report cards, staff salary, transport and the school store. On the computer and on the phone.</p>
+      <h1 class="hero-h">School ERP software<br /><span class="grad">for your whole school.</span></h1>
+      <p class="lead">School management software made for Indian schools: admissions, fee management and receipts, attendance with WhatsApp alerts, exams and report cards, staff salary, transport and the school store. On the computer and on the phone.</p>
       <div class="hero-btns">
         <a href="#contact" class="btn btn-primary btn-lg">Book a free demo<i class="bx bx-right-arrow-alt"></i></a>
         <a href="@loginUrl" class="btn btn-glass btn-lg"><i class="bx bx-lock-alt"></i>Login to your school</a>
@@ -213,7 +293,7 @@
     <div class="sec-head" data-up>
       <span class="kicker">Features</span>
       <h2>Everything a school runs on</h2>
-      <p>Start with what you need most. Add the rest when you are ready; a module you do not use never gets in the way.</p>
+      <p>Every part of a school ERP, from admissions and fee management to attendance and exams. Start with what you need most. Add the rest when you are ready; a module you do not use never gets in the way.</p>
     </div>
     <div class="mods">
       <article class="mod" data-up><span class="mi"><i class="bx bx-user-plus"></i></span><h3>Admissions</h3><p>Enquiry, follow-ups, registration and admission. Admission form, documents and ID cards.</p></article>
@@ -275,12 +355,11 @@
       <p>Anything else? Ask us on the demo call, or call @support.Name directly.</p>
     </div>
     <div class="faq">
-      <details><summary>How much does it cost?<i class="bx bx-plus"></i></summary><p>The price depends on the number of students and the modules your school takes. Book a free demo and we will send a quote for your school.</p></details>
-      <details><summary>Do we need to install anything?<i class="bx bx-plus"></i></summary><p>No. It opens in the browser on any computer or phone. On a phone it can be added to the home screen and used like an app.</p></details>
-      <details><summary>We already have our data in Excel. Do we type it again?<i class="bx bx-plus"></i></summary><p>No. Students, staff and previous dues are imported from Excel. Every row is checked first, and nothing is saved until you confirm.</p></details>
-      <details><summary>Can a teacher see fees or salaries?<i class="bx bx-plus"></i></summary><p>Only if you allow it. Every role has its own permissions: a teacher sees their classes, the accountant sees fees, and salary stays with whoever you choose.</p></details>
-      <details><summary>Is our data safe?<i class="bx bx-plus"></i></summary><p>Each school's data is kept separate from every other school's. Photos and documents open only for your signed-in staff, and every receipt records who collected it.</p></details>
-      <details><summary>Can we start with only fees and add the rest later?<i class="bx bx-plus"></i></summary><p>Yes. Modules are switched on per school, so you can begin with what you need most and add others whenever you are ready.</p></details>
+      @* the questions live in the "faqs" list at the top (shared with the FAQPage structured data) *@
+      @foreach (var f in faqs)
+      {
+        <details><summary>@f.Q<i class="bx bx-plus"></i></summary><p>@f.A</p></details>
+      }
     </div>
   </div>
 </section>

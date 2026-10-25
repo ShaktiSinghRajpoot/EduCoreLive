@@ -5942,3 +5942,15 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - **Calmer page** for owners and principals: reels, marquee bands, mouse glow, tilting cards and magnet buttons removed. Sections: who it is for (owner / principal / office), features, why us, getting started, FAQ, contact + demo form. Login sits on the top bar on phones too.
 - **Contact details** come from the `Support` section of `appsettings.json` (now the owner's real name, phone, WhatsApp and e-mail; `SupportSettings` got `Name` and `WhatsApp`), the same block the "school unavailable" page shows.
 - **Demo enquiries** (`website_enquiry.sql`, bundle `deploy_2026_10_24a.sql`): table `core.website_enquiries`; `core.sp_website_enquiry_save` (public, validates the mobile, the same number within a day counts once, at most 10 an hour per IP) and `core.sp_website_enquiry_manage` (LIST / COUNT_NEW / STATUS, platform tenant 1 only). `SiteController.Enquiry` (POST `/enquiry`, antiforgery, rate limit "enquiry" 5 per 10 min per IP, hidden honeypot field). Super Admin: Platform > Website Enquiries (`/superadmin/enquiries`, `EnquiriesController`), with a "N new" badge in the menu; each enquiry gets a status (New / Contacted / Demo done / Closed) and a note.
+
+### 2026-10-25 — Public website: search-engine basics (robots.txt, sitemap, canonical, noindex)
+- `wwwroot/robots.txt`: everything open except `/uploads/`, points to the sitemap. Portal pages are deliberately NOT disallowed: a crawler must fetch a page to see its noindex tag.
+- `/sitemap.xml` (`SiteController.Sitemap`): built from the `PublicPages` list in the controller; add a page there when the website gets one.
+- The canonical link, `og:url` and sitemap use `Support:Website` (`SupportSettings.PublicUrl`), so Google gets smartschoolwala.com even when the page is opened on the Railway address.
+- `<meta name="robots" content="noindex, nofollow">` in `_CommonMasterLayout` (login, OTP, error and every signed-in page) and on `offline.html`.
+- `/` answers HEAD as well as GET (was 405).
+
+### 2026-10-25 — Public website: keywords and structured data on the homepage
+- Title, description and H1 name what people search for ("School ERP software", "school management software", "fee management"); the hero design is unchanged.
+- One JSON-LD block (`@graph`): `Organization` (contact from `Support`), `WebSite` (the site name Google shows), `SoftwareApplication` (no price or rating until there are real ones) and `FAQPage`. The FAQ section and its structured data come from the same `faqs` list at the top of `Views/Site/Index.cshtml`, so they cannot drift apart.
+- `og:type`, `og:site_name`, `og:locale`, `twitter:card`; `og:image` uses the public address. Fixed `og:title"content=` (a missing space from the previous change).

@@ -1,0 +1,9 @@
+# SmartSchoolWala.com
+# The public website is open to search engines. Portal pages are not blocked here on
+# purpose: they carry <meta name="robots" content="noindex">, and a crawler has to be
+# allowed to fetch a page to see that tag. Uploaded files need a sign-in anyway.
+User-agent: *
+Allow: /
+Disallow: /uploads/
+
+Sitemap: https://smartschoolwala.com/sitemap.xml

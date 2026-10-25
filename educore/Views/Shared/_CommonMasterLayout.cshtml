@@ -17,6 +17,9 @@
     }
     <title>@title | @appName</title>
     <meta name="description" content="@(TempData.Peek("description") as string ?? "")" />
+    @* The portal (login, OTP, error pages and everything after sign-in) stays out of
+       search results; only the public website (Views/Site) is meant for Google. *@
+    <meta name="robots" content="noindex, nofollow" />
 
     <!-- Favicon / PWA / iOS launch screens -->
     @await Html.PartialAsync("Sections/_PwaHead")

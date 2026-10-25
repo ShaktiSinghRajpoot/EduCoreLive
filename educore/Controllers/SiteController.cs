@@ -15,13 +15,34 @@ namespace educore.Controllers
     [AllowAnonymous]
     public class SiteController : Controller
     {
+        // HEAD too: uptime checks and some crawlers ask with HEAD, which got a 405.
         [HttpGet("/")]
+        [HttpHead("/")]
         public IActionResult Index()
         {
             if (User.Identity?.IsAuthenticated == true)
                 return RedirectToAction("Index", "Dashboards", new { area = "" });
 
             return View();
+        }
+
+        // The public pages Google should know about. Add a page here when the website gets one.
+        private static readonly string[] PublicPages = { "/" };
+
+        /// <summary>sitemap.xml for search engines (robots.txt in wwwroot points here).</summary>
+        [HttpGet("/sitemap.xml")]
+        public IActionResult Sitemap([FromServices] Microsoft.Extensions.Options.IOptions<educore.Services.SupportSettings> support)
+        {
+            string siteUrl = support.Value.PublicUrl(Request);
+
+            var xml = new System.Text.StringBuilder();
+            xml.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+            xml.AppendLine("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">");
+            foreach (var page in PublicPages)
+                xml.AppendLine("  <url><loc>" + System.Security.SecurityElement.Escape(siteUrl + page) + "</loc></url>");
+            xml.AppendLine("</urlset>");
+
+            return Content(xml.ToString(), "application/xml", System.Text.Encoding.UTF8);
         }
 
         public sealed class EnquiryForm
