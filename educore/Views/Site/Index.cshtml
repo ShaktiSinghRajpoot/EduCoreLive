@@ -73,89 +73,14 @@
     @Html.Raw("<script type=\"application/ld+json\">" + jsonLd + "</script>")
 }
 
-<!-- ───────────── Hero: the school in pieces, put together as you scroll ─────────────
-     Plain HTML/CSS pieces (a register, a receipt, an ID card, a report card, the bus, the
-     timetable, coins, a WhatsApp message) lie scattered around a closed laptop. home.js
-     (GSAP ScrollTrigger) opens the laptop and flies each piece to its place on the screen,
-     where it turns into a dashboard tile. The section is tall and the stage sticks meanwhile.
-     Without the script (or with reduced motion) the stage is a normal hero: text + the
-     finished laptop. Figures are sample data. -->
-<section class="build" id="build">
-  <div class="build-stage">
+<!-- ───────────── Hero ─────────────
+     Text on the left, the dashboard on a laptop on the right (plain HTML/CSS, no images,
+     no scroll animation). The figures on the screen are sample data. -->
+<section class="hero" id="top">
+  <div class="wrap hero-in">
 
-    <div class="scene" aria-hidden="true">
-      <div class="lap" id="lap">
-        <div class="lid" id="lid">
-          <div class="screen">
-            <div class="scr-off"></div>
-            <aside class="scr-side">
-              <img src="~/img/brand/ssw-icon.svg" alt="" />
-              <i></i><i></i><i></i><i></i><i></i>
-            </aside>
-            <div class="scr-main">
-              <div class="scr-hi"><b>Good morning, Principal</b><small>Today at a glance</small></div>
-              <div class="slots">
-
-                <div class="pc p-id" data-at="12,26" data-r="-18">
-                  <div class="obj idcard"><span class="ph"></span><b>STUDENT ID</b><i></i><i></i><em>2026-27</em></div>
-                  <div class="tile"><small>Students</small><b>1,240</b><span>+38 this session</span></div>
-                </div>
-
-                <div class="pc p-reg" data-at="87,24" data-r="14">
-                  <div class="obj register"><b>ATTENDANCE<br />REGISTER</b><small>Class 5-A · 2026-27</small></div>
-                  <div class="tile"><small>Present today</small><b>96.4%</b><span>1,195 marked</span></div>
-                </div>
-
-                <div class="pc p-rcpt" data-at="10,72" data-r="12">
-                  <div class="obj receipt"><b>FEE RECEIPT</b><i></i><i></i><i></i><em>₹ 8,200</em><span class="paid">PAID</span></div>
-                  <div class="tile"><small>Fees today</small><b>₹1,86,400</b><span>74 receipts</span></div>
-                </div>
-
-                <div class="pc p-coins" data-at="30,88" data-r="-10">
-                  <div class="obj coins"><span>₹</span><span>₹</span><span>₹</span></div>
-                  <div class="tile chart"><small>Fee collection · Apr–Oct</small><div class="bars"><i style="--h:55%"></i><i style="--h:42%"></i><i style="--h:50%"></i><i style="--h:66%"></i><i style="--h:54%"></i><i style="--h:72%"></i><i class="hl" style="--h:90%"></i></div></div>
-                </div>
-
-                <div class="pc p-tt" data-at="72,88" data-r="-8">
-                  <div class="obj timetable"><b>TIME TABLE</b><div class="tt-grid">@for (int i = 0; i < 12; i++) { <i></i> }</div></div>
-                  <div class="tile"><small>Timetable</small><b>No clashes</b><span>3 substitutes today</span></div>
-                </div>
-
-                <div class="pc p-rc" data-at="89,72" data-r="16">
-                  <div class="obj reportcard"><b>REPORT CARD</b><i></i><i></i><i></i><em>A+</em></div>
-                  <div class="tile"><small>Results</small><b>Published</b><span>Half yearly · 312 cards</span></div>
-                </div>
-
-                <div class="pc p-bus" data-at="50,15" data-r="-6">
-                  <div class="obj bus2"><i class="bx bx-bus-school"></i></div>
-                  <div class="tile"><small>Transport</small><b>6 routes</b><span>418 riders on board</span></div>
-                </div>
-
-              </div>
-            </div>
-            <div class="pc p-wa" data-at="88,48" data-r="8">
-              <div class="obj wa"><i class="bx bxl-whatsapp"></i><div><b>Absent alert sent</b><small>Parents of 12 students</small></div></div>
-            </div>
-          </div>
-        </div>
-        <div class="base"></div>
-      </div>
-    </div>
-
-    <div class="cap cap-1" data-from="0" data-to="0.18">
+    <div class="hero-text">
       <span class="pill"><span class="dot"></span>School ERP made for Indian schools</span>
-      <h2 class="cap-big">Registers. Receipts.<br />Fee slips. Report cards.<br /><span class="grad">All over the place?</span></h2>
-      <p class="cap-hint"><span class="mouse"><span></span></span>Scroll to put your school together</p>
-    </div>
-    <div class="cap cap-2" data-from="0.22" data-to="0.46">
-      <h2 class="cap-mid">Every piece of your school&hellip;</h2>
-    </div>
-    <div class="cap cap-3" data-from="0.5" data-to="0.74">
-      <h2 class="cap-mid">&hellip;snaps into <span class="grad">one system.</span></h2>
-    </div>
-
-    <div class="cap cap-final" data-from="0.8" data-to="9">
-      <span class="pill"><span class="dot"></span>SmartSchoolWala.com</span>
       <h1 class="hero-h">School ERP software<br /><span class="grad">for your whole school.</span></h1>
       <p class="lead">School management software made for Indian schools: admissions, fee management and receipts, attendance with WhatsApp alerts, exams and report cards, staff salary, transport and the school store. On the computer and on the phone.</p>
       <div class="hero-btns">
@@ -168,6 +93,34 @@
         <li><i class="bx bx-check"></i>Works on any phone</li>
       </ul>
     </div>
+
+    <div class="hero-shot" aria-hidden="true">
+      <div class="lap">
+        <div class="lid">
+          <div class="screen">
+            <aside class="scr-side">
+              <img src="~/img/brand/ssw-icon.svg" alt="" />
+              <i></i><i></i><i></i><i></i><i></i>
+            </aside>
+            <div class="scr-main">
+              <div class="scr-hi"><b>Good morning, Principal</b><small>Today at a glance</small></div>
+              <div class="slots">
+                <div class="tile p-id"><small>Students</small><b>1,240</b><span>+38 this session</span></div>
+                <div class="tile p-reg"><small>Present today</small><b>96.4%</b><span>1,195 marked</span></div>
+                <div class="tile p-rcpt"><small>Fees today</small><b>₹1,86,400</b><span>74 receipts</span></div>
+                <div class="tile p-rc"><small>Results</small><b>Published</b><span>Half yearly · 312 cards</span></div>
+                <div class="tile chart p-coins"><small>Fee collection · Apr–Oct</small><div class="bars"><i style="--h:55%"></i><i style="--h:42%"></i><i style="--h:50%"></i><i style="--h:66%"></i><i style="--h:54%"></i><i style="--h:72%"></i><i class="hl" style="--h:90%"></i></div></div>
+                <div class="tile p-tt"><small>Timetable</small><b>No clashes</b><span>3 substitutes today</span></div>
+                <div class="tile p-bus"><small>Transport</small><b>6 routes</b><span>418 riders on board</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="base"></div>
+        <div class="wa-note"><i class="bx bxl-whatsapp"></i><div><b>Absent alert sent</b><small>Parents of 12 students</small></div></div>
+      </div>
+    </div>
+
   </div>
 </section>
 
@@ -288,10 +241,3 @@
 
 <!-- ───────────── FAQ (questions in the "faqs" list at the top) ───────────── -->
 <partial name="_Faq" model="faqs" />
-
-@section Scripts {
-    @* GSAP runs only the hero assembly. If it fails to load, the hero shows the finished laptop
-       and everything else is plain HTML; home.js only hides things it is about to animate. *@
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-}

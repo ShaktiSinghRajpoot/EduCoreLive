@@ -1,6 +1,6 @@
-/* Public website (Views/Site/Index.cshtml). Stands alone: no Bootstrap, no app CSS.
-   A dark hero that assembles on scroll (wwwroot/js/site/home.js), then a light, calm page
-   for school owners and principals. Everything is visible without JavaScript. */
+/* Public website (Views/Site). Stands alone: no Bootstrap, no app CSS.
+   A dark hero with the dashboard on a laptop, then a light, calm page for school owners
+   and principals. Everything is visible without JavaScript. */
 
 :root {
     --or: #FF8A00;
@@ -57,32 +57,20 @@ p { margin: 0; }
 .nav-cta { display: flex; gap: .6rem; align-items: center; }
 .nav-burger { display: none; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); border-radius: 10px; width: 42px; height: 42px; font-size: 1.4rem; color: #fff; cursor: pointer; align-items: center; justify-content: center; }
 
-/* the hero is dark: these colours are used by the hero rules below */
-.build { --text2: #CFC2B6; --mute: #9C8E82; background: var(--dark); color: #F7EFE7; }
-
-/* ── hero: the school in pieces, assembled on scroll ──
-   Without the .assembling class (reduced motion, script failed) this is a plain hero:
-   text on the left, the finished laptop on the right. home.js adds .assembling to <html>
-   and then scroll flies the pieces into the laptop (see the hero comment in the view). */
-.build { position: relative; }
-.build::before {
+/* ── hero: text on the left, the dashboard on a laptop on the right ── */
+.hero { --text2: #CFC2B6; --mute: #9C8E82; position: relative; background: var(--dark); color: #F7EFE7; overflow: hidden; padding: 140px 0 96px; }
+.hero::before {
     content: ""; position: absolute; inset: 0; pointer-events: none;
     background:
-        radial-gradient(55% 50% at 60% 50%, rgba(255,94,26,.18), transparent 70%),
-        radial-gradient(40% 40% at 15% 85%, rgba(139,92,246,.12), transparent 70%);
+        radial-gradient(50% 55% at 72% 50%, rgba(255,94,26,.18), transparent 70%),
+        radial-gradient(40% 40% at 10% 90%, rgba(139,92,246,.10), transparent 70%);
 }
-.build-stage {
-    position: relative; min-height: 100vh; min-height: 100svh;
-    display: grid; grid-template-columns: 1fr 1.05fr; align-items: center; gap: 40px;
-    max-width: 1200px; margin: 0 auto; padding: 120px 24px 80px;
-}
-.scene { grid-column: 2; grid-row: 1; display: flex; justify-content: center; align-items: center; }
-.cap { position: relative; z-index: 4; }
-.cap-final { grid-column: 1; grid-row: 1; }
-.cap-1, .cap-2, .cap-3 { display: none; }
+.hero-in { position: relative; display: grid; grid-template-columns: 1fr 1.1fr; align-items: center; gap: 48px; }
+.hero .hero-h { font-size: clamp(2.4rem, 4.2vw, 3.6rem); }
+.hero-shot { position: relative; display: flex; justify-content: center; }
 
 /* the laptop; everything inside is sized in em, so it scales with the laptop */
-.lap { position: relative; width: min(640px, 100%); font-size: min(10.5px, 1.6vw); }
+.lap { position: relative; width: min(620px, 100%); font-size: min(10.2px, 1.55vw); }
 .lid {
     position: relative; padding: 1.1em; border-radius: 1.8em 1.8em .5em .5em;
     background: linear-gradient(160deg, #2B1F18, #140D09);
@@ -98,9 +86,6 @@ p { margin: 0; }
     position: relative; display: flex; aspect-ratio: 16 / 10; border-radius: .7em;
     background: linear-gradient(#FFFFFF, #FFF6EC); color: #1D140E;
 }
-/* the screen is dark until the laptop "switches on" (home.js fades this out) */
-.scr-off { position: absolute; inset: 0; z-index: 2; border-radius: .7em; background: #0E0907; opacity: 0; pointer-events: none; }
-.assembling .scr-off { opacity: 1; }
 .scr-side { width: 4.6em; flex: none; border-radius: .7em 0 0 .7em; background: #17100B; display: flex; flex-direction: column; align-items: center; gap: 1.2em; padding: 1.2em 0; }
 .scr-side img { width: 2.4em; }
 .scr-side i { width: 1.6em; height: 1.6em; border-radius: .5em; background: #3A2C23; }
@@ -116,8 +101,7 @@ p { margin: 0; }
 .p-id { grid-area: id; } .p-reg { grid-area: reg; } .p-rcpt { grid-area: rcpt; } .p-rc { grid-area: rc; }
 .p-coins { grid-area: chart; } .p-tt { grid-area: tt; } .p-bus { grid-area: bus; }
 
-/* each piece: the loose object (.obj) and the tile it turns into (.tile) */
-.pc { position: relative; z-index: 3; }
+/* a dashboard tile (also used on the fee and attendance pages) */
 .tile { height: 100%; padding: .9em 1em; border-radius: .9em; background: #fff; border: 1px solid #F0E6DA; box-shadow: 0 .4em 1.2em -.6em rgba(60,30,10,.25); }
 .tile small { display: block; color: #8A7D72; font-size: .95em; }
 .tile b { display: block; font: 800 1.5em var(--font-h); letter-spacing: -.02em; margin: .15em 0; white-space: nowrap; }
@@ -125,88 +109,16 @@ p { margin: 0; }
 .chart .bars { display: flex; align-items: flex-end; gap: .8em; height: calc(100% - 1.8em); padding-top: .8em; }
 .chart .bars i { flex: 1; height: var(--h); border-radius: .5em .5em .2em .2em; background: #FFE1C2; }
 .chart .bars i.hl { background: linear-gradient(var(--or), var(--or2)); }
-.obj { display: none; }
 
-/* the WhatsApp message lands on the corner of the screen and stays a message */
-.p-wa { position: absolute; z-index: 5; right: -4em; bottom: 2.5em; }   /* over the empty foot of the bus tile */
-.p-wa .obj { display: flex; }
-.obj.wa { align-items: center; gap: .8em; padding: .9em 1.1em; border-radius: 1.1em; background: #DCF8C6; color: #0B3B1C; box-shadow: 0 1.5em 3em -1em rgba(0,0,0,.55); white-space: nowrap; }
-.obj.wa .bx { font-size: 2.2em; color: #128C4A; }
-.obj.wa b { display: block; font-size: 1.15em; }
-.obj.wa small { font-size: .95em; opacity: .7; }
-
-/* ── the loose objects (only while assembling) ── */
-.assembling .obj {
-    display: block; position: absolute; left: 50%; top: 50%; translate: -50% -50%;
-    box-shadow: 0 2em 4em -1.5em rgba(0,0,0,.75);
-    animation: bob 5s ease-in-out infinite;   /* a gentle float on the inner object, never fights GSAP */
+/* the WhatsApp message on the corner of the laptop */
+.wa-note {
+    position: absolute; z-index: 2; right: -3em; bottom: 4em;
+    display: flex; align-items: center; gap: .8em; padding: .9em 1.1em; border-radius: 1.1em;
+    background: #DCF8C6; color: #0B3B1C; white-space: nowrap; box-shadow: 0 1.5em 3em -1em rgba(0,0,0,.55);
 }
-.assembling .p-reg .obj, .assembling .p-tt .obj { animation-delay: -1.5s; }
-.assembling .p-rcpt .obj, .assembling .p-bus .obj { animation-delay: -3s; }
-.assembling .p-wa .obj { display: flex; position: static; translate: none; animation: none; }
-@keyframes bob { 0%, 100% { translate: -50% -50%; } 50% { translate: -50% calc(-50% - .8em); } }
-
-.idcard { width: 13em; height: 8.4em; padding: 1em; border-radius: 1em; background: linear-gradient(135deg, #fff, #FFF1E2); border-top: .7em solid var(--or); }
-.idcard .ph { float: left; width: 3.6em; height: 4.4em; margin-right: .9em; border-radius: .5em; background: linear-gradient(#FFD2A8, #F59E5B); }
-.idcard b { display: block; font: 800 1em var(--font-h); color: #1D140E; letter-spacing: .06em; }
-.idcard i { display: block; height: .55em; margin-top: .6em; border-radius: .3em; background: #EADCCD; }
-.idcard i + i { width: 60%; }
-.idcard em { display: block; clear: both; padding-top: .6em; font-style: normal; font-size: .85em; color: #B5520A; font-weight: 700; }
-
-.register { width: 11em; height: 14em; padding: 1.4em 1.2em; border-radius: .5em 1em 1em .5em; background: linear-gradient(135deg, #8B3A1C, #5A2210); border-left: 1.1em solid #3E160A; color: #FFE7C2; }
-.register b { display: block; font: 800 1.1em/1.25 var(--font-h); letter-spacing: .05em; padding: .8em .6em; border: 2px solid rgba(255,231,194,.5); text-align: center; }
-.register small { display: block; margin-top: 1em; text-align: center; font-size: .85em; opacity: .85; }
-
-.receipt { width: 11em; padding: 1.2em 1.1em 1.4em; background: #FFFDF8; color: #1D140E; border-radius: .4em; }
-.receipt b { display: block; font: 800 1em var(--font-h); letter-spacing: .05em; }
-.receipt i { display: block; height: .5em; margin-top: .7em; border-radius: .3em; background: #EFE3D5; }
-.receipt em { display: block; margin-top: .9em; font: 800 1.4em var(--font-h); font-style: normal; }
-.receipt .paid { position: absolute; right: .8em; top: 2.6em; padding: .1em .5em; border: .2em solid #16A34A; border-radius: .4em; color: #16A34A; font: 800 1em var(--font-h); transform: rotate(-14deg); }
-
-.assembling .coins { width: 9em; height: 7em; box-shadow: none; }
-.coins span {
-    position: absolute; width: 2.5em; height: 2.5em; border-radius: 50%; display: grid; place-items: center;
-    font: 800 2.2em/1 var(--font-h); color: #7A4A00;
-    background: radial-gradient(circle at 35% 30%, #FFE68A, #F5B400 60%, #C98A00);
-    box-shadow: inset 0 0 0 .15em rgba(255,255,255,.35), 0 .5em 1em -.4em rgba(0,0,0,.7);
-}
-.coins span:nth-child(1) { left: 0; top: .55em; } .coins span:nth-child(2) { left: 1.15em; top: 0; } .coins span:nth-child(3) { left: 2.1em; top: 1em; }
-
-.timetable { width: 13em; padding: 1em; border-radius: .8em; background: #F4F7FF; color: #1E3A8A; }
-.timetable b { display: block; font: 800 1em var(--font-h); letter-spacing: .06em; margin-bottom: .7em; }
-.tt-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35em; }
-.tt-grid i { height: 1.5em; border-radius: .3em; background: #C7D7FE; }
-.tt-grid i:nth-child(3n) { background: #FFD9B0; }
-.tt-grid i:nth-child(5n) { background: #BBF7D0; }
-
-.reportcard { width: 11em; padding: 1.2em; border-radius: .6em; background: #fff; color: #1D140E; border: .35em double #E6D3BE; }
-.reportcard b { display: block; font: 800 1em var(--font-h); letter-spacing: .05em; text-align: center; }
-.reportcard i { display: block; height: .5em; margin-top: .8em; border-radius: .3em; background: #EFE3D5; }
-.reportcard em { display: grid; place-items: center; width: 2.4em; height: 2.4em; margin: .8em auto 0; border-radius: 50%; font: 800 1.5em var(--font-h); font-style: normal; color: #fff; background: var(--grad); }
-
-.assembling .bus2 { display: grid; }   /* only while loose: never over the tile in the plain hero */
-.bus2 { width: 9em; height: 6em; border-radius: 1.4em; place-items: center; background: linear-gradient(#FFD34D, #F5A800); color: #1D140E; }
-.bus2 .bx { font-size: 4.4em; }
-
-/* while assembling: the stage sticks to the screen, the laptop is centred, captions sit on top */
-.assembling .build { height: 440vh; }
-.assembling .build-stage { position: sticky; top: 0; height: 100vh; height: 100svh; display: block; max-width: none; padding: 0; overflow: hidden; }
-.assembling .scene { position: absolute; inset: 0; padding: 80px 24px 0; }
-.assembling .lap { width: min(640px, 82vw); font-size: min(10.5px, 1.32vw); }
-.assembling .cap { position: absolute; left: 0; right: 0; display: block; opacity: 0; pointer-events: none; width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
-.assembling .cap.on { pointer-events: auto; }
-.assembling .cap-1 { top: 50%; transform: translateY(-50%); text-align: center; }
-.assembling .cap-2, .assembling .cap-3 { bottom: 7vh; text-align: center; }
-.assembling .cap-final { top: calc(50% + 37px); transform: translateY(-50%); }
-.assembling .cap-final > * { max-width: 520px; }
-.assembling .cap-final .hero-h, .cap-final .hero-h { font-size: clamp(2.4rem, 3.9vw, 3.5rem); }
-
-.cap-big { font-size: clamp(2.3rem, 6.4vw, 5.4rem); font-weight: 800; margin: 1.2rem 0 1.4rem; text-shadow: 0 10px 40px rgba(0,0,0,.8); }
-.cap-mid { font-size: clamp(2rem, 5vw, 4.2rem); font-weight: 800; text-shadow: 0 10px 40px rgba(0,0,0,.9); }
-.cap-hint { display: inline-flex; align-items: center; gap: .7rem; color: var(--text2); font-size: .95rem; }
-.mouse { position: relative; width: 24px; height: 38px; border: 2px solid rgba(255,255,255,.45); border-radius: 13px; }
-.mouse span { position: absolute; left: 50%; top: 7px; width: 4px; height: 8px; margin-left: -2px; border-radius: 2px; background: #fff; animation: wheel 1.6s ease-in-out infinite; }
-@keyframes wheel { 0% { opacity: 0; transform: translateY(0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translateY(12px); } }
+.wa-note .bx { font-size: 2.2em; color: #128C4A; }
+.wa-note b { display: block; font-size: 1.15em; }
+.wa-note small { font-size: .95em; opacity: .7; }
 
 .pill {
     display: inline-flex; align-items: center; gap: .55rem;
@@ -364,13 +276,6 @@ p { margin: 0; }
     *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 
-/* short laptop screens: the last hero caption must fit under the top bar */
-@media (min-width: 961px) and (max-height: 760px) {
-    .assembling .cap-final .hero-h { font-size: 3rem; margin: .8rem 0 .9rem; }
-    .assembling .cap-final .lead { font-size: 1rem; }
-    .assembling .cap-final .hero-btns { margin: 1.3rem 0 1rem; }
-}
-
 /* ── tablet ── */
 @media (max-width: 1060px) {
     .mods { grid-template-columns: repeat(3, 1fr); }
@@ -391,19 +296,11 @@ p { margin: 0; }
     .nav-cta { margin-left: auto; }
     .nav-demo { display: none; }   /* the phone keeps Login on top; the demo is in the hero and the menu */
 
-    /* hero: text first, the laptop under it (plain hero) */
-    .build-stage { grid-template-columns: 1fr; padding-top: 100px; }
-    .scene, .cap-final { grid-column: 1; }
-    .scene { grid-row: 2; }
-    .lap { font-size: min(10.5px, 2.2vw); }
-    .p-wa { right: -1em; }
-    /* while assembling: the laptop ends in the top part of the screen, the last caption below it */
-    .assembling .scene { align-items: flex-start; padding-top: 16vh; }
-    .assembling .lap { width: 88vw; font-size: 2vw; }
-    .assembling .cap-final { top: auto; bottom: 4vh; transform: none; }
-    .assembling .cap-final > * { max-width: none; }
-    .assembling .cap-final .lead { display: none; }
-    .cap-final .hero-h, .assembling .cap-final .hero-h { font-size: clamp(2.3rem, 9vw, 3.2rem); }
+    /* hero: text first, the laptop under it */
+    .hero { padding: 110px 0 64px; }
+    .hero-in { grid-template-columns: 1fr; gap: 40px; }
+    .lap { font-size: min(10.2px, 2.1vw); }
+    .wa-note { right: -1em; }
 
     .roles, .why, .faq-wrap, .contact { grid-template-columns: 1fr; gap: 32px; }
     .lp-hero { padding: 100px 0 64px; }

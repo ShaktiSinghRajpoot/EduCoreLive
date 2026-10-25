@@ -5960,3 +5960,6 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - `_Faq.cshtml` (model `List<SiteFaq>`, `Models/SiteFaq.cs`) shows a page's FAQ and writes the same questions as FAQPage structured data.
 - New pages `/school-fee-management-software` (`FeeManagement.cshtml`) and `/school-attendance-management-software` (`AttendanceManagement.cshtml`), each one search topic. Every feature they name exists in the Fees / Attendance module; keep them true when a module changes. Open to signed-in users too; listed in `SiteController.PublicPages` (the sitemap). The homepage's Fees and Attendance cards and the footer link to them.
 - CSS: `lp-*` rules in `css/site/home.css` (plain dark hero with sample tiles, `mods-full` cards that keep their text on a phone, closing link strip).
+
+### 2026-10-25 — Public website: plain hero, no scroll animation
+- The owner found the scroll-assembled hero ("Scroll to put your school together", pieces flying into the laptop) unprofessional. The hero is now static: text and buttons on the left, the finished dashboard on a laptop on the right, a WhatsApp "absent alert" note on its corner. GSAP/ScrollTrigger (cdnjs) are no longer loaded; `home.js` keeps only the phone menu, the fade-in and the demo form. The loose objects (ID card, register, receipt, coins, ...) and all `.assembling` / caption CSS are gone.

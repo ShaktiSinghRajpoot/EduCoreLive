@@ -1,106 +1,12 @@
-// Public website (Views/Site/Index.cshtml).
-// GSAP + ScrollTrigger run only the hero assembly (setUpAssembly). Everything else is plain:
-// the phone menu, a fade-in as blocks come into view, and the demo form.
-// GSAP comes from a CDN; if it is missing the hero simply shows the finished laptop.
+// Public website (Views/Site): the phone menu, a fade-in as blocks come into view, and the
+// demo form. No libraries; everything on the page works without this file.
 (function () {
     var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var isDesktop = window.matchMedia('(min-width: 961px)').matches;
-    var hasGsap = !!(window.gsap && window.ScrollTrigger);
 
     setUpNav();
     setUpEnquiryForm();
-    if (reduceMotion) {
-        return;   // no motion: the CSS already shows everything
-    }
-    setUpReveal();
-    if (hasGsap) {
-        gsap.registerPlugin(ScrollTrigger);
-        // a phone's address bar showing/hiding must not re-measure the hero mid-scroll
-        ScrollTrigger.config({ ignoreMobileResize: true });
-        setUpAssembly();
-    }
-
-    // ───────────── hero: the loose pieces fly into the laptop as you scroll ─────────────
-    // Each piece (.pc) sits in its final place on the laptop screen. At the top of the page
-    // it is moved away to a spot on the screen given by data-at ("x%,y%" of the window),
-    // tilted by data-r degrees, and shows its loose object (.obj). Scrolling brings it back
-    // to its place, where the object fades into the dashboard tile (.tile).
-    function setUpAssembly() {
-        var build = document.getElementById('build');
-        var lap = document.getElementById('lap');
-        var stage = build.querySelector('.build-stage');
-        var pieces = Array.prototype.slice.call(build.querySelectorAll('.pc'));
-        document.documentElement.classList.add('assembling');
-
-        // how far a piece must move from its place to sit at its starting spot. Measured with the
-        // piece and the laptop un-moved (as they are once assembled), then put back as they were.
-        function offset(piece, axis) {
-            var at = piece.getAttribute('data-at').split(',');
-            var pieceWas = piece.style.transform, lapWas = lap.style.transform;
-            piece.style.transform = 'none';
-            lap.style.transform = 'none';
-            var box = piece.getBoundingClientRect();
-            var area = stage.getBoundingClientRect();   // the stage is the size of the window
-            piece.style.transform = pieceWas;
-            lap.style.transform = lapWas;
-            if (axis === 'x') return area.width * Number(at[0]) / 100 - (box.left - area.left + box.width / 2);
-            return area.height * Number(at[1]) / 100 - (box.top - area.top + box.height / 2);
-        }
-
-        var tl = gsap.timeline({
-            defaults: { ease: 'power2.inOut' },
-            scrollTrigger: {
-                // scrub: true = the pieces follow the scrollbar exactly. A smoothing delay left pieces
-                // half-way on a fast scroll while the captions had already moved on.
-                trigger: build, start: 'top top', end: 'bottom bottom', scrub: true, invalidateOnRefresh: true,
-                onUpdate: function (st) { showCaptions(st.progress); }
-            }
-        });
-
-        // the laptop comes up from a tilt and switches on
-        tl.fromTo(lap, { rotateX: 30, scale: 0.8, transformPerspective: 1400 }, { rotateX: 0, scale: 1, duration: 0.2 }, 0);
-        tl.to('.scr-off', { opacity: 0, duration: 0.08 }, 0.12);
-
-        // the pieces, one after another
-        pieces.forEach(function (piece, i) {
-            var start = 0.2 + i * 0.055;
-            // functions so the distances are measured again when the window is resized;
-            // the laptop is at its final size here, because a fromTo starts from the end state
-            tl.fromTo(piece,
-                {
-                    x: function () { return offset(piece, 'x'); },
-                    y: function () { return offset(piece, 'y'); },
-                    rotation: Number(piece.getAttribute('data-r') || 0)
-                },
-                { x: 0, y: 0, rotation: 0, duration: 0.22 }, start);
-            var obj = piece.querySelector('.obj');
-            var tile = piece.querySelector('.tile');
-            if (tile) {
-                tl.fromTo(obj, { opacity: 1 }, { opacity: 0, duration: 0.05, ease: 'none' }, start + 0.17);
-                tl.fromTo(tile, { opacity: 0 }, { opacity: 1, duration: 0.05, ease: 'none' }, start + 0.17);
-            }
-        });
-
-        // the finished laptop moves aside for the last caption (up on a phone, right on a computer)
-        tl.to(lap, isDesktop
-            ? { x: function () { return window.innerWidth * 0.2; }, scale: 0.9, duration: 0.12 }
-            : { y: function () { return -window.innerHeight * 0.06; }, scale: 0.92, duration: 0.12 }, 0.8);
-        tl.to({}, { duration: 0.08 });   // a short rest at the end before the page moves on
-
-        // captions fade in and out over their data-from..data-to part of the scroll
-        var caps = Array.prototype.slice.call(build.querySelectorAll('.cap'));
-        function showCaptions(p) {
-            caps.forEach(function (cap) {
-                var from = Number(cap.getAttribute('data-from'));
-                var to = Number(cap.getAttribute('data-to'));
-                var fade = 0.04;
-                var o = Math.min(1, Math.max(0, (p - from) / fade), Math.max(0, (to - p) / fade));
-                if (from === 0 && p < fade) o = 1;   // the first caption shows at once
-                cap.style.opacity = o;
-                cap.classList.toggle('on', o > 0.5);
-            });
-        }
-        showCaptions(0);
+    if (!reduceMotion) {
+        setUpReveal();   // no motion: the CSS already shows everything
     }
 
     // ───────────── top bar: phone menu ─────────────
