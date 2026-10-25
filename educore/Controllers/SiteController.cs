@@ -26,8 +26,23 @@ namespace educore.Controllers
             return View();
         }
 
+        // Pages for one search each ("school fee management software", ...). Open to everyone,
+        // signed in or not: unlike "/" they are not the way into the portal.
+        [HttpGet("/school-fee-management-software")]
+        [HttpHead("/school-fee-management-software")]
+        public IActionResult FeeManagement() => View();
+
+        [HttpGet("/school-attendance-management-software")]
+        [HttpHead("/school-attendance-management-software")]
+        public IActionResult AttendanceManagement() => View();
+
         // The public pages Google should know about. Add a page here when the website gets one.
-        private static readonly string[] PublicPages = { "/" };
+        private static readonly string[] PublicPages =
+        {
+            "/",
+            "/school-fee-management-software",
+            "/school-attendance-management-software"
+        };
 
         /// <summary>sitemap.xml for search engines (robots.txt in wwwroot points here).</summary>
         [HttpGet("/sitemap.xml")]

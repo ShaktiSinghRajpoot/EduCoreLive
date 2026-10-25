@@ -1,0 +1,139 @@
+@using educore.Models
+@{
+    // Public page for "school fee management software". Every feature named here exists in
+    // the Fees module (Areas/Fees); keep it that way when the module changes.
+    Layout = "_SiteLayout";
+    ViewData["Title"] = "School Fee Management Software India | SmartSchoolWala";
+    ViewData["Description"] = "Collect school fees at the counter in seconds, print receipts, see month-wise dues and defaulters, and remind parents. Fee management software made for Indian schools. Book a free demo.";
+    ViewData["Path"] = "/school-fee-management-software";
+    ViewData["Crumb"] = "School fee management software";
+
+    var faqs = new List<SiteFaq>
+    {
+        new("Can different classes have different fees?", "Yes. You set fee heads such as tuition, admission, exam and transport, each monthly, quarterly, half-yearly, yearly or one-time, and then the fee structure of each class for the session."),
+        new("Which payment modes can the counter take?", "Cash, UPI, cheque and bank transfer. The receipt shows how the money was paid, and the reports show collection by payment mode."),
+        new("Can we give a concession to some students?", "Yes. A concession is recorded with the student and the person who gave it, and it shows in the concession register, so the owner sees all money given away."),
+        new("What if a receipt is made by mistake?", "It is cancelled with a reason, not deleted. The cancelled receipt stays in the register with who cancelled it and when."),
+        new("We have old dues from last year. Do we enter them by hand?", "No. Previous dues are imported from Excel, checked row by row before anything is saved. At the end of each session, unpaid dues are carried forward to the next one."),
+        new("Does it work with our receipt printer?", "Receipts print in A4, A5 or thermal size, with your school's logo, so you can use the printer your counter already has.")
+    };
+}
+
+<!-- ───────────── Hero (no animation; the figures on the right are sample data) ───────────── -->
+<section class="lp-hero">
+  <div class="wrap lp-hero-in">
+    <div>
+      <nav class="lp-crumb" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span>Fee management software</nav>
+      <span class="pill"><span class="dot"></span>Fees module of SmartSchoolWala</span>
+      <h1 class="hero-h">School fee management<br /><span class="grad">without the registers.</span></h1>
+      <p class="lead">Set the fee structure once, collect at the counter in seconds, print the receipt and always know who still owes what. Made for how Indian schools really collect fees: cash, UPI and cheque, month by month.</p>
+      <div class="hero-btns">
+        <a href="#contact" class="btn btn-primary btn-lg">Book a free demo<i class="bx bx-right-arrow-alt"></i></a>
+        <a href="/#modules" class="btn btn-glass btn-lg">All features</a>
+      </div>
+      <ul class="hero-ticks">
+        <li><i class="bx bx-check"></i>Old dues brought in from Excel</li>
+        <li><i class="bx bx-check"></i>A4, A5 and thermal receipts</li>
+        <li><i class="bx bx-check"></i>Works on any phone</li>
+      </ul>
+    </div>
+    <div class="lp-tiles" aria-hidden="true">
+      <div class="tile"><small>Fees today</small><b>₹1,86,400</b><span>74 receipts</span></div>
+      <div class="tile"><small>Cash · UPI · Cheque</small><b>52 · 19 · 3</b><span>by payment mode</span></div>
+      <div class="tile"><small>Due this month</small><b>₹3,12,000</b><span>96 students</span></div>
+      <div class="tile"><small>Counter closed</small><b>4 of 4</b><span>day close done</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── What it does ───────────── -->
+<section class="sec sec-soft">
+  <div class="wrap">
+    <div class="sec-head" data-up>
+      <span class="kicker">What it does</span>
+      <h2>Everything the fee counter needs</h2>
+      <p>From the fee structure at the start of the session to the dues carried forward at its end.</p>
+    </div>
+    <div class="mods mods-full">
+      <article class="mod" data-up><span class="mi"><i class="bx bx-wallet"></i></span><h3>Fee structure per class</h3><p>Fee heads such as tuition, admission, exam and transport, each monthly, quarterly, half-yearly, yearly or one-time.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-rupee"></i></span><h3>Counter collection</h3><p>Find the child by name or admission number, see every month due, take cash, UPI, cheque or bank transfer.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-receipt"></i></span><h3>Receipts</h3><p>Numbered receipts in A4, A5 or thermal size with your logo. A cancellation needs a reason and stays on record.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-check"></i></span><h3>Concessions &amp; extras</h3><p>Concessions recorded with who gave them; a late fine or a lost book added at the counter.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-calendar-check"></i></span><h3>Month-wise dues</h3><p>What is unpaid, month by month, class by class and child by child, with defaulter lists.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-bell"></i></span><h3>Fee reminders</h3><p>Remind the parents of children with dues on WhatsApp, straight from the dues list.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-lock-alt"></i></span><h3>Day close</h3><p>Each cashier counts the cash and closes their own counter; the owner sees what every counter took.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-line-chart"></i></span><h3>Fee dashboard &amp; reports</h3><p>Collection by day, month, payment mode and staff; the collection register; families owing most.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Who sees what ───────────── -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head" data-up>
+      <span class="kicker">Who it helps</span>
+      <h2>The owner, the principal and the accountant, each with their own view</h2>
+      <p>Fee data opens only for the people you allow. A teacher does not see fees unless you say so.</p>
+    </div>
+    <div class="roles">
+      <article class="role" data-up>
+        <span class="role-ic"><i class="bx bx-line-chart"></i></span>
+        <h3>For the owner</h3>
+        <ul>
+          <li><i class="bx bx-check"></i>Today's collection and pending dues, on your phone</li>
+          <li><i class="bx bx-check"></i>Every receipt numbered; a cancellation needs a reason</li>
+          <li><i class="bx bx-check"></i>Day close shows what each counter collected</li>
+          <li><i class="bx bx-check"></i>The concession register shows all money given away</li>
+        </ul>
+      </article>
+      <article class="role role-mid" data-up>
+        <span class="role-ic"><i class="bx bx-receipt"></i></span>
+        <h3>For the accountant</h3>
+        <ul>
+          <li><i class="bx bx-check"></i>Find the child and see all months due on one screen</li>
+          <li><i class="bx bx-check"></i>Collect and print the receipt in seconds</li>
+          <li><i class="bx bx-check"></i>Late fine, concession and advance handled at the counter</li>
+          <li><i class="bx bx-check"></i>Defaulter list by class, ready to call or remind</li>
+        </ul>
+      </article>
+      <article class="role" data-up>
+        <span class="role-ic"><i class="bx bx-medal"></i></span>
+        <h3>For the principal</h3>
+        <ul>
+          <li><i class="bx bx-check"></i>Classes with the most dues and their class teachers</li>
+          <li><i class="bx bx-check"></i>A warning on children who may have left the school</li>
+          <li><i class="bx bx-check"></i>Transport fee added to the child's fees</li>
+          <li><i class="bx bx-check"></i>Unpaid dues carried forward at the session end</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Getting started ───────────── -->
+<section class="sec sec-soft">
+  <div class="wrap">
+    <div class="sec-head" data-up>
+      <span class="kicker">Getting started</span>
+      <h2>Your fee counter on SmartSchoolWala in days</h2>
+      <p>We set it up with your office, so the first day at the counter is an ordinary day.</p>
+    </div>
+    <ol class="steps">
+      <li data-up><span>1</span><h3>Fee structure</h3><p>Your fee heads and each class's fees set up together with you.</p></li>
+      <li data-up><span>2</span><h3>Old dues come in</h3><p>Students and previous dues imported from Excel, checked row by row.</p></li>
+      <li data-up><span>3</span><h3>Counter goes live</h3><p>Collect, print receipts and close the day; your staff trained by us.</p></li>
+      <li data-up><span>4</span><h3>Session end</h3><p>Unpaid dues carried forward to the next session, nothing lost.</p></li>
+    </ol>
+  </div>
+</section>
+
+<partial name="_Faq" model="faqs" />
+
+<!-- ───────────── Other modules ───────────── -->
+<section class="sec lp-more">
+  <div class="wrap lp-more-in" data-up>
+    <p>Fees is one part of the SmartSchoolWala school ERP. Start with fees and add the rest when you are ready.</p>
+    <a href="/school-attendance-management-software" class="btn btn-dark">Attendance management<i class="bx bx-right-arrow-alt"></i></a>
+    <a href="/#modules" class="btn btn-dark">All features<i class="bx bx-right-arrow-alt"></i></a>
+  </div>
+</section>

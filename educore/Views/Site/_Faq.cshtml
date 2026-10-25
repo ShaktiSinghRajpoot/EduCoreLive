@@ -1,0 +1,35 @@
+@model IList<educore.Models.SiteFaq>
+@inject Microsoft.Extensions.Options.IOptions<educore.Services.SupportSettings> SupportOptions
+@{
+    // FAQ section of a public page, and the same questions as FAQPage structured data,
+    // so what Google reads is always what the visitor sees.
+    // System.Text.Json escapes < and >, so the text cannot break out of the <script> tag.
+    string faqLd = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+    {
+        ["@context"] = "https://schema.org",
+        ["@type"] = "FAQPage",
+        ["mainEntity"] = Model.Select(f => new Dictionary<string, object>
+        {
+            ["@type"] = "Question",
+            ["name"] = f.Q,
+            ["acceptedAnswer"] = new Dictionary<string, object> { ["@type"] = "Answer", ["text"] = f.A }
+        }).ToArray()
+    });
+}
+<section class="sec" id="faq">
+  <div class="wrap faq-wrap">
+    <div class="sec-head left" data-up>
+      <span class="kicker">FAQ</span>
+      <h2>Questions schools ask us</h2>
+      <p>Anything else? Ask us on the demo call, or call @SupportOptions.Value.Name directly.</p>
+    </div>
+    <div class="faq">
+      @foreach (var f in Model)
+      {
+        <details><summary>@f.Q<i class="bx bx-plus"></i></summary><p>@f.A</p></details>
+      }
+    </div>
+  </div>
+  @* written raw: Razor's tag helpers would encode the "+" in the type as &#x2B; *@
+  @Html.Raw("<script type=\"application/ld+json\">" + faqLd + "</script>")
+</section>

@@ -1,0 +1,119 @@
+@using educore.Models
+@{
+    // Public page for "school attendance management software". Every feature named here
+    // exists in the Attendance module (Areas/Attendance); keep it that way when it changes.
+    Layout = "_SiteLayout";
+    ViewData["Title"] = "School Attendance Management Software | SmartSchoolWala";
+    ViewData["Description"] = "Teachers mark class attendance on the phone in under a minute. See which registers are not taken, keep the monthly register and alert parents of absent children on WhatsApp. Made for Indian schools.";
+    ViewData["Path"] = "/school-attendance-management-software";
+    ViewData["Crumb"] = "School attendance management software";
+
+    var faqs = new List<SiteFaq>
+    {
+        new("Who marks the attendance?", "The class teacher marks their own class on the phone. On a day the class teacher is away, a teacher who takes a period in that class can stand in. Admins and the principal can mark any class."),
+        new("What can a child be marked as?", "Present, absent, late or on leave. The monthly register and the reports count each of them separately."),
+        new("What about holidays and Sundays?", "Holidays and weekly offs come from the school calendar. On those days no attendance is taken, so they never show up as missing registers."),
+        new("Do parents get a message when their child is absent?", "Yes. With WhatsApp switched on for your school, the parents of every child marked absent in a class can be sent a message from the attendance page, the same morning."),
+        new("Can we see which teachers did not take attendance?", "Yes. The overview shows today's registers that are not taken yet, and for any period the missing registers week by week with the class teacher responsible."),
+        new("Can we print or export the register?", "The monthly register of each class can be printed, and the per-student summary exported as a CSV file that opens in Excel.")
+    };
+}
+
+<!-- ───────────── Hero (no animation; the figures on the right are sample data) ───────────── -->
+<section class="lp-hero">
+  <div class="wrap lp-hero-in">
+    <div>
+      <nav class="lp-crumb" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span>Attendance management software</nav>
+      <span class="pill"><span class="dot"></span>Attendance module of SmartSchoolWala</span>
+      <h1 class="hero-h">School attendance management<br /><span class="grad">on the teacher's phone.</span></h1>
+      <p class="lead">The class teacher marks present, absent, late or on leave in under a minute. The office sees which classes are done, the principal sees the whole school, and parents of absent children hear about it the same morning.</p>
+      <div class="hero-btns">
+        <a href="#contact" class="btn btn-primary btn-lg">Book a free demo<i class="bx bx-right-arrow-alt"></i></a>
+        <a href="/#modules" class="btn btn-glass btn-lg">All features</a>
+      </div>
+      <ul class="hero-ticks">
+        <li><i class="bx bx-check"></i>Nothing to install</li>
+        <li><i class="bx bx-check"></i>Holidays from your school calendar</li>
+        <li><i class="bx bx-check"></i>Works on any phone</li>
+      </ul>
+    </div>
+    <div class="lp-tiles" aria-hidden="true">
+      <div class="tile"><small>Present today</small><b>96.4%</b><span>1,195 marked</span></div>
+      <div class="tile"><small>Registers taken</small><b>31 of 32</b><span>1 class left</span></div>
+      <div class="tile"><small>Class 5-A</small><b>38 of 40</b><span>2 absent</span></div>
+      <div class="tile lp-wa"><small><i class="bx bxl-whatsapp"></i> Absent alert sent</small><b>12</b><span>parents told</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── What it does ───────────── -->
+<section class="sec sec-soft">
+  <div class="wrap">
+    <div class="sec-head" data-up>
+      <span class="kicker">What it does</span>
+      <h2>The attendance register, without the register</h2>
+      <p>Marked in class, seen by the office at once, and kept month by month like the paper register.</p>
+    </div>
+    <div class="mods mods-full">
+      <article class="mod" data-up><span class="mi"><i class="bx bx-mobile-alt"></i></span><h3>Marked on the phone</h3><p>The class list opens on the teacher's phone; mark and save in under a minute.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-check"></i></span><h3>Present, absent, late, leave</h3><p>Four clear marks, counted separately in the register and the reports.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-group"></i></span><h3>Class teacher marks</h3><p>Each teacher marks their own class; a teacher can stand in when the class teacher is away.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-calendar-check"></i></span><h3>Holidays respected</h3><p>Holidays and weekly offs come from the school calendar; no attendance is asked for on them.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-spreadsheet"></i></span><h3>Monthly register</h3><p>Each class's month at a glance with percentages; print it or export it for Excel.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-bell"></i></span><h3>Registers not taken</h3><p>Today's classes still without attendance, and the class teacher responsible.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-line-chart"></i></span><h3>Overview for the principal</h3><p>Missing registers week by week, classes worst-first and a class-teacher leaderboard.</p></article>
+      <article class="mod" data-up><span class="mi"><i class="bx bx-envelope"></i></span><h3>Absent alerts to parents</h3><p>A WhatsApp message to the parents of every child marked absent in the class.</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────── Who sees what ───────────── -->
+<section class="sec">
+  <div class="wrap">
+    <div class="sec-head" data-up>
+      <span class="kicker">Who it helps</span>
+      <h2>One register, and everyone sees what they need</h2>
+      <p>A teacher works with their own classes; the office and the principal see the whole school.</p>
+    </div>
+    <div class="roles">
+      <article class="role" data-up>
+        <span class="role-ic"><i class="bx bx-mobile-alt"></i></span>
+        <h3>For the class teacher</h3>
+        <ul>
+          <li><i class="bx bx-check"></i>Attendance from the phone, in class</li>
+          <li><i class="bx bx-check"></i>Marks only the classes they are responsible for</li>
+          <li><i class="bx bx-check"></i>No register to total at the month end</li>
+        </ul>
+      </article>
+      <article class="role role-mid" data-up>
+        <span class="role-ic"><i class="bx bx-medal"></i></span>
+        <h3>For the principal</h3>
+        <ul>
+          <li><i class="bx bx-check"></i>Whole-school attendance today, class by class</li>
+          <li><i class="bx bx-check"></i>Which registers are still not taken</li>
+          <li><i class="bx bx-check"></i>Class teachers compared week by week</li>
+        </ul>
+      </article>
+      <article class="role" data-up>
+        <span class="role-ic"><i class="bx bx-group"></i></span>
+        <h3>For the office &amp; parents</h3>
+        <ul>
+          <li><i class="bx bx-check"></i>Parents of absent children told the same morning</li>
+          <li><i class="bx bx-check"></i>Monthly register ready to print</li>
+          <li><i class="bx bx-check"></i>Children with long absences flagged in the fee dues</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<partial name="_Faq" model="faqs" />
+
+<!-- ───────────── Other modules ───────────── -->
+<section class="sec lp-more">
+  <div class="wrap lp-more-in" data-up>
+    <p>Attendance is one part of the SmartSchoolWala school ERP. Staff attendance and leave are in the Staff &amp; salary module.</p>
+    <a href="/school-fee-management-software" class="btn btn-dark">Fee management<i class="bx bx-right-arrow-alt"></i></a>
+    <a href="/#modules" class="btn btn-dark">All features<i class="bx bx-right-arrow-alt"></i></a>
+  </div>
+</section>

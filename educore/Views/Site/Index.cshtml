@@ -1,35 +1,30 @@
 @inject Microsoft.Extensions.Options.IOptions<educore.Services.SupportSettings> SupportOptions
+@using educore.Models
 @{
-    Layout = null;
+    // The homepage of the public website. Head, top bar, demo form and footer are in _SiteLayout.
+    Layout = "_SiteLayout";
+    ViewData["Title"] = "School ERP Software for Indian Schools | SmartSchoolWala";
+    ViewData["Description"] = "SmartSchoolWala is school ERP and school management software for Indian schools: admissions, fee management and receipts, attendance with WhatsApp alerts, exams, staff salary and transport. Book a free demo.";
+    ViewData["Path"] = "/";
 
-    // Contact details come from the "Support" section of appsettings.json (Support__* env vars
-    // override them), the same ones the "school unavailable" page shows.
     var support = SupportOptions.Value;
-    string waText = "Hello, I would like a free demo of SmartSchoolWala for my school.";
-    string waLink = string.IsNullOrWhiteSpace(support.WhatsApp) ? "" : "https://wa.me/" + support.WhatsApp + "?text=" + Uri.EscapeDataString(waText);
-    string telLink = "tel:" + new string((support.Phone ?? "").Where(c => char.IsDigit(c) || c == '+').ToArray());
-    string loginUrl = Url.Action("Login", "Account", new { area = "" })!;
-    int year = DateTime.Now.Year;
     string siteUrl = support.PublicUrl(Context.Request);
+    string loginUrl = Url.Action("Login", "Account", new { area = "" })!;
 
-    string pageTitle = "School ERP Software for Indian Schools | SmartSchoolWala";
-    string pageDescription = "SmartSchoolWala is school ERP and school management software for Indian schools: admissions, fee management and receipts, attendance with WhatsApp alerts, exams, staff salary and transport. Book a free demo.";
-
-    // The FAQ section and its FAQPage structured data are both built from this list,
-    // so what Google reads is always what the visitor sees.
-    var faqs = new[]
+    var faqs = new List<SiteFaq>
     {
-        (Q: "How much does it cost?", A: "The price depends on the number of students and the modules your school takes. Book a free demo and we will send a quote for your school."),
-        (Q: "Do we need to install anything?", A: "No. It opens in the browser on any computer or phone. On a phone it can be added to the home screen and used like an app."),
-        (Q: "We already have our data in Excel. Do we type it again?", A: "No. Students, staff and previous dues are imported from Excel. Every row is checked first, and nothing is saved until you confirm."),
-        (Q: "Can a teacher see fees or salaries?", A: "Only if you allow it. Every role has its own permissions: a teacher sees their classes, the accountant sees fees, and salary stays with whoever you choose."),
-        (Q: "Is our data safe?", A: "Each school's data is kept separate from every other school's. Photos and documents open only for your signed-in staff, and every receipt records who collected it."),
-        (Q: "Can we start with only fees and add the rest later?", A: "Yes. Modules are switched on per school, so you can begin with what you need most and add others whenever you are ready.")
+        new("How much does it cost?", "The price depends on the number of students and the modules your school takes. Book a free demo and we will send a quote for your school."),
+        new("Do we need to install anything?", "No. It opens in the browser on any computer or phone. On a phone it can be added to the home screen and used like an app."),
+        new("We already have our data in Excel. Do we type it again?", "No. Students, staff and previous dues are imported from Excel. Every row is checked first, and nothing is saved until you confirm."),
+        new("Can a teacher see fees or salaries?", "Only if you allow it. Every role has its own permissions: a teacher sees their classes, the accountant sees fees, and salary stays with whoever you choose."),
+        new("Is our data safe?", "Each school's data is kept separate from every other school's. Photos and documents open only for your signed-in staff, and every receipt records who collected it."),
+        new("Can we start with only fees and add the rest later?", "Yes. Modules are switched on per school, so you can begin with what you need most and add others whenever you are ready.")
     };
 
     // Structured data (schema.org JSON-LD) for search engines: the site's name, the company
-    // and its contact, the product, and the FAQ. Only facts that are true and shown on the
-    // page go in here -- no price and no ratings until there are real ones.
+    // and its contact, and the product (the FAQ's own block comes from the _Faq partial).
+    // Only facts that are true and shown on the page go in here -- no price and no ratings
+    // until there are real ones.
     // System.Text.Json escapes < and >, so the text cannot break out of the <script> tag.
     var org = new Dictionary<string, object>
     {
@@ -60,78 +55,23 @@
         ["@type"] = "SoftwareApplication",
         ["name"] = "SmartSchoolWala",
         ["url"] = siteUrl + "/",
-        ["description"] = pageDescription,
+        ["description"] = ViewData["Description"],
         ["applicationCategory"] = "BusinessApplication",
         ["applicationSubCategory"] = "School ERP and school management software",
         ["operatingSystem"] = "Web browser, Android, iOS",
         ["featureList"] = new[] { "Admissions", "Fee management and receipts", "Attendance with WhatsApp alerts", "Exams and report cards", "Timetable and homework", "Staff and salary", "Transport", "School store", "Accounts", "Certificates and TC" },
         ["provider"] = new Dictionary<string, object> { ["@id"] = siteUrl + "/#organization" }
     };
-    var faqPage = new Dictionary<string, object>
-    {
-        ["@type"] = "FAQPage",
-        ["mainEntity"] = faqs.Select(f => new Dictionary<string, object>
-        {
-            ["@type"] = "Question",
-            ["name"] = f.Q,
-            ["acceptedAnswer"] = new Dictionary<string, object> { ["@type"] = "Answer", ["text"] = f.A }
-        }).ToArray()
-    };
     string jsonLd = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
     {
         ["@context"] = "https://schema.org",
-        ["@graph"] = new object[] { org, webSite, app, faqPage }
+        ["@graph"] = new object[] { org, webSite, app }
     });
 }
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>@pageTitle</title>
-    <meta name="description" content="@pageDescription" />
-    <link rel="canonical" href="@siteUrl/" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="SmartSchoolWala" />
-    <meta property="og:locale" content="en_IN" />
-    <meta property="og:url" content="@siteUrl/" />
-    <meta property="og:title" content="@pageTitle" />
-    <meta property="og:description" content="Fees, attendance, exams, staff and more: one simple school ERP for your whole school. Book a free demo." />
-    <meta property="og:image" content="@siteUrl/img/brand/ssw-stacked.png" />
-    <meta name="twitter:card" content="summary" />
+@section StructuredData {
     @* written raw: Razor's tag helpers would encode the "+" in the type as &#x2B; *@
     @Html.Raw("<script type=\"application/ld+json\">" + jsonLd + "</script>")
-    <meta name="theme-color" content="#0B0705" />
-    <link rel="icon" type="image/x-icon" href="~/img/favicon/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="~/icons/apple-touch-icon.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="~/css/site/icons.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/css/site/home.css" asp-append-version="true" />
-</head>
-<body>
-
-<!-- ───────────── Top bar ───────────── -->
-<header class="nav" id="nav">
-  <div class="wrap nav-in">
-    <a href="/" class="nav-logo" aria-label="SmartSchoolWala.com home">
-      <img src="~/img/brand/ssw-icon.svg" alt="" /><span>SmartSchool<b>Wala</b></span>
-    </a>
-    <nav class="nav-links" id="navLinks">
-      <a href="#roles">Who it is for</a>
-      <a href="#modules">Features</a>
-      <a href="#start">Getting started</a>
-      <a href="#faq">FAQ</a>
-      <a href="#contact">Contact</a>
-    </nav>
-    <div class="nav-cta">
-      <a href="@loginUrl" class="btn btn-login"><i class="bx bx-lock-alt"></i>Login</a>
-      <a href="#contact" class="btn btn-primary nav-demo">Book a free demo</a>
-      <button class="nav-burger" id="navBurger" aria-label="Open menu"><i class="bx bx-menu"></i></button>
-    </div>
-  </div>
-</header>
+}
 
 <!-- ───────────── Hero: the school in pieces, put together as you scroll ─────────────
      Plain HTML/CSS pieces (a register, a receipt, an ID card, a report card, the bus, the
@@ -297,8 +237,8 @@
     </div>
     <div class="mods">
       <article class="mod" data-up><span class="mi"><i class="bx bx-user-plus"></i></span><h3>Admissions</h3><p>Enquiry, follow-ups, registration and admission. Admission form, documents and ID cards.</p></article>
-      <article class="mod" data-up><span class="mi"><i class="bx bx-wallet"></i></span><h3>Fees &amp; receipts</h3><p>Fee structure per class, counter collection, concessions, month-wise dues and reminders.</p></article>
-      <article class="mod" data-up><span class="mi"><i class="bx bx-calendar-check"></i></span><h3>Attendance</h3><p>Marked on the phone in seconds. Parents of absent children get a WhatsApp message.</p></article>
+      <a class="mod mod-link" href="/school-fee-management-software" data-up><span class="mi"><i class="bx bx-wallet"></i></span><h3>Fees &amp; receipts</h3><p>Fee structure per class, counter collection, concessions, month-wise dues and reminders.</p><span class="mod-more">Fee management in detail<i class="bx bx-right-arrow-alt"></i></span></a>
+      <a class="mod mod-link" href="/school-attendance-management-software" data-up><span class="mi"><i class="bx bx-calendar-check"></i></span><h3>Attendance</h3><p>Marked on the phone in seconds. Parents of absent children get a WhatsApp message.</p><span class="mod-more">Attendance in detail<i class="bx bx-right-arrow-alt"></i></span></a>
       <article class="mod" data-up><span class="mi"><i class="bx bx-medal"></i></span><h3>Exams &amp; results</h3><p>Datesheet, admit cards, marks by subject teacher, grades, ranks and report cards.</p></article>
       <article class="mod" data-up><span class="mi"><i class="bx bx-time-five"></i></span><h3>Timetable &amp; homework</h3><p>Clash-free timetable, substitutes, the school bell, and homework with who did it.</p></article>
       <article class="mod" data-up><span class="mi"><i class="bx bx-group"></i></span><h3>Staff &amp; salary</h3><p>Staff records, staff attendance, leave, monthly salary and payslips on the phone.</p></article>
@@ -346,108 +286,12 @@
   </div>
 </section>
 
-<!-- ───────────── FAQ ───────────── -->
-<section class="sec" id="faq">
-  <div class="wrap faq-wrap">
-    <div class="sec-head left" data-up>
-      <span class="kicker">FAQ</span>
-      <h2>Questions schools ask us</h2>
-      <p>Anything else? Ask us on the demo call, or call @support.Name directly.</p>
-    </div>
-    <div class="faq">
-      @* the questions live in the "faqs" list at the top (shared with the FAQPage structured data) *@
-      @foreach (var f in faqs)
-      {
-        <details><summary>@f.Q<i class="bx bx-plus"></i></summary><p>@f.A</p></details>
-      }
-    </div>
-  </div>
-</section>
+<!-- ───────────── FAQ (questions in the "faqs" list at the top) ───────────── -->
+<partial name="_Faq" model="faqs" />
 
-<!-- ───────────── Contact + demo form ─────────────
-     The form posts to /enquiry (SiteController); the Super Admin sees it under
-     Platform > Website Enquiries. "website" is a hidden trap field for bots. -->
-<section class="sec contact-sec" id="contact">
-  <div class="wrap contact">
-    <div class="contact-info" data-up>
-      <span class="kicker kicker-l">Book a free demo</span>
-      <h2>See it with your own school's work</h2>
-      <p>Tell us a little about your school. We will call you within one working day and fix a time that suits your office.</p>
-      <div class="person">
-        <span class="avatar">@(string.IsNullOrWhiteSpace(support.Name) ? "S" : support.Name.Substring(0, 1))</span>
-        <div><b>@support.Name</b><small>SmartSchoolWala.com</small></div>
-      </div>
-      <ul class="contact-list">
-        @if (!string.IsNullOrWhiteSpace(support.Phone))
-        {
-          <li><i class="bx bx-phone"></i><a href="@telLink">@support.Phone</a></li>
-        }
-        @if (waLink.Length > 0)
-        {
-          <li><i class="bx bxl-whatsapp"></i><a href="@waLink" target="_blank" rel="noopener">Chat on WhatsApp</a></li>
-        }
-        @if (!string.IsNullOrWhiteSpace(support.Email))
-        {
-          <li><i class="bx bx-envelope"></i><a href="mailto:@support.Email">@support.Email</a></li>
-        }
-        @if (!string.IsNullOrWhiteSpace(support.Hours))
-        {
-          <li><i class="bx bx-time-five"></i><span>@support.Hours</span></li>
-        }
-      </ul>
-    </div>
-
-    <form class="enq" id="enqForm" method="post" action="/enquiry" novalidate data-up>
-      @Html.AntiForgeryToken()
-      <div class="enq-grid">
-        <label>Your name *<input name="Name" maxlength="100" required autocomplete="name" /></label>
-        <label>You are
-          <select name="Designation">
-            <option>Owner / Director</option>
-            <option>Principal</option>
-            <option>Administrator</option>
-            <option>Accountant</option>
-            <option>Other</option>
-          </select>
-        </label>
-        <label class="full">School name *<input name="School" maxlength="150" required autocomplete="organization" /></label>
-        <label>City<input name="City" maxlength="80" autocomplete="address-level2" /></label>
-        <label>Number of students
-          <select name="Students">
-            <option value="">Select</option>
-            <option>Up to 300</option>
-            <option>300 to 700</option>
-            <option>700 to 1500</option>
-            <option>More than 1500</option>
-          </select>
-        </label>
-        <label>Mobile number *<input name="Phone" type="tel" inputmode="numeric" maxlength="14" required autocomplete="tel" placeholder="10-digit mobile" /></label>
-        <label>E-mail<input name="Email" type="email" maxlength="150" autocomplete="email" /></label>
-        <label class="full">Anything you want us to know<textarea name="Message" rows="3" maxlength="1000" placeholder="e.g. we want to start with fees and attendance"></textarea></label>
-        <label class="trap" aria-hidden="true">Website<input name="Website" tabindex="-1" autocomplete="off" /></label>
-      </div>
-      <button type="submit" class="btn btn-primary btn-lg enq-btn" id="enqBtn">Request a call back<i class="bx bx-right-arrow-alt"></i></button>
-      <p class="enq-msg" id="enqMsg" role="status"></p>
-      <p class="enq-note">We use these details only to contact you about the demo.</p>
-    </form>
-  </div>
-</section>
-
-<footer class="foot">
-  <div class="wrap foot-in">
-    <span class="nav-logo"><img src="~/img/brand/ssw-icon.svg" alt="" /><span>SmartSchool<b>Wala</b></span></span>
-    <span class="foot-copy">© @year SmartSchoolWala.com · School management software for Indian schools</span>
-    <span class="foot-links">
-      @if (!string.IsNullOrWhiteSpace(support.Phone)) { <a href="@telLink">@support.Phone</a> }
-      <a href="@loginUrl">Login</a>
-    </span>
-  </div>
-</footer>
-
-@* GSAP runs only the hero assembly. If it fails to load, the hero shows the finished laptop
-   and everything else is plain HTML; home.js only hides things it is about to animate. *@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-<script src="~/js/site/home.js" asp-append-version="true"></script>
-</body>
-</html>
+@section Scripts {
+    @* GSAP runs only the hero assembly. If it fails to load, the hero shows the finished laptop
+       and everything else is plain HTML; home.js only hides things it is about to animate. *@
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+}

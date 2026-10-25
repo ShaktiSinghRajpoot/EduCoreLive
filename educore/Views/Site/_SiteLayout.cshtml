@@ -1,0 +1,182 @@
+@inject Microsoft.Extensions.Options.IOptions<educore.Services.SupportSettings> SupportOptions
+@{
+    // The frame of every public website page (Views/Site): head and search tags, the top
+    // bar, the demo form and the footer. Stands alone: no Bootstrap, no app layout.
+    // A page sets ViewData["Title"], ["Description"], ["Path"] (its address, e.g. "/") and,
+    // except the homepage, ["Crumb"] (its name in the breadcrumb Google shows).
+    //
+    // Contact details come from the "Support" section of appsettings.json (Support__* env vars
+    // override them), the same ones the "school unavailable" page shows.
+    var support = SupportOptions.Value;
+    string siteUrl = support.PublicUrl(Context.Request);
+    string pageTitle = ViewData["Title"] as string ?? "SmartSchoolWala";
+    string pageDescription = ViewData["Description"] as string ?? "";
+    string pageUrl = siteUrl + (ViewData["Path"] as string ?? "/");
+    string? crumb = ViewData["Crumb"] as string;
+
+    string waText = "Hello, I would like a free demo of SmartSchoolWala for my school.";
+    string waLink = string.IsNullOrWhiteSpace(support.WhatsApp) ? "" : "https://wa.me/" + support.WhatsApp + "?text=" + Uri.EscapeDataString(waText);
+    string telLink = "tel:" + new string((support.Phone ?? "").Where(c => char.IsDigit(c) || c == '+').ToArray());
+    string loginUrl = Url.Action("Login", "Account", new { area = "" })!;
+    int year = DateTime.Now.Year;
+
+    // the breadcrumb (Home > this page) as structured data, on every page but the homepage
+    string crumbLd = "";
+    if (!string.IsNullOrEmpty(crumb))
+    {
+        crumbLd = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["@context"] = "https://schema.org",
+            ["@type"] = "BreadcrumbList",
+            ["itemListElement"] = new object[]
+            {
+                new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = 1, ["name"] = "Home", ["item"] = siteUrl + "/" },
+                new Dictionary<string, object> { ["@type"] = "ListItem", ["position"] = 2, ["name"] = crumb, ["item"] = pageUrl }
+            }
+        });
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@pageTitle</title>
+    <meta name="description" content="@pageDescription" />
+    <link rel="canonical" href="@pageUrl" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="SmartSchoolWala" />
+    <meta property="og:locale" content="en_IN" />
+    <meta property="og:url" content="@pageUrl" />
+    <meta property="og:title" content="@pageTitle" />
+    <meta property="og:description" content="@pageDescription" />
+    <meta property="og:image" content="@siteUrl/img/brand/ssw-stacked.png" />
+    <meta name="twitter:card" content="summary" />
+    @RenderSection("StructuredData", required: false)
+    @if (crumbLd.Length > 0)
+    {
+        @* written raw: Razor's tag helpers would encode the "+" in the type as &#x2B; *@
+        @Html.Raw("<script type=\"application/ld+json\">" + crumbLd + "</script>")
+    }
+    <meta name="theme-color" content="#0B0705" />
+    <link rel="icon" type="image/x-icon" href="~/img/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="~/icons/apple-touch-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/css/site/icons.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/site/home.css" asp-append-version="true" />
+</head>
+<body>
+
+<!-- ───────────── Top bar ─────────────
+     "/#..." links reach the homepage's sections from any page; #faq and #contact are on every page. -->
+<header class="nav" id="nav">
+  <div class="wrap nav-in">
+    <a href="/" class="nav-logo" aria-label="SmartSchoolWala.com home">
+      <img src="~/img/brand/ssw-icon.svg" alt="" /><span>SmartSchool<b>Wala</b></span>
+    </a>
+    <nav class="nav-links" id="navLinks">
+      <a href="/#roles">Who it is for</a>
+      <a href="/#modules">Features</a>
+      <a href="/#start">Getting started</a>
+      <a href="#faq">FAQ</a>
+      <a href="#contact">Contact</a>
+    </nav>
+    <div class="nav-cta">
+      <a href="@loginUrl" class="btn btn-login"><i class="bx bx-lock-alt"></i>Login</a>
+      <a href="#contact" class="btn btn-primary nav-demo">Book a free demo</a>
+      <button class="nav-burger" id="navBurger" aria-label="Open menu"><i class="bx bx-menu"></i></button>
+    </div>
+  </div>
+</header>
+
+@RenderBody()
+
+<!-- ───────────── Contact + demo form ─────────────
+     The form posts to /enquiry (SiteController); the Super Admin sees it under
+     Platform > Website Enquiries. "website" is a hidden trap field for bots. -->
+<section class="sec contact-sec" id="contact">
+  <div class="wrap contact">
+    <div class="contact-info" data-up>
+      <span class="kicker kicker-l">Book a free demo</span>
+      <h2>See it with your own school's work</h2>
+      <p>Tell us a little about your school. We will call you within one working day and fix a time that suits your office.</p>
+      <div class="person">
+        <span class="avatar">@(string.IsNullOrWhiteSpace(support.Name) ? "S" : support.Name.Substring(0, 1))</span>
+        <div><b>@support.Name</b><small>SmartSchoolWala.com</small></div>
+      </div>
+      <ul class="contact-list">
+        @if (!string.IsNullOrWhiteSpace(support.Phone))
+        {
+          <li><i class="bx bx-phone"></i><a href="@telLink">@support.Phone</a></li>
+        }
+        @if (waLink.Length > 0)
+        {
+          <li><i class="bx bxl-whatsapp"></i><a href="@waLink" target="_blank" rel="noopener">Chat on WhatsApp</a></li>
+        }
+        @if (!string.IsNullOrWhiteSpace(support.Email))
+        {
+          <li><i class="bx bx-envelope"></i><a href="mailto:@support.Email">@support.Email</a></li>
+        }
+        @if (!string.IsNullOrWhiteSpace(support.Hours))
+        {
+          <li><i class="bx bx-time-five"></i><span>@support.Hours</span></li>
+        }
+      </ul>
+    </div>
+
+    <form class="enq" id="enqForm" method="post" action="/enquiry" novalidate data-up>
+      @Html.AntiForgeryToken()
+      <div class="enq-grid">
+        <label>Your name *<input name="Name" maxlength="100" required autocomplete="name" /></label>
+        <label>You are
+          <select name="Designation">
+            <option>Owner / Director</option>
+            <option>Principal</option>
+            <option>Administrator</option>
+            <option>Accountant</option>
+            <option>Other</option>
+          </select>
+        </label>
+        <label class="full">School name *<input name="School" maxlength="150" required autocomplete="organization" /></label>
+        <label>City<input name="City" maxlength="80" autocomplete="address-level2" /></label>
+        <label>Number of students
+          <select name="Students">
+            <option value="">Select</option>
+            <option>Up to 300</option>
+            <option>300 to 700</option>
+            <option>700 to 1500</option>
+            <option>More than 1500</option>
+          </select>
+        </label>
+        <label>Mobile number *<input name="Phone" type="tel" inputmode="numeric" maxlength="14" required autocomplete="tel" placeholder="10-digit mobile" /></label>
+        <label>E-mail<input name="Email" type="email" maxlength="150" autocomplete="email" /></label>
+        <label class="full">Anything you want us to know<textarea name="Message" rows="3" maxlength="1000" placeholder="e.g. we want to start with fees and attendance"></textarea></label>
+        <label class="trap" aria-hidden="true">Website<input name="Website" tabindex="-1" autocomplete="off" /></label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg enq-btn" id="enqBtn">Request a call back<i class="bx bx-right-arrow-alt"></i></button>
+      <p class="enq-msg" id="enqMsg" role="status"></p>
+      <p class="enq-note">We use these details only to contact you about the demo.</p>
+    </form>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <span class="nav-logo"><img src="~/img/brand/ssw-icon.svg" alt="" /><span>SmartSchool<b>Wala</b></span></span>
+    <span class="foot-copy">© @year SmartSchoolWala.com · School management software for Indian schools</span>
+    <span class="foot-links">
+      <a href="/school-fee-management-software">Fee management</a>
+      <a href="/school-attendance-management-software">Attendance</a>
+      @if (!string.IsNullOrWhiteSpace(support.Phone)) { <a href="@telLink">@support.Phone</a> }
+      <a href="@loginUrl">Login</a>
+    </span>
+  </div>
+</footer>
+
+@* a page's own scripts (the homepage's GSAP) load before home.js *@
+@RenderSection("Scripts", required: false)
+<script src="~/js/site/home.js" asp-append-version="true"></script>
+</body>
+</html>
