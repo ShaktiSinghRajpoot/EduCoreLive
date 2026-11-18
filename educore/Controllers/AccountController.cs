@@ -180,15 +180,21 @@ namespace educore.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        // Brute-force guard: LoginThrottle counts only FAILED attempts (10 per 5 min per IP),
+        // Brute-force guard: LoginThrottle counts only FAILED attempts (5 per 5 min per IP),
         // so a school office signing in together is never blocked by its own correct logins.
         public async Task<IActionResult> Login(UserViewModel model, string? returnUrl)
         {
             string? clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
             if (_throttle.IsBlocked(clientIp))
             {
+                // A real 429 with Retry-After (BUG-014), but still the login page with a
+                // friendly message, not the error page.
+                int waitSeconds = _throttle.RetryAfterSeconds(clientIp);
+                int waitMinutes = Math.Max(1, (int)Math.Ceiling(waitSeconds / 60.0));
+                Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                Response.Headers.RetryAfter = waitSeconds.ToString();
                 TempData["Result"] = "0";
-                TempData["Message"] = "Too many failed sign-in attempts from this network. Please wait a few minutes and try again.";
+                TempData["Message"] = $"Too many failed sign-in attempts from this network. Please wait {waitMinutes} minute{(waitMinutes == 1 ? "" : "s")} and try again.";
                 return View(model);
             }
 
@@ -214,15 +220,6 @@ namespace educore.Controllers
                 return View(model);
             }
 
-            if (!user.IsActive || user.IsDeleted)
-            {
-                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Inactive or deleted account", HttpContext);
-                _throttle.RecordFailure(clientIp);
-                TempData["Result"] = "0";
-                TempData["Message"] = "Your account is not active or deleted.";
-                return View(model);
-            }
-
             bool isPasswordValid = BCrypt.Net.BCrypt.Verify(model.Password, user.PasswordHash);
 
             if (!isPasswordValid)
@@ -231,6 +228,17 @@ namespace educore.Controllers
                 _throttle.RecordFailure(clientIp);
                 TempData["Result"] = "0";
                 TempData["Message"] = "Invalid email/mobile number or password.";
+                return View(model);
+            }
+
+            // Deliberately AFTER the password check (BUG-039): the proc also returns an
+            // inactive login, and only someone who knows the password learns that the
+            // account is switched off. A wrong password gets the same reply as above.
+            if (!user.IsActive || user.IsDeleted)
+            {
+                await _loginService.SaveLoginAttemptAsync(model.Email, false, "Inactive or deleted account", HttpContext);
+                TempData["Result"] = "0";
+                TempData["Message"] = "Your account is inactive. Contact your school admin.";
                 return View(model);
             }
 
@@ -294,7 +302,10 @@ namespace educore.Controllers
                 await _loginService.SaveUserSessionAsync(user.UserId, HttpContext);
 
                 if (!string.IsNullOrWhiteSpace(returnUrl) && Url.IsLocalUrl(returnUrl))
+                {
+                    RememberPostLoginTarget(returnUrl);
                     return Redirect(returnUrl);
+                }
 
                 return RedirectByRole(user.RoleName);
             }
@@ -382,6 +393,14 @@ namespace educore.Controllers
             HttpContext.Session.Remove(PendingUserIdKey);
             HttpContext.Session.Remove("PendingEmail");
             HttpContext.Session.Remove("RememberMe");
+
+            // BUG-001: "Continue as X" means the session runs as X only -- the same
+            // session key the profile menu's SwitchRole sets. Without it the session
+            // ran as "All roles (combined)" whatever the user picked.
+            if (selectedRole.RoleId > 0)
+                HttpContext.Session.SetInt32(Common.SK_ActiveRoleId, selectedRole.RoleId);
+            else
+                HttpContext.Session.Remove(Common.SK_ActiveRoleId);
 
             return RedirectByRole(user.RoleName);
         }
@@ -477,13 +496,52 @@ namespace educore.Controllers
                 authProperties
             );
 
+            // The password and the school status were just checked against the database.
+            // Drop the one-minute cached session check: a stale "school inactive" answer
+            // (cached before the Super Admin re-activated the school) signed the user
+            // straight out again with no message for up to a minute (BUG-043).
+            SessionValidator.Forget(_cache, user.TenantId ?? 0, user.SchoolId ?? 0, user.UserId);
+
             SaveUserDataToSession(user);
 
             return true;
         }
-        public IActionResult AccessDenied()
+        public IActionResult AccessDenied(string? returnUrl = null)
         {
+            if (ConsumePostLoginTarget(returnUrl))
+                return RedirectToAction("Index", "Dashboards", new { area = "" });
             return View();
+        }
+
+        // ── UX-17: a return URL the active role cannot open ─────────────────────
+        // After sign-in we send the user back to the page they came from. When that
+        // page is forbidden for the role they are now using (a teacher whose session
+        // expired on /fees), the first 403 for exactly that page, within a minute of
+        // signing in, goes to the dashboard instead of the 403 page.
+        private const string PostLoginTargetKey = "PostLoginTarget";
+
+        private void RememberPostLoginTarget(string returnUrl)
+        {
+            string path = returnUrl.Split('?', '#')[0];
+            HttpContext.Session.SetString(PostLoginTargetKey,
+                path + "|" + DateTimeOffset.UtcNow.AddMinutes(1).ToUnixTimeSeconds());
+        }
+
+        private bool ConsumePostLoginTarget(string? deniedUrl)
+        {
+            var saved = HttpContext.Session.GetString(PostLoginTargetKey);
+            if (string.IsNullOrEmpty(saved) || string.IsNullOrEmpty(deniedUrl)
+                || !HttpMethods.IsGet(HttpContext.Request.Method))
+                return false;
+
+            HttpContext.Session.Remove(PostLoginTargetKey);   // one use only
+            var parts = saved.Split('|');
+            if (parts.Length != 2 || !long.TryParse(parts[1], out var expires)
+                || DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expires)
+                return false;
+
+            string deniedPath = deniedUrl.Split('?', '#')[0];
+            return string.Equals(parts[0].TrimEnd('/'), deniedPath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -511,6 +569,12 @@ namespace educore.Controllers
         {
             var exceptionFeature = HttpContext.Features.Get<IExceptionHandlerPathFeature>();
             var statusCodeFeature = HttpContext.Features.Get<IStatusCodeReExecuteFeature>();
+
+            // UX-17: the page we just sent the user back to after sign-in is forbidden
+            // for their active role -> dashboard instead of a 403 page.
+            if (Response.StatusCode == StatusCodes.Status403Forbidden
+                && ConsumePostLoginTarget(statusCodeFeature?.OriginalPath))
+                return RedirectToAction("Index", "Dashboards", new { area = "" });
 
             var model = new ErrorViewModel
             {
@@ -559,9 +623,18 @@ namespace educore.Controllers
         private const string ResetUserIdKey = "ResetUserId";
 
         [HttpGet]
-        public IActionResult ForgotPassword()
+        public IActionResult ForgotPassword(int? wait = null)
         {
+            SetThrottledMessage(wait);
             return View(new ForgotPasswordViewModel());
+        }
+
+        // BUG-044: the "otp" rate limiter (Program.cs, OnRejected) sends a blocked POST back
+        // to the form with ?wait=N minutes. Shown on the form instead of the error page.
+        private void SetThrottledMessage(int? wait)
+        {
+            if (wait is int m && m > 0 && m <= 60)
+                ViewData["Throttled"] = $"Too many attempts. Please wait {m} minute{(m == 1 ? "" : "s")} and try again.";
         }
 
         [HttpPost]
@@ -597,11 +670,12 @@ namespace educore.Controllers
         }
 
         [HttpGet]
-        public IActionResult VerifyOtp()
+        public IActionResult VerifyOtp(int? wait = null)
         {
             if (ReadProtectedUserId(ResetUserIdKey) == null)
-                return RedirectToAction(nameof(ForgotPassword));
+                return RedirectToAction(nameof(ForgotPassword), new { wait });
 
+            SetThrottledMessage(wait);
             return View(new VerifyOtpViewModel());
         }
 

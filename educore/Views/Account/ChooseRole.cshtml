@@ -7,40 +7,32 @@
     var currentUser = Model?.FirstOrDefault();
 }
 
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/Account/ChooseRole.css" asp-append-version="true" />
+}
+
+@* The layout already writes <html>, <head> and the viewport tag; this page used to
+   write a second set of its own inside the body. *@
 @if (Model == null || !Model.Any())
 {
     <main class="page-shell">
-        <div class="brand">eduCore</div>
+        <div class="brand"><img src="~/img/brand/ssw-horizontal.png" alt="SmartSchoolWala.com" /></div>
 
         <section class="role-card-wrapper">
             <h1 class="title">No roles assigned</h1>
             <p class="subtitle">Please contact your administrator.</p>
         </section>
     </main>
-
-    return;
 }
-
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>eduCore | Choose Role</title>
-
-@section PageStyles {
-    <link rel="stylesheet" href="~/css/Account/ChooseRole.css" asp-append-version="true" />
-}
-</head>
-
-<body>
+else
+{
     <main class="page-shell">
-        <div class="brand">eduCore</div>
+        <div class="brand"><img src="~/img/brand/ssw-horizontal.png" alt="SmartSchoolWala.com" /></div>
 
         <section class="role-card-wrapper" aria-labelledby="page-title">
             <div class="user-block">
                 <div class="avatar-text">
-                    @((currentUser?.FullName ?? "U").Substring(0, 1).ToUpper())
+                    @((string.IsNullOrEmpty(currentUser?.FullName) ? "U" : currentUser.FullName).Substring(0, 1).ToUpper())
                 </div>
 
                 <div class="user-name">@currentUser?.FullName</div>
@@ -80,8 +72,7 @@
 
                         <button class="role-option"
                                 type="submit"
-                                data-role-code="@role.RoleCode"
-                                onclick="setLastUsedRole(this.dataset.roleCode)">
+                                data-role-code="@role.RoleCode">
                             <span class="role-icon" aria-hidden="true">@icon</span>
 
                             <span class="role-content">
@@ -98,38 +89,38 @@
                 }
             </div>
 
-            <p class="helper-text">You can switch roles later from your profile menu inside eduCore.</p>
+            <p class="helper-text">You can switch roles later from your profile menu inside SmartSchoolWala.</p>
         </section>
     </main>
+}
 
+@section PageScripts {
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-            const lastRole = localStorage.getItem("eduCoreLastRole");
+        // Marks the role used last time on this device. The storage key keeps its old
+        // name so the remembered choice survives the rename.
+        (function () {
+            var KEY = 'eduCoreLastRole';
+            var lastRole = null;
+            try { lastRole = localStorage.getItem(KEY); } catch (e) { }
 
-            if (!lastRole) return;
+            document.querySelectorAll('.role-option').forEach(function (button) {
+                var roleCode = button.getAttribute('data-role-code');
 
-            document.querySelectorAll(".role-option").forEach(function (button) {
-                const roleCode = button.getAttribute("data-role-code");
+                button.addEventListener('click', function () {
+                    try { localStorage.setItem(KEY, roleCode); } catch (e) { }
+                });
 
-                if (roleCode === lastRole) {
-                    button.classList.add("last-used");
-
-                    const header = button.querySelector(".role-header");
-
-                    if (header && !header.querySelector(".tag")) {
-                        const tag = document.createElement("span");
-                        tag.className = "tag";
-                        tag.innerText = "Last used";
+                if (lastRole && roleCode === lastRole) {
+                    button.classList.add('last-used');
+                    var header = button.querySelector('.role-header');
+                    if (header && !header.querySelector('.tag')) {
+                        var tag = document.createElement('span');
+                        tag.className = 'tag';
+                        tag.innerText = 'Last used';
                         header.appendChild(tag);
                     }
                 }
             });
-        });
-
-        function setLastUsedRole(roleCode) {
-            if (!roleCode) return;
-            localStorage.setItem("eduCoreLastRole", roleCode);
-        }
+        })();
     </script>
-</body>
-</html>
+}

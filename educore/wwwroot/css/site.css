@@ -135,3 +135,27 @@ body.modal-open .layout-content-navbar .layout-navbar { z-index: 11 !important; 
                               justify-content: center; white-space: nowrap; padding-left: .6rem !important;
                               padding-right: .6rem !important; font-size: .85rem; }
 }
+
+/* Phones (QA BUG-018 / UX-08): iOS Safari zooms the page when a field under 16px
+   gets focus. 16px on every input under 768px stops that jump. !important because
+   page styles (login, filters, .form-control-sm) set smaller sizes after this file. */
+@media (max-width: 767.98px) {
+    input, select, textarea, .form-control, .form-select { font-size: 16px !important; }
+}
+
+/* Tap targets (QA BUG-019 / UX-09): at least 24px everywhere (WCAG 2.5.8), 44px on
+   touch screens, for the small links and buttons that were measured too small. */
+.nb-acts .btn,
+.login-links a,
+.login-options a,
+.login-legal a { display: inline-flex; align-items: center; min-height: 24px; }
+.login-options .form-check { display: flex; align-items: center; gap: .4rem; min-height: 24px; }
+.login-options .form-check-input { width: 1.25rem; height: 1.25rem; margin-top: 0; }
+@media (pointer: coarse), (max-width: 991.98px) {
+    .nb-acts .btn,
+    .login-links a,
+    .login-options a,
+    .login-legal a { min-height: 44px; }
+    .login-options .form-check { min-height: 44px; }
+    .login-options .form-check-label { padding: .6rem 0; }
+}

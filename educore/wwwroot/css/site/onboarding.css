@@ -1,0 +1,63 @@
+/* "Register your school" page (Views/Site/SchoolOnboarding). Uses the colours and fonts of
+   home.css. One narrow column: the page is mostly opened on a phone from WhatsApp. */
+
+.onb-time { margin-top: .9rem; font-size: .9rem; color: #9C8E82; }
+.onb-sec { background: var(--soft); border-top: 1px solid var(--line); }
+.onb { max-width: 680px; }
+.onb [hidden] { display: none !important; }   /* .field is a grid; without this "hidden" would not hide it */
+
+.onb form { display: grid; gap: 20px; }
+.onb fieldset {
+    border: 1px solid var(--line); background: #fff; border-radius: var(--r); margin: 0;
+    padding: 20px 18px 22px; display: grid; gap: 16px; min-width: 0; box-shadow: var(--shadow);
+}
+.onb legend { display: flex; gap: 10px; align-items: center; padding: 0 6px; font: 700 1.1rem/1.2 var(--font-h); color: var(--ink); }
+.onb legend .n {
+    display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+    background: #FFF1E0; color: var(--or2); font: 700 .85rem var(--font-b);
+}
+.onb .hint { font-size: .9rem; color: var(--mute); margin: 0; }
+.onb .hint a { color: var(--or2); font-weight: 600; text-decoration: underline; }
+.onb .row { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+.onb .field { display: grid; gap: 6px; min-width: 0; }
+.onb label { font-weight: 600; font-size: .92rem; color: var(--ink2); }
+.onb .req { color: #B91C1C; }
+.onb .opt { font-weight: 400; color: var(--mute); font-size: .82rem; }
+.onb input, .onb select, .onb textarea {
+    font: 400 16px var(--font-b); color: var(--ink); background: var(--page);
+    border: 1px solid #E3D8CC; border-radius: 10px; padding: 11px 12px; width: 100%; min-width: 0;
+}
+.onb textarea { min-height: 84px; resize: vertical; }
+.onb input:focus, .onb select:focus, .onb textarea:focus { outline: none; border-color: var(--or); box-shadow: 0 0 0 3px rgba(255,138,0,.18); }
+.onb .err { color: #B91C1C; font-size: .85rem; }
+.onb .field.bad input, .onb .field.bad select { border-color: #DC2626; }
+
+.onb .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.onb .chk {
+    display: flex; gap: 10px; align-items: flex-start; font-weight: 500; font-size: .92rem; color: var(--ink);
+    padding: 10px 12px; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--page); cursor: pointer;
+}
+.onb .chk input { width: 20px; height: 20px; margin: 1px 0 0; padding: 0; flex: none; accent-color: var(--or2); }
+.onb .chk.consent { border: none; background: none; padding: 0; font-weight: 400; }
+
+.onb .formerr { color: #B91C1C; font-weight: 600; margin: 0; }
+.onb-submit { width: 100%; }
+
+.onb-review { background: #fff; border: 1px solid var(--line); border-radius: var(--r); padding: 22px 18px; display: grid; gap: 14px; box-shadow: var(--shadow); }
+.onb-review h2 { font-size: 1.5rem; }
+.onb-review pre {
+    white-space: pre-wrap; word-break: break-word; margin: 0; padding: 12px;
+    font: 14px/1.55 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    background: var(--page); border: 1px solid var(--line); border-radius: 10px;
+}
+.onb-actions { display: grid; gap: 10px; }
+.onb-wa { color: #fff; background: #128C4A; width: 100%; }
+.onb-wa:hover { background: #0E7A40; }
+.onb-ghost { color: var(--ink); background: transparent; border-color: var(--line); width: 100%; }
+.onb-ghost:hover { background: var(--soft); }
+.onb-toast { font-size: .9rem; color: #15803D; min-height: 20px; }
+
+@media (max-width: 560px) {
+    .onb .row { grid-template-columns: 1fr; }
+    .onb fieldset { padding: 18px 14px 20px; }
+}

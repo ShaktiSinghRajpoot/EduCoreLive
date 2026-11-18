@@ -36,12 +36,37 @@ namespace educore.Controllers
         [HttpHead("/school-attendance-management-software")]
         public IActionResult AttendanceManagement() => View();
 
+        // Privacy policy and terms of use (QA BUG-009), linked from the footer, the demo
+        // form and the login page.
+        [HttpGet("/privacy")]
+        [HttpHead("/privacy")]
+        public IActionResult Privacy() => View();
+
+        [HttpGet("/terms")]
+        [HttpHead("/terms")]
+        public IActionResult Terms() => View();
+
+        // "Register your school": the onboarding form. It builds a WhatsApp message to the
+        // support number (Support:WhatsApp); nothing is stored on the server.
+        [HttpGet("/school-onboarding")]
+        [HttpHead("/school-onboarding")]
+        public IActionResult SchoolOnboarding() => View();
+
+        // The demo form only POSTs here. Opening /enquiry (a refresh, a bookmark) used to
+        // give a 405 error page (BUG-013); send the visitor to the form instead.
+        [HttpGet("/enquiry")]
+        [HttpHead("/enquiry")]
+        public IActionResult EnquiryPage() => Redirect("/#contact");
+
         // The public pages Google should know about. Add a page here when the website gets one.
         private static readonly string[] PublicPages =
         {
             "/",
             "/school-fee-management-software",
-            "/school-attendance-management-software"
+            "/school-attendance-management-software",
+            "/school-onboarding",
+            "/privacy",
+            "/terms"
         };
 
         /// <summary>sitemap.xml for search engines (robots.txt in wwwroot points here).</summary>

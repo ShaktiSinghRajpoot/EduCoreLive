@@ -13,6 +13,10 @@
 --   CHANGE_PASSWORD stamps core.users.password_changed_at (column added by
 --   access_security_hardening.sql -- apply that first).
 --
+-- Nov 2026 (qa_fix_auth.sql): GET_LOGIN_USER also returns an inactive login,
+--   active first, so the controller can say "your account is inactive" after
+--   a correct password.
+--
 -- NOTE: the temp-password admin is flagged must_change_password = TRUE inside
 --       core.sp_school_manage (see sp_school_manage.sql). Re-run that script too.
 -- ============================================================
@@ -134,8 +138,13 @@ BEGIN
                    )
               )
           AND u.is_deleted = FALSE
-          AND u.is_active = TRUE
+          -- No is_active filter (QA BUG-039): an inactive login is returned so the
+          -- controller can say "your account is inactive" AFTER the password matched.
+          -- The controller still refuses it; nothing is revealed before BCrypt.Verify.
         ORDER BY
+            -- An active login always wins over an old inactive one with the same
+            -- email or phone (a re-hired staff member, BUG-040).
+            u.is_active DESC,
             CASE r.role_code
                 WHEN 'SUPER_ADMIN' THEN 1
                 WHEN 'SCHOOL_ADMIN' THEN 2

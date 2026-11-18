@@ -26,13 +26,15 @@
         <p class="su-body">@Model.Body</p>
 
         <p class="su-note">
+            @* No "your sign-in details are correct" (QA BUG-043): the page never
+               confirms anything about the account, only about the school. *@
             @if (Model.IsTerminal)
             {
-                <span>Your sign-in details are still valid — it is the school that is no longer active. If you believe this is a mistake, please get in touch.</span>
+                <span>If you believe this is a mistake, please get in touch with SmartSchoolWala support.</span>
             }
             else
             {
-                <span>Your sign-in details are correct. Access will return as soon as the school is reactivated.</span>
+                <span>Access will return as soon as the school is reactivated.</span>
             }
         </p>
 

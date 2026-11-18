@@ -1,0 +1,85 @@
+@inject Microsoft.Extensions.Options.IOptions<educore.Services.SupportSettings> SupportOptions
+@{
+    // Terms of use (QA BUG-009). Plain English. The contact details come from the "Support"
+    // config section. When the terms change, change the "Last updated" date too.
+    Layout = "_SiteLayout";
+    ViewData["Title"] = "Terms of Use | SmartSchoolWala";
+    ViewData["Description"] = "The terms for using the SmartSchoolWala website and school management software: accounts, the school's data, acceptable use, fees, availability and liability.";
+    ViewData["Path"] = "/terms";
+    ViewData["Crumb"] = "Terms of Use";
+
+    var support = SupportOptions.Value;
+}
+
+<section class="lp-hero legal-hero">
+  <div class="wrap">
+    <nav class="lp-crumb" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span>Terms of Use</nav>
+    <h1 class="hero-h">Terms of Use</h1>
+    <p class="lead">The rules for using the SmartSchoolWala website and software, in plain words.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap legal">
+    <p class="legal-date">Last updated: 18 November 2026</p>
+
+    <h2>1. About these terms</h2>
+    <p>These terms apply to the website smartschoolwala.com and to the SmartSchoolWala school management software ("the service"). By using the website or signing in to the service, you agree to them. If a school has signed a separate agreement or order with us, that agreement wins where the two differ.</p>
+
+    <h2>2. Accounts and sign-in</h2>
+    <ul>
+      <li>The school's admin creates logins for staff and decides what each role can see and do.</li>
+      <li>Keep your password to yourself. You are responsible for what is done with your login. Tell your school admin, or us, at once if you think someone else has used it.</li>
+      <li>A school must remove or deactivate the login of anyone who leaves.</li>
+    </ul>
+
+    <h2>3. The school's data</h2>
+    <ul>
+      <li>The data a school enters (students, parents, staff, fees, attendance, marks) belongs to the school. We use it only to provide the service, as described in our <a href="/privacy">Privacy Policy</a>.</li>
+      <li>The school is responsible for the accuracy of its data and for having the right to record it, including the consent of parents or guardians where the law requires it.</li>
+      <li>A school can ask for an export of its data while it uses the service and when it leaves.</li>
+    </ul>
+
+    <h2>4. Acceptable use</h2>
+    <p>Do not:</p>
+    <ul>
+      <li>try to see another school's data, or data your role is not allowed to see;</li>
+      <li>try to break, overload or get around the security of the service;</li>
+      <li>use the messaging features (SMS, WhatsApp, e-mail) to send spam, or messages people have not agreed to receive;</li>
+      <li>upload anything unlawful, or anything you do not have the right to share;</li>
+      <li>copy, resell or rebrand the software without our written agreement.</li>
+    </ul>
+    <p>We may suspend a login or a school that breaks these rules, after telling the school where we reasonably can.</p>
+
+    <h2>5. Plans, fees and payment</h2>
+    <p>The modules a school uses and the price are agreed with the school before it starts. If fees are not paid on time, we may limit the school's access after giving notice; the school's data is not deleted because of this, and access returns once the account is settled.</p>
+
+    <h2>6. Availability and changes</h2>
+    <p>We work to keep the service available and to back up data regularly, but we cannot promise it will never be interrupted, for example during maintenance or problems with internet or hosting providers. We improve the software over time and may change or retire features; we will not remove a core feature a school relies on without reasonable notice.</p>
+
+    <h2>7. Fee receipts, marks and reports</h2>
+    <p>Receipts, report cards, certificates and reports are produced from the data the school enters. The school should check them before issuing them; the school remains responsible for its own records, accounts and compliance with its board and the law.</p>
+
+    <h2>8. Liability</h2>
+    <p>The service is provided by people who care about getting it right, but to the extent the law allows, we are not responsible for indirect losses, such as lost profits or lost opportunities, and our total liability to a school is limited to the fees that school paid us in the 12 months before the claim. Nothing in these terms limits a liability that cannot be limited under Indian law.</p>
+
+    <h2>9. Ending the service</h2>
+    <p>A school can stop using the service at the end of its paid period. On request we provide an export of its data, and then delete it as described in the <a href="/privacy">Privacy Policy</a>.</p>
+
+    <h2>10. Law and disputes</h2>
+    <p>These terms are governed by the laws of India. We will first try to settle any disagreement by talking it through; if that fails, it will be decided by the courts that have jurisdiction under Indian law.</p>
+
+    <h2>11. Contact</h2>
+    <p>
+      Questions about these terms:
+      @if (!string.IsNullOrWhiteSpace(support.Email))
+      {
+        <a href="mailto:@support.Email">@support.Email</a>
+      }
+      @if (!string.IsNullOrWhiteSpace(support.Phone))
+      {
+        <span> · @support.Phone</span>
+      }
+    </p>
+  </div>
+</section>

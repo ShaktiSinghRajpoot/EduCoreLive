@@ -215,3 +215,6 @@
                 padding: 30px;
             }
         }
+
+/* SmartSchoolWala logo in place of the old text brand (QA BUG-012) */
+.brand img { display: block; height: 40px; width: auto; margin: 0 auto; }

@@ -122,3 +122,8 @@
             .login-card { padding: 2rem 1.25rem; border-radius: 18px; }
             .ssw-logo-stacked { width: 180px; }
         }
+
+/* Terms / Privacy line under the form (QA BUG-009) */
+.login-legal { margin: 1rem 0 0; text-align: center; font-size: .78rem; color: #8b8175; }
+.login-legal a { color: #ff8a00; text-decoration: none; }
+.login-legal a:hover { text-decoration: underline; }

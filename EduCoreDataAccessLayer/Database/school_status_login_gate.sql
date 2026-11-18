@@ -42,11 +42,11 @@ FROM (VALUES
     ('Active',       'ACTIVE',       TRUE,  NULL, 1),
     ('Under Review', 'UNDER_REVIEW', TRUE,  NULL, 2),
     ('Pending',      'PENDING',      FALSE,
-        'This school has not been activated yet. Please contact EduCore support.', 3),
+        'This school has not been activated yet. Please contact SmartSchoolWala support.', 3),
     ('Inactive',     'INACTIVE',     FALSE,
-        'This school is currently inactive. Please contact EduCore support.', 4),
+        'This school is currently inactive. Please contact SmartSchoolWala support.', 4),
     ('Suspended',    'SUSPENDED',    FALSE,
-        'Your school''s access has been suspended. Please contact EduCore support.', 5),
+        'Your school''s access has been suspended. Please contact SmartSchoolWala support.', 5),
     ('Closed',       'CLOSED',       FALSE,
         'This school is closed and no longer accessible.', 6)
 ) AS p(nm, code, allows, msg, ord)
@@ -58,7 +58,7 @@ UPDATE config.school_statuses
 SET status_code   = 'CUSTOM_' || school_status_id,
     allows_login  = FALSE,
     login_message = COALESCE(login_message,
-        'This school is not currently active. Please contact EduCore support.')
+        'This school is not currently active. Please contact SmartSchoolWala support.')
 WHERE is_deleted = FALSE AND status_code IS NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_school_status_code

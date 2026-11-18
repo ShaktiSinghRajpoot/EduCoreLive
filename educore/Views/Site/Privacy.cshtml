@@ -1,0 +1,116 @@
+@inject Microsoft.Extensions.Options.IOptions<educore.Services.SupportSettings> SupportOptions
+@{
+    // Privacy policy (QA BUG-009). Plain English, written for India's Digital Personal Data
+    // Protection Act, 2023 (DPDP Act). The grievance contact comes from the "Support" config
+    // section, the same details the rest of the website shows.
+    // When the way data is handled changes, change this page and its "Last updated" date.
+    Layout = "_SiteLayout";
+    ViewData["Title"] = "Privacy Policy | SmartSchoolWala";
+    ViewData["Description"] = "How SmartSchoolWala collects, uses, stores and protects the personal data of schools, staff, students and parents, and how to use your rights under the DPDP Act, 2023.";
+    ViewData["Path"] = "/privacy";
+    ViewData["Crumb"] = "Privacy Policy";
+
+    var support = SupportOptions.Value;
+    string telLink = "tel:" + new string((support.Phone ?? "").Where(c => char.IsDigit(c) || c == '+').ToArray());
+}
+
+<section class="lp-hero legal-hero">
+  <div class="wrap">
+    <nav class="lp-crumb" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span>Privacy Policy</nav>
+    <h1 class="hero-h">Privacy Policy</h1>
+    <p class="lead">What we collect, why, how long we keep it, and the rights you have over it.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap legal">
+    <p class="legal-date">Last updated: 18 November 2026</p>
+
+    <h2>1. Who we are</h2>
+    <p>SmartSchoolWala (smartschoolwala.com) is school management software used by schools, coaching centres and training institutes in India. This policy explains how we handle personal data on this website and inside the software, in line with the Digital Personal Data Protection Act, 2023 ("DPDP Act").</p>
+    <p>There are two situations:</p>
+    <ul>
+      <li><b>Data a school keeps in SmartSchoolWala</b> (students, parents, staff, fees, attendance, marks). The school decides what is recorded and why, so the school is the <i>Data Fiduciary</i>. We process this data only on the school's instructions, to run the software for it.</li>
+      <li><b>Data you give us directly</b> (a demo request, the "Register your school" form, a call or WhatsApp message to us). For this data, we decide how it is used.</li>
+    </ul>
+
+    <h2>2. What we collect</h2>
+    <ul>
+      <li><b>From website visitors:</b> your name, role, school name, city, mobile number, e-mail and any message you write in the demo form. The "Register your school" form is not sent to our server at all: it builds a message that you send to us yourself on WhatsApp.</li>
+      <li><b>From school users (staff, admins):</b> name, e-mail, mobile number, role, the password you set (stored only in scrambled, one-way form), and a log of sign-ins with the device's IP address and browser.</li>
+      <li><b>Entered by the school about students and parents:</b> names, date of birth, class, admission details, parents' names and contact numbers, address, photo, attendance, marks, fees paid and due, and similar school records.</li>
+      <li><b>Technical data:</b> cookies needed to keep you signed in and to protect forms (see section 7). We do not use advertising or tracking cookies.</li>
+    </ul>
+
+    <h2>3. Why we use it</h2>
+    <ul>
+      <li>To call you back about a demo or set up your school's account, when you ask us to.</li>
+      <li>To provide the software to the school: sign-in, fee receipts, attendance, report cards, messages to parents and the other features the school uses.</li>
+      <li>To keep accounts secure: detecting repeated wrong passwords, ending old sessions after a password change, and keeping an audit trail of important changes.</li>
+      <li>To answer support requests and fix problems.</li>
+    </ul>
+    <p>We do not sell personal data, and we do not use it for advertising.</p>
+
+    <h2>4. Who we share it with</h2>
+    <ul>
+      <li><b>The school itself:</b> a school's data is visible only to that school's users, according to the roles the school gives them.</li>
+      <li><b>Service providers who help us run the software:</b> cloud hosting, and the e-mail, SMS and WhatsApp providers that deliver messages the school chooses to send. They may use the data only to provide that service.</li>
+      <li><b>Authorities:</b> only when the law requires it.</li>
+    </ul>
+
+    <h2>5. How long we keep it</h2>
+    <ul>
+      <li><b>Demo requests:</b> up to 2 years after we last spoke, unless you become a customer or ask us to delete them earlier.</li>
+      <li><b>School data:</b> for as long as the school uses SmartSchoolWala. When a school leaves, it can ask for an export of its data; we then delete it within 90 days, except what the law requires us to keep (for example, records of payments made to us).</li>
+      <li><b>Sign-in logs:</b> kept for security and deleted when no longer needed for that purpose.</li>
+    </ul>
+
+    <h2>6. How we protect it</h2>
+    <p>Each school's data is kept separate from every other school's. Passwords are stored only as one-way hashes. Access inside a school is limited by role, sign-ins are rate-limited against password guessing, and important changes are logged. No system is perfectly secure, but if a breach affecting your personal data happens, we will inform the school, the Data Protection Board of India and affected people as the DPDP Act requires.</p>
+
+    <h2>7. Cookies</h2>
+    <p>We use only the cookies the software needs: one that keeps you signed in, one for your session, and one that protects forms from being submitted by other websites. The public website loads fonts from Google Fonts, which receives your IP address to deliver them.</p>
+
+    <h2>8. Your rights</h2>
+    <p>Under the DPDP Act you can ask to:</p>
+    <ul>
+      <li>know what personal data is held about you and how it is used;</li>
+      <li>correct, complete or update it;</li>
+      <li>have it erased when it is no longer needed (some school and financial records must be kept by law);</li>
+      <li>withdraw consent you gave earlier, for example for being contacted about a demo;</li>
+      <li>nominate someone to use these rights for you in case of death or incapacity;</li>
+      <li>have a complaint (grievance) answered.</li>
+    </ul>
+    <p><b>Students and parents:</b> please contact your school first. The school controls its records and can correct them directly; we will help the school with any request.</p>
+
+    <h2>9. Children's data</h2>
+    <p>Student records are entered and managed by the school, which is responsible for getting the consent of parents or guardians where the DPDP Act requires it. SmartSchoolWala does not track children, profile them for advertising, or show them advertisements.</p>
+
+    <h2>10. Grievances and contact</h2>
+    <p>For any question, request or complaint about personal data, contact us:</p>
+    <ul>
+      @if (!string.IsNullOrWhiteSpace(support.Name))
+      {
+        <li>Contact person: @support.Name</li>
+      }
+      @if (!string.IsNullOrWhiteSpace(support.Email))
+      {
+        <li>E-mail: <a href="mailto:@support.Email">@support.Email</a></li>
+      }
+      @if (!string.IsNullOrWhiteSpace(support.Phone))
+      {
+        <li>Phone: <a href="@telLink">@support.Phone</a></li>
+      }
+      @if (!string.IsNullOrWhiteSpace(support.Hours))
+      {
+        <li>Hours: @support.Hours</li>
+      }
+    </ul>
+    <p>We aim to reply within 7 working days. If you are not satisfied with our answer, you may complain to the Data Protection Board of India.</p>
+
+    <h2>11. Changes to this policy</h2>
+    <p>If we change this policy, we will update this page and the date at the top. Important changes will also be told to schools inside the software.</p>
+
+    <p>See also our <a href="/terms">Terms of Use</a>.</p>
+  </div>
+</section>

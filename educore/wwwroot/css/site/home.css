@@ -235,8 +235,25 @@ p { margin: 0; }
 .foot { background: var(--dark); border-top: 1px solid rgba(255,255,255,.07); padding: 24px 0; color: #9C8E82; font-size: .86rem; }
 .foot-in { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
 .foot-in .nav-logo { font-size: 1rem; } .foot-in .nav-logo img { height: 24px; }
-.foot-links { margin-left: auto; display: flex; gap: 1.2rem; }
-.foot-links a { color: #fff; font-weight: 600; }
+.foot-links { margin-left: auto; display: flex; flex-wrap: wrap; gap: 0 1.2rem; }
+.foot-links a { color: #fff; font-weight: 600; display: inline-flex; align-items: center; min-height: 24px; }
+.enq-note a { color: var(--or2); font-weight: 600; text-decoration: underline; }
+.contact-reg { margin-top: 1.4rem; color: #CFC2B6; }
+.contact-reg a { display: inline-flex; align-items: center; gap: .3rem; min-height: 44px; color: var(--or); font-weight: 700; }
+.contact-reg a:hover { color: #fff; }
+
+/* ── privacy policy and terms of use (Views/Site/Privacy, Terms) ── */
+.legal-hero { padding: 120px 0 48px; }
+.legal-hero .hero-h { font-size: clamp(2rem, 4vw, 3rem); }
+.legal-hero .lead { color: #CFC2B6; margin-top: 1rem; }
+.legal { max-width: 780px; color: var(--ink2); }
+.legal h2 { font-size: 1.35rem; color: var(--ink); margin: 2.2rem 0 .7rem; }
+.legal h2:first-child { margin-top: 0; }
+.legal p { margin: 0 0 .9rem; }
+.legal ul { margin: 0 0 1rem; padding-left: 1.3rem; }
+.legal li { margin-bottom: .45rem; }
+.legal a { color: var(--or2); font-weight: 600; text-decoration: underline; }
+.legal .legal-date { font-size: .9rem; color: var(--mute); }
 
 /* ── single-topic pages (Views/Site/FeeManagement, AttendanceManagement) ── */
 /* a plain dark hero: text on the left, a few sample tiles on the right */
@@ -331,6 +348,15 @@ p { margin: 0; }
     .enq { padding: 1.4rem; }
     .enq-grid { grid-template-columns: 1fr; }
     .foot-links { margin-left: 0; }
+    .legal-hero { padding: 96px 0 36px; }
+}
+/* iOS zooms into a field under 16px (QA BUG-018) */
+@media (max-width: 767.98px) {
+    input, select, textarea, .enq input, .enq select, .enq textarea { font-size: 16px; }
+}
+/* touch screens: 44px tap targets in the footer (QA BUG-019) */
+@media (pointer: coarse), (max-width: 960px) {
+    .foot-links a { min-height: 44px; }
 }
 @media (max-width: 380px) {
     .nav .nav-logo span { display: none; }

@@ -66,6 +66,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="~/css/site/icons.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/site/home.css" asp-append-version="true" />
+    @RenderSection("Styles", required: false)
 </head>
 <body>
 
@@ -124,6 +125,7 @@
           <li><i class="bx bx-time-five"></i><span>@support.Hours</span></li>
         }
       </ul>
+      <p class="contact-reg">Already decided? <a href="/school-onboarding">Register your school<i class="bx bx-right-arrow-alt"></i></a></p>
     </div>
 
     <form class="enq" id="enqForm" method="post" action="/enquiry" novalidate data-up>
@@ -157,7 +159,7 @@
       </div>
       <button type="submit" class="btn btn-primary btn-lg enq-btn" id="enqBtn">Request a call back<i class="bx bx-right-arrow-alt"></i></button>
       <p class="enq-msg" id="enqMsg" role="status"></p>
-      <p class="enq-note">We use these details only to contact you about the demo.</p>
+      <p class="enq-note">We use these details only to contact you about the demo. See our <a href="/privacy">Privacy Policy</a>.</p>
     </form>
   </div>
 </section>
@@ -169,6 +171,9 @@
     <span class="foot-links">
       <a href="/school-fee-management-software">Fee management</a>
       <a href="/school-attendance-management-software">Attendance</a>
+      <a href="/school-onboarding">Register your school</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/terms">Terms</a>
       @if (!string.IsNullOrWhiteSpace(support.Phone)) { <a href="@telLink">@support.Phone</a> }
       <a href="@loginUrl">Login</a>
     </span>

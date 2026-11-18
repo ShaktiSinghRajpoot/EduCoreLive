@@ -1,0 +1,223 @@
+@inject Microsoft.Extensions.Options.IOptions<educore.Services.SupportSettings> SupportOptions
+@{
+    // "Register your school": the onboarding form from the QA pack (Forms/School-Onboarding-Form.html)
+    // as a website page. Nothing is posted to the server: the page builds a WhatsApp message
+    // with the answers and the visitor sends it to the support number (Support:WhatsApp).
+    // The sections follow the order of the Super Admin's Create School screen.
+    // Behaviour is in wwwroot/js/site/onboarding.js, styles in wwwroot/css/site/onboarding.css.
+    Layout = "_SiteLayout";
+    ViewData["Title"] = "Register your school | SmartSchoolWala";
+    ViewData["Description"] = "Send us your school's details on WhatsApp and we will set up your SmartSchoolWala account and the School Admin login. About 5 minutes.";
+    ViewData["Path"] = "/school-onboarding";
+    ViewData["Crumb"] = "Register your school";
+
+    var support = SupportOptions.Value;
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/site/onboarding.css" asp-append-version="true" />
+}
+
+<section class="lp-hero legal-hero">
+  <div class="wrap">
+    <nav class="lp-crumb" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span>Register your school</nav>
+    <h1 class="hero-h">Tell us about <span class="grad">your school</span></h1>
+    <p class="lead">Fill in these details and send them to us on WhatsApp. We use them to create your school account and the School Admin login.</p>
+    <p class="onb-time">About 5 minutes · Fields marked <span class="req">*</span> are required · Your answers stay on this device until you send them</p>
+  </div>
+</section>
+
+<section class="sec onb-sec">
+  <div class="wrap onb">
+
+  <form id="onbForm" novalidate data-wa="@support.WhatsApp">
+
+    <fieldset>
+      <legend><span class="n">1</span>School</legend>
+      <div class="field">
+        <label for="category">Type of institution <span class="req">*</span></label>
+        <select id="category" name="category" required>
+          <option value="">Select</option><option>School</option><option>Computer / IT Training Institute</option><option>Coaching / Tuition Centre</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="schoolName">School name <span class="req">*</span></label>
+        <input id="schoolName" name="schoolName" required placeholder="As written on your affiliation certificate" autocomplete="organization">
+      </div>
+      <div class="field">
+        <label for="displayName">Short name <span class="opt">(optional, shown in the app)</span></label>
+        <input id="displayName" name="displayName" placeholder="e.g. IPS Academy">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="board">Board <span class="req">*</span></label>
+          <select id="board" name="board" required>
+            <option value="">Select</option><option>CBSE</option><option>ICSE / ISC (CISCE)</option><option>State Board</option><option>IB (International Baccalaureate)</option><option>Cambridge International (CAIE / IGCSE)</option><option>NIOS</option><option>Madrasah Board</option><option>Franchise / Brand partner</option><option>Not affiliated / Independent</option>
+          </select>
+        </div>
+        <div class="field" id="boardStateWrap" hidden>
+          <label for="boardState">Which state board? <span class="req">*</span></label>
+          <select id="boardState" name="boardState"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="affiliationNo">Affiliation / UDISE number <span class="opt">(optional)</span></label>
+        <input id="affiliationNo" name="affiliationNo" placeholder="e.g. CBSE 2130xxx or UDISE 09xxxxxxxxx">
+      </div>
+      <div class="field">
+        <label for="schoolType">Classes taught <span class="req">*</span></label>
+        <select id="schoolType" name="schoolType" required>
+          <option value="">Select</option><option>Pre-Primary (Nursery / KG)</option><option>Primary School (Class 1–5)</option><option>Middle School (Class 6–8)</option><option>Secondary School (Class 9–10)</option><option>Higher Secondary (Class 11–12)</option><option>K-12 School (Class 1–12)</option><option>Special Education School</option>
+        </select>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="ownership">Ownership <span class="opt">(optional)</span></label>
+          <select id="ownership" name="ownership">
+            <option value="">Select</option><option>Private Unaided</option><option>Trust / Society</option><option>Government Aided</option><option>Minority Institution</option><option>Government</option><option>Central Government</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="medium">Medium of teaching <span class="opt">(optional)</span></label>
+          <select id="medium" name="medium">
+            <option value="">Select</option><option>English</option><option>Hindi</option><option>Bilingual</option><option>Bengali</option><option>Gujarati</option><option>Kannada</option><option>Malayalam</option><option>Marathi</option><option>Odia</option><option>Punjabi</option><option>Tamil</option><option>Telugu</option><option>Urdu</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="students">Number of students <span class="opt">(approx.)</span></label>
+          <input id="students" name="students" inputmode="numeric" placeholder="e.g. 450">
+        </div>
+        <div class="field">
+          <label for="sessionStart">Session starts in <span class="opt">(optional)</span></label>
+          <select id="sessionStart" name="sessionStart">
+            <option value="">Select</option><option>April</option><option>June</option><option>July</option><option>January</option><option>Other</option>
+          </select>
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="n">2</span>Trust or group</legend>
+      <p class="hint">The trust, society or company that runs the school. If you run only one school, you can use the school name again.</p>
+      <div class="field">
+        <label for="orgName">Trust / group name <span class="req">*</span></label>
+        <input id="orgName" name="orgName" required placeholder="e.g. Sharma Education Trust">
+      </div>
+      <div class="field">
+        <label for="otherSchools">Does this group run other schools or branches?</label>
+        <select id="otherSchools" name="otherSchools">
+          <option value="">Select</option><option>No, only this school</option><option>Yes, other schools also</option>
+        </select>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="n">3</span>Address</legend>
+      <div class="field">
+        <label for="address">Address <span class="req">*</span></label>
+        <input id="address" name="address" required placeholder="Building, street, area" autocomplete="street-address">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="state">State / UT <span class="req">*</span></label>
+          <select id="state" name="state" required></select>
+        </div>
+        <div class="field">
+          <label for="district">District <span class="opt">(optional)</span></label>
+          <input id="district" name="district">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="city">City / town <span class="req">*</span></label>
+          <input id="city" name="city" required autocomplete="address-level2">
+        </div>
+        <div class="field">
+          <label for="pincode">Pincode <span class="req">*</span></label>
+          <input id="pincode" name="pincode" required inputmode="numeric" maxlength="6" placeholder="6 digits" autocomplete="postal-code">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="n">4</span>Main contact</legend>
+      <p class="hint">The person we call about setup and billing, usually the owner or principal.</p>
+      <div class="field">
+        <label for="contactName">Full name <span class="req">*</span></label>
+        <input id="contactName" name="contactName" required autocomplete="name">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="contactPhone">Mobile <span class="req">*</span></label>
+          <input id="contactPhone" name="contactPhone" required inputmode="numeric" maxlength="10" placeholder="10 digits" autocomplete="tel-national">
+        </div>
+        <div class="field">
+          <label for="contactEmail">Email <span class="opt">(optional)</span></label>
+          <input id="contactEmail" name="contactEmail" type="email" autocomplete="email">
+        </div>
+      </div>
+      <div class="field">
+        <label for="contactRole">Role at the school</label>
+        <select id="contactRole" name="contactRole">
+          <option value="">Select</option><option>Owner / Director</option><option>Principal</option><option>Manager / Administrator</option><option>Trustee</option><option>Other</option>
+        </select>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="n">5</span>School Admin login</legend>
+      <p class="hint">This person gets the first login and sets up classes, fees and staff. The email and mobile must not already be used for another SmartSchoolWala login, including at another school. We never ask for a password: you set it at the first login.</p>
+      <label class="chk consent" for="adminSame"><input type="checkbox" id="adminSame" name="adminSame"> Same person as the main contact</label>
+      <div class="field">
+        <label for="adminName">Admin full name <span class="req">*</span></label>
+        <input id="adminName" name="adminName" required>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="adminEmail">Admin email <span class="req">*</span></label>
+          <input id="adminEmail" name="adminEmail" type="email" required>
+        </div>
+        <div class="field">
+          <label for="adminPhone">Admin mobile <span class="req">*</span></label>
+          <input id="adminPhone" name="adminPhone" required inputmode="numeric" maxlength="10" placeholder="10 digits">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend><span class="n">6</span>What you need</legend>
+      <p class="hint">Pick everything you want to use. Students, admissions and staff records are always included.</p>
+      <div class="checks" id="modules"></div>
+      <div class="field">
+        <label for="notes">Anything else? <span class="opt">(optional)</span></label>
+        <textarea id="notes" name="notes" placeholder="e.g. we want to start from April, we have 3 buses, we need Hindi receipts"></textarea>
+      </div>
+      <label class="chk consent" for="consent"><input type="checkbox" id="consent" name="consent" required> These details are correct, and SmartSchoolWala may contact me to set up the school. <span class="req">*</span></label>
+      <div class="err" id="consentErr"></div>
+      <p class="hint">We use these details only to set up your school. See our <a href="/privacy">Privacy Policy</a>.</p>
+    </fieldset>
+
+    <p class="formerr" id="formErr" hidden></p>
+    <button class="btn btn-primary btn-lg onb-submit" type="submit">Review details<i class="bx bx-right-arrow-alt"></i></button>
+  </form>
+
+  <section class="onb-review" id="onbReview" hidden aria-live="polite">
+    <h2>Check and send</h2>
+    <p class="hint">Tap <b>Send on WhatsApp</b>. If WhatsApp doesn't open, tap <b>Copy details</b> and paste them into a WhatsApp chat with us.</p>
+    <pre id="onbOut"></pre>
+    <div class="onb-actions">
+      <a class="btn btn-lg onb-wa" id="onbWaBtn" href="#" target="_blank" rel="noopener"><i class="bx bxl-whatsapp"></i>Send on WhatsApp</a>
+      <button class="btn btn-lg onb-ghost" type="button" id="onbCopyBtn">Copy details</button>
+      <button class="btn btn-lg onb-ghost" type="button" id="onbEditBtn">Edit answers</button>
+    </div>
+    <div class="onb-toast" id="onbToast" role="status"></div>
+  </section>
+
+  </div>
+</section>
+
+@section Scripts {
+    <script src="~/js/site/onboarding.js" asp-append-version="true"></script>
+}

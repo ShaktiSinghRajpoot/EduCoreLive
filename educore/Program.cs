@@ -172,6 +172,29 @@ builder.Services.AddRateLimiter(options =>
 
     // WHY: return a clean 429; the status-code-pages middleware re-executes to /Account/Error.
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // Every rejection says when to come back (Retry-After). The password-reset forms go
+    // back to the same form with "please wait N minutes" (BUG-044) instead of the generic
+    // error page. The wait travels in the query string because this middleware runs
+    // before the session (and TempData lives in the session).
+    options.OnRejected = (context, _) =>
+    {
+        var http = context.HttpContext;
+        int seconds = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter)
+            ? Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds))
+            : 300;
+        http.Response.Headers.RetryAfter = seconds.ToString();
+
+        var path = http.Request.Path;
+        if (HttpMethods.IsPost(http.Request.Method) &&
+            (path.Equals("/Account/ForgotPassword", StringComparison.OrdinalIgnoreCase) ||
+             path.Equals("/Account/VerifyOtp", StringComparison.OrdinalIgnoreCase)))
+        {
+            int minutes = Math.Max(1, (int)Math.Ceiling(seconds / 60.0));
+            http.Response.Redirect($"{http.Request.PathBase}{path}?wait={minutes}");
+        }
+        return ValueTask.CompletedTask;
+    };
 });
 
 // WHY (Fix #7): build ONE NpgsqlDataSource for the whole app, registered as a singleton.

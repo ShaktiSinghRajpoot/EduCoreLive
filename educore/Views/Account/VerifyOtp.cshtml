@@ -15,6 +15,12 @@
         <h1 class="login-title">Enter Verification Code</h1>
         <p class="login-subtitle">We've sent a 6-digit code to your registered email and mobile. Enter it below and choose a new password.</p>
 
+        @* Set when the "otp" rate limiter turned the last attempt away (BUG-044). *@
+        @if (ViewData["Throttled"] is string throttled)
+        {
+            <div class="alert alert-warning small" role="alert">@throttled</div>
+        }
+
         <div asp-validation-summary="ModelOnly" class="alert alert-danger" style="display:@(ViewData.ModelState.ErrorCount > 0 ? "block" : "none")"></div>
 
         <form asp-controller="Account" asp-action="VerifyOtp" method="post" autocomplete="off">
