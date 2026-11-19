@@ -37,8 +37,14 @@ namespace educore.Areas.Inventory.Controllers
             // for "Which class is it for?" on a saleable item
             try { ViewBag.ClassList = await baseService.GetSelectListAsync("config.sp_dropdown_common", "Class", TenantId().ToString(), SchoolId().ToString()); }
             catch { ViewBag.ClassList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
+            await SetCanManageAsync();
             return View();
         }
+
+        // The write endpoints below need inventory.manage; a view-only role (Accountant,
+        // Clerk) must not be offered buttons that only end in a 403 (QA BUG-023).
+        private async Task SetCanManageAsync()
+            => ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "inventory.manage");
 
         // Inventory Dashboard (/inventory): the store at a glance. The page
         // reads the endpoints below (Items, StoreSummary, Suppliers, OrderListData,
@@ -54,11 +60,11 @@ namespace educore.Areas.Inventory.Controllers
 
         // Store locations (add / rename / deactivate) and the transfer history.
         [Route("inventory/locations")]
-        public IActionResult StoreLocations() => View();
+        public async Task<IActionResult> StoreLocations() { await SetCanManageAsync(); return View(); }
 
         // Supplier list / search / add / edit / deactivate / remove.
         [Route("inventory/suppliers")]
-        public IActionResult SupplierMaster() => View();
+        public async Task<IActionResult> SupplierMaster() { await SetCanManageAsync(); return View(); }
 
         [Route("inventory/purchase")]
         public async Task<IActionResult> PurchaseEntry()
@@ -75,6 +81,7 @@ namespace educore.Areas.Inventory.Controllers
             // The school's date, not the browser's UTC one (toISOString), so the
             // default is right before 05:30 in the morning too.
             ViewBag.Today     = Dates.Today;
+            await SetCanManageAsync();
             return View();
         }
 

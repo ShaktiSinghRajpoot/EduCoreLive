@@ -197,6 +197,11 @@
                                 <span asp-validation-for="RegistrationNumber" class="text-danger small"></span>
                             </div>
                             <div class="col-md-6">
+                                <label class="form-label">UDISE Code</label>
+                                <input asp-for="UdiseCode" class="form-control" inputmode="numeric" maxlength="11" placeholder="11 digits (optional)" />
+                                <span asp-validation-for="UdiseCode" class="text-danger small"></span>
+                            </div>
+                            <div class="col-md-6">
                                 <label class="form-label">Affiliation Number</label>
                                 <input asp-for="AffiliationNumber" class="form-control" placeholder="Enter affiliation number" />
                                 <span asp-validation-for="AffiliationNumber" class="text-danger small"></span>

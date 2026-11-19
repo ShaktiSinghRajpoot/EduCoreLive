@@ -83,6 +83,9 @@
 @section PageScripts {
 <script>
     $(function () {
+        // The signed-in class teacher's class and section, picked once the lists load (QA UX-11).
+        var MY_CLASS   = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string?)ViewBag.MyClass ?? ""));
+        var MY_SECTION = @Html.Raw(System.Text.Json.JsonSerializer.Serialize((string?)ViewBag.MySection ?? ""));
 
         // The exam's classes and sections come from the admit-card page.
         $('#rcExam').on('change', function () {
@@ -98,6 +101,10 @@
                     html += '<option value="' + c.id + '">' + EC.esc(c.name) + '</option>';
                 });
                 $cls.html(html).prop('disabled', false);
+                if (MY_CLASS) {
+                    var $mine = $cls.find('option').filter(function () { return $(this).text() === MY_CLASS; });
+                    if ($mine.length) $cls.val($mine.val()).trigger('change');
+                }
             })
             .fail(function () { ecToast('error', 'Could not load the classes of this exam.'); });
         });
@@ -111,6 +118,7 @@
                 { examId: $('#rcExam').val(), classId: $(this).val() })
             .done(function (list) {
                 $.each(list || [], function (i, s) { $sec.append($('<option>').val(s).text(s)); });
+                if (MY_SECTION && $('#rcClass option:selected').text() === MY_CLASS && (list || []).indexOf(MY_SECTION) >= 0) $sec.val(MY_SECTION);
             });
         });
 

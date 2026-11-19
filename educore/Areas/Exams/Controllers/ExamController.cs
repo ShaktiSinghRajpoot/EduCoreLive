@@ -437,9 +437,13 @@ namespace educore.Areas.Exams.Controllers
             if (!await CanEnterMarksAsync())
                 return StatusCode(StatusCodes.Status403Forbidden);
 
+            // A body that does not bind (marks "abc" instead of a number) arrives as null;
+            // say what is wrong with it rather than "only the classes you teach" (BUG-015).
+            if (request == null)
+                return Json(new { success = false, message = "Marks must be a number between 0 and the subject's maximum marks." });
+
             // Only the sheets this teacher teaches (unless exams.manage / admin).
-            if (request == null
-                || !InScope(await MarkScopeAsync(request.ExamId), request.AcademicClassId, request.Section, request.SubjectId))
+            if (!InScope(await MarkScopeAsync(request.ExamId), request.AcademicClassId, request.Section, request.SubjectId))
                 return Json(new { success = false, message = "You can enter marks only for the classes and subjects you teach." });
 
             var result = await _exam.SaveMarksAsync(request, TenantId(), SchoolId(), UserId());

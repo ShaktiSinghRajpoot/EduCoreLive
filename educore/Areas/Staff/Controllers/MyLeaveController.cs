@@ -2,6 +2,7 @@ using EduCoreDataAccessLayer.Helpers;
 using EduCoreDataAccessLayer.Services.Contract.ERP;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using educore.Helpers;
 
 namespace educore.Areas.Staff.Controllers
 {
@@ -21,6 +22,9 @@ namespace educore.Areas.Staff.Controllers
     /// </summary>
     [Area("Staff")]
     [Authorize(Policy = "SchoolUserOnly")]
+    // Refused outright when the Staff (Payroll & Leave) module is off (QA BUG-047);
+    // the filter sends a page to the dashboard with a message, not to settings.
+    [RequiresModule(SchoolModule.Payroll)]
     public class MyLeaveController : Controller
     {
         private readonly IStaffSelfService _self;

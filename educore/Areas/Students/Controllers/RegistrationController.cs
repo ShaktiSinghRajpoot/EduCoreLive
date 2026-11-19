@@ -42,11 +42,21 @@ namespace educore.Areas.Students.Controllers
             int tenantId = TenantId(), schoolId = SchoolId(), userId = UserId();
 
             var workflow = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, userId);
-             
+
+            // The menu hides Registrations when the step is switched off; a typed URL is
+            // refused the same way, like a module page (QA BUG-047).
+            if (!workflow.EnableRegistration)
+            {
+                TempData["Result"] = "0";
+                TempData["Message"] = "Registration is turned off for this school. A School Admin can turn it on in Settings > Modules & Workflow.";
+                return RedirectToAction("Index", "Dashboards", new { area = "" });
+            }
+
             var model = new RegistrationPageModel
             {
                 Stats                 = await _registrationService.GetStatsAsync(tenantId, schoolId, userId),
-                RegistrationFeeEnabled = workflow.EnableRegistration && workflow.EnableRegistrationFee
+                // A registration fee is a fee: nothing of it while Fees is off.
+                RegistrationFeeEnabled = workflow.EnableRegistration && workflow.EnableRegistrationFee && workflow.EnableFees
             };
 
             try {

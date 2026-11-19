@@ -3,6 +3,9 @@
 @{
     ViewData["Title"] = "Admission Workflow";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    // Only a School Admin switches modules (the save keeps the switches for anyone
+    // else), so the switches are shown read-only to other roles (QA BUG-025).
+    bool canSwitch = ViewBag.CanSwitchModules == true;
 }
 
 @section PageStyles {
@@ -215,6 +218,12 @@
               </a>
             </div>
 
+            @if (!canSwitch)
+            {
+              <div class="alert alert-info small mb-3">
+                <i class="bx bx-lock-alt me-1"></i>Only a School Admin can switch modules on or off. The other settings on this page are saved as usual.
+              </div>
+            }
             <div class="aw-row">
               <div class="flex-grow-1">
                 <div class="aw-row-title">Transport Module</div>
@@ -237,7 +246,7 @@
               @if (Model.AllowTransport)
               {
                 <div class="form-check form-switch aw-switch m-0">
-                  <input class="form-check-input" type="checkbox" id="EnableTransport" asp-for="EnableTransport" />
+                  <input class="form-check-input" type="checkbox" id="EnableTransport" asp-for="EnableTransport" disabled="@(canSwitch ? null : "disabled")" />
                 </div>
               }
               else
@@ -257,7 +266,7 @@
               @if (Model.AllowExams)
               {
                 <div class="form-check form-switch aw-switch m-0">
-                  <input class="form-check-input" type="checkbox" id="EnableExams" asp-for="EnableExams" />
+                  <input class="form-check-input" type="checkbox" id="EnableExams" asp-for="EnableExams" disabled="@(canSwitch ? null : "disabled")" />
                 </div>
               }
               else
@@ -277,7 +286,7 @@
               @if (Model.AllowInventory)
               {
                 <div class="form-check form-switch aw-switch m-0">
-                  <input class="form-check-input" type="checkbox" id="EnableInventory" asp-for="EnableInventory" />
+                  <input class="form-check-input" type="checkbox" id="EnableInventory" asp-for="EnableInventory" disabled="@(canSwitch ? null : "disabled")" />
                 </div>
               }
               else
@@ -297,7 +306,7 @@
               @if (Model.AllowPayroll)
               {
                 <div class="form-check form-switch aw-switch m-0">
-                  <input class="form-check-input" type="checkbox" id="EnablePayroll" asp-for="EnablePayroll" />
+                  <input class="form-check-input" type="checkbox" id="EnablePayroll" asp-for="EnablePayroll" disabled="@(canSwitch ? null : "disabled")" />
                 </div>
               }
               else
@@ -317,7 +326,7 @@
               @if (Model.AllowAttendance)
               {
                 <div class="form-check form-switch aw-switch m-0">
-                  <input class="form-check-input" type="checkbox" id="EnableAttendance" asp-for="EnableAttendance" />
+                  <input class="form-check-input" type="checkbox" id="EnableAttendance" asp-for="EnableAttendance" disabled="@(canSwitch ? null : "disabled")" />
                 </div>
               }
               else
@@ -337,7 +346,7 @@
               @if (Model.AllowAcademics)
               {
                 <div class="form-check form-switch aw-switch m-0">
-                  <input class="form-check-input" type="checkbox" id="EnableAcademics" asp-for="EnableAcademics" />
+                  <input class="form-check-input" type="checkbox" id="EnableAcademics" asp-for="EnableAcademics" disabled="@(canSwitch ? null : "disabled")" />
                 </div>
               }
               else
@@ -357,7 +366,7 @@
               @if (Model.AllowFees)
               {
                 <div class="form-check form-switch aw-switch m-0">
-                  <input class="form-check-input" type="checkbox" id="EnableFees" asp-for="EnableFees" />
+                  <input class="form-check-input" type="checkbox" id="EnableFees" asp-for="EnableFees" disabled="@(canSwitch ? null : "disabled")" />
                 </div>
               }
               else
@@ -377,7 +386,7 @@
               @if (Model.AllowAccounts)
               {
                 <div class="form-check form-switch aw-switch m-0">
-                  <input class="form-check-input" type="checkbox" id="EnableAccounts" asp-for="EnableAccounts" />
+                  <input class="form-check-input" type="checkbox" id="EnableAccounts" asp-for="EnableAccounts" disabled="@(canSwitch ? null : "disabled")" />
                 </div>
               }
               else

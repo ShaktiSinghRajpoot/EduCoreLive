@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Purchase Entry";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    bool canManage = ViewBag.CanManage == true;
 }
 
 @section PageStyles {
@@ -79,9 +80,12 @@
                             <option value="@s.SupplierId">@s.SupplierName</option>
 }
                           </select>
+@if (canManage)
+{
                           <button type="button" class="btn btn-icon btn-outline-secondary flex-shrink-0" id="addSupplierBtn" title="Add supplier">
                             <i class="bx bx-plus"></i>
                           </button>
+}
                         </div>
                     </div>
                     <div class="col-12 col-md-6 col-lg-3">
@@ -166,6 +170,8 @@
             </div>
         </div>
 
+        @if (canManage)
+        {
         <div class="purchase-sticky-footer mt-3 p-3 rounded-4">
             <div class="d-flex justify-content-end gap-2 flex-wrap purchase-footer-actions">
                 <button type="button" class="btn btn-outline-secondary px-4" id="cancelPurchaseBtn">Cancel</button>
@@ -174,6 +180,13 @@
                 </button>
             </div>
         </div>
+        }
+        else
+        {
+        <div class="alert alert-info mt-3 small mb-0">
+            <i class="bx bx-info-circle me-1"></i>You can see purchases here, but recording, cancelling or returning one needs the Inventory manage permission.
+        </div>
+        }
 
     </div>
 </div>
@@ -249,12 +262,15 @@
       </div>
       <div class="modal-footer flex-column flex-sm-row">
         <button type="button" class="btn btn-outline-secondary w-100 w-sm-auto" data-bs-dismiss="modal">Close</button>
+        @if (canManage)
+        {
         <button type="button" class="btn btn-outline-danger w-100 w-sm-auto dt-live" id="dtCancelBtn">
           <i class="bx bx-x-circle me-1"></i> Cancel purchase
         </button>
         <button type="button" class="btn btn-primary w-100 w-sm-auto dt-ret" id="dtReturnBtn">
           <i class="bx bx-undo me-1"></i> Return to supplier
         </button>
+        }
       </div>
     </div>
   </div>
@@ -312,6 +328,9 @@
 (function () {
     'use strict';
 
+    // inventory.manage, the same check the write endpoints make (BUG-023).
+    var CAN_MANAGE    = @(canManage ? "true" : "false");
+    var NO_PERM       = "You don't have permission to change inventory.";
     var SAVE_URL      = '@Url.Action("SavePurchase", "Inventory", new { area = "Inventory" })';
     var LIST_URL      = '@Url.Action("Purchases", "Inventory", new { area = "Inventory" })';
     var CANCEL_URL    = '@Url.Action("CancelPurchase", "Inventory", new { area = "Inventory" })';
@@ -497,7 +516,7 @@
             resetForm();
             loadSummary();
         })
-        .fail(function () { ecToast('error', 'Could not save the purchase.'); })
+        .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not save the purchase.'); })
         .always(function () { EC.buttonReset($btn); });
     });
 
@@ -563,7 +582,7 @@
                         '<td>' + statusBadge(p) + '</td>' +
                         '<td class="text-end text-nowrap">' +
                             '<button class="btn btn-sm btn-text-secondary" data-view="' + p.id + '">View</button>' +
-                            (p.cancelled ? '' :
+                            (p.cancelled || !CAN_MANAGE ? '' :
                             '<button class="btn btn-sm btn-text-danger" data-cancel="' + p.id + '">Cancel</button>') +
                         '</td></tr>';
                 }).join(''));
@@ -614,7 +633,7 @@
                     if (dm) dm.hide();
                     $('#historyBtn').trigger('click');
                 })
-                .fail(function () { ecToast('error', 'Could not cancel the purchase.'); })
+                .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not cancel the purchase.'); })
                 .always(EC.hideLoader);
         });
     }
@@ -730,7 +749,7 @@
                 openDetail(detail.id);
                 if ($('#historyModal').hasClass('show')) $('#historyBtn').trigger('click');
             })
-            .fail(function () { ecToast('error', 'Could not record the return.'); })
+            .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not record the return.'); })
             .always(function () { EC.buttonReset($btn); });
     });
 
@@ -775,7 +794,7 @@
                 $('#supplierId').html(html).val(res.id);
             });
         })
-        .fail(function () { ecToast('error', 'Could not save the supplier.'); })
+        .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not save the supplier.'); })
         .always(function () { EC.buttonReset($btn); });
     });
 

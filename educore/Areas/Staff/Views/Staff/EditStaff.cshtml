@@ -117,6 +117,12 @@
               <label class="es-label required">Designation</label>
               <select asp-for="Designation" id="ddDesignation" class="form-select" data-current="@Model.Designation">
                 <option value="">Select department first</option>
+                @* The saved designation is rendered here, so the form never posts an empty one
+                   while the department's list is still loading (BUG-022). *@
+                @if (!string.IsNullOrWhiteSpace(Model.Designation))
+                {
+                    <option value="@Model.Designation" selected>@Model.Designation</option>
+                }
               </select>
               <div class="text-muted small mt-1">Shows only roles in the chosen department.</div>
             </div>
@@ -289,7 +295,7 @@
 
       <div class="es-sticky">
         <a class="btn btn-outline-secondary px-4" asp-area="Staff" asp-controller="Staff" asp-action="StaffProfile" asp-route-id="@Model.PublicId">Cancel</a>
-        <button type="submit" class="btn btn-primary px-4"><i class="bx bx-check me-1"></i>Save Changes</button>
+        <button type="submit" id="btnSaveStaff" class="btn btn-primary px-4"><i class="bx bx-check me-1"></i>Save Changes</button>
       </div>
 
     </form>
@@ -314,8 +320,11 @@
 
         function BindDesignations(dept, keep) {
             var url = '@Url.Action("GetDesignations", "Staff", new { area = "Staff" })';
+            // Save waits for the list, so a half-loaded form is never posted (BUG-022).
+            $('#btnSaveStaff').prop('disabled', true);
             $.post(url, { department: dept }, function (data) {
                 var found = false;
+                $('#ddDesignation').empty().append(new Option('Select designation', ''));
                 $.each(data, function (i, item) {
                     // .text, not .html: designation names are typed in by the school.
                     var opt = $("<option></option>").val(item.value).text(item.text).attr('data-type', item.type);
@@ -328,6 +337,8 @@
                     $('#ddDesignation').append($("<option></option>").val(keep).text(keep).prop('selected', true));
                 }
                 SyncStaffType();
+            }).always(function () {
+                $('#btnSaveStaff').prop('disabled', false);
             });
         }
 

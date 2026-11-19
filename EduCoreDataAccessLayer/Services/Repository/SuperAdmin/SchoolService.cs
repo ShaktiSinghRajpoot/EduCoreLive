@@ -149,6 +149,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
 
                 RegistrationNumber = row["registration_number"]?.ToString(),
                 AffiliationNumber = row["affiliation_number"]?.ToString(),
+                UdiseCode = row.Table.Columns.Contains("udise_code") ? row["udise_code"]?.ToString() : null,
                 BoardId = ToNullableInt(row["board_id"]),
                 BoardStateId = HasColumn(row, "board_state_id") ? ToNullableInt(row["board_state_id"]) : null,
                 InstitutionCategoryId = HasColumn(row, "institution_category_id") ? ToInt(row["institution_category_id"], 1) : 1,
@@ -295,7 +296,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 return null;
 
             var row = ds.Tables[0].Rows[0];
-            return new SchoolModulesModel
+            var result = new SchoolModulesModel
             {
                 SchoolId       = ToInt(row["school_id"], 0),
                 SchoolName     = row["school_name"]?.ToString() ?? string.Empty,
@@ -308,6 +309,18 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
                 AllowFees      = ToBool(row["allow_fees"]),
                 AllowAccounts  = ToBool(row["allow_accounts"])
             };
+
+            // Given by the platform but switched off by the school itself.
+            foreach (var (col, label) in new[] {
+                ("transport", "AllowTransport"), ("exams", "AllowExams"), ("inventory", "AllowInventory"),
+                ("payroll", "AllowPayroll"), ("attendance", "AllowAttendance"), ("academics", "AllowAcademics"),
+                ("fees", "AllowFees"), ("accounts", "AllowAccounts") })
+            {
+                if (row.Table.Columns.Contains("enable_" + col)
+                    && ToBool(row["allow_" + col]) && !ToBool(row["enable_" + col]))
+                    result.OffBySchool.Add(label);
+            }
+            return result;
         }
 
         public async Task<LoginAsTarget?> StartLoginAsAsync(int schoolId, int actionUserId)
@@ -418,6 +431,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.SuperAdmin
 
                 new NpgsqlParameter("p_registration_number", (object?)model?.RegistrationNumber ?? DBNull.Value),
                 new NpgsqlParameter("p_affiliation_number", (object?)model?.AffiliationNumber ?? DBNull.Value),
+                new NpgsqlParameter("p_udise_code", (object?)model?.UdiseCode?.Trim() ?? DBNull.Value),
                 new NpgsqlParameter("p_board_id", (object?)model?.BoardId ?? DBNull.Value),
                 new NpgsqlParameter("p_school_type_id", (object?)model?.SchoolTypeId ?? DBNull.Value),
                 new NpgsqlParameter("p_ownership_type_id", (object?)model?.OwnershipTypeId ?? DBNull.Value),

@@ -54,6 +54,15 @@ namespace educore.Models
         [StringLength(100)]
         public string? AffiliationNumber { get; set; }
 
+        /// <summary>UDISE+ code of the school: 11 digits, optional (QA UX-25).</summary>
+        [RegularExpression(@"^\d{11}$", ErrorMessage = "UDISE code must be exactly 11 digits.")]
+        public string? UdiseCode { get; set; }
+
+        /// <summary>Create School only: which modules the new school is given (QA UX-27).
+        /// "Basic" = Attendance + Fees, "Standard" = + Academics, Exams, Staff,
+        /// "Full" (default, today's behaviour) = every module. WhatsApp stays separate.</summary>
+        public string ModulePreset { get; set; } = "Full";
+
         [Range(1800, 2100, ErrorMessage = "Enter valid established year.")]
         public int? EstablishedYear { get; set; }
 

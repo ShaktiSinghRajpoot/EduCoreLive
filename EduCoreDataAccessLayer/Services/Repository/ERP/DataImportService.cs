@@ -51,5 +51,29 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 return (false, ex.MessageText);
             }
         }
+
+        public async Task<List<(string AdmissionNo, string Name, string? Dob, string Mobile, bool Active)>> GetExistingStudentsAsync(
+            int tenantId, int schoolId, int actionUserId)
+        {
+            var list = new List<(string, string, string?, string, bool)>();
+            if (tenantId <= 1 || schoolId <= 0) return list;
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "import_existing_cursor" }
+            };
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_import_existing_students", p);
+            if (ds.Tables.Count == 0) return list;
+            foreach (DataRow row in ds.Tables[0].Rows)
+                list.Add((row["admission_no"]?.ToString() ?? "",
+                          row["student_name"]?.ToString() ?? "",
+                          row["dob"] == DBNull.Value ? null : row["dob"].ToString(),
+                          row["mobile"]?.ToString() ?? "",
+                          row["is_active"] != DBNull.Value && Convert.ToBoolean(row["is_active"])));
+            return list;
+        }
     }
 }

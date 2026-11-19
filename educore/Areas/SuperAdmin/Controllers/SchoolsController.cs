@@ -199,9 +199,30 @@ namespace educore.Areas.SuperAdmin.Controllers
                     model.Password = BCrypt.Net.BCrypt.HashPassword(tempPassword);
                 }
 
-                await _schoolService.CreateSchoolAsync(model, tenantId, userId);
+                int newSchoolId = await _schoolService.CreateSchoolAsync(model, tenantId, userId);
 
-                await DeliverAdminCredentialsAsync(model, tempPassword);
+                // Modules preset (QA UX-27). "Full" needs nothing: a new school gets every module.
+                if (newSchoolId > 0 && model.ModulePreset is "Basic" or "Standard")
+                {
+                    bool standard = model.ModulePreset == "Standard";
+                    try
+                    {
+                        await _schoolService.SaveSchoolModulesAsync(new SchoolModulesModel
+                        {
+                            SchoolId = newSchoolId,
+                            AllowAttendance = true, AllowFees = true,
+                            AllowAcademics = standard, AllowExams = standard, AllowPayroll = standard,
+                            AllowTransport = false, AllowInventory = false, AllowAccounts = false
+                        }, userId);
+                    }
+                    catch (Exception ex)
+                    {
+                        // The school exists; only the plan is left at "every module".
+                        _logger.LogError(ex, "Module preset {Preset} not applied to new school {SchoolId}", model.ModulePreset, newSchoolId);
+                    }
+                }
+
+                await DeliverAdminCredentialsAsync(model, tempPassword, "created");
 
                 return RedirectToAction(nameof(SchoolList));
             }
@@ -216,11 +237,12 @@ namespace educore.Areas.SuperAdmin.Controllers
         // Emails the new school admin their login + temporary password. If the school had no
         // admin created, just confirms. If the email cannot be sent, falls back to surfacing the
         // credentials to the super admin so the admin is never silently locked out.
-        private async Task DeliverAdminCredentialsAsync(SchoolManageModel model, string? tempPassword)
+        // "done" is "created" or "updated", for the message.
+        private async Task DeliverAdminCredentialsAsync(SchoolManageModel model, string? tempPassword, string done)
         {
             if (!model.CreateSchoolAdmin || string.IsNullOrWhiteSpace(model.AdminEmail) || string.IsNullOrWhiteSpace(tempPassword))
             {
-                TempData["Success"] = "School created successfully.";
+                TempData["Success"] = $"School {done} successfully.";
                 return;
             }
 
@@ -243,7 +265,7 @@ namespace educore.Areas.SuperAdmin.Controllers
 
             if (delivered != NotificationChannels.None)
             {
-                TempData["Success"] = $"School created. Login details sent to {model.AdminEmail} ({delivered}).";
+                TempData["Success"] = $"School {done}. Login details sent to {model.AdminEmail} ({delivered}).";
             }
             else
             {
@@ -251,7 +273,7 @@ namespace educore.Areas.SuperAdmin.Controllers
                 // ONLY here. A toast auto-dismisses after 3.5s (see _Scripts.cshtml), which
                 // loses it for good, so these go to a dedicated key that SchoolList renders as
                 // a persistent, manually-dismissed alert.
-                TempData["Success"] = "School created.";
+                TempData["Success"] = $"School {done}.";
                 TempData["CredentialEmail"] = model.AdminEmail;
                 TempData["CredentialPassword"] = tempPassword;
             }
@@ -347,12 +369,27 @@ namespace educore.Areas.SuperAdmin.Controllers
                 var userId = User.Identity.GetUserId();
                 var tenantId = User.Identity.GetTenantId();
 
+                // A school without an admin gets one here: with auto-generate on, a one-time
+                // password is made and delivered just as on Create (BUG-048).
+                string? tempPassword = null;
+                bool newAdmin = model.CreateSchoolAdmin && model.AdminUserId.GetValueOrDefault() <= 0;
+                if (newAdmin && model.AutoGeneratePassword)
+                    model.Password = tempPassword = GenerateTempPassword();
+                else if (newAdmin)
+                    tempPassword = model.Password;
+
                 // On edit the password is optional (blank = keep current). Hash only when a
                 // new one was typed — the proc leaves the stored hash untouched for blanks.
                 if (model.CreateSchoolAdmin && !string.IsNullOrWhiteSpace(model.Password))
                     model.Password = BCrypt.Net.BCrypt.HashPassword(model.Password);
 
                 await _schoolService.SaveSchoolAsync(model, tenantId, userId);
+
+                if (newAdmin)
+                {
+                    await DeliverAdminCredentialsAsync(model, tempPassword, "updated");
+                    return RedirectToAction(nameof(SchoolList));
+                }
 
                 TempData["Success"] = "School updated successfully.";
                 return RedirectToAction(nameof(SchoolList));
@@ -557,9 +594,16 @@ namespace educore.Areas.SuperAdmin.Controllers
             if (model.AdminUserId.GetValueOrDefault() > 0)
                 return;
 
-            // Edit of a school that has no admin yet. sp_school_manage only creates one when a
-            // password hash arrives, so without this the save "succeeds" and silently creates
-            // nothing — the school stays admin-less with no error shown.
+            // Edit of a school that has no admin yet. With auto-generate on, the POST makes a
+            // one-time password exactly like Create (BUG-048), so nothing is required here.
+            if (model.AutoGeneratePassword)
+            {
+                ModelState.Remove(nameof(model.Password));
+                return;
+            }
+
+            // Typed by hand: sp_school_manage only creates the admin when a password hash
+            // arrives, so without this the save "succeeds" and silently creates nothing.
             if (string.IsNullOrWhiteSpace(model.Password))
                 ModelState.AddModelError(nameof(model.Password),
                     "This school has no administrator yet — set a password to create one.");

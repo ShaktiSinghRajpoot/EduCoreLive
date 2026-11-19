@@ -48,7 +48,11 @@
         <div class="mt-2 d-flex gap-2 flex-wrap">
           <span class="sp-bdg @statusClass">@Dash(Model.Status)</span>
           <span class="text-muted" style="font-size:.8rem;font-weight:700;">@Dash(Model.EmployeeCode)</span>
-          @if (Model.UserId is not null)
+          @if (Model.LoginMoved)
+          {
+            <span class="sp-bdg"><i class="bx bx-transfer me-1"></i>Login moved to another staff record</span>
+          }
+          else if (Model.UserId is not null)
           {
             <span class="sp-bdg b-active"><i class="bx bx-log-in-circle me-1"></i>Has Login</span>
           }
@@ -160,7 +164,12 @@
             <div class="sp-sec-title">App Access &amp; Role</div>
           </div>
           <div class="sp-card-body">
-            @if (Model.UserId is not null)
+            @if (Model.LoginMoved)
+            {
+              @* BUG-040: the email/phone of this inactive login now signs in to another staff record. *@
+              <div class="text-muted small">Login moved to another staff record. The login email or mobile of this inactive record is now used by someone else.</div>
+            }
+            else if (Model.UserId is not null)
             {
               var roleNames = ViewBag.RoleNames as List<string> ?? new List<string>();
               <div class="sp-field"><label>Login Email</label><span>@Dash(Model.Email)</span></div>

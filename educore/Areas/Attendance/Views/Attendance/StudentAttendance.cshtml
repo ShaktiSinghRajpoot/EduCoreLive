@@ -299,6 +299,7 @@ $(document).ready(function () {
         const cls = $('#filterClass').val(), sec = $('#filterSection').val(), date = $('#attendanceDate').val();
         touched = false; updateSaveBtn();
         $('#dayNotice').hide();
+        $('.att-summary').show();
         canMark = true; cannotMarkWhy = ''; applyCanMark();
         if (!cls || !sec) { students = []; render(); return; }
 
@@ -324,6 +325,15 @@ $(document).ready(function () {
                 cannotMarkWhy = dayWhy || (res && res.cannotMark) || '';
                 canMark = !cannotMarkWhy && (!res || res.canMark !== false);
                 applyCanMark();
+                // A holiday or weekly off has no register: only the banner shows, no
+                // counters and no "everyone starts as Present" roster (QA BUG-006).
+                if (res && (res.dayType === 'holiday' || res.dayType === 'weekly_off')) {
+                    students = [];
+                    $('.att-summary').hide();
+                    $('#notifyBtn').hide();
+                    $('#list').empty();
+                    return;
+                }
                 if (!students.length) {
                     renderStats();
                     EC.listEmpty('#list', 'No students on this register for the chosen date.', 'bx-user-x');
@@ -424,11 +434,22 @@ $(document).ready(function () {
     function rememberNotified(id) { try { localStorage.setItem(notifiedKey(id), '1'); } catch (e) { } }
     function wasNotified(id) { try { return localStorage.getItem(notifiedKey(id)) === '1'; } catch (e) { return false; } }
 
+    // The roster carries masked numbers only (QA UX-13); the full number of this one
+    // absent child comes from the server when the button is tapped. The tab is opened
+    // first, inside the click, so a popup blocker lets it through.
     function sendWA(id) {
         const s = students.find(x => x.id === id); if (!s) return;
         if (!s.phone) { ecToast('warning', 'No mobile number on record for ' + s.name + '.'); return; }
-        window.open('https://wa.me/91' + String(s.phone).replace(/\D/g,'') + '?text=' + encodeURIComponent(buildMsg(s)), '_blank');
-        notified[id] = true; rememberNotified(id); render(); refreshModal();
+        var win = window.open('', '_blank');
+        $.getJSON('@Url.Action("ParentPhone", "Attendance", new { area = "Attendance" })',
+                  { 'class': $('#filterClass').val(), section: $('#filterSection').val(), date: $('#attendanceDate').val(), studentId: id })
+            .done(function (r) {
+                if (!r || !r.success) { if (win) win.close(); ecToast('warning', (r && r.message) || 'Could not get the number.'); return; }
+                var url = 'https://wa.me/91' + String(r.phone).replace(/\D/g, '').slice(-10) + '?text=' + encodeURIComponent(buildMsg(s));
+                if (win) win.location.href = url; else window.open(url, '_blank');
+                notified[id] = true; rememberNotified(id); render(); refreshModal();
+            })
+            .fail(function (xhr) { if (win) win.close(); ecToast('error', EC.ajaxError(xhr, 'Could not get the number')); });
     }
     $(document).on('click', '.wa-one', function () { sendWA(Number($(this).data('id'))); });
 

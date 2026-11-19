@@ -126,6 +126,7 @@ function ecDialog(opts, fieldHtml, readValue, cancelValue) {
     var danger = opts.danger !== false;
     var icon   = opts.icon   || (danger ? 'bx-trash' : 'bx-help-circle');
     var okText = opts.okText || (danger ? 'Delete' : 'Confirm');
+    // opts.cancelText names the button that backs out ("Keep request"); default "Cancel".
 
     return new Promise(function (resolve) {
         // A dialog can still be on screen if the user double-clicked the button.
@@ -158,7 +159,7 @@ function ecDialog(opts, fieldHtml, readValue, cancelValue) {
                   (fieldHtml || '') +
                 '</div>' +
                 '<div class="modal-footer">' +
-                  '<button type="button" class="btn btn-label-secondary flex-fill" data-bs-dismiss="modal">Cancel</button>' +
+                  '<button type="button" class="btn btn-label-secondary flex-fill" data-bs-dismiss="modal">' + EC.esc(opts.cancelText || 'Cancel') + '</button>' +
                   '<button type="button" class="btn flex-fill ec-confirm-yes ' +
                     (danger ? 'is-danger' : 'is-normal') + '">' + EC.esc(okText) + '</button>' +
                 '</div>' +

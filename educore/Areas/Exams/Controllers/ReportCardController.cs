@@ -34,8 +34,20 @@ namespace educore.Areas.Exams.Controllers
             _baseService = baseService;
         }
 
+        // A class teacher's own class and section, picked by default (QA UX-11).
+        private async Task SetMyClassAsync(IClassTeacherService classTeacher)
+        {
+            try
+            {
+                var mine = (await classTeacher.GetClassesOfAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault();
+                ViewBag.MyClass   = mine?.ClassName ?? "";
+                ViewBag.MySection = mine?.SectionName ?? "";
+            }
+            catch { ViewBag.MyClass = ""; ViewBag.MySection = ""; }
+        }
+
         [HttpGet("exams/report-cards")]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index([FromServices] IClassTeacherService classTeacher)
         {
             var exams = new List<SelectListItem>();
             List<SelectListItem> sessions;
@@ -61,6 +73,7 @@ namespace educore.Areas.Exams.Controllers
             }
 
             ViewBag.Exams = exams;
+            await SetMyClassAsync(classTeacher);
             return View();
         }
 

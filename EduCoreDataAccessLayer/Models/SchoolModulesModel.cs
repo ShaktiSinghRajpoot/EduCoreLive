@@ -17,6 +17,10 @@ namespace educore.Models
         public bool   AllowFees      { get; set; } = true;
         public bool   AllowAccounts  { get; set; } = true;
 
+        /// <summary>Modules the school switched off itself (given, but enable_* off),
+        /// shown read-only on the platform page (QA BUG-047). Display names.</summary>
+        public List<string> OffBySchool { get; set; } = new();
+
         /// <summary>WhatsApp messages to parents from the platform's account (off by default:
         /// every message costs money). Saved in core.school_messaging.</summary>
         public bool   AllowWhatsApp  { get; set; }

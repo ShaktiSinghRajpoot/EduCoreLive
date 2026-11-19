@@ -82,8 +82,6 @@
                 @* Optional fields kept out of the wizard but round-tripped so an Edit
                    never wipes values the school may already have set. *@
                 <input asp-for="Website" type="hidden" />
-                <input asp-for="RegistrationNumber" type="hidden" />
-                <input asp-for="AffiliationNumber" type="hidden" />
                 <input asp-for="EstablishedYear" type="hidden" />
                 <input asp-for="AddressLine2" type="hidden" />
                 <input asp-for="District" type="hidden" />
@@ -272,6 +270,38 @@
                                 <option value="">Select (optional)</option>
                             </select>
                         </div>
+
+                        @* QA UX-25: visible, optional ids. UDISE is the 11-digit UDISE+ code. *@
+                        <div class="col-md-4">
+                            <label class="form-label" asp-for="UdiseCode">UDISE Code</label>
+                            <input asp-for="UdiseCode" class="form-control" inputmode="numeric" maxlength="11" placeholder="11 digits (optional)" autocomplete="off" />
+                            <span asp-validation-for="UdiseCode" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" asp-for="AffiliationNumber">Affiliation No.</label>
+                            <input asp-for="AffiliationNumber" class="form-control" maxlength="100" placeholder="Optional" autocomplete="off" />
+                            <span asp-validation-for="AffiliationNumber" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" asp-for="RegistrationNumber">Registration No.</label>
+                            <input asp-for="RegistrationNumber" class="form-control" maxlength="100" placeholder="Optional" autocomplete="off" />
+                            <span asp-validation-for="RegistrationNumber" class="text-danger small"></span>
+                        </div>
+
+                        @if (!isEdit)
+                        {
+                            @* QA UX-27: the modules the new school is given. Changeable later from
+                               Schools -> Modules. Full keeps today's behaviour. *@
+                            <div class="col-md-6">
+                                <label class="form-label" asp-for="ModulePreset">Modules (plan)</label>
+                                <select asp-for="ModulePreset" class="form-select">
+                                    <option value="Full">Full: every module</option>
+                                    <option value="Standard">Standard: Students, Attendance, Fees, Academics, Exams, Staff</option>
+                                    <option value="Basic">Basic: Students, Attendance, Fees</option>
+                                </select>
+                                <span class="text-muted small">School setup and Students are always included. WhatsApp is given separately.</span>
+                            </div>
+                        }
                     </div>
                 </div>
 
@@ -415,7 +445,7 @@
                             }
                         </div>
 
-                        @if (!isEdit)
+                        @if (!hasAdmin)
                         {
                             <div class="alert alert-info mt-4 mb-0 small">
                                 <i class="bx bx-info-circle me-1"></i>
@@ -783,6 +813,10 @@
                 }
             }
 
+            if (name === "UdiseCode" && value !== "" && !/^[0-9]{11}$/.test(value)) {
+                fail("UDISE code must be exactly 11 digits.");
+            }
+
             if (name === "ContactEmail" && value !== "" && !/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/.test(value)) {
                 fail("Enter valid contact email.");
             }
@@ -821,15 +855,10 @@
                         if (value !== "" && !passwordPattern.test(value)) {
                             fail(passwordRuleMessage);
                         }
-                    } else if (isEdit) {
-                        // Editing a school with no admin yet — the proc only creates one
-                        // when a password is supplied, so it is mandatory here.
-                        if (value === "") {
-                            fail("This school has no administrator yet — set a password to create one.");
-                        } else if (!passwordPattern.test(value)) {
-                            fail(passwordRuleMessage);
-                        }
                     } else if (!$("#AutoGeneratePassword").is(":checked")) {
+                        // No admin yet (Create, or Edit of an admin-less school) and the
+                        // password is typed by hand. With auto-generate on the server makes
+                        // a one-time password, so the hidden box is not checked (BUG-048).
                         if (value === "") {
                             fail("Password is required.");
                         } else if (!passwordPattern.test(value)) {
@@ -1092,6 +1121,8 @@
 
         $("#AutoGeneratePassword").on("change", function () {
             $("#passwordBox").toggle(!this.checked);
+            // A hidden box must not keep an error the user can no longer see.
+            if (this.checked) removeError($form.find('[name="Password"]'));
         });
 
         $(document).ready(function () {

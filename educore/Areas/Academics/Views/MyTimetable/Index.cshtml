@@ -200,13 +200,16 @@ $(function () {
         var html = '';
         var ask = ' data-day="' + d.day + '" data-seq="' + r.seq + '" data-label="' + EC.esc(d.label + ', ' + r.label) + '"';
         if (live) {
-            // Same tinted card as the School view; clicking it asks for a change.
+            // Same tinted card as the School view. A period already taught is not
+            // requestable (the server refuses it), so it is not clickable (QA UX-22).
             var n = ((Math.abs(live.subjectId) - 1) % 8) + 1;
-            html += '<div class="sv-cell t' + n + (req ? '' : ' mt-ask') + '"' + ask + ' title="' + (req ? '' : 'Click to request a change') + '">'
+            html += '<div class="sv-cell t' + n + '">'
                   + '<span class="sv-ini s' + n + '">' + EC.esc(live.subject.slice(0, 2).toUpperCase()) + '</span>'
                   + '<div><div class="sv-sub">' + EC.esc(live.subject) + '</div><div class="sv-tch">' + EC.esc(live.section) + '</div></div></div>';
         } else if (!req) {
-            html += '<div class="sv-empty mt-ask" style="cursor:pointer"' + ask + '>+ Request</div>';
+            // A real button, so it can be reached and pressed from the keyboard (QA UX-20).
+            html += '<button type="button" class="sv-empty mt-ask w-100 border-0" style="cursor:pointer"' + ask
+                  + ' aria-label="Request ' + EC.esc(d.label + ', ' + r.label) + '">+ Request</button>';
         }
         if (req) html += '<div class="sv-req"><div>Waiting: ' + EC.esc(req.subject) + '<br>' + EC.esc(req.section) + '</div></div>';
         return html;
@@ -273,7 +276,7 @@ $(function () {
 
     $('#mtReqBody').on('click', '.mt-cancel', function () {
         var id = Number($(this).attr('data-id'));
-        EC.confirm({ title: 'Cancel this request?', okText: 'Cancel request' }).then(function (ok) {
+        EC.confirm({ title: 'Cancel this request?', okText: 'Cancel request', cancelText: 'Keep request' }).then(function (ok) {
             if (!ok) return;
             post(URL.cancel, { requestId: id }).done(function (res) {
                 ecToast(res && res.success ? 'success' : 'error', (res && res.message) || 'Could not cancel.');

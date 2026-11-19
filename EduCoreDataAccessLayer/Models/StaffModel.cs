@@ -71,6 +71,10 @@ namespace EduCoreDataAccessLayer.Models
         /// <summary>Existing linked login (read-only); null = no app access.</summary>
         public int? UserId { get; set; }
 
+        /// <summary>The (inactive) login's email or phone now belongs to another
+        /// active login, e.g. the person was re-hired under a new staff record (BUG-040).</summary>
+        public bool LoginMoved { get; set; }
+
         /// <summary>Tick to also create a login for this staff member.</summary>
         public bool CreateLogin { get; set; }
 

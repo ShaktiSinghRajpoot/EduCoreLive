@@ -67,8 +67,10 @@
             <i class="bx bx-id-card fs-4"></i>
           </div>
           <div>
-            <h4 class="ec-page-title mb-1">All Students</h4>
-            <div class="ec-page-subtitle">Click a student row or View Dashboard to open the full student panel</div>
+            <h4 class="ec-page-title mb-1">@(ViewBag.OwnClassesOnly == true ? "My Students" : "All Students")</h4>
+            <div class="ec-page-subtitle">@(ViewBag.OwnClassesOnly == true
+                ? "Students of the classes you teach. Click a row to open the full student panel."
+                : "Click a student row or View Dashboard to open the full student panel")</div>
           </div>
         </div>
         @if (ViewBag.RegistrationRequired == true)

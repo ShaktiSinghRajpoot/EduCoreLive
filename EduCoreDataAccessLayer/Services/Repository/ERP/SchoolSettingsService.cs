@@ -159,9 +159,26 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             model.CreateSchoolAdmin = false;
             model.AutoGeneratePassword = true;
 
+            // UDISE code lives beside the basic profile (core.sp_school_udise, QA UX-25).
+            var udise = await _db.ExecuteProcedureWithCursorsAsync(SpSchoolUdise, UdiseParams("Get", tenantId, schoolId, actionUserId, null));
+            if (udise.Tables.Count > 0 && udise.Tables[0].Rows.Count > 0 && udise.Tables[0].Rows[0]["udise_code"] != DBNull.Value)
+                model.UdiseCode = udise.Tables[0].Rows[0]["udise_code"].ToString();
+
             await FillSignatureAsync(model, tenantId, schoolId, actionUserId);
             return model;
         }
+
+        private const string SpSchoolUdise = "core.sp_school_udise";
+
+        private static NpgsqlParameter[] UdiseParams(string op, int tenantId, int schoolId, int actionUserId, string? udise) => new[]
+        {
+            new NpgsqlParameter("p_operation", op),
+            new NpgsqlParameter("p_tenant_id", tenantId),
+            new NpgsqlParameter("p_school_id", schoolId),
+            new NpgsqlParameter("p_action_user_id", actionUserId),
+            new NpgsqlParameter("p_udise_code", NpgsqlDbType.Text) { Value = (object?)udise?.Trim() ?? DBNull.Value },
+            new NpgsqlParameter("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "udise_cursor" }
+        };
 
         // ── Seal & signature (school_signature.sql) ───────────────────────────
         // Read beside the basic profile so every print page that loads the profile
@@ -282,6 +299,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             try
             {
                 ds = await _db.ExecuteProcedureWithCursorsAsync(SpBasicProfileManage, parameters);
+                await _db.ExecuteProcedureWithCursorsAsync(SpSchoolUdise, UdiseParams("Save", tenantId, schoolId, actionUserId, model.UdiseCode));
             }
             catch (PostgresException ex)
             {

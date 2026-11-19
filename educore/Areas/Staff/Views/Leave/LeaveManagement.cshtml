@@ -295,9 +295,17 @@ $(document).ready(function () {
     $('#lmList').on('click','.lm-btn',function(){
         var id = Number($(this).data('id')), act = $(this).data('act'), $btn = $(this);
         if (act === 'approve') { post(APPROVE_URL, { id: id }, $btn, 'Approving…', 'success'); return; }
-        if (act === 'reject')  { post(REJECT_URL,  { id: id }, $btn, 'Rejecting…', 'warning'); return; }
+        // A rejection needs a reason, which the staff member sees on My Leave (QA UX-03).
+        if (act === 'reject') {
+            EC.prompt({ title: 'Reject this leave request?', message: 'The staff member sees your reason on My Leave.', label: 'Reason',
+                        okText: 'Reject leave', cancelText: 'Keep pending', required: true, danger: true, icon: 'bx-x-circle' }).then(function (reason) {
+                if (reason === null) return;
+                post(REJECT_URL, { id: id, remark: reason }, $btn, 'Rejecting…', 'warning');
+            });
+            return;
+        }
         EC.prompt({ title: 'Cancel this leave request?', message: 'The request is kept, marked Cancelled, with your reason.', label: 'Reason',
-                    okText: 'Cancel request', required: true, danger: true }).then(function (reason) {
+                    okText: 'Cancel request', cancelText: 'Keep request', required: true, danger: true }).then(function (reason) {
             if (reason === null) return;
             post(CANCEL_URL, { id: id, reason: reason }, $btn, 'Cancelling…', 'success');
         });

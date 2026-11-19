@@ -4,6 +4,7 @@
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var classes = ViewBag.ClassList as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
                   ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>();
+    bool canManage = ViewBag.CanManage == true;
 }
 
 @section PageStyles {
@@ -28,9 +29,12 @@
           <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="Inventory" asp-controller="Inventory" asp-action="StoreLocations">
             <i class="bx bx-map-pin"></i><span>Store Locations</span>
           </a>
+          @if (canManage)
+          {
           <button class="btn btn-primary d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#itemModal">
             <i class="bx bx-plus"></i><span>Add Item</span>
           </button>
+          }
         </div>
       </div>
     </div>
@@ -471,6 +475,9 @@
 (function () {
     'use strict';
 
+    // inventory.manage, the same check the save/move/transfer/delete endpoints make.
+    var CAN_MANAGE   = @(canManage ? "true" : "false");
+    var NO_PERM      = "You don't have permission to change inventory.";
     var ITEMS_URL    = '@Url.Action("Items", "Inventory", new { area = "Inventory" })';
     var ITEM_URL     = '@Url.Action("Item", "Inventory", new { area = "Inventory" })';
     var SAVE_URL     = '@Url.Action("SaveItem", "Inventory", new { area = "Inventory" })';
@@ -613,12 +620,14 @@
              + '<button type="button" class="btn btn-sm btn-icon btn-text-secondary rounded-pill" data-bs-toggle="dropdown" '
              + 'data-bs-popper-config="{&quot;strategy&quot;:&quot;fixed&quot;}" aria-expanded="false" title="Actions"><i class="bx bx-dots-vertical-rounded fs-5"></i></button>'
              + '<ul class="dropdown-menu dropdown-menu-end shadow-sm py-1" style="min-width:210px;font-size:.85rem">'
-             + item('data-move', 'bx-package', 'Stock in / out')
-             + (xfer ? item('data-xfer', 'bx-transfer-alt', 'Move to another store') : '')
+             + (CAN_MANAGE ? item('data-move', 'bx-package', 'Stock in / out') : '')
+             + (CAN_MANAGE && xfer ? item('data-xfer', 'bx-transfer-alt', 'Move to another store') : '')
              + item('data-hist', 'bx-history', 'Stock history')
-             + item('data-edit', 'bx-edit', 'Edit item')
-             + '<li><hr class="dropdown-divider my-1"></li>'
-             + item('data-del', 'bx-trash', 'Delete', ' text-danger')
+             + (CAN_MANAGE
+                 ? item('data-edit', 'bx-edit', 'Edit item')
+                   + '<li><hr class="dropdown-divider my-1"></li>'
+                   + item('data-del', 'bx-trash', 'Delete', ' text-danger')
+                 : '')
              + '</ul></div>';
     }
 
@@ -858,7 +867,7 @@
             bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
             load();
         })
-        .fail(function () { ecToast('error', 'Could not save the item.'); })
+        .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not save the item.'); })
         .always(function () { EC.buttonReset($btn); });
     });
 
@@ -944,7 +953,7 @@
             bootstrap.Modal.getInstance(document.getElementById('stockModal')).hide();
             load();
         })
-        .fail(function () { ecToast('error', 'Could not record the movement.'); })
+        .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not record the movement.'); })
         .always(function () { EC.buttonReset($btn); });
     });
 
@@ -992,7 +1001,7 @@
             bootstrap.Modal.getInstance(document.getElementById('transferModal')).hide();
             load();
         })
-        .fail(function () { ecToast('error', 'Could not transfer the stock.'); })
+        .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not transfer the stock.'); })
         .always(function () { EC.buttonReset($btn); });
     });
 
@@ -1071,7 +1080,7 @@
                     ecToast('success', res.message);
                     load();
                 })
-                .fail(function () { ecToast('error', 'Could not delete the item.'); })
+                .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not delete the item.'); })
                 .always(EC.hideLoader);
         });
     }

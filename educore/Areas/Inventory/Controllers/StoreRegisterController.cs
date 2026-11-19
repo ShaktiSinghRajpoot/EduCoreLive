@@ -30,6 +30,17 @@ namespace educore.Areas.Inventory.Controllers
             _classTeacher = classTeacher;
         }
 
+        // Sections of a class, for the Register and Class Sale filters. The Students
+        // endpoint they used needs a Students permission an Accountant or Clerk does not
+        // have (403, QA BUG-005); any school user who can open the register (store staff, class teachers) may read it:
+        // section names are not private.
+        [HttpGet]
+        public async Task<IActionResult> ClassSections(string? @class, string? year, [FromServices] IAdmissionService admissions)
+        {
+            if (string.IsNullOrWhiteSpace(@class)) return Json(Array.Empty<object>());
+            return Json(await admissions.GetClassSectionsAsync(@class, TenantId(), SchoolId(), UserId(), year));
+        }
+
         [Route("inventory/register")]
         public async Task<IActionResult> Index([FromServices] IBaseService baseService, [FromServices] ISchoolSettingsService settings)
         {

@@ -266,8 +266,8 @@ $(function () {
         var acts = '';
         if (h.canEdit) {
             acts = '<button class="btn btn-xs btn-primary hw-check" data-id="' + h.id + '"><i class="bx bx-check-square me-1"></i>Check (' + h.done + '/' + h.students + ' done)</button>'
-                 + '<button class="btn btn-xs btn-outline-secondary hw-edit" data-id="' + h.id + '"><i class="bx bx-edit-alt"></i></button>'
-                 + '<button class="btn btn-xs btn-outline-danger hw-del" data-id="' + h.id + '"><i class="bx bx-trash"></i></button>';
+                 + '<button class="btn btn-xs btn-outline-secondary hw-edit" type="button" aria-label="Edit homework" title="Edit homework" data-id="' + h.id + '"><i class="bx bx-edit-alt"></i></button>'
+                 + '<button class="btn btn-xs btn-outline-danger hw-del" type="button" aria-label="Delete homework" title="Delete homework" data-id="' + h.id + '"><i class="bx bx-trash"></i></button>';
         } else if (checked) {
             acts = '<span class="text-muted small">' + h.done + ' of ' + h.students + ' done</span>';
         }

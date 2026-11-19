@@ -148,10 +148,14 @@ namespace educore.Areas.School.Controllers
                 return Json(new { success = false, message = "These columns are missing: " + string.Join(", ", missing) + ". Use the template." });
 
             var ctx = await ContextAsync(kind);
+            // The school's students, so Check finds what Import would refuse (QA BUG-049).
+            var existing = new List<(string AdmissionNo, string Name, string? Dob, string Mobile, bool Active)>();
+            if (kind != "staff") existing = await _import.GetExistingStudentsAsync(TenantId(), SchoolId(), UserId());
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var checkedRows = rows.Select((r, i) =>
             {
                 var errors = Validate(kind, r, ctx, seen);
+                errors.AddRange(CheckAgainstSchool(kind, r, existing));
                 return new { line = i + 2, cells = r, errors };
             }).ToList();
 
@@ -259,9 +263,10 @@ namespace educore.Areas.School.Controllers
             if (kind == "students")
             {
                 if (ctx.Year == null) { e.Add("Set a current session first."); return e; }
-                var cls = V(r, "Class");
+                var raw = V(r, "Class");
+                var cls = ResolveClass(raw, ctx.Sections.Keys) ?? raw;
                 if (cls.Length > 0 && !ctx.Sections.ContainsKey(cls))
-                    e.Add($"\"{cls}\" is not a class in {ctx.Year.AcademicYearName}.");
+                    e.Add($"\"{raw}\" is not a class in {ctx.Year.AcademicYearName}.");
                 else if (cls.Length > 0)
                 {
                     var sec = V(r, "Section");
@@ -302,10 +307,59 @@ namespace educore.Areas.School.Controllers
             return e;
         }
 
+        // What the saves would refuse because of students already in the school (BUG-049):
+        // the same name + DOB + mobile, an admission number in use, or old dues for an
+        // admission number no active student has. Same rules as sp_admission_manage and
+        // sp_import_opening_due.
+        private static List<string> CheckAgainstSchool(string kind, Dictionary<string, string> r,
+            List<(string AdmissionNo, string Name, string? Dob, string Mobile, bool Active)> existing)
+        {
+            var e = new List<string>();
+            var adm = System.Text.RegularExpressions.Regex.Replace(V(r, "Admission No"), @"\s+", " ").ToUpperInvariant();
+            if (kind == "students")
+            {
+                var name = System.Text.RegularExpressions.Regex.Replace(V(r, "Student Name").ToLowerInvariant(), @"\s+", " ");
+                var dob = Date(V(r, "Date of Birth"));
+                var mobile = Mobile(V(r, "Mobile")) ?? "";
+                if (name.Length > 0 && existing.Any(x => x.Active && x.Name == name && x.Dob == dob && x.Mobile == mobile))
+                    e.Add("This student already exists (same name, date of birth and mobile).");
+                if (adm.Length > 0 && existing.Any(x => x.AdmissionNo == adm))
+                    e.Add($"Admission number {adm} is already in use in this school.");
+            }
+            else if (kind == "dues" && adm.Length > 0 && !existing.Any(x => x.Active && x.AdmissionNo == adm))
+                e.Add($"No active student with admission no {adm}.");
+            return e;
+        }
+
+        // UX-29: "1st", "I", "Class-1", "class 1", "Std 1" all mean "Class 1". Returns the
+        // school's own class name, or null when nothing matches. No .xlsx support: that
+        // would need a new package; the page still asks for CSV.
+        private static readonly string[] Roman = { "", "i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii" };
+
+        private static string ClassKey(string? s)
+        {
+            var k = (s ?? "").Trim().ToLowerInvariant();
+            k = System.Text.RegularExpressions.Regex.Replace(k, @"^(class|std\.?|standard|grade)\s*[-.]?\s*", "");
+            k = System.Text.RegularExpressions.Regex.Replace(k, @"^(\d+)\s*(st|nd|rd|th)$", "$1");
+            int roman = Array.IndexOf(Roman, k);
+            if (roman > 0) k = roman.ToString();
+            return k.Replace(" ", "");
+        }
+
+        private static string? ResolveClass(string raw, IEnumerable<string> classes)
+        {
+            var exact = classes.FirstOrDefault(c => c.Equals(raw.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (exact != null) return exact;
+            var key = ClassKey(raw);
+            if (key.Length == 0) return null;
+            var hits = classes.Where(c => ClassKey(c) == key).ToList();
+            return hits.Count == 1 ? hits[0] : null;
+        }
+
         // ── saves ────────────────────────────────────────────────────────────
         private async Task<(bool, string)> SaveStudentAsync(Dictionary<string, string> r, Context ctx)
         {
-            var cls = ctx.Sections.Keys.First(k => k.Equals(V(r, "Class"), StringComparison.OrdinalIgnoreCase));
+            var cls = ResolveClass(V(r, "Class"), ctx.Sections.Keys)!;
             var sec = ctx.Sections[cls].First(s => s.Equals(V(r, "Section"), StringComparison.OrdinalIgnoreCase));
             bool old = V(r, "Old Student").StartsWith("y", StringComparison.OrdinalIgnoreCase);
 

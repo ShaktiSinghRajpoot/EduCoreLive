@@ -127,10 +127,13 @@
             // Today's attendance sits on the Students / Staff cards (one card per thing);
             // clicking them opens the attendance pages.
             var st = Model.StaffToday;
+            string? dayOff = ViewBag.DayOff as string;   // holiday / weekly off: no register today
             string studentAtt = !Model.ShowAttendance ? ""
+                : Model.MarkedToday == 0 && dayOff != null ? $"Today: {dayOff}, no attendance"
                 : Model.MarkedToday == 0 ? "Today: attendance not marked yet"
                 : $"Today: {Model.PresentToday} present · {Model.MarkedToday - Model.PresentToday} absent · {Math.Max(Model.Students - Model.MarkedToday, 0)} not marked";
-            string staffAtt = st.Marked == 0 && st.OnLeave == 0 ? "Today: attendance not marked yet"
+            string staffAtt = st.Marked == 0 && st.OnLeave == 0 && dayOff != null ? $"Today: {dayOff}, no attendance"
+                : st.Marked == 0 && st.OnLeave == 0 ? "Today: attendance not marked yet"
                 : $"Today: {st.Present} present · {st.Absent + st.HalfDay} absent · {st.OnLeave} on leave · {Math.Max(st.Total - st.Marked, 0)} not marked";
             var kpis = new[] {
                 new { Label="Total Students", Value=Model.Students.ToString(),
@@ -191,6 +194,7 @@
                             <h5 class="mb-0 dash-card-title">@mc.Label</h5>
                             <small class="dash-sub">@mc.Students student@(mc.Students == 1 ? "" : "s") · @mc.SessionName ·
                                 @if (mc.MarkedToday) { <span class="text-success fw-semibold">today's attendance marked</span> }
+                                else if (dayOff != null) { <span class="text-muted fw-semibold">@dayOff, no attendance today</span> }
                                 else { <span class="text-danger fw-semibold">today's attendance not marked yet</span> }
                             </small>
                         </div>

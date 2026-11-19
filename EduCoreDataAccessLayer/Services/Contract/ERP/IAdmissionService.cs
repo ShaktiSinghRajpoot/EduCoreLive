@@ -27,8 +27,10 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         // Fat-model list page: one StudentListModel carries the filters/sort/page
         // in and is filled with Items + TotalCount + summary tile counts. Backs
         // Student/StudentList (server-side paging + whitelisted sorting).
+        // sectionKeys: 'class|section' keys (lower case) the list is limited to; null = all.
         Task<StudentListModel> GetStudentListPageAsync(
-            StudentListModel query, int tenantId, int schoolId, int actionUserId);
+            StudentListModel query, int tenantId, int schoolId, int actionUserId,
+            IEnumerable<string>? sectionKeys = null);
 
         Task<AdmissionModel?> GetStudentByIdAsync(int studentId, int tenantId, int schoolId, int actionUserId);
 

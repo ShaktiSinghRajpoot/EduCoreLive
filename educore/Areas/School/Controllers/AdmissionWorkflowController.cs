@@ -30,6 +30,7 @@ namespace educore.Areas.School.Controllers
         public async Task<IActionResult> WorkflowSettings()
         {
             var model = await _admissionWorkflowService.GetAdmissionWorkflowAsync(TenantId(), SchoolId(), UserId());
+            ViewBag.CanSwitchModules = await HasPermissionAttribute.UserIsAdminAsync(this);
 
             // Inline fee setup: surface the Registration / Security-deposit fee heads
             // right on this page so a school never has to open the Fee Head master and
@@ -60,8 +61,10 @@ namespace educore.Areas.School.Controllers
 
             // Switching a module on or off stays with the School Admin: anyone else keeps
             // the school's current switches, whatever the form sent.
+            bool modulesKept = false;
             if (!await HasPermissionAttribute.UserIsAdminAsync(this))
             {
+                modulesKept = true;
                 var current = await _admissionWorkflowService.GetAdmissionWorkflowAsync(tenantId, schoolId, actionUserId);
                 model.EnableTransport  = current.EnableTransport;
                 model.EnableExams      = current.EnableExams;
@@ -86,9 +89,13 @@ namespace educore.Areas.School.Controllers
             }
 
             TempData["Result"] = result > 0 ? "1" : "0";
-            TempData["Message"] = result > 0
-                ? "Admission workflow settings saved successfully."
-                : "Unable to save admission workflow settings.";
+            // Say what was saved: the page holds module switches as well as the
+            // admission workflow, and non-admins cannot change the switches (BUG-025/047).
+            TempData["Message"] = result <= 0
+                ? "Unable to save the settings."
+                : modulesKept
+                    ? "Settings saved. Module switches were not changed: only a School Admin can switch modules on or off."
+                    : "Settings saved.";
 
             return RedirectToAction(nameof(WorkflowSettings));
         }

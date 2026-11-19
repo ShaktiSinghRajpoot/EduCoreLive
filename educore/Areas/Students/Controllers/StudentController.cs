@@ -81,12 +81,18 @@ namespace educore.Areas.Students.Controllers
             ViewBag.CanManage = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
             if (!canViewFees) query.FilterFee = null;
 
-            await _admissionService.GetStudentListPageAsync(query, TenantId(), SchoolId(), UserId());
+            // A teacher sees only the students of the classes they teach (owner decision
+            // #13, QA UX-14). The admin, students.manage (principal, office) and staff who
+            // teach nothing (front desk, accounts) see the whole school, as before.
+            var allowed = await HasPermissionAttribute.UserIsAdminAsync(this)
+                ? null : await ContactAccess.AllowedSectionsAsync(this);
+            ViewBag.OwnClassesOnly = allowed != null;
+
+            await _admissionService.GetStudentListPageAsync(query, TenantId(), SchoolId(), UserId(), allowed);
             if (!canViewFees)
                 foreach (var s in query.Items) { s.FeeStatus = ""; s.FeeDue = 0; s.AnnualTotal = 0; }
 
             // a teacher sees parents' numbers only for the classes they teach
-            var allowed = await ContactAccess.AllowedSectionsAsync(this);
             foreach (var s in query.Items)
                 if (!ContactAccess.CanSee(allowed, s.ClassName, s.Section)) s.Mobile = ContactAccess.Mask(s.Mobile);
             return View(query);

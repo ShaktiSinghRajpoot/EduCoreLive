@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Store Locations";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    bool canManage = ViewBag.CanManage == true;
 }
 
 @section PageStyles {
@@ -26,9 +27,12 @@
           <a class="btn btn-outline-secondary d-flex align-items-center gap-1" asp-area="Inventory" asp-controller="Inventory" asp-action="InventoryItem">
             <i class="bx bx-box"></i><span>Store</span>
           </a>
+          @if (canManage)
+          {
           <button class="btn btn-primary d-flex align-items-center gap-1" id="addLocationBtn">
             <i class="bx bx-plus"></i><span>Add Location</span>
           </button>
+          }
         </div>
       </div>
     </div>
@@ -122,6 +126,9 @@
 (function () {
     'use strict';
 
+    // inventory.manage, the same check the write endpoints make (BUG-023).
+    var CAN_MANAGE    = @(canManage ? "true" : "false");
+    var NO_PERM       = "You don't have permission to change inventory.";
     var LOCS_URL      = '@Url.Action("Locations", "Inventory", new { area = "Inventory" })';
     var SAVE_URL      = '@Url.Action("SaveLocation", "Inventory", new { area = "Inventory" })';
     var ACTIVE_URL    = '@Url.Action("SetLocationActive", "Inventory", new { area = "Inventory" })';
@@ -161,8 +168,8 @@
                         '<td class="text-end">' + EC.num(l.qty) + '</td>' +
                         '<td class="text-end">' + EC.money(l.value) + '</td>' +
                         '<td class="text-end text-nowrap">' +
-                            '<button class="btn btn-sm btn-icon btn-text-secondary" data-rename="' + l.id + '" title="Rename"><i class="bx bx-edit"></i></button>' +
-                            (l.isDefault ? '' : (l.active
+                            (!CAN_MANAGE ? '' : '<button class="btn btn-sm btn-icon btn-text-secondary" data-rename="' + l.id + '" title="Rename"><i class="bx bx-edit"></i></button>') +
+                            (l.isDefault || !CAN_MANAGE ? '' : (l.active
                                 ? '<button class="btn btn-sm btn-text-danger" data-off="' + l.id + '">Deactivate</button>'
                                 : '<button class="btn btn-sm btn-text-success" data-on="' + l.id + '">Activate</button>')) +
                         '</td></tr>';
@@ -212,7 +219,7 @@
                 loadLocations();
                 loadTransfers();
             })
-            .fail(function () { ecToast('error', 'Could not save the location.'); })
+            .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not save the location.'); })
             .always(function () { EC.buttonReset($btn); });
     });
 
@@ -236,7 +243,7 @@
                     ecToast('success', res.message);
                     loadLocations();
                 })
-                .fail(function () { ecToast('error', 'Could not change the location.'); })
+                .fail(function (xhr) { ecToast('error', xhr.status === 403 ? NO_PERM : 'Could not change the location.'); })
                 .always(EC.hideLoader);
         });
     }

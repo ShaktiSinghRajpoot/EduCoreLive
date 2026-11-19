@@ -101,8 +101,10 @@ namespace educore.Areas.Attendance.Controllers
                 DateTime.ParseExact(d, Dates.Iso, System.Globalization.CultureInfo.InvariantCulture),
                 TenantId(), SchoolId(), UserId());
 
-            // parents' numbers only for a class the user teaches (office staff: all)
-            bool phoneOk = ContactAccess.CanSee(await ContactAccess.AllowedSectionsAsync(this), @class, section);
+            // Parents' numbers are always masked in the roster (owner decision #14, QA UX-13):
+            // the page loads every child's number at once. The full number of one absent
+            // child is fetched only when "WhatsApp" is tapped (ParentPhone below), and the
+            // automatic alerts read it on the server.
 
             return Json(new
             {
@@ -117,12 +119,33 @@ namespace educore.Areas.Attendance.Controllers
                     name   = s.StudentName,
                     roll   = s.RollNo,
                     parent = s.GuardianName,
-                    phone  = phoneOk ? s.Mobile : ContactAccess.Mask(s.Mobile),
+                    phone  = ContactAccess.Mask(s.Mobile),
                     // "" = not marked yet; otherwise present | absent | late | leave as stored.
                     status = string.IsNullOrWhiteSpace(s.Status) ? "" : s.Status.ToLowerInvariant(),
                     marked = s.IsMarked
                 })
             });
+        }
+
+        // The full parent number of ONE child marked absent on this register, for the
+        // "WhatsApp" button (it opens wa.me on the teacher's phone). Only for someone who
+        // can mark this register, and only for a child saved as absent on that date.
+        [HttpGet]
+        [HasPermission("attendance.manage")]
+        public async Task<IActionResult> ParentPhone(string @class, string? section, string? date, int studentId)
+        {
+            var d = Dates.Norm(date);
+            if (d == null || string.IsNullOrWhiteSpace(@class) || !await CanMarkAsync(@class, section, d))
+                return Json(new { success = false, message = "You can message only parents of a class whose attendance you can mark." });
+
+            var roster = await _attendance.GetRosterAsync(@class, section, d, TenantId(), SchoolId(), UserId());
+            var s = roster.FirstOrDefault(x => x.StudentId == studentId);
+            if (s == null || !s.IsMarked || !string.Equals(s.Status, "absent", StringComparison.OrdinalIgnoreCase))
+                return Json(new { success = false, message = "Save the attendance with this child marked absent first." });
+            if (string.IsNullOrWhiteSpace(s.Mobile))
+                return Json(new { success = false, message = "No mobile number on record for " + s.StudentName + "." });
+
+            return Json(new { success = true, phone = s.Mobile });
         }
 
         // Absent alert on WhatsApp to the parents of every child marked absent in this class

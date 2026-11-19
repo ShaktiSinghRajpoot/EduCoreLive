@@ -164,7 +164,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
 
         // ── Fat-model list page (server-side paging + sorting) ────
         public async Task<StudentListModel> GetStudentListPageAsync(
-            StudentListModel query, int tenantId, int schoolId, int actionUserId)
+            StudentListModel query, int tenantId, int schoolId, int actionUserId,
+            IEnumerable<string>? sectionKeys = null)
         {
             query.Items = new List<StudentListModel>();
             if (tenantId <= 1 || schoolId <= 0) { query.TotalCount = 0; return query; }
@@ -185,7 +186,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_sort_column",    NpgsqlDbType.Text)    { Value = (object?)query.SortColumn   ?? DBNull.Value },
                 new("p_sort_dir",       NpgsqlDbType.Text)    { Value = query.SortDirection },
                 new("p_result", NpgsqlDbType.Refcursor)
-                    { Direction = ParameterDirection.InputOutput, Value = "student_list_cursor" }
+                    { Direction = ParameterDirection.InputOutput, Value = "student_list_cursor" },
+                new("p_section_keys", NpgsqlDbType.Array | NpgsqlDbType.Text)
+                    { Value = sectionKeys == null ? DBNull.Value : sectionKeys.ToArray() }
             };
 
             var ds = await _db.ExecuteProcedureWithCursorsAsync(SpStudentList, parameters);

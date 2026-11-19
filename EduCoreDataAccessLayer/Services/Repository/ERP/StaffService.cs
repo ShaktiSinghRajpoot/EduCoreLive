@@ -155,7 +155,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 IfscCode        = NullStr(row, "ifsc_code"),
                 Pan             = NullStr(row, "pan"),
                 Aadhaar         = NullStr(row, "aadhaar"),
-                UserId          = NullIntVal(row, "user_id")
+                UserId          = NullIntVal(row, "user_id"),
+                LoginMoved      = row.Table.Columns.Contains("login_moved") && row["login_moved"] is bool moved && moved
             };
 
             // Pre-fill the person's current roles so the edit form can check them.

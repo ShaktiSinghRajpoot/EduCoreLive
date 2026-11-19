@@ -83,8 +83,12 @@ namespace educore.Controllers
             if (t == 1)
                 return RedirectToAction("SchoolList", "Schools", new { area = "SuperAdmin" });
 
-            var model = await _dashboardService.GetSummaryAsync(t, s, u);
-            model.Upcoming = await UpcomingAsync(calendar, t, s, u);
+            // The summary and the calendar are independent reads on their own connections:
+            // started together instead of one after the other (QA BUG-008).
+            var summaryTask  = _dashboardService.GetSummaryAsync(t, s, u);
+            var upcomingTask = UpcomingAsync(calendar, t, s, u);
+            var model = await summaryTask;
+            model.Upcoming = await upcomingTask;
 
             // A module that is off (or was not given) leaves nothing of itself here.
             var mods = await _modules.GetAsync();
@@ -142,6 +146,20 @@ namespace educore.Controllers
                     model.StaffAttendanceDefaulters.Clear(); model.StaffAttendanceDefaulterCount = 0;
                 }
             }
+
+            // On a holiday or weekly off no register is taken, so nothing on the page may
+            // say "attendance not marked yet" (QA BUG-006). Same day check as the roster.
+            string? dayOff = null;
+            try
+            {
+                var day = await calendar.GetDayStatusAsync(Dates.Now.Date, t, s, u);
+                if (day.DayType == "holiday" || day.DayType == "weekly_off")
+                    dayOff = string.IsNullOrWhiteSpace(day.Title)
+                        ? (day.DayType == "holiday" ? "School holiday" : "Weekly off")
+                        : day.Title;
+            }
+            catch { dayOff = null; }
+            ViewBag.DayOff = dayOff;
 
             // A class teacher sees their class and whether today's register is taken.
             try { model.MyClasses = await classTeacher.GetClassesOfAsync(t, s, u); } catch { model.MyClasses = new(); }

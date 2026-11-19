@@ -26,6 +26,22 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             _logger = logger;
         }
 
+        // Reads for a page. A proc RAISE here (an exam of another school, a deleted exam)
+        // means "nothing to show", so it is logged and the page gets an empty result
+        // instead of an HTTP 500 (QA BUG-042).
+        private async Task<DataSet> ReadAsync(string proc, NpgsqlParameter[] p)
+        {
+            try
+            {
+                return await _db.ExecuteProcedureWithCursorsAsync(proc, p);
+            }
+            catch (PostgresException ex)
+            {
+                _logger.LogWarning(ex, "Exam read {Proc} refused. SqlState {SqlState}", proc, ex.SqlState);
+                return new DataSet();
+            }
+        }
+
         public async Task<ExamListData> GetExamsAsync(
             int tenantId, int schoolId, int actionUserId, int academicYearId = 0)
         {
@@ -70,7 +86,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var p = Params("GetExam", tenantId, schoolId, actionUserId);
             p[6].Value = examId;                       // p_exam_id
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
+            var ds = await ReadAsync(Sp, p);
             if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
 
             var head = ds.Tables[0].Rows[0];
@@ -243,7 +259,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             p[5].Value = academicClassId > 0 ? academicClassId : (object)DBNull.Value;
             p[6].Value = examId > 0 ? examId : (object)DBNull.Value;
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
+            var ds = await ReadAsync(Sp, p);
 
             if (ds.Tables.Count > 0)
                 foreach (DataRow row in ds.Tables[0].Rows)
@@ -309,7 +325,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var p = WithYear(Params("GetClassSections", tenantId, schoolId, actionUserId), academicYearId);
             p[5].Value = academicClassId;              // p_academic_class_id
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(Sp, p);
+            var ds = await ReadAsync(Sp, p);
             if (ds.Tables.Count == 0) return list;
 
             foreach (DataRow row in ds.Tables[0].Rows)
@@ -368,7 +384,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var p = MarkParams("GetExamClasses", tenantId, schoolId, actionUserId);
             p[4].Value = examId;                       // p_exam_id
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpMarks, p);
+            var ds = await ReadAsync(SpMarks, p);
             if (ds.Tables.Count == 0) return list;
 
             foreach (DataRow row in ds.Tables[0].Rows)
@@ -392,7 +408,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             p[4].Value = examId;                       // p_exam_id
             p[5].Value = academicClassId;              // p_academic_class_id
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpMarks, p);
+            var ds = await ReadAsync(SpMarks, p);
 
             if (ds.Tables.Count > 0)
                 foreach (DataRow row in ds.Tables[0].Rows)
@@ -431,7 +447,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             p[6].Value = subjectId;                                // p_subject_id
             p[7].Value = section ?? string.Empty;                  // p_section
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpMarks, p);
+            var ds = await ReadAsync(SpMarks, p);
             var sheet = new ExamSheet();
 
             if (ds.Tables.Count > 0)
@@ -596,7 +612,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             var p = MarkParams("GetMarkScope", tenantId, schoolId, actionUserId);
             p[4].Value = examId;                       // p_exam_id
 
-            var ds = await _db.ExecuteProcedureWithCursorsAsync(SpMarks, p);
+            var ds = await ReadAsync(SpMarks, p);
             if (ds.Tables.Count == 0) return list;
 
             foreach (DataRow row in ds.Tables[0].Rows)
