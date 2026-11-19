@@ -475,6 +475,9 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 sheet.IsFinalized = BoolVal(meta, "is_finalized");
                 sheet.FinalizedAt = NullDateStr(meta, "finalized_at");
                 sheet.ResultsPublished = BoolVal(meta, "results_published");
+                sheet.FinalizedBy = StrOrNull(meta, "finalized_by_name");
+                sheet.EnteredBy   = StrOrNull(meta, "entered_by");
+                sheet.LastEntryAt = NullDateStr(meta, "last_entry_at");
             }
 
             return sheet;
@@ -620,7 +623,10 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 {
                     AcademicClassId = IntVal(row, "academic_class_id"),
                     Section         = Str(row, "section"),
-                    SubjectId       = IntVal(row, "subject_id")
+                    SubjectId       = IntVal(row, "subject_id"),
+                    // Missing column (proc not yet updated) = editable, the old behaviour.
+                    CanEdit         = !Has(row, "can_edit") || BoolVal(row, "can_edit"),
+                    TaughtBy        = StrOrNull(row, "taught_by")
                 });
 
             return list;
@@ -723,6 +729,7 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
         private static int     IntVal(DataRow r, string col)  => Has(r, col) && r[col] != DBNull.Value ? Convert.ToInt32(r[col]) : 0;
         private static bool    BoolVal(DataRow r, string col) => Has(r, col) && r[col] != DBNull.Value && Convert.ToBoolean(r[col]);
         private static string  Str(DataRow r, string col)     => Has(r, col) && r[col] != DBNull.Value ? r[col].ToString()! : string.Empty;
+        private static string? StrOrNull(DataRow r, string col) => Str(r, col) == string.Empty ? null : Str(r, col);
 
         private static decimal DecVal(DataRow r, string col, decimal fallback)
             => Has(r, col) && r[col] != DBNull.Value ? Convert.ToDecimal(r[col]) : fallback;

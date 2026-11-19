@@ -197,6 +197,10 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int    AcademicClassId { get; set; }
         public string Section         { get; set; } = string.Empty;
         public int    SubjectId       { get; set; }
+        /// <summary>False = view only: another teacher teaches this subject in this section.</summary>
+        public bool   CanEdit         { get; set; } = true;
+        /// <summary>The subject teacher(s) from the timetable, for the view-only message.</summary>
+        public string? TaughtBy       { get; set; }
     }
 
     /// <summary>A section of the class that actually has students enrolled.</summary>
@@ -238,6 +242,11 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? FinalizedAt { get; set; }                   // yyyy-MM-dd
         /// <summary>The exam's results are published: every sheet is locked.</summary>
         public bool    ResultsPublished { get; set; }
+        /// <summary>Who finalized the sheet (null while it is a draft).</summary>
+        public string? FinalizedBy { get; set; }
+        /// <summary>Everyone whose marks are on the sheet now, comma-separated.</summary>
+        public string? EnteredBy   { get; set; }
+        public string? LastEntryAt { get; set; }                   // yyyy-MM-dd
         public List<ExamMarkRow> Students { get; set; } = new();
     }
 

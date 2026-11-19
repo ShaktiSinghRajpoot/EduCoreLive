@@ -79,10 +79,29 @@ namespace educore.Areas.Exams.Controllers
         private static bool SameSection(string? a, string? b) =>
             string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
 
+        // The scope row of one sheet, or null when the sheet is not the teacher's.
+        private static ExamMarkScope? ScopeRow(List<ExamMarkScope> scope, int classId, string? section, int subjectId) =>
+            scope.FirstOrDefault(x => x.AcademicClassId == classId
+                                   && x.SubjectId == subjectId
+                                   && SameSection(x.Section, section));
+
+        // May open (view) the sheet.
         private static bool InScope(List<ExamMarkScope>? scope, int classId, string? section, int subjectId) =>
-            scope == null || scope.Any(x => x.AcademicClassId == classId
-                                         && x.SubjectId == subjectId
-                                         && SameSection(x.Section, section));
+            scope == null || ScopeRow(scope, classId, section, subjectId) != null;
+
+        // May save / finalize the sheet: the subject teacher, or the class teacher
+        // when nobody teaches that subject in the section (2026-11-19).
+        private static bool CanEditSheet(List<ExamMarkScope>? scope, int classId, string? section, int subjectId) =>
+            scope == null || ScopeRow(scope, classId, section, subjectId)?.CanEdit == true;
+
+        // "Only Rekha Tiwari enters ..." - the message for a view-only sheet.
+        private static string ViewOnlyMessage(List<ExamMarkScope>? scope, int classId, string? section, int subjectId)
+        {
+            var taughtBy = scope == null ? null : ScopeRow(scope, classId, section, subjectId)?.TaughtBy;
+            return string.IsNullOrEmpty(taughtBy)
+                ? "You can view these marks, but only the subject teacher can enter them."
+                : "You can view these marks. " + taughtBy + " teaches this subject here, so only they can enter them.";
+        }
 
         // ── Exam Schedule ──
         // An exam is school-wide; each class it covers gets its own datesheet.
@@ -380,7 +399,7 @@ namespace educore.Areas.Exams.Controllers
 
             return Json(new
             {
-                scope = mine?.Select(x => new { section = x.Section.Trim(), subjectId = x.SubjectId }),
+                scope = mine?.Select(x => new { section = x.Section.Trim(), subjectId = x.SubjectId, canEdit = x.CanEdit }),
                 subjects = setup.Subjects.Select(s => new
                 {
                     id        = s.SubjectId,
@@ -397,7 +416,8 @@ namespace educore.Areas.Exams.Controllers
         [HttpGet]
         public async Task<IActionResult> Sheet(int examId, int classId, int subjectId, string? section)
         {
-            if (!InScope(await MarkScopeAsync(examId), classId, section, subjectId))
+            var scope = await MarkScopeAsync(examId);
+            if (!InScope(scope, classId, section, subjectId))
                 return Json(new { success = false, message = "You can enter marks only for the classes and subjects you teach." });
 
             var sheet = await _exam.GetSheetAsync(
@@ -415,6 +435,12 @@ namespace educore.Areas.Exams.Controllers
                 finalizedAt = sheet.FinalizedAt,
                 // Published results lock every sheet of the exam.
                 resultsPublished = sheet.ResultsPublished,
+                // A class teacher viewing a subject another teacher teaches.
+                canEdit     = CanEditSheet(scope, classId, section, subjectId),
+                viewOnlyMessage = ViewOnlyMessage(scope, classId, section, subjectId),
+                finalizedBy = sheet.FinalizedBy,
+                enteredBy   = sheet.EnteredBy,
+                lastEntryAt = sheet.LastEntryAt,
                 students    = sheet.Students.Select(s => new
                 {
                     id      = s.StudentId,
@@ -443,8 +469,11 @@ namespace educore.Areas.Exams.Controllers
                 return Json(new { success = false, message = "Marks must be a number between 0 and the subject's maximum marks." });
 
             // Only the sheets this teacher teaches (unless exams.manage / admin).
-            if (!InScope(await MarkScopeAsync(request.ExamId), request.AcademicClassId, request.Section, request.SubjectId))
+            var scope = await MarkScopeAsync(request.ExamId);
+            if (!InScope(scope, request.AcademicClassId, request.Section, request.SubjectId))
                 return Json(new { success = false, message = "You can enter marks only for the classes and subjects you teach." });
+            if (!CanEditSheet(scope, request.AcademicClassId, request.Section, request.SubjectId))
+                return Json(new { success = false, message = ViewOnlyMessage(scope, request.AcademicClassId, request.Section, request.SubjectId) });
 
             var result = await _exam.SaveMarksAsync(request, TenantId(), SchoolId(), UserId());
             return Json(new

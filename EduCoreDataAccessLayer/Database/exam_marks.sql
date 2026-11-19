@@ -7,6 +7,11 @@
 --   academic.sp_school_admin_exam_marks_manage
 --         GetExamClasses | GetClassSetup | GetSheet | SaveMarks | ReopenSheet | GetMarkScope
 --
+-- WHO ENTERS WHICH SHEET (2026-11-19): the subject teacher (timetable) enters a
+-- subject's marks; the class teacher sees every subject of their section but a
+-- subject someone else teaches there is view-only (GetMarkScope.can_edit).
+-- GetSheet returns who entered and who finalized the marks.
+--
 -- A SHEET is one (exam, class, section, subject) — what a teacher fills in one
 -- sitting. The exam is school-wide (see exam_schedule.sql), so the selector
 -- cascade is Exam -> Class -> Section -> Subject. The class is part of the sheet
@@ -303,7 +308,22 @@ BEGIN
              WHERE s.subject_id = p_subject_id) AS subject_name,
             COALESCE(sh.is_finalized, FALSE) AS is_finalized,
             sh.finalized_at,
-            (v_results = 'Published') AS results_published
+            (v_results = 'Published') AS results_published,
+            -- Who did the work (2026-11-19), so a class teacher and a subject
+            -- teacher can see whose marks these are.
+            CASE WHEN sh.is_finalized THEN core.fn_user_display_name(sh.finalized_by) END AS finalized_by_name,
+            (SELECT string_agg(DISTINCT core.fn_user_display_name(COALESCE(m.updated_by, m.created_by)), ', ')
+               FROM academic.exam_marks m
+              WHERE m.exam_id           = p_exam_id
+                AND m.academic_class_id = p_academic_class_id
+                AND m.subject_id        = p_subject_id
+                AND m.section           = v_section) AS entered_by,
+            (SELECT MAX(COALESCE(m.updated_at, m.created_at))::date
+               FROM academic.exam_marks m
+              WHERE m.exam_id           = p_exam_id
+                AND m.academic_class_id = p_academic_class_id
+                AND m.subject_id        = p_subject_id
+                AND m.section           = v_section) AS last_entry_at
         FROM (SELECT 1) x
         LEFT JOIN academic.exam_mark_sheets sh
                ON sh.exam_id           = p_exam_id
@@ -493,33 +513,69 @@ BEGIN
         -- admins and exams.manage (the proc cannot see roles).
         -- Sections are per session, so joining on the exam's class id keeps
         -- this to the exam's own academic year.
+        --
+        -- can_edit (2026-11-19): the SUBJECT teacher enters a subject's marks.
+        -- A class teacher still sees every subject of their section, but a
+        -- subject another teacher teaches there is view-only for them. A subject
+        -- nobody teaches in the timetable stays editable for the class teacher,
+        -- so no sheet is left without someone who can fill it.
+        -- taught_by names the subject teacher(s) for the view-only message.
         OPEN p_result FOR
-        SELECT DISTINCT es.academic_class_id,
-               sec.section_name AS section,
-               es.subject_id
-        FROM academic.exam_subjects es
-        JOIN academic.academic_class_sections sec
-             ON sec.academic_class_id = es.academic_class_id
-            AND sec.tenant_id = p_tenant_id
-            AND sec.school_id = p_school_id
-            AND COALESCE(sec.is_deleted, FALSE) = FALSE
-        JOIN core.staff st
-             ON st.tenant_id = p_tenant_id
-            AND st.school_id = p_school_id
-            AND st.user_id   = p_action_user_id
-            -- A teacher who has left must not keep entering marks.
-            AND COALESCE(st.is_active, TRUE)   = TRUE
-            AND COALESCE(st.is_deleted, FALSE) = FALSE
-        WHERE es.exam_id   = p_exam_id
-          AND es.tenant_id = p_tenant_id
-          AND es.school_id = p_school_id
-          AND (sec.class_teacher_staff_id = st.staff_id
-               OR EXISTS (SELECT 1 FROM academic.timetable t
-                          WHERE t.academic_class_section_id = sec.academic_class_section_id
-                            AND t.subject_id = es.subject_id
-                            AND t.staff_id   = st.staff_id
-                            AND t.tenant_id  = p_tenant_id
-                            AND t.school_id  = p_school_id));
+        WITH me AS (
+            SELECT st.staff_id
+            FROM core.staff st
+            WHERE st.tenant_id = p_tenant_id
+              AND st.school_id = p_school_id
+              AND st.user_id   = p_action_user_id
+              -- A teacher who has left must not keep entering marks.
+              AND COALESCE(st.is_active, TRUE)   = TRUE
+              AND COALESCE(st.is_deleted, FALSE) = FALSE
+        ),
+        sheets AS (
+            SELECT DISTINCT es.academic_class_id, es.subject_id,
+                   sec.academic_class_section_id, sec.section_name, sec.class_teacher_staff_id
+            FROM academic.exam_subjects es
+            JOIN academic.academic_class_sections sec
+                 ON sec.academic_class_id = es.academic_class_id
+                AND sec.tenant_id = p_tenant_id
+                AND sec.school_id = p_school_id
+                AND COALESCE(sec.is_deleted, FALSE) = FALSE
+            WHERE es.exam_id   = p_exam_id
+              AND es.tenant_id = p_tenant_id
+              AND es.school_id = p_school_id
+        ),
+        -- Who teaches each subject in each of those sections (active staff only).
+        taught AS (
+            SELECT DISTINCT t.academic_class_section_id, t.subject_id, t.staff_id, ts.full_name
+            FROM academic.timetable t
+            JOIN core.staff ts
+                 ON ts.staff_id = t.staff_id
+                AND COALESCE(ts.is_active, TRUE)   = TRUE
+                AND COALESCE(ts.is_deleted, FALSE) = FALSE
+            WHERE t.tenant_id = p_tenant_id
+              AND t.school_id = p_school_id
+              AND t.academic_class_section_id IN (SELECT academic_class_section_id FROM sheets)
+        )
+        SELECT s.academic_class_id,
+               s.section_name AS section,
+               s.subject_id,
+               (EXISTS (SELECT 1 FROM taught x
+                        WHERE x.academic_class_section_id = s.academic_class_section_id
+                          AND x.subject_id = s.subject_id
+                          AND x.staff_id IN (SELECT staff_id FROM me))
+                OR NOT EXISTS (SELECT 1 FROM taught x
+                               WHERE x.academic_class_section_id = s.academic_class_section_id
+                                 AND x.subject_id = s.subject_id)) AS can_edit,
+               (SELECT string_agg(DISTINCT x.full_name, ', ')
+                  FROM taught x
+                 WHERE x.academic_class_section_id = s.academic_class_section_id
+                   AND x.subject_id = s.subject_id) AS taught_by
+        FROM sheets s
+        WHERE s.class_teacher_staff_id IN (SELECT staff_id FROM me)
+           OR EXISTS (SELECT 1 FROM taught x
+                      WHERE x.academic_class_section_id = s.academic_class_section_id
+                        AND x.subject_id = s.subject_id
+                        AND x.staff_id IN (SELECT staff_id FROM me));
 
         OPEN p_result2 FOR SELECT 1 WHERE FALSE;
 

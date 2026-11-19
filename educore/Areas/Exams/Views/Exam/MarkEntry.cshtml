@@ -100,6 +100,7 @@
             <div>
                 <div class="me-ctx-line" id="ctxLine">—</div>
                 <div class="me-ctx-scale" id="ctxScale">—</div>
+                <div class="me-ctx-scale" id="ctxWho" style="display:none;"></div>
             </div>
             <div class="me-grid-actions">
                 <span class="me-lock-chip" id="lockChip" style="display:none;">
@@ -108,6 +109,9 @@
                 <span class="me-lock-chip" id="futureChip" style="display:none;"
                       title="Marks can be entered from the day of the paper">
                     <i class="bx bx-time-five"></i> Paper not written yet
+                </span>
+                <span class="me-lock-chip" id="viewChip" style="display:none;">
+                    <i class="bx bx-show"></i> View only
                 </span>
                 <span class="me-lock-chip" id="pubChip" style="display:none;"
                       title="Unpublish the results on the Result Sheet page to change marks">
@@ -227,7 +231,10 @@ var state = {
     examDate: '', startTime: '', endTime: '',
     rows: [],          // { studentId, roll, name, marks, absent, hadMark }
     finalized: false,
-    resultsPublished: false   // published results lock every sheet of the exam
+    resultsPublished: false,  // published results lock every sheet of the exam
+    canEdit: true,            // false = a class teacher viewing another teacher's subject
+    viewOnlyMessage: '',
+    enteredBy: '', lastEntryAt: '', finalizedBy: '', finalizedAt: ''
 };
 
 var selExam    = document.getElementById('selExam');
@@ -254,6 +261,8 @@ function closeSheet() {
     state.resultsPublished = false;
     $('#pubChip').hide();
     $('#futureChip').hide();
+    $('#viewChip').hide();
+    $('#ctxWho').hide().text('');
     document.getElementById('markTableBody').innerHTML = '';
     document.getElementById('mobList').innerHTML       = '';
     document.getElementById('meEmpty').style.display   = 'flex';
@@ -335,9 +344,19 @@ function fillSubjects() {
     });
     selSubject.innerHTML = '<option value="">Select Subject</option>';
     $.each(list, function (i, s) {
-        selSubject.innerHTML += '<option value="' + s.id + '">' + EC.esc(s.name) + '</option>';
+        var label = s.name + (isViewOnly(s.id, sec) ? ' (view only)' : '');
+        selSubject.innerHTML += '<option value="' + s.id + '">' + EC.esc(label) + '</option>';
     });
     selSubject.disabled = list.length === 0;
+}
+
+// A class teacher sees every subject of their section, but a subject another
+// teacher teaches there is view-only for them (the server decides; see ExamController).
+function isViewOnly(subjectId, sec) {
+    if (!setupScope) return false;
+    return setupScope.some(function (x) {
+        return x.subjectId === subjectId && String(x.section || '').toLowerCase() === sec && x.canEdit === false;
+    });
 }
 
 function loadSetup(examId, classId) {
@@ -408,6 +427,12 @@ $(loadBtn).on('click', function () {
             state.endTime     = d.endTime || '';
             state.finalized   = !!d.isFinalized;
             state.resultsPublished = !!d.resultsPublished;
+            state.canEdit         = d.canEdit !== false;
+            state.viewOnlyMessage = d.viewOnlyMessage || '';
+            state.enteredBy   = d.enteredBy || '';
+            state.lastEntryAt = d.lastEntryAt || '';
+            state.finalizedBy = d.finalizedBy || '';
+            state.finalizedAt = d.finalizedAt || '';
 
             state.rows = $.map(d.students || [], function (s) {
                 return {
@@ -429,6 +454,8 @@ $(loadBtn).on('click', function () {
 
             renderGrid();
             document.getElementById('meBar').style.display = 'block';
+            if (!state.canEdit && !state.finalized && !state.resultsPublished)
+                ecToast('info', state.viewOnlyMessage);
         })
         .fail(function () { ecToast('error', 'Could not open the sheet. Please retry.'); })
         .always(function () { EC.buttonReset($btn); });
@@ -453,6 +480,13 @@ function renderContext() {
 
     $('#thMax').text('/ ' + fmtMarks(state.maxMarks));
 
+    // Who entered and who finalized the marks on this sheet.
+    var who = [];
+    if (state.enteredBy) who.push('Entered by ' + state.enteredBy + (state.lastEntryAt ? ' (last change ' + state.lastEntryAt + ')' : ''));
+    if (state.finalizedBy) who.push('Finalized by ' + state.finalizedBy + (state.finalizedAt ? ' on ' + state.finalizedAt : ''));
+    $('#ctxWho').text(who.join(' · ')).toggle(who.length > 0);
+
+    $('#viewChip').toggle(!state.canEdit).attr('title', state.viewOnlyMessage);
     $('#lockChip').toggle(state.finalized);
     $('#pubChip').toggle(state.resultsPublished);
     $('#futureChip').toggle(paperAhead());
@@ -470,8 +504,9 @@ function entered() {
 }
 
 // Marks and the absent toggle are locked once finalized, once the exam's
-// results are published, and for anyone without exams.marks / exams.manage.
-function locked() { return state.finalized || state.resultsPublished || paperAhead() || !CAN_ENTER_MARKS; }
+// results are published, for anyone without exams.marks / exams.manage, and for a
+// class teacher viewing a subject another teacher teaches.
+function locked() { return state.finalized || state.resultsPublished || paperAhead() || !CAN_ENTER_MARKS || !state.canEdit; }
 
 // The paper's date is still to come: no marks yet (the server refuses them too).
 // Dates are yyyy-MM-dd text, so they compare as strings.

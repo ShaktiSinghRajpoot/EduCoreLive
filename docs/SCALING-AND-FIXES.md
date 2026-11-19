@@ -5978,3 +5978,9 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - `core.sp_parent_children(mobile)` is the only source of a parent's children (Mobile / Alternate mobile match, school has Parent App and can sign in, not blocked, current or left within 12 months). Read on every parent request: an id not in it is 404, an empty list signs the parent out.
 - Staff side: Student profile > Parent Access card (`sp_parent_access_manage`, `core.parent_access_blocks`), Students > Parent Logins report (`sp_parent_login_report`), audit `core.parent_access_log` (LOGIN, RECEIPT_VIEW, REPORT_CARD_VIEW).
 - Details: `educore/docs/PARENT-MODULE.md`. SQL: `EduCoreDataAccessLayer/Database/parent_module.sql`.
+
+### 2026-11-19 — Marks Entry: who enters which sheet
+- `GetMarkScope` (in `academic.sp_school_admin_exam_marks_manage`) returns `can_edit` and `taught_by`. The **subject teacher** (timetable) enters a subject's marks. A **class teacher** still sees every subject of their section, but a subject another active teacher teaches there is **view only**. A subject nobody teaches in that section stays editable for the class teacher, so a school without a timetable works as before. Two teachers on the same subject can both enter it.
+- `ExamController.Sheet` opens a view-only sheet read-only (`canEdit`, `viewOnlyMessage`); `SaveMarks` refuses it. Admins and `exams.manage` are not restricted.
+- `GetSheet` also returns `finalized_by_name`, `entered_by` (everyone whose marks are on the sheet now) and `last_entry_at`; the sheet header shows "Entered by … · Finalized by …".
+- SQL: `EduCoreDataAccessLayer/Database/qa_fix_marks_owner.sql` (the proc only; source of truth `exam_marks.sql`).

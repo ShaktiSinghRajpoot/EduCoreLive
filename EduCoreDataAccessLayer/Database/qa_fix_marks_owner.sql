@@ -1,0 +1,475 @@
+-- 2026-11-19: Marks Entry - subject teacher enters, class teacher views others' subjects; sheet shows who entered/finalized.
+-- Only the marks proc changes (no table changes). Source of truth: exam_marks.sql. Safe to re-run.
+
+CREATE OR REPLACE PROCEDURE academic.sp_school_admin_exam_marks_manage(
+    IN    p_operation         character varying,
+    IN    p_tenant_id         integer,
+    IN    p_school_id         integer,
+    IN    p_action_user_id    integer,
+    IN    p_exam_id           integer   DEFAULT NULL,
+    IN    p_academic_class_id integer   DEFAULT NULL,
+    IN    p_subject_id        integer   DEFAULT NULL,
+    IN    p_section           character varying DEFAULT NULL,
+    IN    p_items             text      DEFAULT NULL,
+    IN    p_finalize          boolean   DEFAULT FALSE,
+    INOUT p_result            refcursor DEFAULT 'exam_marks_cursor'::refcursor,
+    INOUT p_result2           refcursor DEFAULT 'exam_marks_cursor2'::refcursor)
+LANGUAGE plpgsql
+AS $procedure$
+DECLARE
+    v_section text;
+    v_year_id integer;
+    v_max     numeric;
+    v_pass    numeric;
+    v_paper   date;
+    v_old_sec text;      -- section of a moved student's finalised mark
+    v_final   boolean;
+    v_items   jsonb;
+    v_item    jsonb;
+    v_sid     integer;
+    v_marks   numeric;
+    v_absent  boolean;
+    v_name    text;
+    v_enrol   integer;
+    v_saved   integer := 0;
+    v_added   integer := 0;
+    v_blank   integer := 0;
+    v_status  text;
+    v_results text;
+BEGIN
+    IF p_tenant_id <= 1 OR p_school_id <= 0 THEN
+        RAISE EXCEPTION 'Invalid school admin scope.';
+    END IF;
+
+    v_section := COALESCE(TRIM(p_section), '');
+
+    -- Every operation works on one exam; resolve its academic year once.
+    IF COALESCE(p_exam_id, 0) > 0 THEN
+        SELECT academic_year_id, status, results_status INTO v_year_id, v_status, v_results
+        FROM academic.exams
+        WHERE exam_id   = p_exam_id
+          AND tenant_id = p_tenant_id
+          AND school_id = p_school_id
+          AND NOT is_deleted;
+
+        IF v_year_id IS NULL THEN
+            RAISE EXCEPTION 'That exam was not found.';
+        END IF;
+    END IF;
+
+    -- Operations from GetClassSetup down all need a class that is on the exam.
+    IF p_operation IN ('GetClassSetup', 'GetSheet', 'SaveMarks', 'ReopenSheet') THEN
+        IF COALESCE(p_academic_class_id, 0) <= 0 THEN
+            RAISE EXCEPTION 'Pick a class first.';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM academic.exam_subjects
+                       WHERE exam_id = p_exam_id
+                         AND academic_class_id = p_academic_class_id) THEN
+            RAISE EXCEPTION 'That class is not part of this exam.';
+        END IF;
+    END IF;
+
+    IF p_operation = 'GetExamClasses' THEN
+
+        -- The classes this exam covers — the Class dropdown.
+        OPEN p_result FOR
+        SELECT es.academic_class_id,
+               c.class_name,
+               COUNT(*)::int AS subject_count
+        FROM academic.exam_subjects es
+        JOIN academic.academic_classes c ON c.academic_class_id = es.academic_class_id
+        WHERE es.exam_id   = p_exam_id
+          AND es.tenant_id = p_tenant_id
+          AND es.school_id = p_school_id
+        GROUP BY es.academic_class_id, c.class_name, c.display_order
+        ORDER BY c.display_order, c.class_name;
+
+        OPEN p_result2 FOR SELECT 1 WHERE FALSE;
+
+    ELSIF p_operation = 'GetClassSetup' THEN
+
+        -- That class's datesheet — the Subject dropdown and its marks scale.
+        OPEN p_result FOR
+        SELECT es.subject_id, s.subject_name, es.exam_date, es.start_time, es.end_time,
+               es.max_marks, es.pass_marks
+        FROM academic.exam_subjects es
+        JOIN academic.school_subjects s ON s.subject_id = es.subject_id
+        WHERE es.exam_id           = p_exam_id
+          AND es.academic_class_id = p_academic_class_id
+          AND es.tenant_id         = p_tenant_id
+          AND es.school_id         = p_school_id
+        ORDER BY es.display_order, s.subject_name;
+
+        -- Sections that actually have students enrolled in this class that year,
+        -- narrowed to the exam's chosen sections when it targets specific ones.
+        -- No exam_class_sections rows for this (exam, class) = the whole class.
+        OPEN p_result2 FOR
+        SELECT COALESCE(TRIM(e.section), '') AS section, COUNT(*)::int AS student_count
+        FROM core.student_enrolment e
+        WHERE e.tenant_id = p_tenant_id
+          AND e.school_id = p_school_id
+          AND e.academic_year_id  = v_year_id
+          AND e.academic_class_id = p_academic_class_id
+          AND COALESCE(e.status, '') <> 'Left'
+          AND (NOT EXISTS (SELECT 1 FROM academic.exam_class_sections x
+                           WHERE x.exam_id = p_exam_id
+                             AND x.academic_class_id = p_academic_class_id)
+               OR EXISTS (SELECT 1 FROM academic.exam_class_sections x
+                          WHERE x.exam_id = p_exam_id
+                            AND x.academic_class_id = p_academic_class_id
+                            AND x.section = COALESCE(TRIM(e.section), '')))
+        GROUP BY COALESCE(TRIM(e.section), '')
+        ORDER BY 1;
+
+    ELSIF p_operation = 'GetSheet' THEN
+
+        SELECT es.max_marks, es.pass_marks INTO v_max, v_pass
+        FROM academic.exam_subjects es
+        WHERE es.exam_id = p_exam_id
+          AND es.academic_class_id = p_academic_class_id
+          AND es.subject_id = p_subject_id;
+
+        IF v_max IS NULL THEN
+            RAISE EXCEPTION 'That subject is not on this class''s datesheet.';
+        END IF;
+
+        OPEN p_result FOR
+        SELECT
+            r.out_student_id   AS student_id,
+            r.out_roll_no      AS roll_no,
+            r.out_student_name AS student_name,
+            r.out_gender       AS gender,
+            m.marks_obtained,
+            COALESCE(m.is_absent, FALSE) AS is_absent,
+            (m.exam_mark_id IS NOT NULL) AS has_mark
+        FROM academic.fn_exam_sheet_roster(p_tenant_id, p_school_id, v_year_id, p_academic_class_id, v_section) r
+        LEFT JOIN academic.exam_marks m
+               ON m.exam_id    = p_exam_id
+              AND m.subject_id = p_subject_id
+              AND m.student_id = r.out_student_id;
+
+        OPEN p_result2 FOR
+        SELECT
+            v_max  AS max_marks,
+            v_pass AS pass_marks,
+            (SELECT es.exam_date FROM academic.exam_subjects es
+             WHERE es.exam_id = p_exam_id
+               AND es.academic_class_id = p_academic_class_id
+               AND es.subject_id = p_subject_id) AS exam_date,
+            (SELECT es.start_time FROM academic.exam_subjects es
+             WHERE es.exam_id = p_exam_id
+               AND es.academic_class_id = p_academic_class_id
+               AND es.subject_id = p_subject_id) AS start_time,
+            (SELECT es.end_time FROM academic.exam_subjects es
+             WHERE es.exam_id = p_exam_id
+               AND es.academic_class_id = p_academic_class_id
+               AND es.subject_id = p_subject_id) AS end_time,
+            (SELECT s.subject_name FROM academic.school_subjects s
+             WHERE s.subject_id = p_subject_id) AS subject_name,
+            COALESCE(sh.is_finalized, FALSE) AS is_finalized,
+            sh.finalized_at,
+            (v_results = 'Published') AS results_published,
+            -- Who did the work (2026-11-19), so a class teacher and a subject
+            -- teacher can see whose marks these are.
+            CASE WHEN sh.is_finalized THEN core.fn_user_display_name(sh.finalized_by) END AS finalized_by_name,
+            (SELECT string_agg(DISTINCT core.fn_user_display_name(COALESCE(m.updated_by, m.created_by)), ', ')
+               FROM academic.exam_marks m
+              WHERE m.exam_id           = p_exam_id
+                AND m.academic_class_id = p_academic_class_id
+                AND m.subject_id        = p_subject_id
+                AND m.section           = v_section) AS entered_by,
+            (SELECT MAX(COALESCE(m.updated_at, m.created_at))::date
+               FROM academic.exam_marks m
+              WHERE m.exam_id           = p_exam_id
+                AND m.academic_class_id = p_academic_class_id
+                AND m.subject_id        = p_subject_id
+                AND m.section           = v_section) AS last_entry_at
+        FROM (SELECT 1) x
+        LEFT JOIN academic.exam_mark_sheets sh
+               ON sh.exam_id           = p_exam_id
+              AND sh.academic_class_id = p_academic_class_id
+              AND sh.subject_id        = p_subject_id
+              AND sh.section           = v_section;
+
+    ELSIF p_operation = 'SaveMarks' THEN
+
+        SELECT es.max_marks, es.pass_marks, NULLIF(es.exam_date::text, '')::date INTO v_max, v_pass, v_paper
+        FROM academic.exam_subjects es
+        WHERE es.exam_id = p_exam_id
+          AND es.academic_class_id = p_academic_class_id
+          AND es.subject_id = p_subject_id;
+
+        IF v_max IS NULL THEN
+            RAISE EXCEPTION 'That subject is not on this class''s datesheet.';
+        END IF;
+
+        SELECT COALESCE(is_finalized, FALSE) INTO v_final
+        FROM academic.exam_mark_sheets
+        WHERE exam_id           = p_exam_id
+          AND academic_class_id = p_academic_class_id
+          AND subject_id        = p_subject_id
+          AND section           = v_section;
+
+        -- Published results are a record parents have seen; they change only
+        -- after someone unpublishes them (with a reason, logged).
+        IF v_results = 'Published' THEN
+            RAISE EXCEPTION 'The results of this exam are published, so its marks are locked. Unpublish the results first.';
+        END IF;
+
+        IF COALESCE(v_final, FALSE) THEN
+            RAISE EXCEPTION 'These marks are finalized. Ask a school admin to reopen the sheet.';
+        END IF;
+
+        -- A draft datesheet is still being built; the Marks Entry page hides
+        -- drafts, and the server holds the same line.
+        IF v_status IS DISTINCT FROM 'Published' THEN
+            RAISE EXCEPTION 'This exam is still a draft. Publish it before entering marks.';
+        END IF;
+
+        -- No marks before the paper has been written (QA BUG-076).
+        IF v_paper > CURRENT_DATE THEN
+            RAISE EXCEPTION 'This paper is on %. Marks can be entered from that day.', to_char(v_paper, 'DD Mon YYYY');
+        END IF;
+
+        -- An exam that targets specific sections of this class takes marks only
+        -- for those sections (no exam_class_sections rows = the whole class).
+        IF EXISTS (SELECT 1 FROM academic.exam_class_sections x
+                   WHERE x.exam_id = p_exam_id AND x.academic_class_id = p_academic_class_id)
+           AND NOT EXISTS (SELECT 1 FROM academic.exam_class_sections x
+                           WHERE x.exam_id = p_exam_id AND x.academic_class_id = p_academic_class_id
+                             AND LOWER(x.section) = LOWER(v_section)) THEN
+            RAISE EXCEPTION 'This exam is not held for section % of this class.',
+                CASE WHEN v_section = '' THEN '(none)' ELSE v_section END;
+        END IF;
+
+        v_items := COALESCE(NULLIF(p_items, ''), '[]')::jsonb;
+
+        FOR v_item IN SELECT value FROM jsonb_array_elements(v_items)
+        LOOP
+            v_sid := NULLIF(v_item->>'studentId', '')::int;
+            CONTINUE WHEN v_sid IS NULL;
+
+            v_absent := COALESCE((v_item->>'absent')::boolean, FALSE);
+            v_marks  := CASE WHEN v_absent THEN NULL
+                             ELSE NULLIF(v_item->>'marks', '')::numeric END;
+
+            -- Only students actually on this sheet's roster.
+            SELECT r.out_student_name, r.out_enrolment_id INTO v_name, v_enrol
+            FROM academic.fn_exam_sheet_roster(p_tenant_id, p_school_id, v_year_id, p_academic_class_id, v_section) r
+            WHERE r.out_student_id = v_sid;
+
+            IF v_name IS NULL THEN
+                RAISE EXCEPTION 'A student on this sheet is not enrolled in this class and section.';
+            END IF;
+
+            IF v_marks IS NOT NULL AND (v_marks < 0 OR v_marks > v_max) THEN
+                RAISE EXCEPTION 'Marks for % must be between 0 and %.', v_name, v_max;
+            END IF;
+
+            -- A student who moved section may already have this paper's mark on the
+            -- OLD section's sheet. If that sheet is finalised, saving here would change a
+            -- locked mark without anyone reopening it.
+            SELECT m.section INTO v_old_sec
+              FROM academic.exam_marks m
+              JOIN academic.exam_mark_sheets sh
+                ON sh.exam_id = m.exam_id AND sh.academic_class_id = m.academic_class_id
+               AND sh.subject_id = m.subject_id AND sh.section = m.section AND sh.is_finalized
+             WHERE m.exam_id = p_exam_id AND m.subject_id = p_subject_id AND m.student_id = v_sid
+               AND (m.section IS DISTINCT FROM v_section OR m.academic_class_id <> p_academic_class_id)
+             LIMIT 1;
+            IF v_old_sec IS NOT NULL THEN
+                RAISE EXCEPTION '%''s mark for this paper is on the finalised sheet of section %. Reopen that sheet first.',
+                    v_name, CASE WHEN v_old_sec = '' THEN '(none)' ELSE v_old_sec END;
+            END IF;
+
+            INSERT INTO academic.exam_marks
+                (tenant_id, school_id, exam_id, academic_class_id, subject_id, student_id,
+                 enrolment_id, section, marks_obtained, is_absent, created_by, created_at)
+            VALUES
+                (p_tenant_id, p_school_id, p_exam_id, p_academic_class_id, p_subject_id, v_sid,
+                 v_enrol, v_section, v_marks, v_absent, p_action_user_id, now())
+            ON CONFLICT ON CONSTRAINT uq_exam_marks
+            DO UPDATE SET marks_obtained    = EXCLUDED.marks_obtained,
+                          is_absent         = EXCLUDED.is_absent,
+                          enrolment_id      = EXCLUDED.enrolment_id,
+                          academic_class_id = EXCLUDED.academic_class_id,
+                          section           = EXCLUDED.section,
+                          updated_by        = p_action_user_id,
+                          updated_at        = now()
+            -- An unchanged mark is not rewritten, so updated_by keeps meaning
+            -- "who last changed it" and the history trigger stays quiet.
+            WHERE academic.exam_marks.marks_obtained    IS DISTINCT FROM EXCLUDED.marks_obtained
+               OR academic.exam_marks.is_absent         IS DISTINCT FROM EXCLUDED.is_absent
+               OR academic.exam_marks.enrolment_id      IS DISTINCT FROM EXCLUDED.enrolment_id
+               OR academic.exam_marks.academic_class_id IS DISTINCT FROM EXCLUDED.academic_class_id
+               OR academic.exam_marks.section           IS DISTINCT FROM EXCLUDED.section;
+
+            v_saved := v_saved + 1;
+        END LOOP;
+
+        IF p_finalize THEN
+            -- Anyone still without a row is recorded Absent, which is exactly what
+            -- the finalize dialog warns the teacher about.
+            INSERT INTO academic.exam_marks
+                (tenant_id, school_id, exam_id, academic_class_id, subject_id, student_id,
+                 enrolment_id, section, marks_obtained, is_absent, created_by, created_at)
+            SELECT p_tenant_id, p_school_id, p_exam_id, p_academic_class_id, p_subject_id,
+                   r.out_student_id, r.out_enrolment_id, v_section, NULL, TRUE,
+                   p_action_user_id, now()
+            FROM academic.fn_exam_sheet_roster(p_tenant_id, p_school_id, v_year_id, p_academic_class_id, v_section) r
+            WHERE NOT EXISTS (SELECT 1 FROM academic.exam_marks m
+                              WHERE m.exam_id    = p_exam_id
+                                AND m.subject_id = p_subject_id
+                                AND m.student_id = r.out_student_id);
+
+            GET DIAGNOSTICS v_added = ROW_COUNT;
+
+            -- A blank that was saved as a draft (or a mark cleared later) is just
+            -- as unmarked: it is recorded Absent too.
+            UPDATE academic.exam_marks m
+               SET is_absent  = TRUE,
+                   updated_by = p_action_user_id,
+                   updated_at = now()
+             WHERE m.exam_id    = p_exam_id
+               AND m.subject_id = p_subject_id
+               AND m.marks_obtained IS NULL
+               AND NOT m.is_absent
+               AND m.student_id IN (SELECT r.out_student_id
+                                    FROM academic.fn_exam_sheet_roster(p_tenant_id, p_school_id, v_year_id,
+                                                                       p_academic_class_id, v_section) r);
+
+            GET DIAGNOSTICS v_blank = ROW_COUNT;
+            v_added := v_added + v_blank;
+
+            INSERT INTO academic.exam_mark_sheets
+                (tenant_id, school_id, exam_id, academic_class_id, subject_id, section,
+                 is_finalized, finalized_by, finalized_at)
+            VALUES
+                (p_tenant_id, p_school_id, p_exam_id, p_academic_class_id, p_subject_id, v_section,
+                 TRUE, p_action_user_id, now())
+            ON CONFLICT ON CONSTRAINT uq_exam_mark_sheets
+            DO UPDATE SET is_finalized = TRUE,
+                          finalized_by = p_action_user_id,
+                          finalized_at = now();
+        END IF;
+
+        OPEN p_result FOR
+        SELECT TRUE AS success,
+               v_saved AS saved,
+               v_added AS marked_absent,
+               p_finalize AS is_finalized,
+               CASE WHEN p_finalize
+                    THEN 'Marks finalized and locked.'
+                    ELSE 'Marks saved as draft.' END AS message;
+
+        OPEN p_result2 FOR SELECT 1 WHERE FALSE;
+
+    ELSIF p_operation = 'GetMarkScope' THEN
+
+        -- The sheets of this exam the calling user teaches (2026-10-12):
+        -- every subject of a section they are class teacher of, plus each
+        -- subject the timetable gives them in a section. A teacher with only
+        -- exams.marks is limited to these; the caller skips this for school
+        -- admins and exams.manage (the proc cannot see roles).
+        -- Sections are per session, so joining on the exam's class id keeps
+        -- this to the exam's own academic year.
+        --
+        -- can_edit (2026-11-19): the SUBJECT teacher enters a subject's marks.
+        -- A class teacher still sees every subject of their section, but a
+        -- subject another teacher teaches there is view-only for them. A subject
+        -- nobody teaches in the timetable stays editable for the class teacher,
+        -- so no sheet is left without someone who can fill it.
+        -- taught_by names the subject teacher(s) for the view-only message.
+        OPEN p_result FOR
+        WITH me AS (
+            SELECT st.staff_id
+            FROM core.staff st
+            WHERE st.tenant_id = p_tenant_id
+              AND st.school_id = p_school_id
+              AND st.user_id   = p_action_user_id
+              -- A teacher who has left must not keep entering marks.
+              AND COALESCE(st.is_active, TRUE)   = TRUE
+              AND COALESCE(st.is_deleted, FALSE) = FALSE
+        ),
+        sheets AS (
+            SELECT DISTINCT es.academic_class_id, es.subject_id,
+                   sec.academic_class_section_id, sec.section_name, sec.class_teacher_staff_id
+            FROM academic.exam_subjects es
+            JOIN academic.academic_class_sections sec
+                 ON sec.academic_class_id = es.academic_class_id
+                AND sec.tenant_id = p_tenant_id
+                AND sec.school_id = p_school_id
+                AND COALESCE(sec.is_deleted, FALSE) = FALSE
+            WHERE es.exam_id   = p_exam_id
+              AND es.tenant_id = p_tenant_id
+              AND es.school_id = p_school_id
+        ),
+        -- Who teaches each subject in each of those sections (active staff only).
+        taught AS (
+            SELECT DISTINCT t.academic_class_section_id, t.subject_id, t.staff_id, ts.full_name
+            FROM academic.timetable t
+            JOIN core.staff ts
+                 ON ts.staff_id = t.staff_id
+                AND COALESCE(ts.is_active, TRUE)   = TRUE
+                AND COALESCE(ts.is_deleted, FALSE) = FALSE
+            WHERE t.tenant_id = p_tenant_id
+              AND t.school_id = p_school_id
+              AND t.academic_class_section_id IN (SELECT academic_class_section_id FROM sheets)
+        )
+        SELECT s.academic_class_id,
+               s.section_name AS section,
+               s.subject_id,
+               (EXISTS (SELECT 1 FROM taught x
+                        WHERE x.academic_class_section_id = s.academic_class_section_id
+                          AND x.subject_id = s.subject_id
+                          AND x.staff_id IN (SELECT staff_id FROM me))
+                OR NOT EXISTS (SELECT 1 FROM taught x
+                               WHERE x.academic_class_section_id = s.academic_class_section_id
+                                 AND x.subject_id = s.subject_id)) AS can_edit,
+               (SELECT string_agg(DISTINCT x.full_name, ', ')
+                  FROM taught x
+                 WHERE x.academic_class_section_id = s.academic_class_section_id
+                   AND x.subject_id = s.subject_id) AS taught_by
+        FROM sheets s
+        WHERE s.class_teacher_staff_id IN (SELECT staff_id FROM me)
+           OR EXISTS (SELECT 1 FROM taught x
+                      WHERE x.academic_class_section_id = s.academic_class_section_id
+                        AND x.subject_id = s.subject_id
+                        AND x.staff_id IN (SELECT staff_id FROM me));
+
+        OPEN p_result2 FOR SELECT 1 WHERE FALSE;
+
+    ELSIF p_operation = 'ReopenSheet' THEN
+
+        -- Admin-only; the caller enforces that (the proc cannot see roles).
+        IF COALESCE(p_subject_id, 0) <= 0 THEN
+            RAISE EXCEPTION 'Pick a subject first.';
+        END IF;
+        IF v_results = 'Published' THEN
+            RAISE EXCEPTION 'The results of this exam are published. Unpublish the results before reopening a sheet.';
+        END IF;
+
+        UPDATE academic.exam_mark_sheets
+           SET is_finalized = FALSE,
+               reopened_by  = p_action_user_id,
+               reopened_at  = now()
+         WHERE exam_id           = p_exam_id
+           AND academic_class_id = p_academic_class_id
+           AND subject_id        = p_subject_id
+           AND section           = v_section
+           AND tenant_id        = p_tenant_id
+           AND school_id        = p_school_id
+           AND is_finalized;
+
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'That sheet is not finalized.';
+        END IF;
+
+        OPEN p_result FOR SELECT TRUE AS success, 'Sheet reopened for editing.' AS message;
+        OPEN p_result2 FOR SELECT 1 WHERE FALSE;
+
+    ELSE
+        RAISE EXCEPTION 'Invalid operation %', p_operation;
+    END IF;
+END;
+$procedure$;
