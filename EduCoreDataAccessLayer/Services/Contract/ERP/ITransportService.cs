@@ -30,5 +30,7 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
             int studentId, int routeId, int stopId, string? academicYear, string? startDate, int months,
             int tenantId, int schoolId, int actionUserId);
         Task<(bool Success, string Message)> RemoveAssignmentAsync(int studentId, int tenantId, int schoolId, int actionUserId);
+        /// <summary>What Remove Transport will close (bus fees not yet due) and what stays owed (already due).</summary>
+        Task<(decimal FutureAmount, int FutureMonths, decimal OverdueAmount, int OverdueMonths)> RemovePreviewAsync(int studentId, int tenantId, int schoolId, int actionUserId);
     }
 }

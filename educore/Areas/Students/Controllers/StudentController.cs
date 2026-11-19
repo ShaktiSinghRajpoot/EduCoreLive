@@ -119,25 +119,52 @@ namespace educore.Areas.Students.Controllers
             // reloads the ladder from the target session once one is chosen.
             ViewBag.ClassLadder = await _admissionService.GetClassLadderDetailedAsync(TenantId(), SchoolId(), UserId());
 
+            // Commit needs students.manage (the Promote action). Without it the page is
+            // read-only with a note, instead of letting staff do all the work and then
+            // meet a 403 (QA BUG-028).
+            ViewBag.CanPromote = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
+            ViewBag.CanSeeFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
+
             return View();
         }
 
-        // Promotion History: who moved out of a session and how. The office (students.manage)
-        // sees the whole school; anyone else sees only the classes they are class teacher of.
+        // Promotion History: who moved out of a session and how. The admin and the office
+        // see the whole school (owner decision #10); a teacher sees only the classes they
+        // are class teacher of.
         [Route("students/promotion/history")]
         public async Task<IActionResult> PromoteHistory()
         {
             try { ViewBag.YearList = await _baseService.GetSelectListAsync("config.sp_dropdown_common", "AcademicYear", TenantId().ToString(), SchoolId().ToString()); }
             catch { ViewBag.YearList = new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(); }
-            ViewBag.WholeSchool = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
+            bool wholeSchool = await HistoryWholeSchoolAsync();
+            ViewBag.WholeSchool = wholeSchool;
+
+            // QA BUG-032: after the switch nobody has been promoted OUT of the new current
+            // session yet, so open on the session before it when the current one has no rows.
+            var years = (List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>)ViewBag.YearList;
+            var current = years.FirstOrDefault(y => y.Selected)?.Text;
+            var previous = years.Select(y => y.Text)
+                .Where(t => current != null && string.CompareOrdinal(t, current) < 0)
+                .OrderByDescending(t => t, StringComparer.Ordinal).FirstOrDefault();
+            if (current != null && previous != null
+                && (await _admissionService.GetPromotionHistoryAsync(current, !wholeSchool, TenantId(), SchoolId(), UserId())).Count == 0)
+            {
+                foreach (var y in years) y.Selected = y.Text == previous;
+            }
             return View();
         }
+
+        // Same rule as the Student Directory (#13): admin, students.manage and staff who
+        // teach nothing (front office, accounts) see every class.
+        private async Task<bool> HistoryWholeSchoolAsync() =>
+            await HasPermissionAttribute.UserIsAdminAsync(this)
+            || await ContactAccess.AllowedSectionsAsync(this) == null;
 
         [HttpGet]
         public async Task<IActionResult> PromoteHistoryData(string? fromYear)
         {
             if (string.IsNullOrWhiteSpace(fromYear)) return Json(new { success = false, message = "Choose a session." });
-            bool wholeSchool = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
+            bool wholeSchool = await HistoryWholeSchoolAsync();
             bool canViewFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
             var rows = await _admissionService.GetPromotionHistoryAsync(fromYear, !wholeSchool, TenantId(), SchoolId(), UserId());
             return Json(new
@@ -165,7 +192,9 @@ namespace educore.Areas.Students.Controllers
         // are per-session rows, so a new session is empty until its structure is
         // copied forward — promoting into it would strand every student on a
         // class that does not exist. The page asks before showing the confirm.
-        public async Task<IActionResult> PromotionSessionCheck(string? year)
+        // With the source session it also says whether the run is early (QA BUG-030),
+        // whether the target has a fee structure (G12) and what the last run was (G11).
+        public async Task<IActionResult> PromotionSessionCheck(string? year, string? source)
         {
             var info = await _schoolSettingsService.GetSessionStructureAsync(
                 TenantId(), SchoolId(), UserId(), academicYearName: year);
@@ -173,6 +202,9 @@ namespace educore.Areas.Students.Controllers
             var ladder = info.IsReady
                 ? await _admissionService.GetClassLadderDetailedAsync(TenantId(), SchoolId(), UserId(), year)
                 : new List<ClassLadderItem>();
+
+            var ctx = await _admissionService.GetPromotionContextAsync(
+                source ?? string.Empty, year ?? string.Empty, null, TenantId(), SchoolId(), UserId());
 
             return Json(new
             {
@@ -182,7 +214,20 @@ namespace educore.Areas.Students.Controllers
                 sectionCount   = info.SectionCount,
                 canCopy        = info.CanCopy,
                 sourceYearName = info.SourceYearName,
-                ladder = ladder.Select(c => new { name = c.Name, order = c.Order })
+                ladder = ladder.Select(c => new { name = c.Name, order = c.Order }),
+                isEarly        = ctx.IsEarly,
+                sourceEnd      = ctx.SourceEnd,
+                lastMonth      = ctx.LastMonthStart,
+                feeClasses     = ctx.TargetFeeClasses,
+                undo = ctx.UndoRunId == null ? null : new
+                {
+                    runId  = ctx.UndoRunId,
+                    at     = ctx.UndoRunAt,
+                    source = ctx.UndoSource,
+                    target = ctx.UndoTarget,
+                    count  = ctx.UndoCount,
+                    block  = ctx.UndoBlock
+                }
             });
         }
 
@@ -212,9 +257,11 @@ namespace educore.Areas.Students.Controllers
             return Json(sections);
         }
 
-        // The roster for the chosen class/section/year, with real pending dues.
-        // Result % has no source yet (no exam module) — returned as null.
-        public async Task<IActionResult> PromotionRoster(string @class, string? section, string? year)
+        // The roster for the chosen class/section/year, with real pending dues and the
+        // result of the session's latest published exam (G02: Fail / Compartment
+        // pre-ticks Retain on the page; staff can untick).
+        public async Task<IActionResult> PromotionRoster(string @class, string? section, string? year,
+                                                         [FromServices] ModuleFlags modules)
         {
             if (string.IsNullOrWhiteSpace(@class)) return Json(Array.Empty<object>());
 
@@ -228,6 +275,12 @@ namespace educore.Areas.Students.Controllers
 
             // dues are fee data: without fees.view the column is sent empty
             bool seeFees = await HasPermissionAttribute.UserHasAsync(this, "fees.view");
+
+            var results = new Dictionary<int, (string Exam, string Result)>();
+            if (await modules.ExamsOn() && !string.IsNullOrWhiteSpace(year))
+                results = (await _admissionService.GetPromotionContextAsync(
+                    year, string.Empty, @class, TenantId(), SchoolId(), UserId())).Results;
+
             var roster = items.Select(s => new
             {
                 id      = s.StudentId,
@@ -237,7 +290,9 @@ namespace educore.Areas.Students.Controllers
                 sec     = s.Section,
                 // what the child owes today; months still ahead and next
                 // session's fees are not dues yet (as at a real fee counter)
-                due     = seeFees ? s.FeeDueNow : (decimal?)null
+                due     = seeFees ? s.FeeDueNow : (decimal?)null,
+                result  = results.TryGetValue(s.StudentId, out var r) ? r.Result : null,
+                exam    = results.TryGetValue(s.StudentId, out var r2) ? r2.Exam : null
             });
             return Json(roster);
         }
@@ -343,9 +398,24 @@ namespace educore.Areas.Students.Controllers
                 retained      = result.Retained,
                 passedOut     = result.PassedOut,
                 skipped       = result.Skipped,
-                skippedDetail = result.SkippedDetail
+                skippedDetail = result.SkippedDetail,
+                runId         = result.RunId
             });
         }
+
+        // Undo the school's last promotion run: same day, before the target session is
+        // made current (owner decision #8). The proc checks both and refuses otherwise.
+        [HttpPost]
+        [HasPermission("students.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UndoPromotion([FromBody] UndoPromotionRequest req)
+        {
+            if (req == null || req.RunId <= 0) return Json(new { success = false, message = "Choose the run to undo." });
+            var (ok, msg) = await _admissionService.UndoPromotionRunAsync(req.RunId, TenantId(), SchoolId(), UserId());
+            return Json(new { success = ok, message = msg });
+        }
+
+        public class UndoPromotionRequest { public int RunId { get; set; } }
 
         // The URL carries the student's uuid. Resolving it here is what enforces the
         // tenant/school check — an unknown uuid and another school's uuid both give 0.

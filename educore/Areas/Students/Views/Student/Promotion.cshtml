@@ -3,6 +3,8 @@
 @{
     ViewData["Title"] = "Promote Students";
     bool examsOn = await Modules.ExamsOn();
+    bool feesOn = await Modules.FeesOn();
+    bool canPromote = ViewBag.CanPromote == true;
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
 
     // Teaching order with each class's display_order. The page compares orders
@@ -37,6 +39,25 @@
     </div>
 
     @await Html.PartialAsync("_SessionSteps", 3)
+
+    @if (!canPromote)
+    {
+    <!-- QA BUG-028: the server refuses the commit without students.manage, so say so up front -->
+    <div class="alert alert-info d-flex align-items-start gap-2 mb-3">
+      <i class="bx bx-lock-alt fs-5"></i>
+      <div class="small">You can look at the class lists here, but only the School Admin (or staff allowed to manage students) can promote.</div>
+    </div>
+    }
+
+    <!-- Undo the school's last promotion run (owner decision #8) -->
+    <div class="alert alert-secondary d-flex d-none flex-column flex-sm-row align-items-sm-center gap-2 mb-3" id="undoBar">
+      <i class="bx bx-undo fs-5"></i>
+      <div class="small flex-grow-1" id="undoText"></div>
+      @if (canPromote)
+      {
+      <button type="button" class="btn btn-sm btn-outline-danger" id="undoBtn"><i class="bx bx-undo me-1"></i>Undo last run</button>
+      }
+    </div>
 
     <!-- Source → Target flow -->
     <div class="ec-card mb-4">
@@ -120,6 +141,14 @@
               </span>
             </span>
           </label>
+          <!-- Owner decision #7: what happens to roll numbers in the new class -->
+          <div class="pr-field mb-0" style="min-width:200px;">
+            <label for="rollMode">Roll numbers</label>
+            <select class="pr-sel" id="rollMode">
+              <option value="keep">Keep old rolls</option>
+              <option value="renumber">Re-number alphabetically</option>
+            </select>
+          </div>
           <button class="btn btn-primary d-flex align-items-center justify-content-center gap-1" id="loadBtn">
             <i class="bx bx-list-ul"></i><span>Load Students</span>
           </button>
@@ -216,9 +245,12 @@
           <div class="hint"><i class="bx bx-info-circle me-1"></i>Review outcomes, then preview before committing. This action updates student records.</div>
           <div class="d-flex flex-column flex-sm-row gap-2">
             <button class="btn btn-outline-secondary px-4" id="resetBtn"><i class="bx bx-reset me-1"></i>Reset</button>
+            @if (canPromote)
+            {
             <button class="btn btn-primary px-4" id="reviewBtn">
               <i class="bx bx-up-arrow-circle me-1"></i>Review &amp; Promote
             </button>
+            }
           </div>
         </div>
 
@@ -278,9 +310,33 @@
           <span><strong id="mDuesCount">0</strong> selected student(s) have pending dues and will be <strong>held back</strong>
                 (not promoted). Tick "Promote students who still owe fees" to move them anyway, or settle the dues first.</span>
         </div>
+        <!-- Graduating students who still owe: they leave with the dues (QA BUG-033) -->
+        <div class="alert alert-warning d-flex d-none align-items-start gap-2 mt-3 mb-0" id="mPassDuesWarn" style="border-radius:12px;font-size:.82rem;">
+          <i class="bx bx-wallet fs-5"></i>
+          <span id="mPassDuesText"></span>
+        </div>
+        <!-- Students whose section does not exist in their new class (G04) -->
+        <div class="alert alert-warning d-flex d-none align-items-start gap-2 mt-3 mb-0" id="mSecWarn" style="border-radius:12px;font-size:.82rem;">
+          <i class="bx bx-error-circle fs-5"></i>
+          <span id="mSecText"></span>
+        </div>
+        <!-- Target session has no fee structure (G12) -->
+        <div class="alert alert-warning d-flex d-none align-items-start gap-2 mt-3 mb-0" id="mFeeWarn" style="border-radius:12px;font-size:.82rem;">
+          <i class="bx bx-receipt fs-5"></i>
+          <span id="mFeeText"></span>
+        </div>
         <div class="alert alert-warning d-flex align-items-start gap-2 mt-3 mb-0" style="border-radius:12px;font-size:.82rem;">
           <i class="bx bx-error-circle fs-5"></i>
           <span>This will move the selected students into the new academic session.@(examsOn ? " Make sure exam results are finalised first." : "")</span>
+        </div>
+        <!-- Before the session's last month: strong warning + type the session name (QA BUG-030) -->
+        <div class="alert alert-danger d-none mt-3 mb-0" id="mEarly" style="border-radius:12px;font-size:.82rem;">
+          <div class="d-flex align-items-start gap-2 mb-2">
+            <i class="bx bx-error fs-5"></i>
+            <span id="mEarlyText"></span>
+          </div>
+          <label class="form-label small fw-bold mb-1" for="mEarlyInput">Type <span id="mEarlyName"></span> to confirm</label>
+          <input type="text" class="form-control form-control-sm" id="mEarlyInput" autocomplete="off">
         </div>
       </div>
       <div class="ec-card-body pt-0 p-3 p-lg-4 d-flex flex-column flex-sm-row justify-content-end gap-2">
@@ -360,6 +416,13 @@ var CLASSES_URL='@Url.Action("PromotionClasses","Student",new{area="Students"})'
 var ROSTER_URL='@Url.Action("PromotionRoster","Student",new{area="Students"})';
 var PROMOTE_URL='@Url.Action("Promote","Student",new{area="Students"})';
 var CHECK_URL='@Url.Action("PromotionSessionCheck","Student",new{area="Students"})';
+var UNDO_URL='@Url.Action("UndoPromotion","Student",new{area="Students"})';
+var SESSIONS_LINK='<a href="@Url.Action("AcademicYears","SchoolSettings",new{area="School"})">School Setup › Sessions</a>';
+var CLASSES_LINK='<a href="@Url.Action("ClassSection","SchoolSettings",new{area="School"})">School Setup › Classes &amp; Sections</a>';
+var FEES_ON=@(feesOn ? "true" : "false");
+var sessionInfo={};   // early warning, fee structure, last run (PromotionSessionCheck)
+/* The Review button is not drawn for staff who cannot promote, so go through this. */
+function setReview(on){ var b=document.getElementById('reviewBtn'); if(!b) return; if(on) b.removeAttribute('disabled'); else b.setAttribute('disabled','disabled'); }
 
 /* Set by the session check below: false blocks the commit. */
 var targetReady=true;
@@ -368,6 +431,7 @@ var PALETTE=['primary','info','success','warning','danger','secondary'];
 var roster=[];          // currently loaded students (from the server)
 var outcome={};         // id -> 'promote' | 'retain' | 'passout'
 var unpicked={};        // id -> true when the office unticked that student
+var nextSections=null;  // sections of the next class in the target session (G04 check)
 
 /* ── Helpers ─────────────────────────────────── */
 function ini(n){ return n.split(' ').slice(0,2).map(function(w){return w[0];}).join('').toUpperCase(); }
@@ -407,7 +471,7 @@ document.getElementById('srcClass').addEventListener('change', function(){
   if(classUnknown(cls)){
     showErr(cls + ' is not set up in ' + document.getElementById('srcYear').value +
             ' or ' + document.getElementById('tgtYear').value +
-            '. Every student in it would be skipped. Check Settings → Classes & Sections.');
+            '. Every student in it would be skipped. Check School Setup › Classes & Sections.');
   } else {
     clearErr();
   }
@@ -418,13 +482,16 @@ document.getElementById('srcClass').addEventListener('change', function(){
     fillSelect(document.getElementById('srcSection'), list, 'All sections', '');
   });
   // Target sections come from the next class (blank on the final class).
-  if(nc){ $.getJSON(SEC_URL, { 'class':nc, year:document.getElementById('tgtYear').value }).done(function(list){ fillSelect(document.getElementById('tgtSection'), list, 'Keep same section', 'keep'); }); }
-  else  { fillSelect(document.getElementById('tgtSection'), [], 'Keep same section', 'keep'); }
+  nextSections=null;
+  if(nc){ $.getJSON(SEC_URL, { 'class':nc, year:document.getElementById('tgtYear').value }).done(function(list){ nextSections=list||[]; fillSelect(document.getElementById('tgtSection'), list, 'Keep same section', 'keep'); }); }
+  else  { nextSections=null; fillSelect(document.getElementById('tgtSection'), [], 'Keep same section', 'keep'); }
 });
 
-/* ── Default outcome: graduate the final class, otherwise promote.
-      (Retain-by-result needs the exam module, which isn't wired yet.) ── */
+/* ── Default outcome: a Fail / Compartment in the session's latest published exam
+      is pre-ticked Retain (owner decision #6, staff can change it); otherwise
+      graduate the final class and promote everyone else. ── */
 function defaultOutcome(s){
+  if(s.result==='Fail' || s.result==='Compartment') return 'retain';
   // undefined (class not in the target session) must NOT become Pass Out.
   return nextClass(s.cls)===null ? 'passout' : 'promote';
 }
@@ -440,7 +507,8 @@ document.getElementById('loadBtn').addEventListener('click', function(){
   $.getJSON(ROSTER_URL, { 'class':cls, section:sec, year:yr })
   .done(function(list){
     roster=(list||[]).map(function(s,i){
-      return {id:s.id, name:s.name, roll:s.roll||'', cls:s.cls, sec:s.sec||'', due:(s.due == null ? null : s.due), color:PALETTE[i%PALETTE.length]};
+      return {id:s.id, name:s.name, roll:s.roll||'', cls:s.cls, sec:s.sec||'', due:(s.due == null ? null : s.due),
+              result:s.result||'', exam:s.exam||'', color:PALETTE[i%PALETTE.length]};
     });
     outcome={}; targetClass={}; unpicked={};
     roster.forEach(function(s){ outcome[s.id]=defaultOutcome(s); });
@@ -507,6 +575,17 @@ function seg(id, val, pfx){
   return '<div class="pr-seg" data-id="'+id+'">'+r('promote','Promote')+r('retain','Retain')+r('passout','Pass Out')+'</div>';
 }
 
+/* Fee Due Now: without fee permission the server sends no amount (QA BUG-027). */
+function dueCell(s){
+  if(s.due == null) return FEES_ON ? '<span class="text-muted small">Hidden for your role</span>' : '—';
+  return '<span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> '+inr(s.due) : 'Paid up')+'</span>';
+}
+/* The latest published exam of the session, when it was not a pass (G02). */
+function resultBadge(s){
+  if(s.result!=='Fail' && s.result!=='Compartment') return '';
+  return ' · <span class="text-danger fw-bold" title="'+EC.esc(s.exam)+'">'+EC.esc(s.result)+'</span>';
+}
+
 /* ── Render desktop + mobile ─────────────────── */
 function render(){
   var tb=document.getElementById('tblBody'),
@@ -530,10 +609,10 @@ function render(){
       +'<td onclick="event.stopPropagation()"><input type="checkbox" class="form-check-input pr-pick" data-id="'+s.id+'"'+(isPicked(s.id)?' checked':'')+'></td>'
       +'<td><div class="d-flex align-items-center gap-2">'
       +   '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
-      +   '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
+      +   '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.cls)+' – '+EC.esc(s.sec)+resultBadge(s)+'</div></div>'
       +'</div></td>'
       +'<td>'+EC.esc(s.roll||'—')+'</td>'
-      +'<td>'+(s.due == null ? '—' : '<span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> '+inr(s.due) : 'Paid up')+'</span>')+'</td>'
+      +'<td>'+dueCell(s)+'</td>'
       +'<td>'+ncTxt+'</td>'
       +'<td>'+seg(s.id, oc)+'</td>'
       +'</tr>';
@@ -549,10 +628,10 @@ function render(){
       +'<div class="pr-mob-top">'
       +  '<input type="checkbox" class="form-check-input pr-pick-m mt-0" data-id="'+s.id+'"'+(isPicked(s.id)?' checked':'')+'>'
       +  '<span class="pr-av bg-label-'+s.color+' text-'+s.color+'">'+ini(s.name)+'</span>'
-      +  '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.roll||'—')+' · '+EC.esc(s.cls)+' – '+EC.esc(s.sec)+'</div></div>'
+      +  '<div><div class="pr-nm">'+EC.esc(s.name)+'</div><div class="pr-rl">'+EC.esc(s.roll||'—')+' · '+EC.esc(s.cls)+' – '+EC.esc(s.sec)+resultBadge(s)+'</div></div>'
       +'</div>'
       +'<div class="pr-mob-meta">'
-      +  (s.due == null ? '' : '<span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> Fee due '+inr(s.due) : 'Fees paid up')+'</span>')
+      +  (s.due == null ? (FEES_ON ? '<span class="text-muted small">Fees hidden for your role</span>' : '') : '<span class="pr-due '+(s.due>0?'has':'clear')+'">'+(s.due>0 ? '<i class="bx bx-error-circle"></i> Fee due '+inr(s.due) : 'Fees paid up')+'</span>')
       +'</div>'
       +'<div class="text-muted small fw-bold mb-2"><i class="bx bx-right-arrow-alt"></i> '+ncTxt+'</div>'
       +seg(s.id, oc, 'ocm')
@@ -666,17 +745,18 @@ document.getElementById('resetBtn').addEventListener('click', function(){
 function checkTargetSession(){
   var tgtY=document.getElementById('tgtYear').value,
       banner=document.getElementById('tgtNotReady'),
-      text=document.getElementById('tgtNotReadyText'),
-      reviewBtn=document.getElementById('reviewBtn');
+      text=document.getElementById('tgtNotReadyText');
 
   if(!tgtY){ targetReady=false; return; }
 
-  $.getJSON(CHECK_URL, { year:tgtY }).done(function(res){
+  $.getJSON(CHECK_URL, { year:tgtY, source:document.getElementById('srcYear').value }).done(function(res){
     targetReady = !!(res && res.ready);
+    sessionInfo = res || {};
+    drawUndo();
 
     if(targetReady){
       banner.classList.add('d-none');
-      reviewBtn.removeAttribute('disabled');
+      setReview(true);
       if(res.ladder && res.ladder.length){ LADDER=res.ladder; }
       // The reachable classes just changed — re-evaluate the picked one and the
       // per-student "next class" preview against the new ladder.
@@ -691,16 +771,57 @@ function checkTargetSession(){
       return;
     }
 
-    var msg='Session '+tgtY+' has no classes or sections yet, so nobody can be promoted into it. ';
+    var msg='Session '+EC.esc(tgtY)+' has no classes or sections yet, so nobody can be promoted into it. ';
     msg += (res && res.canCopy)
-      ? 'Open Settings → Classes &amp; Sections, pick '+tgtY+', and copy the structure from '+res.sourceYearName+'.'
-      : 'Set up its classes and sections first under Settings → Classes &amp; Sections.';
+      ? 'Open '+CLASSES_LINK+', pick '+EC.esc(tgtY)+', and copy the structure from '+EC.esc(res.sourceYearName)+'.'
+      : 'Set up its classes and sections first under '+CLASSES_LINK+'.';
     text.innerHTML=msg;
     banner.classList.remove('d-none');
-    reviewBtn.setAttribute('disabled','disabled');
+    setReview(false);
   });
 }
 document.getElementById('tgtYear').addEventListener('change', checkTargetSession);
+
+/* ── Undo last promotion run (owner decision #8) ──
+   Shown while the school's last run can still be undone, or with the reason
+   it no longer can. */
+function drawUndo(){
+  var u=sessionInfo.undo, bar=document.getElementById('undoBar'), btn=document.getElementById('undoBtn');
+  if(!u || !u.runId){ bar.classList.add('d-none'); return; }
+  document.getElementById('undoText').textContent =
+    'Last promotion run: ' + u.count + ' student(s) from ' + u.source + ' to ' + u.target + ' on ' + u.at + '.'
+    + (u.block ? ' It can no longer be undone: ' + u.block : ' It can be undone today, until ' + u.target + ' is made current.');
+  if(btn) btn.disabled = !!u.block;
+  bar.classList.remove('d-none');
+}
+var undoBtnEl=document.getElementById('undoBtn');
+if(undoBtnEl) undoBtnEl.addEventListener('click', function(){
+  var u=sessionInfo.undo; if(!u || !u.runId) return;
+  var btn=this;
+  EC.confirm({ title:'Undo the last promotion run?',
+               name: u.count + ' student(s): ' + u.source + ' → ' + u.target,
+               message:'They go back to their class, section and roll in ' + u.source + '. Fee lines and bus fees billed for '
+                       + u.target + ' by that run are removed. Passed-out students come back on the roll.',
+               okText:'Undo run' }).then(function(ok){
+    if(!ok) return;
+    EC.buttonBusy(btn,'Undoing…');
+    $.ajax({ url:UNDO_URL, type:'POST', contentType:'application/json',
+             headers:{ 'RequestVerificationToken': $('input[name="__RequestVerificationToken"]').first().val() },
+             data: JSON.stringify({ runId:u.runId }) })
+      .done(function(r){
+        ecToast(r && r.success ? 'success' : 'error', (r && r.message) || 'Could not undo.');
+        if(r && r.success){
+          roster=[]; outcome={}; targetClass={}; unpicked={};
+          document.getElementById('sumSection').style.display='none';
+          document.getElementById('rosterCard').style.display='none';
+          document.getElementById('resultCard').style.display='none';
+          checkTargetSession();
+        }
+      })
+      .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr,'Could not undo the run')); })
+      .always(function(){ EC.buttonReset(btn); });
+  });
+});
 
 /* ── Pick a sensible target session on load ───
    Both selects are built from the same list, and the current session is ordered
@@ -725,10 +846,10 @@ function initTargetYear(){
 
   if(other===null){
     targetReady=false;
-    document.getElementById('reviewBtn').setAttribute('disabled','disabled');
-    document.getElementById('tgtNotReadyText').textContent =
-      'This school has only one academic session (' + src.value + '), so there is nowhere to promote students into. '
-      + 'Create the next session first under Settings → Academic Year, then set up its classes and sections.';
+    setReview(false);
+    document.getElementById('tgtNotReadyText').innerHTML =
+      'This school has only one academic session (' + EC.esc(src.value) + '), so there is nowhere to promote students into. '
+      + 'Create the next session first in ' + SESSIONS_LINK + ', then set up its classes and sections in ' + CLASSES_LINK + '.';
     document.getElementById('tgtNotReady').classList.remove('d-none');
     return;
   }
@@ -738,7 +859,8 @@ function initTargetYear(){
 }
 initTargetYear();
 document.getElementById('srcYear').addEventListener('change', function(){
-  if(document.getElementById('srcYear').value===document.getElementById('tgtYear').value) initTargetYear();
+  // the early-promotion check belongs to the SOURCE session, so ask again
+  if(document.getElementById('srcYear').value===document.getElementById('tgtYear').value) initTargetYear(); else checkTargetSession();
 
   // Classes belong to a session, so the list and any loaded roster are now stale.
   roster=[]; outcome={}; targetClass={}; unpicked={};
@@ -764,7 +886,7 @@ function validate(){
   var cls=document.getElementById('srcClass').value;
   if(classUnknown(cls))
     return cls + ' is not set up in ' + srcY + ' or ' + tgtY
-         + ', so every student in it would be skipped. Check Settings → Classes & Sections.';
+         + ', so every student in it would be skipped. Check School Setup › Classes & Sections.';
 
   return '';
 }
@@ -786,18 +908,29 @@ function duesSkipCount(){
 }
 
 /* ── Review modal fill ───────────────────────── */
-document.getElementById('reviewBtn').addEventListener('click', function(){
-  var err=validate();
-  if(err){ showErr(err); return; }
-  clearErr();
+/* G04: "Keep same section" skips anyone whose section is missing in the new class.
+   Name them in the review, not only in the result list afterwards. Retained
+   students stay in their class, so that class's sections in the target are read. */
+function missingSections(retainSecs){
+  var mode=document.getElementById('tgtSection').value, out=[];
+  picked().forEach(function(s){
+    var o=outcome[s.id], sec=(!mode || mode==='keep') ? s.sec : mode, list=null;
+    if(o==='promote' && !targetClass[s.id]) list=nextSections;
+    else if(o==='retain') list=retainSecs;
+    if(list && sec && list.indexOf(sec)<0) out.push(s.name+' ('+sec+')');
+  });
+  return out;
+}
 
+function openReview(retainSecs){
   updateCounts();
   var srcY=document.getElementById('srcYear').value,
       tgtY=document.getElementById('tgtYear').value,
       cls=document.getElementById('srcClass').value;
   document.getElementById('confirmFlow').textContent=cls+' · '+srcY+'  →  '+tgtY;
   var owing=picked().filter(function(s){ return (s.due||0)>0 && outcome[s.id]!=='passout'; });
-  document.getElementById('mDues').textContent=
+  var hidden=picked().some(function(s){ return s.due == null; });
+  document.getElementById('mDues').textContent= hidden ? 'Hidden for your role' :
     (owing.length ? owing.length+' owe '+inr(owing.reduce(function(t,s){ return t+s.due; },0))+' · ' : 'None · ')
     + (document.getElementById('carryDues').checked ? 'promote them' : 'hold them back');
 
@@ -806,7 +939,62 @@ document.getElementById('reviewBtn').addEventListener('click', function(){
   // d-flex beats an inline display:none, so the box is hidden with the d-none class
   document.getElementById('mDuesWarn').classList.toggle('d-none', dn === 0);
 
+  // QA BUG-033: graduating students who owe leave with their dues; say who.
+  var passOwing=picked().filter(function(s){ return (s.due||0)>0 && outcome[s.id]==='passout'; });
+  document.getElementById('mPassDuesText').textContent = passOwing.length
+    ? passOwing.length+' graduating student(s) still owe '+inr(passOwing.reduce(function(t,s){ return t+s.due; },0))
+      +'. Their dues stay on their account after they leave: '+passOwing.map(function(s){ return s.name; }).join(', ')+'.'
+    : '';
+  document.getElementById('mPassDuesWarn').classList.toggle('d-none', passOwing.length === 0);
+
+  var miss=missingSections(retainSecs);
+  document.getElementById('mSecText').textContent = miss.length
+    ? miss.length+' student(s) will be skipped because their section does not exist in the new class for '+tgtY+': '
+      +miss.join(', ')+'. Add the section, or pick a section above.'
+    : '';
+  document.getElementById('mSecWarn').classList.toggle('d-none', miss.length === 0);
+
+  // G12: promoting into a session with no fee structure bills nobody.
+  var moving=picked().some(function(s){ return outcome[s.id]!=='passout'; });
+  var noFees=FEES_ON && moving && sessionInfo.feeClasses === 0;
+  document.getElementById('mFeeText').textContent = noFees
+    ? tgtY+' has no fee structure yet, so promoted students get no fee lines for it. Copy the fee structure first (Fees › Fee Structure), or bill them later.'
+    : '';
+  document.getElementById('mFeeWarn').classList.toggle('d-none', !noFees);
+
+  // QA BUG-030: before the source session's last month, type its name to go ahead.
+  var early=!!sessionInfo.isEarly;
+  document.getElementById('mEarly').classList.toggle('d-none', !early);
+  document.getElementById('mEarlyInput').value='';
+  if(early){
+    document.getElementById('mEarlyName').textContent='"'+srcY+'"';
+    document.getElementById('mEarlyText').textContent =
+      srcY+' is still running (until '+EC.date(sessionInfo.sourceEnd)+'). Promotion normally happens from '
+      +EC.date(sessionInfo.lastMonth)+', its last month. Moved students leave '+srcY+' class lists, attendance and reports now. '
+      +'Fees already billed for '+srcY+' stay owed, including the months still ahead.';
+  }
+  document.getElementById('commitBtn').disabled = early;
+
   bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).show();
+}
+
+document.getElementById('mEarlyInput').addEventListener('input', function(){
+  document.getElementById('commitBtn').disabled =
+    this.value.trim().toLowerCase() !== document.getElementById('srcYear').value.trim().toLowerCase();
+});
+
+var reviewBtnEl=document.getElementById('reviewBtn');
+if(reviewBtnEl) reviewBtnEl.addEventListener('click', function(){
+  var err=validate();
+  if(err){ showErr(err); return; }
+  clearErr();
+
+  var cls=document.getElementById('srcClass').value,
+      anyRetain=picked().some(function(s){ return outcome[s.id]==='retain'; });
+  if(!anyRetain){ openReview(null); return; }
+  $.getJSON(SEC_URL, { 'class':cls, year:document.getElementById('tgtYear').value })
+    .done(function(list){ openReview(list||[]); })
+    .fail(function(){ openReview(null); });
 });
 
 document.getElementById('resultClose').addEventListener('click', function(){
@@ -853,6 +1041,9 @@ document.getElementById('commitBtn').addEventListener('click', function(){
       srcY=document.getElementById('srcYear').value,
       tgtY=document.getElementById('tgtYear').value;
 
+  // QA BUG-030: the typed session name is the confirmation of an early run
+  if(sessionInfo.isEarly && document.getElementById('mEarlyInput').value.trim().toLowerCase() !== document.getElementById('srcYear').value.trim().toLowerCase()) return;
+
   var btn=this;
   EC.buttonBusy(btn,'Promoting…');
   $.ajax({
@@ -865,6 +1056,8 @@ document.getElementById('commitBtn').addEventListener('click', function(){
       targetYear:    tgtY,
       targetSection: document.getElementById('tgtSection').value,
       carryDues:     document.getElementById('carryDues').checked,
+      confirmEarly:  !!sessionInfo.isEarly,
+      rollMode:      document.getElementById('rollMode').value,
       students:      sel.map(function(s){
         return { studentId:s.id, outcome:outcome[s.id], toClass:targetClass[s.id]||null };
       })
@@ -876,6 +1069,8 @@ document.getElementById('commitBtn').addEventListener('click', function(){
     if(!res || !res.success){
       bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();
       showErr((res && res.message) || 'Could not promote.');
+      // everyone held back: the names come back as the skipped list (QA BUG-033)
+      if(res && res.skipped>0) showResult(res); else document.getElementById('resultCard').style.display='none';
       return;
     }
 
@@ -888,6 +1083,7 @@ document.getElementById('commitBtn').addEventListener('click', function(){
     roster=[]; outcome={}; targetClass={}; unpicked={};
     document.getElementById('sumSection').style.display='none';
     document.getElementById('rosterCard').style.display='none';
+    checkTargetSession();   // shows the Undo bar for this run
   })
   .fail(function(xhr){
     bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).hide();

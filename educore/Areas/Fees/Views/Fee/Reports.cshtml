@@ -205,7 +205,21 @@ $(function () {
     // ── collection register ──
     var regData={receipts:[]};
     $('#rFrom').val(monthStart()); $('#rTo').val(todayStr());
+    // QA BUG-004: From after To is refused with a message, and the old result is
+    // cleared so it cannot be read as the answer for the new range.
+    function badRange(from, to){
+        if(from && to && from > to){ ecToast('warning','"From" date cannot be after the "To" date.'); return true; }
+        return false;
+    }
     function loadReg(){
+        if(badRange($('#rFrom').val(), $('#rTo').val())){
+            regData={receipts:[],refunds:[]};
+            $('#rTotal,#rRefund,#rNet').text(EC.money(0)); $('#rCount').text(0);
+            $('#rRefundWrap').addClass('d-none'); $('#rModes').html('<span class="text-muted">—</span>');
+            $('#rHeads').html('<tr><td colspan="2" class="text-muted text-center py-3">—</td></tr>');
+            $('#rRows').html('<tr><td colspan="10" class="text-muted text-center py-4">Fix the dates and load again.</td></tr>');
+            return;
+        }
         $.getJSON(URL.reg,{from:$('#rFrom').val(),to:$('#rTo').val(),className:$('#rClass').val(),section:$('#rSection').val()}).done(function(d){
             regData=d;
             $('#rTotal').text(EC.money(d.total)); $('#rCount').text(d.receiptCount||0);
@@ -305,6 +319,13 @@ $(function () {
         return 'Authorised by '+EC.esc(r.approvedBy)+(r.givenBy?' <span class="text-muted">(entered by '+EC.esc(r.givenBy)+')</span>':'');
     }
     function loadAudit(){
+        if(badRange($('#aFrom').val(), $('#aTo').val())){
+            auditData={concessions:[],cancels:[]};
+            $('#aConcTotal').text(EC.money(0)); $('#aCancCount').text(0);
+            $('#aConcRows').html('<tr><td colspan="7" class="text-muted text-center py-4">Fix the dates and load again.</td></tr>');
+            $('#aCancRows').html('<tr><td colspan="8" class="text-muted text-center py-4">Fix the dates and load again.</td></tr>');
+            return;
+        }
         $.getJSON(URL.audit,{from:$('#aFrom').val(),to:$('#aTo').val()}).done(function(d){
             auditData=d;
             var conc=d.concessions||[], canc=d.cancels||[];

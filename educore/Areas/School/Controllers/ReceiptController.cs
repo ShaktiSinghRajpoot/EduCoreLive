@@ -10,7 +10,8 @@ namespace educore.Areas.School.Controllers
     ///
     /// Not part of the Fees module on purpose. Admission, Registration, Enquiry and
     /// the student profile print and cancel receipts too (registration fee, fee at
-    /// admission), and they must keep working for a school that has not bought Fees.
+    /// admission), and re-printing must keep working for a school that has not bought
+    /// Fees. Cancelling (it reverses money) needs the Fees module (QA BUG-045).
     /// Moved here out of FeeController; the permissions are the ones they had there.
     /// </summary>
     [Area("School")]
@@ -192,8 +193,11 @@ namespace educore.Areas.School.Controllers
         // ── POST: /school/receipt/cancelreceipt ─────────────────────────
         // Voids a receipt: reverses its ledger allocation (re-opens the dues) and
         // marks it Cancelled with reason + authoriser. The receipt is kept on record.
+        // Cancelling changes the money ledger, so it needs the Fees module (QA BUG-045):
+        // a school whose plan has no Fees (or a suspended one) can re-print, not reverse.
         [HttpPost]
         [HasPermission("fees.cancel")]
+        [RequiresModule(SchoolModule.Fees)]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CancelReceipt([FromBody] CancelReceiptRequest req)
         {

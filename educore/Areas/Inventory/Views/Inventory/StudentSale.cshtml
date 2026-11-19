@@ -213,7 +213,7 @@ $(function () {
             // a child promoted early can be given next session's books (charged in that session)
             var opts = r.sessions.map(function (s) {
                 return '<option value="' + EC.esc(s.year) + '"' + (s.current ? ' selected' : '') + '>'
-                     + EC.esc(s.year) + ' · ' + EC.esc(s.cls) + (s.sec ? ' – ' + EC.esc(s.sec) : '') + (s.current ? ' (now)' : ' (next session)') + '</option>';
+                     + EC.esc(s.year) + ' · ' + EC.esc(s.cls) + (s.sec ? ' – ' + EC.esc(s.sec) : '') + ' (' + EC.esc(s.label || (s.current ? 'current session' : 'next session')) + ')' + '</option>';
             }).join('');
             $('#ssStudent').removeClass('d-none').html(
                 '<div class="d-flex flex-wrap align-items-end gap-3">'

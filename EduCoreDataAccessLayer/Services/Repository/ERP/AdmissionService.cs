@@ -736,7 +736,11 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 new("p_carry_dues",     NpgsqlDbType.Boolean) { Value = request.CarryDues },
                 new("p_students",       NpgsqlDbType.Jsonb)   { Value = studentsJson },
                 new("p_result", NpgsqlDbType.Refcursor)
-                    { Direction = ParameterDirection.InputOutput, Value = "student_promote_cursor" }
+                    { Direction = ParameterDirection.InputOutput, Value = "student_promote_cursor" },
+                // after p_result in the proc (added with defaults, so named calls keep working)
+                new("p_confirm_early",  NpgsqlDbType.Boolean) { Value = request.ConfirmEarly },
+                new("p_roll_mode",      NpgsqlDbType.Varchar)
+                    { Value = string.Equals(request.RollMode, "renumber", StringComparison.OrdinalIgnoreCase) ? "renumber" : "keep" }
             };
 
             try
@@ -754,7 +758,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                     Retained      = IntVal(row, "retained"),
                     PassedOut     = IntVal(row, "passed_out"),
                     Skipped       = IntVal(row, "skipped"),
-                    SkippedDetail = NullStr(row, "skipped_detail")
+                    SkippedDetail = NullStr(row, "skipped_detail"),
+                    RunId         = IntVal(row, "run_id")
                 };
             }
             catch (PostgresException ex)
@@ -762,7 +767,86 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 // The proc RAISEs the business rules ("final class", "session not
                 // set up"), so the office sees that message rather than a stack.
                 _logger.LogWarning(ex, "Promotion rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
-                return new StudentPromotionResult { Message = ex.MessageText };
+                var result = new StudentPromotionResult { Message = ex.MessageText };
+
+                // "Nothing was promoted. A (pending dues); B (pending dues)" -- everyone was
+                // held back. Hand the names over as the skipped list, so the result card
+                // counts them instead of saying 0 (QA BUG-033).
+                const string nothing = "Nothing was promoted. ";
+                if (ex.MessageText.StartsWith(nothing) && ex.MessageText.Contains(" ("))
+                {
+                    result.SkippedDetail = ex.MessageText.Substring(nothing.Length);
+                    result.Skipped = result.SkippedDetail.Split("; ").Length;
+                }
+                return result;
+            }
+        }
+
+        public async Task<PromotionContext> GetPromotionContextAsync(
+            string sourceYear, string targetYear, string? className, int tenantId, int schoolId, int actionUserId)
+        {
+            var ctx = new PromotionContext();
+            if (tenantId <= 1 || schoolId <= 0) return ctx;
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_source_year",    NpgsqlDbType.Varchar) { Value = sourceYear ?? string.Empty },
+                new("p_target_year",    NpgsqlDbType.Varchar) { Value = targetYear ?? string.Empty },
+                new("p_class_name",     NpgsqlDbType.Varchar) { Value = string.IsNullOrWhiteSpace(className) ? DBNull.Value : className.Trim() },
+                new("p_info",    NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "promotion_info_cursor" },
+                new("p_results", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "promotion_results_cursor" }
+            };
+
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_promotion_context", parameters);
+            if (ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+            {
+                var r = ds.Tables[0].Rows[0];
+                ctx.SourceEnd        = NullStr(r, "source_end");
+                ctx.LastMonthStart   = NullStr(r, "last_month_start");
+                ctx.IsEarly          = Has(r, "is_early") && r["is_early"] != DBNull.Value && Convert.ToBoolean(r["is_early"]);
+                ctx.TargetFeeClasses = IntVal(r, "target_fee_classes");
+                ctx.UndoRunId        = Has(r, "undo_run_id") && r["undo_run_id"] != DBNull.Value ? Convert.ToInt32(r["undo_run_id"]) : null;
+                ctx.UndoRunAt        = NullStr(r, "undo_run_at");
+                ctx.UndoSource       = NullStr(r, "undo_source");
+                ctx.UndoTarget       = NullStr(r, "undo_target");
+                ctx.UndoCount        = IntVal(r, "undo_count");
+                ctx.UndoBlock        = NullStr(r, "undo_block");
+            }
+            if (ds.Tables.Count > 1)
+            {
+                foreach (DataRow r in ds.Tables[1].Rows)
+                    ctx.Results[IntVal(r, "student_id")] = (Str(r, "exam_name"), Str(r, "result"));
+            }
+            return ctx;
+        }
+
+        public async Task<(bool Success, string Message)> UndoPromotionRunAsync(
+            int runId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || runId <= 0) return (false, "Invalid request.");
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_run_id",         NpgsqlDbType.Integer) { Value = runId },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "promotion_undo_cursor" }
+            };
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_promotion_undo", parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (false, "Nothing was changed.");
+                return (true, Str(ds.Tables[0].Rows[0], "message"));
+            }
+            catch (PostgresException ex)
+            {
+                _logger.LogWarning(ex, "Promotion undo rejected for school {SchoolId}. SqlState {SqlState}", schoolId, ex.SqlState);
+                return (false, ex.MessageText);
             }
         }
 

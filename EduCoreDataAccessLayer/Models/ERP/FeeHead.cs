@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.ComponentModel.DataAnnotations;
 
 namespace EduCoreDataAccessLayer.Models.ERP
 {
@@ -20,8 +21,13 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public int SchoolId { get; set; }
 
         public int FeeHeadId { get; set; }
+        // Plain-language messages (QA UX-06) instead of "The FeeHeadName field is required."
+        [Required(ErrorMessage = "Enter a fee head name.")]
+        [StringLength(100, ErrorMessage = "Keep the fee head name under 100 characters.")]
         public string FeeHeadName { get; set; } = string.Empty;
+        [Required(ErrorMessage = "Choose how often this fee is charged.")]
         public string Frequency { get; set; } = string.Empty;
+        [Range(typeof(decimal), "0", "10000000", ErrorMessage = "Enter the amount as a number, 0 or more.")]
         public decimal DefaultAmount { get; set; }
         public string FeeType { get; set; } = string.Empty;
         public string FeeGroup { get; set; } = "Academic";

@@ -48,7 +48,8 @@
     <!-- the session as a whole: closed or not, and the Close / Re-open button -->
     <div id="yClose" class="ec-card mb-3 d-none"><div class="ec-card-body py-2 d-flex flex-wrap align-items-center gap-2">
       <div class="flex-grow-1 small" id="yCloseText"></div>
-      @if (canManage)
+      @* Owner decision #11: closing is for the School Admin / Principal (fees.writeoff), not the Accountant *@
+      @if (canWriteOff)
       {
           <button id="btnClose" class="btn btn-sm btn-outline-primary d-none"><i class="bx bx-lock-alt me-1"></i>Close session</button>
       }
@@ -62,7 +63,7 @@
       <div class="kpi open"><div class="l">To decide</div><div class="v" id="kOpen">₹0</div><div class="s" id="kOpenN">0 lines</div></div>
       <div class="kpi"><div class="l">Carried forward</div><div class="v" id="kCarry">₹0</div><div class="s" id="kCarryN">0 lines</div></div>
       <div class="kpi"><div class="l">Written off</div><div class="v" id="kWrite">₹0</div><div class="s" id="kWriteN">0 lines</div></div>
-      <div class="kpi"><div class="l">Students owing</div><div class="v" id="kStu">0</div><div class="s">in this session</div></div>
+      <div class="kpi"><div class="l">Students owing</div><div class="v" id="kStu">0</div><div class="s">fees already due</div></div>
     </div>
 
     <div class="ec-card mb-3"><div class="ec-card-body ye-tools">
@@ -106,8 +107,9 @@ $(function () {
     var shown = PAGE;    // how many student cards are drawn
 
     // Carrying needs a next session; nothing changes once the session is closed.
-    function canCarry() { return CAN_MANAGE && !!status.next && !status.closedAt; }
-    function canAct()   { return CAN_MANAGE && !status.closedAt; }
+    // ... and carrying opens only in the session's last month (status.carryOpen).
+    function canCarry() { return CAN_MANAGE && !!status.next && !status.closedAt && status.carryOpen !== false; }
+    function canAct()   { return (CAN_MANAGE || CAN_WRITEOFF) && !status.closedAt; }
 
     function drawStatus() {
         var closed = !!status.closedAt;
@@ -119,7 +121,18 @@ $(function () {
                 : 'Every line is decided. You can close the session now.');
         $('#btnClose').toggleClass('d-none', closed).prop('disabled', status.open > 0);
         $('#btnReopen').toggleClass('d-none', !closed);
-        $('#btnCarryAll').toggleClass('d-none', !canCarry());
+        // QA BUG-034: before the session's last month the server refuses a carry, so
+        // the button shows disabled with the date instead of failing on click.
+        var early = status.carryOpen === false;
+        $('#btnCarryAll').toggleClass('d-none', !(CAN_MANAGE && !!status.next && !closed))
+            .attr('title', early ? 'Dues can be carried to the next session from ' + (status.carryFrom || '') + ' (the last month of this session).' : '');
+        drawCarryAll();
+    }
+
+    // Disabled when nothing is due to carry, or before carrying opens.
+    var openDue = 0;
+    function drawCarryAll() {
+        $('#btnCarryAll').prop('disabled', openDue === 0 || status.carryOpen === false);
     }
 
     function load() {
@@ -133,7 +146,7 @@ $(function () {
             $('#yNext').toggleClass('d-none', !lines.length)
                 .toggleClass('alert-info', !!next).toggleClass('alert-warning', !next)
                 .html(next ? 'Carried dues move into <b>' + EC.esc(next) + '</b> and leave the defaulters of this session. Only fees already due can be carried or written off.'
-                           : 'There is no next session yet, so nothing can be carried. Create it in School Setup › Sessions. Only fees already due can be written off.');
+                           : 'There is no next session yet, so nothing can be carried. Create it in <a href="@Url.Action("AcademicYears","SchoolSettings",new{area="School"})">School Setup › Sessions</a>. Only fees already due can be written off.');
             fillClasses();
             drawKpis();
             draw();
@@ -152,16 +165,19 @@ $(function () {
     function classOf(l) { return (l.cls || '') + (l.sec ? '-' + l.sec : ''); }
 
     function drawKpis() {
-        var t = { Open: [0, 0], Carried: [0, 0], WrittenOff: [0, 0] }, owing = {};
+        var t = { Open: [0, 0], Carried: [0, 0], WrittenOff: [0, 0] }, owing = {}, due = 0;
         lines.forEach(function (l) {
             t[l.state][0] += EC.num(l.amount); t[l.state][1]++;
-            if (l.state !== 'WrittenOff') owing[l.sid] = 1;
+            // G07: a fee not due yet is not owed yet, so it does not make a student "owing"
+            if (l.state !== 'WrittenOff' && !(l.state === 'Open' && l.notDue)) owing[l.sid] = 1;
+            if (l.state === 'Open' && !l.notDue) due++;
         });
         $('#kOpen').text(EC.money(t.Open[0]));          $('#kOpenN').text(t.Open[1] + ' lines');
         $('#kCarry').text(EC.money(t.Carried[0]));      $('#kCarryN').text(t.Carried[1] + ' lines');
         $('#kWrite').text(EC.money(t.WrittenOff[0]));   $('#kWriteN').text(t.WrittenOff[1] + ' lines');
         $('#kStu').text(Object.keys(owing).length);
-        $('#btnCarryAll').prop('disabled', t.Open[1] === 0);
+        openDue = due;
+        drawCarryAll();
     }
 
     // Lines that pass the tab, class and search filters, grouped per student.
@@ -214,7 +230,7 @@ $(function () {
             btns = l.state === 'Open'
                 ? (l.notDue ? '' : (canCarry() ? '<button class="btn btn-xs ec-btn-soft ye-act" data-op="Carry" data-id="' + l.id + '">Carry fwd</button>' : '')
                   + (CAN_WRITEOFF ? '<button class="btn btn-xs btn-outline-danger ye-act" data-op="WriteOff" data-id="' + l.id + '">Write off</button>' : ''))
-                : '<button class="btn btn-xs btn-outline-secondary ye-act" data-op="Undo" data-id="' + l.id + '">Undo</button>';
+                : (CAN_MANAGE ? '<button class="btn btn-xs btn-outline-secondary ye-act" data-op="Undo" data-id="' + l.id + '">Undo</button>' : '');
         }
         return '<div class="ye-line"><div class="ye-what"><b>' + EC.esc(l.head) + '</b>' + (l.inst ? ' · ' + EC.esc(l.inst) : '') + ' ' + label + note + '</div>'
              + '<div class="ye-amt">' + EC.money(l.amount) + '</div><div class="ye-btns">' + btns + '</div></div>';
@@ -252,10 +268,12 @@ $(function () {
     });
 
     $('#btnClose').on('click', function () {
-        var $b = $(this);
-        EC.confirm({ title: 'Close session ' + $('#ySession').val() + '?', danger: false, okText: 'Close session',
-                     message: 'Every fee line of this session is decided. After closing, nothing can be carried, written off or undone here until the session is re-opened.' })
-          .then(function (ok) { if (ok) send({ operation: 'Close' }, $b); });
+        var $b = $(this), word = 'CLOSE ' + $('#ySession').val();
+        // Owner decision #11: typed confirmation; the server checks the same text.
+        EC.prompt({ title: 'Close session ' + $('#ySession').val() + '?', danger: true, icon: 'bx-lock-alt', okText: 'Close session',
+                    message: 'Every fee line of this session is decided. After closing, nothing can be carried, written off or undone here until the session is re-opened.',
+                    label: 'Type ' + word + ' to confirm', mustType: word })
+          .then(function (typed) { if (typed !== null) send({ operation: 'Close', confirm: typed }, $b); });
     });
     $('#btnReopen').on('click', function () {
         var $b = $(this);

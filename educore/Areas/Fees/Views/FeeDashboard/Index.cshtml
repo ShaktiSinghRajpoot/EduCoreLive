@@ -177,7 +177,7 @@ $(function () {
         $('#fdKpis').html(
             kpi('Collection rate', rate === null ? '—' : rate + '%', 'of fees due so far', 'main')
           + kpi('Collected this month', EC.money(now), S.receipts_month + ' receipt(s)' + (prev ? ' · last month ' + short(prev) : ''), 'good')
-          + kpi('Still due', EC.money(S.overdue), S.overdue_families + ' famil' + (S.overdue_families == 1 ? 'y' : 'ies') + ' overdue', n(S.overdue) > 0 ? 'warn' : '')
+          + kpi('Still due', EC.money(S.overdue), S.overdue_families + ' famil' + (S.overdue_families == 1 ? 'y' : 'ies') + ' overdue · all sessions', n(S.overdue) > 0 ? 'warn' : '')
           + kpi('Doubtful dues', EC.money(doubtful), pctText(doubtful, owed) + ' of everything owed', doubtful > 0 ? 'warn' : '')
           + kpi('Falling due in 10 days', EC.money(S.due_next_10), S.due_next_10_families + ' famil' + (S.due_next_10_families == 1 ? 'y' : 'ies') + ' worth reminding'));
 
@@ -185,9 +185,9 @@ $(function () {
         var top = Math.max(n(S.billed_session), 1);
         $('#fdFunnel').html(
             hbar('The session should bring in', 'everything billed for ' + (S.session || 'the session'), S.billed_session, top, 'r3', EC.money(S.billed_session))
-          + hbar('Due so far', 'billed with a due date up to today', S.billed_due, top, 'r2', EC.money(S.billed_due))
+          + hbar('Due so far', (S.session ? S.session + ' fees' : 'billed') + ' with a due date up to today', S.billed_due, top, 'r2', EC.money(S.billed_due))
           + hbar('Collected', pctText(S.paid_due, S.billed_due) + ' of what is due', S.paid_due, top, 'r3', EC.money(S.paid_due))
-          + hbar('Still due', S.overdue_families + ' families', S.overdue, top, 'r0', EC.money(S.overdue))
+          + hbar('Still due', S.overdue_families + ' families · includes earlier sessions', S.overdue, top, 'r0', EC.money(S.overdue))
           + hbar('Not due yet', 'later months of the session', S.not_yet_due, top, 'r1', EC.money(S.not_yet_due))
           + hbar('Doubtful or likely lost', 'over 90 days old, or the student has left', doubtful, top, 'r0', EC.money(doubtful)));
 

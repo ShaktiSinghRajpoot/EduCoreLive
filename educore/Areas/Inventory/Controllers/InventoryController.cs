@@ -553,14 +553,29 @@ namespace educore.Areas.Inventory.Controllers
 
         [HttpGet]
         [HasPermission("inventory.manage")]
-        public async Task<IActionResult> SaleStudent(int id)
+        public async Task<IActionResult> SaleStudent(int id, [FromServices] ISchoolSettingsService settings)
         {
             var st = await _sales.GetStudentAsync(id, TenantId(), SchoolId(), UserId());
             if (st == null) return Json(new { success = false, message = "Student not found, or has left the school." });
+
+            // QA BUG-038: "(current)" / "(next session)" follow the school's CURRENT session,
+            // and the current session is the one picked by default.
+            string? current = null;
+            try { current = (await settings.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId())).FirstOrDefault(y => y.IsCurrent)?.AcademicYearName; }
+            catch { /* fall back to the proc's own flag */ }
+            bool IsCur(string year, bool procFlag) => current == null ? procFlag : string.Equals(year, current, StringComparison.OrdinalIgnoreCase);
+            string Label(string year, bool procFlag) =>
+                IsCur(year, procFlag) ? "current session"
+                : current != null && string.CompareOrdinal(year, current) < 0 ? "previous session" : "next session";
+
             return Json(new
             {
                 success = true, id = st.StudentId, name = st.StudentName, admNo = st.AdmissionNo ?? "",
-                sessions = st.Sessions.Select(x => new { year = x.AcademicYear, cls = x.ClassName, sec = x.Section ?? "", current = x.IsCurrent })
+                sessions = st.Sessions.Select(x => new
+                {
+                    year = x.AcademicYear, cls = x.ClassName, sec = x.Section ?? "",
+                    current = IsCur(x.AcademicYear, x.IsCurrent), label = Label(x.AcademicYear, x.IsCurrent)
+                })
             });
         }
 

@@ -55,7 +55,7 @@
                                 <optgroup label="@(g.SessionName + (g.IsCurrent ? "  (current)" : ""))">
                                     @foreach (var e in g.Exams)
                                     {
-                                        <option value="@e.ExamId" selected="@(e.ExamId == selected)">@e.ExamName</option>
+                                        <option value="@e.ExamId" selected="@(e.ExamId == selected)">@e.ExamName · @g.SessionName</option>
                                     }
                                 </optgroup>
                             }

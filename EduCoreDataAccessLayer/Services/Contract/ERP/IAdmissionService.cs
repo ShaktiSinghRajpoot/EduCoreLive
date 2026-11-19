@@ -89,6 +89,16 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<StudentPromotionResult> PromoteStudentsAsync(
             StudentPromotionRequest request, int tenantId, int schoolId, int actionUserId);
 
+        /// <summary>Facts the Promote page checks before a run (core.sp_promotion_context):
+        /// early-promotion warning, target fee structure, last undoable run, and the exam
+        /// result per student of className (null className = no results).</summary>
+        Task<PromotionContext> GetPromotionContextAsync(
+            string sourceYear, string targetYear, string? className, int tenantId, int schoolId, int actionUserId);
+
+        /// <summary>Undo the school's last promotion run (same day, target not current).</summary>
+        Task<(bool Success, string Message)> UndoPromotionRunAsync(
+            int runId, int tenantId, int schoolId, int actionUserId);
+
         /// <summary>Who moved out of a session and how (promotion_history.sql).
         /// onlyMyClass = just the sections the user is class teacher of.</summary>
         Task<List<PromotionHistoryRow>> GetPromotionHistoryAsync(

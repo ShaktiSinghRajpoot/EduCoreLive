@@ -156,6 +156,9 @@ function ecDialog(opts, fieldHtml, readValue, cancelValue) {
                   '<h5 class="ec-confirm-title">' + EC.esc(opts.title || 'Are you sure?') + '</h5>' +
                   (opts.name ? '<div class="ec-confirm-name">' + EC.esc(opts.name) + '</div>' : '') +
                   '<p class="ec-confirm-msg">' + EC.esc(opts.message || '') + '</p>' +
+                  // opts.items: a short list under the message (each line escaped)
+                  (opts.items && opts.items.length ? '<ul class="ec-confirm-msg text-start ps-3">' +
+                      opts.items.map(function (x) { return '<li>' + EC.esc(x) + '</li>'; }).join('') + '</ul>' : '') +
                   (fieldHtml || '') +
                 '</div>' +
                 '<div class="modal-footer">' +
@@ -178,6 +181,18 @@ function ecDialog(opts, fieldHtml, readValue, cancelValue) {
             field.addEventListener('input', function () {
                 yes.disabled = field.value.trim().length === 0;
             });
+        }
+        // opts.mustType: the confirm button stays dead until exactly this text is
+        // typed (case ignored) -- for school-wide steps such as "CLOSE 2026-27".
+        if (field && opts.mustType) {
+            yes.disabled = true;
+            field.addEventListener('input', function () {
+                yes.disabled = field.value.trim().toLowerCase() !== String(opts.mustType).trim().toLowerCase();
+            });
+        }
+        // opts.enterConfirms (no text field): Enter presses the confirm button.
+        if (!field && opts.enterConfirms) {
+            el.addEventListener('shown.bs.modal', function () { yes.focus(); });
         }
         if (field) el.addEventListener('shown.bs.modal', function () { field.focus(); });
 

@@ -29,9 +29,15 @@
     <div class="cmd">
       <div class="ec-page-icon"><i class="bx bx-wallet"></i></div>
       <div><div class="title">Fee Collection</div><div class="sub">Find a student, choose how many months to collect, then take payment</div></div>
-      <div class="today"><div class="dot"><i class="bx bx-rupee"></i></div><div><div class="n" id="todayN">₹0.00</div><div class="l" title="Everything you collected today, admission and registration receipts included -- the same figure as Day close">Your collection today · <span id="todayC">0</span> receipts</div></div></div>
+      <div class="today"><div class="dot"><i class="bx bx-rupee"></i></div><div><div class="n" id="todayN">₹0.00</div><div class="l" title="Everything you collected today, admission and registration receipts included -- the same figure as Day close">Your collection today · <span id="todayC">0 receipts</span></div></div></div>
       <a href="@Url.Action("Index","DayClose",new{area="Fees"})" class="btn btn-sm ec-btn-soft"><i class="bx bx-lock-open-alt me-1"></i>Day close</a>
       <a href="@Url.Action("Reports","Fee",new{area="Fees"})" class="btn btn-sm ec-btn-soft"><i class="bx bx-bar-chart-alt-2 me-1"></i>Reports</a>
+    </div>
+
+    <!-- QA BUG-026: say up front that this counter is closed for today -->
+    <div class="alert alert-warning d-flex d-none align-items-start gap-2 mb-3" id="dayClosedBanner">
+      <i class="bx bx-lock-alt fs-5"></i>
+      <div class="small">Today is closed for your counter, so no fee can be collected here. Ask someone who can re-open closed days (Day close) if you need to take a payment.</div>
     </div>
 
     <!-- Filters — SAME cascade: Session → Admission No → Class → Section → Student -->
@@ -331,7 +337,14 @@ $(function () {
     // Header total = this cashier's Day close figure for today, so receipts taken
     // on the Admission / Registration pages are counted too, not just this page's.
     function loadToday(){
-        api.day().done(function(d){ $('#todayN').text(EC.money(d.totalCollected)); $('#todayC').text(d.receiptCount); });
+        api.day().done(function(d){
+            $('#todayN').text(EC.money(d.totalCollected));
+            // QA UX-16: "1 receipt", and say how many were cancelled (the amount above already nets them out)
+            var n = d.receiptCount || 0, c = d.cancelledCount || 0;
+            $('#todayC').text(n + ' receipt' + (n === 1 ? '' : 's') + (c > 0 ? ' (' + c + ' cancelled)' : ''));
+            // QA BUG-026: this counter's day is closed -- say so before the form is filled in
+            $('#dayClosedBanner').toggleClass('d-none', !d.isClosed);
+        });
     }
     loadToday();
 
@@ -366,10 +379,15 @@ $(function () {
         if(!$section.val()){ $student.prop('disabled',true).html('<option value="">Select section first</option>'); return; }
         api.students($session.val(),$class.val(),$section.val()).done(function(list){ students=list||[]; fillStudentSelect(); });
     }
+    // QA UX-12: by roll number (numeric where it is a number), then name; shown "Roll – Name".
+    function rollKey(r){ var n=parseInt(r,10); return isNaN(n) ? 1e9 : n; }
     function fillStudentSelect(){
-        var h='<option value="">'+(students.length?'Select Student':'No students')+'</option>';
-        students.forEach(function(s){ h+='<option value="'+s.id+'">Roll '+EC.esc(s.roll||'—')+' — '+EC.esc(s.name)+' ('+EC.esc(s.admNo)+')</option>'; });
-        $student.html(h).prop('disabled',students.length===0);
+        var list=students.slice().sort(function(a,b){
+            return (rollKey(a.roll)-rollKey(b.roll)) || String(a.roll||'').localeCompare(String(b.roll||'')) || String(a.name||'').localeCompare(String(b.name||''));
+        });
+        var h='<option value="">'+(list.length?'Select Student':'No students')+'</option>';
+        list.forEach(function(s){ h+='<option value="'+s.id+'">'+EC.esc(s.roll||'—')+' – '+EC.esc(s.name)+' ('+EC.esc(s.admNo)+')</option>'; });
+        $student.html(h).prop('disabled',list.length===0);
     }
     $session.on('change',loadClasses);
     $class.on('change',loadSections);
@@ -703,7 +721,18 @@ $(function () {
         var missingRef = paidTenders.filter(function(t){ return refRequired(t.mode) && !t.reference; })[0];
         if(missingRef){ ecToast('warning','Enter the '+(missingRef.mode==='Cheque'?'cheque':'DD')+' number.'); return; }
         var primaryMode = tenders.length>1 ? 'Mixed' : (tenders[0]&&tenders[0].mode) || 'Cash';
-        var $btn=$(this); EC.buttonBusy($btn,'Collecting…');
+        var $btn=$(this);
+        // QA UX-01: one look at who, what and how much before the money is recorded.
+        // Enter confirms, so the counter stays fast.
+        var paying = paidTenders.reduce(function(t,x){ return t+x.amount; },0) + advUse;
+        EC.confirm({ title:'Collect '+EC.money(paying)+'?', name:currentStudent.name, danger:false, icon:'bx-receipt',
+                     okText:'Collect', enterConfirms:true,
+                     items:[ ($class.val()||'')+($section.val()?' - '+$section.val():'')+(currentStudent.roll?' · Roll '+currentStudent.roll:''),
+                             $('#scope').text() + (exs.length ? ' + '+exs.length+' extra charge(s)' : ''),
+                             'Mode: '+paidTenders.map(function(t){ return t.mode+' '+EC.money(t.amount); }).concat(advUse>0?['Advance '+EC.money(advUse)]:[]).join(', ') ] })
+        .then(function(ok){
+        if(!ok) return;
+        EC.buttonBusy($btn,'Collecting…');
         api.collect({ studentId:currentStudent.id, mode:primaryMode, reference:'', remarks:$('#pRemarks').val(),
                       session:$session.val(), items:items, extras:exs,
                       discountType: discount ? (discount.type==='pct'?'Percent':'Flat') : null,
@@ -713,9 +742,19 @@ $(function () {
         .done(function(res){
             EC.buttonReset($btn);
             if(!res || !res.success){ ecToast('error',(res&&res.message)||'Could not record payment.'); return; }
-            ecToast('success','Collected '+EC.money(res.amount)+'. Receipt '+res.receiptNo+'.');
+            // QA UX-23: a repeat of a settlement that already went through is not a new
+            // collection -- say so as information, not "Collected".
+            if(/^Already recorded/i.test(res.message||'')){
+                ecToast('info', res.message+' Nothing new was collected.');
+            } else {
+                ecToast('success','Collected '+EC.money(res.amount)+'. Receipt '+res.receiptNo+'.');
+            }
             loadToday();
             $('#pRemarks').val('');
+            // QA UX-23: the form is spent -- a fresh settlement id and no Collect until
+            // the dues reload, so edited amounts cannot fall back on the old receipt.
+            newCollectKey();
+            $('#collectBtn').prop('disabled', true);
             // Receipt is NOT force-opened — the cashier may be mid-queue. It is
             // available from the payment history list ("Print") whenever needed.
             api.dues(currentStudent.id).done(openStudent);
@@ -726,6 +765,7 @@ $(function () {
             // it returns the receipt already issued instead of a second one.
             EC.buttonReset($btn);
             ecToast('error','Could not reach the server. Collect again to retry — the same payment is never taken twice.');
+        });
         });
     });
 

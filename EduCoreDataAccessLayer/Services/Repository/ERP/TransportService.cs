@@ -301,6 +301,17 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             }
         }
 
+        public async Task<(decimal, int, decimal, int)> RemovePreviewAsync(int studentId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || studentId <= 0) return (0, 0, 0, 0);
+            var p = AssignParams("RemovePreview", tenantId, schoolId, actionUserId, studentId);
+            var ds = await ExecAsync(SpAssign, p);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return (0, 0, 0, 0);
+            var row = ds.Tables[0].Rows[0];
+            return (Convert.ToDecimal(row["future_amount"]), ToInt(row["future_months"]),
+                    Convert.ToDecimal(row["overdue_amount"]), ToInt(row["overdue_months"]));
+        }
+
         // ── Param builders ───────────────────────────────────────
         private static NpgsqlParameter[] RouteParams(string op, int t, int s, int u) => new NpgsqlParameter[]
         {

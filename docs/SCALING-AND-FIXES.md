@@ -5963,3 +5963,10 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 
 ### 2026-10-25 — Public website: plain hero, no scroll animation
 - The owner found the scroll-assembled hero ("Scroll to put your school together", pieces flying into the laptop) unprofessional. The hero is now static: text and buttons on the left, the finished dashboard on a laptop on the right, a WhatsApp "absent alert" note on its corner. GSAP/ScrollTrigger (cdnjs) are no longer loaded; `home.js` keeps only the phone menu, the fade-in and the demo form. The loose objects (ID card, register, receipt, coins, ...) and all `.assembling` / caption CSS are gone.
+
+### 2026-11-19 — Session rollover safety (QA pack: fees + rollover)
+- `core.sp_student_promote` has two trailing parameters (after `p_result`, with defaults): `p_confirm_early` (promoting before the source session's last month needs the session name typed on the Promote page) and `p_roll_mode` (`keep` | `renumber`). A pass-out now closes only fee lines due after the session ends: the running session's months stay owed.
+- Every run is logged in `core.student_promotion_run`; `student_promotion_history` carries `run_id`, `from_roll`, `from_status`. `core.sp_promotion_undo` reverses the last run (same day, target not current). It finds what the run wrote by its transaction time: fee lines, fee plan rows and bus assignments created at `run_at`, lines closed at `run_at`.
+- "Make it current" goes through `academic.sp_academic_year_switch_check` and a typed session name (checked in `SchoolSettingsController` too); Save no longer moves the current flag when another session is current.
+- Month-wise Dues (`sp_fee_month_dues`) shows unpaid lines of earlier sessions, labelled with their session. Year-End Close needs `fees.writeoff` plus "CLOSE <year>".
+- SQL: `EduCoreDataAccessLayer/Database/qa_fix_fees_rollover.sql`.

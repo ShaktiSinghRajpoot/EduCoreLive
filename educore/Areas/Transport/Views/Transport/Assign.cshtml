@@ -55,7 +55,7 @@ $(function(){
   'use strict';
   var CSRF=$('input[name="__RequestVerificationToken"]').val();
   var URL={ sessions:'@Url.Action("GetSessions")', classes:'@Url.Action("GetClasses")', sections:'@Url.Action("GetSections")', students:'@Url.Action("GetStudents")',
-            routes:'@Url.Action("GetRoutesDropdown")', getAssign:'@Url.Action("GetAssignment")', save:'@Url.Action("SaveAssignment")', remove:'@Url.Action("RemoveAssignment")' };
+            routes:'@Url.Action("GetRoutesDropdown")', getAssign:'@Url.Action("GetAssignment")', save:'@Url.Action("SaveAssignment")', remove:'@Url.Action("RemoveAssignment")', removePreview:'@Url.Action("RemovePreview")' };
   function post(url,data){ return $.ajax({url:url,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},data:JSON.stringify(data)}); }
   function postForm(url,data){ data.__RequestVerificationToken=CSRF; return $.post(url,data); }
   // Every name below comes from the database and goes into .html(), so it is
@@ -108,13 +108,23 @@ $(function(){
   });
   $('#removeBtn').on('click',function(){
     if(!currentStudent) return;
-    EC.confirm({ title:'Remove transport?', name:currentStudent.name,
-                 message:'Future unpaid bus dues for this student will be removed.',
-                 okText:'Remove transport' }).then(function(ok){
-      if(!ok) return;
-      postForm(URL.remove,{studentId:currentStudent.id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success){ openStudent(); reloadRoutes(); } })
-        .fail(function(){ ecToast('error','Could not remove transport.'); });
-    });
+    // Show the money first (QA BUG-046): months not due yet are closed, months
+    // already due stay owed because the child used the bus.
+    $.getJSON(URL.removePreview,{studentId:currentStudent.id}).done(function(pv){
+      pv=pv||{};
+      var msg=(pv.futureMonths>0
+                ? EC.money(pv.future)+' of bus fees not due yet ('+pv.futureMonths+' month'+(pv.futureMonths===1?'':'s')+') will be closed.'
+                : 'No future bus fees to close.')
+            +(pv.overdueMonths>0
+                ? ' '+EC.money(pv.overdue)+' already due ('+pv.overdueMonths+' month'+(pv.overdueMonths===1?'':'s')+') stays owed.'
+                : '');
+      EC.confirm({ title:'Remove transport?', name:currentStudent.name, message:msg,
+                   okText:'Remove transport' }).then(function(ok){
+        if(!ok) return;
+        postForm(URL.remove,{studentId:currentStudent.id}).done(function(res){ ecToast(res.success?'success':'error',res.message); if(res.success){ openStudent(); reloadRoutes(); } })
+          .fail(function(){ ecToast('error','Could not remove transport.'); });
+      });
+    }).fail(function(xhr){ ecToast('error', EC.ajaxError(xhr,'Could not read the bus fees')); });
   });
 
 });

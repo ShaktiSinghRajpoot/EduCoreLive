@@ -22,7 +22,7 @@
         @* View-only (e.g. Accountant): hide the form and buttons the server would refuse. *@
         <style>
             .col-xl-4:has(#feeHeadFormTitle), .edit-fee-head,
-            form[action*="ToggleFeeHeadStatus"], form[action*="DeleteFeeHead"] { display: none !important; }
+            form[action*="ToggleFeeHeadStatus" i], form[action*="DeleteFeeHead" i] { display: none !important; }
             /* the list then takes the full width instead of leaving the form's column empty */
             .col-xl-8:has(#feeHeadFilterForm) { flex: 0 0 100%; max-width: 100%; }
         </style>
@@ -191,6 +191,7 @@
                                     <span class="input-group-text">₹</span>
 
                                     <input asp-for="DefaultAmount"
+                                           data-val-number="Enter the amount as a number."
                                            type="number"
                                            class="form-control"
                                            id="DefaultAmount"
@@ -470,6 +471,10 @@
                                                 <i class="bx bx-edit"></i>
                                             </button>
 
+                                            @* QA BUG-010: rendered only for fee-master managers (settings.manage). The CSS
+                                               hide below missed them: the form action is lower-case, the selector was not. *@
+                                            @if (ViewBag.CanManage == true)
+                                            {
                                             @* Deactivate / re-activate. This is the safe way to stop
                                                charging a head that already has money against it --
                                                the delete refusal tells the user to do exactly this. *@
@@ -509,6 +514,7 @@
                                                 </button>
 
                                             </form>
+                                            }
                                         </div>
                                     </div>
                                 </div>

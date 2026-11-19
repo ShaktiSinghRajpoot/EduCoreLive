@@ -52,7 +52,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                             Due       = DbRead.Dec(r, cols, "due"),
                             Collected = DbRead.Dec(r, cols, "collected"),
                             Pending   = DbRead.Dec(r, cols, "pending"),
-                            Children  = DbRead.Int(r, cols, "children")
+                            Children  = DbRead.Int(r, cols, "children"),
+                            Session   = DbRead.NStr(r, cols, "session")
                         });
                 },
                 async r =>

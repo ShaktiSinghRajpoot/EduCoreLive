@@ -1105,6 +1105,8 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                         status.ClosedBy    = DbRead.NStr(reader, cols, "closed_by");
                         status.OpenLines   = DbRead.Int(reader, cols, "open_lines");
                         status.NotDueLines = DbRead.Int(reader, cols, "not_due_lines");
+                        status.CarryFrom   = DbRead.NStr(reader, cols, "carry_from");
+                        status.CarryOpen   = !cols.Contains("carry_open") || DbRead.Bool(reader, cols, "carry_open");
                     }
                 });
             return status;

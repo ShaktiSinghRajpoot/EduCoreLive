@@ -59,7 +59,7 @@ namespace educore.Areas.Fees.Controllers
             return Json(new
             {
                 success  = true,
-                months   = d.Months.Select(m => new { month = m.Month, due = m.Due, collected = m.Collected, pending = m.Pending, children = m.Children }),
+                months   = d.Months.Select(m => new { month = m.Month, due = m.Due, collected = m.Collected, pending = m.Pending, children = m.Children, session = m.Session }),
                 classes  = d.Classes.Select(c => new { cls = c.ClassName, sec = c.Section, children = c.Children, withDues = c.WithDues, pending = c.Pending }),
                 students = d.Students.Select(s => new
                 {
@@ -135,10 +135,21 @@ namespace educore.Areas.Fees.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         [HasPermission("fees.manage")]
-        public async Task<IActionResult> SaveSettings([FromBody] EduCoreDataAccessLayer.Models.ERP.FeeDuesSettings req)
+        public async Task<IActionResult> SaveSettings([FromBody] DuesSettingsRequest? req)
         {
-            if (req == null) return Json(new { success = false, message = "Nothing to save." });
-            var r = await _dues.SaveSettingsAsync(req, TenantId(), SchoolId(), UserId());
+            // All three values are required (QA BUG-024): a body of {} used to bind the
+            // model defaults and silently set the school's late fee to 0.
+            if (req == null || req.LateFeeAmount == null || req.GraceDays == null || req.HoldMonths == null)
+                return BadRequest(new { success = false, message = "Enter the late fee, the grace days and the hold months." });
+            if (req.LateFeeAmount < 0 || req.GraceDays < 0 || req.HoldMonths < 0)
+                return BadRequest(new { success = false, message = "The late fee, grace days and hold months cannot be negative." });
+            var settings = new EduCoreDataAccessLayer.Models.ERP.FeeDuesSettings
+            {
+                LateFeeAmount = req.LateFeeAmount.Value,
+                GraceDays     = req.GraceDays.Value,
+                HoldMonths    = req.HoldMonths.Value
+            };
+            var r = await _dues.SaveSettingsAsync(settings, TenantId(), SchoolId(), UserId());
             return Json(new { success = r.Success, message = r.Message });
         }
 
@@ -171,6 +182,8 @@ namespace educore.Areas.Fees.Controllers
         }
 
         public class IdRequest       { public int Id { get; set; } }
+        // nullable so a missing value can be told apart from a real 0
+        public class DuesSettingsRequest { public decimal? LateFeeAmount { get; set; } public int? GraceDays { get; set; } public int? HoldMonths { get; set; } }
         public class FollowupRequest { public int StudentId { get; set; } public string? Note { get; set; } public string? PromiseDate { get; set; } }
         public class NoChaseRequest  { public int StudentId { get; set; } public string? Reason { get; set; } public string? Until { get; set; } public bool On { get; set; } }
         public class LateFeeRequest  { public string? Year { get; set; } public List<int>? StudentIds { get; set; } }

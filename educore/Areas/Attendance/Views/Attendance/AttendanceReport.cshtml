@@ -233,7 +233,8 @@ function pctCls(pct){ return pct>=THRESHOLD?'good':(pct>=60?'warn':'bad'); }
 
 function updateCards(){
   var totPct=0, defs=0;
-  STUDENTS.forEach(function(s){ var st=statsFor(s.id); totPct+=st.pct; if(st.pct<THRESHOLD) defs++; });
+  // no register taken for the student = no school day: not a defaulter (QA BUG-037)
+  STUDENTS.forEach(function(s){ var st=statsFor(s.id); totPct+=st.pct; if((s.days||0)>0 && st.pct<THRESHOLD) defs++; });
   var avg=STUDENTS.length?Math.round(totPct/STUDENTS.length):0;
   document.getElementById('cDays').textContent=schoolDays;
   document.getElementById('cAvg').textContent=avg+'%';
@@ -271,7 +272,7 @@ function renderRegister(){
 function renderDefaulters(){
   var box=document.getElementById('defList'), empty=document.getElementById('defEmpty');
   var defs=STUDENTS.map(function(s){ return {s:s,st:statsFor(s.id)}; })
-                   .filter(function(x){ return x.st.pct<THRESHOLD; })
+                   .filter(function(x){ return (x.s.days||0)>0 && x.st.pct<THRESHOLD; })
                    .sort(function(a,b){ return a.st.pct-b.st.pct; });
   if(!defs.length){ box.innerHTML=''; empty.classList.remove('d-none'); return; }
   empty.classList.add('d-none');

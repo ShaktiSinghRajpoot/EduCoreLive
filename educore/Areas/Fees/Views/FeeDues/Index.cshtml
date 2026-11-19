@@ -15,7 +15,9 @@
 @section PageStyles {
 <style>
   .fd-kpi { border:1px solid var(--bs-border-color); border-radius:14px; padding:.75rem .9rem; background:var(--bs-body-bg); height:100%; }
-  .fd-kpi .v { font-size:1.3rem; font-weight:900; line-height:1.1; }
+  /* clamp + wrap: "₹12,71,870.00" must fit a half-width card on a 360px phone (QA BUG-017) */
+  .fd-kpi { min-width:0; }
+  .fd-kpi .v { font-size:clamp(.95rem, 4vw, 1.3rem); font-weight:900; line-height:1.1; overflow-wrap:anywhere; }
   .fd-kpi .l { font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--bs-secondary-color); }
   .fd-kpi.fd-click { cursor:pointer; }
   .fd-kpi.fd-on { border-color:#dc2626; background:#fff5f5; }
@@ -445,7 +447,8 @@ $(function () {
 
         var maxP = Math.max.apply(null, data.months.map(function (m) { return m.pending; }).concat([1]));
         $('#fdMonths').html(data.months.length ? data.months.map(function (m) {
-            return '<tr><td class="fw-semibold">' + EC.esc(monthName(m.month)) + '</td>'
+            // a month of an earlier session that is still unpaid carries that session's name
+            return '<tr><td class="fw-semibold">' + EC.esc(monthName(m.month)) + (m.session ? ' <span class="badge bg-label-warning">' + EC.esc(m.session) + '</span>' : '') + '</td>'
                  + '<td class="text-end fd-hide-sm">' + EC.money(m.due) + '</td>'
                  + '<td class="text-end text-success">' + EC.money(m.collected) + '</td>'
                  + '<td class="text-end"><span class="fw-bold text-danger">' + EC.money(m.pending) + '</span>'
@@ -793,7 +796,8 @@ $(function () {
                 ecToast('success', r.message);
                 bootstrap.Modal.getInstance(document.getElementById('fdSetModal')).hide();
                 load();
-            });
+            })
+            .fail(function (x) { ecToast('error', EC.ajaxError(x, 'Could not save the settings')); });
     });
 
     // ── late fees: preview for the ticked children (or everyone), then add ──

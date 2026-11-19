@@ -61,6 +61,8 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
         Task<List<AcademicYearModel>> GetAcademicYearsAsync(int tenantId, int schoolId, int actionUserId);
         Task<(bool Success, string Message, int Id)> SaveAcademicYearAsync(AcademicYearModel model, int tenantId, int schoolId, int actionUserId);
         Task<(bool Success, string Message)> SetCurrentAcademicYearAsync(int academicYearId, int tenantId, int schoolId, int actionUserId);
+        /// <summary>What is still open before academicYearId is made current (QA BUG-031).</summary>
+        Task<AcademicYearSwitchCheck?> GetYearSwitchCheckAsync(int academicYearId, int tenantId, int schoolId, int actionUserId);
         Task<(bool Success, string Message)> DeleteAcademicYearAsync(int academicYearId, int tenantId, int schoolId, int actionUserId);
         #endregion
 

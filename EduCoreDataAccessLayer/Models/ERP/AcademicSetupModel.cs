@@ -64,6 +64,18 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public List<string> Sections { get; set; } = new();
     }
 
+    /// <summary>What is still open before a session is made current (QA BUG-031).</summary>
+    public class AcademicYearSwitchCheck
+    {
+        public string  YearName        { get; set; } = string.Empty;
+        public string? StartDate       { get; set; }   // ISO
+        public bool    StartsInFuture  { get; set; }
+        public string? CurrentName     { get; set; }   // the session it replaces
+        public bool    CurrentOpen     { get; set; }   // Year-End of that session not closed
+        public int     UndecidedLines  { get; set; }   // its unpaid fee lines not carried / written off
+        public decimal UndecidedAmount { get; set; }
+    }
+
     public class AcademicYearModel
     {
         public int AcademicYearId { get; set; }

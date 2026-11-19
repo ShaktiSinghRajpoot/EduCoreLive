@@ -25,7 +25,28 @@
         /// student either way. False means "hold back anyone who still owes" — those
         /// students are skipped, not promoted.</summary>
         public bool    CarryDues     { get; set; } = true;
+        /// <summary>The office typed the session name to promote before its last month (QA BUG-030).</summary>
+        public bool    ConfirmEarly  { get; set; }
+        /// <summary>"keep" (default) or "renumber" (alphabetical rolls in the new class).</summary>
+        public string? RollMode      { get; set; }
         public List<StudentPromotionItem> Students { get; set; } = new();
+    }
+
+    /// <summary>What core.sp_promotion_context returns for the Promote page.</summary>
+    public class PromotionContext
+    {
+        public string? SourceEnd        { get; set; }   // ISO
+        public string? LastMonthStart   { get; set; }   // ISO, first day of the source session's last month
+        public bool    IsEarly          { get; set; }   // today is before LastMonthStart
+        public int     TargetFeeClasses { get; set; }   // classes with a fee structure in the target
+        public int?    UndoRunId        { get; set; }
+        public string? UndoRunAt        { get; set; }
+        public string? UndoSource       { get; set; }
+        public string? UndoTarget       { get; set; }
+        public int     UndoCount        { get; set; }
+        public string? UndoBlock        { get; set; }   // why the last run cannot be undone (null = it can)
+        /// <summary>studentId -> (exam name, "Pass" | "Compartment" | "Fail").</summary>
+        public Dictionary<int, (string Exam, string Result)> Results { get; set; } = new();
     }
 
     public class StudentPromotionItem
@@ -68,5 +89,6 @@
         public int     Skipped       { get; set; }
         /// <summary>Names + reasons for anyone the proc could not move ("Devi Sen (pending dues)").</summary>
         public string? SkippedDetail { get; set; }
+        public int     RunId         { get; set; }   // for "Undo last promotion run"
     }
 }

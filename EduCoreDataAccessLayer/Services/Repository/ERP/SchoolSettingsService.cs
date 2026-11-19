@@ -880,6 +880,35 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             return (AsBool(row, "success"), AsStr(row, "message") ?? string.Empty);
         }
 
+        public async Task<AcademicYearSwitchCheck?> GetYearSwitchCheckAsync(
+            int academicYearId, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || academicYearId <= 0) return null;
+
+            var p = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",        NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",        NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id",   NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_academic_year_id", NpgsqlDbType.Integer) { Value = academicYearId },
+                new("p_result", NpgsqlDbType.Refcursor)
+                    { Direction = ParameterDirection.InputOutput, Value = "year_switch_check_cursor" }
+            };
+            var ds = await _db.ExecuteProcedureWithCursorsAsync("academic.sp_academic_year_switch_check", p);
+            if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0) return null;
+            var row = ds.Tables[0].Rows[0];
+            return new AcademicYearSwitchCheck
+            {
+                YearName        = AsStr(row, "year_name") ?? string.Empty,
+                StartDate       = AsStr(row, "start_date"),
+                StartsInFuture  = AsBool(row, "starts_in_future"),
+                CurrentName     = AsStr(row, "current_name"),
+                CurrentOpen     = AsBool(row, "current_open"),
+                UndecidedLines  = AsInt(row, "undecided_lines"),
+                UndecidedAmount = AsDec(row, "undecided_amount")
+            };
+        }
+
         public async Task<(bool Success, string Message)> DeleteAcademicYearAsync(
             int academicYearId, int tenantId, int schoolId, int actionUserId)
         {

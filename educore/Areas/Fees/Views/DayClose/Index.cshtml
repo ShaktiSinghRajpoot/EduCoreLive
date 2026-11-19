@@ -263,14 +263,25 @@ $(function () {
         if(Math.abs(Number(counted)-expected)>0.004 && !$('#remarks').val().trim()){
             ecToast('warning','The cash does not tally. Write a remark explaining the difference.'); $('#remarks').focus(); return;
         }
-        var $btn=$(this); EC.buttonBusy($btn);
-        $.ajax({url:URL.close,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},
-                data:JSON.stringify({ date:$('#dDate').val(), countedCash:Number(counted), remarks:$('#remarks').val() })})
-        .done(function(res){
-            EC.buttonReset($btn);
-            if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not close.'); return; }
-            ecToast('success',res.message||'Day closed.'); load();
-        }).fail(function(){ EC.buttonReset($btn); ecToast('error','Could not close the day.'); });
+        // QA BUG-026: closing locks the counter for the day, so show the figures first.
+        var d=Number(counted)-expected;
+        var $btn=$(this);
+        EC.confirm({ title:'Close the day?', name:EC.date($('#dDate').val()), danger:false, icon:'bx-lock-alt', okText:'Close day',
+                     message:'No more fees can be collected on this counter for the day unless someone re-opens it.',
+                     items:[ 'Expected cash: '+EC.money(expected),
+                             'Counted cash: '+EC.money(Number(counted)),
+                             Math.abs(d)<0.005 ? 'The cash tallies.' : (d<0 ? 'Short by ' : 'Excess ')+EC.money(Math.abs(d)) ] })
+        .then(function(ok){
+            if(!ok) return;
+            EC.buttonBusy($btn);
+            $.ajax({url:URL.close,type:'POST',contentType:'application/json',headers:{'RequestVerificationToken':CSRF},
+                    data:JSON.stringify({ date:$('#dDate').val(), countedCash:Number(counted), remarks:$('#remarks').val() })})
+            .done(function(res){
+                EC.buttonReset($btn);
+                if(!res||!res.success){ ecToast('error',(res&&res.message)||'Could not close.'); return; }
+                ecToast('success',res.message||'Day closed.'); load();
+            }).fail(function(){ EC.buttonReset($btn); ecToast('error','Could not close the day.'); });
+        });
     });
 
     load();

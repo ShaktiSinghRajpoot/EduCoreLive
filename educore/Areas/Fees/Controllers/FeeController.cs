@@ -519,23 +519,43 @@ namespace educore.Areas.Fees.Controllers
                 closedAt = st.ClosedAt?.ToString("dd MMM yyyy"),
                 closedBy = st.ClosedBy,
                 open     = st.OpenLines,
-                notDue   = st.NotDueLines
+                notDue   = st.NotDueLines,
+                carryFrom = st.CarryFrom,     // QA BUG-034: Carry all is disabled until then
+                carryOpen = st.CarryOpen
             });
         }
 
         [HttpPost]
-        [HasPermission("fees.manage")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> YearEndAction([FromBody] YearEndRequest req)
         {
             var allowed = new[] { "Carry", "WriteOff", "Undo", "CarryAll", "Close", "Reopen" };
             if (req == null || string.IsNullOrWhiteSpace(req.Session) || !allowed.Contains(req.Operation))
                 return Json(new { success = false, message = "Invalid request." });
-            if (req.Operation == "WriteOff" && !await HasPermissionAttribute.UserHasAsync(this, "fees.writeoff"))
-                return Json(new { success = false, message = "Writing dues off needs the school admin or principal." });
-            // Opening a closed session again is the head of school's call, like a write-off.
-            if (req.Operation == "Reopen" && !await HasPermissionAttribute.UserHasAsync(this, "fees.writeoff"))
-                return Json(new { success = false, message = "Re-opening a closed session needs the school admin or principal." });
+
+            // Writing off, closing and re-opening the session are the head of school's
+            // call (fees.writeoff: School Admin, Principal). Owner decision #11: an
+            // Accountant cannot close the session. Carrying is the fee office's job.
+            bool head = await HasPermissionAttribute.UserHasAsync(this, "fees.writeoff");
+            if (req.Operation is "WriteOff" or "Close" or "Reopen")
+            {
+                if (!head)
+                    return Json(new { success = false, message = req.Operation switch
+                    {
+                        "WriteOff" => "Writing dues off needs the school admin or principal.",
+                        "Close"    => "Closing a session needs the school admin or principal.",
+                        _          => "Re-opening a closed session needs the school admin or principal."
+                    } });
+            }
+            else if (!await HasPermissionAttribute.UserHasAsync(this, "fees.manage"))
+            {
+                return StatusCode(403, new { success = false, message = "You do not have permission to change Year-End." });
+            }
+
+            // Closing is school-wide: the page asks for "CLOSE <year>" to be typed.
+            if (req.Operation == "Close" &&
+                !string.Equals((req.Confirm ?? "").Trim(), "CLOSE " + req.Session!.Trim(), StringComparison.OrdinalIgnoreCase))
+                return Json(new { success = false, message = $"Type CLOSE {req.Session!.Trim()} to close the session." });
 
             var (ok, msg) = await _feePaymentService.YearEndActionAsync(
                 req.Operation!, req.Session!.Trim(), req.LedgerId, req.StudentId, NullIfEmpty(req.Reason),
@@ -550,6 +570,7 @@ namespace educore.Areas.Fees.Controllers
             public int?    LedgerId  { get; set; }
             public int?    StudentId { get; set; }
             public string? Reason    { get; set; }
+            public string? Confirm   { get; set; }   // Close: "CLOSE 2026-27" as typed
         }
 
         // ── GET: /fees/fee/GetCollectionRegister ──────────────────

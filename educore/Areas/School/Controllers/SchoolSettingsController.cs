@@ -776,6 +776,17 @@ namespace educore.Areas.School.Controllers
             if (string.CompareOrdinal(endDate, startDate) <= 0)   // ISO text compares as dates
                 return Json(new { success = false, message = "End date must be after the start date." });
 
+            // Switching the current session goes through "Set current" with its checks and
+            // typed confirmation (QA BUG-031). Saving may only keep the current one current,
+            // or make the very first session current.
+            if (dto.IsCurrent)
+            {
+                var years = await _schoolSettingsService.GetAcademicYearsAsync(tenantId, schoolId, actionUserId);
+                var cur = years.FirstOrDefault(y => y.IsCurrent);
+                if (cur != null && cur.AcademicYearId != dto.Id)
+                    return Json(new { success = false, message = "To switch the current session, save this one first, then use Set current on its row." });
+            }
+
             var model = new AcademicYearModel
             {
                 AcademicYearId   = dto.Id,
@@ -800,6 +811,32 @@ namespace educore.Areas.School.Controllers
             }
         }
 
+        // What is still open before a session is made current: the page lists it in
+        // the confirm dialog and asks for the session name to be typed (QA BUG-031).
+        [HttpGet]
+        [HasPermission("settings.manage")]
+        public async Task<IActionResult> YearSwitchCheck(int id)
+        {
+            int tenantId = Convert.ToInt32(User.FindFirst(Common.SK_TenantId)?.Value ?? "0");
+            int schoolId = Convert.ToInt32(User.FindFirst(Common.SK_SchoolId)?.Value ?? "0");
+            int actionUserId = Convert.ToInt32(User.FindFirst(Common.SK_UserId)?.Value ?? "0");
+            try
+            {
+                var c = await _schoolSettingsService.GetYearSwitchCheckAsync(id, tenantId, schoolId, actionUserId);
+                if (c == null) return Json(new { success = false, message = "This academic year no longer exists. Refresh the page." });
+                return Json(new
+                {
+                    success = true, name = c.YearName, start = c.StartDate, startsInFuture = c.StartsInFuture,
+                    current = c.CurrentName, currentOpen = c.CurrentOpen,
+                    undecidedLines = c.UndecidedLines, undecidedAmount = c.UndecidedAmount
+                });
+            }
+            catch (Npgsql.PostgresException ex)
+            {
+                return Json(new { success = false, message = ex.MessageText });
+            }
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         [HasPermission("settings.manage")]
@@ -811,6 +848,14 @@ namespace educore.Areas.School.Controllers
 
             try
             {
+                // School-wide and hard to undo, so the session name must be typed
+                // (QA BUG-031). Checked here too, not only in the page.
+                var check = await _schoolSettingsService.GetYearSwitchCheckAsync(dto?.Id ?? 0, tenantId, schoolId, actionUserId);
+                if (check == null)
+                    return Json(new { success = false, message = "This academic year no longer exists. Refresh the page." });
+                if (!string.Equals((dto?.Confirm ?? "").Trim(), check.YearName.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return Json(new { success = false, message = $"Type {check.YearName} to confirm the switch." });
+
                 var (ok, msg) = await _schoolSettingsService.SetCurrentAcademicYearAsync(dto?.Id ?? 0, tenantId, schoolId, actionUserId);
                 return Json(new { success = ok, message = msg });
             }
@@ -1118,5 +1163,7 @@ namespace educore.Areas.School.Controllers
     public class AcademicYearIdDto
     {
         public int Id { get; set; }
+        /// <summary>Set current: the session name typed by the user (QA BUG-031).</summary>
+        public string? Confirm { get; set; }
     }
 }

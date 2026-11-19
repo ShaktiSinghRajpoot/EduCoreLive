@@ -120,7 +120,7 @@
                     promoted into it until it has some.
                 </div>
                 <button type="button" class="btn btn-sm btn-warning text-nowrap" id="btnCopySetup"
-                        data-from="@ViewBag.CopyFromYearId">
+                        data-from="@ViewBag.CopyFromYearId" data-from-name="@ViewBag.CopyFromYearName">
                     <i class="bx bx-copy me-1"></i>Copy from @ViewBag.CopyFromYearName
                 </button>
             </div>
@@ -138,7 +138,7 @@
                     <div class="text-muted" style="font-size:.75rem">Only staff still working are copied. Anything already set here is kept.</div>
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" id="btnCopyExtras"
-                        data-from="@ViewBag.CopyFromYearId">Copy</button>
+                        data-from="@ViewBag.CopyFromYearId" data-from-name="@ViewBag.CopyFromYearName">Copy</button>
             </div>
         }
       </div>
@@ -365,6 +365,11 @@ if (btnCopy) {
   btnCopy.addEventListener('click', function(){
     var from = parseInt(btnCopy.getAttribute('data-from'), 10) || 0;
     if (!from || !ACADEMIC_YEAR_ID) { ecToast('error','Nothing to copy from.'); return; }
+    // QA BUG-034: a copy writes every class and section at once, so ask first.
+    EC.confirm({ title:'Copy classes and sections?', danger:false, icon:'bx-copy', okText:'Copy',
+                 message:'Every class and section of ' + (btnCopy.getAttribute('data-from-name') || 'the previous session')
+                         + ' is copied into this session. You can edit or remove them afterwards.' }).then(function(ok){
+    if (!ok) return;
 
     EC.buttonBusy(btnCopy, 'Copying…');
     $.ajax({
@@ -386,6 +391,7 @@ if (btnCopy) {
     .fail(function(xhr){
       ecToast('error', EC.ajaxError(xhr, 'Copy failed'));
       EC.buttonReset(btnCopy);
+    });
     });
   });
 }

@@ -256,6 +256,8 @@
         public string?   ClosedBy    { get; set; }
         public int       OpenLines   { get; set; }   // still to carry / write off
         public int       NotDueLines { get; set; }   // ... of which not due yet
+        public string?   CarryFrom   { get; set; }   // "01 Mar 2027": carrying opens in the session's last month
+        public bool      CarryOpen   { get; set; } = true;   // false before CarryFrom
     }
 
     /// <summary>One unpaid fee line on the Year-End closure screen.</summary>

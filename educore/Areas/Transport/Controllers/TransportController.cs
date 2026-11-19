@@ -187,6 +187,17 @@ namespace educore.Areas.Transport.Controllers
             return Json(new { success = ok, message = msg, monthlyFare = fare, monthsGenerated = made });
         }
 
+        // For the Remove Transport confirm: bus fees that will be closed (not due yet)
+        // and the ones that stay owed (already due). QA BUG-046.
+        [HttpGet]
+        [HasPermission("transport.manage")]
+        public async Task<IActionResult> RemovePreview(int studentId)
+        {
+            var (future, futureMonths, overdue, overdueMonths) =
+                await _transportService.RemovePreviewAsync(studentId, TenantId(), SchoolId(), UserId());
+            return Json(new { future, futureMonths, overdue, overdueMonths });
+        }
+
         [HttpPost]
         [HasPermission("transport.manage")]
         [ValidateAntiForgeryToken]

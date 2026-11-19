@@ -177,6 +177,9 @@
 var URL_SAVE    = '@Url.Action("SaveAcademicYear", "SchoolSettings", new { area = "School" })';
 var URL_CURRENT = '@Url.Action("SetCurrentAcademicYear", "SchoolSettings", new { area = "School" })';
 var URL_DELETE  = '@Url.Action("DeleteAcademicYear", "SchoolSettings", new { area = "School" })';
+var URL_CHECK   = '@Url.Action("YearSwitchCheck", "SchoolSettings", new { area = "School" })';
+// the current session (0 = none yet): switching happens only through Set current
+var CURRENT_ID = @(current?.AcademicYearId ?? 0);
 
 var editId = null;
 
@@ -225,8 +228,14 @@ function openEdit(btn){
 function setCurrentSwitch(isCurrent){
   var sw = document.getElementById('mCurrent');
   sw.checked = isCurrent;
-  sw.disabled = isCurrent;
-  document.getElementById('mCurrentNote').classList.toggle('d-none', !isCurrent);
+  // With a current session already set, another one becomes current only through
+  // Set current (its checks and typed confirmation); the server refuses it here too.
+  sw.disabled = isCurrent || CURRENT_ID > 0;
+  var note = document.getElementById('mCurrentNote');
+  note.innerHTML = isCurrent
+    ? 'This is the current session. To change it, use <strong>Set current</strong> on another session.'
+    : 'To make this the current session, save it, then use <strong>Set current</strong> on its row.';
+  note.classList.toggle('d-none', !isCurrent && CURRENT_ID === 0);
 }
 
 /* A student's fee plan is generated once, at admission, and then frozen, so this
@@ -276,13 +285,28 @@ document.getElementById('yearSave').addEventListener('click',function(){
     .catch(function(xhr){ EC.buttonReset(btn); ecToast('error', EC.ajaxError(xhr, 'Save failed')); });
 });
 
+/* "Make it current" is school-wide and hard to undo (QA BUG-031): list what is
+   still open, then the session name has to be typed. The server checks it too. */
 function setCurrent(id){
-  post(URL_CURRENT, { id:id })
-    .then(function(res){
-      if(res && res.success){ ecToast('success','Current academic year updated.'); setTimeout(function(){ window.location.reload(); }, 500); }
-      else { ecToast('error',(res&&res.message)||'Failed.'); }
-    })
-    .catch(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Could not set the current year')); });
+  $.getJSON(URL_CHECK, { id:id }).done(function(c){
+    if(!c || !c.success){ ecToast('error', (c && c.message) || 'Could not check this session.'); return; }
+    var items=[];
+    if(c.startsInFuture) items.push(c.name + ' starts on ' + EC.date(c.start) + ', which is still ahead.');
+    if(c.current && c.currentOpen) items.push('Year-End of ' + c.current + ' is not closed yet.');
+    if(c.undecidedLines > 0) items.push(EC.money(c.undecidedAmount) + ' of ' + (c.current || 'the current session') + ' fees (' + c.undecidedLines + ' line' + (c.undecidedLines === 1 ? '' : 's') + ') is still undecided. It stays owed and shows in Month-wise Dues with its session.');
+    EC.prompt({ title:'Make ' + c.name + ' the current session?', danger:true, icon:'bx-error',
+                message: (items.length ? 'Still open:' : 'Every page will open on ' + c.name + '. Switching back later needs the students moved back.'),
+                items: items, label:'Type ' + c.name + ' to confirm', mustType: c.name,
+                okText:'Make current' }).then(function(typed){
+      if(typed === null) return;
+      post(URL_CURRENT, { id:id, confirm:typed })
+        .then(function(res){
+          if(res && res.success){ ecToast('success','Current academic year updated.'); setTimeout(function(){ window.location.reload(); }, 500); }
+          else { ecToast('error',(res&&res.message)||'Failed.'); }
+        })
+        .catch(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Could not set the current year')); });
+    });
+  }).fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Could not check this session')); });
 }
 
 function del(id, name){

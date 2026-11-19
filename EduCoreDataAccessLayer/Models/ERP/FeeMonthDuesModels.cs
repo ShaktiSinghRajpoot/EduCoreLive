@@ -15,6 +15,7 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public decimal Collected { get; set; }                   // paid + concession
         public decimal Pending   { get; set; }
         public int     Children  { get; set; }                   // with something pending in the month
+        public string? Session   { get; set; }                   // set when the month belongs to an EARLIER session (still unpaid)
     }
 
     public class FeeDueClass
