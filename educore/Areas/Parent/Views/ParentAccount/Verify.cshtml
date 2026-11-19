@@ -1,0 +1,53 @@
+@{
+    Layout = "_BlankLayout";
+    ViewData["Title"] = "Enter Code";
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/Account/ForgotPassword.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/parent.css" asp-append-version="true" />
+}
+
+<div class="login-page">
+    <div class="login-card">
+
+        <img src="~/img/brand/ssw-horizontal.png" alt="SmartSchoolWala.com" class="ssw-logo-horizontal" />
+        <h1 class="login-title">Enter the code</h1>
+        @* The same words whether or not the number is on a student record (PT-02). *@
+        <p class="login-subtitle">If @(ViewData["Masked"]) is saved on a student's record at a school that uses the SmartSchoolWala parent app, a 6-digit code has been sent to it. The code is valid for 10 minutes.</p>
+
+        @if (ViewData["Error"] is string err)
+        {
+            <div class="alert alert-warning small" role="alert">@err</div>
+        }
+
+        <form action="/parent/verify" method="post" autocomplete="off" id="parentVerifyForm">
+            @Html.AntiForgeryToken()
+            <div>
+                <label for="code" class="form-label">6-digit code</label>
+                <input id="code" name="code" type="text" inputmode="numeric" maxlength="6" pattern="[0-9]{6}"
+                       autocomplete="one-time-code" class="form-control pa-code" placeholder="••••••" autofocus required />
+            </div>
+            <button class="btn btn-primary d-grid w-100 login-btn mt-3" type="submit">
+                Log in <span class="ms-1">→</span>
+            </button>
+        </form>
+
+        <div class="login-links">
+            <a href="/parent/login">← Use another number / send a new code</a>
+        </div>
+    </div>
+</div>
+
+@section PageScripts {
+    <script>
+        $(function () {
+            $('#parentVerifyForm').on('submit', function () {
+                var $btn = $(this).find('button[type="submit"]');
+                if ($btn.data('busy')) { return false; }
+                $btn.data('busy', true);
+                EC.buttonBusy($btn, 'Checking…');
+            });
+        });
+    </script>
+}

@@ -15,7 +15,8 @@ namespace educore.Helpers
         Attendance,
         Academics,
         Fees,
-        Accounts
+        Accounts,
+        ParentApp    // parent logins (Areas/Parent); OFF unless given and switched on
     }
 
     /// <summary>
@@ -71,6 +72,7 @@ namespace educore.Helpers
                     SchoolModule.Academics => settings.EnableAcademics,
                     SchoolModule.Fees      => settings.EnableFees,
                     SchoolModule.Accounts  => settings.EnableAccounts,
+                    SchoolModule.ParentApp => settings.EnableParentApp,
                     _                      => true
                 };
 
@@ -90,6 +92,7 @@ namespace educore.Helpers
                     SchoolModule.Academics => settings.AllowAcademics,
                     SchoolModule.Fees      => settings.AllowFees,
                     SchoolModule.Accounts  => settings.AllowAccounts,
+                    SchoolModule.ParentApp => settings.AllowParentApp,
                     _                      => true
                 };
                 string msg = given
@@ -130,6 +133,7 @@ namespace educore.Helpers
                 SchoolModule.Academics => "Academics module",
                 SchoolModule.Fees      => "Fees module",
                 SchoolModule.Accounts  => "Accounts module",
+                SchoolModule.ParentApp => "Parent App",
                 _                      => "This module"
             };
 

@@ -17,6 +17,9 @@ namespace educore.Models
         public bool   AllowFees      { get; set; } = true;
         public bool   AllowAccounts  { get; set; } = true;
 
+        /// <summary>Parent App (parent logins). OFF by default; saved by core.sp_superadmin_parent_app.</summary>
+        public bool   AllowParentApp { get; set; }
+
         /// <summary>Modules the school switched off itself (given, but enable_* off),
         /// shown read-only on the platform page (QA BUG-047). Display names.</summary>
         public List<string> OffBySchool { get; set; } = new();

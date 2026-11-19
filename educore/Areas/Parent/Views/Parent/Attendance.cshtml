@@ -1,0 +1,58 @@
+@model ParentAttendancePage
+@{
+    ViewData["Title"] = "Attendance";
+    var child = (ParentChild)ViewBag.Child;
+    var first = new DateTime(Model.Year, Model.Month, 1);
+    var prev = first.AddMonths(-1);
+    var next = first.AddMonths(1);
+    int lead = (int)first.DayOfWeek;   // 0 = Sunday
+    int days = DateTime.DaysInMonth(Model.Year, Model.Month);
+    string TodayText(string? m) => m switch { "P" => "Present", "A" => "Absent", "L" => "Leave", null => "Not marked yet", _ => m };
+}
+
+<div class="pa-card">
+    <h2>Today</h2>
+    <div class="pa-total">@TodayText(Model.TodayMark)</div>
+</div>
+
+<div class="pa-card">
+    <h2>This session</h2>
+    <div class="pa-total">@Model.Summary.Percent.ToString("0.#")%</div>
+    <div class="pa-muted">Present @Model.Summary.Present of @Model.Summary.SchoolDays school days · Absent @Model.Summary.Absent · Leave @Model.Summary.LeaveDays</div>
+</div>
+
+<div class="pa-card">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <a class="btn btn-sm btn-outline-secondary" href="/parent/attendance?c=@child.StudentId&m=@prev.Month&y=@prev.Year" aria-label="Previous month"><i class="bx bx-chevron-left"></i></a>
+        <h2 class="m-0">@first.ToString("MMMM yyyy")</h2>
+        <a class="btn btn-sm btn-outline-secondary" href="/parent/attendance?c=@child.StudentId&m=@next.Month&y=@next.Year" aria-label="Next month"><i class="bx bx-chevron-right"></i></a>
+    </div>
+    <div class="pa-cal">
+        @foreach (var h in new[] { "S", "M", "T", "W", "T", "F", "S" })
+        {
+            <div class="h">@h</div>
+        }
+        @for (int i = 0; i < lead; i++)
+        {
+            <div></div>
+        }
+        @for (int d = 1; d <= days; d++)
+        {
+            int dow = (int)new DateTime(Model.Year, Model.Month, d).DayOfWeek;
+            Model.Summary.Days.TryGetValue(d, out var mark);
+            Model.Holidays.TryGetValue(d, out var holiday);
+            string css = mark ?? (holiday != null || Model.WeeklyOffDays.Contains(dow) ? "off" : "");
+            <div class="d @css" title="@(holiday ?? "")">@d</div>
+        }
+    </div>
+    <div class="pa-muted mt-2">Green present · red absent · yellow leave · grey holiday or weekly off. A blank day had no register.</div>
+    @if (Model.Holidays.Count > 0)
+    {
+        <ul class="pa-muted mt-2 mb-0 ps-3">
+            @foreach (var h in Model.Holidays.OrderBy(x => x.Key))
+            {
+                <li>@h.Key @first.ToString("MMM"): @h.Value</li>
+            }
+        </ul>
+    }
+</div>

@@ -1,0 +1,60 @@
+@{
+    Layout = "_BlankLayout";
+    ViewData["Title"] = "Parent Login";
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/Account/ForgotPassword.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/parent.css" asp-append-version="true" />
+}
+
+<div class="login-page">
+    <div class="login-card">
+
+        <img src="~/img/brand/ssw-horizontal.png" alt="SmartSchoolWala.com" class="ssw-logo-horizontal" />
+        <h1 class="login-title">Parent Login</h1>
+        <p class="login-subtitle">Enter the mobile number saved on your child's school record. We'll send you a 6-digit code.</p>
+
+        @if (TempData["ParentMessage"] is string msg)
+        {
+            <div class="alert alert-info small" role="alert">@msg</div>
+        }
+        @if (ViewData["Error"] is string err)
+        {
+            <div class="alert alert-warning small" role="alert">@err</div>
+        }
+
+        <form action="/parent/login" method="post" autocomplete="off" id="parentLoginForm">
+            @Html.AntiForgeryToken()
+            <div>
+                <label for="mobile" class="form-label">Mobile number</label>
+                <div class="login-input-wrap">
+                    <i class="icon-base bx bx-mobile field-icon"></i>
+                    <input id="mobile" name="mobile" type="tel" inputmode="numeric" maxlength="14"
+                           class="form-control" placeholder="98XXXXXXXX" value="@(ViewData["Mobile"] as string)" autofocus required />
+                </div>
+            </div>
+            <button class="btn btn-primary d-grid w-100 login-btn mt-3" type="submit">
+                Send code <span class="ms-1">→</span>
+            </button>
+        </form>
+
+        <div class="login-links">
+            <a href="/Account/Login">School staff? Staff login</a>
+        </div>
+    </div>
+</div>
+
+@section PageScripts {
+    <script>
+        $(function () {
+            // One submit only: every extra POST uses up the code-request limit.
+            $('#parentLoginForm').on('submit', function () {
+                var $btn = $(this).find('button[type="submit"]');
+                if ($btn.data('busy')) { return false; }
+                $btn.data('busy', true);
+                EC.buttonBusy($btn, 'Sending…');
+            });
+        });
+    </script>
+}

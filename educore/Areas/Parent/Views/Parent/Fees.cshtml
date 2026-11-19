@@ -1,0 +1,47 @@
+@model ParentFeesPage
+@{
+    ViewData["Title"] = "Fees";
+    string Money(decimal v) => "₹" + v.ToString("N2", new System.Globalization.CultureInfo("en-IN"));
+}
+
+<div class="pa-card">
+    <h2>Total due now</h2>
+    <div class="pa-total">@Money(Model.DueNow)</div>
+    <div class="pa-muted">Rest of the session (not due yet): @Money(Model.Later)</div>
+    <div class="pa-muted mt-1">Pay at the school fee counter. The school's receipt is the final word on what is paid.</div>
+</div>
+
+@if (Model.Months.Count == 0)
+{
+    <div class="pa-card text-center pa-muted">Nothing is due.</div>
+}
+@foreach (var m in Model.Months)
+{
+    <div class="pa-card">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <h2 class="m-0">@m.Label</h2>
+            @if (m.Overdue)
+            {
+                <span class="badge bg-label-danger">Overdue</span>
+            }
+        </div>
+        @foreach (var l in m.Lines)
+        {
+            <div class="pa-row">
+                <div>
+                    @l.Head
+                    @if (l.OldSession != null)
+                    {
+                        <div class="pa-muted">@l.OldSession</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(l.DueDate))
+                    {
+                        <div class="pa-muted">Due @Dates.Show(l.DueDate)</div>
+                    }
+                </div>
+                <div class="text-end @(l.Overdue ? "text-danger" : "")">@Money(l.Outstanding)</div>
+            </div>
+        }
+        <div class="pa-row fw-semibold"><div>Total</div><div>@Money(m.Total)</div></div>
+    </div>
+}

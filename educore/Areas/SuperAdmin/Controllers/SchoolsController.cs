@@ -508,7 +508,8 @@ namespace educore.Areas.SuperAdmin.Controllers
         // A module not given is hidden everywhere in that school and the School Admin
         // cannot switch it on (core.sp_superadmin_school_modules).
         [HttpGet]
-        public async Task<IActionResult> Modules(int id, [FromServices] IMessageLogService messaging)
+        public async Task<IActionResult> Modules(int id, [FromServices] IMessageLogService messaging,
+                                                 [FromServices] IParentService parents)
         {
             var model = await _schoolService.GetSchoolModulesAsync(id, User.Identity.GetUserId());
             if (model == null)
@@ -517,17 +518,25 @@ namespace educore.Areas.SuperAdmin.Controllers
                 return RedirectToAction(nameof(SchoolList));
             }
             (model.AllowWhatsApp, model.WhatsAppSentThisMonth) = await messaging.GetSchoolWhatsAppAsync(id, User.Identity.GetUserId());
+
+            // Parent App is kept apart from the 8 modules above (parent_module.sql).
+            var (allowParent, enableParent) = await parents.GetPlatformAsync(id, User.Identity.GetUserId());
+            model.AllowParentApp = allowParent;
+            if (allowParent && !enableParent)
+                model.OffBySchool.Add("AllowParentApp");
             return View(model);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Modules(SchoolModulesModel model, [FromServices] IMessageLogService messaging)
+        public async Task<IActionResult> Modules(SchoolModulesModel model, [FromServices] IMessageLogService messaging,
+                                                 [FromServices] IParentService parents)
         {
             try
             {
                 var saved = await _schoolService.SaveSchoolModulesAsync(model, User.Identity.GetUserId());
                 await messaging.SaveSchoolWhatsAppAsync(model.SchoolId, model.AllowWhatsApp, User.Identity.GetUserId());
+                await parents.SavePlatformAsync(model.SchoolId, model.AllowParentApp, User.Identity.GetUserId());
                 TempData["Success"] = $"Modules saved for {saved?.SchoolName}.";
                 return RedirectToAction(nameof(SchoolList));
             }

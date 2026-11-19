@@ -1,0 +1,51 @@
+@model ParentResultsPage
+@{
+    ViewData["Title"] = "Report Card";
+    var child = (ParentChild)ViewBag.Child;
+    var res = Model.Result;
+}
+
+<div class="d-flex flex-wrap gap-2 mb-2 no-print">
+    <a class="btn btn-sm btn-outline-secondary" href="/parent/results?c=@child.StudentId&exam=@Model.ExamId"><i class="bx bx-arrow-back me-1"></i>Results</a>
+    <button type="button" class="btn btn-sm btn-primary" onclick="window.print()"><i class="bx bx-printer me-1"></i>Print / Save as PDF</button>
+</div>
+
+<div class="pa-card">
+    <div class="text-center mb-2">
+        <h2 class="mb-0">@Model.School.SchoolName</h2>
+        @if (!string.IsNullOrWhiteSpace(Model.School.Address))
+        {
+            <div class="pa-muted">@Model.School.Address</div>
+        }
+        <div class="fw-semibold mt-1">REPORT CARD – @Model.ExamName</div>
+    </div>
+
+    <dl class="pa-kv mb-2">
+        <dt>Student</dt><dd>@child.StudentName</dd>
+        <dt>Class</dt><dd>@child.ClassName@(string.IsNullOrWhiteSpace(child.Section) ? "" : " – " + child.Section)</dd>
+        <dt>Roll no.</dt><dd>@(string.IsNullOrWhiteSpace(child.RollNo) ? "-" : child.RollNo)</dd>
+        <dt>Admission no.</dt><dd>@child.AdmissionNo</dd>
+    </dl>
+
+    <table class="pa-table">
+        <thead><tr><th>Subject</th><th class="n">Max</th><th class="n">Obtained</th><th class="n">Grade</th></tr></thead>
+        <tbody>
+            @foreach (var s in res.Subjects)
+            {
+                <tr>
+                    <td>@s.Subject</td>
+                    <td class="n">@(s.MaxMarks?.ToString("0.##") ?? "-")</td>
+                    <td class="n">@(s.IsAbsent ? "AB" : s.Obtained?.ToString("0.##") ?? "-")</td>
+                    <td class="n">@(s.Grade ?? "-")</td>
+                </tr>
+            }
+            <tr class="fw-semibold">
+                <td>Total</td>
+                <td class="n">@res.Total.ToString("0.##")</td>
+                <td class="n">@res.Obtained.ToString("0.##")</td>
+                <td class="n">@(res.Grade ?? "-")</td>
+            </tr>
+        </tbody>
+    </table>
+    <div class="mt-2">Percentage: <strong>@res.Percent.ToString("0.##")%</strong>@(res.SectionRank.HasValue ? $" · Rank {res.SectionRank} of {res.SectionSize} in section" : "")</div>
+</div>

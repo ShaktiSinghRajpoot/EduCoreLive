@@ -101,6 +101,23 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         {
             OnValidatePrincipal = educore.Helpers.SessionValidator.ValidateAsync
         };
+    })
+    // Parent logins (Areas/Parent) use their OWN cookie and scheme. The staff scheme above
+    // stays the default, so a parent cookie is never read on a staff page: there the parent
+    // is simply not signed in, and no staff policy can ever match a parent (PT-11).
+    // 30 days sliding (owner decision). Whether the parent may still see a child is checked
+    // on every request by ParentController (Helpers/ParentAuth.cs), not by this cookie.
+    .AddCookie(educore.Helpers.ParentAuth.Scheme, options =>
+    {
+        options.LoginPath = "/parent/login";
+        options.LogoutPath = "/parent/logout";
+        options.AccessDeniedPath = "/parent/login";
+        options.Cookie.Name = "EduCore.Parent";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.SecurePolicy = cookieSecurePolicy;
+        options.SlidingExpiration = true;
+        options.ExpireTimeSpan = TimeSpan.FromDays(30);
     });
 
 builder.Services.AddAuthorization(options =>
@@ -118,6 +135,15 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole("SCHOOL_ADMIN");
         policy.RequireClaim(Common.SK_TenantId);
         policy.RequireClaim(Common.SK_SchoolId);
+    });
+
+    // Parent pages: only the parent cookie counts, and it must carry the PARENT role.
+    options.AddPolicy(educore.Helpers.ParentAuth.Policy, policy =>
+    {
+        policy.AddAuthenticationSchemes(educore.Helpers.ParentAuth.Scheme);
+        policy.RequireAuthenticatedUser();
+        policy.RequireRole(educore.Helpers.ParentAuth.Role);
+        policy.RequireClaim(educore.Helpers.ParentAuth.MobileClaim);
     });
 
     options.AddPolicy("SchoolUserOnly", policy =>
@@ -188,7 +214,9 @@ builder.Services.AddRateLimiter(options =>
         var path = http.Request.Path;
         if (HttpMethods.IsPost(http.Request.Method) &&
             (path.Equals("/Account/ForgotPassword", StringComparison.OrdinalIgnoreCase) ||
-             path.Equals("/Account/VerifyOtp", StringComparison.OrdinalIgnoreCase)))
+             path.Equals("/Account/VerifyOtp", StringComparison.OrdinalIgnoreCase) ||
+             path.Equals("/parent/login", StringComparison.OrdinalIgnoreCase) ||
+             path.Equals("/parent/verify", StringComparison.OrdinalIgnoreCase)))
         {
             int minutes = Math.Max(1, (int)Math.Ceiling(seconds / 60.0));
             http.Response.Redirect($"{http.Request.PathBase}{path}?wait={minutes}");
@@ -315,6 +343,7 @@ builder.Services.AddScoped<IFeeMonthDuesService, FeeMonthDuesService>(); // mont
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddScoped<IMessageLogService, MessageLogService>();
 builder.Services.AddScoped<SchoolMessenger>();   // WhatsApp alerts to parents + the message log
+builder.Services.AddScoped<IParentService, ParentService>();   // Parent module (Areas/Parent), parent_module.sql
 
 // The landing dashboard. Every number on it used to be hardcoded in the view.
 builder.Services.AddScoped<IDashboardService, DashboardService>();

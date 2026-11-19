@@ -45,7 +45,8 @@ namespace educore.Areas.School.Controllers
         [HttpPost]
         [HasPermission("admission_workflow.manage")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SaveWorkflowSettings(AdmissionWorkflowModel model)
+        public async Task<IActionResult> SaveWorkflowSettings(AdmissionWorkflowModel model,
+            [FromServices] IParentService parentService)
         {
             int tenantId = TenantId(), schoolId = SchoolId(), actionUserId = UserId();
 
@@ -80,6 +81,11 @@ namespace educore.Areas.School.Controllers
             try
             {
                 result = await _admissionWorkflowService.SaveAdmissionWorkflowAsync(model, tenantId, schoolId, actionUserId);
+
+                // Parent App switch and the parent screens: School Admin only, and only
+                // when the platform gave Parent App (the proc keeps them otherwise).
+                if (result > 0 && !modulesKept)
+                    await parentService.SaveSchoolSettingsAsync(model, tenantId, schoolId, actionUserId);
             }
             catch (Npgsql.PostgresException pg)
             {

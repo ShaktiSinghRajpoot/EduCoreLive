@@ -1,0 +1,39 @@
+@model ParentTimetablePage
+@{
+    ViewData["Title"] = "Timetable";
+    var child = (ParentChild)ViewBag.Child;
+    string[] dayNames = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+    var days = Model.Entries.Select(e => e.DayOfWeek).Distinct().OrderBy(d => d == 0 ? 7 : d).ToList();
+    string Time(int day, int seq)
+    {
+        var p = Model.Periods.FirstOrDefault(x => x.DayOfWeek == day && x.PeriodSeq == seq)
+             ?? Model.Periods.FirstOrDefault(x => x.PeriodSeq == seq);
+        return p == null || string.IsNullOrWhiteSpace(p.StartTime) ? $"Period {seq}" : $"{p.StartTime}–{p.EndTime}";
+    }
+}
+
+<div class="pa-muted mb-2">Class @child.ClassName@(string.IsNullOrWhiteSpace(child.Section) ? "" : " – " + child.Section)</div>
+
+@if (days.Count == 0)
+{
+    <div class="pa-card text-center pa-muted">The timetable has not been set yet.</div>
+}
+@foreach (var d in days)
+{
+    <div class="pa-card">
+        <h2>@(d >= 0 && d < 7 ? dayNames[d] : "Day " + d)</h2>
+        @foreach (var e in Model.Entries.Where(e => e.DayOfWeek == d).OrderBy(e => e.PeriodSeq))
+        {
+            <div class="pa-row">
+                <div>
+                    <div class="fw-semibold">@e.SubjectName</div>
+                    @if (!string.IsNullOrWhiteSpace(e.StaffName))
+                    {
+                        <div class="pa-muted">@e.StaffName</div>
+                    }
+                </div>
+                <div class="text-end pa-muted">@Time(d, e.PeriodSeq)</div>
+            </div>
+        }
+    </div>
+}

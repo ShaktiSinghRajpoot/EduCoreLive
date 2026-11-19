@@ -1,0 +1,48 @@
+@model ParentResultsPage
+@{
+    ViewData["Title"] = "Results";
+    var child = (ParentChild)ViewBag.Child;
+    var res = Model.Result;
+}
+
+@if (res.Exams.Count == 0 || Model.ExamId == 0)
+{
+    <div class="pa-card text-center pa-muted">No results have been published yet.</div>
+}
+else
+{
+    @if (res.Exams.Count > 1)
+    {
+        <div class="pa-switch">
+            @foreach (var e in res.Exams)
+            {
+                <a class="pa-chip @(e.ExamId == Model.ExamId ? "active" : "")" href="/parent/results?c=@child.StudentId&exam=@e.ExamId">@e.ExamName</a>
+            }
+        </div>
+    }
+
+    <div class="pa-card">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <h2 class="m-0">@Model.ExamName</h2>
+            <a class="btn btn-sm btn-primary" href="/parent/report-card?c=@child.StudentId&exam=@Model.ExamId"><i class="bx bx-printer me-1"></i>Report card</a>
+        </div>
+        <div class="pa-total">@res.Percent.ToString("0.##")%@(string.IsNullOrWhiteSpace(res.Grade) ? "" : " · " + res.Grade)</div>
+        <div class="pa-muted">@res.Obtained.ToString("0.##") / @res.Total.ToString("0.##")@(res.SectionRank.HasValue ? $" · Rank {res.SectionRank} of {res.SectionSize} in section" : "")</div>
+    </div>
+
+    <div class="pa-card">
+        <table class="pa-table">
+            <thead><tr><th>Subject</th><th class="n">Marks</th><th class="n">Grade</th></tr></thead>
+            <tbody>
+                @foreach (var s in res.Subjects)
+                {
+                    <tr>
+                        <td>@s.Subject</td>
+                        <td class="n @(s.Passed == false ? "text-danger" : "")">@(s.IsAbsent ? "Absent" : $"{s.Obtained?.ToString("0.##") ?? "-"} / {s.MaxMarks?.ToString("0.##") ?? "-"}")</td>
+                        <td class="n">@(s.Grade ?? "-")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

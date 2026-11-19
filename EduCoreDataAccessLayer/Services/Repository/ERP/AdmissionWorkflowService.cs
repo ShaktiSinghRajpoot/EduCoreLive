@@ -89,6 +89,15 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
                 model.AllowAcademics   = GetBool(row, "allow_academics", true);
                 model.AllowFees        = GetBool(row, "allow_fees", true);
                 model.AllowAccounts    = GetBool(row, "allow_accounts", true);
+                // Parent App: off unless given and switched on (parent_module.sql)
+                model.AllowParentApp      = GetBool(row, "allow_parent_app");
+                model.EnableParentApp     = GetBool(row, "enable_parent_app");
+                model.ParentShowFees      = GetBool(row, "parent_show_fees", true);
+                model.ParentShowReceipts  = GetBool(row, "parent_show_receipts", true);
+                model.ParentShowResults   = GetBool(row, "parent_show_results", true);
+                model.ParentShowHomework  = GetBool(row, "parent_show_homework", true);
+                model.ParentShowTimetable = GetBool(row, "parent_show_timetable", true);
+                model.ParentShowNotices   = GetBool(row, "parent_show_notices", true);
 
                 if (row.Table.Columns.Contains("registration_number_prefix") && row["registration_number_prefix"] != DBNull.Value)
                     model.RegistrationNumberPrefix = row["registration_number_prefix"].ToString() ?? "REG-";

@@ -1,0 +1,64 @@
+@model ParentReceiptPage
+@{
+    ViewData["Title"] = "Receipt " + Model.Receipt.ReceiptNo;
+    var r = Model.Receipt;
+    var child = (ParentChild)ViewBag.Child;
+    string Money(decimal v) => "₹" + v.ToString("N2", new System.Globalization.CultureInfo("en-IN"));
+}
+
+<div class="d-flex flex-wrap gap-2 mb-2 no-print">
+    <a class="btn btn-sm btn-outline-secondary" href="/parent/receipts?c=@child.StudentId"><i class="bx bx-arrow-back me-1"></i>Receipts</a>
+    <button type="button" class="btn btn-sm btn-primary" onclick="window.print()"><i class="bx bx-printer me-1"></i>Print / Save as PDF</button>
+</div>
+
+<div class="pa-card">
+    <div class="text-center mb-2">
+        <h2 class="mb-0">@Model.School.SchoolName</h2>
+        @if (!string.IsNullOrWhiteSpace(Model.School.Address))
+        {
+            <div class="pa-muted">@Model.School.Address</div>
+        }
+        <div class="fw-semibold mt-1">FEE RECEIPT</div>
+    </div>
+
+    @* A cancelled receipt says so -- and nothing about who cancelled it or why. *@
+    @if (r.IsCancelled)
+    {
+        <div class="alert alert-secondary text-center fw-semibold">Cancelled</div>
+    }
+
+    <dl class="pa-kv mb-2">
+        <dt>Receipt no.</dt><dd class="@(r.IsCancelled ? "pa-cancelled" : "")">@r.ReceiptNo</dd>
+        <dt>Date</dt><dd>@Dates.Show(r.PaymentDate)</dd>
+        <dt>Student</dt><dd>@r.StudentName</dd>
+        <dt>Class</dt><dd>@r.ClassName@(string.IsNullOrWhiteSpace(r.Section) ? "" : " – " + r.Section)</dd>
+        <dt>Admission no.</dt><dd>@r.AdmissionNo</dd>
+        @if (!string.IsNullOrWhiteSpace(r.Session))
+        {
+            <dt>Session</dt><dd>@r.Session</dd>
+        }
+    </dl>
+
+    <table class="pa-table @(r.IsCancelled ? "pa-cancelled" : "")">
+        <thead><tr><th>Fee</th><th class="n">Amount</th></tr></thead>
+        <tbody>
+            @foreach (var l in r.Lines)
+            {
+                string label = string.IsNullOrWhiteSpace(l.InstallmentLabel) ? l.FeeHeadName : $"{l.FeeHeadName} – {l.InstallmentLabel}";
+                if (!string.IsNullOrWhiteSpace(l.CarriedFrom)) { label += $" (Dues of {l.CarriedFrom})"; }
+                <tr><td>@label</td><td class="n">@Money(l.Amount - l.Concession)</td></tr>
+            }
+            @if (r.DiscountAmount > 0)
+            {
+                <tr><td>Discount</td><td class="n">-@Money(r.DiscountAmount)</td></tr>
+            }
+            @if (r.AdvanceUsed > 0)
+            {
+                <tr><td>Paid from advance</td><td class="n">-@Money(r.AdvanceUsed)</td></tr>
+            }
+            <tr class="fw-semibold"><td>Amount paid</td><td class="n">@Money(r.Amount)</td></tr>
+        </tbody>
+    </table>
+    <div class="pa-muted mt-2">Paid by @r.PaymentMode@(string.IsNullOrWhiteSpace(r.ReferenceNo) ? "" : " · Ref " + r.ReferenceNo)</div>
+    <div class="pa-muted mt-1">Re-print of the school's receipt.</div>
+</div>

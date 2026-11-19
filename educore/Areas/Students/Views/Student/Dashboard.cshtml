@@ -12,6 +12,7 @@
     bool transportOn  = await Modules.TransportOn();
     bool attendanceOn = await Modules.AttendanceOn();  // Attendance tab and card
     bool academicsOn  = await Modules.AcademicsOn();   // Timetable and Homework tabs
+    bool parentAppOn  = await Modules.ParentAppOn();   // Parent access card (parent_module.sql)
 }
 
 @section VendorScripts {
@@ -312,6 +313,38 @@
                         </div>
                       </div>
                     </div>
+
+                    @if (parentAppOn)
+                    {
+                    <!-- Parent access: which mobiles on this record can use the Parent App,
+                         their last login, and Block / Unblock for this child only. -->
+                    <div class="ec-card mt-3" id="parentAccessCard"
+                         data-student="@studentPublicId"
+                         data-can-manage="@(canManage ? "1" : "0")"
+                         data-get-url="@Url.Action("ParentAccess","Student",new{area="Students"})"
+                         data-block-url="@Url.Action("ParentAccessBlock","Student",new{area="Students"})">
+                      @Html.AntiForgeryToken()
+                      <div class="ec-card-header">
+                        <div class="ec-section-title-wrap">
+                          <span class="ec-section-icon"><i class="bx bx-mobile-alt"></i></span>
+                          <div>
+                            <div class="ec-section-title">Parent Access</div>
+                            <div class="ec-section-subtitle">Mobiles on this record that can log in to the Parent App</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="ec-card-body pt-2">
+                        <div class="table-responsive">
+                          <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>Mobile</th><th>Last parent login</th><th>Access</th><th></th></tr></thead>
+                            <tbody id="parentAccessBody">
+                              <tr><td colspan="4" class="text-muted small">Loading…</td></tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                    }
                 </div>
 
             </div>
@@ -336,6 +369,10 @@
 @if (canViewFees)
 {
     <script src="~/js/fee-receipt.js" asp-append-version="true"></script>
+}
+@if (parentAppOn)
+{
+    <script src="~/js/parent-access.js" asp-append-version="true"></script>
 }
 <script>
 (function(){

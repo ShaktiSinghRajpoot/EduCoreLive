@@ -1,0 +1,57 @@
+@{
+    Layout = "_BlankLayout";
+    var children = ViewBag.Children as List<ParentChild> ?? new List<ParentChild>();
+    var child = ViewBag.Child as ParentChild;
+    string screen = ViewBag.Screen as string ?? "";
+    // The school's name goes next to each child only when the children are in 2+ schools.
+    bool manySchools = children.Select(x => x.SchoolId).Distinct().Count() > 1;
+    string ChildLabel(ParentChild x) => manySchools ? $"{x.StudentName} – {x.SchoolName}" : x.StudentName;
+}
+
+@section PageStyles {
+    <link rel="stylesheet" href="~/css/parent.css" asp-append-version="true" />
+    @RenderSection("PageStyles", required: false)
+}
+
+<div class="pa-wrap">
+    <header class="pa-top no-print">
+        <a href="/parent" class="pa-brand"><img src="~/img/brand/ssw-horizontal.png" alt="SmartSchoolWala.com" /></a>
+        <form action="/parent/logout" method="post" class="m-0">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-sm btn-outline-secondary"><i class="bx bx-log-out me-1"></i>Log out</button>
+        </form>
+    </header>
+
+    @if (children.Count > 1)
+    {
+        <nav class="pa-switch no-print" aria-label="Choose child">
+            @foreach (var x in children)
+            {
+                bool on = child != null && x.StudentId == child.StudentId;
+                string target = string.IsNullOrEmpty(screen) || ParentScreens.Refusal(x, screen) != null ? "home" : screen;
+                <a class="pa-chip @(on ? "active" : "")" href="/parent/@target?c=@x.StudentId">@ChildLabel(x)@(x.IsCurrent ? "" : " (left)")</a>
+            }
+        </nav>
+    }
+
+    @if (child != null)
+    {
+        <nav class="pa-nav no-print" aria-label="Screens">
+            @foreach (var s in ParentScreens.All)
+            {
+                if (ParentScreens.Refusal(child, s) != null) { continue; }
+                <a class="pa-tab @(s == screen ? "active" : "")" href="/parent/@s?c=@child.StudentId">
+                    <i class="bx @ParentScreens.Icon(s)"></i><span>@ParentScreens.Label(s)</span>
+                </a>
+            }
+        </nav>
+    }
+
+    <main class="pa-main">
+        @RenderBody()
+    </main>
+</div>
+
+@section PageScripts {
+    @RenderSection("PageScripts", required: false)
+}

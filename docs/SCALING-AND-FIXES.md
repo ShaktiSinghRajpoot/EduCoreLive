@@ -5970,3 +5970,11 @@ attendance stamped rows with the student's PRESENT class and session. Rule now, 
 - "Make it current" goes through `academic.sp_academic_year_switch_check` and a typed session name (checked in `SchoolSettingsController` too); Save no longer moves the current flag when another session is current.
 - Month-wise Dues (`sp_fee_month_dues`) shows unpaid lines of earlier sessions, labelled with their session. Year-End Close needs `fees.writeoff` plus "CLOSE <year>".
 - SQL: `EduCoreDataAccessLayer/Database/qa_fix_fees_rollover.sql`.
+
+### 2026-11-19 — Parent module, Phase 1 (view only)
+- "Parent App" is the 10th sellable module: `allow_parent_app` (Super Admin, Schools > Modules) and `enable_parent_app` (school, Modules & Workflow) on `core.school_admission_workflow_settings`, both **off by default** and off in every new-school preset. Six per-screen switches `parent_show_*` (Fees, Receipts, Results, Homework, Timetable, Notices). `SchoolModule.ParentApp`, `ModuleFlags.ParentAppOn()`. Saved by their own procs (`core.sp_parent_app_settings_save`, `core.sp_superadmin_parent_app`, audit `SCHOOL_MODULES_CHANGE`), so the workflow and the 8-module procs keep their signatures; the workflow Get only returns the new columns.
+- Parents sign in at `/parent/login` with a mobile and a 6-digit code (`core.parent_login_codes`, hashed, 10 min, 5 wrong = 15 min lock; plus the `otp` IP limiter). Config `ParentLogin:StaticOtp` (empty in the committed file): when set, that code works and nothing is sent.
+- Separate cookie scheme `Parent` (`EduCore.Parent`, 30 days sliding) and policy `ParentOnly` (`Helpers/ParentAuth.cs`). The staff scheme stays the default, so a parent cookie is never read on a staff page.
+- `core.sp_parent_children(mobile)` is the only source of a parent's children (Mobile / Alternate mobile match, school has Parent App and can sign in, not blocked, current or left within 12 months). Read on every parent request: an id not in it is 404, an empty list signs the parent out.
+- Staff side: Student profile > Parent Access card (`sp_parent_access_manage`, `core.parent_access_blocks`), Students > Parent Logins report (`sp_parent_login_report`), audit `core.parent_access_log` (LOGIN, RECEIPT_VIEW, REPORT_CARD_VIEW).
+- Details: `educore/docs/PARENT-MODULE.md`. SQL: `EduCoreDataAccessLayer/Database/parent_module.sql`.

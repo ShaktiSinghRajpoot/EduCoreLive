@@ -1,0 +1,100 @@
+@model EduCoreDataAccessLayer.Models.ERP.ParentLoginReport
+@{
+    ViewData["Title"] = "Parent Logins";
+    Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
+    int totalStudents = Model.Classes.Sum(c => c.Students);
+    int totalLoggedIn = Model.Classes.Sum(c => c.LoggedIn);
+    string ActionText(string a) => a switch
+    {
+        "LOGIN"            => "Logged in",
+        "RECEIPT_VIEW"     => "Opened receipt",
+        "REPORT_CARD_VIEW" => "Opened report card",
+        _                  => a
+    };
+}
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+        <h4 class="mb-1">Parent Logins</h4>
+        <div class="text-muted small">Parents log in at <strong>/parent/login</strong> with the mobile number on the student's record. @totalLoggedIn of @totalStudents current students have a parent who has logged in.</div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-12 col-lg-5">
+        <div class="card h-100">
+            <div class="card-header"><h6 class="mb-0">By class</h6></div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Class</th><th class="text-end">Students</th><th class="text-end">Logged in</th><th class="text-end">Never</th></tr></thead>
+                    <tbody>
+                        @if (Model.Classes.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">No current students.</td></tr>
+                        }
+                        @foreach (var c in Model.Classes)
+                        {
+                            <tr>
+                                <td>@c.ClassName@(string.IsNullOrWhiteSpace(c.Section) ? "" : " – " + c.Section)</td>
+                                <td class="text-end">@c.Students</td>
+                                <td class="text-end">@c.LoggedIn</td>
+                                <td class="text-end">@(c.Students - c.LoggedIn)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-7">
+        <div class="card h-100">
+            <div class="card-header"><h6 class="mb-0">Latest parent activity</h6></div>
+            <div class="table-responsive" style="max-height:480px;">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>When</th><th>Mobile</th><th>Child</th><th>What</th></tr></thead>
+                    <tbody>
+                        @if (Model.Log.Count == 0)
+                        {
+                            <tr><td colspan="4" class="text-center text-muted py-4">No parent has logged in yet.</td></tr>
+                        }
+                        @foreach (var l in Model.Log)
+                        {
+                            <tr>
+                                <td class="text-nowrap">@l.AtTime</td>
+                                <td>@l.Mobile</td>
+                                <td>@l.StudentName<div class="text-muted small">@l.ClassName@(string.IsNullOrWhiteSpace(l.Section) ? "" : " – " + l.Section)</div></td>
+                                <td>@ActionText(l.Action)@(string.IsNullOrWhiteSpace(l.Detail) ? "" : " " + l.Detail)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><h6 class="mb-0">Parents who have never logged in (@Model.Never.Count@(Model.Never.Count >= 1000 ? "+" : ""))</h6></div>
+            <div class="table-responsive" style="max-height:480px;">
+                <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Student</th><th>Class</th><th>Roll</th></tr></thead>
+                    <tbody>
+                        @if (Model.Never.Count == 0)
+                        {
+                            <tr><td colspan="3" class="text-center text-muted py-4">Every current student has a parent who has logged in.</td></tr>
+                        }
+                        @foreach (var n in Model.Never)
+                        {
+                            <tr>
+                                <td>@n.StudentName</td>
+                                <td>@n.ClassName@(string.IsNullOrWhiteSpace(n.Section) ? "" : " – " + n.Section)</td>
+                                <td>@n.RollNo</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

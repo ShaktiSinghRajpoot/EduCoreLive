@@ -395,6 +395,53 @@
                 <span class="badge bg-label-secondary text-wrap text-start" style="max-width:12rem;">Not in your plan. Contact SmartSchoolWala to add it.</span>
               }
             </div>
+
+            @* Parent App (Database/parent_module.sql): off by default. When the platform has not
+               given it, its parent-screen switches are not shown at all. *@
+            <div class="aw-row">
+              <div class="flex-grow-1">
+                <div class="aw-row-title">Parent App</div>
+                <div class="aw-row-desc">@(Model.AllowParentApp
+                    ? "Parents log in at /parent/login with the mobile number on their child's record and a one-time code. They can only view: nothing a parent does changes school data."
+                    : "Parents see their children's attendance, fees, receipts, results, homework and notices on their phone.")</div>
+              </div>
+              @if (Model.AllowParentApp)
+              {
+                <div class="form-check form-switch aw-switch m-0">
+                  <input class="form-check-input" type="checkbox" id="EnableParentApp" asp-for="EnableParentApp" disabled="@(canSwitch ? null : "disabled")" />
+                </div>
+              }
+              else
+              {
+                <span class="badge bg-label-secondary text-wrap text-start" style="max-width:12rem;">Not in your plan. Contact SmartSchoolWala to add it.</span>
+              }
+            </div>
+            @if (Model.AllowParentApp)
+            {
+              var parentScreens = new[]
+              {
+                  (Name: "ParentShowFees",      Title: "Fees (dues)",  On: Model.ParentShowFees),
+                  (Name: "ParentShowReceipts",  Title: "Receipts",     On: Model.ParentShowReceipts),
+                  (Name: "ParentShowResults",   Title: "Results and report cards (published results only, always)", On: Model.ParentShowResults),
+                  (Name: "ParentShowHomework",  Title: "Homework",     On: Model.ParentShowHomework),
+                  (Name: "ParentShowTimetable", Title: "Class timetable", On: Model.ParentShowTimetable),
+                  (Name: "ParentShowNotices",   Title: "Notices and school calendar", On: Model.ParentShowNotices)
+              };
+              <div class="aw-row" style="padding-left:1.25rem;">
+                <div class="flex-grow-1">
+                  <div class="aw-row-title">Screens parents see</div>
+                  <div class="aw-row-desc">A screen whose module is off stays hidden whatever is ticked here. Home and Attendance always show.</div>
+                  @foreach (var ps in parentScreens)
+                  {
+                    <div class="form-check mt-2">
+                      <input class="form-check-input" type="checkbox" id="@ps.Name" name="@ps.Name" value="true" @(ps.On ? "checked" : "") @(canSwitch ? "" : "disabled") />
+                      <input type="hidden" name="@ps.Name" value="false" />
+                      <label class="form-check-label" for="@ps.Name">@ps.Title</label>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
           </div>
         </div>
 

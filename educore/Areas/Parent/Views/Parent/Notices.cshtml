@@ -1,0 +1,53 @@
+@model ParentNoticesPage
+@{
+    ViewData["Title"] = "Notices";
+}
+
+<div class="pa-card">
+    <h2>Notices</h2>
+    @if (Model.Notices.Count == 0)
+    {
+        <div class="pa-muted">No notices right now.</div>
+    }
+    @foreach (var n in Model.Notices)
+    {
+        <div class="pa-row">
+            <div>
+                <div class="fw-semibold">@if (n.IsPinned) {<i class="bx bx-pin me-1"></i>}@n.Title</div>
+                @if (!string.IsNullOrWhiteSpace(n.Body))
+                {
+                    <div style="white-space:pre-line">@n.Body</div>
+                }
+                <div class="pa-muted">@Dates.Show(n.PostedOn)@(string.IsNullOrWhiteSpace(n.Category) ? "" : " · " + n.Category)</div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="pa-card">
+    <h2>Coming up (next 60 days)</h2>
+    @if (Model.Events.Count == 0 && Model.Holidays.Count == 0)
+    {
+        <div class="pa-muted">Nothing on the school calendar.</div>
+    }
+    @foreach (var e in Model.Events.OrderBy(e => e.StartDate))
+    {
+        <div class="pa-row">
+            <div>
+                <div class="fw-semibold">@e.Title</div>
+                <div class="pa-muted">@e.EventType@(string.IsNullOrWhiteSpace(e.StartTime) ? "" : " · " + e.StartTime)</div>
+            </div>
+            <div class="text-end pa-muted">@Dates.Show(e.StartDate)@(e.EndDate != e.StartDate && !string.IsNullOrWhiteSpace(e.EndDate) ? " – " + Dates.Show(e.EndDate) : "")</div>
+        </div>
+    }
+    @foreach (var h in Model.Holidays)
+    {
+        <div class="pa-row">
+            <div>
+                <div class="fw-semibold">@h.Title</div>
+                <div class="pa-muted">@(h.DayType == "half_day" ? "Half day" + (string.IsNullOrWhiteSpace(h.HalfDayEnd) ? "" : " till " + h.HalfDayEnd) : "Holiday")</div>
+            </div>
+            <div class="text-end pa-muted">@Dates.Show(h.Date)</div>
+        </div>
+    }
+</div>

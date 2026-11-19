@@ -1,0 +1,45 @@
+@model ParentChild
+@{
+    ViewData["Title"] = "Home";
+    string initial = string.IsNullOrWhiteSpace(Model.StudentName) ? "?" : Model.StudentName.Trim().Substring(0, 1).ToUpperInvariant();
+}
+
+<div class="pa-card">
+    <div class="pa-child">
+        @if (!string.IsNullOrWhiteSpace(Model.PhotoUrl))
+        {
+            @* A missing photo file falls back to the initial (the img is hidden, the letter shows). *@
+            <div class="pa-photo" style="position:relative;overflow:hidden;">
+                @initial
+                <img src="/parent/photo?c=@Model.StudentId" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"
+                     onerror="this.style.display='none'" />
+            </div>
+        }
+        else
+        {
+            <div class="pa-photo">@initial</div>
+        }
+        <div>
+            <h2 class="mb-1">@Model.StudentName</h2>
+            <div class="pa-muted">@Model.SchoolName</div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.IsCurrent)
+{
+    <div class="alert alert-secondary small">Left the school@(string.IsNullOrEmpty(Model.LeftOn) ? "" : " on " + Dates.Show(Model.LeftOn)). Receipts and results stay available for 12 months.</div>
+}
+
+<div class="pa-card">
+    <dl class="pa-kv mb-0">
+        <dt>Class</dt><dd>@Model.ClassName@(string.IsNullOrWhiteSpace(Model.Section) ? "" : " – " + Model.Section)</dd>
+        <dt>Roll no.</dt><dd>@(string.IsNullOrWhiteSpace(Model.RollNo) ? "-" : Model.RollNo)</dd>
+        <dt>Admission no.</dt><dd>@(string.IsNullOrWhiteSpace(Model.AdmissionNo) ? "-" : Model.AdmissionNo)</dd>
+        @if (Model.IsCurrent)
+        {
+            <dt>Class teacher</dt><dd>@(string.IsNullOrWhiteSpace(Model.ClassTeacher) ? "-" : Model.ClassTeacher)</dd>
+            <dt>Session</dt><dd>@Model.AcademicYear</dd>
+        }
+    </dl>
+</div>

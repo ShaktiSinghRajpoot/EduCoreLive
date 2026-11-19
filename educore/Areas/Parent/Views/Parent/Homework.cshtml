@@ -1,0 +1,29 @@
+@model List<Homework>
+@{
+    ViewData["Title"] = "Homework";
+}
+
+<div class="pa-card">
+    <h2>Homework (last 30 days)</h2>
+    @if (Model.Count == 0)
+    {
+        <div class="pa-muted">No homework in the last 30 days.</div>
+    }
+    @foreach (var h in Model)
+    {
+        <div class="pa-row">
+            <div>
+                <div class="fw-semibold">@h.SubjectName: @h.Title</div>
+                @if (!string.IsNullOrWhiteSpace(h.Details))
+                {
+                    <div style="white-space:pre-line">@h.Details</div>
+                }
+                <div class="pa-muted">Given @Dates.Show(h.AssignedOn) · Due @Dates.Show(h.DueOn)@(string.IsNullOrWhiteSpace(h.TeacherName) ? "" : " · " + h.TeacherName)</div>
+            </div>
+            @if (!string.IsNullOrWhiteSpace(h.MyStatus))
+            {
+                <div class="text-end"><span class="badge bg-label-@(h.MyStatus == "Done" ? "success" : "warning")">@h.MyStatus</span></div>
+            }
+        </div>
+    }
+</div>

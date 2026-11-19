@@ -88,6 +88,20 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public bool AllowFees       { get; set; } = true;
         public bool AllowAccounts   { get; set; } = true;
 
+        /// <summary>
+        /// Parent App (Database/parent_module.sql). Unlike the modules above it is OFF
+        /// by default: the Super Admin gives it (AllowParentApp) and the school switches
+        /// it on. The ParentShow* switches pick which screens parents see.
+        /// </summary>
+        public bool AllowParentApp  { get; set; }
+        public bool EnableParentApp { get; set; }
+        public bool ParentShowFees      { get; set; } = true;
+        public bool ParentShowReceipts  { get; set; } = true;
+        public bool ParentShowResults   { get; set; } = true;
+        public bool ParentShowHomework  { get; set; } = true;
+        public bool ParentShowTimetable { get; set; } = true;
+        public bool ParentShowNotices   { get; set; } = true;
+
         // "Charge recurring fees from" used to live here. It now belongs to the
         // academic year (AcademicYearModel.ChargeFeesFrom), because it decides how a
         // whole session is billed and a school-wide value could be changed halfway

@@ -452,6 +452,49 @@ namespace educore.Areas.Students.Controllers
         // Everything the dashboard shows, in one call — the page used to build this
         // from a hardcoded array of ten students.
         //
+        // ── Parent access (Parent App, parent_module.sql) ──────────────────────
+        // The student's two mobiles, whether each is blocked from this child, and its
+        // last parent login. Blocking touches only this child, never the student record.
+        [HttpGet]
+        [RequiresModule(SchoolModule.ParentApp)]
+        public async Task<IActionResult> ParentAccess(Guid id, [FromServices] IParentService parents)
+        {
+            var studentId = await _publicIds.ResolveAsync(IPublicIdService.Student, id, TenantId(), SchoolId());
+            if (studentId == 0) return Json(new { success = false, message = "Student not found." });
+
+            var rows = await parents.GetAccessAsync(studentId, TenantId(), SchoolId(), UserId());
+            return Json(new { success = true, rows = ParentAccessRows(rows) });
+        }
+
+        [HttpPost]
+        [HasPermission("students.manage")]
+        [RequiresModule(SchoolModule.ParentApp)]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ParentAccessBlock([FromBody] ParentAccessRequest req, [FromServices] IParentService parents)
+        {
+            var studentId = req == null ? 0 : await _publicIds.ResolveAsync(IPublicIdService.Student, req.Id, TenantId(), SchoolId());
+            if (studentId == 0) return Json(new { success = false, message = "Student not found." });
+            try
+            {
+                var rows = await parents.SetBlockedAsync(studentId, req!.Mobile ?? "", req.Block, TenantId(), SchoolId(), UserId());
+                return Json(new { success = true, message = req.Block ? "Blocked. That mobile no longer sees this child." : "Unblocked.", rows = ParentAccessRows(rows) });
+            }
+            catch (Npgsql.PostgresException pg) when (pg.SqlState == "P0001")
+            {
+                return Json(new { success = false, message = pg.MessageText });
+            }
+        }
+
+        private static object ParentAccessRows(List<EduCoreDataAccessLayer.Models.ERP.ParentAccessMobile> rows) =>
+            rows.Select(r => new { label = r.Label, mobile = r.Mobile, blocked = r.IsBlocked, lastLogin = r.LastLogin });
+
+        public class ParentAccessRequest
+        {
+            public Guid    Id     { get; set; }
+            public string? Mobile { get; set; }
+            public bool    Block  { get; set; }
+        }
+
         // The Homework tab: the student's homework of the last 30 days with whether
         // they did it. Loaded only when the tab is opened.
         [HttpGet]
