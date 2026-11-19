@@ -13,6 +13,9 @@
     var classes      = Model.AvailableClasses;
     var counsellors  = Model.AvailableCounsellors;
     var showRegistration = Model.Workflow.EnableRegistration;
+    // Fee/discount controls appear only for users the server lets use them (QA BUG-011).
+    bool canCollectFee = ViewData["CanCollectFee"] as bool? == true;
+    bool canDiscount   = ViewData["CanDiscount"] as bool? == true;
     // Read by _EnquiryRowActions to show/hide the Register button.
     ViewData["ShowRegistration"] = showRegistration;
 
@@ -72,9 +75,11 @@
                 </div>
             </div>
             <div class="d-flex gap-2 flex-shrink-0">
-                <button type="button" class="btn btn-outline-secondary">
+                @* Same query string as this page, so the CSV holds what the filters show. *@
+                <a class="btn btn-outline-secondary" id="btnExport"
+                   href="@(Url.Action("ExportCsv", "Enquiry", new { area = "Students" }) + Context.Request.QueryString)">
                     <i class="bx bx-export me-1"></i> Export
-                </button>
+                </a>
                 <button type="button" class="btn btn-primary" id="btnAddEnquiry"
                         data-bs-toggle="modal" data-bs-target="#addEnquiryModal">
                     <i class="bx bx-user-plus me-1"></i> Add Enquiry
@@ -210,6 +215,14 @@
                         <i class="bx bx-error-circle"></i> Overdue Only
                         <span class="qf-count @(stats.OverdueCount > 0 ? "qf-count-danger" : "")">@stats.OverdueCount</span>
                     </button>
+                    @if (Model.FilterOverdue && Model.TotalCount > 0)
+                    {
+                        @* Bulk tidy-up of stale leads (QA UX-18): previews the list, then
+                           marks them Not Interested with reason "Not Responding". *@
+                        <button type="button" class="qf-btn" id="btnCloseOverdue">
+                            <i class="bx bx-archive-in"></i> Close as lost…
+                        </button>
+                    }
                     @if (Model.HasFilters)
                     {
                         <a asp-area="Students" asp-controller="Enquiry" asp-action="EnquiryCRM" class="qf-btn ms-auto">
@@ -549,6 +562,8 @@
                                 <input type="tel" class="form-control" name="FatherMobile" id="addFatherMobile"
                                        placeholder="9876543210" />
                             </div>
+                            @* Filled on blur when the number is already on another enquiry (QA UX-05). *@
+                            <div class="small text-warning-emphasis mt-1 d-none" id="dupMobileNote"></div>
                         </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label">Mother's Name</label>
@@ -646,7 +661,7 @@
                         }
                         <div class="col-12 col-md-6">
                             <label class="form-label">Next Follow-up Date</label>
-                            <input type="date" class="form-control" name="NextFollowupDate" />
+                            <input type="date" class="form-control" name="NextFollowupDate" id="addNextFollowup" min="@EduCoreDataAccessLayer.Helpers.Dates.Today" />
                         </div>
                         @if (transportOn)
                         {
@@ -732,7 +747,7 @@
                     </div>
                     <div class="col-12 col-md-6">
                         <label class="form-label">Next Follow-up Date</label>
-                        <input type="date" class="form-control" id="followupNextDate" />
+                        <input type="date" class="form-control" id="followupNextDate" min="@EduCoreDataAccessLayer.Helpers.Dates.Today" />
                     </div>
 
                     @* This used to sit behind an "Also update enquiry status" switch. The
@@ -855,7 +870,7 @@
             <div class="modal-body">
                 <input type="hidden" id="visitEnquiryId" />
                 <label class="form-label">Visit date <span class="text-danger">*</span></label>
-                <input type="date" class="form-control mb-3" id="visitDate" />
+                <input type="date" class="form-control mb-3" id="visitDate" min="@EduCoreDataAccessLayer.Helpers.Dates.Today" />
                 <label class="form-label">Note <span class="text-muted">(optional)</span></label>
                 <input type="text" class="form-control" id="visitNote" maxlength="300"
                        placeholder="e.g. Parents coming at 11 AM with both children" />
@@ -988,7 +1003,7 @@
                     </div>
                     <div class="col-12 col-md-6">
                         <label class="form-label">Registration Date</label>
-                        <input type="date" class="form-control" id="regDate" />
+                        <input type="date" class="form-control" id="regDate" max="@EduCoreDataAccessLayer.Helpers.Dates.Today" />
                     </div>
 
                     <!-- Registration fee — shown only when fee is enabled -->
@@ -999,13 +1014,22 @@
                                 <div class="fw-bold" style="font-size:.88rem">Registration Fee</div>
                                 <small class="text-muted">Amount: <span class="fw-bold" id="regFeeAmountLabel">₹0.00</span></small>
                             </div>
+                            @if (canCollectFee)
+                            {
                             <div class="form-check form-switch m-0">
                                 <input class="form-check-input" type="checkbox" id="regFeePaid" />
                                 <label class="form-check-label" for="regFeePaid" style="font-size:.82rem">Fee collected</label>
                             </div>
+                            }
+                            else
+                            {
+                            <small class="text-muted text-end" style="font-size:.76rem">Collected by the accounts desk</small>
+                            }
                         </div>
                         <!-- Payment details — shown only when fee is collected; issues a receipt -->
                         <div class="row g-2 mt-1 d-none" id="regPaymentRow">
+                            @if (canDiscount)
+                            {
                             <div class="col-12 col-md-4">
                                 <label class="form-label">Discount</label>
                                 <select class="form-select" id="regDiscountType">
@@ -1022,6 +1046,7 @@
                                 <label class="form-label">Reason</label>
                                 <input type="text" class="form-control" id="regDiscountReason" maxlength="200" placeholder="Required if discount" />
                             </div>
+                            }
                             <div class="col-12">
                                 <div class="alert alert-light border mb-0 py-2" id="regNetLine" style="font-size:.83rem">Fee ₹0.00</div>
                             </div>
@@ -1152,6 +1177,7 @@ $(document).ready(function () {
     $('#confirmVisitBtn').on('click', function () {
         var date = $('#visitDate').val();
         if (!date) { ecToast('error', 'Please pick the visit date.'); return; }
+        if (date < EC.today()) { ecToast('error', 'The visit date cannot be before today.'); return; }
 
         var $btn = $(this);
         EC.buttonBusy($btn, 'Scheduling…');
@@ -1343,6 +1369,11 @@ $(document).ready(function () {
 
         // Validations
         if (!outcome) { ecToast('error', 'Please select an outcome.'); return; }
+        if (nextDate && nextDate < EC.today()) {
+            ecToast('error', 'Next follow-up date cannot be before today.');
+            $('#followupNextDate').focus();
+            return;
+        }
         if ((outcome === 'Not Interested' || newStatus === 'Not Interested') && !lostReason) {
             ecToast('error', 'Please select a reason for Not Interested.'); return;
         }
@@ -1495,6 +1526,11 @@ $(document).ready(function () {
         var regNumber = REG_AUTO_NUMBER ? '' : $.trim($('#regNumber').val());
         if (!REG_AUTO_NUMBER && regNumber === '') {
             ecToast('error', 'Please enter a registration number.');
+            return;
+        }
+        if ($('#regDate').val() > EC.today()) {
+            ecToast('error', 'Registration date cannot be in the future.');
+            $('#regDate').focus();
             return;
         }
 
@@ -1697,6 +1733,9 @@ $(document).ready(function () {
     $('#addWhatsApp').prop('readonly', true);
 
     /* ── Edit Enquiry ───────────────────────────────────── */
+    // The next follow-up date the lead already had when the edit form opened.
+    var origNextFollowup = '';
+
     function setEnqVal(name, val) {
         $('[name="' + name + '"]', '#addEnquiryModal').val(val == null ? '' : val);
     }
@@ -1713,6 +1752,10 @@ $(document).ready(function () {
         $('#whatsappSameAsMobile').prop('checked', true);
         $('#addWhatsApp').prop('readonly', true);
         $('#initialStatusRow').removeClass('d-none');   // status applies on Add only
+        origNextFollowup = '';
+        $('#addNextFollowup').attr('min', EC.today());
+        $('#dupMobileNote').addClass('d-none').empty();
+        lastDupChecked = '';
     }
 
     function enquiryFormFill(d) {
@@ -1745,6 +1788,9 @@ $(document).ready(function () {
         setEnqVal('ReferrerMobile', d.referrerMobile);
         if (d.assignedToId) setEnqVal('AssignedToId', d.assignedToId);
         setEnqVal('NextFollowupDate', d.nextFollowupDate);
+        // An old date already on the lead may stay as it is; only a new past date is refused.
+        origNextFollowup = d.nextFollowupDate || '';
+        if (origNextFollowup && origNextFollowup < EC.today()) $('#addNextFollowup').attr('min', origNextFollowup);
         setEnqVal('Notes', d.notes);
         $('#addPrimaryMobile').val(d.fatherMobile || '');
 
@@ -1800,7 +1846,86 @@ $(document).ready(function () {
         ClassName:    EC.rule.required('Class'),
         Session:      EC.rule.required('Academic session'),
         FatherMobile: function (v) { return !v ? "Father's mobile number is required." : EC.rule.mobile(v); },
-        ParentEmail:  EC.rule.email
+        MotherMobile: EC.rule.mobile,
+        ParentEmail:  EC.rule.email,
+        // Blank is fine; a past date is not (QA BUG-003), except the one already saved.
+        NextFollowupDate: function (v) {
+            return v && v < EC.today() && v !== origNextFollowup ? 'Next follow-up date cannot be before today.' : '';
+        }
+    });
+
+    /* ── Possible duplicate, on leaving the mobile field (QA UX-05) ──
+       Siblings share a parent's number, so this only warns: Open shows the other
+       enquiry in a new tab, Continue hides the note and the form carries on. */
+    var lastDupChecked = '';
+    $('#addFatherMobile').on('blur', function () {
+        var mob = $.trim($(this).val());
+        if (mob === lastDupChecked) return;
+        lastDupChecked = mob;
+        $('#dupMobileNote').addClass('d-none').empty();
+        if (EC.rule.mobile(mob) !== '' || !mob) return;
+
+        $.getJSON('/students/enquiry/CheckMobile', { mobile: mob, excludeId: parseInt($('#enquiryFormId').val()) || 0 })
+            .done(function (res) {
+                if (!res || !res.matches || !res.matches.length || $.trim($('#addFatherMobile').val()) !== mob) return;
+                var m = res.matches[0];
+                var more = res.matches.length > 1 ? ' and ' + (res.matches.length - 1) + ' more' : '';
+                var openUrl = '@Url.Action("EnquiryCRM", "Enquiry", new { area = "Students" })?Search=' + encodeURIComponent(mob);
+                $('#dupMobileNote').html(
+                    '<i class="bx bx-error me-1"></i>Possible duplicate: <strong>' + EC.esc(m.studentName) + '</strong> (enquiry #' + m.enquiryId +
+                    ', ' + EC.esc(m.className) + ' ' + EC.esc(m.session) + ', ' + EC.esc(m.status) + ')' + more + '. ' +
+                    '<a href="' + openUrl + '" target="_blank" rel="noopener">Open</a> · ' +
+                    '<a href="#" id="dupContinue">Continue</a>'
+                ).removeClass('d-none');
+            });
+    });
+    $(document).on('click', '#dupContinue', function (e) {
+        e.preventDefault();
+        $('#dupMobileNote').addClass('d-none').empty();
+    });
+
+    /* ── Close overdue leads as lost (QA UX-18) ─────────────
+       Shown only with "Overdue Only" on. Asks the server which leads that is
+       (same filters as the list), lists them, and closes them on confirm. */
+    $('#btnCloseOverdue').on('click', function () {
+        // The filters the list on screen was built from (the address bar), not
+        // a dropdown changed since without pressing Search.
+        var q = new URLSearchParams(window.location.search);
+        var body = {
+            search:           q.get('Search') || '',
+            filterSession:    q.get('FilterSession') || '',
+            filterClass:      q.get('FilterClass') || '',
+            filterSource:     q.get('FilterSource') || '',
+            filterPipeline:   q.get('FilterPipeline') || '',
+            filterAssignedTo: parseInt(q.get('FilterAssignedTo')) || null
+        };
+        function send(preview) {
+            body.preview = preview;
+            return $.ajax({ url: '/students/enquiry/CloseOverdueAsLost', type: 'POST', contentType: 'application/json',
+                            headers: { 'RequestVerificationToken': csrf }, data: JSON.stringify(body) });
+        }
+        send(true).done(function (res) {
+            if (!res || !res.success) { ecToast('error', (res && res.message) || 'Could not load the overdue list.'); return; }
+            if (!res.count) { ecToast('info', 'No overdue enquiries to close (registered ones are left alone).'); return; }
+            var items = (res.names || []).slice();
+            if (res.count > items.length) items.push('… and ' + (res.count - items.length) + ' more');
+            EC.confirm({
+                title:   'Close ' + res.count + ' overdue enquir' + (res.count === 1 ? 'y' : 'ies') + ' as lost?',
+                message: 'They will be marked Not Interested with the reason "Not Responding". You can reopen any of them later from its status.',
+                items:   items,
+                okText:  'Close as lost',
+                cancelText: 'Keep them',
+                icon:    'bx-archive-in'
+            }).then(function (ok) {
+                if (!ok) return;
+                EC.showLoader();
+                send(false).done(function (r) {
+                    ecToast(r.success ? 'success' : 'error', r.message || 'Done.');
+                    if (r.success) reloadList();
+                }).fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Close failed')); })
+                  .always(function () { EC.hideLoader(); });
+            });
+        }).fail(function (xhr) { ecToast('error', EC.ajaxError(xhr, 'Could not load the overdue list')); });
     });
 
     // Mobile fields the server expects, mirrored from what was typed. Registered

@@ -119,6 +119,46 @@ namespace EduCoreDataAccessLayer.Services.Repository.ERP
             int enquiryId, string? reason, int tenantId, int schoolId, int actionUserId)
             => RunActionAsync("Cancel", enquiryId, reason, tenantId, schoolId, actionUserId);
 
+        // Move a pending registration to another session (QA BUG-036). Number, date
+        // and receipts stay on the enquiry; the class must exist in the target session.
+        public async Task<(int Success, string Message)> MoveSessionAsync(
+            int enquiryId, string session, string? className, int tenantId, int schoolId, int actionUserId)
+        {
+            if (tenantId <= 1 || schoolId <= 0 || enquiryId <= 0)
+                return (0, "Invalid request.");
+
+            var parameters = new NpgsqlParameter[]
+            {
+                new("p_tenant_id",      NpgsqlDbType.Integer) { Value = tenantId },
+                new("p_school_id",      NpgsqlDbType.Integer) { Value = schoolId },
+                new("p_action_user_id", NpgsqlDbType.Integer) { Value = actionUserId },
+                new("p_enquiry_id",     NpgsqlDbType.Integer) { Value = enquiryId },
+                new("p_session",        NpgsqlDbType.Text)    { Value = session },
+                new("p_class_name",     NpgsqlDbType.Text)    { Value = (object?)className ?? DBNull.Value },
+                new("p_result", NpgsqlDbType.Refcursor) { Direction = ParameterDirection.InputOutput, Value = "result_cursor" }
+            };
+
+            try
+            {
+                var ds = await _db.ExecuteProcedureWithCursorsAsync("core.sp_registration_move_session", parameters);
+                if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0)
+                    return (0, "No response.");
+
+                var row = ds.Tables[0].Rows[0];
+                return (BoolVal(row, "success") ? 1 : 0, Str(row, "message"));
+            }
+            catch (PostgresException pex)
+            {
+                _logger.LogWarning(pex, "Registration move rejected for enquiry {EnquiryId}, school {SchoolId}. SqlState {SqlState}", enquiryId, schoolId, pex.SqlState);
+                return (0, pex.MessageText);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error moving registration {EnquiryId}, school {SchoolId}.", enquiryId, schoolId);
+                return (0, "Unable to move the registration.");
+            }
+        }
+
         // (There is no MarkFeePaid any more: it flipped the "fee paid" flag before,
         // and sometimes without, a receipt. Collecting goes through
         // FeePaymentService.RecordRegistrationPaymentAsync, and paid follows the money.)

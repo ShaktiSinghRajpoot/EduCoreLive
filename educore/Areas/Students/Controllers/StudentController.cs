@@ -89,6 +89,21 @@ namespace educore.Areas.Students.Controllers
             ViewBag.OwnClassesOnly = allowed != null;
 
             await _admissionService.GetStudentListPageAsync(query, TenantId(), SchoolId(), UserId(), allowed);
+
+            // ?Page=999 showed an empty table with no pager (QA BUG-016): show the last
+            // page instead. The proc reports the total only on a page that has rows,
+            // so page 1 is asked first to learn how many pages there are.
+            if (query.Items.Count == 0 && query.Page > 1)
+            {
+                query.Page = 1;
+                await _admissionService.GetStudentListPageAsync(query, TenantId(), SchoolId(), UserId(), allowed);
+                if (query.TotalPages > 1)
+                {
+                    query.Page = query.TotalPages;
+                    await _admissionService.GetStudentListPageAsync(query, TenantId(), SchoolId(), UserId(), allowed);
+                }
+            }
+
             if (!canViewFees)
                 foreach (var s in query.Items) { s.FeeStatus = ""; s.FeeDue = 0; s.AnnualTotal = 0; }
 

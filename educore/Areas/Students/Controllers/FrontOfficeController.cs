@@ -41,6 +41,17 @@ namespace educore.Areas.Students.Controllers
         public async Task<IActionResult> Save(string op, [FromBody] FrontOfficeEntry entry)
         {
             if (entry == null) return Json(new { success = false, message = "Invalid request." });
+
+            // QA BUG-021: "abc" was saved as a visitor's mobile. Blank stays allowed; a
+            // typed number must be a 10-digit mobile (as on Enquiry). A call may also
+            // come from a landline, so the call log takes either.
+            if (op is "VisitorSave" or "ComplaintSave" or "CallSave" && !string.IsNullOrWhiteSpace(entry.Mobile))
+            {
+                bool validNumber = op == "CallSave" ? PhoneRules.IsValid(entry.Mobile) : PhoneRules.IsMobile(entry.Mobile);
+                if (!validNumber)
+                    return Json(new { success = false, message = op == "CallSave" ? PhoneRules.Message : "Enter a valid 10-digit mobile number." });
+                entry.Mobile = PhoneRules.Clean(entry.Mobile);
+            }
             var (ok, msg) = await _fo.SaveAsync(op ?? "", entry, TenantId(), SchoolId(), UserId());
             return Json(new { success = ok, message = msg });
         }

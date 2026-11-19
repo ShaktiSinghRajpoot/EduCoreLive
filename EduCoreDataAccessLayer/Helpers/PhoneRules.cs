@@ -26,6 +26,13 @@ namespace EduCoreDataAccessLayer.Helpers
             return digits.Length == 0 ? null : digits;
         }
 
+        /// <summary>True for a 10-digit Indian mobile only (same rule as EC.rule.mobile).</summary>
+        public static bool IsMobile(string? value)
+        {
+            var v = Clean(value);
+            return v != null && Mobile.IsMatch(v);
+        }
+
         /// <summary>True for a mobile or a landline (blank is NOT valid — check required separately).</summary>
         public static bool IsValid(string? value)
         {

@@ -176,7 +176,10 @@ namespace EduCoreDataAccessLayer.Models.ERP
                 if (days is null)
                     return IsVisitScheduled ? "Visit date not set" : "Add a date to track this lead";
 
-                var when = days < 0  ? $"Overdue by {Plural(-days.Value, "day")}"
+                // Capped (QA UX-18): "Overdue by 2506 days" says nothing more than
+                // "> 90 days" does, and such a lead is a candidate for Close as lost.
+                var when = days < -90 ? "Overdue by > 90 days"
+                         : days < 0  ? $"Overdue by {Plural(-days.Value, "day")}"
                          : days == 0 ? "Due today"
                          :             $"In {Plural(days.Value, "day")}";
 
@@ -402,6 +405,19 @@ namespace EduCoreDataAccessLayer.Models.ERP
     public class DeleteEnquiryRequest
     {
         public int EnquiryId { get; set; }
+    }
+
+    // Bulk "Close as lost" on the overdue list: the page's own filters, plus
+    // Preview = true to count and name the leads before anything changes.
+    public class CloseOverdueRequest
+    {
+        public string? Search           { get; set; }
+        public string? FilterSession    { get; set; }
+        public string? FilterClass      { get; set; }
+        public string? FilterSource     { get; set; }
+        public string? FilterPipeline   { get; set; }
+        public int?    FilterAssignedTo { get; set; }
+        public bool    Preview          { get; set; }
     }
 
     public class RegisterEnquiryRequest

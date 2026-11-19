@@ -885,6 +885,17 @@ namespace educore.Areas.Students.Controllers
             catch { ViewBag.Sessions = new List<SelectListItem>(); }
             // Sections are class-dependent → loaded dynamically via GetSections.
 
+            // The form warns when the chosen session is not the current one (QA BUG-036):
+            // an earlier session needs a real warning (a carried-over registration would
+            // admit the child into last year), the next session is just a note (early
+            // admissions, owner decision #9).
+            var years = await _schoolSettingsService.GetAcademicYearsAsync(TenantId(), SchoolId(), UserId());
+            var current = years.FirstOrDefault(y => y.IsCurrent);
+            ViewBag.CurrentSession = current?.AcademicYearName ?? "";
+            ViewBag.OlderSessions = current == null ? new List<string>() : years
+                .Where(y => !y.IsCurrent && string.CompareOrdinal(y.StartDate ?? "", current.StartDate ?? "") < 0)
+                .Select(y => y.AcademicYearName).ToList();
+
             // Whether the admission form may collect fee on the spot. The security
             // deposit (and every other charge) is now a Fee Head pulled via the fee
             // structure, so no amount is read from the workflow settings here.

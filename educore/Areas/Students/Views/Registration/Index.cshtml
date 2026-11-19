@@ -6,6 +6,9 @@
     ViewData["Title"] = "Registrations";
     Layout = "~/Views/Shared/_ContentNavbarLayout.cshtml";
     var stats = Model.Stats;
+    // Only the money controls the server accepts for this user (QA BUG-011).
+    bool canCollectFee = ViewBag.CanCollectFee == true;
+    bool canDiscount   = ViewBag.CanDiscount == true;
 }
 
 @section PageStyles {
@@ -279,7 +282,7 @@
         <div class="row g-3 mb-3">
           <div class="col-md-6">
             <label class="form-label">Student Name <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" id="rwName" maxlength="80" />
+            <input type="text" class="form-control" id="rwName" name="StudentName" maxlength="80" />
           </div>
           <div class="col-md-6">
             <label class="form-label">Gender</label>
@@ -292,14 +295,14 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Class <span class="text-danger">*</span></label>
-            <select class="form-select" id="rwClass">
+            <select class="form-select" id="rwClass" name="ClassName">
               <option value="">Select class</option>
               @foreach (var c in Model.AvailableClasses) { <option value="@c.Text">@c.Text</option> }
             </select>
           </div>
           <div class="col-md-6">
             <label class="form-label">Session <span class="text-danger">*</span></label>
-            <select class="form-select" id="rwSession">
+            <select class="form-select" id="rwSession" name="Session">
               <option value="">Select session</option>
               @foreach (var s in Model.AvailableSessions) { <option value="@s.Text">@s.Text</option> }
             </select>
@@ -314,7 +317,7 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Mobile <span class="text-danger">*</span></label>
-            <input type="tel" class="form-control" id="rwMobile" maxlength="10" placeholder="10-digit mobile" />
+            <input type="tel" class="form-control" id="rwMobile" name="Mobile" maxlength="10" placeholder="10-digit mobile" />
           </div>
           <div class="col-md-6">
             <label class="form-label">Mother Name</label>
@@ -322,7 +325,7 @@
           </div>
           <div class="col-md-6">
             <label class="form-label">Parent Email</label>
-            <input type="email" class="form-control" id="rwEmail" maxlength="120" />
+            <input type="email" class="form-control" id="rwEmail" name="ParentEmail" maxlength="120" />
           </div>
         </div>
 
@@ -330,12 +333,12 @@
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Registration Number</label>
-            <input type="text" class="form-control" id="rwRegNumber" maxlength="40" />
+            <input type="text" class="form-control" id="rwRegNumber" name="RegistrationNumber" maxlength="40" />
             <small class="text-muted" id="rwRegNumberHint">Leave blank to auto-generate.</small>
           </div>
           <div class="col-md-6">
             <label class="form-label">Registration Date</label>
-            <input type="date" class="form-control" id="rwRegDate" />
+            <input type="date" class="form-control" id="rwRegDate" name="RegistrationDate" max="@EduCoreDataAccessLayer.Helpers.Dates.Today" />
           </div>
         </div>
 
@@ -347,12 +350,21 @@
                 <div class="fw-bold" style="font-size:.88rem">Registration Fee</div>
                 <div class="text-muted" id="rwFeeAmountLabel" style="font-size:.8rem">Select class &amp; session</div>
               </div>
+              @if (canCollectFee)
+              {
               <div class="form-check form-switch mb-0">
                 <input class="form-check-input" type="checkbox" id="rwFeePaid" />
                 <label class="form-check-label" for="rwFeePaid">Collected now</label>
               </div>
+              }
+              else
+              {
+              <small class="text-muted text-end" style="font-size:.78rem">Collected by the accounts desk</small>
+              }
             </div>
             <div class="row g-3 mt-1 d-none" id="rwPaymentRow">
+              @if (canDiscount)
+              {
               <div class="col-md-4">
                 <label class="form-label">Discount</label>
                 <select class="form-select" id="rwDiscountType">
@@ -363,18 +375,19 @@
               </div>
               <div class="col-md-4">
                 <label class="form-label">Value</label>
-                <input type="number" min="0" step="0.01" class="form-control" id="rwDiscountValue" placeholder="0" />
+                <input type="number" min="0" step="0.01" class="form-control" id="rwDiscountValue" name="DiscountValue" placeholder="0" />
               </div>
               <div class="col-md-4">
                 <label class="form-label">Reason</label>
-                <input type="text" class="form-control" id="rwDiscountReason" maxlength="200" placeholder="Required if discount given" />
+                <input type="text" class="form-control" id="rwDiscountReason" name="DiscountReason" maxlength="200" placeholder="Required if discount given" />
               </div>
+              }
               <div class="col-12">
                 <div class="alert alert-light border mb-0 py-2" id="rwNetLine" style="font-size:.85rem">Select class &amp; session to see the fee.</div>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Collecting now</label>
-                <input type="number" min="0" step="0.01" class="form-control" id="rwCollectAmount" placeholder="0" />
+                <input type="number" min="0" step="0.01" class="form-control" id="rwCollectAmount" name="CollectAmount" placeholder="0" />
                 <div class="form-text" id="rwBalanceHint">
                   Leave as-is to take the whole fee. Enter less if the parent is paying part of it.
                 </div>
@@ -391,7 +404,7 @@
               </div>
               <div class="col-md-6">
                 <label class="form-label">Reference</label>
-                <input type="text" class="form-control" id="rwPaymentReference" maxlength="60" placeholder="Txn / cheque no (optional)" />
+                <input type="text" class="form-control" id="rwPaymentReference" name="PaymentReference" maxlength="60" placeholder="Txn / cheque no (optional)" />
               </div>
             </div>
           </div>
@@ -415,6 +428,10 @@ $(function () {
 
     var FEE_ENABLED = @(Model.RegistrationFeeEnabled ? "true" : "false");
     var CAN_ADMIT = @(ViewBag.CanAdmit == true ? "true" : "false");
+    var CAN_COLLECT = @(canCollectFee ? "true" : "false");
+    var CAN_MANAGE = @(ViewBag.CanManage == true ? "true" : "false");
+    var CURRENT_SESSION = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Convert.ToString(ViewBag.CurrentSession) ?? ""));
+    var OLDER_SESSIONS  = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OlderSessions as List<string> ?? new List<string>()));
     var csrf = $('input[name="__RequestVerificationToken"]').first().val() || $('[name="__RequestVerificationToken"]').val() || '';
     var ADMISSION_URL = '@Url.Action("Create", "Admission", new { area = "Students" })';
     var ENQUIRY_EDIT_URL = '@Url.Action("EnquiryCRM", "Enquiry", new { area = "Students" })';
@@ -449,12 +466,17 @@ $(function () {
         // (they are filed against the enquiry, not a student). Every slip, not just the newest.
         if (r.receipts && r.receipts.length)
             actions += '<button class="btn btn-sm btn-icon btn-outline-secondary reg-act-btn btn-receipts" title="Fee receipts ('+r.receipts.length+')" data-id="'+r.enquiryId+'"><i class="bx bx-printer"></i></button>';
-        // Mark fee paid
-        if (FEE_ENABLED && !r.registrationFeePaid && active)
+        // Mark fee paid (fees.collect only -- the server refuses everyone else)
+        if (FEE_ENABLED && CAN_COLLECT && !r.registrationFeePaid && active)
             actions += '<button class="btn btn-sm btn-icon btn-outline-success reg-act-btn btn-fee" title="Mark fee collected" data-id="'+r.enquiryId+'"><i class="bx bx-rupee"></i></button>';
+        // Left behind in an earlier session by the rollover (QA BUG-036): offer to
+        // move it to the current session, and warn before admitting into the old one.
+        var oldSession = active && OLDER_SESSIONS.indexOf(r.session) >= 0;
+        if (oldSession && CAN_MANAGE)
+            actions += '<button class="btn btn-sm btn-icon btn-outline-warning reg-act-btn btn-move" title="Move to '+EC.esc(CURRENT_SESSION)+'" data-id="'+r.enquiryId+'" data-name="'+EC.esc(r.studentName)+'" data-session="'+EC.esc(r.session)+'" data-class="'+EC.esc(r.className)+'"><i class="bx bx-calendar-edit"></i></button>';
         // Convert to admission (only for users who can admit students)
         if (active && CAN_ADMIT)
-            actions += '<a href="'+ADMISSION_URL+'?enquiryId='+r.enquiryId+'" class="btn btn-sm btn-icon btn-success reg-act-btn" title="Convert to Admission"><i class="bx bx-user-check"></i></a>';
+            actions += '<a href="'+ADMISSION_URL+'?enquiryId='+r.enquiryId+'" class="btn btn-sm btn-icon btn-success reg-act-btn'+(oldSession ? ' btn-convert-old' : '')+'" title="Convert to Admission" data-session="'+EC.esc(r.session)+'"><i class="bx bx-user-check"></i></a>';
         // Cancel (mark withdrawn / Not Interested — fee retained)
         if (active)
             actions += '<button class="btn btn-sm btn-icon btn-outline-danger reg-act-btn btn-cancel" title="Cancel registration" data-id="'+r.enquiryId+'" data-name="'+EC.esc(r.studentName)+'"><i class="bx bx-x"></i></button>';
@@ -697,6 +719,43 @@ $(function () {
         .always(function () { EC.buttonReset($btn); });
     });
 
+    /* ── Registration left in an earlier session (QA BUG-036) ── */
+    $('#regBody').on('click', '.btn-move', function(){
+        var $b = $(this), id = $b.data('id');
+        EC.confirm({
+            title:   'Move to ' + CURRENT_SESSION + '?',
+            name:    $b.data('name') + ' - ' + $b.data('class') + ', ' + $b.data('session'),
+            message: 'The registration moves to ' + $b.data('class') + ' in ' + CURRENT_SESSION +
+                     '. Its number, date and any registration fee paid stay with it.',
+            okText:  'Move to ' + CURRENT_SESSION,
+            danger:  false,
+            icon:    'bx-calendar-edit'
+        }).then(function (ok) {
+            if (!ok) return;
+            EC.showLoader();
+            $.ajax({ url:'/students/registration/MoveSession', type:'POST', contentType:'application/json',
+                headers:{ 'RequestVerificationToken':csrf },
+                data: JSON.stringify({ enquiryId:id, session:CURRENT_SESSION, className:'' }) })
+            .done(function(res){ ecToast(res.success ? 'success' : 'error', res.message || (res.success ? 'Moved.' : 'Failed.')); if (res.success) load(); })
+            .fail(function(xhr){ ecToast('error', EC.ajaxError(xhr, 'Move failed')); })
+            .always(function(){ EC.hideLoader(); });
+        });
+    });
+    // Admitting into a finished session is almost never meant: ask first.
+    $('#regBody').on('click', '.btn-convert-old', function(e){
+        e.preventDefault();
+        var href = $(this).attr('href'), ses = $(this).data('session');
+        EC.confirm({
+            title:   'Admit into ' + ses + '?',
+            message: 'This registration is still in ' + ses + ', an earlier session. The current session is ' + CURRENT_SESSION +
+                     '. Move the registration first to admit the child for this year.',
+            okText:  'Admit into ' + ses,
+            cancelText: 'Go back',
+            danger:  true,
+            icon:    'bx-error'
+        }).then(function (ok) { if (ok) window.location.href = href; });
+    });
+
     /* ── export current view to CSV ── */
     $('#btnExport').on('click', function(){
         if (!lastRows.length) { ecToast('info', 'Nothing to export.'); return; }
@@ -778,20 +837,52 @@ $(function () {
         $('#rwFeeAmountLabel').text('Select class & session');
         RW_FEE_AMOUNT = 0; rwUpdateNet();
         $('#rwRegDate').val(EC.today());
+        if (rwForm) rwForm.clear();
         new bootstrap.Modal(document.getElementById('registerWalkinModal')).show();
     });
 
     $('#rwClass, #rwSession').on('change', rwLoadFee);
     $('#rwFeePaid').on('change', function () { $('#rwPaymentRow').toggleClass('d-none', !$(this).is(':checked')); });
 
+    /* Every field is checked on Register, each bad one gets its own red line and
+       the first is focused (QA UX-04) -- the same EC.liveValidate the Add Enquiry
+       form uses. It used to stop at the first problem with one toast at a time.
+       The fee fields count only while "Collected now" is on. */
+    function rwCollecting() { return FEE_ENABLED && $('#rwFeePaid').is(':checked'); }
+    function rwPayable() {
+        var fee = RW_FEE_AMOUNT || 0, type = $('#rwDiscountType').val(), val = EC.numPos($('#rwDiscountValue').val());
+        var disc = (type && val > 0) ? (type === 'Percentage' ? Math.round(fee * val) / 100 : val) : 0;
+        return fee - disc;
+    }
+    var rwForm = EC.liveValidate('#registerWalkinModal .modal-body', {
+        StudentName: EC.rule.required('Student name'),
+        ClassName:   EC.rule.required('Class'),
+        Session:     EC.rule.required('Session'),
+        Mobile:      function (v) { return !v ? 'Mobile number is required.' : EC.rule.mobile(v); },
+        ParentEmail: EC.rule.email,
+        RegistrationDate: function (v) { return v && v > EC.today() ? 'Registration date cannot be in the future.' : ''; },
+        DiscountValue: function (v) {
+            if (!rwCollecting() || !$('#rwDiscountType').val() || !(EC.numPos(v) > 0)) return '';
+            if ($('#rwDiscountType').val() === 'Percentage' && EC.numPos(v) > 100) return 'A percentage cannot be more than 100.';
+            return rwPayable() < 0 ? 'Discount cannot be more than the fee of ' + EC.money(RW_FEE_AMOUNT) + '.' : '';
+        },
+        DiscountReason: function (v) {
+            return rwCollecting() && $('#rwDiscountType').val() && EC.numPos($('#rwDiscountValue').val()) > 0 && !v
+                ? 'Give a reason for the discount.' : '';
+        },
+        CollectAmount: function (v) {
+            return rwCollecting() && EC.numPos(v) > rwPayable() + 0.005 ? 'More than the ' + EC.money(rwPayable()) + ' payable.' : '';
+        },
+        PaymentReference: function (v) {
+            return rwCollecting() && $('#rwPaymentMode').val() === 'Cheque' && !v ? 'Enter the cheque number.' : '';
+        }
+    });
+
     $('#rwSubmit').on('click', function () {
+        if (!rwForm.isValid()) return;
         var name = $.trim($('#rwName').val());
         var cls  = $('#rwClass').val(), ses = $('#rwSession').val();
         var mob  = $.trim($('#rwMobile').val());
-        if (!name) { ecToast('error', 'Student name is required.'); return; }
-        if (!cls)  { ecToast('error', 'Please select a class.'); return; }
-        if (!ses)  { ecToast('error', 'Please select a session.'); return; }
-        if (!/^\d{10}$/.test(mob)) { ecToast('error', 'Enter a valid 10-digit mobile.'); return; }
 
         var $btn = $(this);
         EC.buttonBusy($btn, 'Registering…');

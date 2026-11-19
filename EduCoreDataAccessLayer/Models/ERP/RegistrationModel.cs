@@ -72,6 +72,14 @@ namespace EduCoreDataAccessLayer.Models.ERP
         public string? Reason    { get; set; }
     }
 
+    // Move a pending registration to another session (QA BUG-036).
+    public class MoveRegistrationRequest
+    {
+        public int     EnquiryId { get; set; }
+        public string? Session   { get; set; }
+        public string? ClassName { get; set; }   // blank = keep the current class name
+    }
+
     public class MarkRegistrationFeeRequest
     {
         public int     EnquiryId        { get; set; }

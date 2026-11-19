@@ -69,8 +69,40 @@ namespace educore.Areas.Students.Controllers
             // Admitting writes a student (students.manage, as on SaveAdmission). Without
             // it the Convert button is hidden instead of leading to a form that 403s.
             ViewBag.CanAdmit = await HasPermissionAttribute.UserHasAsync(this, "students.manage");
+            // The walk-in form shows only the money controls the server will accept
+            // (EnquiryController.MoneyPermissionRefusalAsync, QA BUG-011).
+            ViewBag.CanCollectFee = await HasPermissionAttribute.UserHasAsync(this, "fees.collect");
+            ViewBag.CanDiscount   = await HasPermissionAttribute.UserHasAsync(this, "fees.concession");
+            ViewBag.CanManage     = await HasPermissionAttribute.UserHasAsync(this, "registration.manage");
+
+            // A registration left in an earlier session after the rollover is offered
+            // "Move to <current>" instead of converting into last year (QA BUG-036).
+            var years = await _schoolSettingsService.GetAcademicYearsAsync(tenantId, schoolId, userId);
+            var current = years.FirstOrDefault(y => y.IsCurrent);
+            ViewBag.CurrentSession = current?.AcademicYearName ?? "";
+            ViewBag.OlderSessions = current == null ? new List<string>() : years
+                .Where(y => !y.IsCurrent && string.CompareOrdinal(y.StartDate ?? "", current.StartDate ?? "") < 0)
+                .Select(y => y.AcademicYearName).ToList();
 
             return View(model);
+        }
+
+        // ── POST: /students/registration/MoveSession (AJAX) ─────────
+        // Moves a pending registration to another session (normally the current one
+        // after a rollover). Number, date and every fee receipt stay with it: they hang
+        // off the enquiry, which is the same row. The class name is kept and must
+        // exist in the target session.
+        [HttpPost]
+        [HasPermission("registration.manage")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> MoveSession([FromBody] MoveRegistrationRequest req)
+        {
+            if (req == null || req.EnquiryId <= 0 || string.IsNullOrWhiteSpace(req.Session))
+                return Json(new { success = false, message = "Invalid request." });
+
+            var (success, message) = await _registrationService.MoveSessionAsync(
+                req.EnquiryId, req.Session.Trim(), NullIfEmpty(req.ClassName), TenantId(), SchoolId(), UserId());
+            return Json(new { success = success > 0, message });
         }
 
         // ── GET: /students/registration/GetRegistrationsData (AJAX) ─

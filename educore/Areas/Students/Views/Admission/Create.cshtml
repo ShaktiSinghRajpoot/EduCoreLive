@@ -92,6 +92,7 @@
                                         <option value="@s.Text" data-ayid="@s.Value" selected="@(s.Selected || s.Text == Convert.ToString(ViewBag.PreAcademicYear))">@s.Text</option>
                                     }
                                 </select>
+                                <div class="small mt-1 d-none" id="yearNotCurrentNote"></div>
                             </div>
                             <div class="col-12 col-sm-6 col-lg-3">
                                 <label class="form-label required">Class</label>
@@ -459,6 +460,28 @@ $(function () {
 
     var $year       = $('#academicYearSelect');
     var $class      = $('#classSelect');
+
+    /* Not the current session? Say so under the field (QA BUG-036). An earlier
+       session is a warning: a registration carried over from last year would admit
+       the child into a year that is over. The next session is only a note: early
+       admissions for next year are normal (owner decision #9). */
+    var CURRENT_SESSION = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Convert.ToString(ViewBag.CurrentSession) ?? ""));
+    var OLDER_SESSIONS  = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(ViewBag.OlderSessions as List<string> ?? new List<string>()));
+    function yearNote() {
+        var y = $year.val();
+        var $n = $('#yearNotCurrentNote');
+        if (!y || !CURRENT_SESSION || y === CURRENT_SESSION) { $n.addClass('d-none').empty(); return; }
+        if (OLDER_SESSIONS.indexOf(y) >= 0) {
+            $n.attr('class', 'small mt-1 text-danger').html('<i class="bx bx-error me-1"></i>' + EC.esc(y) +
+                ' is an earlier session, not the current one (' + EC.esc(CURRENT_SESSION) + '). The child will be admitted into ' +
+                EC.esc(y) + '. To admit for this year, pick ' + EC.esc(CURRENT_SESSION) + ' (or move the registration first).');
+        } else {
+            $n.attr('class', 'small mt-1 text-info').html('<i class="bx bx-info-circle me-1"></i>Admission for the next session, ' +
+                EC.esc(y) + ' (the current session is ' + EC.esc(CURRENT_SESSION) + ').');
+        }
+    }
+    $year.on('change', yearNote);
+    yearNote();
     var $section    = $('#adm_Section');
     // The Admission Date field was removed from this form; the database dates
     // an admission on the day it is entered. The fee preview still needs that

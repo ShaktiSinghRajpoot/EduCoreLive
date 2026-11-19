@@ -18,5 +18,8 @@ namespace EduCoreDataAccessLayer.Services.Contract.ERP
 
         Task<(int Success, string Message)> CancelRegistrationAsync(
             int enquiryId, string? reason, int tenantId, int schoolId, int actionUserId);
+
+        Task<(int Success, string Message)> MoveSessionAsync(
+            int enquiryId, string session, string? className, int tenantId, int schoolId, int actionUserId);
     }
 }

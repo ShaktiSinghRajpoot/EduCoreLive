@@ -206,6 +206,14 @@ $(function () {
         var body = { id: formId, name: $('#eName').val(), mobile: $('#eMobile').val(), purpose: $('#ePurpose').val(), toMeet: $('#eToMeet').val(),
                      persons: $('#ePersons').length ? +$('#ePersons').val() || 1 : null, idProof: $('#eIdProof').val(), note: $('#eNote').val(),
                      direction: $('#eDirection').val(), followUp: $('#eFollowUp').val() || null, student: $('#eStudent').val(), status: $('#eStatus').val() };
+        // Mobile is optional, but what is typed must be a number (QA BUG-021): a 10-digit
+        // mobile, as on Enquiry. A call may also come from a landline with STD code.
+        var $m = $('#eMobile');
+        if ($m.length) {
+            var bad = formOp === 'CallSave' ? EC.rule.phone($.trim($m.val())) : EC.rule.mobile($.trim($m.val()));
+            $m.toggleClass('is-invalid', !!bad);
+            if (bad) { ecToast('error', bad); $m.trigger('focus'); return; }
+        }
         var $b = $(this); EC.buttonBusy($b);
         post(formOp, body)
             .done(function (r) { ecToast(r.success ? 'success' : 'error', r.message); if (r.success) { bootstrap.Modal.getInstance(document.getElementById('foModal')).hide(); load(); loadSummary(); } })
